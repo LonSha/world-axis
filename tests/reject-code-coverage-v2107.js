@@ -170,7 +170,12 @@ function runAll(A) {
     && D.summary.indexOf('%') >= 0 && D.summary.indexOf('恒等式平') >= 0,
     'B6 summary 与 coverage 同源：' + D.summary);
   A(D.missing.length === 0 && D.unexpected.length === 0,
-    'B7 见证面零缺口（missing ' + D.missing.length + ' / unexpected ' + D.unexpected.length + '）');
+    'B7 见证面零缺口（missing ' + D.missing.length + ' / unexpected ' + D.unexpected.length + '）'
+    // v2.257.0（回归修复）：缺口**必须点名**。
+    //   病灶：消息只报条数（实测全量里 `missing 1`），读的人得自己在几万行日志里找出是哪一条；
+    //   而本仓纪律是「每条问题都要带 pattern 与 evidence」—— 只给计数的红行没有 evidence。
+    + (D.missing.length ? '——缺：' + D.missing.slice(0, 8).join(',') : '')
+    + (D.unexpected.length ? '——多：' + D.unexpected.slice(0, 8).join(',') : ''));
   A(D.declarations.declared === dec.declared && D.declarations.occurrences === dec.occurrences,
     'B7b discover 里的声明面与 declarations() 同值（同一真源，不重算）');
   // 分母必须与门禁扫描面同源

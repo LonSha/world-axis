@@ -67,9 +67,17 @@ const EXPORTS_ECO = ['economySpec', 'money', 'declaredBase', 'recipeOf', 'recipe
 const EXPORTS_FAT = ['judgeView'];
 const EXPORTS_THM = ['THEME_EXT'];
 // 出口面契约里本轮涉及的四段（冻结串是逐字锁：改导出面就必须显式确认，C1 双向咬）
+//
+// ⚠ 全量回归体检批次：recipe / economy 两段此前**落后于 run.js 的 FROZEN2800**。
+//   v2.231.0 那批给 run.js 冻结串补了 recipe 的 economySpec/judgeSpec/list/setSettings/stat
+//   与 economy 的 RECIPES/declaredBase/recipeOf/stat，而本文件那份手抄副本没同批跟进 ——
+//   于是 C2 每趟都报「不合：recipe,economy」。两条通道本来就该**同一份真源**：这里手抄一份
+//   是为了让「run.js 冻结串被悄悄改了」这件事有第二个读者（若本文件直接从 run.js 派生期望值，
+//   C2 就退化成同义反复、判据自我指涉）。所以修法不是取消双份，而是**把这次对齐显式写下来**：
+//   下面两段逐字取自当前 FROZEN2800，等于一次人工确认过的同步。
 const CONTRACT_SEG = {
-  recipe: 'recipe:catalogView extendedThemes getSettings policyClashes preview satisfied seed staleness statView themeCatalog themeClashes',
-  economy: 'economy:buildBlock buy craft economySpec getSettings markRoute money price recipeKeys route routeView setSettings shelf ship statView stock tick view',
+  recipe: 'recipe:catalogView economySpec extendedThemes getSettings judgeSpec list policyClashes preview satisfied seed staleness statView themeCatalog themeClashes',
+  economy: 'economy:RECIPES buildBlock buy craft declaredBase economySpec getSettings markRoute money price recipeKeys recipeOf route routeView setSettings shelf ship statView stock tick view',
   fate: 'fate:bigrams check deck dedupe evalArith evalFormula getSettings isArithmeticSyntax jaccard judgeView oversample parse reset resolveCount resolveDC roll setSettings stat stripHeader titleGate view',
   theme: 'theme:THEMES THEME_EXT activeModules apply contrast list preview separation statView'
 };

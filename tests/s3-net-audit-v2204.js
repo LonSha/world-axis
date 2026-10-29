@@ -76,7 +76,7 @@ function stripComments(src) {
  */
 const ANCHOR = {
   probes: "const PROBES = ['fetch(",
-  whitelistForm: "forms: ['fetch(']",
+  whitelistForm: "{ forms: ['fetch('], why: '唯一出站出口",
   smokeMember: "{ rel: 'tests/module-registry-gate.js', why:",
   fastGates: 'const FAST_GATES = [',
   smokeSet: 'const SMOKE_SET = ['
@@ -154,9 +154,22 @@ function runAll(a) {
       'v2204/B1b: 扫描面 === productFiles() 长度（' + r.files + ' vs ' + pf.length + '）—— 两处各算一份必然漂移');
     a(r.sites.length >= r.minSites && r.minSites >= 2,
       'v2204/B1c: 出站点 ' + r.sites.length + ' 处、下限 ' + r.minSites + '（零命中不许算通过）');
-    a(r.sites.every(function (s) { return s.rel === 'core/api-router.js'; }),
-      'v2204/B1d: 全部出站点都落在唯一出口 core/api-router.js（实 '
-      + j(r.sites.map(function (s) { return s.rel; }).filter(function (v, i, x) { return x.indexOf(v) === i; })) + '）');
+    // v2.252.0 起，产品里**有两类**外呼点，性质不同，判据必须分开写：
+    //   ① 内容出口 core/api-router.js —— 会把聊天内容发出去（LLM 通道 + 模型列表）；
+    //   ② 加载器 index.js —— 只取**自家扩展目录**的静态文件（probeUrlForms / tauriHost /
+    //      prefetch），前缀 WA.baseUrl、GET + no-store、不带 body 与凭据。
+    //   旧判据写的是「全部出站点都落在 api-router」，它把 ② 一并否掉了 —— 而 ② 当时就在仓库里、
+    //   也已在 tools/net-audit.js 的白名单里逐条登记过 why。于是这条判据与产品自己的契约
+    //   **互相矛盾**：白名单说「这两处都合规」，B1d 说「只许有一处」。修法不是放宽，而是
+    //   把话说到点上 —— 内容出口**唯一**，其余出站点必须逐条在白名单上（这正是「无计划外外呼」）。
+    const uniqRels = r.sites.map(function (s) { return s.rel; })
+      .filter(function (v, i, x) { return x.indexOf(v) === i; });
+    a(uniqRels.indexOf('core/api-router.js') >= 0,
+      'v2204/B1d: 内容出口 core/api-router.js 仍在出站集里（实 ' + j(uniqRels) + '）');
+    const offList = r.sites.filter(function (s) { return !r.whitelist[s.rel]; });
+    a(offList.length === 0,
+      'v2204/B1d2: 每个出站点都在白名单上（计划外 ' + j(offList.map(function (s) { return s.rel; })) + '）'
+      + ' —— 白名单是**唯一**的放行凭据；api-router 不再是「唯一出站点」，而是「唯一内容出口」');
     a(r.hostImports.length === 1 && r.hostImports[0].rel === 'engines/worldbook.js'
       && r.hostImports[0].spec === '/scripts/world-info.js',
       'v2204/B1e: 宿主同源 import 恰 1 处且指向 SillyTavern 自己的模块（实 ' + j(r.hostImports) + '）'
@@ -220,7 +233,7 @@ function runAll(a) {
   })();
   // N1：白名单形态被改窄 ⇒ 现场外呼点变「形态不允许」（判据不是白名单的复读机）
   (function () {
-    const b = breakAnchor(NET, ANCHOR.whitelistForm, "forms: ['XMLHttpRequest']");
+    const b = breakAnchor(NET, ANCHOR.whitelistForm, "{ forms: ['XMLHttpRequest'], why: '唯一出站出口");
     if (!b.ok) { a(false, 'v2204/N1a: 白名单形态锚点恰中 1 次（前置失效，实 ' + b.n + '）'); return; }
     const broken = loadAsModule(NET_REL, b.text);
     const bad = broken.audit({});

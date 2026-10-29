@@ -70,7 +70,16 @@ function scene(WA) {
 }
 /** 造一笔「已结算」的行动回执（不经 agency，直调 act）。 */
 function receipt(WA, gid, kind) {
-  const ad = rc(WA.act.add('匠人', { kind: kind || 'work', goalId: gid, duration: 1000 }));
+  // v2.257.0（回归修复）：备料用的行动种类**必须是能自结算的那一种**。
+  //   病灶（全量回归实测，6 条 A 段判据连红）：本函数原用 `kind:'work'` 造「已结算回执」，
+  //   而 v2.231.0（OPT-2）之后 `work` 的确认器是**委托面**（engines/act.js 626-640 行）：
+  //   没挂钩委托 ⇒ 到期恒落 running「工作已做，待业务侧交付确认」，advance 返回
+  //   `reason:'in-progress' / still:1 / awaiting:1`，`acts.res` 一条都不写。
+  //   于是 A2b/A2/A2c/A3/A5a/A5 的**前提**（存在一笔已结算回执）不成立，六条判据红的
+  //   不是被测的 agency.processReceipts，而是备料自己用错了种类。
+  //   口径：改成内置确认器能自结算的 `wait`（resolve 恒 done/evidence:'self'），
+  //   本段要测的是「回执消化 / 整链原子」，不是 work 的委托确认链（那条另有专锁）。
+  const ad = rc(WA.act.add('匠人', { kind: kind || 'wait', goalId: gid, duration: 1000 }));
   if (!ad || ad.ok !== true) return { ok: false, why: 'add' };
   const am = rc(WA.act.admit(ad.id, 0, {}));
   if (!am || am.ok !== true) return { ok: false, why: 'admit' };

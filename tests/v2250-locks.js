@@ -30,73 +30,72 @@
 //   真 store 落盘会把本锁变成有副作用的慢用例；桩保留「抛错即不提交」这一条真语义，
 //   骨架物化与容量（G18/registryParity）由那几把专锁负责，不在这里重复。
 'use strict';
-
-global.window = global;
-const WorldAxis = global.WorldAxis = global.WorldAxis || {};
-
-WorldAxis.log = function () {};
-WorldAxis.clock = { now: function () { return 1700000000000; }, wallNow: function () { return 1700000000000; } };
-WorldAxis.inputGuard = { text: function (v, max) { return String(v == null ? '' : v).trim().slice(0, max); } };
-WorldAxis.evict = {
-  array: function (arr, site, cap) {
-    if (!Array.isArray(arr)) return { ok: false, reason: 'not-array' };
-    if (typeof cap !== 'number') return { ok: false, reason: 'bad-cap' };
-    if (arr.length > cap) arr.splice(0, arr.length - cap);
-    return { ok: true, dropped: 0 };
-  },
-  object: function (obj, site, ordered, cap) {
-    if (typeof cap !== 'number') return { ok: false, reason: 'bad-cap', dropped: 0 };
-    const keys = Array.isArray(ordered) ? ordered.slice() : Object.keys(obj);
-    const excess = Object.keys(obj).length - cap;
-    if (excess <= 0) return { ok: true, dropped: 0 };
-    keys.slice(0, excess).forEach(function (k) { delete obj[k]; });
-    return { ok: true, dropped: excess };
-  },
-  note: function () { return { ok: true }; }
-};
-
+// ── v2.257.0（收口②）：**装配下沉到运行期** ─────────────────────────────
+//   治的病（全量回归本锁 8 条红、独立跑 98/0 全绿 —— 「靠顺序活着」的第二次现形）：
+//   第一版修法（加载前后 delete 引擎缓存）只解决了「引擎绑在旧宿主」，没解决
+//   **本锁自己也是被缓存的**。全量里本文件先被 negative-control-audit 的 `require(abs)`
+//   装载过一次（那在很靠前的节），装配与引擎绑定就在**那一刻**定了下来；其后产品面被重装
+//   （fresh / 再一次 LOAD），`WorldAxis.genTiming` 换成了**新对象**，而本锁的 `GT` 仍指着旧对象
+//   —— 现场实测：`GT === WorldAxis.genTiming : false`（window/宿主身份全 true，唯独引擎不同）。
+//   runLock 再 require 时命中模块缓存 ⇒ 拿到的是那份旧实例 ⇒ 引擎往旧对象写、断言读本锁的
+//   新 store 桩 ⇒ 「shouldSend 通过、lastSentAt 读不到」「pending 空 ⇒ pending[0].kind 抛错」。
+//   修法：把「桩装配 + 引擎重绑 + GT/OSM/MG/OG 取值」全部下沉进 `mount()`，
+//   每次 `runAll` / `runNegative` 开头都重新 mount。加载期**不再**产生任何绑定，
+//   于是本锁的结论与「谁在什么时候 require 过这个文件」彻底解耦。
+//   ⚠ 不用「加载时装配 + 运行时比对」的折中：那等于把「这一次装的是不是当前那套」变成
+//     又一条需要维护的判据；直接重新装配，装配本身没有副作用（全是内存桩）。
 let store = {};
-WorldAxis.store = {
-  get: function () { return store; },
-  // 事务语义与真 store 同口径：回调抛错 ⇒ 草稿丢弃（半写不留）
-  transact: function (fn, site) {
-    const draft = JSON.parse(JSON.stringify(store));
-    fn(draft);
-    store = draft;
-    return { ok: true, site: site };
-  }
-};
-
 const SETTINGS = {};
-WorldAxis.settingsBus = {
-  read: function (reg) { return Object.assign({}, reg.def, SETTINGS[reg.key] || {}); },
-  normalize: function (reg, val) { return Object.assign({}, reg.def, val || {}); },
-  saveOrThrow: function (reg, val) { SETTINGS[reg.key] = val; return val; }
-};
+let GT, OSM, MG, OG;
+const STUBBED = ['gen-timing', 'one-shot-mod', 'mood-glide', 'output-guard'];
 
-// v2.257.0：**必须清掉引擎的 require 缓存再加载**。
-//   治的病（全量回归里本锁 8 条红，独立跑 98/0 全绿 —— 「靠顺序活着」的典型）：
-//   引擎模块在**加载那一刻**就把宿主钉进了闭包（`const WA = window.WorldAxis = window.WorldAxis || {}`）。
-//   全量里前面的用例可能已经把引擎加载过一次、且当时那个 WorldAxis 是**另一个对象**；
-//   本锁再 require 时命中缓存 ⇒ 拿到的引擎仍绑在旧宿主，而本锁的 store 桩装在本锁看到的
-//   host 上。于是引擎读写旧宿主的 store，本锁断言读新宿主的 store ⇒
-//   「shouldSend 通过、但 lastSentAt/ledger 读不到」「pending 为空 ⇒ pending[0].kind 抛错」。
-//   独立跑时宿主是全新的、缓存是空的，引擎正好绑到本锁宿主 ⇒ 必然绿。
-//   修法：加载前 delete 掉这四个模块的缓存条目，让它们按本锁的 WorldAxis 重新绑定。
-//   （只清引擎条目，不动别的模块；本锁自带全套桩，重绑不会碰到真实落盘。）
-['gen-timing', 'one-shot-mod', 'mood-glide', 'output-guard'].forEach(function (n) {
-  const p = require.resolve('../engines/' + n + '.js');
-  delete require.cache[p];
-});
-require('../engines/gen-timing.js');
-require('../engines/one-shot-mod.js');
-require('../engines/mood-glide.js');
-require('../engines/output-guard.js');
-
-const GT = WorldAxis.genTiming;
-const OSM = WorldAxis.oneShotMod;
-const MG = WorldAxis.moodGlide;
-const OG = WorldAxis.outputGuard;
+function mount() {
+  global.window = global;
+  const WA = global.WorldAxis = global.WorldAxis || {};
+  // 四件宿主能力：日志静音、固定时钟、输入边界、挤出侧（per-call 站点靠它签名）。
+  WA.log = function () {};
+  WA.clock = { now: function () { return 1700000000000; }, wallNow: function () { return 1700000000000; } };
+  WA.inputGuard = { text: function (v, max) { return String(v == null ? '' : v).trim().slice(0, max); } };
+  WA.evict = {
+    array: function (arr, site, cap) {
+      if (!Array.isArray(arr)) return { ok: false, reason: 'not-array' };
+      if (typeof cap !== 'number') return { ok: false, reason: 'bad-cap' };
+      if (arr.length > cap) arr.splice(0, arr.length - cap);
+      return { ok: true, dropped: 0 };
+    },
+    object: function (obj, site, ordered, cap) {
+      if (typeof cap !== 'number') return { ok: false, reason: 'bad-cap', dropped: 0 };
+      const keys = Array.isArray(ordered) ? ordered.slice() : Object.keys(obj);
+      const excess = Object.keys(obj).length - cap;
+      if (excess <= 0) return { ok: true, dropped: 0 };
+      keys.slice(0, excess).forEach(function (k) { delete obj[k]; });
+      return { ok: true, dropped: excess };
+    },
+    note: function () { return { ok: true }; }
+  };
+  store = {};
+  WA.store = {
+    get: function () { return store; },
+    // 事务语义与真 store 同口径：回调抛错 ⇒ 草稿丢弃（半写不留）
+    transact: function (fn, site) {
+      const draft = JSON.parse(JSON.stringify(store));
+      fn(draft);
+      store = draft;
+      return { ok: true, site: site };
+    }
+  };
+  Object.keys(SETTINGS).forEach(function (k) { delete SETTINGS[k]; });
+  WA.settingsBus = {
+    read: function (reg) { return Object.assign({}, reg.def, SETTINGS[reg.key] || {}); },
+    normalize: function (reg, val) { return Object.assign({}, reg.def, val || {}); },
+    saveOrThrow: function (reg, val) { SETTINGS[reg.key] = val; return val; }
+  };
+  // 引擎在**加载那一刻**就把宿主钉进闭包（`const WA = window.WorldAxis = window.WorldAxis || {}`），
+  //   所以每次 mount 都要清缓存重装，让它们绑到这一次的 WorldAxis（而不是上一次的）。
+  STUBBED.forEach(function (n) { delete require.cache[require.resolve('../engines/' + n + '.js')]; });
+  STUBBED.forEach(function (n) { require('../engines/' + n + '.js'); });
+  GT = WA.genTiming; OSM = WA.oneShotMod; MG = WA.moodGlide; OG = WA.outputGuard;
+}
 
 function seed() {
   store = {
@@ -414,6 +413,7 @@ function ogAll(a) {
 }
 
 function runAll(a) {
+  mount();
   gtAll(a);
   osmAll(a);
   mgAll(a);
@@ -424,6 +424,7 @@ function runAll(a) {
 }
 
 function runNegative(a) {
+  mount();
   // N0 两向自证：同一正面用例在开/关两种状态下必须换结论（判据不是恒真）
   reset(); seed();
   on(GT, { quietStart: '00:00', quietEnd: '00:01', minIntervalHours: 0, lambdaRate: 5, utilityThreshold: 0.01, minInfoGain: 0.01 });

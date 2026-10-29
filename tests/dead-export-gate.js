@@ -476,7 +476,15 @@ function main() {
   const argv = process.argv.slice(2);
   const asJson = argv.indexOf('--json') >= 0;
   const doUpdate = argv.indexOf('--update') >= 0;
-  const result = inventory.collect();
+  // v2.257.0（回归修复）：同 inventory.js —— `--json` 期间静音 collect() 的装载日志。
+  //   病灶逐字同型：verdict 之前先被 25 行 `[WorldAxis] … 已加载` 占住 stdout，
+  //   消费方 `JSON.parse(String(rr.stdout))` 恒抛 ⇒ tests/run.js 的 v2.29.0 三条端到端判据
+  //   （基线 / 铁证一锁 / 铁证一对照）在**任何输入**下都红，与它们要守的 `bridge.snapshot` 无关。
+  const __origLog = console.log, __origInfo = console.info;
+  if (asJson) { console.log = function () {}; console.info = function () {}; }
+  let result;
+  try { result = inventory.collect(); }
+  finally { if (asJson) { console.log = __origLog; console.info = __origInfo; } }
   if (doUpdate) {
     const before = loadLedger();
     const next = refresh(result, before, versionOf());

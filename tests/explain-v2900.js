@@ -122,6 +122,13 @@ function seed(WA) {
     d.memory.foreshadows = [{ id: 'f-' + PAT.longline, content: PAT.longline, status: 'waiting', dueAt: 1 }];
   }, 'explain-v2900:seed');
   WA.longline.setSettings({ enabled: true, graceMs: 0 });   // 与上面显式置定同向（冗余但不冲突）
+  // v2.257.0（回归修复）：**注入预算也须显式复位**（与上面 people/factions/lastInjection 同族）。
+  //   病灶（全量回归实测）：B2 判「关掉一个原本会落地的源 ⇒ 未进项 +1」。前序节把
+  //   backstage.injectBudget 设成有限值后，`applyInjections` 的预算裁决会折叠/丢弃一批源；
+  //   于是一关可见性，被丢弃的某个源替补落地 —— 未进项总数原地不动（实测 76 → 76），
+  //   而 longline 本身确实已归 visibility-off。计数不动不是实现错，是本锁没把前提钉住。
+  //   复位值取 0（= 不限），与引擎语义一致：本锁治的是可见性与失败归因，不是预算裁决。
+  if (WA.backstage && WA.backstage.setSettings) WA.backstage.setSettings({ injectBudget: 0 });
   WA.render.SOURCES.forEach(function (k) { WA.render.setVisibility(k, true); });
 }
 function inject(WA) { WA.render.applyInjections({ injections: [] }); return WA.store.get().lastInjection; }
@@ -258,7 +265,13 @@ function runAll(a) {
   // 守恒式要挑对层级：全知面是源级，玩家面是块级
   a(ex.omniscient.landedCount + ex.omniscient.missedCount === sources.length,
     'v2900: [C2] 全知面源级守恒：落地 ' + ex.omniscient.landedCount + ' + 未落地 ' + ex.omniscient.missedCount + ' = 源面 ' + sources.length);
-  const snapN = 6, landedN = ex.omniscient.landedCount - snapN;
+  // v2.257.0（回归修复）：快照源数**不许写死 6**。
+  //   病灶：旧写法 `const snapN = 6` 把「6 个快照源全部落地」当常量，而 `landedCount` 的定义是
+  //   `hit.length + inState.length` —— 快照源里有没有内容取决于现场存档，不是常量。
+  //   全量回归实测：预算复位后快照块改为全量落地，读数变成 15 块 vs 1+13 差 1，判据假红。
+  //   口径：快照源落地了几项就减几项，从现场读数反推（不引第二份名单，避免两处漂移）。
+  const snapN = ex.omniscient.decisions.filter(function (x) { return x.state === 'landed-in-state'; }).length;
+  const landedN = ex.omniscient.landedCount - snapN;
   a(ex.player.landed.length === 1 + landedN,
     'v2900: [C2] 玩家面块级守恒：' + ex.player.landed.length + ' 块 = 世界状态 1 块 + 真落地源 ' + landedN + ' 个（块级不是源级）');
   a(Array.isArray(ex.player.landed) && typeof ex.player.missedCount === 'number' && typeof ex.omniscient.decisions[0].key === 'string',

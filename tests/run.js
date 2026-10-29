@@ -20349,10 +20349,21 @@ assert(r2900.dead.length === 1175 && r2900.uiDead.length === 5 && r2900.dataOnly
       'v2203: 默认值可由 slow-sections 的同一公式复算（合计 1487.44s 得 '
       + (typeof slowRT.suggestTimeoutMs === 'function' ? slowRT.suggestTimeoutMs(1487.44) : 'n/a')
       + '，宣称 ' + declaredRT + '）—— 口径与工具一致，重算实测即须同批改默认值');
-    const fuse = gt.findSiteBlock(runSrc, gt.ARMED_SITES[3].anchor);
+    // v2.257.0（回归修复）：**按形态定位，不许按数组下标定位**。
+    //   病灶（全量回归实测）：判据写 `gt.ARMED_SITES[3]`，而本判据要守的是「管道形态」那个调用点。
+    //   现场事实：ARMED_SITES 头部后来插入了 script-body-lock / negative-probe-broken /
+    //   dead-export-json 三条 ⇒ 下标 3 早已漂到 export-contract（纯 spawn，自身就没有 shell 管道），
+    //   于是读数恒为「找不到 240 tar 保险丝」—— 判据红的是它自己选错了对象，不是源码缺保险丝
+    //   （实测：tar-copy 站点 `timeout -k 5 240 tar` 逐字在场）。
+    //   口径：形态是语义，下标是排版。按 mode 找，且**找不到就红**（别把「查不到」当成「没问题」）。
+    const pipeSites = gt.ARMED_SITES.filter(function (s) { return s.mode === 'spawn+shell'; });
+    assert(pipeSites.length >= 1, 'v2105: 武装表里恰有管道形态站点（实 ' + pipeSites.length + ' 条）——找不到就无从核对');
+    const pipeSite = pipeSites[0];
+    const fuse = gt.findSiteBlock(runSrc, pipeSite.anchor);
+    assert(!!fuse, 'v2105: 管道形态站点（key=' + pipeSite.key + '）的源码块可按锚点定位');
     assert(!!fuse && fuse.text.indexOf(String(d.limits.shellMs) + ' tar') > 0 && fuse.text.indexOf('-k ') > 0,
       'v2105: 管道形态的调用点另有 `timeout -k <grace> ' + d.limits.shellMs + ' tar` 保险丝'
-      + '（缺 -k 只杀写端、读端照挂）');
+      + '（缺 -k 只杀写端、读端照挂；站点 key=' + pipeSite.key + '）');
 
     // 专锁（A 静态 / B 运行时 / C 不变式 / N 负控制）
     await runLock('./gate-timeout-v2105.js');
@@ -20437,7 +20448,12 @@ assert(r2900.dead.length === 1175 && r2900.uiDead.length === 5 && r2900.dataOnly
       'v2107: 覆盖率分母 === reject-code-gate 扫描面（'
       + Object.keys(require('./reject-code-gate.js').scan().hits).length + ' === ' + c.total + '）');
     assert(d.missing.length === 0 && d.unexpected.length === 0,
-      'v2107: 见证面零缺口（missing ' + d.missing.length + ' / unexpected ' + d.unexpected.length + '）');
+      'v2107: 见证面零缺口（missing ' + d.missing.length + ' / unexpected ' + d.unexpected.length + '）'
+      // v2.257.0（回归修复）：缺口**必须点名**（与专锁 B7 同口径）。
+      //   全量里这条红只报 `missing 1`，得自己翻几万行日志找是哪一条；本仓纪律是
+      //   「每条问题都要带 pattern 与 evidence」—— 只给计数的红行没有 evidence。
+      + (d.missing.length ? '——缺：' + d.missing.slice(0, 8).join(',') : '')
+      + (d.unexpected.length ? '——多：' + d.unexpected.slice(0, 8).join(',') : ''));
     assert(Object.keys(rcc.DEFERRED).length === 0 && d.deferred && Object.keys(d.deferred).length === 0,
       'v2107: 延后登记表为空 —— 未登记的跑不出来一律算真缺口（默认一条都不许延后）');
     console.log('    · 备注：重复声明是**读数**不是缺陷（字典语义本就如此），但它必须可见；'
@@ -21524,8 +21540,17 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       && panelSrc2149.indexOf('function stageOut(target, html)') > 0,
       'v2149: 面板侧 applyView 调用点恰 1 处且住在 stageOut 出口内（不散落、不空转）');
     const cssSrc2149 = fs.readFileSync(path.join(BASE, 'style.css'), 'utf8');
-    assert(cssSrc2149.indexOf('.wa-viewsel{') > 0 && cssSrc2149.indexOf('.wa-view{') > 0,
-      'v2149: 视角选择器与视角容器样式在场（渲染面）');
+    // v2.257.0（回归修复）：**选择器判据不许把排版当语义**。
+    //   病灶（全量回归实测）：判据写 `indexOf('.wa-viewsel{')`（左花括号紧贴），而 8ab817b
+    //   「深度重构面板结构」把 style.css 整体按 `选择器 {` 的空格形态重排 ⇒ 字面串 0 命中，
+    //   判据红成「样式不在场」，而样式逐字都在（实测 `.wa-viewsel {` 在第 217 行）。
+    //   口径：钉的是「这两族选择器的样式块在场」，不是「左花括号前有没有空格」。
+    //   故改成转义点 + 允许可选空白 + 左花括号，并**要求至少一条规则体**（避免只写个选择器名）。
+    const re2149 = function (sel) {
+      return new RegExp('(^|[\\s,{}])' + sel.replace('.', '\\.') + '\\s*\\{[^}]*\\}', 'm').test(cssSrc2149);
+    };
+    assert(re2149('.wa-viewsel') && re2149('.wa-view'),
+      'v2149: 视角选择器与视角容器样式在场（渲染面；按选择器+规则体判定，不按左花括号的空格排版）');
     const injSrc2149 = fs.readFileSync(path.join(BASE, 'render/inject.js'), 'utf8');
     assert(injSrc2149.indexOf("sediment: 'worldaxis_sediment_settings_v1'") > 0
       && injSrc2149.indexOf('WA.sediment.buildBlock()') > 0,

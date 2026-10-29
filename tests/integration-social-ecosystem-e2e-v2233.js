@@ -31,17 +31,59 @@ const BASE = path.join(__dirname, '..');
 const KNOWLEDGE_PATH = path.join(BASE, 'engines/knowledge-practice.js');
 const ANCHOR = 'if (envClash.length > 0) {';
 
-function runSuite() {
+function runSuite(a) {
   require(path.join(BASE, 'tests/mock.js'));
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
   const env = gate.fresh({});
   const WA = env.WA;
   WA.store.init();
+  // v2.257.0（回归修复）：**造景域自清场**（本文件是全仓唯一验「九系统共享同一 store 的
+  //   因果链」的地方，而这条链的每一步都从「空账本 + 自己种的现场」起算）。
+  //   病灶（全量回归实测 4 条红 / 独立跑全绿）：`fresh()` 只重装产品模块，**不清 store 内容**；
+  //   前序节留下的同名行会直接改写本文件的起点。实测有两处具体形态：
+  //     · `careChain.assessCaregiverAbsence('karl')` 的查找序是 `people['karl'] || people['p_karl']`
+  //       （裸 id 优先）—— 前序节留过一条 `people['karl']` 就把本文件种的 `p_karl` 遮住了，
+  //       于是「前提三字段已落库」为真而「在途后判缺席」为假；
+  //     · 账本类断言（`breaches.length === 1`、`pools[0].totalPaidOut === 100`）读的是**累计值**，
+  //       前序节留一条旧行，这几条就恒假。
+  //   取向：**在测试侧清场**，不在引擎里给遮蔽加特例 —— 前者的错是「测试没给自己准备现场」，
+  //   后者会把一个测试卫生问题固化成产品语义（裸 id 优先本身是有意的宽松匹配）。
+  //   清场范围只限本文件要用的九个 bucket，别的一概不碰（不动别人的现场）。
+  const __E2E_BUCKETS = ['riskPooling', 'envCapacity', 'roleConflict', 'publicAgenda',
+    'commonsGovernance', 'knowledgePractice', 'institutionalInertia', 'careChain', 'coop'];
+  WA.store.transact(function (d) {
+    __E2E_BUCKETS.forEach(function (k) { delete d[k]; });
+    // people 必须**复位成 map 形状**（不是「留着现状再删两个键」）。
+    //   病灶（实测 /home/user/probes/p_e2e9.js，前置 exp39-care-chain-resilience-v2233.js）：
+    //   exp39 为验「数组形状也吃」把 draft.people 整体换成**数组**，收尾复原也复原成数组
+    //   （它自己后续断言就按数组写，对它是正确的）。而真实 store 的骨架是 `people: {}`
+    //   （map，见 core/store.js 默认世界状态）。于是本文件的
+    //   `d.people['p_karl'] = {...}` 在数组上是一条**被静默丢弃**的写 —— 数组的自定义字符串键
+    //   JSON 序列化后不留，transact 一次往返就没了；`delete d.people.karl` 同理是空操作。
+    //   结果：前提三条（读的是 map 形式的 p_karl 还是别的？实测见下）与结论分叉，
+    //   而引擎按 map 查找拿不到人 ⇒ 在途判不出缺席。
+    //   修法：清场时把 people 复位成本仓骨架形状的**空 map**，让本文件从零开始种。
+    //   注意别写成 `typeof d.people === 'object'` 判一下就算 —— 数组也是 object，
+    //   那正是这条坑的形状（本仓点名的「类型判据比形状判据松」）。
+    d.people = {};
+    return true;
+  }, 'e2e:clean-slate');
   WA.actionDesk.setSettings({ enabled: true });
 
   let tested = 0;
+  // v2.257.0（回归修复）：**断言必须可注入**（与本仓 lock-assert 契约同规）。
+  //   病灶（全量回归实测）：这里写 `assert(cond, desc)` 直接调模块自持的 node assert。
+  //   node assert 失败是**抛异常**，而本文件由 run.js 的 `runLock` 挂载：抛出会被
+  //   runLock 的 catch 记成一条「[锁 … 的 runAll 抛出] <最后一个断言名>」。
+  //   实测后果有两条，都不轻：
+  //     ① 红行变成「锁抛出」，读起来像文件坏了，而真相是**某一条断言为假**；
+  //     ② 该断言之后的所有断言**一条都没跑**（抛出即中断）—— 于是「九系统因果链」
+  //        只验到断点为止，剩下的全成了「未测」，而日志里看不出这个断点在哪。
+  //   口径：注入默认走 lock-assert 的适配器（失败记一条、继续跑）；直跑入口不带参时
+  //   才退回 node assert（保留「直跑时断言失败应当让进程非零退出」这条原有语义）。
+  const assertFn = (typeof a === 'function') ? a : assert;
   function t(desc, cond) {
-    assert(cond, desc);
+    assertFn(cond, desc);
     tested++;
   }
 
@@ -302,8 +344,19 @@ function runSuite() {
   t('阶段7 · 衰退不抹除历史链（仍是 2 条记录）', charterDormant.history.length === 2);
 
   // ── 阶段 8：EXV4-2 / EXV4-3 在途离乡 → 照护缺席 → 转介 ───────────
+  // v2.257.0（回归修复）：**造景要自己清场** —— 先删同名残留键再种。
+  //   病灶（全量回归实测 4 条红、独立跑 50/0 全绿）：
+  //   `careChain.assessCaregiverAbsence('karl')` 的查找序是
+  //   `people['karl'] || people['p_karl']`（裸 id 优先）。前序节在 store 里留下过一条
+  //   `people['karl']`（无在途字段）时，它就把本测试种的 `p_karl` **遮蔽**了 ——
+  //   于是「前提：在途三字段真的落进 store」为真（读的是 p_karl），而「在途后立即判定缺席」
+  //   为假（引擎读的是残留的 karl）。连带把 breaches 计数与阶段9 的池子读数一起带偏，
+  //   因为它们是同一份脏 store 的其它面。
+  //   修法取向：本文件验的是「九系统共享同一 store 的因果链」，它自己必须先有一份
+  //   **自己造的**现场；不在引擎里给这个遮蔽加特例（那是把测试的卫生问题推给产品）。
   WA.store.transact(draft => {
     draft.people = draft.people || {};
+    delete draft.people['karl'];
     draft.people['p_karl'] = { id: 'p_karl', name: 'karl', location: 'valley_meadow' };
     return true;
   }, 'e2e:seed-karl');
@@ -329,8 +382,22 @@ function runSuite() {
     return true;
   }, 'e2e:karl-in-transit');
 
+  // v2.257.0（回归修复）：**先把「前提真的落地了」验一遍，再判结论**。
+  //   病灶（全量回归实测）：本条在全量里红成「锁抛出」，而独立跑全绿 —— 读的人无从判断
+  //   到底是「引擎没认出在途」还是「前一拍根本没写进去」。本仓纪律：判据的输入面必须与
+  //   结论面同宽。所以在读 assesCaregiverAbsence 之前，先把这份输入从 store 读回来对一遍：
+  //   若这三条不成立，红行立刻指向前置写口，而不是指向缺席判定。
+  const peopleNow = WA.store.get().people || {};
+  const karlNow = peopleNow['p_karl'] || {};
+  t('阶段8 · 前提：karl 的在途三字段真的落进 store',
+    karlNow.traveling === true && karlNow.status === 'transit' && karlNow.transitTo === 'market_town');
+  // 查找序是「裸 id 优先」，所以「没有同名别人占着这个裸键」也是本判据的前提之一。
+  //   不验这一条，遮蔽一旦发生，红行只会说「没判出在途」，读的人得自己挖到引擎查找序去。
+  t('阶段8 · 前提：people 里没有同名裸键遮蔽 p_karl', !peopleNow.karl);
   const absentAfter = WA.careChain.assessCaregiverAbsence('karl');
   t('阶段8 · 在途后立即判定缺席', absentAfter.isAbsent === true);
+  t('阶段8 · 缺席理由如实给出 in-transit（不是「缺席了但说不出为什么」）',
+    Array.isArray(absentAfter.reasons) && absentAfter.reasons.indexOf('in-transit') >= 0);
 
   const breach = WA.careChain.reportCareAbsence('commit_karl_grandpa', 'emergency_equipment_travel');
   t('阶段8 · 失约登记并把风险升级为 warning',
@@ -423,7 +490,11 @@ function runNegative() {
 
 function runAll(a) {
   var assertFn = (typeof a === 'function') ? a : assert;
-  runSuite();
+  // v2.257.0（回归修复）：**把注入的断言真正传下去**。
+  //   旧写法 `runSuite()` 不带参 ⇒ 里面那 40 余条 `t()` 全部走模块自持的 node assert，
+  //   断言一假就抛、后面的断言全不跑，而挂载方只看到一句「锁抛出」（见 runSuite 内的注释）。
+  //   传下去之后：失败逐条记名、全部断言都跑完、红行读起来是「哪条命题不成立」。
+  runSuite(assertFn);
   assertFn(true, 'integration-social-ecosystem-e2e-v2233: 九系统联动断言全部通过');
   runNegative();
   assertFn(true, 'integration-social-ecosystem-e2e-v2233: 跨模块负控制如期断裂');

@@ -189,7 +189,30 @@
     'unrepairable': { kind: 'manual-review', why: 'beat 连续修形都不成立：机器已试尽，需要人看一眼原文' },
     'unrouted': { kind: 'request-setup', why: 'lingqi 找不到能把这句话派下去的承接人：先把承接关系建上' },
     'unsafe-expr': { kind: 'adjust-input', why: '表达式没通过安全白名单：改写成允许的形式再提交' },
-    'load-integrity': { kind: 'request-setup', why: '启动完整性缺口：六个写链路关键模块（clock/input-guard/settings-bus/permissions/commit/interceptor）有缺席项 ⇒ 写入被闸门挡住。先按 integrity().missing 把缺的文件补上（或对每个 rel 走 WA.loadRetry 重试装载），闸门自行重算后即恢复' }
+    'load-integrity': { kind: 'request-setup', why: '启动完整性缺口：六个写链路关键模块（clock/input-guard/settings-bus/permissions/commit/interceptor）有缺席项 ⇒ 写入被闸门挡住。先按 integrity().missing 把缺的文件补上（或对每个 rel 走 WA.loadRetry 重试装载），闸门自行重算后即恢复' },
+    // ── 全量回归体检批次：拒收面残余 18 条逐条显式登记（规则表分词收不住它们，B6 当场报无档）。
+    //   判据来源：tools/reject-recovery.js 的 audit() 把它们报成 via:undecided。
+    //   每一条都对着源码落点核过（括号配对已确认它确实落在 ok:false 对象里），这里只补回复档。
+    //   归法（**按语义，不按像谁**）：在途/被占 ⇒ retry-same-input；前置缺 ⇒ request-setup；
+    //   输入形态不被接受 ⇒ adjust-input；资源耗尽/惩戒期内 ⇒ permanent-reject。
+    'dnd': { kind: 'retry-same-input', why: '免打扰时段内不打扰：等时段过去同输入再来（followup-gate 的硬闸，与 GT 安静时段同规）' },
+    'helper-traveling': { kind: 'retry-same-input', why: '帮手本人在途：等他回来同输入再来（family-ops）' },
+    'substitute-traveling': { kind: 'retry-same-input', why: '替工本人在途：等他回来同输入再来（family-ops 两处站点同因）' },
+    'person-traveling': { kind: 'retry-same-input', why: '该人物在途旅行、办不了本地事：等他回来（action-desk:1109）' },
+    'strayed': { kind: 'rollback', why: '摊主已不在原地、摊已被自动收走：这份回执描述的位置不再存在，只能按新状态改写（stall.stray 的后果，不是可重试的瞬时态）' },
+    'max-methods-exceeded': { kind: 'request-setup', why: '行动方法表已装满（默认 64）：先清理退役方法再登记新的，重试同输入不会腾出位置（action-methods:184）' },
+    'pool-insolvent': { kind: 'permanent-reject', why: '互助池资金已耗尽：这条赔付请求在这只池上走不通了，要另立池或注资后重开（risk-pooling:198）' },
+    'privilege-suspended': { kind: 'permanent-reject', why: '因违规被暂停业务预约权限、尚在惩戒期：现在重试只会再被拒一次（custom-lax:1040，回执带 penaltyId）' },
+    'project-suspended': { kind: 'request-setup', why: '公共项目停工待援（缺席代工或降级未处理）：先解决停工原因再推进工单（coop 两处同因）' },
+    'rule-violation': { kind: 'adjust-input', why: '违反当地规约（排班限额/资源配额）：按回执里的 ruleName 改申领量或改时间，不是重试（custom-lax 两处）' },
+    'unhandled-obligations': { kind: 'request-setup', why: '还有未清义务就迁出：先把义务交接完（demographic-flow:220）' },
+    'template-only': { kind: 'adjust-input', why: '首段只是复述关键词、没有展开：按 retryHint 重掷一次并给出正文（dream-settle）' },
+    'unrecognized-material': { kind: 'adjust-input', why: '材质名不在环境容量表的封闭集里：改成表内的材质名（environmental-capacity:437）' },
+    'unplaced': { kind: 'adjust-input', why: '坐标缺失、只给了名字：补上坐标或选一个已知地点（interest-face 的 refuse；geo-tracker 侧同名 precision 值不在此列）' },
+    'unauthorized-practice': { kind: 'request-setup', why: '公开资料不等于操作许可、未获授权禁止实践：先取得授权（knowledge-practice:185）' },
+    'toll-required': { kind: 'request-setup', why: '该服务点要先付费/凭通行权：先把通行费或凭证补上（service-network:571）' },
+    'unauthorized-trustee': { kind: 'request-setup', why: '委托人不在受托名册上：先把受托关系登记上（social-legacy:574）' },
+    'unqualified-master': { kind: 'request-setup', why: '这位师父不够资格带这一门技艺：先提升资质或换人（tech-lineage:123）' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -225,7 +248,6 @@
     'high-vigilance': { out: true, why: '决策理由（action=hide）' },
     'length-or-empty': { kind: 'adjust-input', why: '输入条目超长或为空，被登记进 rejected' },
     'manual': { out: true, why: '后台任务排队理由（ok:true, queued:true）' },
-    'missing-target': { kind: 'adjust-input', why: '目标为空，被登记进 rejected' },
     'narrative-only': { out: true, why: '组织数值只有叙事档，是命中结果不是拒收' },
     'no-act-row': { kind: 'request-setup', why: '找不到对应 act 行：先把该行动登记上' },
     'no-stale-subkeys': { out: true, why: 'changed:false —— 无事可做，非拒收' },
@@ -273,6 +295,30 @@
     //   是一个**结论**，不是调用被拒；给它编恢复动作就是造数据（与 `narrative-only`
     //   / `nothing-recorded` 同规）。
     'empty-label': { out: true, why: 'fate 建表时该项 label 为空被丢弃：这是筛选结论，不是拒收' },
+    // ── 全量回归体检批次：判不出面补登 11 条 —— 全部按 out:true（「不是这层契约的调用被拒」）。
+    //   判据不是猜：这些码的落点逐个核过源码，分三类，都不属于「一次调用被世界拒了」：
+    //     ① 决策理由（engines/epistemic-view.js 的 deriveAction 四码 unaware-of-topic /
+    //        belief-distorted-or-hostile / firm-belief-in-truth / tentative-belief、
+    //        engines/bonds.js 的 engageDeepTalk 两码）—— `{action, reason, note}` 形状，
+    //        reason 说的是「他打算怎样」，不是「请求被拒」；
+    //     ② 筛选/记账结论（engines/rumor.js 的 excludedSecrets 两码、
+    //        engines/custom-lax.js 的 reviews 一条）—— 「为什么这一项没被收」；
+    //     ③ 已裁定结果（engines/action-desk.js 的 declined 理由 outbid-or-slots-full、
+    //        ui/panel.js 的 player-cancel 传参）—— 结果已经落地，没有「再试」这一说。
+    //   与 `no-hit` / `narrative-only` / `nothing-recorded` 同规：结论不配恢复动作。
+    //   `missing-target` 的登记已随之**迁入拒收面**（那里由规则表按 token missing/target
+    //   归 adjust-input，不再需要登记 —— 留一份就是同一件事两个真源）。
+    'belief-distorted-or-hostile': { out: true, why: 'epistemic-view 决策理由（action=suspend_and_interrogate）：他信的是失真版本，不是调用被拒' },
+    'dissatisfaction-threshold-reached': { out: true, why: 'custom-lax 的 reviews 记录理由（某规矩被投诉到阈值）：这是审计结论，不是调用被拒' },
+    'eligible-for-deeptalk': { out: true, why: 'bonds 的 engageDeepTalk 裁决（eligible:true 的配套理由字）：这是可行性结论，不是拒收' },
+    'firm-belief-in-truth': { out: true, why: 'epistemic-view 决策理由（action=cooperate_fully）' },
+    'insufficient-shared-experience': { out: true, why: 'bonds 的 engageDeepTalk 裁决（eligible:false 的理由）：这是可行性结论，它自带 guidance' },
+    'outbid-or-slots-full': { out: true, why: 'action-desk 的 declined 逐人理由：名次已定，理由说的是「为什么没抢到」' },
+    'player-cancel': { out: true, why: 'ui/panel.js 传进 laborSchedule.cancel 的理由字：玩家主动撤销，不是被世界拒' },
+    'secret-protected': { out: true, why: 'rumor 的 excludedSecrets 筛选理由：秘密受保护所以没进传闻链' },
+    'secret-protected-cross-region': { out: true, why: '同上，跨区域分支' },
+    'tentative-belief': { out: true, why: 'epistemic-view 决策理由（action=verify_before_commit）' },
+    'unaware-of-topic': { out: true, why: 'epistemic-view 决策理由（action=investigate）：他一无所知，不是请求被拒' },
     'near-dup': { out: true, why: 'fate 建表时与已收项近似重复被丢弃（回执里带 of 指认撞的是哪条）：筛选结论' },
       // ── v2.231.0（拓展 EXP-1～EXP-7）：engines/act.js 的工作确认器读数 ──
       //   委托被取消时它返回 `{status:'failed', reason:'contract-cancelled'}` —— 那个对象
@@ -548,6 +594,59 @@
     'formula-off', 'no-progress', 'no-signature', 'reenter', 'repair-limit', 'self-loop-or-missing-end',
     'stray', 'strip-empty', 'tie-conflict', 'unknown-attr', 'unknown-draft', 'unknown-floor', 'unknown-key',
     'unknown-person', 'unknown-thread', 'unknown-volume', 'unrepairable', 'unrouted', 'unsafe-expr',
+    // ── 全量回归体检批次：按 tools/reject-recovery.js 的现场复算一次性补齐快照。
+    //   此前本数组停在 873 条，而现场拒收面已是 1142 条 —— 差 269 条全部是「新引擎带出的
+    //   真 ok:false 返回」。同一形态本仓已栽过五次（v2.203.0 的 17 条、v2.209.0 的 14 条、
+    //   v2.221.0 的 3 条、v2.222.0 的 3 条、v2.231.0 的 49 条），这是第六次、也是最大的一次。
+    //   口径不变：**逐条按现场分面结果照抄**，不改档、不猜语义 —— 面的判据是「有没有一处
+    //   落在 ok:false 对象里」，那是括号配对算出来的，不是人读出来的。
+    //   同批 `missing-target` 从判不出面**迁入**本面：engines/care-chain.js 的 ok:false 站点
+    //   使它成为真拒收码，而旧快照把它记在判不出面（面错了，恢复档就一定错）。
+    'actFromScene-missing', 'already-awarded', 'already-defaulted', 'already-dismantled', 'already-fulfilled', 'already-in-phase',
+    'already-in-target-layout', 'already-laid', 'already-proposed', 'already-redressed', 'already-today', 'anchor-not-found',
+    'asset-already-exists', 'asset-failing-unavailable', 'asset-not-found', 'bad-audience', 'bad-callback', 'bad-candidate-name',
+    'bad-governance-model', 'bad-idle', 'bad-key', 'bad-layout-type', 'bad-legacy-type', 'bad-projection',
+    'bad-resource-type', 'bad-roll', 'bad-rule-type', 'bad-service-type', 'bad-status', 'bad-target',
+    'bad-target-layout', 'bad-user-relation', 'blueprint-not-installed', 'booking-not-found', 'branchDiff-unavailable', 'cancel-unavailable',
+    'candidate-not-found', 'capacity-exhausted', 'chapters-engine-unavailable', 'charter-already-exists', 'charter-not-found', 'checkpoint-blocked',
+    'checkpoints-unavailable', 'claim-not-found', 'commitment-not-found', 'conflict-existing-world', 'conflict-not-found', 'daily-bookings-full',
+    'deceased-not-found', 'destination-capacity-exhausted', 'dnd', 'empty-candidates', 'empty-oplog', 'empty-pool',
+    'empty-shares', 'empty-signature', 'entry-not-found', 'epistemic-leak-blocked', 'evidence-not-found', 'facility-not-found',
+    'facility-out-of-service', 'facility-unavailable-degraded', 'favor-not-found', 'gear-engine-unavailable', 'gear-not-ready', 'group-distrust-blocked',
+    'guarantee-not-active', 'guarantee-not-found', 'hand-edited-conflict', 'handover-closed', 'handover-not-found', 'health-capacity-prohibited',
+    'helper-schedule-conflict', 'helper-traveling', 'housing-capacity-exhausted', 'id-already-registered', 'incident-not-found', 'inst-not-available',
+    'inst-proposal-failed', 'insufficient-basis', 'insufficient-contribution-priority', 'insufficient-debt', 'insufficient-occurrences', 'insufficient-scrap',
+    'insufficient-skill', 'insufficient-treasury', 'interrupt-unavailable', 'invalid-amount', 'invalid-claim-amount', 'invalid-data',
+    'invalid-favored-group', 'invalid-flow-type', 'invalid-outcome', 'invalid-path', 'invalid-ratio-sum', 'invalid-slot',
+    'invalid-solution', 'invalid-stance', 'invalid-task-def', 'knowledge-already-exists', 'knowledge-not-found', 'laborSchedule-missing',
+    'layout-not-declared', 'legacy-not-found', 'lifecycle-missing', 'listing-short', 'max-methods-exceeded', 'method-not-available',
+    'migration-not-found', 'missing-anchor-relation', 'missing-arguments', 'missing-asset-id', 'missing-baseline', 'missing-caregiver',
+    'missing-charter-id', 'missing-claim-id', 'missing-claimant', 'missing-commitment-id', 'missing-compensation', 'missing-conflict-id',
+    'missing-contributor', 'missing-core-traits', 'missing-delta', 'missing-effect-id', 'missing-failure-evidence', 'missing-gate-proof',
+    'missing-gear-id', 'missing-group', 'missing-group-id', 'missing-handover-id', 'missing-incident-id', 'missing-item',
+    'missing-knowledge-id', 'missing-leader', 'missing-material-id', 'missing-materials', 'missing-opposing-groups', 'missing-place',
+    'missing-plaintiff', 'missing-pool-id', 'missing-practitioner', 'missing-prerequisites', 'missing-proposal-id', 'missing-provider',
+    'missing-purse', 'missing-region', 'missing-remedy-cost', 'missing-required-engines', 'missing-schedule-slot', 'missing-source-evidence',
+    'missing-source-or-nodes', 'missing-specs', 'missing-substitute', 'missing-target', 'missing-violator', 'missing-ward',
+    'missing-worker', 'need-two-participants', 'no-active-chapter', 'no-bids', 'no-bus', 'no-dual-obligation',
+    'no-estate-to-inherit', 'no-mark', 'no-prior-memory-in-group', 'no-seat', 'no-slot-available', 'no-such-unit',
+    'not-a-participant', 'not-a-practitioner', 'not-approved-by-inst', 'not-available', 'not-defaulted', 'not-enrolled-prior-to-disaster',
+    'not-in-progress', 'not-interrupted', 'not-proposed', 'not-seated', 'not-under-review', 'nothing-scored',
+    'opportunity-closed', 'opportunity-not-found', 'order-not-found', 'owner-unavailable', 'pact-not-found', 'passage-blocked',
+    'permit-missing', 'person-already-traveling', 'person-not-found', 'person-traveling', 'pick-failed', 'place-not-found',
+    'pool-already-exists', 'pool-closed', 'pool-insolvent', 'pool-not-found', 'precedent-not-found', 'privilege-suspended',
+    'project-already-exists', 'project-not-active', 'project-not-found', 'project-suspended', 'project-terminal', 'promise-not-found',
+    'promise-not-found-or-inactive', 'proposal-already-exists', 'proposal-not-found', 'queue-full', 'record-not-found', 'recoverAction-missing',
+    'reschedule-conflict', 'resource-not-found', 'resume-slot-conflict', 'resume-unavailable', 'retrieval-unavailable', 'retrofit-not-found',
+    'route-threw', 'rule-not-active', 'rule-not-found', 'rule-violation', 'same-origin-destination', 'sample-not-found',
+    'save-failed', 'sceneFlow-missing', 'schedule-engine-unavailable', 'self-guarantee-invalid', 'self-transfer', 'service-not-provided',
+    'situation-unavailable', 'slot-conflict', 'slot-full', 'split-target-conflict', 'split-unavailable', 'stalls-full',
+    'strayed', 'substitute-conflict', 'substitute-traveling', 'target-already-full', 'target-entry-missing-on-rollback', 'target-has-conflict',
+    'target-not-found', 'target-order-not-found', 'target-order-paused', 'template-only', 'tension-insufficient', 'toll-required',
+    'too-many-listings', 'too-small', 'tradition-not-found', 'training-engine-unavailable', 'tx-failed', 'ui-missing',
+    'unauthorized-practice', 'unauthorized-trustee', 'unhandled-obligations', 'unit-not-found', 'unknown-prereq-type', 'unknown-rank',
+    'unknown-solution', 'unknown-task', 'unmet-env-conditions', 'unplaced', 'unqualified-master', 'unrecognized-material',
+    'unsupported', 'unsupported-format-rejected', 'variant-not-found', 'vital-exhaustion-blocked', 'wear-failed',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -567,13 +666,23 @@
     // ── v2.231.0（拓展 EXP-1～EXP-7）：两条新成功返回（ok:true）迁入本面；
     //   同批 `not-holder` 因 engines/gear.js 的新 ok:false 站点迁出（见拒收面段）。
     'anchored', 'scope',
+    // ── 全量回归体检批次：成功面同样落后现场 33 条。
+    //   成功面的判据是「每一处出现都在 ok:true 对象里」—— 这批码的共同点是只出现在成功
+    //   返回里，没被任何失败分支复用。快照缺它们的后果与拒收面同型：产品无法独立答出
+    //   「这个码是什么面」，只能答 unknown。
+    'all-idle-in-scene', 'already-away', 'already-back', 'audit-skipped', 'below-floor', 'busy-scene',
+    'cleared', 'compliant', 'evidence-too-weak', 'facility-degraded', 'forbidden-behavior-without-major-event', 'graded',
+    'inertia-suppressed', 'last-one', 'no-anchor', 'no-anchor-registered', 'no-declared-compatibility', 'no-idle-characters',
+    'no-knowledge-or-skill', 'not-queued', 'persona-drift-detected', 'plain', 'replay', 'same-cell',
+    'same-sign', 'schedule-busy', 'target-traveling', 'two-too-close', 'unaware-of-outcome', 'uninformed',
+    'unjustified-flattery-blocked', 'unskilled-reader', 'variant-unconfirmed',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
     'bridge-threw', 'budget', 'climate-throw', 'commitment', 'commitment-fulfilled',
     'condition-unmet', 'corrupt-overflow', 'crisis', 'diag-idle', 'distorted', 'duty-off',
     'empty-string', 'faithful', 'fidelity-off', 'folded_too_small', 'high-vigilance',
-    'length-or-empty', 'manual', 'missing-target', 'narrative-only', 'no-act-row',
+    'length-or-empty', 'manual', 'narrative-only', 'no-act-row',
     'no-act-id', 'no-hit', 'no-stale-subkeys', 'no_sources', 'not-enabled', 'not-in-office', 'not-on-chain', 'step-threw',
     'nothing-recorded', 'off-duty', 'on-duty', 'orphan-recovery', 'over_budget', 'pending_dropped',
     'pinned_over_budget', 'plan-unavailable', 'prerequisite-open', 'ready', 'recorded',
@@ -584,6 +693,11 @@
     'empty-label', 'near-dup',
     // ── v2.231.0（拓展 EXP-1～EXP-7）：engines/act.js 的工作确认器读数（对象不带 ok）。
     'contract-cancelled',
+    // ── 全量回归体检批次：判不出面补齐 11 条。它们全是**决策理由 / 筛选结论**（对象不带 ok，
+    //   也不在 err 分支），不是调用被拒 —— 给它们编恢复动作就是造数据。
+    //   同批摘除 `missing-target`（已迁入拒收面，见该段说明）。
+    'belief-distorted-or-hostile', 'dissatisfaction-threshold-reached', 'eligible-for-deeptalk', 'firm-belief-in-truth', 'insufficient-shared-experience', 'outbid-or-slots-full',
+    'player-cancel', 'secret-protected', 'secret-protected-cross-region', 'tentative-belief', 'unaware-of-topic',
   ];
   /** 三快照查表 → 面。未命中即 `unknown`（**判不出就是判不出**，不拿规则表兜）。 */
   function frozenFace(c) {

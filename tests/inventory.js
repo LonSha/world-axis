@@ -292,7 +292,20 @@ return result;
 }
 
 if (require.main === module) {
-  const result = collect();
+  // v2.257.0（回归修复）：**`--json` 的 stdout 必须是纯 JSON**。
+  //   病灶（全量回归实测，v2.29.0 三连红）：`collect()` 要装载 315 个产品文件，而每个引擎
+  //   装载时都会 `WA.log('info', '<ns> 已加载（x.y.z）')`，而 `WA.log` 的实现直写 console.log ——
+  //   于是 25 行 `[WorldAxis] … 已加载` 抢先写进 stdout，`JSON.parse` 必抛
+  //   （实测：total 1454 / braceAt 1226 / PARSE_FAIL）。消费方（tests/run.js 的 `--json` 子跑）
+  //   因此恒拿 null，三条端到端判据永远红 —— 红的是**输出通道**，不是被它测的源码。
+  //   口径：机器可读契约与人类读日志是两条通道，`--json` 只走前者。
+  //   实现只包住 collect()：算完立刻还原，后续人类分支照常打日志（不开静音就不改变任何现有行为）。
+  const __silent = AS_JSON;
+  const __origLog = console.log, __origInfo = console.info;
+  if (__silent) { console.log = function () {}; console.info = function () {}; }
+  let result;
+  try { result = collect(); }
+  finally { if (__silent) { console.log = __origLog; console.info = __origInfo; } }
   const phantom = result.phantom, uiPhantom = result.uiPhantom;
   const dead = result.dead, dataOnly = result.dataOnly;
   const undeclared = result.files.undeclared, declaredMissing = result.files.declaredMissing;
