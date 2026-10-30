@@ -66,6 +66,11 @@
     { page: 'tools', id: 'worldlab', label: '世界实验室与反事实对比' },
     { page: 'tools', id: 'capacity', label: '存储压力面与义务清点' },
     { page: 'tools', id: 'perfbase', label: '性能基线面与三档' },
+    // v2.274.0（V6 收口）：能力档位与启用面。本段是 V6 阶段新加的第 14 个折叠段，
+    //   当时只加了 panel 侧的 `foldSec('tools', 'capability', …)`，没进这张封闭表。
+    //   后果两侧都现形：a11y 的「折叠钮名 == 模块自己登记的段数」当场不等（13 vs 14）；
+    //   本表的用途正是「面板渲染了而表里没有 = 漏登记」——补登记才是修法，改判据不是。
+    { page: 'tools', id: 'capability', label: '能力档位与启用面' },
   ];
   const __REG = {
     key: LS_KEY,

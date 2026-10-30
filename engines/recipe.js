@@ -589,8 +589,22 @@
     }
     const r = saveSettings({ name: k });
     stat.applies++; stat.lastReason = 'applied';
+    // v2.258.0（OPV6-3）：配方不再只是「把题材交给 theme.apply」——题材现在**真开引擎**，
+    //   配方必须把这件事如实转达给玩家（否则「配方已应用」与「机制真跑起来」又分家）。
+    //   口径：部分成功就是部分成功，原样透传 partial / notEffective / notInjected，
+    //   不在这里折成「已应用」（本仓纪律③：档位不是开关）。
+    const ta = themeApplied || null;
+    const partial = !!(ta && ta.partial);
+    if (partial) stat.lastReason = 'tier-partial';
     return { ok: true, name: k, cn: RECIPES[k].cn, themes: spec.themes.slice(),
-      policies: spec.policies.slice(), themeApplied: themeApplied ? { ok: true, themes: themeApplied.themes } : null, saved: r,
+      policies: spec.policies.slice(), themeApplied: ta ? { ok: true, themes: ta.themes,
+        enginesOn: (ta.enginesOn || []).slice(), enginesOff: (ta.enginesOff || []).slice(),
+        notEffective: (ta.notEffective || []).slice(), notInjected: (ta.notInjected || []).slice(),
+        partial: !!ta.partial, partialReason: ta.partialReason || '', noop: !!ta.noop } : null,
+      // 引擎面平铺一份（面板直接读，不必再解 themeApplied 那层）
+      enginesOn: ta ? (ta.enginesOn || []).slice() : [],
+      partial: partial, partialReason: partial ? (ta.partialReason || 'tier-partial') : '',
+      saved: r,
       // 冲突**只报不改**：应用成功不等于「这么配没问题」。
       clashes: { themes: themeClashes(spec.themes), policies: policyClashes(spec.policies) },
       basicsStale: basicsStale(), basicsUnverified: basicsUnverified() };

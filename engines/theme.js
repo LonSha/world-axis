@@ -21,7 +21,10 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_theme_settings_v1';
-  const DEF = { themes: [] };
+  // v2.258.0（OPV6-3）：`engines` 记**本模块自己打开的**引擎（判据与 capabilityTier.granted 同构：
+  //   只有「返回 'on' 的那一次」才算，'already' 不算）。为什么要记：题材切走时要把自己开的收回去，
+  //   而**只能收回自己开的** —— 玩家手动开的、档位开的，一次都不许被题材关掉。
+  const DEF = { themes: [], engines: [] };
   const __REG = { key: LS_KEY, def: DEF, module: 'theme', bounds: {} };
   // 题材 = 模块的显式组合。核模块（world/event/info/reputation）不入任何题材的排除面，
   //   它们是「世界非中心化」的承重墙，卸掉就没有世界可言。
@@ -47,7 +50,65 @@
    *   本表只回答「哪几张是这一轮加的」（供面板标注与诊断读数）。
    */
   const THEME_EXT = { modern: true, history: true, scifi: true, xianxia: true };
-  const stat = { applies: 0, previews: 0, rejects: 0, contrasts: 0, lastTheme: '', lastReason: '' };
+  /**
+   * 题材 -> **要开起来的引擎**（v2.258.0 / OPV6-3）。
+   *
+   * ── 它治什么（现场实测，v2.257.0 探针 tools/v6probes/p_engines.js）────────
+   *   100 个「带 enabled + buildBlock + 有写入口」的真机制里，**出厂只开 5 个**。
+   *   而 `apply(['urban'])` 此前只改 `rules.ORDER`（题材模块的**注入顺序**），
+   *   一次都不碰任何引擎的 `enabled`。于是「我选了都市」与「都市机制在跑」
+   *   是**两件互不相干的事**：选完都市，都市的经济/仇敌/律法机制照样一个个关着。
+   *   本仓的判据一贯是「装了不等于跑着」（v2.157.0 起）—— 玩家点了题材却什么都没开，
+   *   正是这条判据的反面：**说了要跑，就得真跑**。
+   *
+   * ── 三条口径 ──────────────────────────────────────────────────────────
+   *   ① **表只列引擎、不列理由**：每个引擎归哪个题材，按它**造的东西**归（经济造钱、
+   *      仇敌造敌意、hazard 造横祸……），不按文件在哪个目录归。一个引擎可以属多个题材
+   *      （并集语义，与 `modules` 一致：都市 + 悬疑 ⇒ 两边引擎都要跑）。
+   *   ② **本表不写死「什么算引擎」**：成员是否真开关、有没有注入面，一律由
+   *      `capabilityTier.shapeOf()` 现场回答（OPV6-1 的同一判据）。表里写了个
+   *      不存在的键 ⇒ apply 会把它报进 `notInjected`，而不是假装开了。
+   *   ③ **只做「加开」与「收回自己开的」**：见 `apply()` 与 `DEF.engines` 的注释。
+   *      题材**绝不**因为「这个引擎不属于我」就去关它 —— 那是档位与玩家自己的事。
+   *
+   * ── 刻意留空的题材 ────────────────────────────────────────────────────
+   *   校园 / 历史 / 现代 / 历史 的引擎面与都市高度重叠（同一个世界，只是视角不同），
+   *   故只挂**题材特有**的那几个；其余靠叠加（都市 + 校园）表达。宁可少开，
+   *   也不把「选了个题材」膨胀成「把整个档位打开」—— 那是 OPV6-1 的活，不是本题材的。
+   */
+  const THEME_ENGINES = {
+    // 都市：钱、活路、人挤人、消息、仇怨、律法与灰色地带
+    urban: ['economy', 'activity', 'family', 'org', 'intel', 'rumor', 'shadow', 'rivalry',
+      'marginal', 'tolerance', 'quota', 'gauge', 'survival', 'agency', 'operations',
+      'commission', 'freight', 'worldBridge', 'beatFacade', 'motif'],
+    // 校园：同龄群体、传言、情绪起伏、暗恋与竞争、成长
+    campus: ['affect', 'bonds', 'fondness', 'temperament', 'moodGlide', 'activity', 'family',
+      'rivalry', 'rumor', 'spotlight', 'motif', 'appearance', 'ladder'],
+    // 悬疑：线索、疑点、藏起来的东西、时间锁、黑箱
+    mystery: ['investigation', 'sediment', 'enigma', 'threads', 'foreshadow', 'shadow',
+      'temporalLock', 'masks', 'hazard', 'canon', 'storyChoice', 'tempo'],
+    // 奇幻：灵气、异兽、因果报应、天数、门阶
+    fantasy: ['lingqi', 'beastBond', 'karma', 'survival', 'hazard', 'powerAnchor', 'ladder',
+      'eraCycle', 'canon', 'motif', 'gauge'],
+    // 经营：钱与账、雇工与订单、物流与谈判、声誉
+    business: ['economy', 'commission', 'freight', 'org', 'operations', 'quota', 'gauge',
+      'agency', 'diplomacy', 'beatLedger', 'beatReport'],
+    // 现代：跟都市同源，加速度与消息面
+    modern: ['economy', 'activity', 'org', 'intel', 'rumor', 'operations', 'worldBridge', 'motif'],
+    // 历史：气数、纪元、律法、家族、科举式的阶梯
+    history: ['eraCycle', 'canon', 'family', 'org', 'karma', 'ladder', 'diplomacy',
+      'survival', 'warrant', 'temporalLock'],
+    // 科幻：技术、研究、制度惯性、黑箱、信息面
+    scifi: ['research', 'org', 'worldBridge', 'enigma', 'canon', 'quota', 'gauge',
+      'offlineTick', 'farfield', 'retrieval'],
+    // 仙侠：灵气、报应、天数、异兽、门阶、寿数
+    xianxia: ['lingqi', 'karma', 'beastBond', 'eraCycle', 'ladder', 'survival', 'hazard',
+      'canon', 'powerAnchor', 'motif']
+  };
+  const stat = { applies: 0, previews: 0, rejects: 0, contrasts: 0, lastTheme: '', lastReason: '',
+    // v2.258.0（OPV6-3）：引擎面计数。noops 与 capabilityTier 同义（真的没活可干）；
+    //   partials 记「有引擎没真起来」的次数 —— 它是玩家最该看见的那一个数。
+    noops: 0, engineOns: 0, engineOffs: 0, partials: 0, lastPartial: 0 };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
     return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
@@ -61,6 +122,58 @@
     });
   }
   function known(name) { return !!THEMES[String(name || '')]; }
+  /**
+   * 下面三个是本文件对 OPV6-1 判据面的**转发**（不是第二套实现）。
+   *   为什么要转发而不是直接 `WA.capabilityTier.flipSwitch(...)`：装载顺序上 theme.js
+   *   （LOAD idx 早）可能先于 capability-tier.js 被求值，且题材面在档位面缺席时
+   *   **必须照样能用**（题材功能不依赖档位功能的存在）。故这里做三态处理：
+   *     · capabilityTier 在 ⇒ 用它（同一判据、同一回读复核）；
+   *     · 不在 ⇒ 自带一份**最小等价实现**（带 enabled + 有写入口 + 回读确认，逐条同规），
+   *       并在 `engineFace()` 里如实报 `{ via: 'fallback' }` —— 让诊断面看得见「这是降级跑」，
+   *       而不是让两条路悄悄分叉（v2.101.0 那类账：缺席与在场长得一样）。
+   */
+  function cap() { return (WA.capabilityTier && typeof WA.capabilityTier === 'object') ? WA.capabilityTier : null; }
+  function shape(key) {
+    const c = cap();
+    // v2.258.0 收口：判据面**显式点名** `WA.capabilityTier.shapeOf`（先判 `c` 在场再点名调用，
+    //   两者是同一个对象）。为什么不让它写成 `c.shapeOf(...)`：清册的引用面口径是
+    //   `WA <sep> ns <sep> mem`（tests/inventory.js 的 REF_RE），经由局部变量的调用
+    //   **产品侧 refs 读成 0** ⇒ dead-export 台账当场把这两口记成「过度导出（self-only）」。
+    //   也就是说，代码是对的、账是错的 —— 治法不是给台账加豁免，而是让引用面如实可见。
+    if (c && typeof c.shapeOf === 'function') { try { return WA.capabilityTier.shapeOf(key); } catch (e) { return null; } }
+    // 降级：与 capabilityTier.shapeOf 逐条同规（带 enabled + 有 getSettings）
+    const m = WA[key];
+    if (!m || typeof m !== 'object' || typeof m.getSettings !== 'function') return null;
+    let s = null;
+    try { s = m.getSettings(); } catch (e) { return null; }
+    if (!s || !Object.prototype.hasOwnProperty.call(s, 'enabled')) return null;
+    return { key: key, on: s.enabled === true,
+      hasBuild: typeof m.buildBlock === 'function', hasSet: typeof m.setSettings === 'function' };
+  }
+  function flip(key, on) {
+    const c = cap();
+    // 同上：显式点名 `WA.capabilityTier.flipSwitch`，让「题材面真读档位面判据」这件事在清册里可测
+    if (c && typeof c.flipSwitch === 'function') { try { return WA.capabilityTier.flipSwitch(key, on); } catch (e) { return 'not-effective'; } }
+    // 降级：toggle + 回读复核（与 capabilityTier.turnOn/turnOff 同规）
+    const sh = shape(key);
+    if (!sh || !sh.hasSet) return 'missing';
+    if (sh.on === (on === true)) return 'already';
+    try { WA[key].setSettings({ enabled: on === true }); } catch (e) { return 'not-effective'; }
+    const back = shape(key);
+    if (!back || back.on !== (on === true)) return 'not-effective';
+    return on === true ? 'on' : 'off';
+  }
+  function uniqArr(arr) {
+    const s = {};
+    const out = [];
+    (Array.isArray(arr) ? arr : []).forEach(function (k) {
+      const x = String(k || '');
+      if (!x || s[x]) return;
+      s[x] = true;
+      out.push(x);
+    });
+    return out;
+  }
   /** 题材列表 -> 模块集合（并按 ORDER 原序返回；核心模块永远在场） */
   function compose(names) {
     const order = (WA.rules && Array.isArray(WA.rules.ORDER)) ? WA.rules.ORDER : [];
@@ -92,12 +205,41 @@
     };
     const added = b.modules.filter(function (k) { return a.modules.indexOf(k) < 0; });
     const removed = a.modules.filter(function (k) { return b.modules.indexOf(k) < 0; });
+    // v2.258.0（OPV6-3）：预览也必须答「会开几个引擎」，否则玩家点了预览只知道模块变了，
+    //   apply 之后才第一次看见引擎被开 —— 预览不覆盖的纪律（本文件口径②）要求先把账算清。
+    //   纯计算：只读 shape()，不调 flip、不写盘。
+    const face = engineFace(names);
+    const willOn = face.want.filter(function (k) {
+      const sh = shape(k);
+      return !!(sh && sh.hasSet && sh.hasBuild && sh.on !== true);
+    });
     return { ok: true, current: cur.slice(), next: (Array.isArray(names) ? names.slice() : []),
       modules: b.modules.slice(), moduleCount: b.modules.length,
       chars: chars(b.modules), currentChars: chars(a.modules), deltaChars: chars(b.modules) - chars(a.modules),
-      added: added, removed: removed, droppedModules: b.dropped.slice(), previewOnly: true };
+      added: added, removed: removed, droppedModules: b.dropped.slice(),
+      // 引擎面预览（与 apply 的返回契约同名：enginesOn / notInjected）
+      enginesOn: willOn, enginesWant: face.want.slice(), notInjected: face.notInjected.slice(),
+      engineCount: face.want.length, engineWillOn: willOn.length,
+      previewOnly: true };
   }
-  /** 应用（唯一写入口）：未知题材一律拒收，不静默当空集 */
+  /**
+   * 应用（唯一写入口）：未知题材一律拒收，不静默当空集。
+   *
+   * v2.258.0（OPV6-3）：**本函数现在真开引擎**，不再只改 `rules.ORDER`。
+   *   现场病：`apply(['urban'])` 只改注入顺序，经济 / 仇敌 / 律法 一个个关着 ——
+   *   「选了都市」与「都市机制在跑」是两件不相干的事。
+   *
+   * 五条口径（每条都有专锁咬）：
+   *   ① **只加开，不关别人的**：收回面严格等于 `settings().engines`（本模块自己开的），
+   *      玩家手动开的、档位（capabilityTier.granted）开的，一次都不碰。
+   *   ② **逐个真写 + 当场回读复核**：走 `capabilityTier.flipSwitch`，与档位面**同一判据**
+   *      （自己再写一遍 setSettings 就是第二套判据，分叉后玩家只看得见报成功那条）。
+   *   ③ **部分成功就是部分成功**：没真开起来的进 `notEffective`，没有注入面 / 不是真开关的
+   *      进 `notInjected`，两者都非空 ⇒ `partial:true` + `tier-partial` 归因。绝不报「已开启」。
+   *   ④ **幂等**：目标引擎全已开、且没有要收回的 ⇒ `noop:true`，不写盘、不计数。
+   *   ⑤ **题材与引擎可分开查**：`enginesOn` / `enginesOff` / `enginesGranted` 三个读数
+   *      让面板能说「题材 A 开了 12 个机制，其中 2 个没能起来」而不是只报「已应用」。
+   */
   function apply(names) {
     const arr = Array.isArray(names) ? names.slice() : [];
     const bad = arr.filter(function (n) { return !known(n); });
@@ -105,9 +247,89 @@
       stat.rejects++; stat.lastReason = 'unknown-theme';
       return { ok: false, reason: 'unknown-theme', unknown: bad, known: Object.keys(THEMES) };
     }
-    const r = saveSettings({ themes: arr });
-    stat.applies++; stat.lastTheme = arr.join('+'); stat.lastReason = 'applied';
-    return { ok: true, themes: arr.slice(), modules: compose(arr).modules, saved: r };
+    // 目标引擎集（并集语义，按 THEME_ENGINES 原序去重）
+    const wantKeys = [];
+    const seen = {};
+    arr.forEach(function (n) {
+      (THEME_ENGINES[String(n)] || []).forEach(function (k) {
+        if (!k || seen[k]) return;
+        seen[k] = true;
+        wantKeys.push(k);
+      });
+    });
+    const before = Array.isArray(settings().engines) ? settings().engines.slice() : [];
+    const wantSet = {};
+    wantKeys.forEach(function (k) { wantSet[k] = true; });
+    // 要收回的：本模块**此前开过**、新题材不要的（口径①）
+    const toOff = before.filter(function (k) { return !wantSet[k]; });
+
+    const notEffective = [];
+    const notInjected = [];
+    const didOn = [];
+    const didOff = [];
+    // 收回（只动自己开的）。`already` 与 `off` **分开记**：
+    //   `off` 是本模块真关掉的；`already` 是「本该收回、但它已经不在开着」（玩家自己先关了）。
+    //   两者都算「本模块不再记这个名字」（granted 里要摘掉），但只有 `off` 进 turnedOff
+    //   —— 把 `already` 也算成「我关的」就是虚报工作量（本仓纪律：读数不许比事实大）。
+    toOff.forEach(function (k) {
+      const x = flip(k, false);
+      if (x === 'off') didOff.push(k);
+      else if (x === 'not-effective') notEffective.push(k);
+      // 'already' / 'missing' 都不进 didOff：一个本就没开，一个键都不在
+    });
+    // 开出
+    wantKeys.forEach(function (k) {
+      const sh = shape(k);
+      if (!sh || !sh.hasSet) { notInjected.push(k); return; }   // 不是真开关：如实归类，不假装
+      if (!sh.hasBuild) { notInjected.push(k); return; }        // 没有注入面：开了也不出声
+      const x = flip(k, true);
+      if (x === 'on') didOn.push(k);                            // 只有 'on' 才算「本模块开的」
+      else if (x === 'already') { /* 玩家/档位/出厂已经开着：不属于我，不得回收 */ }
+      else notEffective.push(k);
+    });
+    // granted = 旧 granted 里**仍在新目标中且此刻真开着**的 + 本次真正由本模块打开的
+    //   （与 capabilityTier 的 keptGrant 同规：回滚栈里不留「其实已经关着」的名字）
+    const kept = before.filter(function (k) {
+      if (!wantSet[k]) return false;
+      const sh = shape(k);
+      return !!(sh && sh.on === true);
+    });
+    const granted = uniqArr(kept.concat(didOn));
+    const themesChanged = JSON.stringify(arr) !== JSON.stringify(settings().themes || []);
+    // granted 是**集合**语义：比较前两侧都排序，否则「同集合不同序」会被误判成有变更，
+    //   于是重复 apply 同题材会写盘、幂等当场破功（本仓 v2.257.0 的 B3b 就是为这条立的锁）。
+    const grantChanged = JSON.stringify(granted.slice().sort()) !== JSON.stringify(before.slice().sort());
+    // 幂等（口径④）：真开关一个没动、题材名与「本模块开过的」名单都没变 ⇒ 不写盘、不入计数
+    if (!didOn.length && !didOff.length && !themesChanged && !grantChanged) {
+      stat.noops++;
+      stat.lastReason = 'noop';
+      return { ok: true, themes: arr.slice(), modules: compose(arr).modules, noop: true,
+        enginesOn: [], enginesOff: [], enginesGranted: before.slice(),
+        notEffective: [], notInjected: notInjected.slice(),
+        partial: notInjected.length > 0, partialReason: notInjected.length ? 'tier-partial' : '',
+        total: wantKeys.length, saved: null };
+    }
+    let r = null;
+    try {
+      r = saveSettings({ themes: arr, engines: granted });
+    } catch (e) {
+      stat.lastReason = 'save-threw';
+      return { ok: false, reason: 'save-threw', themes: arr.slice() };
+    }
+    stat.applies++; stat.lastTheme = arr.join('+');
+    stat.engineOns += didOn.length;
+    stat.engineOffs += didOff.length;
+    // `tier-partial`：计划要求的归因口径 —— 有引擎没真起来（或表里点了不存在的键）时必须自报，
+    //   不许折成「已开启」。`notInjected` 是**静态**的（表的质量），故它也参与 partial，
+    //   但不参与幂等判定（否则每次 apply 都会被一个永远修不好的名字顶成「有活干」）。
+    const partial = notEffective.length > 0 || notInjected.length > 0;
+    if (partial) { stat.partials++; stat.lastPartial = notEffective.length + notInjected.length; }
+    stat.lastReason = partial ? 'tier-partial' : 'applied';
+    return { ok: true, themes: arr.slice(), modules: compose(arr).modules,
+      enginesOn: didOn, enginesOff: didOff, enginesGranted: granted,
+      notEffective: notEffective, notInjected: notInjected,
+      partial: partial, partialReason: partial ? 'tier-partial' : '',
+      total: wantKeys.length, saved: r };
   }
   /** 当前生效的模块（rules 侧注入按它过滤；未启用题材时 = 全量，保持旧行为不变） */
   function activeModules() {
@@ -175,7 +397,44 @@
     return { themes: t.slice(), active: activeModules(), applies: stat.applies,
       previews: stat.previews, rejects: stat.rejects, contrasts: stat.contrasts,
       lastTheme: stat.lastTheme, lastReason: stat.lastReason,
-      available: Object.keys(THEMES) };
+      available: Object.keys(THEMES),
+      // v2.258.0（OPV6-3）：引擎面随题材变化的读数（诊断节与面板共用）
+      engines: settings().engines || [],
+      engineOns: stat.engineOns || 0, engineOffs: stat.engineOffs || 0,
+      partials: stat.partials || 0, noops: stat.noops || 0,
+      via: cap() ? 'capabilityTier' : 'fallback' };
+  }
+  /**
+   * 题材面**当前让哪些引擎在跑**（v2.258.0 / OPV6-3 的只读口）。
+   *   三类分开报，因为这个区分就是「会不会误伤玩家」的判据：
+   *     · `granted` —— 本模块开的（切走题材时会被收回的，就是这些）
+   *     · `themeRunning` —— 目标集里此刻真在跑的（含 granted + 本来自己就开着的）
+   *     · `notInjected` —— 表里写了、但不是「带 enabled + 有 buildBlock」的真机制
+   *   `via` 如实报判据来源：'capabilityTier' 或 'fallback'（见上方三态注释）。
+   */
+  function engineFace(names) {
+    const arr = Array.isArray(names) ? names.slice() : (settings().themes || []);
+    const want = [];
+    const seen = {};
+    arr.forEach(function (n) {
+      (THEME_ENGINES[String(n)] || []).forEach(function (k) {
+        if (!k || seen[k]) return;
+        seen[k] = true;
+        want.push(k);
+      });
+    });
+    const running = [];
+    const notInjected = [];
+    want.forEach(function (k) {
+      const sh = shape(k);
+      if (!sh || !sh.hasSet || !sh.hasBuild) { notInjected.push(k); return; }
+      if (sh.on) running.push(k);
+    });
+    return { themes: arr, want: want.slice(), running: running, notInjected: notInjected,
+      granted: (settings().engines || []).slice(),
+      /* 空缺：want 里没跑起来的（含没生效与无注入面），面板据此说「还差 N 个」 */
+      gap: want.length - running.length,
+      via: cap() ? 'capabilityTier' : 'fallback' };
   }
   /**
    * B7 第三项：三插件职责分离（事实结算 / 证据读取 / 交互执行）。
@@ -241,7 +500,9 @@
   // v2.87.0：known()/compose() 是本文件内部自用口（preview/apply/activeModules 消费，
   //   外部零引用 = 过度导出），故不进导出面。题材能力对外由 list/preview/contrast/apply/
   //   activeModules/statView/separation 七个有真消费方的口表达。
-  WA.theme = { THEMES, CORE, THEME_EXT: THEME_EXT, list: list, preview: preview, contrast: contrast,
-    apply: apply, activeModules: activeModules, statView: statView, separation: separation };
+  WA.theme = { THEMES, CORE, THEME_EXT: THEME_EXT, THEME_ENGINES: THEME_ENGINES,
+    list: list, preview: preview, contrast: contrast,
+    apply: apply, activeModules: activeModules, statView: statView,
+    engineFace: engineFace, separation: separation };
   if (WA.log) WA.log('info', '题材规则组合已加载');
 })();

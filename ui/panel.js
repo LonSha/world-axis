@@ -800,6 +800,364 @@
     const s = WA.store.get();
     const nodes = WA.workflow.list();
     const beforeN = nodes.filter(n => n.chain === 'before').length, afterN = nodes.filter(n => n.chain === 'after').length;
+    // v2.257.0（V6 OPV6-2）：启用面摘要行 —— 玩家第一屏就要答出「世界到底跑起来了吗」。
+    //   三条口径：
+    //   ① **只念引擎原话**：整句取自 `capabilityAudit.summary().line`，面板不自己拼措辞
+    //      （同一句话在诊断节与设置页也是这一份，另编一份就是第二个措辞真源）。
+    //   ② **「读不到」与「关着」分开**：引擎缺席时明写「读数不可用」，不渲染成「世界只跑了最基础的部分」
+    //      —— 后者会让玩家以为「本来就该这样」，而实际上是一整块能力没装上。
+    //   ③ **玩家关掉的显示开关要算数**：`showSummary:false` 就整行不出现（玩家说不看就不看），
+    //      但诊断节与机制页的读数不受此影响 —— 那是诊断面，不是玩家面。
+    const capLine = (function () {
+      try {
+        if (!WA.capabilityAudit || typeof WA.capabilityAudit.summary !== 'function') {
+          return '<div class="wa-dim" id="wa-cap-line">世界规模读数不可用（engines/capability-audit.js 缺席）</div>';
+        }
+        const sm = WA.capabilityAudit.summary();
+        if (!sm || sm.ok === false) return '<div class="wa-dim" id="wa-cap-line">世界规模读数失败（summary() 未返回）</div>';
+        if (sm.showSummary !== true) return '';
+        // 用纯文本节点承载整句（不把数字包进 <b>）：这段读数会被 ui-gate 与专锁按
+        //   textContent 比对，标签内嵌数值在不同序列化实现下会漂位置（本版真踩过一次）。
+        const extra = sm.userOff > 0
+          ? '（其中 ' + sm.userOff + ' 项是你自己关掉的，不算欠账）'
+          : '';
+        return '<div class="wa-dim" id="wa-cap-line">' + esc(sm.line) + ' —— 共 ' + sm.mechanisms
+          + ' 项世界机制，' + (sm.mechanisms - sm.running) + ' 项没开' + extra
+          + '。到「设置」页顶部一键调整。</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-cap-line">世界规模读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.259.0（V6 OPV6-4）：首轮体检块 —— 「世界跑起来了，但内容只出来一部分」要说得出为什么。
+    //   三条口径（与 capLine 同规）：
+    //   ① **整句取自引擎原话**：`threeGatesLine()` 一句到底，面板不拼措辞（第二个措辞真源就是漂移源）。
+    //   ② **「读不到」与「都通」分开**：引擎缺席时写「体检读数不可用」，不渲染成「三道门槛都通」
+    //      —— 后者会让玩家以为世界健康，而实际上是一整块自检没装上。
+    //   ③ **通过时不占屏**：verdict 为 running 就整块不出现（没毛病就不打扰），
+    //      有问题才显示 —— 这是体检块，不是装饰块。
+    const healthLine = (function () {
+      try {
+        if (!WA.healthPreflight || typeof WA.healthPreflight.threeGatesLine !== 'function') {
+          return '<div class="wa-dim" id="wa-health-line">体检读数不可用（engines/health-preflight.js 缺席）</div>';
+        }
+        const r = WA.healthPreflight.threeGates({ sample: 8 });
+        if (!r || r.verdict === 'running') return '';
+        // 纯文本节点承载整句：ui-gate 与专锁按 textContent 比对，标签内嵌数值会漂位置（capLine 踩过）。
+        return '<div class="wa-dim" id="wa-health-line">' + esc(WA.healthPreflight.threeGatesLine({ sample: 8 }))
+          + '。到「诊断」页的体检节看逐条读数。</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-health-line">体检读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.260.0（V6 OPV6-5）：缺省面提示行 —— 「引擎在跑、正文没内容」的第三类病因。
+    //   三条口径：
+    //   ① **只在「从未配置」时说**：`configured === true` 就是玩家自己配过，缺省不再背锅
+    //      （此时若内容没出来，是玩家自己的选择或模块关着，另有 capLine/healthLine 在报）。
+    //   ② **静默组合优先、且最重**：`silent > 0`（默认关 + 模块开着）才是真的「引擎在跑、
+    //      内容不注入」，这一句必须单独成句；剩下 defaultOff 里那些「双重关/无开关」只作补充，
+    //      因为它们本来就得先开模块，不构成「不该关却关着」。
+    //   ③ **没毛病就整行不出现**：三桶全为零就返回空串（这是提示，不是装饰）。
+    const visLine = (function () {
+      try {
+        if (!WA.render || typeof WA.render.visibilityDefault !== 'function') return '';
+        const vd = WA.render.visibilityDefault();
+        if (!vd || vd.configured === true) return '';
+        const off = vd.defaultOff || [];
+        if (!off.length) return '';
+        const head = vd.silent > 0
+          ? '有 ' + vd.silent + ' 个源默认关着、而它们的模块总开关是开着的（' + (vd.silentKeys || []).join('、')
+            + '）—— 引擎在跑，这部分内容不会进正文。'
+          : '注入源可见性从未配置过：' + vd.sources + ' 个源全走出厂缺省。';
+        const tail = vd.silent > 0
+          ? ''
+          : '其中 ' + off.length + ' 个默认关（' + off.join('、') + '），默认关不等于你用不上。';
+        return '<div class="wa-dim" id="wa-vis-line">' + esc(head + tail)
+          + '到「设置」页的注入可见性一格逐项打开。</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-vis-line">注入源缺省读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.263.0（V6 OPV6-8）：首局体检结论块 —— 「所以这一局到底跑起来了没有」。
+    //   与上面三条并列行（capLine / healthLine / visLine）的分工必须说清：
+    //   那三条各答一面（机制够不够 / 门槛过没过 / 缺省该不该改），**都是诊断面语言**；
+    //   本块答的是把三面压成一句之后的那个结论，**是玩家面语言**，故排在最前。
+    //   三条口径（与 capLine 同规）：
+    //   ① **整句取自引擎原话**：`firstRunLine()` 一句到底，面板不拼措辞；
+    //   ② **unknown 不折叠成 running**：读不到时明写「读不到」，绝不渲染成「正在运转」；
+    //   ③ **running 也显示**：这是首局体检，玩家第一次打开就该看到「跑起来了」这句话 ——
+    //      与 healthLine（通过时不占屏）取舍相反，因为那一块是告警，这一块是结论。
+    const firstLine = (function () {
+      try {
+        if (!WA.healthPreflight || typeof WA.healthPreflight.firstRunLine !== 'function') {
+          return '<div class="wa-dim" id="wa-first-line">首局体检读数不可用（engines/health-preflight.js 缺席）</div>';
+        }
+        const fv = WA.healthPreflight.firstRunView({ sample: 0 });
+        // 四态各带一个稳定 class：专锁与 ui-gate 按 class 判「这一刻是哪个结论」，
+        //   不按文字判（文字会改，class 是契约）。
+        return '<div class="wa-dim wa-first wa-first-' + esc(fv.state) + '" id="wa-first-line">'
+          + esc(WA.healthPreflight.firstRunLine({ sample: 0 })) + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-first-line">首局体检读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.265.0（V6 EXV6-1）：世界日记 —— 「你看不见的地方发生了什么」。
+    //   与上面四条并列行（firstLine / capLine / healthLine / visLine）的分工必须说清：
+    //   那四条答的都是「这套机制跑没跑起来」（诊断面语言），本块答的是「世界这一刻发生过什么」
+    //   （玩家面语言，正文的补充读物）—— 混排会让概览页变成两张不同语言的清单。
+    //   三条口径：
+    //   ① **整句取自引擎原话**：句子由 `worldDiary.build()` 压好，面板只做转义与排版，
+    //      不自己拼措辞（另拼一份就是第二个措辞真源，与 capLine 同规）。
+    //   ② **「读不到」与「没有事」必须分开**：引擎缺席写「读数不可用」，空态写「不是「没读到」」
+    //      —— 后者是**确实没有**，前者是**没装上**；两者在玩家眼里同形，处置却一个是等、一个是修。
+    //   ③ **不打扰**：关闭时只留一行「已关闭」，不出占位空块；quiet 时也只有一句话，不铺留白。
+    const diaryBlock = (function () {
+      try {
+        if (!WA.worldDiary || typeof WA.worldDiary.build !== 'function') {
+          return '<div class="wa-dim" id="wa-diary-block">世界日记读数不可用（engines/world-diary.js 缺席）</div>';
+        }
+        const cfg = (typeof WA.worldDiary.getSettings === 'function') ? WA.worldDiary.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) {
+          return '<div class="wa-dim" id="wa-diary-block">世界日记已关闭（在设置页的「世界日记」一格打开）</div>';
+        }
+        const r = WA.worldDiary.build();
+        if (!r || r.ok !== true) {
+          return '<div class="wa-dim" id="wa-diary-block">世界日记读数失败（build() 未返回）</div>';
+        }
+        // 稳定 class 承载「这一刻是哪个态」：专锁按 class 判，不按文字判（文字会改，class 是契约）。
+        if (r.quiet === true) {
+          return '<div class="wa-diary wa-diary-quiet" id="wa-diary-block"><div class="wa-dim">'
+            + esc(r.hint || '这几轮镜头外没有需要你知道的事') + '</div></div>';
+        }
+        const lines = Array.isArray(r.lines) ? r.lines : [];
+        return '<div class="wa-diary wa-diary-live" id="wa-diary-block">'
+          + lines.map(function (l) { return '<div class="wa-diary-line">' + esc(l) + '</div>'; }).join('')
+          + (r.truncated
+            ? '<div class="wa-dim">另有 ' + esc(String(r.dropped)) + ' 条没展开（本屏上限 ' + esc(String(r.cap)) + ' 句）</div>'
+            : '')
+          + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-diary-block">世界日记读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.266.0（V6 EXV6-2）：人物今日动线 —— 「NPC 的一天看得见」。
+    //   与上面 diaryBlock 的分工：日记答「镜头外发生过什么」（过去、多来源合流），
+    //   动线答「这几个人今天在哪、做了什么、接下来干嘛」（现在、按人分栏）。
+    //   两块都是玩家面语言，故并列排在一起；与 firstLine/capLine/healthLine/visLine
+    //   那四条诊断面语言的行**必须分开**（混排会让概览页变成两张不同语言的清单）。
+    //   四条口径（与 diaryBlock 同规，新出口上不再重犯）：
+    //   ① **整句取自引擎**：面板只转义与排版，不自己拼措辞；
+    //   ② **三种零读数分开**：模块缺席 / 关着 / 没人可读 —— 各自不同因、各自不同处置；
+    //   ③ **`unreadable` 不占位**：读了但判不了的段由引擎拼句时丢弃，面板不补「（无）」；
+    //   ④ **不打扰**：quiet 只有一句话，不出空块。
+    const routeBlock = (function () {
+      try {
+        if (!WA.dayRoute || typeof WA.dayRoute.build !== 'function') {
+          return '<div class="wa-dim" id="wa-route-block">人物动线读数不可用（engines/day-route.js 缺席）</div>';
+        }
+        const cfg = (typeof WA.dayRoute.getSettings === 'function') ? WA.dayRoute.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) {
+          return '<div class="wa-dim" id="wa-route-block">人物动线已关闭（在设置页的「人物动线」一格打开）</div>';
+        }
+        const r = WA.dayRoute.build();
+        if (!r || r.ok !== true) {
+          return '<div class="wa-dim" id="wa-route-block">人物动线读数失败（build() 未返回）</div>';
+        }
+        // 稳定 class 承载「这一刻是哪个态」：专锁按 class 判，不按文字判。
+        if (r.quiet === true) {
+          // quiet 的两种因（没人可读 / 读了没依据）由引擎给 hint，面板只转义。
+          return '<div class="wa-route wa-route-quiet" id="wa-route-block"><div class="wa-dim">'
+            + esc(r.hint || '这几个人今天没有可读的动线') + '</div></div>';
+        }
+        const lines = Array.isArray(r.lines) ? r.lines : [];
+        // 第几日放在同一个块头：动线的语义是「今天」，不给日子等于让玩家自己去别处对。
+        const dayHead = (r.dayReadable === true && r.day !== null && r.day !== undefined)
+          ? '<div class="wa-dim">第' + esc(String(r.day)) + '日的动线</div>'
+          : '<div class="wa-dim">日子读不到（世界钟未设定）—— 下面几行仍按已记录的事实念</div>';
+        return '<div class="wa-route wa-route-live" id="wa-route-block">'
+          + dayHead
+          + lines.map(function (l) { return '<div class="wa-route-line">' + esc(l) + '</div>'; }).join('')
+          + (r.truncated
+            ? '<div class="wa-dim">另有 ' + esc(String(r.dropped)) + ' 人没展开（本屏上限 ' + esc(String(r.cap)) + ' 人）</div>'
+            : '')
+          + '</div>';
+      } catch (e) {
+        return '<div class=\"wa-dim\" id=\"wa-route-block\">人物动线读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.267.0（V6 EXV6-3）：关系温度计 —— 「这段关系为什么变了」。
+    const tempBlock = (function () {
+      try {
+        if (!WA.relationTemp || typeof WA.relationTemp.build !== 'function') {
+          return '<div class=\"wa-dim\" id=\"wa-temp-block\">关系温度读数不可用（engines/relation-temp.js 缺席）</div>';
+        }
+        const cfg = (typeof WA.relationTemp.getSettings === 'function') ? WA.relationTemp.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) {
+          return '<div class=\"wa-dim\" id=\"wa-temp-block\">关系温度计已关闭（在设置页的「关系温度计」一格打开）</div>';
+        }
+        const r = WA.relationTemp.build();
+        if (!r || r.ok !== true) {
+          return '<div class=\"wa-dim\" id=\"wa-temp-block\">关系温度读数失败（build() 未返回）</div>';
+        }
+        if (r.quiet === true) {
+          return '<div class=\"wa-temp wa-temp-quiet\" id=\"wa-temp-block\"><div class=\"wa-dim\">'
+            + esc(r.hint || '暂无记录在案的关系变化') + '</div></div>';
+        }
+        const lines = Array.isArray(r.lines) ? r.lines : [];
+        return '<div class="wa-temp wa-temp-live" id="wa-temp-block">'
+          + lines.map(function (l) { return '<div class="wa-temp-line">' + esc(l) + '</div>'; }).join('')
+          + (r.truncated
+            ? '<div class="wa-dim">另有 ' + esc(String(r.dropped)) + ' 人没展开（本屏上限 ' + esc(String(r.cap)) + ' 人）</div>'
+            : '')
+          + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-temp-block">关系温度读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.268.0（V6 EXV6-4）：暗流日历 —— 「未结算的事几时撞上」。
+    const calBlock = (function () {
+      try {
+        if (!WA.undercurrentCalendar || typeof WA.undercurrentCalendar.build !== 'function') {
+          return '<div class="wa-dim" id="wa-cal-block">暗流日历读数不可用（engines/undercurrent-calendar.js 缺席）</div>';
+        }
+        const cfg = (typeof WA.undercurrentCalendar.getSettings === 'function') ? WA.undercurrentCalendar.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) {
+          return '<div class="wa-dim" id="wa-cal-block">暗流日历已关闭（在设置页的「暗流日历」一格打开）</div>';
+        }
+        const r = WA.undercurrentCalendar.build();
+        if (!r || r.ok !== true) {
+          return '<div class="wa-dim" id="wa-cal-block">暗流日历读数失败（build() 未返回）</div>';
+        }
+        if (r.totalActive === 0) {
+          return '<div class="wa-cal wa-cal-quiet" id="wa-cal-block"><div class="wa-dim">未来三天未发现迫近的未结算暗流，局势相对平稳。</div></div>';
+        }
+        const items = Array.isArray(r.items) ? r.items : [];
+        return '<div class="wa-cal wa-cal-live" id="wa-cal-block">'
+          + '<div class="wa-cal-line" style="font-weight:600;margin-bottom:3px;">未来三天暗流日历（基准：' + esc((r.baseDay && r.baseDay.label) || '当前') + '）</div>'
+          + items.map(function (it) {
+              const dayTag = (it.etaDays === 0) ? '今日' : (it.etaDays === 1 ? '明日' : (it.etaDays === 2 ? '后日' : ('第' + it.targetDay + '日')));
+              return '<div class="wa-cal-line">'
+                + '<b>【' + esc(dayTag) + '·' + esc(it.urgencyName) + '】</b>'
+                + esc(it.title)
+                + ' <span class="wa-dim">（窗口:' + esc(it.turns) + ' · ' + esc(it.windowText) + '）</span>'
+                + '</div>';
+            }).join('')
+          + (r.overflowCount > 0 ? '<div class="wa-dim">另有 ' + esc(String(r.overflowCount)) + ' 条远期暗流推进中</div>' : '')
+          + (r.shieldedHiddenCount > 0 ? '<div class="wa-dim">（含 ' + esc(String(r.shieldedHiddenCount)) + ' 条隐秘异动保护）</div>' : '')
+          + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-cal-block">暗流日历读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.269.0（V6 EXV6-5）：单轮成本卡 —— 「这一轮我花了多少上下文、哪几条白花」。
+    //   三态如实分列：关着 / 没有上一轮 / 有读数。**「没有上一轮」绝不许长得像「零成本」**，
+    //   面板上那一格必须明说「还不是零成本」——本模块立项的全部意义就在这一句上。
+    const costBlock = (function () {
+      try {
+        if (!WA.roundCost || typeof WA.roundCost.build !== 'function') {
+          return '<div class="wa-dim" id="wa-cost-block">单轮成本读数不可用（engines/round-cost.js 缺席）</div>';
+        }
+        const cfg = (typeof WA.roundCost.getSettings === 'function') ? WA.roundCost.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) {
+          return '<div class="wa-dim" id="wa-cost-block">单轮成本卡已关闭（在设置页的「单轮成本卡」一格打开）</div>';
+        }
+        const r = WA.roundCost.build();
+        if (!r || (r.state !== 'live' && r.state !== 'empty')) {
+          return '<div class="wa-cost wa-cost-quiet" id="wa-cost-block"><div class="wa-dim">'
+            + esc((r && r.line) || '单轮成本读数失败（build() 未返回）') + '</div></div>';
+        }
+        if (r.state === 'empty') {
+          return '<div class="wa-cost wa-cost-quiet" id="wa-cost-block"><div class="wa-dim">'
+            + esc(r.line) + '</div></div>';
+        }
+        const b = r.board || {};
+        return '<div class="wa-cost wa-cost-live" id="wa-cost-block">'
+          + '<div class="wa-cost-line" style="font-weight:600;margin-bottom:3px;">本轮成本卡（第 ' + esc(String(r.round == null ? '?' : r.round)) + ' 轮）</div>'
+          + '<div class="wa-cost-line">' + esc(r.line) + '</div>'
+          + (r.modeText ? '<div class="wa-cost-line wa-dim">额度档位：' + esc(r.modeText) + '</div>' : '')
+          + (b.stale > 0 ? '<div class="wa-cost-line wa-dim">另有 ' + esc(String(b.stale)) + ' 条更早轮次的源，不列入本轮统计</div>' : '')
+          + (r.flaggedAll && r.flaggedAll.length
+            ? '<div class="wa-cost-line wa-dim">连续零引用：' + esc(r.flaggedAll.slice(0, 6).join('、')) + '</div>' : '')
+          + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-cost-block">单轮成本读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.270.0（V6 EXV6-6）：存档体检 —— 「这局还能跑多久 + 建议先做什么」。
+    //   缺面必须看得见：三个上游出厂全关，体检单要明说「读不全（不等于健康）」，
+    //   而不是给一个看着正常的「状况良好」——那是把没量到写成量出来很好。
+    const saveBlock = (function () {
+      try {
+        if (!WA.saveHealth || typeof WA.saveHealth.build !== 'function') {
+          return '<div class="wa-dim" id="wa-save-block">存档体检读数不可用（engines/save-health.js 缺席）</div>';
+        }
+        const cfg = (typeof WA.saveHealth.getSettings === 'function') ? WA.saveHealth.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) {
+          return '<div class="wa-dim" id="wa-save-block">存档体检已关闭（在设置页的「存档体检」一格打开）</div>';
+        }
+        const r = WA.saveHealth.build();
+        if (!r || (r.ok !== true && r.state !== 'no-data')) {
+          return '<div class="wa-dim" id="wa-save-block">存档体检读数失败（build() 未返回）</div>';
+        }
+        if (r.state === 'no-data') {
+          return '<div class="wa-save wa-save-quiet" id="wa-save-block"><div class="wa-dim">'
+            + esc(r.line) + '</div></div>';
+        }
+        const cls = (r.state === 'urgent') ? 'wa-save wa-save-live wa-save-urgent'
+          : (r.state === 'watch' ? 'wa-save wa-save-live wa-save-watch' : 'wa-save wa-save-live');
+        const rows = (r.advice || []).map(function (x) {
+          return '<div class="wa-save-line wa-dim">· ' + esc(x.text) + '</div>';
+        }).join('');
+        return '<div class="' + cls + '" id="wa-save-block">'
+          + '<div class="wa-save-line" style="font-weight:600;margin-bottom:3px;">存档体检 · ' + esc(r.state) + '</div>'
+          + '<div class="wa-save-line">' + esc(r.line) + '</div>'
+          + rows
+          + (r.adviceTotal > (r.advice || []).length
+            ? '<div class="wa-save-line wa-dim">另有 ' + esc(String(r.adviceTotal - r.advice.length)) + ' 条建议未列出</div>' : '')
+          + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-save-block">存档体检读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
+    // v2.271.0（V6 EXV6-7）：开局引导三步卡 —— 「你现在在第几步、下一步做什么」。
+    //   三态如实渲染：done 划掉、todo 加粗、cannot-tell 斜体并说明**测不到**（不写成没做）。
+    //   每步给一个直达按钮（出口来自引擎的 next()，面板不自己编动作）。
+    const firstBlock = (function () {
+      try {
+        if (!WA.firstRun || typeof WA.firstRun.build !== 'function') {
+          return '<div class="wa-dim" id="wa-first-block">开局引导不可用（engines/first-run.js 缺席）</div>';
+        }
+        const cfg = (typeof WA.firstRun.getSettings === 'function') ? WA.firstRun.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) return '';   // 关着就整块不渲染（不占屏）
+        const r = WA.firstRun.build();
+        if (!r || r.ok !== true) return '';
+        if (r.visible !== true) return '';             // 三步都做完且未要求保留 ⇒ 不占屏
+        const rows = (r.steps || []).map(function (s) {
+          const cls = s.state === 'done' ? 'wa-first-done'
+            : (s.state === 'cannot-tell' ? 'wa-first-cannot' : 'wa-first-todo');
+          const mark = s.state === 'done' ? '✓' : (s.state === 'cannot-tell' ? '?' : '○');
+          const note = s.state === 'cannot-tell'
+            ? (' <span class="wa-dim">（测不到' + (s.why2 ? '：' + esc(s.why2) : '') + '，可手勾）</span>')
+            : (s.source === 'manual' ? ' <span class="wa-dim">（你自己勾的）</span>' : '');
+          return '<div class="wa-first-step ' + cls + '">'
+            + '<b>' + esc(mark + ' ' + s.order + '. ' + s.title) + '</b>'
+            + '<span class="wa-dim">' + esc(s.why) + '</span>'
+            + note
+            + '<button class="wa-btn wa-mini wa-first-go" data-first-go="' + esc(s.id) + '" title="' + esc(s.exit.hint) + '">去做</button>'
+            + '</div>';
+        }).join('');
+        return '<div class="wa-first wa-first-live" id="wa-first-block">'
+          + '<div class="wa-first-line" style="font-weight:600;margin-bottom:3px;">开局引导（' + esc(String(r.doneCount)) + '/' + esc(String(r.total)) + '）</div>'
+          + rows
+          + '<div class="wa-first-line wa-dim">' + esc(r.line) + '</div>'
+          // v2.274.0：dismiss 的真消费方。用 data-* 而非 id 绑：本块是**条件渲染**
+          //   （visible 才出），进 UI_BINDINGS 的静态 id 表会被判成「静态渲染缺失」。
+          + '<button class="wa-btn wa-mini wa-first-dismiss" data-first-dismiss="1" title="收起这一块（只写设置族，不动世界）：三步的当前态在设置页「开局引导」一格仍然查得到">知道了</button>'
+          + '<div id="wa-first-out" class="wa-out"></div>'
+          + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-first-block">开局引导读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
     return `
       <div class="wa-stat-grid">
         <div class="wa-stat"><div class="wa-stat-v">${esc(s.clock.label || '未设定')}</div><div class="wa-stat-k">世界时间</div></div>
@@ -809,6 +1167,17 @@
         <div class="wa-stat"><div class="wa-stat-v">${s.evolution.round}</div><div class="wa-stat-k">演化回合</div></div>
         <div class="wa-stat"><div class="wa-stat-v">${beforeN}+${afterN}</div><div class="wa-stat-k">工作流节点</div></div>
       </div>
+      ${firstBlock}
+      ${firstLine}
+      ${diaryBlock}
+      ${routeBlock}
+      ${tempBlock}
+      ${calBlock}
+      ${costBlock}
+      ${saveBlock}
+      ${capLine}
+      ${healthLine}
+      ${visLine}
       <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}</div>
       <div class="wa-sec">工作流节点开关</div>
       <div class="wa-node-list">${nodes.map(n => `
@@ -2195,6 +2564,23 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           + '<div class="wa-kv"><span>预算来源</span><b>' + esc(b.source || '?') + (b.contextSize ? '（上下文 ' + esc(String(b.contextSize)) + '）' : '') + '</b></div>'
           + '<div class="wa-kv"><span>保留项</span><b>' + esc(String(b.keptCount == null ? '?' : b.keptCount)) + '</b></div>'
           + (b.overBudget ? '<div class="wa-dim wa-log-warn">超出预算（pinned 保底项不可裁）</div>' : '');
+        // v2.261.0（V6 OPV6-6）：**余量行**。修前这段只报 `used/cap` 两个数，
+        //   「还剩多少」要读者自己做减法，「算不算饱和」更是无从判断——而现场实测
+        //   长局额度只用 43%，玩家的真实问题不是「额度不够」而是「机制没开够」。
+        //   本行把余量、占比、可再开几个源、以及一句建议直接说出来。
+        //   走 `injectBudget.budgetView`（与诊断包、backstage 同一判据）。
+        const bh = (WA.injectBudget && typeof WA.injectBudget.budgetView === 'function')
+          ? WA.injectBudget.budgetView(b) : null;
+        if (bh) {
+          h += '<div class="wa-kv"><span>余量</span><b>' + esc(String(bh.remain)) + 't'
+            + '（' + esc(String(bh.freePct)) + '%）'
+            + (bh.spareSources != null ? '<span class="wa-dim"> · 可再开 ' + esc(String(bh.spareSources)) + ' 个源</span>' : '')
+            + '</b></div>';
+          if (bh.modeText) h += '<div class="wa-dim">' + esc(bh.modeText) + '</div>';
+          if (bh.saturated && !bh.overBudget) h += '<div class="wa-dim wa-log-warn">额度已饱和：余量小到再放不下最小可保项</div>';
+          if (bh.advice) h += '<div class="wa-dim">' + esc(bh.advice) + '</div>';
+          if (bh.derived) h += '<div class="wa-dim">余量按快照现算（非裁决当时所记）</div>';
+        }
         if ((b.folded || []).length) h += '<div class="wa-dim">折叠 ' + (b.folded || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')'; }).join('、') + '</div>';
         if ((b.dropped || []).length) h += '<div class="wa-dim wa-log-warn">丢弃 ' + (b.dropped || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')' + (f.tokens ? ' ' + esc(String(f.tokens)) + 't' : ''); }).join('、') + '</div>';
         h += '</div>';
@@ -2786,8 +3172,14 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-theme-out" class="wa-out">${(() => {
         const ts = (WA.theme && typeof WA.theme.statView === 'function') ? WA.theme.statView() : null;
         if (!ts) return '';
+        // v2.258.0（OPV6-3）：这一行现在也报**引擎面**——题材不再只改模块顺序，
+        //   它真开机制。只说「已应用」而不说「开了几个机制」＝ 玩家看不见枪响没响。
+        const face = (typeof WA.theme.engineFace === 'function') ? WA.theme.engineFace() : null;
         return '<span class="wa-dim">当前启用：' + (ts.themes.length ? esc(ts.themes.join('+')) : '无（全量 ' + (((WA.rules && WA.rules.ORDER) || []).length) + ' 模块）')
-          + ' · 应用 ' + ts.applies + ' 次 / 预览 ' + ts.previews + ' 次 / 拒收 ' + ts.rejects + ' 次</span>';
+          + (face ? ' · 本题材机制 ' + face.running.length + '/' + face.want.length + ' 在跑'
+            + (face.notInjected.length ? '（' + face.notInjected.length + ' 个无注入面）' : '') : '')
+          + ' · 应用 ' + ts.applies + ' 次 / 预览 ' + ts.previews + ' 次 / 拒收 ' + ts.rejects + ' 次'
+          + (ts.partials ? ' / 部分成功 ' + ts.partials + ' 次' : '') + '</span>';
       })()}</div>
       <div class="wa-sec">剧情引导（弧线/序列）</div>
       ${plan ? `<div class="wa-item"><b>${esc(plan.kind === 'arc' ? '弧线' : '序列')}</b> 第${plan.current + 1}/${plan.beats.length}拍<div class="wa-dim">${esc((WA.oracle.currentBeat() || {}).goal || '')}</div><button class="wa-btn wa-mini" id="wa-beat-next" title="推进到剧情弧线的下一拍">完成本拍</button><button class="wa-btn wa-mini" id="wa-plan-clear">放弃</button></div>`
@@ -2961,6 +3353,17 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     const capOn = lazy(function () { const c = capCfgL(); return !!(c && c.enabled); });
     const pblCfgL = lazy(function () { return (WA.perfBaseline && WA.perfBaseline.getSettings) ? WA.perfBaseline.getSettings() : null; });
     const pblOn = lazy(function () { const c = pblCfgL(); return !!(c && c.enabled); });
+    // v2.257.0（OPV6-1 / OPV6-2）：能力档位与启用面的读数。
+    //   分工是**引擎算、面板显示**：档位引擎只答「三档各多大 / 现在跑几台 / 能退回几步」，
+    //   审计引擎只答「关着的那些为什么关着」。纪律同 v2.164.0 起：**「读不到」与「关着」分开**。
+    const tierViewL = lazy(function () {
+      try { return (WA.capabilityTier && typeof WA.capabilityTier.view === 'function') ? WA.capabilityTier.view() : null; }
+      catch (e) { return null; }
+    });
+    const capAuditCfgL = lazy(function () {
+      return (WA.capabilityAudit && WA.capabilityAudit.getSettings) ? WA.capabilityAudit.getSettings() : null;
+    });
+    const capSummaryOn = lazy(function () { const c = capAuditCfgL(); return !!(c && c.showSummary === true); });
     // v2.184.0（E3）：存档槽的开关与三个容量参数常驻读数 ——
     //   「库是空的」与「这一面被关掉了」必须分得开（同 v2.164.0/v2.182.0 的惯例）。
     const ckcfg = (WA.checkpoints && WA.checkpoints.getSettings) ? WA.checkpoints.getSettings() : null;
@@ -3094,6 +3497,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       ${foldSec('tools', 'traces', '运行痕迹<span class="wa-dim">（只清计量，不动世界状态）</span>', () => `
       <div class="wa-row">
         <button class="wa-btn" id="wa-stat-reset" title="仅重置各种计数器，世界状态与存档不受影响">清零计量</button>
+        <button class="wa-btn" id="wa-gauge-reset" title="清零八台读数仪的进程态计量（世界日记/人物动线/关系温度/暗流日历/单轮成本/存档体检/开局引导/一键交班）。只清计量，不动存档、不改配置">清零读数仪</button>
         <button class="wa-btn" id="wa-wf-reset" title="清空工作流运行历史与失败台账">清空运行痕迹</button>
       </div>
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
@@ -3282,6 +3686,34 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-pbl-out" class="wa-out"></div>
       <div id="wa-diag-out" class="wa-out"></div>
       `)}
+      ${foldSec('tools', 'capability', '能力档位与启用面</div><div class="wa-dim">（OPV6-1/2：默认隐身 —— 想加多少能力，由你自己挑；关着的那些为什么关着，看得见）', () => {
+        // 读数在**段体内部**求值（OPT-9 的惰性约定）：收起态下这一整段不拼接，也就不读。
+        const tv = tierViewL();
+        const stdN = tv ? ((tv.tiers || []).filter(function (t) { return t.name === 'standard'; })[0] || {}).size : null;
+        return `      <div class="wa-dim">三档的定义是<b>「这一档要求哪些引擎开着」</b>，不是「这一档有多强」：
+        <b>lite</b> 一个都不额外开（只有出厂默认那几台在跑）；<b>standard</b> 按<b>静态白名单</b>逐名点开（${stdN === null ? '读不到' : stdN} 个世界机制）；<b>full</b> 在<b>运行时探测</b>——凡是有 buildBlock 又能被统一写入口打开的，一律点开（不写死名单，所以引擎增删不会让名单过期）。
+        <br>边界：档位<b>只收回自己开过的</b>（granted）。玩家自己手动开的，切档不会被关掉；出厂就开着的，永远不在 granted 里 —— 因此切回 lite 不会把出厂能力误关（这是本模块最容易写错的一处，已在源码里留注）。
+        <br>此刻：<span id="wa-ct-live"><b>${tv ? esc(String(tv.tier)) : '读不到档位引擎'}</b>${tv ? ('　在跑世界机制 ' + tv.running + ' / ' + tv.mechanisms + ' 台（关着 ' + tv.dormant + ' 台）　可退回 ' + tv.rollbackDepth + ' / ' + tv.rollbackCap + ' 步') : ''}</span></div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-ct-lite" title="一个都不额外开：只留出厂默认在跑的那几台。档位只收回自己开过的 —— 玩家手动开的不会被关掉">lite｜只留出厂</button>
+        <button class="wa-btn" id="wa-ct-standard" title="静态白名单逐名点开：每一个都会真写一次并回读确认，开不动的不静默算成功，逐条列进 notEffective">standard｜常用一套</button>
+        <button class="wa-btn" id="wa-ct-full" title="运行时探测：凡有 buildBlock 又能被统一写入口打开的，一律点开（不写死名单）。探测 100 台需要点时间">full｜全都打开</button>
+        <button class="wa-btn" id="wa-ct-rollback" title="退回上一档：栈里只装「启用面」的变更（不含玩家手动操作），最多 12 步，与规则包同规格">退回上一档</button>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-ct-view" title="只读：三档各自的名单规模与当前开着的个数，以及下一档还差几步（gap 是「离下一档还差几个要开的」，不是「离下一档有多远」这种模糊说法）">档位总览</button>
+        <button class="wa-btn" id="wa-ct-list" title="只读：谁在跑 / 谁没跑 / 关着但有 buildBlock 的是哪些（点开会有内容的那些）">清单</button>
+        <button class="wa-btn" id="wa-ca-audit" title="只读：关着的每一个为什么关着，三档归因 —— 出厂就没开 / 你自己关的 / 压根没有 buildBlock。判据直接读磁盘落盘原值，不经过 def 合并（否则「没表过态」与「表过态 false」分不开）">为什么关着</button>
+        <button class="wa-btn" id="wa-ca-dormant" title="只读：关着、但开了会有内容的那批（不含 no-builder）—— 这是「你还能加多少能力」的实际可加量">可加能力</button>
+      </div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-ca-preview" title="只读：摘要长什么样 —— 勾上「带一行摘要」之后，每轮注入末尾会多这一行。先看再决定占不占额度">摘要预览</button>
+        <button class="wa-btn" id="wa-ct-stat" title="自证面：两个引擎各自被调了多少次、失败几次、写了多少次盘 —— 这些数由引擎自己数，面板只转述（面板不另算一份）">引擎自证</button>
+      </div>
+      <label class="wa-row"><input id="wa-ca-summary" type="checkbox" ${capSummaryOn() ? 'checked' : ''}/> 在每轮注入末尾带一行启用面摘要<span class="wa-dim">（默认关 —— 摘要本身也占上下文，占不占由你定）</span></label>
+      <div id="wa-ct-out" class="wa-out"></div>
+      `;
+      })}
       </div>`;
   }
   /**
@@ -4638,6 +5070,42 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     '#wa-co-out', '#wa-ff-out', '#wa-inj-out', '#wa-rt-out'];
   function bindBody() {
     const $ = sel => panelEl.querySelector(sel);
+    // v2.271.0（V6 EXV6-7）：开局引导「去做」按钮的点击实现。
+    //   出口来自引擎 next()（面板不自己编动作）；本处置的是「点了之后该去哪」：
+    //     · openSettings / applyTier ⇒ 切到设置页（切档按钮在那一格）；
+    //     · openOverview ⇒ 已经在概览页，只需提示「回对话说一句」。
+    //   为什么不在这里直接切档：切档要逐引擎真写并复核（capabilityTier.applyTier 的事），
+    //   面板越权调用等于把「部分成功」报成「已开启」——那是已付过价的形态。
+    try {
+      panelEl.querySelectorAll('[data-first-go]').forEach(function (b) {
+        if (typeof b.onclick === 'function') return;   // 幂等：重入不叠处理器
+        b.onclick = function () {
+          const id = b.dataset.firstGo;
+          const nx = (WA.firstRun && typeof WA.firstRun.next === 'function') ? WA.firstRun.next(id) : null;
+          const action = nx ? nx.do : 'openSettings';
+          if (action === 'openOverview') {
+            setOut('#wa-first-out', '回对话里随便说一句即可（推演会随即开始）');
+            return;
+          }
+          if (WA.ui && typeof WA.ui.goPage === 'function') WA.ui.goPage('settings');
+          if (nx && nx.hint) setOut('#wa-first-out', nx.hint);
+        };
+      });
+    } catch (e) { /* 查询失败 ⇒ 不绑，不假装绑上 */ }
+    // v2.274.0：开局引导「知道了」——调引擎 dismiss()，不自己写设置键。
+    //   幂等靠 data-* 判重（重入时 onclick 已在，不叠处理器）。
+    try {
+      panelEl.querySelectorAll('[data-first-dismiss]').forEach(function (b) {
+        if (typeof b.onclick === 'function') return;
+        b.onclick = function () {
+          if (!(WA.firstRun && typeof WA.firstRun.dismiss === 'function')) return;
+          const r = WA.firstRun.dismiss();
+          if (r && r.ok === false) { setOut('#wa-first-out', '收起失败：' + (r.reason || '被拒')); return; }
+          renderBody();
+        };
+      });
+    } catch (e) { /* 同上：查询失败就不绑 */ }
+
     // v2.21.0: 结果出口的**判空写**（与设置页同规格，同一处约定不再各写一份）。
     //   `$('#x')` 每次调用都重新查询；异步出口（观测/档案/弧线/选项目/快照导入）在 `await`
     //   之后才写回，其间任意状态事件都会触发面板重绘、目标节点从树中消失 ⇒ 重查得 null ⇒
@@ -4922,18 +5390,34 @@ on('#wa-desk-show', showDesk);
             + '（源级投影覆盖 ' + c.coverage.mapped + '/' + c.coverage.sources + ' 个源）';
         if (c.coverage.unmapped.length) text += '｜未映射源 ' + c.coverage.unmapped.length + ' 个：' + c.coverage.unmapped.join('、');
       }
+      // v2.258.0（OPV6-3）：预览必须报「会开几个机制」——否则玩家点了预览只知道模块变了，
+      //   应用之后才第一次看见引擎被开（预览不覆盖的纪律：先把账算清再决定）。
+      if (typeof p.engineCount === 'number') {
+        text += '｜机制面：将开 ' + p.engineWillOn + '/' + p.engineCount + ' 个'
+          + (p.notInjected.length ? '（' + p.notInjected.length + ' 个无注入面：' + p.notInjected.slice(0, 5).join('、') + '）' : '');
+      }
       themeOut(text);
     });
     on('#wa-theme-apply', () => {
       if (!WA.theme) { themeOut('题材模块未加载'); return; }
       const r = WA.theme.apply(themePicked());
-      themeOut(r.ok ? ('已应用：' + (r.themes.join('+') || '全量') + '（' + ((r.modules || []).length) + ' 模块）') : ('拒收：' + r.reason + '（未知 ' + ((r.unknown || []).join('、')) + '）'));
+      // v2.258.0（OPV6-3）：应用回执带**机制面实数**，且部分成功如实报 partial
+      //   （计划口径：任一未生效如实 tier-partial，不折成「已开启」）。
+      themeOut(r.ok ? ('已应用：' + (r.themes.join('+') || '全量') + '（' + ((r.modules || []).length) + ' 模块'
+          + ' / 开机制 ' + ((r.enginesOn || []).length) + ' 个'
+          + (r.noop ? '，本档已就位' : '')
+          + (r.partial ? '；' + (r.partialReason || 'tier-partial') + '：未生效 ' + ((r.notEffective || []).length)
+            + ' 个' + (((r.notEffective || []).length) ? '（' + r.notEffective.join('、') + '）' : '')
+            + '、无注入面 ' + ((r.notInjected || []).length) + ' 个' + (((r.notInjected || []).length) ? '（' + r.notInjected.join('、') + '）' : '') : '')
+          + '）')
+        : ('拒收：' + r.reason + '（未知 ' + ((r.unknown || []).join('、')) + '）'));
       if (r.ok) renderBody();
     });
     on('#wa-theme-clear', () => {
       if (!WA.theme) return;
-      WA.theme.apply([]);
-      themeOut('已清空题材：回到全量注入');
+      const r = WA.theme.apply([]);
+      // 清空 = 连本模块自己开的机制一起收回（只收自己开的，见 theme.apply 口径①）
+      themeOut('已清空题材：回到全量注入' + (r && r.ok ? '（收回机制 ' + ((r.enginesOff || []).length) + ' 个）' : ''));
       renderBody();
     });
     // v2.87.0 B6：因果工作台——当前/累计分列、干预预览、分支试演、冲突显式选择、回放证据。
@@ -7456,6 +7940,7 @@ on('#wa-desk-show', showDesk);
       if (!WA.rulePack || !WA.rulePack.apply) return rpkOut('未记录：module-missing');
       const r = WA.rulePack.apply(rpkVal('#wa-rp-name'));
       if (!r.ok) return rpkOut('未切换：' + r.reason, true);
+      if (r.idempotent) return rpkOut('已切到 ' + r.name + '：幂等跳过 —— 当前面已与包逐键一致，未写盘、栈不占位、计数不涨', true);
       rpkOut('已切到 ' + r.name + '：写回 ' + r.applied.length + ' 键'
         + (r.failed.length ? ' · 失败 ' + r.failed.length + '（' + esc(r.failed.map(function (x) { return x.key; }).join('、')) + '）' : '')
         + (r.skipped.length ? ' · 跳过 ' + r.skipped.length + '（本侧未登记）' : '')
@@ -11248,6 +11733,35 @@ on('#wa-desk-show', showDesk);
           + '——只重置计数器，世界状态与存档未受影响</div>';
       } catch (e) { out.textContent = '清零失败：' + (e && e.message); }
     };
+    // v2.274.0：读数仪清零出口——八台读数引擎的 reset() 此前**零消费**（导出面有口、无人调），
+    //   是「只在测试里活」的典型形态。本按钮是它们的真消费方，且与「清零计量」分工不同：
+    //   前者清 store/apiRouter 的事务与通道台账，后者只清八台读数仪自己的观测计数。
+    //   ⚠ 逐台如实报缺席：某台没装载时不许静默少清（少清一台 = 那份读数跨了两代）。
+    const grBtn = $('#wa-gauge-reset');
+    if (grBtn) grBtn.onclick = () => {
+      const out = $('#wa-diag-out'); if (!out) return;
+      // 逐台**字面调用**（不用 `WA[名字].reset()` 动态取）：死导出门禁的引用判据认的是
+      //   `WA.ns.mem` 这一字形形态，动态取值在真代码面上零命中，会被判成「产品零引用」。
+      const gauges = [
+        ['世界日记', function () { return WA.worldDiary && WA.worldDiary.reset; }],
+        ['人物动线', function () { return WA.dayRoute && WA.dayRoute.reset; }],
+        ['关系温度', function () { return WA.relationTemp && WA.relationTemp.reset; }],
+        ['暗流日历', function () { return WA.undercurrentCalendar && WA.undercurrentCalendar.reset; }],
+        ['单轮成本', function () { return WA.roundCost && WA.roundCost.reset; }],
+        ['存档体检', function () { return WA.saveHealth && WA.saveHealth.reset; }],
+        ['开局引导', function () { return WA.firstRun && WA.firstRun.reset; }],
+        ['一键交班', function () { return WA.handoffPack && WA.handoffPack.reset; }]
+      ];
+      const done = [], absent = [];
+      gauges.forEach(function (g) {
+        const fn = g[1]();
+        if (typeof fn === 'function') { try { fn(); done.push(g[0]); } catch (e) { absent.push(g[0] + '(抛错)'); } }
+        else absent.push(g[0] + '(未装载)');
+      });
+      out.innerHTML = '<div class="wa-log wa-log-info">✓ 读数仪已清零 ' + done.length + ' 台：' + esc(done.join('、'))
+        + (absent.length ? '　未清：' + esc(absent.join('、')) : '')
+        + '——只清观测计数，世界状态与存档未受影响</div>';
+    };
     // v2.2.0: 宿主兼容层出口——compatMvu.status / compatTH.status 此前零消费
     const cvBtn = $('#wa-compat-view');
     if (cvBtn) cvBtn.onclick = () => {
@@ -11866,7 +12380,10 @@ on('#wa-desk-show', showDesk);
             //   快照库同理——读不出来时它与「本地没有快照」同形，而后者是安装/覆盖的既有前提。
             historySearch: '历史检索词库读回（读失败 ⇒ 与「从来没查过」同形）',
             worldSnapshot: '世界快照库读回（读失败 ⇒ 与「本地没有快照」同形）',
-            tapeStore: '磁带仓库读回' };
+            tapeStore: '磁带仓库读回',
+            // v2.274.0（V6 收口）：与 store.LAB / toolDiag.SRC_LABEL 同源同键集。
+            //   缺这一份，面板上「读不出玩家表过的态」与「玩家没表过态」同形。
+            capabilityAudit: '能力档位表态读回' };
           const byP = rdStore2.bySource || {};
           const srcTxtP = Object.keys(byP).filter(function (k) { return byP[k] > 0; })
             .map(function (k) { return (LAB_P[k] || k) + ' ' + byP[k]; }).join(' / ');
@@ -12565,7 +13082,6 @@ on('#wa-desk-show', showDesk);
             return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<span class="wa-dim">缺席</span>') + '</div>';
           }).join(''));
       });
-
       const pblOut = function (html) { const o = $('#wa-pbl-out'); if (o) o.innerHTML = html; };
       const pblWhy = function (reason) {
         const M = {
@@ -12630,8 +13146,162 @@ on('#wa-desk-show', showDesk);
         pblOut('<div class="wa-log wa-log-' + (d.closedLoop ? 'info' : 'warn') + '">自证面：闭环 ' + (d.closedLoop ? '✓' : '✗')
           + '　版本 ' + esc(d.version) + '　分层 ' + d.faceCount + ' · 档位 ' + d.bandCount + '　实机 ' + esc(d.realDevice) + '</div>'
           + Object.keys(d.checks).map(function (k) {
-            return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<span class="wa-dim">缺席</span>') + '</div>';
+return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<span class="wa-dim">缺席</span>') + '</div>';
           }).join(''));
+      });
+    }
+    // ══ v2.257.0（OPV6-1 / OPV6-2）：能力档位与启用面 ══
+    //   这三件事必须分得开，界面上也分开写：
+    //     ① 切档（写：真开/真关一批引擎，只动自己开过的那批）
+    //     ② 总览/清单（只读：三档多大、谁在跑）
+    //     ③ 归因（只读：关着的那些到底为什么关着）
+    //   把②③混进①的按钮里，玩家就再也分不清「我点了一下发生了什么」与「现在是什么状态」。
+    //   拒收理由一律**照引擎原话**回显（不在这里编一套新的措辞）—— 两处措辞必然漂移。
+    {
+      const ctOut = function (html) { const o = $('#wa-ct-out'); if (o) o.innerHTML = html; };
+      const ctMissing = function () { ctOut('<div class="wa-log wa-log-err">档位引擎未加载（engines/capability-tier.js 缺席）—— 这不是配置问题</div>'); };
+      const ctWhy = function (reason) {
+        const M = {
+          'bad-value': '档位名不认识（只认 lite / standard / full）',
+          'save-threw': '写盘时抛错了 —— 世界设设置未被改动',
+          'no-history': '没有可退回的记录（栈是空的）',
+          'module-missing': '模块缺席'
+        };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      // 把一次切档的结果摊成人话：动了几个、哪几个没生效（notEffective 是真写后回读失败的，
+      //   **必须逐条列出来** —— 静默算成功就是本仓反复裁决过的假验收）。
+      //   「此刻在跑几台」不在 applyTier 的返回里（引擎只答它改了什么，状态由 view() 现场读）——
+      //   所以这里切完**重读一次** view()，而不是让引擎顺手报一个它自己没算过的数。
+      const ctRunning = function () {
+        try { const v = WA.capabilityTier.view(); return v ? v.running : null; } catch (e) { return null; }
+      };
+      const ctRunTxt = function (n) { return n === null ? '读不到在跑数' : (n + ' 台'); };
+      const ctReport = function (r, runAfter, runBefore) {
+        if (!r || !r.ok) return '<div class="wa-log wa-log-warn">' + esc(ctWhy(r && r.reason)) + '</div>';
+        if (r.noop) {
+          return '<div class="wa-log wa-log-info">已经在 <b>' + esc(r.tier) + '</b> 档：什么都没动（同一个档重复切不写盘、不入栈）'
+            + '　此刻在跑 ' + esc(ctRunTxt(runAfter)) + '</div>';
+        }
+        const on = (r.turnedOn || []), off = (r.turnedOff || []), ne = (r.notEffective || []);
+        return '<div class="wa-log wa-log-info">已切到 <b>' + esc(r.tier) + '</b>：开 ' + on.length + ' · 关 ' + off.length
+          + '　此刻在跑 ' + esc(ctRunTxt(runAfter)) + (runBefore === null ? '' : ('（切前 ' + runBefore + '）')) + '</div>'
+          + (on.length ? '<div class="wa-dim">开了：' + esc(on.join('、')) + '</div>' : '')
+          + (off.length ? '<div class="wa-dim">关了：' + esc(off.join('、')) + '</div>' : '')
+          + (ne.length ? '<div class="wa-log wa-log-warn">写了但没生效（回读仍关）：' + esc(ne.join('、'))
+            + '</div><div class="wa-dim">这些不是「打开失败」那么简单 —— 它们的开关记下了 true 却仍读到关，说明该引擎的启用判定不只认这个键。</div>' : '');
+      };
+      const doTier = function (nm) {
+        if (!WA.capabilityTier || typeof WA.capabilityTier.applyTier !== 'function') return ctMissing();
+        // 切前先读一次，切后再读一次：两个读数都来自 view()（同一真源），不拼凑。
+        const runBefore = ctRunning();
+        ctOut('<div class="wa-log wa-log-info">切换中…（full 档要逐台探测，稍等）</div>');
+        let r;
+        try { r = WA.capabilityTier.applyTier(nm); }
+        catch (e) { return ctOut('<div class="wa-log wa-log-err">切换抛错：' + esc(e && e.message) + '</div>'); }
+        ctOut(ctReport(r, ctRunning(), runBefore));
+      };
+      on('#wa-ct-lite', () => doTier('lite'));
+      on('#wa-ct-standard', () => doTier('standard'));
+      on('#wa-ct-full', () => doTier('full'));
+      on('#wa-ct-rollback', () => {
+        if (!WA.capabilityTier || typeof WA.capabilityTier.rollback !== 'function') return ctMissing();
+        let r;
+        try { r = WA.capabilityTier.rollback(); }
+        catch (e) { return ctOut('<div class="wa-log wa-log-err">退回抛错：' + esc(e && e.message) + '</div>'); }
+        if (!r || !r.ok) return ctOut('<div class="wa-log wa-log-warn">' + esc(ctWhy(r && r.reason)) + '</div>');
+        ctOut('<div class="wa-log wa-log-info">已退回 <b>' + esc(r.tier) + '</b>（来自 ' + esc(r.from || '?') + '）：开 '
+          + (r.turnedOn || []).length + ' · 关 ' + (r.turnedOff || []).length + '　此刻在跑 ' + r.running + ' 台</div>');
+      });
+      on('#wa-ct-view', () => {
+        if (!WA.capabilityTier || typeof WA.capabilityTier.view !== 'function') return ctMissing();
+        const v = WA.capabilityTier.view();
+        ctOut('<div class="wa-log wa-log-info">当前档位 <b>' + esc(v.tier) + '</b>　在跑 ' + v.running + ' / ' + v.mechanisms
+          + ' 台（关着 ' + v.dormant + '）　退回栈 ' + v.rollbackDepth + '/' + v.rollbackCap + '</div>'
+          + (v.tiers || []).map(function (t) {
+            const isCur = t.name === v.tier;
+            return '<div class="wa-item">' + (isCur ? '<b>' + esc(t.name) + '（当前）</b>' : esc(t.name))
+              + '：名单 ' + t.size + ' 个，其中开着 ' + t.on + ' 个</div>';
+          }).join('')
+          + (v.next ? '<div class="wa-dim">下一档 ' + esc(v.next) + ' 还差 ' + v.gap + ' 个要开的'
+            + '（这个数是「差几个」，不是「有多远」）</div>' : '<div class="wa-dim">已是最高档</div>')
+          + ((v.granted || []).length ? '<div class="wa-dim">档位自己开过的 ' + v.granted.length
+            + ' 个（切回更低档时只会关这些，玩家手动开的不在其列）：' + esc(v.granted.join('、')) + '</div>'
+            : '<div class="wa-dim">档位自己还没开过任何东西 —— 现在在跑的都是出厂默认或你手动开的</div>'));
+      });
+      on('#wa-ct-list', () => {
+        if (!WA.capabilityTier || typeof WA.capabilityTier.list !== 'function') return ctMissing();
+        const l = WA.capabilityTier.list();
+        ctOut('<div class="wa-log wa-log-info">开关 ' + l.switches + ' 个：开 ' + (l.on || []).length + ' · 关 ' + (l.off || []).length
+          + ' · 关着但有 buildBlock（点开会出内容的）' + (l.offWithBlock || []).length + '</div>'
+          // 注意括号：`A + cond ? x : y` 会先算 `A + cond`（恒真），分支就永远走 x。
+          + ((l.offWithBlock || []).length
+            ? '<div class="wa-dim">这些是「还能加的能力」：' + esc((l.offWithBlock || []).slice(0, 40).join('、'))
+              + ((l.offWithBlock || []).length > 40 ? ' 等 ' + (l.offWithBlock || []).length + ' 个' : '') + '</div>'
+            : '<div class="wa-dim">没有「关着但有 buildBlock」的引擎 —— 能开的都开了。</div>'));
+      });
+      on('#wa-ca-audit', () => {
+        if (!WA.capabilityAudit || typeof WA.capabilityAudit.audit !== 'function') return ctOut('<div class="wa-log wa-log-err">启用面审计引擎未加载（engines/capability-audit.js 缺席）</div>');
+        const a = WA.capabilityAudit.audit();
+        const br = a.byReason || {};
+        ctOut('<div class="wa-log wa-log-info">开关 ' + a.switches + ' 个 · 世界机制 ' + a.mechanisms + ' 台 · 在跑 ' + a.running
+          + ' · 关着 ' + a.dormant + '</div>'
+          // 三个数字放在**同一个纯文本节点**里、不用 <b> 包裹：本行是给判据读的读数行，
+          //   混进标签会让「数字跟着哪个标签」在序列化后失真（jQuery/innerHTML 两种读法都能读对）。
+          + '<div class="wa-item" id="wa-ca-reasons">关着的 ' + a.dormant + ' 个分成三类：出厂就没开 '
+          + (br.defaultOff || 0) + ' · 你自己关的 ' + (br.userOff || 0) + ' · 压根没有 buildBlock '
+          + (br.noBuilder || 0) + '</div>'
+          + '<div class="wa-dim">三类的处置完全不同：第一类点开就有内容；第二类是你表过态（关它就是关它，档位也不碰）；'
+          + '第三类开着也不产出任何注入，打开它只是多一个空转的引擎。</div>'
+          + (br.userOff ? '<div class="wa-dim">你关掉的那些（意图，不是欠账）：'
+            + esc((a.dormantRows || []).filter(function (r) { return r.reason === 'user-off'; }).slice(0, 20).map(function (r) { return r.ns; }).join('、')) + '</div>' : ''));
+      });
+      on('#wa-ca-dormant', () => {
+        if (!WA.capabilityAudit || typeof WA.capabilityAudit.dormantMechanisms !== 'function') return ctOut('<div class="wa-log wa-log-err">启用面审计引擎未加载</div>');
+        const list = WA.capabilityAudit.dormantMechanisms();
+        ctOut('<div class="wa-log wa-log-info">可加能力：' + list.length + ' 个引擎关着、但开了会有内容（已排除「开着也不产出」的那种）</div>'
+          + (list.length ? '<div class="wa-dim">' + esc(list.slice(0, 60).join('、'))
+            + (list.length > 60 ? ' 等 ' + list.length + ' 个' : '') + '</div>'
+            : '<div class="wa-item">一个都没有 —— 要么全开着，要么剩下的都没有 buildBlock。</div>')
+          + '<div class="wa-dim">想要一次性多加，用上面的 standard / full；只想挑几个，就按这份名单自己去各页开。</div>');
+      });
+      const caSum = $('#wa-ca-summary');
+      if (caSum) caSum.onchange = function () {
+        if (!WA.capabilityAudit || !WA.capabilityAudit.setSettings) return ctOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');
+        const r = WA.capabilityAudit.setSettings({ showSummary: !!caSum.checked });
+        ctOut('<div class="wa-log wa-log-' + (r && r.ok === false ? 'warn' : 'info') + '">' + (r && r.ok === false
+          ? '未记录：' + esc(ctWhy(r.reason))
+          : '已记录 ' + (caSum.checked
+            ? 'showSummary=true（每轮注入末尾带一行启用面摘要 —— 它会占一点上下文）'
+            : 'showSummary=false（摘要不再进注入，省下的额度归你的剧情）')) + '</div>');
+      };
+      on('#wa-ca-preview', () => {
+        if (!WA.capabilityAudit || typeof WA.capabilityAudit.summary !== 'function') return ctOut('<div class="wa-log wa-log-err">启用面审计引擎未加载</div>');
+        const s = WA.capabilityAudit.summary();
+        // 预览的是**引擎自己会写进注入的那一句**（summary.line），不是面板另编一句 ——
+        //   另编一句就变成「预览的与实际注入的不是同一句话」，这种预览没有价值。
+        ctOut('<div class="wa-log wa-log-info">摘要会是这样一行：</div>'
+          + '<div class="wa-item"><code>' + esc(s.line) + '</code></div>'
+          + '<div class="wa-dim">世界机制 ' + s.mechanisms + ' / ' + s.switches + ' 个开关　在跑 ' + s.running
+          + '　还能开 ' + s.dormantWorld + ' 项' + (s.userOff ? '（其中你亲手关掉的 ' + s.userOff + ' 项不算欠账）' : '')
+          + '　当前开关：<b>' + (s.showSummary ? '开（会进注入）' : '关（不进注入）') + '</b></div>');
+      });
+      on('#wa-ct-stat', () => {
+        // 两个引擎的自证面：各自的计数器由引擎自己数，面板只转述。
+        //   相加两份计数没有意义（它们数的不是同一件事），所以并排列、不求和。
+        const t = (WA.capabilityTier && typeof WA.capabilityTier.stat === 'function') ? WA.capabilityTier.stat() : null;
+        const a = (WA.capabilityAudit && typeof WA.capabilityAudit.stat === 'function') ? WA.capabilityAudit.stat() : null;
+        if (!t && !a) return ctOut('<div class="wa-log wa-log-err">两个引擎都读不到自证数</div>');
+        const kv = function (o) {
+          return Object.keys(o || {}).map(function (k) {
+            const v = o[k];
+            return esc(k) + '=' + esc(typeof v === 'object' ? JSON.stringify(v) : String(v));
+          }).join('　');
+        };
+        ctOut('<div class="wa-log wa-log-info">引擎自证（面板只转述，不另算一份）</div>'
+          + '<div class="wa-item"><b>档位</b> ' + (t ? kv(t) : '<span class="wa-dim">读不到</span>') + '</div>'
+          + '<div class="wa-item"><b>启用面</b> ' + (a ? kv(a) : '<span class="wa-dim">读不到</span>') + '</div>'
+          + '<div class="wa-dim">两个引擎数的不是同一件事（档位数「切了几次、开/关了几个」，启用面数「盘了几次、归因几轮」），所以并排列出、不相加。</div>');
       });
     }
 

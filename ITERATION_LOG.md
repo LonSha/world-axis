@@ -1,3 +1,568 @@
+### R225 · v2.274.0（V6 收口）读数仪收口：八台清零、一行归一，两个零消费动作接上界面
+**批次**：V6 收口（承接 R224 / EXV6-3；把 EXV6-1～9 九台读数仪的尾巴一次收干净）。
+#### 这一版治的玩家问题（一句话）
+九台读数仪在面板上各自「有话说」，但玩家**没有任何办法把它们从零看起**——
+`reset()` 八台都写了、都挂在导出面上，产品代码里却一次都没被调用过（只在测试里活着），
+于是「这台计数器累计了多少次」只能一路累加到重启为止；而「知道了」这类引导收尾、
+「打包完下一步该开哪块」这类收尾话，引擎里写着、界面上根本没有入口。
+#### 这一版治的制卡者问题（一句话）
+同一个「人话一行」在七台引擎里有**两种形态**并存：四台做成独立 `line()` 函数挂在导出面，
+三台只塞进 `build()` 的返回体。面板要按引擎分支分别取，两份措辞**迟早分叉**——
+这正是本仓反复裁决的「第二份真源」。导出面有口、产品零引用，是另一种死：
+「只在测试里活的导出不算交付」。
+#### 交付
+- **口径定案（先定后动，避免返工）**：`line` **只作为 `build()` 的返回字段**，导出面不另立 `line` 口。
+  理由：若导出面也提供 line，面板可以绕开 build 直接取，两份措辞必然分叉。
+  据此 `world-diary` / `day-route` / `relation-temp` / `undercurrent-calendar` 四台的独立
+  `line()` 收进 `build()`；`round-cost` / `save-health` / `first-run` 三台的
+  `function line(cfg, used, …)` 保留为**内部拼句 helper**（由 `build()` 调用），导出面不暴露。
+- `ui/panel.js`：
+  - 「运行痕迹」段 `#wa-stat-reset` 旁新增 `#wa-gauge-reset`「清零读数仪」按钮，
+    处理器**逐台字面调用**八台引擎的 `reset()`（`WA.worldDiary.reset` / `WA.dayRoute.reset` /
+    `WA.relationTemp.reset` / `WA.undercurrentCalendar.reset` / `WA.roundCost.reset` /
+    `WA.saveHealth.reset` / `WA.firstRun.reset` / `WA.handoffPack.reset`），
+    缺席者逐台如实报「未装载/抛错」，结果输出到 `#wa-diag-out`。
+    字面调用是刻意的：dead-export-gate 的引用判据认 `WA.ns.mem` 的字形形态，
+    `WA[g[0]].reset()` 这类动态取值在真代码面零命中，仍会被判成「产品零引用」。
+  - 概览页 firstBlock 在 `r.line` 之后新增 `<button class="wa-btn wa-mini wa-first-dismiss" data-first-dismiss="1">知道了</button>`，
+    `bindBody()` 里新增 `[data-first-dismiss]` 绑定（调 `WA.firstRun.dismiss()` 后 `renderBody()`）。
+    用 `data-*` 而非 `id` 是刻意豁免：该块是**条件渲染**，进 UI_BINDINGS 静态 id 表会被
+    `ui-wire-audit` / `ui-gate-sync` 判成「静态渲染缺失」。
+- `engines/first-run.js`：导出面补 `dismiss: dismiss`（`function dismiss()` 早在 242 行定义、
+  却从未出现在 `WA.firstRun = {…}` 里 ——「这个动作在引擎里存在、在界面上不存在」）。
+  补口前专锁 `first-run-v2271` 的 B9 段实测 `TypeError: FR.dismiss is not a function`（rc=1）。
+- `ui/settings.js`：`#wa-hp-pack` 的 onclick 里追加
+  `const sg = (typeof WA.handoffPack.suggest === 'function') ? WA.handoffPack.suggest(p) : null;`，
+  把 `sg.rows.map(x => x.text).join('；')` 以前缀「　下一步：」拼进结果串。
+  suggest 只排顺序与给出口，**不代替玩家动手**（打包之后最需要的恰是「缺块该去哪开」「先复哪块」）。
+- `engines/tool-diag.js`：`'wa-gauge-reset'` 追加进 `page:'tools'` 组的 `ids`（控件三件齐做：
+  渲染 + 绑定 + 守卫登记；缺第三件时「渲染了但绑定 id 写错」永远不会被守卫表发现）。
+- **既有测试锁同步（八份）**：`world-diary-v2265`（七处：`dropSay` 锚点去尾 ` };`、
+  `exportsFace` 锚点删 `line: line,`、A8 文案改「line 是 build() 的返回字段」、B1b 七口列表删 `line`、
+  新增 B1e 判 `typeof D.build().line === 'string'`、B2d 改读 `r.line`、C1 改 `D.build().line`）、
+  `day-route-v2266`（E1 改 `build()` 后判 + 新增 E1e）、`relation-temp-v2267`（导出面锚点删 line 行、
+  A3 改判 `build().line`、C 段三处改）、`undercurrent-calendar-v2268`（`pvEmpty` 锚点改成 `line: '未来三天…'`、
+  A5 改判、`UC.line()` 三处改读返回体字段）、`round-cost-v2269` / `save-health-v2270` / `first-run-v2271`
+  （各 A3b + B 段 + C 段改读 `build().line`）。
+  `world-diary-v2265` 的 B2e 从 `emptyBuilds >= 2` 改为**先显式 `build()` 一次再判 `=== 2`**：
+  B2d 改读 `r.line` 后少了一次 build，原松口判据会误红；改后反而更强（「两次空态恰好记两笔」）。
+- **挂载欠债修复（本轮暴露的既有假红）**：`tests/round-cost-v2269.js` / `save-health-v2270.js` /
+  `first-run-v2271.js` / `handoff-pack-v2273.js` 四份只有 `if (require.main === module) runAll()`、
+  **没有 `module.exports`**，而 `tests/run.js` 是用 `runLock('./xxx.js','runAll')` 挂载它们的
+  ⇒ 全量回归会报 `NO runAll`（独立跑绿、回归记红）。四份补 `module.exports = { runAll: runAll }`。
+- **FROZEN2800 回填**：跑 `node tests/export-contract.js` 生成新产物后逐命名空间比对，差异 10 处
+  （`dayRoute` / `relationTemp` / `roundCost` / `saveHealth` / `undercurrentCalendar` / `worldDiary` /
+  `handoffPack` 各 ACTUAL-ONLY `reset`；`firstRun` ACTUAL-ONLY `dismiss` + `reset`；`handoffPack` ACTUAL-ONLY `suggest`），
+  另有两笔**历史欠账**（`injectValue.reset`、`theme.getSettings` 在旧冻结串里存在、实际产物里不存在），
+  回填后一并消失。回填后 `equal: true`、长度 25533。
+- **版本升位**：`index.js` 的 `const VERSION = '2.274.0'`、`manifest.json` 的 `"version": "2.274.0"`、
+  五本账（`consumer-ledger` / `dead-export-ledger` / `evidence-ledger` / `module-registry-ledger` /
+  `reject-code-ledger`）的 `version` 字段与 `_note` 版本词；白名单按形态升位 14 个文件。
+- **新专锁 `tests/gauge-wire-v2274.js`（299 行 / 102 通过 0 失败）**：
+  A 静态契约（三锚点各恰 1 次 + H5 纯度 + 八台导出 reset + 七台**导出块内**不另立 line + 控件三件齐做）、
+  B 运行时（七台 `build().line` 非空、`typeof m.line !== 'function'`、`typeof m.reset === 'function'`）、
+  C 真点击链路（工具页渲染 → 点 → `worldDiary/dayRoute/roundCost.stat().builds` 归零 → 反馈含「读数仪已清零」且报台数；
+  概览页「知道了」→ `firstRun.build().visible === false`；设置页打包 → 结果含「下一步」）、
+  N 真源码破坏 + 两向自证（N1 摘清零调用 / N2 摘 dismiss 调用 / N3 摘 suggest 调用 / N4 负控制验真源码逐字未变）。
+  已挂进 `tests/run.js`（`section('v2.274.0 (V6·收口): 读数仪接线锁…')` + `runLock`）。
+#### 三条判据纯度教训（写进锁里的原因）
+1. **锚点定界符要与本体引号错开**：`suggestCall` 本体里带单引号，用单引号包裹时源码字面量带反斜杠转义，
+   `cnt(SELF, anchor)` 数到 0（H5 纯度判据红）。定界一律用双引号。
+2. **判据要咬导出块、不能咬全文**：`day-route.js` 的逐人一行 `line: line ? … : ''` 是真代码、
+   成本卡/体检/引导的 `function line(cfg, …)` 是内部 helper，全文计数会把它们误判成「导出面另立 line 口」。
+   改为正则提取 `WA.<ns> = {…};` 块再判 `/\bline\s*:/`，并加 `A3pre` 先判块可定位（否则在 `null` 上恒真）。
+3. **两向自证必须先渲染目标页**：控件不在 DOM 树里时 `getElementById` 返回 `null`、「点了没反应」恒成立
+   ——那是**空判据**而非破坏现形。故 N1/N2/N3 都先 `goto(WA, page)` 并加 `hasBtn` 前置判据，
+   破坏版与原版**都要求 hasBtn 为真**。
+#### 验证
+- 新专锁 `tests/gauge-wire-v2274.js`：102 / 0。
+- 八份既有锁：`world-diary-v2265` 102/0、`day-route-v2266` 116/0、`relation-temp-v2267` 41/0、
+  `undercurrent-calendar-v2268` 40/0，四份 script 体（`round-cost-v2269` / `save-health-v2270` /
+  `first-run-v2271` / `handoff-pack-v2273`）独立跑 rc 全 0 且**挂载面 `runAll` 可调用**（`/tmp/mountcheck.js` 5/5 OK）。
+- UI 接线锁：`world-diary-ui-v2265` 57/0、`day-route-ui-v2266` 81/0、`relation-temp-ui-v2267` 29/0、
+  `first-run-ui-v2271` 71/0、`handoff-pack-ui-v2273` 48/0。
+- 门禁：`dead-export-gate` ✓（冻结面 dead 1180 → **1171**，uiDead 5，9 项红灯清零；
+  `--update` 后证据复算一致，`dataOnly` 547 备查）、`ui-wire-audit` 20/0（零幽灵引用）、
+  `ui-gate` 53/0、`version-surface-gate-v2185` 14 pass（31 条白名单全部 2.274.0）、
+  `test-surface-gate` 全通过（零孤儿）、`export_contract.txt` 与 `FROZEN2800` 逐字节相等（25533）。
+
+### R224 · v2.267.0（V6 EXV6-3）关系温度计：这段关系为什么变了
+**批次**：V6 拓展九项之 EXV6-3。承接 R223（EXV6-2 人物今日动线）。
+#### 这一版治的玩家问题（一句话）
+原本 NPC 好感与六型关系有底层审计与数值记录，但玩家面板上只看得到冷冰冰的数字或静态档位 ——
+**读者无法直观感知「这段关系是变暖了还是变冷了，具体是因为哪件事变的」**，只能靠翻回日志去猜。
+#### 交付
+- `engines/relation-temp.js`（新，295 行）：设置族 `worldaxis_relation_temp_settings_v1`，
+  `DEF = {enabled:true, maxItems:4, onlyChanged:false, showReason:true}`、`bounds = {maxItems:[1,12]}`。
+  导出 `{getSettings, setSettings, build, line, stat, reset, DEF}`，
+  `registerModule` 标 `ver:'2.267.0'`。**纯读聚合**：零 `store.transact`、零 `settingsBus` 写、零 `localStorage`。
+- 状态判断与步进人话：结合 `engines/fondness.js` 的 BANDS（区间 `[{lo,hi,name}]`）与 `history` 尾项变动差值，
+  严格归入四态：`warmer`（升温 ↗）、`colder`（降温 ↘）、`steady`（平稳 →）、`quiet`（无变动）。
+  变动依据直接提取自 `fondness.rows[].history` 的真实 `reason` 与差值，绝不凭空臆造情节。
+- 玩家自身过滤：自动排查 `worldBridge.worldKey().player` 及通用代词（玩家、player、你、我），避免出现「玩家与自己的关系」。
+- `engines/tool-diag.js`：新增 `secRelationTemp()`（诊断节采集），在 `collect()` 中于 `dayRoute` 后挂载 `relationTemp`，
+  UI_BINDINGS 登记七枚 `wa-rt-*` 控件。
+- `ui/panel.js`：概览页新增 `#wa-temp-block`，按 live/quiet 态渲染条目与截断提示。
+- `style.css`：新增 `.wa-temp*` 四条规则（`.wa-temp`、`.wa-temp-live`、`.wa-temp-item`、`.wa-temp-quiet`）。
+- `ui/settings.js`：新增「关系温度计」配置分区，包含七枚控件（`wa-rt-enable` / `wa-rt-max` / `wa-rt-maxv` / `wa-rt-onlychg` / `wa-rt-reason` / `wa-rt-save` / `wa-rt-out`）。
+- 专锁与接线锁：`tests/relation-temp-v2267.js`（185 行，通过）覆盖 A/B/C/N 契约与破坏自证；`tests/relation-temp-ui-v2267.js`（168 行，29/0）覆盖 UI 渲染与控件联动。
+- 门禁全绿：`module-registry-gate --update`（305 文件 / 314 空间 / 190 边 / 364 引用）、`dead-export-gate --update`（dead 1172 / uiDead 5）、`reject-code-gate`（1297 码全归属，补充 `no-records` 与 `built` 见证）。
+
+### R223 · v2.266.0（V6 EXV6-2）人物今日动线：NPC 的一天看得见
+**批次**：V6 拓展九项之 EXV6-2。承接 R222（EXV6-1 世界日记）。
+#### 这一版治的玩家问题（一句话）
+本来同一天里人是会动的（谁在工上、谁在家、谁正要出门），但玩家眼前只有「当前在场的人」这一张静态名单 ——
+**于是「他今天在哪儿、接下来要去哪儿」只能靠读者自己从一串结算日志里拼**，而拼错的部分不会被任何人纠正。
+#### 交付
+- `engines/day-route.js`（新，543 行）：设置族 `worldaxis_day_route_settings_v1`，
+  `DEF = {enabled:true, maxPeople:3, showNext:true, hidePlace:false}`、`bounds = {maxPeople:[1,8]}`。
+  导出 `{getSettings, setSettings, build, line, stat, reset, boundary, scheduleDomain, storyDay, ACTION_TEXT, REASON_TEXT, DEF}`，
+  `registerModule` 标 `ver:'2.266.0'`。**纯读聚合**：零 `store.transact`、零 `settingsBus` 写、零 `localStorage`。
+- 三行一条人：今天在哪 / 做了什么 / 接下来去做什么。人名单只收**有 `life` 行的人**与**当天有排班的人** ——
+  收全量会让动线里出现「这个人今天什么都没做」，那不是动线，是名单。
+- 日程时间域**四态**（`absolute` / `clock` / `unknown` / `mixed`，`ABS_MIN = 1e11`）：
+  `onScheduleNow` 开头 `if (!dom || dom.state !== 'absolute') return null;` —— 域判不了就不说「正在做什么」。
+- `engines/tool-diag.js`：新增 `secDayRoute()`（地名五栏 + 日程三栏 + `probe` 判域自证 + `storyDay` 原样带出 +
+  边界面六字段 + 五路来源 + `note` 四分支），并在 `collect()` 里以 `worldDiary` 之后一行登记。
+- `ui/panel.js`：概览页新块 `#wa-route-block`，与 `#wa-diary-block` 并列 ——
+  日记答「镜头外发生过什么」（过去、多来源合流），动线答「这几个人今天在哪 / 做什么 / 接下来干嘛」（现在、按人分栏）。
+  整句取自引擎原话，面板只转义与排版（另拼一份就是第二个措辞真源）。
+- `ui/settings.js`：插入「人物今日动线」一格，七枚控件 `wa-dr-enable` / `wa-dr-maxp` / `wa-dr-maxpv` /
+  `wa-dr-next` / `wa-dr-hideplace` / `wa-dr-save` / `wa-dr-out`，绑定段与 `wa-wd-save` 同规（走 `settingsBus` 写路径、
+  `r.ok === false` 才报失败）。`style.css` 补 `.wa-route*` 四条。
+- 登记三件齐做：`index.js` LOAD_ORDER、`tests/run.js` LOAD 与两条 `await runLock` section、`UI_BINDINGS` 七枚 `wa-dr-*`。
+  LOAD 严格同序 **diary → day-route → tier**：动线的边界面**复用**世界日记的 `boundary()`，不新建第二套真源。
+#### 实施期抓到的两处真缺陷（都是「拿判不了当判到了」）
+1. **`perceive` 的 `via:'unknown-place'` 被读成「看不见」**。
+   `world.canBeAt` 对未登记地名返回 `{ok:true, range:'out', via:'unknown-place'}` —— 它说的是「我没法判」，
+   而首版引擎把它落成 `basis:'hidden'`、句子直接念「今天在你看不见的地方」。
+   **这是一句可以随便编的假话**，而且方向是更保守的那一边，永远不会有人来纠正。
+   修法不是加 `if`，而是立白名单：`HIDDEN_VIA = ['closed','window-too-short','scheduled-elsewhere','unreachable']`，
+   只有落在白名单里的 `via` 才算真 hidden，其余一律落 `unknown`。
+   **必须是白名单而不是黑名单**：将来 `world.canBeAt` 新增一个 reason，默认落「判不了」那一侧，
+   不会静默变成一句「他看不见」。
+   （表里第 4 项 `unreachable` 属**防御性**：`world.canBeAt` 本身不产这个 reason，它来自 `canTravel`。
+   留着它是为了「将来若有人把可达性否决接进来，默认仍算真 hidden」；现在它永不命中 —— 这点如实在注释里，不含糊。）
+2. **`range:'unknown'` 同样被读成 hidden**。`rangeEnabled:false` 时 `perceive` 返 `{ok:true, range:'unknown', reason:'range-off'}`，
+   首版与 `out` 合并处理。修法同上一条一并收口（`r.range === 'out' && 白名单命中` 才 hidden）。
+#### 先立据后动手（本轮四个仓外探针，全部跑在产品改之前）
+`/tmp/probe_ui1.js` 概览页渲染成型（`#wa-route-block` 真出现、class 为 `wa-route wa-route-live`、句子真念出人物与去处）·
+`/tmp/probe_ui2.js` noesis 默认关闭时 `perceive` 返 `{ok:false, reason:'disabled'}` ·
+`/tmp/probe_ui3.js` noesis 开启后三形态 + `hidePlace` 分支 → **此处暴露缺陷 1、2** ·
+`/tmp/probe_ui4.js` `world.addPlace` 补齐四种真实 reason 现场（登记+开 `present` / 登记+关窗 `via:'closed'` /
+未登记 `via:'unknown-place'` / `rangeEnabled:false` 时 `range:'unknown'`）→ **据此判定哪些是判不了**。
+没有第四个探针，前两个缺陷会以「看起来更保守」的样子一直留着。
+#### 专锁 `tests/day-route-v2266.js`：115 条（失败 0）
+A 静态契约（16 个锚点各恰 1 次 / 三态存在性 / 白名单是白名单而非黑名单）/ B 运行时地名五态
+（B5 未登记 ⇒ `unjudgeable` 且文本**不含**「看不见」· B6b `why` 含 `:unknown-place` · B6d/B6e/B6f 用 `addPlace` 造
+「登记了但此刻关着」验真 hidden）/ C 日程域与点名（C8b 三合法值 `schedule-now|hidden|unjudgeable` ·
+C8d 登记齐全即点名）/ D 登记面 / N **六组**真源码破坏两向自证（N1 小时域被折成 `none` ·
+N2 玩家主动隐去被折成「看不见」· N3 双向：降成 `unknown` / 升成无条件 `hidden` · N4 域判定仍在但闸门被摘 ·
+N5「life 关着」被读成「他没有记录」· N6「栏目关着」被读成「没有下一步」）。
+**B6d–B6f 那一支是这轮最关键的补充**：只钉「未登记 ⇒ 判不了」的话，把 `HIDDEN_VIA` 写成空表也全绿 ——
+那正好把缺陷 1 换个方向写回去了。
+#### 接线锁 `tests/day-route-ui-v2266.js`：81 条（失败 0）
+A 概览页渲染成型（含上限与截断）/ B 设置页七枚控件（B4c 关掉预告后概览页真的不再念「去钱庄」·
+B5b 真的不报地名 · B5c 也不许说看不见 · B7 走 `settingsBus` 写路径）/ C 诊断节（地名五栏、日程三栏、
+判域自证、零构建 vs 关着）/ D 登记面（LOAD 三文件相对次序断言）/ N 五组破坏（概览页闸门·引擎缺席的「读数不可用」·
+保存写路径·地名「判不了」栏·日程 clock 栏）+ N6 五处静态锚点各恰 1 次。
+#### 首跑失败的六处，**全部是判据错而不是产品错**（本轮最贵的一课）
+C8b 只允许 `schedule-now|hidden`（实际正确值是 `unjudgeable`）· C8d 用 `scheduleSlots.length === 1` 判 absolute 域，
+而该字段**只对 clock 域产出**（absolute 域恒空 ⇒ 判据恒假）· N3 破坏串原样抄了产品锚点（A1f 判「字面量在 SELF 里出现 2 次」
+且破坏根本没发生）· 另三处同类。**首跑红灯先怀疑尺子**，这轮六次全中。
+#### 一次作用域事故，`node --check` 查不出
+`secDayRoute()` 首版被插进 `secWorldDiary()` 的收尾大括号**之内**，成了嵌套函数 ——
+`node --check` 只查语法不查作用域，一路通过；运行时炸 `secDayRoute is not defined`。
+修法用三段切分（prefix 必须 `endswith("    }, {});\n")`、suffix 必须 `startswith("  }\n/**\n   * v2.165.0")`、
+block 必须 `endswith("    }, {});\n  }\n")`）把函数移成同级，`380311 -> 380311`（长度不变，纯移动）。
+**教训**：插函数必须同时验「插完是同级还是嵌套」，不能只看 `--check`。
+#### 连带账（本版一并平掉）
+版本跟位 `tools/bump266.py` + `tools/bump266_whitelist.py`（以 `bump264_whitelist.py` 为模板 ——
+`bump265_whitelist.py` 自身有缩进损坏 `t = fix_alt(t0)` 少 4 空格，不可作模板）：
+`RESIDUAL 0`、白名单 `CHANGED 14`。五道门禁随之红→绿：
+`module-registry-gate` 文件 304 / 命名空间 313 / 装载期边 189 / 硬边 0 / 调用期引用 362 / 结构问题 0 ·
+`dead-export-gate`（`_note` 版本词 + 三条证据失实，走 `--update` 重算，dead 1174 / uiDead 5 无新增）·
+`settings-lanes-v2262` 四对硬编码（section 17、标题「14 段」、`rendered 14`、`secNames 14`）→ 180/0 ·
+`reject-code-gate` 给 `no-people` / `quiet` 补**可执行见证**（1295 码全归属：见证 728 / 死表 50 / 基线 547）·
+`version-surface-gate-v2185` pass(14)（31 条白名单全跟到 2.266.0）。另 `ui-wire-audit` 20/0 · `ui-gate` ·
+`dup-decl` · `delete-gate` 63 项 · `module-cycle` · `field-liveness` 全绿。
+（`quiet` 见证首跑跑不出，原因是人名单只收「有 `life` 行的人」：只写 `{name:'见证路人'}` 会落回 `no-people`
+—— 见证必须带空 life 行才到得了 `quiet` 那一支。**见证写不对时，红灯看起来像产品错。**）
+#### 台账补记（本版不得不做的两件事）
+1. `ITERATION_LOG.md` 此前**从未记 v2.265.0**（EXV6-1 交付时漏记，全库 `grep '2.265.0' *.md` 零命中）。
+   本版补上 R222 后才写本条目，否则版本史会缺一版、编号会跳。
+2. `NEXT_PLAN.md` 顶部入口停在「基线 v2.260.0 / 已交付 OPV6-1～OPV6-5」，历次都没跟 —— 一并更新到 v2.266.0。
+   这类「账的形状」错比产品错耐久：产品错会被测试抓住，账错了没人抓，下一版照着错的形状继续追加。
+
+---
+
+### R222 · v2.265.0（V6 EXV6-1）世界日记：你看不见的地方发生了什么
+**本条为补记**：v2.265.0 交付当时未入账，随 v2.266.0 一并补写，口径按现场交付物还原。
+**批次**：V6 拓展九项之 EXV6-1。
+#### 这一版治的玩家问题（一句话）
+镜头之外真的在发生事（谁跟谁照了面、谁家出了变故、你不在时谁做了什么），
+但这些事实分散在三个既有容器里、各自只在自己的页出现 —— **玩家要知道「世界在动」得逛三处**，
+而多数人不会逛，于是世界在他们眼里是静止的。
+#### 交付
+- `engines/world-diary.js`（新，306 行 / 18 KB）：设置族 `worldaxis_world_diary_settings_v1`，
+  `DEF = {enabled:true, maxLines:3, maxItems:6, includeOffline:true, hidePlace:false}`、
+  `bounds = {maxLines:[1,6], maxItems:[1,20]}`。导出 `{getSettings, setSettings, build, line, stat, reset, boundary, DEF}`。
+- **为什么不新开一本日记**：做一个 `worldDiary.lines[]` 容器、每轮往里 push 一句最省事，但那等于把
+  「发生过什么」记两份，第二份必然与第一份漂移（引擎改了结算，日记还在念旧的）。本模块只做一件事：
+  **从既有 owner 的只读读口里现算** —— ① `livingWorld` 的 intersections / ripples / vignettes / livingTraces；
+  ② `elsewhere.card` 的近况；③ `offlineTick.summary().lines`（已有措辞，直接念）。
+  **零 `store.transact`、零 `settingsBus` 写、零 `localStorage`。**
+- **三句话上限是硬约束**：`maxLines`（默认 3）夹取，超出截断并如实记 `truncated:true` + `dropped:N` ——
+  悄悄丢掉等于玩家以为「就这么多」。
+- **空态不编**：没有任何事实来源时返回 `quiet:true` 的「这几轮没有需要你知道的事」，
+  而不是编一段「世界在悄悄运转」—— 那是空转冒充有事发生。
+- `engines/tool-diag.js`：新增 `secWorldDiary()`（977 行）与 `collect()` 登记（`worldDiary: secWorldDiary()`，
+  与 health 节分列不合并 —— 那一节问「压了几句、隐了几条」，本节问「值不值得读」）。
+- `ui/panel.js`：概览页新块 `#wa-diary-block`，与 firstLine / capLine / healthLine / visLine 并列但**语言不同**：
+  那四条答「这套机制跑没跑起来」（诊断面），本块答「世界这一刻发生过什么」（玩家面）。混排会让概览页变成两张语言的清单。
+- `ui/settings.js`：设置页「世界日记」一格（`wa-wd-enable` / `wa-wd-maxlines` / `wa-wd-maxlinesv` /
+  `wa-wd-offline` / `wa-wd-save` / `wa-wd-out`），绑定段走 `settingsBus` 写路径、`r.ok === false` 才报失败。
+- 登记：`index.js:1135`、`tests/run.js:789` LOAD，`tests/run.js` 两条 `await runLock` section，`UI_BINDINGS` 六枚 `wa-wd-*`。
+#### 计划原文与现场不符的两处（实施期修正）
+1. 计划写「信息边界走既有 `noesis` / `epistemic-view`」。实测：
+   - `noesis` 里**没有**「按地点问可见性」那一口 —— 那个名字根本不存在。真正要的是 `perceive(person, placeId)`：
+     **从玩家自身视角**问「这个人能感知到这个地方吗」，返 `present / impaired / out / unknown` 四态，
+     且 `unknown` 与 `out` **是分开的**。这正是要的那把尺，所以用它，而不是新造一个地点查询。
+   - `epistemic-view` 是**信念面**（`registerBelief` / `buildView`），管「某人以为什么」，不是「这里玩家看不看得见」。
+     拿它判可见性是**类型错配**，故不接。
+   - 玩家名从 `worldBridge.worldKey().player` 取（本仓唯一权威的「玩家是谁」），取不到就等于**判不了**
+     （`available:false`），句子降级为不点名，**绝不当作「全都可见」**。
+2. `impaired` 单独留一档是有意的：它与 `out` 在旧读数上都显得「不是清清楚楚」，但处置不同
+   （「看得见但模糊」要加「远远地」，「根本不在那」不该点名）。
+#### 实施期抓到的两处假绿（本锁重点钉的就是这两条）
+1. **「没有地名」≠「地名被隐去」**：首版把两者压成同一个 `hidden:!pv.ok`，于是 `hidden` 在多数行上恒真 ——
+   那样它就不再是判据（与「全都可见」一样是假绿）。修法是**三态输出**：
+   `ok:true` 点名 / `ok:false + hidden:true` 有地名但看不见 / `ok:false + hidden:false` 本来没地名或判不了。
+   全程只允许 **1 处** `hidden:true`（唯一给它的是「真看不见」那一支，A2e 钉住）。
+2. **「判不了」≠「看不见」**：`perceive` 在 `noesis` 未启用时返 `ok:false reason:'disabled'`。
+   把 `ok:false` 读成「玩家看不见」= 拿读不到当读到了，**而且方向还是更保守的那一边，于是永远不会有人发现**。
+   修法：`ok:false` 时 `hidden:false`，`why` 记 `perceive-<reason>`。B5 / B7 把这两条分开。
+   首版就是这么写的，靠专锁抓到才改。
+#### 一处措辞纪律
+措辞**不随可见性改变**：可见性只决定「地点名说不说」，不能决定「事实是什么」。
+首版写成「可见时说『互通难处』、不可见时说『只有他们知道的事』」—— 句子看着都对，
+但那是在**用可见性改写事实内容**，注入面一旦复用就成了「编」。
+#### 专锁与接线锁
+`tests/world-diary-v2265.js`（31 KB）**102 / 失败 0**：A 静态契约（13 锚点各恰 1 次 / 三态三分 / 上限与溢出如实 /
+空态走 quiet）/ B 运行时（四源合流 / 语料去重 / 三句上限 / 三态地点 / 判不了 vs 看不见 / `present` 点名 vs 不在场隐去）/
+C 零写盘不变式（世界摘要、设置族、偏好键逐字不变）/ N 真源码破坏两向自证。
+`tests/world-diary-ui-v2265.js`（23 KB）**57 / 失败 0**：概览页与设置页接线成型。
+
+### R221 · v2.264.0（V6 OPV6-9）幂等闸：重复切同档一次都不写
+
+**批次**：V6 双九项之 OPV6-9。第 3 天第三项。
+
+#### 这一版治的玩家问题（一句话）
+同一个规则包连点两次「切到这个包」：**结果一个字都没变，代价却照付** ——
+回滚栈被无意义条目挤占（`MAX_HISTORY = 12`，塞满之后真要回的那一步会被丢最旧）、
+`applies` 台账虚高、每键都重写一遍。
+
+#### 交付
+- `engines/rule-pack.js` · `apply()`：在**冲突门之后、压栈之前**插入幂等闸。
+  判据**两向**，缺一条就变成两种不同的坏事：
+  - 只看名字（`cfg.active === p.name`）：用户手改过某个键之后再点同一个包会被**误跳过**，
+    手改被静默吞掉 —— 本仓点名的「最坏的一种静默」（界面上与「切成功了」同形）。
+  - 只看值（`keyClashes(...).length === 0`）：「切走到 B，再切回 A」那一轮里标记还停在 B
+    而值恰好一致 ⇒ 被误判成幂等，`active` 退化成一句空话。
+  跳过时**零写盘**：不压栈、不写键、不动标记、`applies` 不涨，只 `_stat.idemSkips++`、
+  `lastReason='idempotent'`；回执带 `idempotent:true` + `applied:[]`/`failed:[]` +
+  `marker:true` + `note:'幂等跳过：…未压栈、未写盘、applies 不涨、栈不占位'`。
+- `engines/rule-pack.js` · `_stat`：新增 `idemSkips: 0`（不可数等于没发生，与 detects/rolls 同规）。
+- `engines/rule-pack.js` · `catalog.notes.idempotent`：口径逐字与 rollback 并列。
+- `ui/panel.js` · `#wa-rp-apply`：新增幂等回执**独立分支**，排在「写回 N 键」之前 ——
+  否则用户会看到「已切到 X：写回 0 键」这种自相矛盾的话。
+
+#### 口径纪律（本版最容易被将来的人破坏的一点）
+闸内的值比较**复用** `keyClashes` / `asWritten`（与冲突检测同一个函数、同一次写路径归一），
+不另造第二份 `JSON.stringify` 比较。另造就立刻与冲突检测分叉：归一规则一改，
+两处对同一份面给出不同答案，而分叉的表现是「幂等偶尔不生效」—— 又是静默失效。
+判据 A3 / A3b / A3c 三条静态钉死：闸内必须调 `keyClashes(`，去注释后零 `JSON.stringify`、
+零直接 `asWritten(`。
+
+#### 专锁 `tests/rulepack-idem-v2264.js`：91 条 + 三组负控制
+A 静态契约（13 个锚点各恰 1 次 · 位置 A2「冲突门 < 闸 < 压栈」· 同一把尺 A3 ·
+回执形状 A4 · 台账 A5 · 口径 A6 · 面板分支位置 A7 · 零碰世界 A9）/ B 运行时（B2–B3h 主判据
+连点四下 · B4 名字同值不同不许跳 · B5 值同名字不同不许跳 · B6 面板端到端两次点击）/
+C 零写盘不变式（设置族逐字 · 偏好键原文逐字 · 世界摘要逐字）/ N 真源码破坏两向自证。
+
+**N 段三组，每组都先证工具会拒（N0）再拿它去拒别人**：
+- N1 摘闸门 ⇒ 重复切真的又写一遍并占一格栈（原版零写盘）。
+- N2 把 `idemDiff` 恒置空数组（只看名字）⇒ **假幂等**：手改被吞、盘上还是手改值。
+  ⚠ 实测修正：这一击**必须带 `force:true`**。不带时冲突门（在本闸**之前**）会先把它明说拒收，
+  「假幂等」根本走不到 —— 那证明的是 A2 的位置纪律，不是本闸的判据。手改过键必然产生一条
+  key-clash，故 force 是这一形唯一能露头的入口。这条实测结论直接改写了判据写法。
+- N3 闸门条件写成恒真（只看值）⇒ **连第一次切换都被跳过**（包本来就是从当前面存的），
+  活跃标记从头到尾是空串。首版判据写成「切回同包被跳过、active 停在旧名字」，
+  实测发现破坏版根本走不到那一步（第一次就跳了，标记从未写进去）—— 判据按实测重写。
+
+#### 挂载纪律踩到的一处真坑（与 v2.263.0 的「独立绿、挂载漏」同族）
+`tools/smoke_mounted_2264.js` 首跑崩在 `core/clock.js:55`：
+`Cannot read properties of undefined (reading 'WorldAxis')`。
+成因：`tests/lock-assert.js` 的 `restoring()` 在**调用前**捕获 `global.window` 并在 finally 写回，
+而本锁的 `mock.js` 是在 `runAll` **体内**才 require 的（它设 `global.window = global`）——
+于是「独立跑第二次」（smoke 的两向比对）捕获到 `undefined` 再把它写回去，第三次调用就死在
+`window.WorldAxis` 上。改法：本锁自带 `safeRunAll`，**先 require mock（幂等，走缓存）再捕获/还原**，
+与 run.js「开头就 require ./mock.js」同序 —— 宿主全局仍不靠顺序活着。
+`tests/lock-assert.js` 的 `restoring` 未改动（其它锁的用法是对的）。
+
+#### 顺带修好的两处账（本版连带，不是新功能）
+1. `dead-export-gate` 首次全量红：账本元数据三级同源失配（`version=2.264.0` 已被 bump 改，
+   而 `_note` 里仍写 `v2.263.0`），以及 `difficulty.setSettings` 的 `tref=14` 复算为 18。
+   成因是版本升位脚本只改 `version` 字段、不改 `_note` 文案；`tref` 则是本版新锁与
+   `tests/run.js` 新增节带来的测试侧真引用。正解不是手改账本，而是走
+   `node tests/dead-export-gate.js --update` 让门禁自己重算重写（1179 条证据复核，
+   `dead 1174 → 1174 · uiDead 5 → 5` 无新增）。
+2. `tools/gate_all_2264.sh` 新增**第三道护栏**：本版专锁的读数行
+   （`^OPV6-9 rulepack-idem-v2264 `）必须在场，否则记 `READOUT-MISSING` 计入 BAD。
+   理由：「91 / 失败 0」这类结论不许只活在 rc 里 —— 前两道护栏只防「空跑」与「只信 rc」，
+   防不住「跑了但结论行被日志吞掉」。
+
+#### 门禁（十二项全绿 · BAD=0）
+`version-surface-gate-v2185` pass(14) · `test-surface-gate` 通过 · `module-registry-gate`
+文件 302 / 命名空间 311 / 装载期边 187 / 硬边 0 / 调用期引用 358 / 结构问题 0 ·
+`reject-code-gate` 内联拒收码 1293（见证 726 / 死表 50 / 基线 547）·
+`dead-export-gate` ✓（dead 1174 · uiDead 5 · dataOnly 531→531）· `ui-gate` 53/0（15297 B）·
+`q9` 67/0 · `o7` pass(69) · `o6` 71/0 · `o8` 38/0 · `q1` 64/0 · `o9` 50/0（tier=full）·
+`lock2264` 91/0 · `smoke2264` 三处一致 = true。
+版本面 `2.264.0`（`index.js` VERSION / `manifest.json` / 五份 ledger version 字段 /
+`tests/run.js` 9 处 assert / 14 个测试文件的版本白名单形态，全部跟位）。
+
+### R220 · v2.263.0（V6 OPV6-8）首局体检结论 —— 一句话回答「世界跑起来了吗」
+
+**批次**：V6 双九项之 OPV6-8。第 3 天第二项。
+
+#### 开工前先修上一版留下的一处账坏
+`grep -n settings-lanes-v2262 tests/run.js` 命中 **2 处**（24627 / 24643）——
+v2.262.0 的挂载段被插了两份，专锁在全量回归里跑两次、实际计入 356 条而台账记 178。
+成因是上一版补丁脚本第二步缺幂等，且两段注释文字不完全一样（第二段带转义残迹），
+所以「同串去重」发现不了它。修法 `tools/fix_dup262_block.py`：删第二段整块
+（24679 → 24663 行），落盘前三重自检（section 计数、runLock 计数、删除行数自洽）。
+**本版起所有挂载脚本必须先查「已存在则跳过」**（`bump263.py` 已按此写）。
+
+#### 现场立据（tools/v6probes/p_first.js）
+出厂态：100 项机制里 5 项在跑；107 个注入源里 6 个在出内容（degraded 1）；
+`capabilityTier.view().dormant = 95`、`capabilityAudit.summary().dormantWorld = 95`。
+三面读数各自都对，但概览页上是三句并列的话，没有一句回答
+「所以这一局到底跑起来了没有」——玩家据此通常去改设定 / 换模型，而真正该做的是切一次档位。
+
+#### 交付
+- `engines/health-preflight.js`：`firstRunView(opts)` 四态（running / thin / blocked / unknown），
+  判序即优先级「读不到 > 卡死 > 太少 > 在跑」；`firstRunLine(opts)` = 结论 + 下一步整句。
+  三面读数全部走现场现成读口：机制面 `capabilityTier.view()`，内容面 `threeGates()`
+  （两面对账与预算挤占已由它做完），本函数不重算任何一条。
+- `engines/tool-diag.js`：`secHealth` 新增 `firstRun` 子节（与门槛清单分列不合并）。
+- `ui/panel.js`：概览页新块 `#wa-first-line`，四态各带稳定 class `wa-first-<state>`；
+  排在 capLine / healthLine / visLine **之前**（结论先于三面详情）。
+
+#### 实施期抓到的三处问题
+1. **`dormantWorld` 同名不同算法**。首版取 `capabilityTier.view().dormant`（含 `no-builder`），
+   而 `capabilityAudit.summary()` 的 `dormantWorld` 排除了它们。同一个名字两套算法 ⇒
+   概览页与诊断页会各说一个「还有 N 项可以开」。改走 `capabilityAudit.dormantMechanisms().length`
+   （与 summary 共用 `reason !== 'no-builder'` 过滤式）。判据 B4e / H3 / H3b 三处钉死口径出处。
+2. **thin 判据与门槛②重复真源**。首版写 `degraded > 0 || sourcesOn/sources < 0.5`，
+   而 threeGates 的门槛②**已经**按 0.5 判 degraded —— 同一条规则算两遍，两处阈值必然漂移。
+   去重为只认 `degraded > 0`，并加 A7b 反向判据「体内不许再出现 `sourcesOn / nums.sources`」。
+3. **探针首版 C/D 面是空壳**。留了个 `withThree()` 从未被调用，D 面只打一句「由专锁去验」。
+   空壳比没有更坏 —— 它让「四态未必真走得到」这件事看不见。重写为真驱动：
+   换掉 `capabilityTier` / `injectBudget` / `render` 三个**函数外**依赖，四态各走一遍。
+
+#### 专锁 `tests/first-run-v2263.js`：92 条 + 六组负控制
+A 源码面（判序位置、四态各赋值恰一次、两个口各定义一次、导出面两项、三处接线）／
+B 运行时同源（八个数与三面读数逐一对比、结论句零技术词、next 形态、整句拼接）／
+C 四态真驱动（unknown←摘掉机制面、blocked←预算挤掉、running←可见性全通、thin←出厂态）／
+D 面板渲染（结论块在位、class 跟真 state、文字取自 firstRunLine、位置在 capLine 之前）／
+E 诊断包（firstRun 子节无错、与门槛 line 分列不互相顶掉）／
+F–K 负控制 N1–N6（破坏判序 / 删 thin 分支 / 改 dormant 口径 / 断整句拼接 / 写死面板 class / 验 blocked 优先）／
+Q 假绿记录（同名不同算法、读到不存在字段不会红、空壳探针）。
+
+**负控制修法**：每条「真源码破坏 → 装内存副本（带上真依赖）→ 重跑同款判据」，
+且配「正版上同款判据必须真」的双向自证。实施期首版有两处判据写法错：
+① `state = 'running'` 数成 2 次（漏区分 `let state = 'running';` 初始化）；
+② H2 断言「bad 里不该再出现 dormantMechanisms」而破坏只换了三元 `?` 分支。
+两处都改判据不改产品（**判据写法错 ≠ 产品缺陷**，必须分清）。
+
+#### 门禁（十二项全绿）
+`version-surface-gate-v2185` pass(14) · `test-surface-gate` 363 文件 / 孤儿 0 ·
+`module-registry-gate` 302 文件 / 硬边 0 · `reject-code-gate` 1293 ·
+`dead-export-gate` ✓（`dead 1174 · uiDead 5`，两个新导出均有产品侧真读）·
+`ui-gate` 53/0 · `q9` 67/0 · `o7` pass(69) · `o6` 71/0 · `o8` 38/0 · `q1` 64/0 ·
+`o9` 50/0（tier=full）。版本面升至 `2.263.0`。
+
+十二项改为一次跑完的 `tools/gate_all_2263.sh`（此前逐条手敲，一条条看 rc）。
+**本版踩到的一处「空跑假绿」，并因此给脚本加了两道护栏**：
+`tests/ui-gate-sync.js` 是**模块文件、没有 CLI 入口**（只 `module.exports`），
+`node tests/ui-gate-sync.js` 跑出来 `rc=0`、输出 **0 字节** —— 谁都没验，却在汇总里记成「通过」。
+这与本项目点名的假绿是同一族：**绿得需要解释，就不是绿**。
+护栏一：输出 < 40 字节即记 `EMPTY-RUN` 并计入失败（真凶当场现形，换成真正入口
+`tests/ui-gate.js` 后输出 15297 字节 / 53 通过）。护栏二：不只信 rc，把每个门禁最后两行
+原样抄进汇总（`BAD=0` 才收工），人眼可复核。
+
+#### 版本升位连带三件（每版必做，本版都踩到）
+1. 白名单 14 个测试文件的跟随型版本面（`s3-*` 系列）—— `tools/bump263_whitelist.py`；
+   注意脚本头部注释要一并改（v2.262 照抄过 v2.261 的说明，留下参数与文字不符）。
+2. `plans/{O,E,TP,TX}_*.md` 的现场读数块 —— `node tools/gen-plan-status.js --write`。
+3. `tests/evidence-ledger.json` 的 sha 与计数 —— `node tools/evidence-index.js --write`
+   （14 个改写过的测试文件让它 stale 15 条，q9 的 C6/B9b 当场红）。
+
+#### 挂载一致性
+`tools/smoke_mounted_2263.js`：独立计数 92/0、外部断言数 92/0、模块自计数 92/0，三处一致。
+排除「独立绿、挂载漏」的假绿形态。
+
+#### 台账归位（三处判据错，全部只改脚本不改产品）
+R220 初版被 `tools/ledger263.py` 插到了 R216 之前（第 74 行），且标题写成 `## R220`。
+成因：脚本用 `startswith('## R')` 找插入点，而既有日志用的是 `### R`
+（`'### R219'.startswith('## R')` 为 False —— 第三字符是 `#` 不是空格），
+于是跳过 R219/R218/R217、一路找到 `## R216` 才命中。**「最新在最上」的判据写错，
+条目就被钉在了三条之前**，而且插入点看着也「像个位置」，很难一眼发现。
+
+修的过程本身又踩两次：
+1. `tools/fix_r220_pos.py` 的自检 `out.count('## R220 …')` —— `## R220 …` 是新标题
+   `### R220 …` 的**子串**，替换成功后仍计 1，报「旧标题残留 1」并 `exit(1)`，
+   而写入在自检之后 ⇒ **文件根本没落盘，脚本却已经「报过错」了**。
+   改判据为行首形态（`startswith(OLD_HEAD) and not startswith('### ')`）后归位成功。
+2. `tools/fix_log_level.py` 用 `lines[i][1:]` 想「去掉一个 #」，实际是**删掉**一个 #
+   ⇒ `## R216` 变成 `# R216`（一级标题）。**按偏移做字符串手术，偏一位就是另一个错**。
+   自检当场拦住（`### R` 计数 220 != 221）—— 这一条证明「自检要对结果形态断言，
+   不要对操作位数断言」。第二版改按结果形态重挂 `### ` 前缀，一次通过。
+3. R220 正文里 9 条小节原写 `### 开工前先修…` / `### 交付` / `### 下一批`，
+   与 `### R219` **同级** —— 目录里这 9 条会当成独立 R 条并列出来。
+   降为 `####`（`tools/fix_r220_subhead.py`；全篇只有这一处出现过非 R 的三级标题）。
+
+收口判据：`^#{1,2}\s+R\d` = 0 · `^### R\d` = 221 · 首条 = R220 · 行数未变。
+归位后复跑 `o7`（pass 69）与 `q9`（67/0）均不受影响。
+
+#### 下一批
+OPV6-9（档位变更可回滚与幂等）：复用 `engines/rule-pack.js` 已交付的回滚栈
+（`history` / `MAX_HISTORY=12`），切档前自动存「切换前启用面」，一键回上档；
+重复切同档幂等（不重复写盘、不重复计数）。
+
+---
+
+### R219 · 2026-10-29 · v2.262.0（V6 第 3 天）设置页玩家动线分组：12 个引擎分区之上加一层「世界怎么转 / 人怎么活 / 故事怎么讲 / 我有多少控制权」导航（专锁 176/0，零破坏，抓到四处缺陷：「探针切片偏移假读数」「title 属性里露出 markdown 星号」「未知动线把整页藏光」「为让判据能读而生出的死导出」）
+**批次定位**：V6 双九项之 OPV6-7。前一批（OPV6-6，v2.261.0）把「额度用了不到一半」变成一个读数；本批治的是**上手面的病**：引擎一个都没少，但玩家不知道从哪开始。
+**现场立据（`tools/v6probes/p_lane.js`）**：设置页 12 个 `wa-sec` 全按**引擎分区**摆（世界规模 / 界面 / 世界推演设置 / 主观记忆采样 / 自定义推演指令 / 输出净化规则 / 区域突发事件 / 舆情引擎 / 事件演化 / 远方近端随机事件 / 叙事工艺 / 缝合引擎总开关），一屏接一屏、**零导航**。玩家要改「一次推演多深」得在「世界推演设置」与「叙事工艺」之间来回找。实测读数：渲染 HTML 17572 字节、`sec 总数 = 12`、`无 lane 的 wa-sec = 0`、导航按钮 6 个全在位。
+**交付采用「零破坏方案」（对计划原文的一处判断性偏离，理由留在计划台账里）**：原文说「按玩家动线**重排**」，实施时判定**不移动任何控件**——重排会动 40 余个既有 id 与一整套 `bind()` 绑定（`[data-tier]` 档位按钮、`#wa-set-tier-rollback`、`#wa-set-devmode`、净化规则 `[data-prm-on]/[data-prm-del]`、区域 `#wa-rg-*`、舆情 `#wa-op-*`、演化 `#wa-ev-*`、随机事件 `#wa-hz-*`、`switchBind`、天气联动 `[data-hzwx]`），风险面远大于收益。改为在原有结构上**加一层动线导航**：切一条动线只看这一路，「全部」就是原来的整页。
+**交付面（一处产品文件，五个改动）**：
+· 15 处 `wa-sec` 补 `data-wa-lane` / `data-wa-sec`（源码 15 处 / 运行时 12 段，差 3 是分支块缺席态备用标注：叙事工艺 2 处、世界规模 3 处，多出的 1+2=3）。
+· `LANES` 表（单一真源）+ `laneNavHtml()` 六个按钮 + `#wa-lane-note`。**按钮 id 逐行字面量**（`wa-lane-all/world/people/story/power/ui`）——门禁 H2 用字面量正则采集控件，由映射表拼出的 id 运行时存在、静态采集面隐形，既漏覆盖又让守卫表条目变僵尸（v2.51.0 叙事工艺五控件踩过同一坑）。
+· `laneApply(rootEl, lane)`：逐个 `wa-sec` 读它自己的 `data-wa-lane`，它到**下一个** wa-sec 之间的全部兄弟节点属于这一段；匹配就显示，否则 `display:none`。返回真读数 `{lane, shown, hidden, total, dev}`。
+· 模块级 `__laneSel` 保住重绘后的选中态（设置页会被状态事件整块重绘，重绘后上一轮的 display 全部丢失）。
+· `laneSayNote(lane, r)`：切动线 / 重绘恢复时把「这一路几段、都叫什么」写入 `#wa-lane-note`。`r` 直接用 laneApply 的真读数，**不重新数一遍**（避免两处口径又分家）。
+**为什么不用 CSS `~` 分组（写进代码注释）**：`wa-sec` 与它的内容**不是父子关系**，`~` 只能「选它之后的全部兄弟」，无法「止于下一个 sec」，会把后续段落一起隐藏——正是本仓反复付过价的「靠顺序活着的判据」。改用 JS 遍历、每次切换重算，不缓存（专锁 Q5/Q6 断言源码里没有 `.wa-sec ~` 这类顺序近似选择器）。
+**抓到的四处缺陷（全部修掉并写成判据）**：
+⚠ 一、**探针切片偏移假读数**：`x.slice(15, -1)` 应为 `slice(14, -1)`（`data-wa-lane="` 长 14），lane 名被截断成 `{"ower":2,"i":1,"orld":5,"eople":1,"tory":3}`。产品是对的、判据算错了——**读数骗人的另一种形态**，比产品坏掉更难发现，因为分布看起来仍然「像那么回事」。修后分布正确 `{power:2, ui:1, world:5, people:1, story:3}`。专锁 Q1/Q2 把两种切片并排断言，把这一手钉死。
+⚠ 二、**渲染残留 2 处 markdown 星号**：来源是 `title` 属性里的 `**推导值**`。**HTML 属性不吃 markdown**，tooltip 会原样露出星号。这是既有缺陷（非本版引入），一并修掉；专锁 C10 断言渲染结果零 `**`。顺带确立一条口径：面板渲染的是 HTML，**注释里的 `**` 无害（不进 DOM），属性与文本里的 `**` 就是缺陷**。
+⚠ 三、**未知动线把整页藏光**（`shown=0 hidden=3`）：设置页藏光是玩家**完全无法自救**的失败形态——导航条自己也在页里，一起藏了就再也点不回来。本版加兜底：不在取值域里的 lane（拼错 / 旧调用 / 外部传进来）**一律回落「全部」**并标 `fallback:true`，读数如实报 `lane:'all'` 而不是谎报成传入值。专锁 G1~G8 覆盖拼错 / 空串 / `undefined` 三种形态，都断言 `shown === total`。
+⚠ 四、**为让判据能读而生出的死导出**：本版一度给 `uiSettings` 加了 `lanes()`（把 LANES 镜像一份给专锁读），`dead-export-gate` 当场判红——`+ uiSettings.lanes [test-only] 仅测试引用（产品代码零引用）`。这是本仓反复付过价的形态：为了让判据能读，额外长出一个生产面零消费的读口，于是「被测的东西」与「跑起来的东西」又多了一份。**修法不是去登记它，而是撤掉它**：判据改读运行时真值（渲染出的导航按钮 `data-wa-lane-go` + `laneApply` 的读数），冻结面 `uiDead` 由 6 降到 5。同时把 `#wa-lane-note` 做成**活的**——它消费 `laneApply` 的 `shown/total` 并显示段名清单，于是「分组到底生效没」在界面上自证，`data-wa-sec` 也真的有人用（专锁 R 段八条断言这条链）。
+**专锁 `tests/settings-lanes-v2262.js`：178 通过 / 0 失败**。结构：A 源码面（标注一一对应 / 六处定义各恰 1 处 / 六个 id 字面量）／B 取值域（读运行时按钮，6 个、首位 all、逐字固定、五条动线都能真分到段）／C 渲染面（12 段全有归属、零漏标、五条动线各至少 1 段、零 `**`）／D 兄弟遍历分组（10 条，含「止于下一个 sec」与末段走父末子）／E 切回「全部」清空 display（含 8 条逐元素断言）／F 开发者模式一律不隐藏／G 未知动线兜底（8 条）／H 坏 root 不抛、返回零计数／I 绑定面 7 条／J 零破坏（既有控件 ≥30 个仍在、七个关键 id 各恰 1 处）／K~P 六组负控制 22 条／R 说明条活口 8 条／Q 假绿留痕 6 条。
+**负控制（六组，全部「真源码破坏 → 装内存副本 → 重跑同款判据」，且每条都配「正版上同款判据必须真」的双向自证）**：N1 破坏兄弟遍历（`let cur = null`）⇒ 段落子控件不被显式显示，内容跟着丢；N2 破坏 lane 归属（叙事工艺 story → world）⇒ story 段数由 3 变 2；N3 破坏未知动线兜底 ⇒ `shown=0` 空屏；N4 破坏「全部」分支（`lane === '__never'`）⇒ 切回 all 仍残留 `none`；N5 按钮 id 改成拼接 ⇒ 源码里再无字面量、静态采集不到，**而运行时仍能渲染出该 id**（守卫变僵尸的危险形态，专锁 N5.3 正面断言这一点）；N6 拆成两支——整块删掉（重绘即踢回整页）与只删说明条写回（显隐恢复了但说明条与实际分组脱节）。
+**实施期踩到的一处判据自身缺陷**：N6 的锚点原先是单句 `if (__laneSel && __laneSel !== 'all') laneApply(...)`，而在收口时因「重绘恢复也要写说明条」把这一句改成了花括号块，锚点随即失效（`实得 0 处`）。`breakOnce` 如实记账、没有静默通过——这正是锚点计数判据该有的样子：**锚点失配必须当失败报，不能当「没得破坏所以跳过」**。修法是把锚点改成块形态并拆成 N6a/N6b 两支。
+**门禁（十一项全绿）**：`version-surface-gate-v2185` pass(14)、31 条白名单全跟上 2.262.0；`test-surface-gate` 363 文件 / 305 锁 / 孤儿 0；`module-registry-gate` 302 文件 / 311 命名空间 / 硬边 0；`reject-code-gate` 1293 全绿；`dead-export-gate` ✓（`uiDead` 6→5，零新增死导出，元数据同源）；`ui-gate` 53/0；`q9-evidence-ledger-v2226` 67/0（先跑 `evidence-index --write` 重建）；`o7-plan-tree-gate-v2187` pass(69)（先跑 `update_plans262` + `gen-plan-status --write`）；`o6-layer-gate-v2187` 71/0；`o8-consumer-gate-v2187` 38/0（`_note` 追加本版复算段，长度 2818）；`q1-load-integrity-v2211` 64/0；`o9-outlet-gate-v2186` 50/0（tier=full）。
+**下一批**：OPV6-8（首局体检结论）。
+### R218 · 2026-10-29 · v2.261.0（V6 第 2 天）预算余量可见与档位建议：把「额度用了不到一半」从读者自己做减法变成一个读数（专锁 146/0，抓到并修掉三处假绿：「-1 自动与从未配置共用一个 source」「overBudget 冒充 saturated」「三个消费方各自做减法」）
+**批次定位**：V6 双九项之 OPV6-6。前一批（OPV6-5，v2.260.0）把「出厂缺省替你关了什么」变成可读对账；本批治的是同一类病的另一面：**额度这件事只有两个裸数，没有读数**。
+**现场立据（`tools/v6probes/p_budget2.js`）**：`plan()` 返回 `budget=2400 used=500 remain=1900`（余量占 79.2%），但 `summaryText` 只输出 `注入 500/2400t｜未声明 5 源[…]`——余量在**字符串里根本不存在**；诊断包 `budget` 段只有 `used` / `cap`；面板「注入预算裁决」段同形。`resolveBudget` 四入口径实测：`null`→`2400/default`、`-1`→`2400/default`、`0`→`0/manual`、`2400`→`2400/manual`——**前两支完全同形**。
+**三处假绿（本批抓到并修掉，全部写成专锁负控制）**：
+⚠ 一、**`-1 自动` 与「从未配置」共用一个 source**：`autoBudget()` 在量不到宿主上下文窗口时返回 `source:'default'`，于是「玩家选了按 6% 算但窗口没量到」与「玩家根本没配过」在诊断包与面板上逐字同形。玩家按 `-1` 的语义以为额度会随上下文长，实际恒 `DEFAULT_BUDGET`，界面上无处告诉他——**两种不同的原因共用一个读数**，这是本项目同一类假绿的第三次出现（前两次：OPV6-5 的「默认值伪装成用户配置」与「第三态源人间蒸发」）。正解：`resolveBudget` 补 `mode`（auto / auto-noctx / manual / off）与 `requested`（原样回显调用方要的值），`source` 与 `contextSize` 语义**逐字不变**（既有消费方零改动）。
+⚠ 二、**`overBudget` 被当成「饱和」**：`used >= cap` 只覆盖「用满/超支」；而「余量只剩 12t，再放不进一个最小可保项」在工程上同样是饱和，此时报「还有余量」等于骗人。正解：`saturated = used >= budget || remain < MIN_KEEP_TOKENS`，两条并列不互相冒名（专锁 D4~D7 覆盖边界：`remain == MIN_KEEP_TOKENS` 不算饱和，`MIN_KEEP_TOKENS - 1` 算）。
+⚠ 三、**三个消费方各自 `cap - used`**：面板读的是**存档快照**（`lastInjection.budget`，不是 plan 结果本身），诊断包读同一份快照，backstage 读设置——三处若各自现算，「算不算饱和」会得出两种结论。正解：收敛到唯一判据口 `injectBudget.budgetView()`，三面共用（专锁 O5/O6 断言面板与诊断都走它、且全库零处 `b.cap - b.used`）。
+**交付面（四处产品改动 + 一处落盘）**：
+· `engines/inject-budget.js`：`resolveBudget` 补 `mode`/`requested`；`plan` 补 `budgetMode` 与 `headroom`（remain / usedPct / freePct / saturated / avgKeptTokens / spareSources / note）；`summaryText` 补余量句与超支句（**两句互斥**：超支时余量恒 0，两句同时出现只会互相打架）；新增导出 `budgetView()`。
+· `render/inject.js`：落盘快照补 `budgetMode` 与 `headroom` 两个字段——面板与诊断读的是同一份快照，这是「同一份快照两处消费」，不是新增读口。
+· `engines/tool-diag.js`：诊断包 `budget` 段补 `headroom` / `mode` / `modeText` / `advice` / `headroomText`。
+· `ui/panel.js`：预算段补余量行（含占比与可再开数）、档位说明、饱和警告、建议、以及「余量按快照现算」的如实提示。
+· `engines/backstage.js`：新增只读口 `budgetHeadroom()`（`stored` 落盘原值 / `resolved` 现算档位 / `last` 上一轮真实用量 / `advice` 建议）。**未注入过 `last` 就是 null**——不拿 `resolved` 冒充「用过」（专锁 H3 + 负控制 N6）。
+**口径与克制（计划原文的「不做」逐条落地）**：
+· 原文「不做把预算调小」→ 本版**零写路径**：`budgetView` / `budgetHeadroom` 都是纯读，`advice` 只是建议句，改不改额度仍由玩家在设置页决定。
+· 原文「把 `-1 自动` 改为用量驱动」→ **按实测改成更小心的读法**：若真做成「按用量自适应」，同一份世界在不同轮次会拿到不同额度，复现性变差，且「这一轮裁掉了什么」将无法用固定额度复算。本版只把**档位口径说清**（`mode` + `modeText`），不改裁决逻辑。
+· `advice` 只在「闲置过半（freePct ≥ 50）且真裁过项（used > 0）」时给出，并逐字写明「**也可以不动——空闲额度没有代价**」：不制造焦虑，也不把「额度富余」说成「配置有问题」。
+**专锁 `tests/budget-headroom-v2261.js`：146 通过 / 0 失败**。结构：A 源码面 20 条（六处改动各恰 1 处，防重复打补丁）／B 档位口径 19 条／C 余量账 13 条／D 饱和判据 7 条／E 摘要互斥 10 条／F `budgetView` 26 条／G 端到端 19 条（三个消费方吃同一判据）／H 未注入 4 条／I~N 六组负控制 22 条／O 假绿留痕 6 条。
+**负控制（六条，全部「真源码破坏 → 装内存副本 → 重跑同款判据」，且每条都配「正版上同款判据必须真」的双向自证）**：N1 破坏 `mode` 分支 ⇒ `-1` 与未配置又合回一个读数；N2 破坏 `saturated` 判据 ⇒「余量剩 12t」被报成「还有余量」；N3 破坏 `plan().headroom` ⇒ 余量退化成各消费方做减法；N4 破坏 `summaryText` 余量句 ⇒ 余量在读面消失；N5 破坏 `derived` 标记 ⇒ 事后现算与裁决所记同形；N6 破坏 `backstage.last` 分支 ⇒ 未注入过时拿 `resolved` 冒充用量。
+**实施期踩到的一处锁自身缺陷（已修，并留痕）**：首版专锁的 `boot()` 直接 `WA = {}` 重建，把 `tests/mock.js` 挂在 `WA` 上的基础设施（`WA.log` 等）一起清掉了，于是注入链路第一句就抛 `WA.log is not a function`，G 段端到端**整段静默跳过而锁仍然全绿**——这正是本项目点名的「假绿：锁绿了但那一节根本没跑」。修法：`boot()` 改为 `Object.assign({}, MOCK_WA_BASE)`，保留 mock 基础面再重建状态；同时 `runAll` 的正文包 `try/catch`，抛错**必须**记一条失败并把栈打出来，不许静默。
+**门禁**（八道全绿）：`version-surface-gate-v2185` pass(14)／31 条白名单全跟上；`dead-export-gate` 1174 全绿（`_note` 版本词跟位后）；`test-surface-gate` 362 文件 / 304 锁 / 孤儿 0；`module-registry-gate` 302 文件 / 311 命名空间 / 硬边 0；`reject-code-gate` 1293 全绿；`ui-gate` 53/0；`q9-evidence-ledger-v2226` 67/0（`tools/evidence-index.js --write` 重建）；`o7-plan-tree-gate-v2187` 69/0；`o9-outlet-gate-v2186` 50/0（tier=full）；`o6-layer-gate-v2187` 71/0；`o8-consumer-gate-v2187` 38/0（consumer-ledger `_note` 追加本版复算段，长度 2262）；`q1-load-integrity-v2211` 64/0。
+**下一批**：OPV6-7（设置页收敛：从 12 个分区到玩家动线）。
+
+### R217 · 2026-10-29 · v2.260.0（V6 第 2 天）注入源可见性缺省 vs 启用面对账：把「出厂缺省替你关了什么、那份缺省是不是真的在用」变成一行可读的对账（专锁 80/0，抓到并修掉两处假绿：「默认值伪装成用户配置」与「第三态源人间蒸发」）
+
+**批次定位**：V6 双九项之 OPV6-5。前一批（OPV6-4，v2.259.0）把三道门槛摆在一起，能报「107 源只通 6 个」；本批补的正是它答不出的那一问：**这 6 个之外，有多少是被出厂缺省挡住的、那份缺省是不是真在用**。
+
+**现场立据（`tools/v6probes/p_vis_default.js`）**：`worldaxis_inject_visibility_v1` 落盘原值 **null**（玩家从未配置），107 源全走 `__REG.def`；def 中默认 false 的只有 3 个（`echoes` / `opinion` / `style`）；面分布 `{unavailable:24, vis-off:3, mod-off:74, on:6}`。此时「引擎装着但内容不注入」与「引擎关着」在现场长得一样。
+
+**五条口径**：
+① **落盘真相只有总线知道**：`read()` 必 `applyDefaults` 补满 107 子键、返回恒非空，不能拿返回值判「有没有配过」；正解走 `readEx` 契约口。
+② **`stats.lastRead` 是全局单槽，判据不许引用**（实测：读完本键再读 chrono，`key` 就变成 chrono）；`readEx` 内部 read 后立刻封装来源，故抗插队（实测中间插两个别的键仍报本键 + disk）。
+③ **`moduleEnabled` 是三态**（true/false/**null**=该源无模块级总开关、由 store 直供），默认关的源必须逐个落进 `silent`/`doubleOff`/`noSwitch` 三桶，三桶相加须等于 `defaultOff` 长度。
+④ **不并入 faceAudit**：那面是四态封闭集（`on/vis-off/mod-off/unavailable`），`tests/switch-matrix-v2910.js` 有全景负控制盯着；本面在顶层 `visibilityDefault()` 单列。
+⑤ **只报读数、不写配置**：连调三次零写盘（B5 / D2 双断言）。
+
+**实施期抓到的两处真缺陷（均已写成本锁负控制）**：
+① `configured` 首版判据「`read(__REG)` 返回对象非空」⇒ **恒为 true**，出厂态被报成「玩家配过」——最典型的「默认值伪装成用户配置」。探针 `p_vis_default2.js` 写前即报 `configured = true`，与落盘 null 直接矛盾。
+② 三桶首版只写 true/false 两支，`moduleEnabled === null` 被**静默丢掉** ⇒ 3 个默认关的源里 2 个（`echoes`/`style`）在读数里人间蒸发，读者以为「只剩 1 个有问题」。
+
+**消费方接线**：`engines/tool-diag.js` 的 `secInject()` 内新增 `out.visDefault` 子读数（与 `faceAudit` 分列不合并，全字段含三桶名单与 note）；`ui/panel.js` 概览页新增 `#wa-vis-line` 提示行（三条口径：只在「从未配置」时说、`silent > 0` 时单独成句、没毛病整行不出现）。
+
+**专锁结构**：`tests/vis-default-v2260.js` 403 行，A/B/C/D + N1–N5。**80 通过 / 0 失败**。四条破坏锚点：`A_SRC`（改回「read 返回非空 ⇒ 配过」）、`A_CONF`（`configured = true` 写死）、`A_NOSW`（摘掉第三态桶）、`A_SIL`（面板静默分叉恒 false）。N1/N2 验证「假绿①」必现形，N3 验证「假绿②」的三桶不再封闭，N4 验证静默主句丢失。N5 纯度：全部负控制跑在内存副本上，原文件零改写。
+
+**一处判据自身的坑（写进锁注释）**：`fresh()` 会清空 localStorage，但 `WA` 是挂在 global 上的**同一个对象**——先建两个实例再取读数，读到的其实是第二个实例的状态（N1 前提曾因此报 `configured = true` 而正版明明是 false）。修法：先取完 r0 再建第二个实例。
+
+**版本跟随面**：`tools/bump260.py`（CHANGED 8：index.js 1 / manifest 1 / run.js 9 / five ledgers）+ `tools/fix_dead_export_note260.py`（`_note` 版本词 § note-vs-entry 口径）+ `tools/bump260_whitelist.py`（**MAXM=259 / ADDS=['260']**，CHANGED 14 个 s3 文件，31 条白名单全部跟到 2.260.0）。`tests/run.js` 挂载第 24575–24594 行（section 名 `v2.260.0 (VIS-DEFAULT)`，含 12 行挂载纪律注释）。
+
+**门禁实测**：`vis-default-v2260` 80/0 · `version-surface-gate-v2185` pass(14) · `dead-export-gate` 1174 全绿（`_note` 跟位后）· `test-surface-gate` 361 文件 / 303 锁 / 0 孤儿 · `module-registry-gate` 302 文件 / 311 命名空间 / 硬边 0 · `reject-code-gate` 1293 全绿 · `ui-gate` 53/0 · `q9-evidence-ledger-v2226` 67/0（重建后）· `o7-plan-tree-gate-v2187` 69/0（gen-plan-status 重建四份计划块后）· `o9-outlet-gate-v2186` 50/0（tier=full）· `o6-layer-gate-v2187` 71/0 · `o8-consumer-gate-v2187` 38/0 · `q1-load-integrity-v2211` 64/0。
+
+**下一批**：OPV6-6（预算余量可见，`engines/inject-budget.js` + `engines/backstage.js`）。全量回归仍按用户裁决推迟到 V6 十八项全部落地后一次性执行。
+
+### R216 · 2026-10-29 · v2.259.0（V6 第 2 天）首轮零内容的三重门槛自检：把「机制开着为什么正文没内容」变成三行可修的动作（专锁 76/0，抓到并修掉三处假绿）
+**批次定位**：OPV6-1/2 答的是「179 个开关此刻谁在跑」（running 5 / dormant 95），OPV6-3 答的是「选了题材真开哪些机制」。但玩家最先撞上的那个问题这两节都答不出：**机制开着的那些，为什么正文里没内容**。`tools/v6probes/p_three_gates.js` 现场实测出厂态把三个真实门槛摆出来了——门槛① 引擎 `enabled`：`running 5 / mechanisms 100 / dormant 95 / tier lite`（过）；门槛② 注入源 `visibility`：107 源里 `on 6 / mod-off 74 / vis-off 3 / unavailable 24`（不过）；门槛③ 预算档位：`budget 2400 / source default / 未挤掉任何源`（过）。**三重门槛全通的源只有 6 个**（`livingWorld geoTracker healthPreflight antiOmniscience personaAnchor outputGuard`）—— 这就是「装了插件却只看到一点世界」的直接原因，也是本项立项的根本依据。
+**口径一：只用现场读数，不另立真源**。引擎门槛走 `capabilityTier.view()`（「什么算引擎」的唯一判据，与题材面/档位面同一份）；可见性走 `render.visibilityStat().faceAudit`（v2.91.0 已把两面真值摆在一起，本节不自己重算两面对账）；预算走 `injectBudget.resolveBudget()/plan()`。三条门槛**一条都不重算**——重算就是第二个真源，分叉后玩家只看得见报「通过」的那条。
+**口径二：每个门槛给一条动作，且动作必须真可执行**。`fix` 里写的名字是现场存在的写入口（`capabilityTier.applyTier` / `render.setVisibility` / `injectBudget.resolveBudget` / 模块总开关），给不出动作的门槛如实报 `fix: null` + `why`——**编一个假按钮比不给更坏**。专锁 B3c 逐条断言 `fix.do` 落在真实写入口封闭集内。
+**口径三：缺件如实报 absent，绝不当通过**。三个门槛各有两种「读不到」出口（读取异常 + 模块压根未加载，共 6 处 `'absent', {}`），诊断面不在场就报 `absent`，结论落 `unknown`——**不在没读到的情况下说「这道门槛过了」**。这是本仓「缺数据不得当成通过」的一贯口径。
+**口径四：部分成功就是部分成功（本轮最关键的一处修正）**。门槛②首版判据写的是 `on.length > 0 ? 'pass' : 'blocked'`——在「107 源只有 6 个通」时它照样报 pass，`threeGatesLine` 当场输出「三道门槛都通，可以开始推演」。这正是本仓点名的**把部分成功折成全成功**：玩家读到「都通」就不会去开那 74 个被模块总开关挡住的源。修法是把判据改按**比例三档**（`≥半数 pass / >0 但不足半数 degraded / =0 blocked`），`nums` 增 `onRatio`，`why` 在 degraded 时直说「只有 6/107 个源在出内容：另有 74 个被模块总开关挡住、24 个无模块级开关」。
+**结论四态（不折叠）**：`blocked ⇒ empty-risk`（这一轮大概率零内容，玩家最该看见的一档）/ `degraded ⇒ partial`（有内容但远少于该有的量）/ `absent ⇒ unknown`（读不到，不假称健康）/ 全 pass ⇒ `running`。`nextAction` 从 `blocked[0] || degraded[0]` 取第一条带动作的门槛并指名道姓，`threeGatesLine` 一句到底（面板不自己拼措辞——第二个措辞真源就是漂移源）。
+**抓到的假绿一：判据读到不存在的字段时不会红（最隐蔽的一类）**。实施期首版照计划文字把门槛①的字段写成 `v.total` / `v.off`，而 `capabilityTier.view()` 现场返回的是 `{ running, mechanisms, dormant, granted, rollbackDepth, rollbackCap }` ——三个数字全是 `undefined`，而判据（`v.running > 0 ? 'pass' : 'blocked'`）照样绿。**字段读到空洞也不红**，等于整条门槛在自欺。修法：字段改 `{ running, mechanisms, dormant, tier }`，并在锁里立 C1 判据逐字段断言 `nums` 是 `isFinite` 的真数字、C1b 断言关键数非恒 0（恒 0 也是「读不到」的一种伪装）。
+**抓到的假绿二：`ok` 漏了 `absent`**。`verdict` 已经把 absent 算成 `unknown`，而 `ok` 首版写的是 `blocked === 0 && degraded === 0` —— 抽掉门槛②读口后 `verdict` 正确报 `unknown`，`ok` 却仍是 `true`。任何按 `ok` 走的分支都会把「不知道」当成「健康」。修法：`ok` 加上 `absent.length === 0`，锁里立 A5c（锚点级）+ C3c（行为级：抽掉 `WA.render` 读口 ⇒ `unknown` 且 `ok === false`）。
+**抓到的判据口径错（非代码错）**：A5 首版写 `cnt(H, "'absent', {}") === 3`，实跑 6 ⇒ 红。这不是代码错，是**判据口径错**：只看「每门槛一条」会漏掉「模块压根没加载」那一支，而那一支才是出厂缺件的真实形态。改 6 并补 A5b（门槛①只在真读到 `running>0` 时才 pass）。
+**消费方接线（三处，全部玩家可达）**：① `engines/tool-diag.js` 新增 `secHealth()` 节并登记进 `collect()` 的 `health` 键（103 个诊断节），带 `verdict / passed / blocked / degraded / absent / sourcePassing / sourceTotal / gates / nextAction / line / note`，与 `capability` 节**分列不合并**（那一节答「谁在跑」，本节答「跑着的为什么没内容」）；② `ui/panel.js` 概览页新增 `#wa-health-line` 体检块，整句逐字取 `threeGatesLine()`，且 **`running` 时整块不出现**（体检块不是装饰块，没毛病就不打扰），引擎缺席时明写「体检读数不可用」而不渲染成「都通」；③ 面板/诊断共用引擎那一份措辞，不另编。
+**专锁结构**：`tests/three-gates-v2259.js` **76/0**。A 结构 15 条（四个破坏锚点各恰中 1 次 / 两个导出各声明一次 / 三个现场读口都在 / 函数体内零写入口调用 / 六处 absent 出口 / `ok` 含 absent / 诊断节与面板真接线 / 稳定 id / 版本已升位）；B 运行时 15 条（三门槛身份与顺序 / state 四态封闭集 / `fix` 形态与真实写入口 / 六通数与 `faceAudit` 同源 / 四态面相加等于总源数 / 门槛①③读数同源 / `dormant` 自洽 / **连调三次零写盘且启用面不变** / 整句带「源全通 N/M」/ `sample` 上限夹 20）；C 归因 11 条（字段真数字 / `verdict` 与四态计数自洽 / `ok` 三门槛全 pass 才真 / 抽读口报 absent 且 `fix:null` / 恢复后读数回原样 / partial 时 nextAction 指名）；D 消费方 9 条；N1–N4 负控制 + N5 纯度。
+**负控制两向自证（逐条打在真分叉点上）**：N1 把可见性判据退回首版 `on>0 ⇒ pass`（要求破坏版 state 必为 pass 且与正版**不同**，并自带失效提醒：若哪天真把 107 源全通，正版也是 pass ⇒ 本条红要求改靶标，**绝不静默跳过**）；N2 摘掉 `degraded ⇒ partial`（正版 `partial` / 破坏版 `running`）；N3 把 `absent ⇒ unknown` 改成 `⇒ running`（正版 `unknown` / 破坏版 `running`）；N4 把 `first` 收窄成 `blocked[0]`（正版 nextAction 指名门槛 / 破坏版丢失）。N5 纯度：四个锚点在原文件各恰中 1 次，且首版那条错判据 `on.length > 0 ? 'pass' : 'blocked'` 在产品里零残留。
+**读数**：专锁 76/0 · 探针现场（verdict `partial` / ok false / passed 2 / degraded 1 / blocked 0 / absent 0 / 源全通 **6/107** / nextAction「先修「注入源可见性」：开 life 对应的模块（另有 73 个同因；或直接切档位一次性打开）」）· 诊断节 `health` 实测与引擎直读逐字同源 · `dead-export` 冻结面 **1174**（复算 1179 条证据，归因 test-only 411 / 其余 763）· `o8-consumer-gate` 38/0 · `q9-evidence-ledger` **67/0**（重建 358 条）· `version-surface-gate-v2185` 14/0（31 条白名单全部 2.259.0）· `test-surface-gate` 360 文件 / 302 锁 / 0 孤儿 · `reject-code-gate` 1293 全绿 · `ui-gate` 53/0 · `module-registry-gate` 文件 302 / 命名空间 311 / 硬边 0 / 结构问题 0 · `o7-plan-tree-gate` 69/0（四份旧计划块随版本重建）· `o9-outlet-gate` 50/0（tier=full）。
+**版本跟随面**：`tools/bump259.py`（复用 bump258 口径）CHANGED 8 个文件（index.js / manifest.json / run.js 9 处断言 / 五本台账 version）；`tools/bump259_whitelist.py` CHANGED 14 个 s3 系列文件（**MAXM 取「当前白名单里的最大小版本」258 而非上一版版本号**——v2.258.0 那一轮把 256 一次补到 258，若沿用 MAXM=256 两种形态都匹配不上、一条都不改却静默报「0 changed」）；`tools/fix_dead_export_note.py` 单独跟 `_note` 版本词（dead-export 的元数据自洽判据要求 `_note` 版本词与入口 VERSION 同值，而 bump 脚本按设计只动 `version` 字段与断言串）。三者均先 `ast.parse` 预检再执行（本仓纪律：补丁脚本一律落盘 + AST 校验；本轮 heredoc 内嵌 `python3 -c` 又把缩进改坏两次，最终仍以落盘脚本解决）。
+**一处判据被自己骗过的教训（已写进锁注释）**：D3b 首版锚点写裸串 `体检读数不可用`，而同一句在面板的**注释**里也出现一次 ⇒ `cnt === 2` 判据红。修法是改用带渲染边界的完整串 `>体检读数不可用（engines/health-preflight.js 缺席）<` ——**裸串锚点会把注释算成一次渲染出口，判据自己就会被注释骗过**。
+### R215 · 2026-10-29 · v2.258.0（V6 第 1 天）题材驱动启用面：让「选了都市」真的等于「都市机制在跑」（题材锁 73/0，另修 4 处真实跨模块账）
+**批次定位**：OPV6-1/OPV6-2 把「机制做了、玩家碰不到」摊到了台面上（179 个带开关引擎里 161 个默认关、95 个「有 `buildBlock` 却关着」），但玩家手里最直觉的那个动作仍然是空的：`theme.apply(['urban'])` **只改 `rules.ORDER`**（题材模块的注入顺序），一次都不碰任何引擎的 `enabled`。于是「我选了都市」与「都市机制在跑」是两件互不相干的事 —— 选完都市，经济/仇敌/治安/物流照样一个个关着。本版让题材真开机制：选都市 **真开 20 个**（running 5 → 25），清空 **真收回 20 个**（回到出厂 5 个）。
+**口径一：不造第二套判据（本轮最重要的一条设计裁决）**。题材面开引擎必须走 `capabilityTier.flipSwitch`，否则「档位说开了、题材说没开」的双判据分叉后，玩家只看得见报「成功」的那一条。实施期第一版试图把 `turnOn`/`turnOff` 重构成统一的 `flipSwitch(key, want)`，改完才意识到会破坏既有专锁 `capability-tier-v2257.js` 的负控制锚点 `A_VERIFY`（该专锁 A1 要求锚点恰中 1 次）——**当场回退**，改为「保留 `turnOn`/`turnOff` 原实现一条不动，只在其上新增纯分派入口 `flipSwitch(key, want) { return want === true ? turnOn(key) : turnOff(key); }`」。这条体现的是本仓纪律：**已有专锁的锚点字面量是稳定契约，重构不得擅自更改**。
+**口径二：三态转发，而缺席要如实报**。`theme.js` 在装载序上早于 `capability-tier.js`，且题材功能**不许**依赖档位功能的存在。故 `shape()` / `flip()` 做三态：档位面在场 ⇒ 用它的 `shapeOf` / `flipSwitch`（同一判据、同一回读复核）；缺席 ⇒ 自带一份**最小等价实现**（带 `enabled` + 有写入口 + 回读确认，逐条同规），并在 `engineFace()` 里如实报 `{ via: 'fallback' }`，让诊断面看得见「这是降级跑」——而不是让两条路悄悄分叉（v2.101.0 那类账：缺席与在场长得一样）。
+**口径三：五条边界，全部可执行**。① 只加开不关别人的：收回面**严格等于** `settings().engines`（本模块自己开过的），玩家手开的、档位开的，一次都不碰。② 逐个真写 + 当场回读复核。③ 部分成功就是部分成功：没真起来的进 `notEffective`、无注入面的进 `notInjected`，非空 ⇒ `partial:true` + `tier-partial`。④ 幂等（`!didOn.length && !didOff.length && !themesChanged && !grantChanged` ⇒ noop，不写盘不计数；`notInjected` 是**静态表质量**，刻意不参与幂等判定，否则每次 apply 都会被一个永远修不好的名字顶成「有活干」）。⑤ **副作用自收尾**（见下面的污染事件）。
+**`THEME_ENGINES` 九题材映射表（真源）**：按引擎**造的东西**归类（经济造钱、`hazard` 造横祸、`investigation` 造线索），一个引擎可属多题材（并集语义）。本表**不写死「什么算引擎」** —— 成员是否真开关、有无注入面一律由 `capabilityTier.shapeOf()` 现场回答；题材**绝不**因为「这引擎不属于我」就去关它。urban 20 / campus 13 / mystery 12 / fantasy 11 / business 11 / modern 8 / history 10 / scifi 10 / xianxia 10。刻意留空的题材（校园/历史/现代）只挂题材特有的那几个：宁可少开，也不把「选了个题材」膨胀成「把整个档位打开」——那是 OPV6-1 的活。
+**抓到的真缺陷一：跨用例污染（本仓「靠顺序活着」的又一次现形）**。`tests/b6-b7-v2870.js` 的 B7 块调了 `WA.theme.apply(['campus','mystery'])` 却**不收尾**；`tests/run.js` 的 `runLock(spec)` 是 `require(spec)[m](assert)` 直跑（同一 vm 上下文共享 localStorage），于是 25 个机制外溢到后续用例，`shadow-v2630` / `threads-v2630` 的「[1] 默认关闭（实 true）」当场红。探针实测复现（`/tmp/p_pollute.js`：hazard/investigation/shadow/threads/storyChoice 的 `enabled` 全为 true、`theme.engines` 25 项），爆炸半径实测（`/tmp/p_blast.js`）。**修法不是改那些断言（它们判的是对的），而是让写出副作用的那一块自己擦干净**：b6-b7 块内加 `WA.theme.apply([])` 自收尾 + 三条断言（收回数 >0 / `enginesGranted.length === 0` / 注入面回全量）。修后六把相关锁全绿。
+**抓到的真缺陷二：引用面口径与「复用判据」撞车**。`shape()` / `flip()` 首版写成经局部变量调用（`const c = cap(); c.flipSwitch(...)`），而清册的引用面口径是 `WA.ns.mem`（`tests/inventory.js` 的 `REF_RE`）——**产品侧 refs 读成 0**，dead-export 台账当场把 `capabilityTier.flipSwitch` / `shapeOf` 记成「过度导出（self-only）」（+2 新增死导出）。这不是代码错，是**账错**：治法不是给台账加豁免，而是**让引用面如实可见** —— 调用点改成显式点名 `WA.capabilityTier.flipSwitch(key, on)`，破坏锚点 `A_VIA` 同批改动。改后冻结面回到 1175、dis.registerable 仍为零。
+**抓到的真缺陷三：锁的靶标不能是「已登记为无消费者」的导出**。B6/N2 要测「玩家手动开的引擎不被题材收走」，首版挑了 `research`（属科幻、不在都市/校园表内）—— 但它在 `consumer-ledger` 的 `programmatic` 登记里（含义恰是「产品面与测试面都零引用」）。测试一直接调它的 `setSettings`/`getSettings`，它当场变成 test-only 消费方，`o8-consumer-gate` 报 `stale-entry`（C1 / D6 / N4b / N4c 四条红）。**登记过期比没登记更坏**。修法：新建探针 `tools/v6probes/p_manual_engine.js` 按三条硬约束筛靶标（真开关 + 不在任何题材表内 + 不在 programmatic 登记里），现场筛出 35 个候选，改取 `plan`；`/tmp` 侧另建 `p_ledger_lookup.js` 交叉核对冻结面。改后 o8 38/0、dead-export 证据复算零失实。
+**抓到的真缺陷四：版本白名单两版没跟上**。`bump257.py` 只升「版本字段 / `===` 断言」，**没碰跟随型版本面**（正则 alternation 与数组名单两种形态）—— 31 条白名单停在 2.256.0，`version-surface-gate-v2185` 当场 6 红（含用它自己的 N1 锚点过期一起红，与 v2.184/v2.185 两轮栽的形态逐字同族）。新建 `tools/bump258_whitelist.py` 按**形态**升位（不逐串枚举：形态一追 `2\.(…|256)\.0` 的末项、形态二追方括号内末项，且**跳过注释行**），一次补齐 257 与 258 两版，改 14 个文件、31 条白名单全部跟到 2.258.0，`version-surface-gate-v2185` 14/0。被改的五个 s3 系列锁逐个复跑全绿（146/0、82/0、42/0、46/0、91/0）。
+**专锁结构**：`tests/theme-engines-v2258.js` **73/0**（A 结构 8 条：五个破坏锚点各恰中 1 次 / `flipSwitch`+`shapeOf` 在导出面 / theme.js 零裸写 `enabled` / `engineFace` 有真消费方 / 装载序 / 九表每个名字都是真开关且都有 `buildBlock` / 每题材面非空 / recipe 透传 partial；B 运行时 9 条：出厂 running 5 / preview 答机制面且不落设置 / apply 真开且 running 等量涨 / 逐个回读 / 零 `notEffective` / 幂等不写盘不虚报 / 切题材只收自己开的 / **边界①反向证：玩家手开的跨三次切换仍 true** / 叠加为并集 / 清空收回等量且 running 回 5 / `engineFace` 读数与现场一致且 `via` 如实；C 归因 4 条；D 消费方 2 大条；N1–N5 负控制 + N6 纯度）。
+**两处「破坏不敏感」的教训（已写进锁注释）**：① **N4 首版破坏在 urban 表上不敏感** —— 改成 `uniqArr(wantKeys)` 后读数与正版**逐字相同**（表内 20 个出厂全关，`'already'` 一个都没有），判据恒绿等于没测；修法是把破坏**打在真正的分叉点上**（表内已开着的引擎才是「`already` 不得入 `granted`」唯一能被观测的情形：玩家手动开 economy ⇒ 错误 `granted` 下清空会把它关掉），并加 **N4c 正向对照**（同款判据在原版上必须为真，否则「N4b 变红」也可能只因「economy 压根开不起来」这类无关原因）。② **N5 首版打错了分支** —— 用不存在的键 `zz-not-such-engine` 当靶标，先命中 `!sh` 而非 `!sh.hasBuild`，破坏对结果毫无影响；修法是取 `p_nobuild.js` 实测的真靶标 `opinion`（78 个「带 `enabled` + 有 `setSettings` 但无 `buildBlock`」的引擎之一）。
+**消费方接线**：`recipe.apply` 把 `themeApplied` 扩成带 `enginesOn/enginesOff/notEffective/notInjected/partial/partialReason/noop`，并平铺一份 `enginesOn` 与 `partial/partialReason`（回执部分成功就是部分成功）；`ui/panel.js` 题材区回执带「本题材机制 N/M 在跑」+ partial 明细、预览报「机制面：将开 N/M 个」、清空报收回数；`engines/tool-diag.js` 的 `secWorldLexicon()` theme 节点带 `engines: { want, running, granted, gap, notInjected, via }`（只读，缺 theme 时如实 null）。
+**读数**：题材锁 73/0 · theme 相关探针三支现场读数（选都市 on 20 / running 5→25；重复 apply noop 且 writes 81→81；清空 off 20 回 5；玩家手开的 `research` 跨三次切换仍 true）· dead-export 冻结面 **1175**（+2 新增已当场治好，归因 test-only 412 / 其余 763）· `o8-consumer-gate` 38/0 · `q9-evidence-ledger` **67/0**（重建后 357 条）· `version-surface-gate-v2185` 14/0（31 条白名单全部 2.258.0）· `test-surface-gate` 359 文件 / 301 锁 / 0 孤儿 · `reject-code-gate` 1293 全绿 · `ui-gate` 53/0 · `module-registry-gate` 文件 302 / 命名空间 311 / 硬边 0 / 结构问题 0。
+**版本跟随面**：`tools/bump258.py`（复用 bump257 口径）CHANGED 8 个文件（index.js / manifest.json / run.js 9 处断言 / 五本台账 version）；`tools/bump258_whitelist.py` CHANGED 14 个 s3 系列文件。两者均先 `ast.parse` 预检再执行（本仓纪律：补丁脚本一律落盘 + AST 校验，不用 heredoc 内嵌 `python3 -c`）。**本轮踩到的一个坑**：`capabilityTier.flipSwitch` / `shapeOf` 两口在 `consumer-ledger` 里没有 programmatic 登记（它们不是「无消费者」，而是「已有产品侧真读」），`o8` 的 D6「programmatic 档数 === 登记数」差额 186/188 是两条 `data-const`（`capabilityTier.REG` / `capabilityAudit.REG` 走 `dataOnly` 口径），已在 `_note` 里写清。
+### R214 · 2026-10-29 · v2.257.0（V6 第 1 天）能力档位 + 启用面可见：把「引擎已建好、玩家零接线」这笔账真正平掉（引擎 86 + 界面 60 专锁全绿）
+**批次定位**：V6 纲领的立项读数不是「机制不够」，而是「机制做了、玩家碰不到」——179 个带 `enabled` 开关的引擎里 161 个默认关，95 个「有 `buildBlock` 却关着」的真世界机制躺在开关后面，空世界下 107 个注入源只有 **4** 个产出非空。OPV6-1/OPV6-2 要答的就是这件事：给一组「轻 / 标准 / 完整」的可验收档位，并把「谁在跑、谁没跑、为什么」摊到面板上。本批次的真难点不在造两个引擎，而在**新引擎建好之后 dead-export 台账当场由 1175 涨到 1189（+14）**：两个新模块的 14 条导出 `refs=0`、`reason` 全是 `test-only` / `self-only` —— 这就是「功能级失效」的字面形态。台账在这里不是记账，是**替玩家抓住「你写了但没人能用到」**。
+**口径一：档位不是开关，是逐引擎真实落盘 + 当场复核**。`applyTier(name)` 不做批量赋值，而是对目标档的每个引擎真调 `setSettings({enabled:true})`，再当场 `getSettings().enabled === true` 复核；任一读不回来就进 `notEffective`，整体 `partial:true`，绝不把部分成功折成「已开启」。返回体 `{ok, tier, noop, turnedOn, turnedOff, notEffective, partial, granted, rollbackDepth, total, saved}` —— 注意**不含 `running` / `before`**：这两个恰是 UI 侧最容易想当然引用的字段（本轮真踩了，见自纠三）。
+**口径二：grant 边界是本轮抓到的真缺陷**。初版 `granted` 把「出厂就开着的 5 个」也算成本档位的功劳，于是 full→lite 之后 `running` 读成 13 而不是 18。判据改为「旧 `granted` 里仍在新档目标中的」+「本次真正由本模块打开的」两段合并，`granted` 才等于「本档位此刻按住的东西」。
+**口径三：引擎算、面板显示；读不到与关着必须分开**。审计面 `audit()` 把关闭分成三类 `byReason:{defaultOff,userOff,noBuilder}` ——「出厂就没开」与「你自己关的」与「压根没有 `buildBlock`（开了也不出内容）」是三回事，混成一档就是在骗玩家「开档位就能用」。`dormantMechanisms()` 只回命名空间字符串数组，不掺内部 id。
+**口径四：拒收理由照引擎原话回显，不另编措辞**。UI 侧 `ctWhy` 只做四个码的直译（`bad-value` / `save-threw` / `no-history` / `module-missing`），其余按引擎原话摊平；`notEffective` 逐条列名字，不做「部分成功」的模糊措辞。
+**三处玩家可达入口（本轮的真正落地点，也是本轮最大的一处返工）**：实施期先只接了机制页折叠段 `foldSec('tools','capability',…)`（10 个控件 + `wa-ca-summary` 勾选 + `#wa-ct-out` 出口，读数走 `renderTools` 的 lazy 区遵守 OPT-9「折叠 = 不构建」），结果 dead-export 台账用 `capabilityTier.getSettings` / `setSettings` / `probeFull` 三条 refs=0 指出：**机制页是开发者面**（默认收起、玩家模式下不可见），而计划写的是「设置页顶部呈现当前档位」「概览页摘要行报 N 个机制未运行」。补齐后才算真交付：
+  ① **设置页顶部「世界规模」块**（`tierBlockHtml`）：三档按钮 + 退回按钮 + 当前档位 + 「离下一档还差 N 个」（`gap` 由引擎按下一档目标集现场数，不是档级相减 —— 玩家自己开过的会抵掉一部分，相减会答错）+「本档位按住 N 台 / 回滚栈剩 M 步」。
+  ② **概览页摘要行** `#wa-cap-line`：整句逐字取自 `summary().line`，面板不自己拼措辞；`showSummary:false` 时整行不渲染；引擎缺席时报「读数不可用」而非静默降级成「世界只跑了最基础的部分」。
+  ③ **`ui/settings.js` 与 `engines/tool-diag.js` 的 `UI_BINDINGS` 登记**：本轮**漏了这一项**，是收尾时才发现 —— 本仓口径是「渲染 + 绑定 + 守卫登记」三件齐做，渲染了不登记就等于「绑定 id 写错」这类断裂永远没人发现。
+**本轮四类自纠（都是「判据/破坏本身错」，全部留在测试注释里）**：① **mock DOM 序列化器会重排文本与子节点顺序** —— 读数里用 `<b>` 包数字，`innerHTML` 比对时 `<b>` 内文本会漂到父节点 `_text`，A4/B3 假红；改为给读数加 id（`#wa-ct-live` / `#wa-ca-reasons` / `#wa-cap-line`）并读 `textContent`。② **B8b 写死产线基线 `18`** —— UI 门禁环境只装载一部分模块，出厂基线 `running = 5`；改为「同环境内不变量」（切 standard 前取 `vBefore`，切回 lite 后要求 `running === vBefore`），判据咬的是「切回得去」而不是一个与装载面耦合的数字。③ **N4 破坏点打在了不走 `ctRunning` 的总览路径上** —— 破坏既没被观测、判据也没被驱动（本仓 N3 老教训又一次复现）；改为点 standard 走 `doTier → ctReport → ctRunning` 真路径。④ **D5/N6 判据假绿**：mock 的 `localStorage` 是**模块级共享 store**，档位跨用例保留 —— 上一用例切到 standard 后，这里再点 standard 走的是幂等早退（noop），「切档成功」其实是「什么都没做」，而负控制的破坏版反倒报 noop 才把这件事暴露出来。修法是两侧都先归位到 lite。
+**抓到的两处真缺陷**：① `+ (l.offWithBlock||[]).length ? x : y` —— `+` 优先于 `?:`，恒走 x 分支，「有 buildBlock 却关着」的读数会永远显示同一支；已加括号并补 else 分支。② **切档后出口一片空白**：整页重绘会把 `#wa-set-tier-out` 节点整块换新，先写文本再重绘 = 玩家点了按钮看不到任何结果（档位其实已经切了）。修法收成单一出口 `tierSay(text, refresh)`：**先重绘、后写文本**。这一条由专锁 D5b 当场抓到。
+**一条「假欠账」的收掉 + 一条过度导出的收口**：`reject-code-gate` 曾报唯一红灯「未分类: on」——`capability-audit.js` 里 `runningRows.push({… reason: 'on' })` 被第十二面 `reason:\s*'x'` 扫成新内联拒收码。判定它是**状态标记而非拒收码**（`kind:'running'` 已说完），摘字段（不是往死表塞豁免），码数 1294→1293。另 `capabilityTier.setSettings` / `probeFull` 判为过度导出**摘出导出面**：裸 `setSettings` 能让外部直接写 `granted` / `history` 两个不变量（手写 `granted` ⇒ 回滚会关掉本该留着的机制；手写 `history` ⇒ 回滚栈里出现从未发生的档位变更），这是加固而非删功能。
+**专锁结构**：`tests/capability-tier-v2257.js` **86/0**（引擎语义：三档怎么切、granted 边界、三档归因判据）；`tests/capability-ui-v2257.js` **60/0**（界面接线，A 渲染成型 / B 点击链路 / C 缺席与拒收 / D 玩家可达入口 10 条 / N 负控制 7 组）。负控制锚点全部要求真源码恰中 1 次：`ANCHOR_OUT`（`#wa-ct-out` 出口行）、`ANCHOR_TIER_CALL`（`applyTier(nm)` 调用行）、`ANCHOR_RUN`（`view().running` 读点）、`ANCHOR_SAY`（`tierSay` 整函数，破坏用**换序**而非摘行）、`ANCHOR_CAPLINE`（摘要行透传）。
+**读数**：引擎锁 86/0 · 界面锁 60/0 · `ui-gate` 53/0 · `ui-wire-audit` 20/0 · `reject-code-gate` 1293 = 726 + 50 + 547 全绿 · `o8-consumer-gate` 38/0（补登两条 REG 为 data-const）· `q9-evidence-ledger` 67/0（重建后 357 条）· dead-export 台账 `dead` 1189 → **1175**（14 条新死导出全部接上真实消费方，capability 相关死导出归零，另有旧债顺带偿清）· `module-registry` 文件 302 / 命名空间 311 / 装载期边 187 / 硬边 0 / 调用期引用 358。
+**版本跟随面**：`tools/bump257.py`（复用 bump256 口径、按实测形态定锚点）CHANGED 8 个文件，AST 预检通过，`2.256.0` 残留断言 0；五本台账 version 全部 2.257.0；`reject-code-ledger` changelog 追加本版条目（39→40）。
 ### R213 · 2026-10-28 · v2.256.0（README-SLIM）README 面向玩家重写 + README 治理门禁整体退役（71 项专锁全绿）
 **批次定位**：用户两轮递进立据 —— 先「把 worldaxis 的 readme 修改掉，目前还是太多太复杂了，搞得简洁一点，说明这是一个酒馆的世界引擎，有哪些方面的功能就行了」，随后一句「还有一些没用的门禁，直接给他删掉，这些都是给玩家看的，告诉他们这么清楚，有什么测试文件、有什么之类的有什么用呢，他们只需要知道，这是个干嘛的插件有什么功能就行了」。现场形状：README 287 行，承担四类**维护者治理职能**（版本历史 170+ 条 / `### tools/ 的取舍` 45 个工具名单 / 缝合来源许可清点表 / 版本锚点与安装节锚点），另有 6 个门禁专门盯着它别脱节。而 README 的读者是**玩家**：他要的只有「这是什么、有什么功能、怎么装」。**「给玩家看的文档」为「维护者的账」服务**是这轮拆掉的结构性错位 —— 不是「删了几个门禁」，是「承认这些门禁本身服务错了对象」。
 **口径一：删门禁不等于删证据（逐条归账，防「顺手删过头」）**。退役 6 个文件各自守的面，只有一面**真会变成无人守**：`toolchain-gate`（tools/ 在册/引用/入口）另有 `export-contract` + orphan-lock + 各工具自己的专锁；`docs-archive-gate`（版本条目单一真源）另有 `version-surface-gate-v2185`（31 条白名单形态）+ `run.js` 9 处版本钉 + `readings-v2106` 的台账三级同源；`attribution-gate`（许可清点）另有 `docs/attribution.md` 本体。**真正失守的只有「README 自述名单」这一条** —— 所以它是随 README 精简一并退役的，本锁 A 段逐条登记这笔账，不是「漏掉了」。

@@ -851,6 +851,509 @@
   }
 
   /**
+   * v2.257.0（V6 OPV6-2）：启用面可见 —— 谁在跑、谁没跑、为什么。
+   *   与上方 `capabilities` 节（9. 能力清单，答「三件套/编辑器/自检 API 装齐没」）
+   *   **分列不合并**：那一节答的是「接口齐不齐」，本节答的是「这些接口背后的机制此刻谁在跑」。
+   *   两问的失效模式完全不同 —— 前者失效在「少了一个方法」，后者失效在「方法都在、但开关关着，
+   *   于是玩家装了插件却只看到 4/107 个注入源」（V6 立项读数）。合并会让后者无处可报。
+   *
+   *   本节把审计引擎的三档归因原样搬出来（default-off / user-off / no-builder），
+   *   不做二次归类：维护者面要的正是「这一台到底是哪种没跑」。
+   */
+  function secCapability() {
+    return safe(function () {
+      if (!WA.capabilityAudit || typeof WA.capabilityAudit.audit !== 'function') {
+        return { error: 'engines/capability-audit.js 未加载（启用面读数缺席）' };
+      }
+      const a = WA.capabilityAudit.audit();
+      const sm = (typeof WA.capabilityAudit.summary === 'function') ? WA.capabilityAudit.summary() : null;
+      const tv = (WA.capabilityTier && typeof WA.capabilityTier.view === 'function') ? WA.capabilityTier.view() : null;
+      const st = (typeof WA.capabilityAudit.stat === 'function') ? WA.capabilityAudit.stat() : {};
+      return {
+        // 总账：179 / 95 两组真读数（计划验收口径）
+        switches: a.switches, mechanisms: a.mechanisms,
+        running: a.running, dormant: a.dormant,
+        byReason: Object.assign({}, a.byReason || {}),
+        // 逐条全表（维护者面看名字，玩家面看 summary 那句）
+        runningRows: (a.runningRows || []).map(function (r) { return { ns: r.ns, hasBuild: r.hasBuild }; }),
+        dormantRows: (a.dormantRows || []).map(function (r) { return { ns: r.ns, hasBuild: r.hasBuild, reason: r.reason }; }),
+        // 档位侧（与审计同源但不同问：审计答「现在什么样」，档位答「换一档会怎样」）
+        tier: tv ? tv.tier : null,
+        tiers: tv ? (tv.tiers || []).map(function (t) { return { name: t.name, size: t.size, on: t.on }; }) : [],
+        next: tv ? tv.next : '', gap: tv ? tv.gap : 0,
+        rollbackDepth: tv ? tv.rollbackDepth : 0, rollbackCap: tv ? tv.rollbackCap : 0,
+        // 玩家面摘要那句（与 OPV6-8 同源，不另编）
+        summary: sm ? { line: sm.line, showSummary: sm.showSummary } : null,
+        note: a.switches === 0
+          ? '一个带开关的引擎都没看见 —— 这不是「全都关着」，是装载面本身没起来（先看 modules 节）'
+          : (a.dormant === 0 ? '全部开关都在跑（没有关着的）'
+            : ('关着的 ' + a.dormant + ' 台里，出厂默认 ' + a.byReason.defaultOff
+              + ' · 玩家自己关的 ' + a.byReason.userOff + ' · 压根没有注入面 ' + a.byReason.noBuilder
+              + '；后两组不该被档位擅自打开')),
+        audits: st.audits, lastAt: st.lastAt, lastReason: st.lastReason
+      };
+    });
+  }
+ /**
+   * v2.259.0（V6 OPV6-4）：首轮零内容的三重门槛自检。
+   *   与上方 `capability` 节（v2.257.0）**分列不合并**：那一节答「179 个开关此刻谁在跑」，
+   *   本节答「跑着的那些，为什么内容还是没出来」。两问的失效模式完全不同 ——
+   *   前者失效在「机制没开」，后者失效在「机制开着但注入源被挡住 / 预算挤掉」。
+   *   V6 立项读数正是后者：107 个注入源里三重门槛全通的只有 6 个，而 `capability` 节
+   *   当时报的是「running 5 / dormant 95」，读不出那 74 个被模块总开关挡住的源。
+   *
+   *   本节是 `healthPreflight.threeGates()` 在**产品侧的真读者**（口径：产品零引用即
+   *   冻结面）。与 secSediment / secTapeStore 同规：**只报读数、不写世界** ——
+   *   不切档位、不开模块、不改可见性、不调预算（`fix` 只是「该按哪个写入口」的转述，
+   *   点了才算数；本节目自己不点）。给不出动作的门槛如实报 `fix: null`。
+   */
+  function secHealth() {
+    return safe(function () {
+      if (!WA.healthPreflight || typeof WA.healthPreflight.threeGates !== 'function') {
+        return { error: 'engines/health-preflight.js 未加载（三重门槛自检缺席）' };
+      }
+      const r = WA.healthPreflight.threeGates({ sample: 8 });
+      const line = (typeof WA.healthPreflight.threeGatesLine === 'function')
+        ? WA.healthPreflight.threeGatesLine({ sample: 8 })
+        : null;
+      return {
+        // 三态结论：empty-risk（这一轮大概率零内容）/ partial（有内容但远少于该有的量）/
+        //   unknown（读数取不到，不假称健康）/ running（三道都过）。
+        verdict: r.verdict, ok: r.ok,
+        passed: r.passed, blocked: r.blocked, degraded: r.degraded, absent: r.absent,
+        // 玩家实际能看到多少世界：这是本节最该被念出来的两个数
+        sourcePassing: r.sourcePassing, sourceTotal: r.sourceTotal,
+        gates: (r.gates || []).map(function (g) {
+          return { id: g.id, label: g.label, state: g.state,
+            nums: Object.assign({}, g.nums || {}), why: g.why || '',
+            fix: g.fix ? { do: g.fix.do, arg: g.fix.arg, hint: g.fix.hint } : null };
+        }),
+        nextAction: r.nextAction,
+        line: line,
+        // v2.263.0（V6 OPV6-8）：首局体检结论。与上面的门槛读数**分列不合并** ——
+        //   上面那一组答「哪道门槛没过、按什么修」（诊断面语言，逐门槛）；
+        //   本节答「所以这一局到底跑起来了没有」（玩家面语言，一个结论 + 一条动作）。
+        //   两句话给两个读者：把玩家结论混进门槛清单会让诊断包多出一句非机器可读的行。
+        firstRun: (function () {
+          try {
+            if (!WA.healthPreflight || typeof WA.healthPreflight.firstRunView !== 'function') {
+              return { error: 'firstRunView 缺席' };
+            }
+            const fv = WA.healthPreflight.firstRunView({ sample: 0 });
+            return { state: fv.state, line: fv.line,
+              next: fv.next ? { do: fv.next.do, arg: fv.next.arg, hint: fv.next.hint } : null,
+              nums: Object.assign({}, fv.nums || {}), at: fv.at };
+          } catch (e) { return { error: String((e && e.message) || e).slice(0, 80) }; }
+        })(),
+        at: r.at,
+        note: r.verdict === 'empty-risk'
+          ? '有门槛把内容全卡住了 —— 这一轮正文大概率是空的（先按 nextAction 修一条，不必全修）'
+          : (r.verdict === 'partial'
+            ? ('三道门槛只过了一部分：注入源全通 ' + r.sourcePassing + '/' + r.sourceTotal
+              + '。部分成功不是成功 —— 玩家看到的世界就这么多')
+            : (r.verdict === 'unknown' ? '有读数取不到：这是「不知道」，不是「健康」' : null))
+      };
+    }, {});
+  }
+  /**
+   * v2.265.0（V6 EXV6-1）：世界日记读数。
+   *
+   * 与上面 health / capability 两节的分工必须说清：那两节答「机制跑没跑起来」，
+   *   本节答「跑起来之后世界**说出了什么**」—— 即玩家在概览页读到的那一到三句人话
+   *   是从哪几路事实里压出来的、压的时候哪一路不在场。
+   *
+   * 本节必须把三组「看起来一样」的态分开，分开才叫读数（本仓反复付过价的那类假绿）：
+   *   ① **「这几轮没事」与「读数取不到」**：前者是 `emptyBuilds > 0 && quiet`，
+   *      后者是 `sources` 里某一路缺席。前者是正常，后者要修 —— 同形不同因。
+   *   ② **「判不了」与「看不见」**：`boundary.available:false` 意味着**根本没有边界口**
+   *      （玩家名取不到 / noesis 未加载），此时引擎不隐地名是因为**判不了**，不是因为
+   *      「全都看得见」。报告里这两件事必须分行，否则「隐去 0 条」会被读成「世界全公开」。
+   *   ③ **三路来源各自的在场与否**：`livingWorld` / `elsewhere` / `offlineTick` 缺一路
+   *      不是「那一路没发生事」，是**那个容器没装上**。
+   *
+   * 只读：不 build 也不写世界（`build` 会推进本模块自己的计量，诊断面不该污染它）——
+   *   本节只读 `stat()` 与 `getSettings()`，两者都是纯读口。
+   */
+  function secWorldDiary() {
+    return safe(function () {
+      if (!WA.worldDiary || typeof WA.worldDiary.stat !== 'function') {
+        return { error: 'engines/world-diary.js 未加载（世界日记读数缺席）' };
+      }
+      const st = WA.worldDiary.stat();
+      const cfg = (typeof WA.worldDiary.getSettings === 'function') ? WA.worldDiary.getSettings() : null;
+      const src = (st && st.sources) || {};
+      const bnd = (src.boundary || { available: false, sources: [] });
+      return {
+        enabled: !!(cfg && cfg.enabled === true),
+        // 设置面原样带出（诊断包要能复原「当时是按什么上限压的」）
+        settings: cfg ? { maxLines: cfg.maxLines, maxItems: cfg.maxItems,
+          includeOffline: cfg.includeOffline, hidePlace: cfg.hidePlace } : null,
+        // 计分面：四栏各自可数 —— 「压了几次 / 说出了几行 / 有几次确实没事 / 溢出丢掉几条」
+        builds: st.builds, linesEmitted: st.linesEmitted,
+        emptyBuilds: st.emptyBuilds, dropped: st.dropped,
+        lastReason: st.lastReason || null,
+        faults: Object.assign({}, st.faults || {}),
+        // 边界面：**判不了 vs 看不见**必须分行（合并会让「隐去 0 条」被读成「世界全公开」）
+        boundary: {
+          consulted: st.boundaryConsulted, available: st.boundaryAvailable,
+          present: !!(bnd.available === true),
+          sources: Array.isArray(bnd.sources) ? bnd.sources.slice() : [],
+          why: bnd.available === true ? null : '边界口不在场 ⇒ 地名一律不点名是**判不了**，不是「全都看得见」'
+        },
+        // 三路来源在场与否：缺一路不是「那一路没发生事」，是那个容器没装上
+        sources: {
+          livingWorld: src.livingWorld === true,
+          elsewhere: src.elsewhere === true,
+          offlineTick: src.offlineTick === true
+        },
+        note: (cfg && cfg.enabled !== true)
+          ? '世界日记关着 —— 这一栏零读数是「关着」，不是「没内容」'
+          : (st.builds === 0
+            ? '还没构建过一次（概览页没打开过 / 面板未挂载）—— 零读数不等于零内容'
+            : (st.emptyBuilds === st.builds
+              ? '每次都空：确认不是三路来源都没装上（见 sources）'
+              : null))
+      };
+    }, {});
+  }
+  /**
+   * v2.266.0（V6 EXV6-2）：人物今日动线读面。
+   *
+   * 本节要答的问题与世界日记节不同：那一节问「压了几句、隐了几条」，本节问
+   *   **「为什么这一栏空着」**。动线有三个彼此独立的空法，混在一起就再也答不出来：
+   *   ① **没扫到人** —— 幕后生活的 `people` 里没人，或 life 总开关关着；
+   *   ② **扫到了但地名说不出口** —— 又分四支：known 念了 / hidden 真看不见 /
+   *      unjudgeable 事实在场但判不了可见性 / suppressed 玩家自己要求不报地名 /
+   *      unknown 连地点事实都没有。**判不了与看不见必须分行**，
+   *      否则「隐去 0 条」会被读成「世界全公开」，「不显示地名」会被读成「他不在那」；
+   *   ③ **日程时间域不对** —— 这是本版抓到的最隐蔽的一条：`life.tick` 是拿
+   *      `f.now`（毫秒）去比 `start/end`，而档期预约里存的是「第几点」的钟点。
+   *      两种口径混在同一个字段里，钟点口径的排班**永远命中不了**。
+   *      引擎对此的处理是「不硬猜」：只有 absolute 域才答「此刻正在做什么」，
+   *      clock 域只答「今天排了几段」并计入 `schedule.clock`。
+   *      诊断面必须把这一栏单列 —— 否则「今日做了什么」全空会被读成「他今天没安排」。
+   *
+   * 只读：不 build（`build` 会推进本模块自己的计量，诊断面不该污染它）。
+   *   `stat()` / `getSettings()` / `scheduleDomain([])` / `storyDay()` 四个口都是纯读。
+   */
+  function secDayRoute() {
+    return safe(function () {
+      if (!WA.dayRoute || typeof WA.dayRoute.stat !== 'function') {
+        return { error: 'engines/day-route.js 未加载（人物动线读数缺席）' };
+      }
+      const st = WA.dayRoute.stat();
+      const cfg = (typeof WA.dayRoute.getSettings === 'function') ? WA.dayRoute.getSettings() : null;
+      const src = (st && st.sources) || {};
+      const wh = (st && st.where) || {};
+      const sc = (st && st.schedule) || {};
+      const bnd = (typeof WA.dayRoute.boundary === 'function') ? WA.dayRoute.boundary() : { available: false, sources: [] };
+      // 判域自证：拿一组钟点口径与一组绝对口径当场各判一次，证「两种口径确实不同域」
+      //   —— 这条不是装饰：域判错时「此刻在做什么」会**静默**变成「没有安排」，
+      //   而设置页那行说明是照着这个判据写的。
+      const domProbe = (typeof WA.dayRoute.scheduleDomain === 'function')
+        ? {
+          clock: WA.dayRoute.scheduleDomain([{ start: 8, end: 12, status: 'active' }]).state,
+          absolute: WA.dayRoute.scheduleDomain([{ start: 1.79e12, end: 1.79e12 + 60e3, status: 'active' }]).state,
+          bad: WA.dayRoute.scheduleDomain([{ start: 12, end: 8, status: 'active' }]).state
+        }
+        : { error: 'scheduleDomain 未导出（判域契约缺席）' };
+      const dayRead = (typeof WA.dayRoute.storyDay === 'function')
+        ? WA.dayRoute.storyDay()
+        : { error: 'storyDay 未导出（故事日契约缺席）' };
+      return {
+        enabled: !!(cfg && cfg.enabled === true),
+        // 设置面原样带出（诊断包要能复原「当时是按几个人的上限压的」）
+        settings: cfg ? { maxPeople: cfg.maxPeople, showNext: !!cfg.showNext, hidePlace: !!cfg.hidePlace } : null,
+        builds: st.builds, peopleScanned: st.peopleScanned,
+        linesEmitted: st.linesEmitted, quietBuilds: st.quietBuilds,
+        lastReason: st.lastReason || null,
+        faults: Object.assign({}, st.faults || {}),
+        // 地名五栏各自可数：**判不了 / 玩家要求不报 / 真看不见**三件不同的事，分行
+        where: { known: wh.known, hidden: wh.hidden, unjudgeable: wh.unjudgeable,
+          suppressed: wh.suppressed, unknown: wh.unknown },
+        // 日程域三栏：absolute 能答此刻，clock 判不了此刻 —— 合并就答不出「为什么这一栏空」
+        schedule: { absolute: sc.absolute, clock: sc.clock, unjudgeable: sc.unjudgeable,
+          probe: domProbe },
+        // 故事日：读不到与「真的是第 1 天」必须分开（`dayReadable:false` 时 `day` 不可信）
+        storyDay: dayRead,
+        // 边界面：复用的是世界日记的口子（不新建第二套真源），缺席时引擎退化为本地探测并计量
+        boundary: {
+          consulted: st.boundary && st.boundary.consulted, available: st.boundary && st.boundary.available,
+          fallback: st.boundary && st.boundary.fallback,
+          present: !!(bnd && bnd.available === true),
+          sources: Array.isArray(bnd && bnd.sources) ? bnd.sources.slice() : [],
+          why: (bnd && bnd.available === true) ? null : '边界口不在场 ⇒ 地名一律不点名是**判不了**，不是「他不在任何地方」'
+        },
+        // 五路来源在场与否：缺一路不是「那一路没事」，是那个容器没装上
+        sources: {
+          life: src.life === true, lifeEnabled: src.lifeEnabled === true,
+          laborSchedule: src.laborSchedule === true,
+          boundaryOwner: src.boundaryOwner === true,
+          clock: src.clock === true
+        },
+        note: (cfg && cfg.enabled !== true)
+          ? '人物动线关着 —— 这一栏零读数是「关着」，不是「没人可报」'
+          : (st.builds === 0
+            ? '还没构建过一次（概览页没打开过 / 面板未挂载）—— 零读数不等于零内容'
+            : (st.quietBuilds === st.builds
+              ? '每次都空：先看 sources（life / laborSchedule 是否装上）再看 where（地名是否全被判不了）'
+              : (src.lifeEnabled !== true
+                ? '幕后生活总开关关着 —— 「今天做了什么」这一栏空是**没有安排来源**，不是「他今天没动」'
+                : null)))
+      };
+    }, {});
+  }
+  /**
+   * v2.273.0（V6 EXV6-9）：一键交班读数。
+   *   「缺块」与「四块齐全」是两件事，本节分列报 —— 只报 complete 的话，
+   *   「少了一块」与「四块都在」在诊断面上就只剩一个布尔，看不出缺的是谁、为什么。
+   */
+  function secHandoffPack() {
+    return safe(function () {
+      if (!WA.handoffPack || typeof WA.handoffPack.pack !== 'function') {
+        return { error: 'engines/handoff-pack.js 未加载（一键交班读数缺席）' };
+      }
+      const st = WA.handoffPack.stat();
+      const cfg = typeof WA.handoffPack.getSettings === 'function' ? WA.handoffPack.getSettings() : null;
+      const p = WA.handoffPack.pack();
+      const v = (typeof WA.handoffPack.verify === 'function') ? WA.handoffPack.verify(p) : null;
+      return {
+        enabled: !!(cfg && cfg.enabled),
+        include: {
+          blueprint: !!(cfg && cfg.includeBlueprint !== false),
+          rules: !!(cfg && cfg.includeRules !== false),
+          tier: !!(cfg && cfg.includeTier !== false),
+          theme: !!(cfg && cfg.includeTheme !== false)
+        },
+        complete: !!(p && p.complete),
+        blockCount: (p && p.blocks) ? Object.keys(p.blocks).length : 0,
+        missing: (p && Array.isArray(p.missing)) ? p.missing.map(function (m) {
+          return { id: m.id, label: m.label, why: m.why };
+        }) : [],
+        verdict: (v && v.verdict) ? v.verdict : null,
+        verifyOk: !!(v && v.ok === true),
+        packs: st.packs, verifies: st.verifies, restores: st.restores,
+        missingBlocks: st.missingBlocks,
+        sources: st.sources,
+        note: (cfg && cfg.enabled !== true)
+          ? '一键交班关着 —— 这一栏零读数是「关着」，不是「四块齐全」'
+          : ((p && p.complete !== true)
+            ? ('包不完整：缺 ' + ((p && p.missing) ? p.missing.length : 0) + ' 块（缺块不等于没有包）')
+            : null)
+      };
+    }, {});
+  }
+  /**
+   * v2.271.0（V6 EXV6-7）：开局引导读数。
+   *   「测不到」与「没做」是两件事，本节分列报 —— 只报 state 的话，
+   *   cannot-tell（缺读数口）会与 todo（读了、确实没做）在诊断面上长得一样。
+   */
+  function secFirstRun() {
+    return safe(function () {
+      if (!WA.firstRun || typeof WA.firstRun.build !== 'function') {
+        return { error: 'engines/first-run.js 未加载（开局引导读数缺席）' };
+      }
+      // ⚠ 顺序：**先 build 再 stat** —— cannot-tell 计数是在 build() 里累加的，
+      //   反过来读的话本次判决还没进账，诊断包里那三个计数会永远显示上一次的值
+      //   （首跑因此报「计数恒 0」，而实现没问题）。与 secRoundCost / secSaveHealth 同规。
+      const b = WA.firstRun.build();
+      const st = WA.firstRun.stat();
+      const cfg = typeof WA.firstRun.getSettings === 'function' ? WA.firstRun.getSettings() : null;
+      return {
+        enabled: !!(cfg && cfg.enabled),
+        dismissed: !!(cfg && cfg.dismissed),
+        showWhenDone: !!(cfg && cfg.showWhenDone),
+        cold: !!(b && b.cold),
+        visible: !!(b && b.visible),
+        doneCount: (b && typeof b.doneCount === 'number') ? b.doneCount : 0,
+        pendingId: (b && b.pendingId) ? b.pendingId : null,
+        // 每一步：最终态 + 环境态 + 来源（env / manual / none）+ 判不出的原因
+        steps: (b && Array.isArray(b.steps)) ? b.steps.map(function (s) {
+          return { id: s.id, order: s.order, state: s.state, envState: s.envState,
+            source: s.source, why: s.why2 || null, manualAllowed: !!s.manualAllowed };
+        }) : [],
+        cannotTell: {
+          api: st.apiCannotTell, tier: st.tierCannotTell, talk: st.talkCannotTell
+        },
+        // ⚠ 注：这里**不能**再放 `cold: st.cold` —— 上面已经用 `cold` 报「本次判决是不是冷启动」
+        //   （布尔），同名再写一次会让后者覆盖它，值变成 stat 的累计计数。首跑就是这么红的
+        //   （`cold` 读数成了 6 而不是 true）——同一个对象里同名键写两次，JS 不报错、静默覆盖。
+        coldBuilds: st.cold, warm: st.warm, builds: st.builds,
+        dismissedBuilds: st.dismissedBuilds,
+        manual: st.manual,
+        sources: st.sources,
+        note: (cfg && cfg.enabled !== true)
+          ? '开局引导关着 —— 这一栏零读数是「关着」，不是「装好了」'
+          // ⚠ 优先级：「有档测不到」要**排在「冷启动」之前**。反过来的话，一个上游整块缺席
+          //   又恰逢冷启动的现场，note 只会说「冷启动不是故障」，把「有一档根本判不了」
+          //   这件事盖掉 —— 那是把「测不到」混进「已确认的没做」（本模块最忌的形态）。
+          : ((st.apiCannotTell + st.tierCannotTell + st.talkCannotTell > 0)
+            ? '至少有一档是「测不到」（读数口不在场）—— 测不到不等于没做'
+            : ((b && b.doneCount === 0)
+              ? '三步全未完成（冷启动）—— 世界还不会出内容，这不是故障'
+              : null))
+      };
+    }, {});
+  }
+  /**
+   * v2.270.0（V6 EXV6-6）：存档体检读数。
+   *   「上游关着」与「真的够用」是两件事，本节分列报 —— 只报 state 的话，
+   *   出厂态（两个上游全关）会与「查完没事」在诊断面上长得一样。
+   */
+  function secSaveHealth() {
+    return safe(function () {
+      if (!WA.saveHealth || typeof WA.saveHealth.build !== 'function') {
+        return { error: 'engines/save-health.js 未加载（存档体检读数缺席）' };
+      }
+      const st = WA.saveHealth.stat();
+      const cfg = typeof WA.saveHealth.getSettings === 'function' ? WA.saveHealth.getSettings() : null;
+      const card = WA.saveHealth.build();
+      const cardState = (card && card.state) || 'unknown';
+      return {
+        enabled: !!(cfg && cfg.enabled),
+        warnRounds: (cfg && cfg.warnRounds) || 0,
+        urgentRounds: (cfg && cfg.urgentRounds) || 0,
+        state: cardState,
+        bytes: (card && card.bytes !== undefined) ? card.bytes : null,
+        quotaBytes: (card && card.quotaBytes !== undefined) ? card.quotaBytes : null,
+        usedPct: (card && card.usedPct !== undefined) ? card.usedPct : null,
+        trendAvailable: !!(card && card.trend && card.trend.available),
+        trendReason: (card && card.trend && card.trend.reason) ? card.trend.reason : null,
+        trendInRounds: (card && card.trend && card.trend.inRounds !== undefined) ? card.trend.inRounds : null,
+        waterlineAvailable: !!(card && card.waterline && card.waterline.available),
+        waterlineFull: (card && card.waterline) ? card.waterline.fullCount : null,
+        waterlineNear: (card && card.waterline) ? card.waterline.nearCount : null,
+        obligationsAvailable: !!(card && card.obligations && card.obligations.available),
+        obligationsTotal: (card && card.obligations) ? card.obligations.total : null,
+        adviceCount: (card && Array.isArray(card.advice)) ? card.advice.length : 0,
+        adviceTotal: (card && typeof card.adviceTotal === 'number') ? card.adviceTotal : 0,
+        adviceCodes: (card && Array.isArray(card.advice)) ? card.advice.map(function (x) { return x.code; }) : [],
+        builds: st.builds, healthy: st.healthy, watch: st.watch, urgent: st.urgent,
+        noData: st.noData, forecasterOff: st.forecasterOff, waterlineOff: st.waterlineOff,
+        sources: st.sources,
+        note: (cfg && cfg.enabled !== true)
+          ? '存档体检关着 —— 这一栏零读数是「关着」，不是「存档很空」'
+          : (cardState === 'no-data'
+            ? '这张体检单读不全（上游缺面）—— 缺口不等于健康'
+            : (cardState === 'healthy' && st.forecasterOff > 0
+              ? '本局读数尚可，但历史上至少有一次趋势面不在场（forecasterOff 计数）'
+              : null))
+      };
+    }, {});
+  }
+  /**
+   * v2.269.0（V6 EXV6-5）：单轮成本卡读数。
+   *   「还没有注入过任何一轮」与「本轮花了 0」是两件事，本节分开报 —— 只报 used 的话，
+   *   出厂态（从没推演过）与「预算裁决真的裁了 0t」在诊断面上长得一样。
+   */
+  function secRoundCost() {
+    return safe(function () {
+      if (!WA.roundCost || typeof WA.roundCost.build !== 'function') {
+        return { error: 'engines/round-cost.js 未加载（单轮成本读数缺席）' };
+      }
+      const st = WA.roundCost.stat();
+      const cfg = typeof WA.roundCost.getSettings === 'function' ? WA.roundCost.getSettings() : null;
+      const card = WA.roundCost.build();
+      // ⚠ note 必须读**本次 build 的返回值**（`card.state`），不能读 `st.lastState` ——
+      //   stat() 在 build() **之前**调用，那次读到的是上一轮的判决，首次打开诊断包时
+      //   它必然是空串 ⇒ note 恒 null。「拿旧判决描述本次状态」是本节最容易写出的假绿
+      //   （判据照样绿，玩家拿到的 note 永远是空的）。
+      const cardState = (card && card.state) || 'unknown';
+      return {
+        enabled: !!(cfg && cfg.enabled),
+        topN: (cfg && cfg.topN) || 0,
+        showTiming: !!(cfg && cfg.showTiming),
+        showLongTrend: !!(cfg && cfg.showLongTrend),
+        state: cardState,
+        used: (card && card.used !== undefined) ? card.used : null,
+        cap: (card && card.cap !== undefined) ? card.cap : null,
+        chars: (card && card.chars !== undefined) ? card.chars : null,
+        round: (card && card.round !== undefined) ? card.round : null,
+        boarded: (card && card.board) ? card.board.rows : 0,
+        boardFresh: (card && card.board) ? card.board.fresh : 0,
+        boardStale: (card && card.board) ? card.board.stale : 0,
+        boardCapped: !!(card && card.board && card.board.capped),
+        zeroInBoard: (card && card.board) ? card.board.zeroInBoard : 0,
+        flaggedAll: (card && Array.isArray(card.flaggedAll)) ? card.flaggedAll.slice(0, 8) : [],
+        builds: st.builds, cards: st.cards, noReading: st.noReading, disabled: st.disabled,
+        longTrendReads: st.longTrendReads,
+        sources: st.sources,
+        note: (cfg && cfg.enabled !== true)
+          ? '单轮成本卡关着 —— 这一栏零读数是「关着」，不是「没有成本」'
+          : (cardState === 'no-reading'
+            ? '还没有注入过任何一轮（读不到 ≠ 这一轮没花钱）'
+            : (cardState === 'empty'
+              ? '上一轮没有可裁的注入项（有快照、无预算裁决）'
+              : null))
+      };
+    }, {});
+  }
+  /**
+   * v2.268.0（V6 EXV6-4）：暗流日历读数。
+   *   「未来三天未发现迫近的未结算暗流」与「日历关着」是两件事，本节分列报。
+   */
+  function secUndercurrentCalendar() {
+    return safe(function () {
+      if (!WA.undercurrentCalendar || typeof WA.undercurrentCalendar.stat !== 'function') {
+        return { error: 'engines/undercurrent-calendar.js 未加载（暗流日历读数缺席）' };
+      }
+      const st = WA.undercurrentCalendar.stat();
+      const cfg = typeof WA.undercurrentCalendar.getSettings === 'function' ? WA.undercurrentCalendar.getSettings() : null;
+      let last = null;
+      try { last = WA.undercurrentCalendar.build(); } catch (e) { last = null; }
+      return {
+        enabled: !!(cfg && cfg.enabled),
+        horizonDays: (cfg && cfg.horizonDays) || 0,
+        maxItems: (cfg && cfg.maxItems) || 0,
+        showHidden: !!(cfg && cfg.showHidden),
+        builds: st.builds || 0,
+        emptyBuilds: st.emptyBuilds || 0,
+        itemsProjected: st.itemsProjected || 0,
+        hiddenShielded: st.hiddenShielded || 0,
+        totalActive: (last && typeof last.totalActive === 'number') ? last.totalActive : 0,
+        visibleNow: (last && Array.isArray(last.items)) ? last.items.length : 0,
+        baseDayLabel: (last && last.baseDay && last.baseDay.label) || '',
+        baseDaySource: (last && last.baseDay && last.baseDay.source) || '',
+        note: (cfg && cfg.enabled !== true)
+          ? '暗流日历关着 —— 这一栏零读数是「关着」，不是「没有未结算暗流」'
+          : (st.builds === 0
+            ? '还没构建过一次（概览页没打开过 / 面板未挂载）'
+            : null)
+      };
+    }, {});
+  }
+  /**
+   * v2.267.0（V6 EXV6-3）：关系温度计读数。
+   */
+  function secRelationTemp() {
+    return safe(function () {
+      if (!WA.relationTemp || typeof WA.relationTemp.stat !== 'function') {
+        return { error: 'engines/relation-temp.js 未加载（关系温度计读数缺席）' };
+      }
+      const st = WA.relationTemp.stat();
+      const cfg = typeof WA.relationTemp.getSettings === 'function' ? WA.relationTemp.getSettings() : null;
+      return {
+        enabled: !!(cfg && cfg.enabled),
+        builds: st.builds || 0,
+        linesEmitted: st.linesEmitted || 0,
+        emptyBuilds: st.emptyBuilds || 0,
+        warmer: st.warmerCount || 0,
+        colder: st.colderCount || 0,
+        steady: st.steadyCount || 0,
+        lastReason: st.lastReason || '',
+        sources: {
+          bonds: !!(WA.bonds && typeof WA.bonds.read === 'function'),
+          fondness: !!(WA.fondness && typeof WA.fondness.read === 'function')
+        },
+        note: (cfg && cfg.enabled !== true)
+          ? '关系温度计关着 —— 这一栏零读数是「关着」，不是「无关系记录」'
+          : (st.builds === 0
+            ? '还没构建过一次（概览页没打开过 / 面板未挂载）'
+            : null)
+      };
+    }, {});
+  }
+/**
    * v2.165.0（TX1）：势力外交读面。
    *   与 faction-graph 节的分工必须在这里说清：那一节答「按双方立场**推导**出来的关系图是
    *   什么样」（derived:true），本节答「**谈成了什么**」（pairId / 双边态度 / 有效条款 / 到期）。
@@ -1530,8 +2033,17 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       return {
         // 当前生效的配方名（留空 = 未生效，如实报空串而不是「默认」）
         recipe: name,
+        // v2.258.0（OPV6-3）：题材节点现在也报**引擎面**——题材不再只改模块顺序，
+        //   它真开机制。这里报「本题材要开几个、此刻真在跑几个、有几个无注入面」，
+        //   并如实带出判据来源（capabilityTier 在场 / 降级 fallback），
+        //   否则「题材没生效」与「题材没装」在读数上长得一样。
         theme: { source: Th ? 'theme.THEMES（单一真源）' : 'theme 未加载', count: themes ? themes.length : null,
           keys: themes, extended: ext,
+          // 引擎面（只读；缺 theme 时如实 null，不回落成「零个」）
+          engines: (Th && typeof Th.engineFace === 'function')
+            ? (function () { try { const f = Th.engineFace(); return { want: f.want.length, running: f.running.length,
+              granted: f.granted.length, gap: f.gap, notInjected: f.notInjected.slice(), via: f.via }; } catch (e) { return { error: 'threw' }; } })()
+            : null,
           note: Th ? null : 'theme 未加载 ⇒ 题材目录核不了（不假装「题材都不在」）' },
         economy: { source: (es && es.source) || (E ? 'default（旧常量）' : 'economy 未加载'),
           declared: !!es, money: money, recipes: recipes, goods: es ? Object.keys(es.goods || {}).sort() : null,
@@ -2228,6 +2740,17 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   }
 
   const MODULE_EXPORTS = {
+    // v2.273.0（V6 拓展线 EXV6-1~9）：八台只读读数引擎一次登记到位。
+    //   漏登记的后果不是报错，而是「自检看不见的黑盒」（全量回归的
+    //   「诊断清单覆盖全部磁盘模块」判据正是为这一格设的）。
+    'engines/world-diary.js': 'worldDiary',
+    'engines/day-route.js': 'dayRoute',
+    'engines/relation-temp.js': 'relationTemp',
+    'engines/undercurrent-calendar.js': 'undercurrentCalendar',
+    'engines/round-cost.js': 'roundCost',
+    'engines/save-health.js': 'saveHealth',
+    'engines/first-run.js': 'firstRun',
+    'engines/handoff-pack.js': 'handoffPack',
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/input-guard.js': 'inputGuard', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块 —— 登记一次到位。
@@ -2682,6 +3205,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/stall.js': 'stall',
     'engines/observation-projection.js': 'observationProjection',
     'engines/scene-budget.js': 'sceneBudget',
+    // v2.257.0（V6 OPV6-1 / OPV6-2）：能力档位 + 启用面可见。
+    //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它们的真消费方是
+    //   设置页 / 概览页 / 诊断节（本表），缺席就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。
+    'engines/capability-tier.js': 'capabilityTier',
+    'engines/capability-audit.js': 'capabilityAudit',
     'engines/success-grade.js': 'successGrade',
     'engines/weighted-draw.js': 'weightedDraw',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
@@ -2848,7 +3378,26 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         const b = li.budget;
         out.budget = { used: b.used, cap: b.cap, source: b.source, contextSize: b.contextSize || null, remain: b.remain, inputTokens: b.inputTokens, saved: b.saved, overBudget: !!b.overBudget, keptCount: b.keptCount || 0, foldedCount: (b.folded || []).length, droppedCount: (b.dropped || []).length };
         if ((b.dropped || []).length) out.budget.dropped = b.dropped;
-        out.budget.summary = WA.injectBudget && WA.injectBudget.summaryText ? WA.injectBudget.summaryText({ used: b.used, budget: b.cap, folded: b.folded || [], dropped: b.dropped || [], saved: b.saved, cost: b.cost || null }) : null;
+        out.budget.summary = WA.injectBudget && WA.injectBudget.summaryText ? WA.injectBudget.summaryText({ used: b.used, budget: b.cap, overBudget: !!b.overBudget, folded: b.folded || [], dropped: b.dropped || [], saved: b.saved, cost: b.cost || null, headroom: b.headroom || null }) : null;
+        // v2.261.0（V6 OPV6-6）：**余量账**。修前诊断包里只有 `used/cap` 两个裸数——
+        //   「还剩多少、算不算饱和、还能再开几个源」三问在诊断包上**无一可答**，
+        //   于是「预算不够」永远是玩家的第一直觉（现场实测长局只用 43%）。
+        //   本块走 `injectBudget.budgetView`（与面板、backstage 同一判据，不各算一套）。
+        if (WA.injectBudget && typeof WA.injectBudget.budgetView === 'function') {
+          const bv = WA.injectBudget.budgetView(b);
+          if (bv) {
+            out.budget.headroom = {
+              remain: bv.remain, usedPct: bv.usedPct, freePct: bv.freePct,
+              saturated: bv.saturated, overBudget: bv.overBudget,
+              avgKeptTokens: bv.avgKeptTokens, spareSources: bv.spareSources,
+              derived: bv.derived
+            };
+            if (bv.mode) out.budget.mode = bv.mode;
+            if (bv.modeText) out.budget.modeText = bv.modeText;
+            if (bv.advice) out.budget.advice = bv.advice;
+            out.budget.headroomText = bv.text;
+          }
+        }
         // v2.88.0 O1：成本账的**真消费点**。快照里写了 cost 而无人读，就只是「记了没人看」
         //   （与 v2.49.0 的主块账、v2.50.0 的宿主账同病）。这里把分档/科目/最慢源提到诊断面上：
         //   「注入慢在哪、慢在谁身上」从本版起在诊断包里可答。
@@ -2904,6 +3453,24 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
           if (offRows.length) out.faceOff = offRows.map(function (r) { return r.name + '(' + r.key + ')'; });
           out.faceUnavailable = fa.filter(function (r) { return r.face === 'unavailable'; }).length;
         } catch (e) { out.faceAuditError = String((e && e.message) || e).slice(0, 120); }
+      }
+      // v2.260.0（V6 OPV6-5）：**缺省面**读数 —— 与上面 faceAudit（「每个源此刻是哪个面」）
+      //   分列不合并：本段答的是「出厂缺省替你关了什么、那份缺省是不是真在用」。
+      //   修前这一面在诊断包里**完全不可见**：visibility 整键可以是 null，107 个源全走
+      //   `__REG.def` 缺省，玩家与诊断者都看不出「有一批源默认关着」，而现场表现是
+      //   「引擎在跑、正文没内容」。只报读数，一个 save 都不调（走 visibilityDefault 口）。
+      if (WA.render && typeof WA.render.visibilityDefault === 'function') {
+        try {
+          const vd = WA.render.visibilityDefault();
+          out.visDefault = {
+            configured: vd.configured, sources: vd.sources,
+            defaultOff: (vd.defaultOff || []).slice(),
+            silent: vd.silent | 0, silentKeys: (vd.silentKeys || []).slice(),
+            doubleOff: vd.doubleOff | 0, doubleOffKeys: (vd.doubleOffKeys || []).slice(),
+            noSwitch: vd.noSwitch | 0, noSwitchKeys: (vd.noSwitchKeys || []).slice()
+          };
+          if (vd.note) out.visDefault.note = vd.note;
+        } catch (e) { out.visDefaultError = String((e && e.message) || e).slice(0, 120); }
       }
       // v0.1.9: 槽位路由错误快照（部分失败时存在）
       if (li && li.slotErrors) out.slotErrors = li.slotErrors;
@@ -3379,6 +3946,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'tools', ids: ['wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-faces', 'wa-snap-subset', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out',
       // v2.2.0: 诊断出口收口——三个新增控件同样纳入「渲染 ↔ 绑定」一致性校验
       'wa-stat-reset', 'wa-compat-view', 'wa-wf-reset',
+      // v2.274.0：读数仪清零出口。八台读数引擎的 reset() 此前零消费（导出面有口、无人调），
+      //   本控件是它们的真消费方 —— 同 v2.2.0 三条的理由：新出口必须「渲染 + 绑定 + 守卫登记」
+      //   三件齐做，否则「渲染了但绑定 id 写错」永远不会被守卫表发现。
+      'wa-gauge-reset',
       // v2.2.0 块5：存档恢复点 / 设置键卫生
       'wa-recovery-view', 'wa-orphan-view', 'wa-undo-btn', 'wa-mirror-view',
       // v2.83.0（B6）：配置包出口。与 v2.2.0/v2.34.0 新增控件同规格——
@@ -3417,7 +3988,18 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.197.0（Y3）：「另开计划」两枚控件 —— 新世界顶层键输入 + 只读计划按钮。
       //   同 v2.184.0 的理由：新控件必须「渲染 + 绑定 + 守卫登记」三件齐做，否则
       //   「按钮渲染了但 id 写错/没登记」无人发现（本版实测正是被这条门禁抓出未登记）。
-      'wa-ck-newkey', 'wa-ck-plan'],
+      'wa-ck-newkey', 'wa-ck-plan',
+      // v2.257.0（V6 OPV6-1/OPV6-2）：能力档位与启用面的 10 枚控件。
+      //   三件齐做（渲染 + 绑定 + 守卫登记）——理由同 v2.184.0 / v2.197.0：
+      //   渲染了不登记 ⇒ 守卫永远查不到它，而「按钮渲染了但绑定 id 写错」这类断裂
+      //   只有在登记过的控件上才会被发现（本表是接线面的唯一真源）。
+      //   这一批尤其要登记：它们是 OPV6-1/OPV6-2 的**唯一**玩家入口 ——
+      //   引擎算得再对，控件没接线就等于「功能做了、玩家碰不到」（本版立项读数）。
+      'wa-ct-lite', 'wa-ct-standard', 'wa-ct-full', 'wa-ct-rollback', 'wa-ct-view', 'wa-ct-list',
+      'wa-ca-audit', 'wa-ca-dormant', 'wa-ca-preview', 'wa-ct-stat',
+      // 摘要显示开关：勾了写引擎（`capabilityAudit.setSettings({showSummary})`），
+      //   它是**设置型**控件而非按钮，但同属接线面，一并登记。
+      'wa-ca-summary'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
       dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue',
       // v2.83.0（B6）：配置包面板里的动态控件（点开才渲染）。
@@ -3710,7 +4292,20 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.210.0（收口）：面板导航的**常驻头部**（跳转读数 + 返回）。它渲染在布局壳里、
       //   不属任何单页，故归概览组 —— 同 v2.209.0 的 ui/panel-nav.js 一样，这两个控件
       //   「渲染了但绑定写错 id」这类断裂只有登记过才会被发现（本表的全部意义）。
-      'wa-nav-out', 'wa-nav-back'] },
+      'wa-nav-out', 'wa-nav-back',
+      // v2.273.0（V6 拓展线）：概览页九块只读读数容器一次登记到位。
+      //   它们是**展示容器**（不是控件），本仓既有惯例同样登记 —— 见
+      //   `wa-first-out` / `wa-lfn-out` 的先例：「输出区，与 wa-rec-out 同规格：
+      //   它是面板回显，不是控件」。理由：渲染了不登记 ⇒ 守卫表查不到它，
+      //   而「块渲染了但 id 写错」这类断裂只有在登记过的 id 上才会被发现（本表全部意义）。
+      'wa-cap-line', 'wa-health-line', 'wa-vis-line', 'wa-first-line', 'wa-diary-block', 'wa-route-block', 'wa-temp-block', 'wa-cal-block', 'wa-cost-block', 'wa-save-block',
+      // v2.271.0（V6 EXV6-7）：概览页开局引导块的两个出口。v2.274.0 从 settings 组迁来
+      //   （firstBlock 拼进的是 overview 模板，登在 settings 组等于永不校验）。
+      //   `wa-first-block` 的三态渲染（缺席提示 / 关闭不渲染 / 三步做完不占屏）由
+      //   `cond` 层承载：它缺失是**依赖态**，不判失败 —— 这与 first-run-ui 锁的 A8/A10
+      //   「关闭时整块不渲染」是同一条口径，不然两处会互相打架。
+      'wa-first-out'],
+      cond: ['wa-first-block'] },
     { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat', 'wa-sed-out'] },
     // v2.151.0（RX2+RX3）：会话页十六枚控件（跨会话记忆锚八枚 + 远方世界脉搏四枚 + 共用输出区一枚）。
     //   守卫表是控件接线面的唯一真源：渲染了不登记 ⇒「渲染了但绑定的 id 写错」这类断裂
@@ -3852,6 +4447,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   （含推演尺度/预算/净化规则/舆情/演化/随机事件）绑定断裂无人发现。
     //   净化规则区在 purifier 未加载时整段不渲染 → 归入 cond（依赖态，缺失不判失败）。
     { page: 'settings', ids: [
+      // v2.257.0（V6 OPV6-1）：设置页**顶部**的档位呈现 —— 三档按钮 + 退回按钮。
+      //   为什么这一组必须登记：档位此前只存在于机制页折叠段里（默认收起、
+      //   且玩家模式下机制页不可见），设置页顶部是它唯一的玩家可达入口。
+      // v2.274.0（收口）：`wa-set-tier-rollback` 是**条件渲染**（`rollbackDepth > 0`
+      //   才拼出这个按钮，出厂态回滚栈空 ⇒ 正确行为就是不渲染）。此前登在 ids 里 ⇒
+      //   出厂态必报缺失，而那时「没有可退的」恰是正确态。故移入 cond。
       'wa-set-mode', 'wa-set-time', 'wa-set-pulse', 'wa-set-npc',
       'wa-set-auto', 'wa-set-fullrules', 'wa-set-sync', 'wa-set-autobak', 'wa-set-budget-mode', 'wa-set-budget',
       'wa-set-mslimit', 'wa-set-msdice', 'wa-set-msrel', 'wa-set-custom', 'wa-set-save',
@@ -3870,6 +4471,53 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.7.0: 区域突发事件配置（生效值视图接入界面后的新增出口）
       'wa-rg-enable', 'wa-rg-chance', 'wa-rg-dur', 'wa-rg-save', 'wa-rg-out',
       'wa-rg-chancev', 'wa-rg-durv',
+      // v2.265.0（V6 EXV6-1）：世界日记设置面五枚控件（渲染在设置页「世界日记」一格）。
+      //   同 v2.51.0 的理由：**渲染 + 绑定 + 守卫登记**三件齐做，否则「控件渲染了但绑定的
+      //   id 写错」在这个新出口上无人发现 —— 而这一格的失效后果尤其静默：日记照常显示，
+      //   只是玩家改了「每屏句数」却不生效（滑块拖动、读数不跟随）。
+      //   `wa-wd-out` 是结果出口，随渲染出 ⇒ 与 wa-rg-out 同列（不挂 cond：它恒在场）。
+      'wa-wd-enable', 'wa-wd-maxlines', 'wa-wd-maxlinesv', 'wa-wd-offline', 'wa-wd-save', 'wa-wd-out',
+      // v2.266.0（V6 EXV6-2）：人物动线设置面七枚控件（渲染在设置页「人物今日动线」一格）。
+      //   同 v2.265.0 世界日记那组的理由，且这一格多一条**静默失效**：
+      //   `wa-dr-next` / `wa-dr-hideplace` 关掉后动线照常显示，只是少一段/不报地名，
+      //   玩家看不出「我改了但它没生效」——只有守卫能发现 id 写错。
+      //   注：`wa-dr-maxp` 是滑块、`wa-dr-maxpv` 是它的读数 span，两者必须同列
+      //   （读数不跟随＝拖动无效，属真缺陷）。
+      'wa-dr-enable', 'wa-dr-maxp', 'wa-dr-maxpv', 'wa-dr-next', 'wa-dr-hideplace', 'wa-dr-save', 'wa-dr-out',
+      // v2.267.0（V6 EXV6-3）：关系温度计设置面七枚控件。
+      'wa-rt-enable', 'wa-rt-maxp', 'wa-rt-maxpv', 'wa-rt-types', 'wa-rt-reason', 'wa-rt-save', 'wa-rt-out',
+      // v2.268.0（V6 EXV6-4）：暗流日历设置面七枚控件（渲染在设置页「暗流日历」一格）。
+      //   同 v2.267.0 关系温度计那组的理由，且这一格同样有**静默失效**：
+      //   `wa-uc-hidden` 关掉后日历照常出，只是隐秘暗流被脱敏成「异动」，
+      //   玩家看不出「我改了但它没生效」——只有守卫能发现 id 写错。
+      //   注：`wa-uc-hz` / `wa-uc-max` 是滑块、`wa-uc-hzv` / `wa-uc-maxv` 是读数 span，
+      //   两组必须同列（读数不跟随＝拖动无效，属真缺陷）。
+      'wa-uc-enable', 'wa-uc-hz', 'wa-uc-hzv', 'wa-uc-max', 'wa-uc-maxv', 'wa-uc-hidden', 'wa-uc-save', 'wa-uc-out',
+      // v2.269.0（V6 EXV6-5）：单轮成本卡设置面六枚控件（渲染在设置页「单轮成本卡」一格）。
+      //   同 v2.268.0 暗流日历那组的理由，且这一格多一条**默认关着的项**：
+      //   `wa-rc-longtrend` 关掉时长期趋势不进卡（默认就是关的），
+      //   玩家看不出「我开了但它没生效」——只有守卫能发现 id 写错。
+      //   注：`wa-rc-topn` 是滑块、`wa-rc-topnv` 是它的读数 span，两者必须同列。
+      'wa-rc-enable', 'wa-rc-topn', 'wa-rc-topnv', 'wa-rc-timing', 'wa-rc-longtrend', 'wa-rc-save', 'wa-rc-out',
+      // v2.270.0（V6 EXV6-6）：存档体检设置面**九枚**控件（渲染在设置页「存档体检」一格）。
+      //   同前几组的理由，且这一格多一条**上游耦合同步**：
+      //   `wa-sh-forecaster` / `wa-sh-waterline` 是真会写**别的引擎**的开关，
+      //   点了必须复核读回（静默不生效时只有守卫能发现）。
+      //   注：`wa-sh-warn` / `wa-sh-urgent` 是滑块、`wa-sh-warnv` / `wa-sh-urgentv` 是读数 span，
+      //   两组必须同列（读数不跟随＝拖动无效，属真缺陷）。
+      'wa-sh-enable', 'wa-sh-warn', 'wa-sh-warnv', 'wa-sh-urgent', 'wa-sh-urgentv',
+      'wa-sh-forecaster', 'wa-sh-waterline', 'wa-sh-save', 'wa-sh-out',
+      // v2.271.0（V6 EXV6-7）：开局引导设置面七枚控件（渲染在设置页「开局引导」一格）。
+      //   同前几组的理由，且这一格多一条**跨引擎读**：三步的判据分别来自 api-router /
+      //   capability-tier / store，任何一处 id 写错都只会静默不显示。
+      //   注：`wa-fr-talk` 的手勾走 mark()（环境判得出时会被拒），面板不许绕过。
+      'wa-fr-enable', 'wa-fr-showdone', 'wa-fr-talk', 'wa-fr-save',
+      'wa-fr-resume', 'wa-fr-reset', 'wa-fr-out',
+      // v2.273.0（V6 EXV6-9）：一键交班设置面九枚控件（渲染在设置页「一键交班」一格）。
+      //   同前几组的理由；这一格多一条**跨引擎写**（复原会真调各模块导入口），
+      //   任何一处 id 写错都只会静默不生效。
+      'wa-hp-enable', 'wa-hp-bp', 'wa-hp-rules', 'wa-hp-tier', 'wa-hp-theme',
+      'wa-hp-save', 'wa-hp-pack', 'wa-hp-restore', 'wa-hp-out',
       // v2.51.0（第三十六面）: 叙事工艺设置面控件（同 v2.45.0/v2.46.0 的理由：新控件
       //   必须同时「渲染 + 绑定 + 守卫登记」，否则「渲染了但绑定的 id 写错」在新增出口上无人发现）。
       //   注：`wa-st-block` 等一律无条件渲染（模块缺席时整段降级成一句提示、控件不在场 ⇒
@@ -3913,8 +4561,14 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   渲染（ui/settings.js 的「界面」分区）+ 绑定（bind 的 #wa-set-devmode onchange）+
       //   守卫登记（本行）三件齐做 —— 漏登记的表现是 ui-gate 的「每个控件都在守卫表内」红灯。
       'wa-set-devmode',
-'wa-set-out'],
-      cond: ['wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
+      // v2.273.0（V6 拓展线）：设置页档位面读数 span/出口 + 动线导航条。
+      //   档位四条与 `wa-rc-topnv` 同规格（滑块读数 span 必须与滑块同列）；
+      //   动线导航条是 v2.262.0（OPV6-7）引入、此前一直在守卫表之外。
+      'wa-set-tier-now', 'wa-set-tier-gap', 'wa-set-tier-hold', 'wa-set-tier-out',
+      'wa-lane-bar', 'wa-lane-all', 'wa-lane-world', 'wa-lane-people', 'wa-lane-story',
+      'wa-lane-power', 'wa-lane-ui', 'wa-lane-note',
+      'wa-set-out'],
+      cond: ['wa-set-tier-rollback', 'wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
     // v2.33.0: 记忆页 / 注入页——本版把「能力面」第一次接到「呈现面」：memory（92 方法，
     //   全库最大单体）与 timeline（记忆溯源）此前产品 UI 零入口。两页控件一并纳管，
     //   否则「渲染了但绑定写错 id」这类断裂在新增出口上无人发现（同 v2.2.0 设置页教训）。
@@ -3955,13 +4609,24 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.182.0（第二批 O4 / O3）：工具页两块 —— 存储压力面 6 控件 + 性能基线面 6 控件。
     //   同 v2.150.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
     //   否则「渲染了但绑定写错 id」这类断裂在新增出口上无人发现（本表是唯一会互相校验的地方）。
-    { page: 'tools', ids: ['wa-cap-enabled', 'wa-cap-oblig', 'wa-cap-water', 'wa-cap-reclaim', 'wa-cap-migrate', 'wa-cap-diag',
+    { page: 'tools', ids: [
+      // v2.274.0（收口）：三枚能力档位读数**从 overview 组迁来**。它们渲染在工具页
+      //   的「能力档位与启用面」折叠段里（`foldSec('tools', 'capability', …)`），
+      //   此前登在 overview 组 —— 登记组的 page 是**校验时机**，写错页的后果是
+      //   「在错的页上永远报缺失、在对的页上从不被查」，两头都看不见真断裂。
+      // v2.274.0（收口 · 二修）：`wa-ca-reasons` **不是静态控件** —— 它由
+      //   `on('#wa-ca-audit', …)` 的读数写入（`ctOut(… '<div id="wa-ca-reasons">' …)`），
+      //   出厂态没点过「为什么关着」时页面上根本没有这个节点。放进 `ids` 会让
+      //   secUi 把它当「无条件渲染控件」逐个 getElementById ⇒ 出厂态必报缺失。
+      //   与 wa-cap-out / wa-pbl-out 同形态（面板动态写入的读数出口），故改登 dynamic。
+      'wa-ct-live', 'wa-ct-out',
+      'wa-cap-enabled', 'wa-cap-oblig', 'wa-cap-water', 'wa-cap-reclaim', 'wa-cap-migrate', 'wa-cap-diag',
         'wa-pbl-enabled', 'wa-pbl-bands', 'wa-pbl-budget', 'wa-pbl-readings', 'wa-pbl-gap', 'wa-pbl-diag'],
       // 读数出口（`wa-*-out`）也在守卫表内，但走 `dynamic` 层而不是 `ids` 层：
       //   它们由面板**动态写入**（`o.innerHTML = ...`），id 出现在渲染 HTML 里却不是静态控件节点。
       //   放进 `ids` 会让 secUi 的「无条件渲染控件」判据把它们当按钮数（口径混），
       //   放进 `dynamic` 才是它们的真实形态（与 wa-ag-out / wa-iv-out 同规格）。
-      dynamic: ['wa-cap-out', 'wa-pbl-out'] },
+      dynamic: ['wa-ca-reasons', 'wa-cap-out', 'wa-pbl-out'] },
     // v2.182.0（第二批 O5 / E2 / E5）：健康页三块 —— 12 控件。
     //   三块合页（健康中心 / 世界日程 / 世界纪事），登记到 health 页；
     //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
@@ -4781,6 +5446,23 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   （无损、稳定 ID + 方向化关系 + 道路端点）；前者失效在「同名被静默合并」，
       //   后者失效在「版本对不上却按 v1 猜着收 ⇒ 静默污染目标存档」。
       worldBlueprint: secWorldBlueprint(),
+      // v2.257.0（V6 OPV6-2）：启用面可见。与上方 capabilities 节分列（接口齐不齐 vs 机制跑没跑）。
+      capability: secCapability(),
+      // v2.259.0（V6 OPV6-4）：三重门槛自检。与 capability 节分列不合并 ——
+      //   那一节答「179 个开关谁在跑」，本节答「跑着的那些为什么内容还是没出来」
+      //   （107 个源里三门槛全通只有 6 个）。本节是 threeGates 的产品侧唯一真读者。
+      health: secHealth(),
+      // v2.265.0（V6 EXV6-1）：世界日记读数。与 health 节分列不合并 ——
+      //   那一节答「机制跑没跑起来」，本节答「跑起来之后世界说出了什么」
+      //   （三路来源哪一路不在场 / 边界是判不了还是真看不见）。
+      worldDiary: secWorldDiary(),
+      dayRoute: secDayRoute(),
+      relationTemp: secRelationTemp(),
+      undercurrentCalendar: secUndercurrentCalendar(),
+      roundCost: secRoundCost(),
+      saveHealth: secSaveHealth(),
+      firstRun: secFirstRun(),
+      handoffPack: secHandoffPack(),
       // v2.181.0（UI 主题化）：界面主题层读数。与上面各节分列不合并 ——
       //   它答的是「界面这一层现在是什么状态」，与世界观/剧情/经济各面正交；
       //   失效模式也独立（主题切了没生效 / 样式叠了两套 / 切不回去）。
@@ -5362,7 +6044,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         //   同族先例：v2.11.0 的 readSpotCheck（自己新增的来源首版漏标）、v2.132.0 的 lifeTurn。
         historySearch: '历史检索词库读回（读失败 ⇒ 与「从来没查过」同形）',
         worldSnapshot: '世界快照库读回（读失败 ⇒ 与「本地没有快照」同形）',
-        tapeStore: '磁带仓库读回（读失败 ⇒ 空仓库与存储故障同形）'
+        tapeStore: '磁带仓库读回（读失败 ⇒ 空仓库与存储故障同形）',
+        // v2.274.0（V6 收口）：capability-audit 的 wroteFalse 读回点（G16 新增来源）。
+        //   漏进本表 = 消费端退回裸桶名 ⇒ 读者只看到 `capabilityAudit×1` 而不知其后果。
+        capabilityAudit: '能力档位表态读回（读失败 ⇒ 与「玩家没表过态」同形）'
       };
       const srcTxt = Object.keys(byS).filter(function (k) { return byS[k] > 0; })
         .map(function (k) { return (SRC_LABEL[k] || k) + '×' + byS[k]; }).join('、');

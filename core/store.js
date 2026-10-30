@@ -2915,7 +2915,11 @@
           //   同族第四条（v2.11.0 readSpotCheck / v2.132.0 lifeTurn / v2.156.0 playtime）之后新增的两个来源。
           historySearch: '历史检索词库读回（读失败 ⇒ 与「从来没查过」同形）',
           worldSnapshot: '世界快照库读回（读失败 ⇒ 与「本地没有快照」同形）',
-          tapeStore: '磁带仓库读回（读失败 ⇒ 空仓库与存储故障同形）' };
+          tapeStore: '磁带仓库读回（读失败 ⇒ 空仓库与存储故障同形）',
+          // v2.274.0（V6 收口）：能力档位报读面的键读回（engines/capability-audit.js 的 wroteFalse）。
+          //   三份真源（本表 / ui/panel.js 的 LAB_P / engines/tool-diag.js 的 SRC_LABEL）同键集——
+          //   缺这一份，『读不出玩家表过的态』与『玩家从没表过态』在诊断上同形。
+          capabilityAudit: '能力档位表态读回（读失败 ⇒ 与「玩家没表过态」同形）' };
         const rTxt = Object.keys(rdSrc).filter(function (k) { return rdSrc[k] > 0; })
           .map(function (k) { return (LAB[k] || k) + ' ' + rdSrc[k]; }).join(' / ');
         issues.push({ level: 'warn', key: 'storage.readFailed',

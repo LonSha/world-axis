@@ -5110,6 +5110,57 @@ function runWitness(WA) {
         } finally { WA.store = k; }
       });
     }
+    // ③b audit-absent / forecaster-absent（engines/save-health.js，v2.270.0 EXV6-6）
+    //   save-health 读四个面；其中「上游引擎**整个不在场**」与「它在场但关着（disabled）」
+    //   是**两件不同的事**（后者去设置页开，前者是装载问题），故按本仓「不同因不同码」
+    //   用了两个独立码。见证必须走「把上游整个摘掉」的形态 —— 只把它关掉得到的是 disabled。
+    if (WA.saveHealth) {
+      want('forecaster-absent', 'save-health：storage-forecast 整个不在场 ⇒ 趋势面报 forecaster-absent（与「关着」的 disabled 分列：一个是装载问题、一个是配置）');
+      want('audit-absent', 'save-health：capacity-audit 整个不在场 ⇒ 水位/义务面报 audit-absent（同上，与 disabled 分列）');
+      WA.saveHealth.setSettings({ enabled: true });
+      trip('forecaster-absent', function () {
+        var k = WA.storageForecast;
+        WA.storageForecast = undefined;
+        try { return [WA.saveHealth.build().trend.reason]; } finally { WA.storageForecast = k; }
+      });
+      trip('audit-absent', function () {
+        var k = WA.capacityAudit, out = [];
+        WA.capacityAudit = undefined;
+        try {
+          var r = WA.saveHealth.build();
+          out.push(r.waterline.reason);
+          if (r.obligations && r.obligations.reason) out.push(r.obligations.reason);
+          return out;
+        } finally { WA.capacityAudit = k; }
+      });
+    }
+    // ③d unusable（engines/handoff-pack.js，v2.273.0 EXV6-9）
+    //   复原入口对「这份包不可用」的拒绝：与「包不完整」（partial，仍可复原）**分列** ——
+    //   前者是「一块都没有」，后者是「缺几块」。把两者合成一个码，玩家就分不出
+    //   「这份包废了」与「这份包能用但不全」。
+    if (WA.handoffPack) {
+      want('unusable', 'handoff-pack.restore：包里一块都没有 ⇒ 拒绝复原（与「不完整」分列，后者仍可复原）');
+      trip('unusable', function () {
+        return [WA.handoffPack.restore({ ver: WA.handoffPack.PACK_VER, blocks: {} }).reason];
+      });
+    }
+    // ③c env-decides / unknown-step（engines/first-run.js，v2.271.0 EXV6-7）
+    //   手勾的两个拒绝理由**不能合并**：`env-decides` 是「环境判得出，不许覆盖」
+    //   （读数有效、只是轮不到你手勾），`unknown-step` 是「你传的步骤名根本不存在」
+    //   （调用方写错）。前者是纪律、后者是缺陷，处置完全不同。
+    if (WA.firstRun) {
+      want('env-decides', 'first-run.mark：该步环境判得出时拒绝手勾（真读数优先，不许用确认盖住事实）');
+      want('unknown-step', 'first-run.mark：未知步骤名拒绝（与 env-decides 分列：一个是纪律、一个是调用方写错）');
+      WA.firstRun.setSettings({ enabled: true });
+      WA.firstRun.resetAll();
+      trip('env-decides', function () {
+        // 现场：出厂态 API 未配 ⇒ 环境判得出 todo ⇒ mark 必须拒绝
+        return [WA.firstRun.mark('api', true).reason];
+      });
+      trip('unknown-step', function () {
+        return [WA.firstRun.mark('__no_such_step__', true).reason];
+      });
+    }
     // ③ no-bytes（engines/perf-baseline.js bandOf）
     //   「这一局属于哪一档」只认**现场字节读数**（saveStat().bytes 或 sizeAudit().total），
     //   两处都取不到 ⇒ 报 no-bytes，**不默认成小局**（猜档位就是把「没测过」写成「小局」）。
@@ -7783,6 +7834,81 @@ function runWitness(WA) {
       }
     }
 
+  // ── v2.266.0, 2.267.0（V6 EXV6-2）：人物今日动线两枚「确实没有」的归因码 ──
+  //   为什么要见证：`build()` 的 `reason` 是**产品面读数**（面板按它决定说哪句话），
+  //   两枚码都表示「这一栏空着」，但成因相反 ——
+  //     · `no-people`：一个人都没扫到（人物面还没有生活记录）；
+  //     · `quiet`    ：扫到了人，但三段都读不到依据（不等于他们今天没动）。
+  //   不见证就等于让门禁替我们说「这些码没人会跑到」，而面板恰是它们的唯一读者。
+  //   见证面刻意还原现场（下列四处设置都在 finally 里收回），不靠顺序活着。
+  {
+    const DR = WA.dayRoute;
+    if (DR && typeof DR.build === 'function') {
+      const keepDR = (typeof DR.getSettings === 'function') ? DR.getSettings() : null;
+      const keepLife = (WA.life && typeof WA.life.getSettings === 'function') ? WA.life.getSettings() : null;
+      let snapKeep = null;
+      try {
+        // ① no-people：把人物面清空（只是本次见证的临时现场，finally 全量还原）
+        try { snapKeep = WA.store.get(); } catch (e) { snapKeep = null; }
+        const snapSaved = snapKeep ? JSON.parse(JSON.stringify(snapKeep)) : null;
+        WA.store.transact(function (d) { d.people = {}; }, 'witness:dr-no-people');
+        if (typeof DR.setSettings === 'function') DR.setSettings({ enabled: true });
+        want('no-people', 'EXV6-2：人物面空 ⇒ no-people（「没人可读」不是「今天谁都没动」）');
+        trip('no-people', function () { return DR.build().reason; });
+        // ② quiet：有人、但三段都读不到依据。
+        //   ⚠ 人名单只收「有 life 行」的人（纯排班的人也收）—— 只写 {name} 的人
+        //     根本进不了名单，会落回 no-people（首版见证就踩了这一格：码跑不出，
+        //     而门禁的报法是「触发路径在、码跑不出」，读起来像产品坏了）。
+        //     故这里给一条**空 life 行**：人被扫到了，但 schedule / goals / commitments 全空，
+        //     且 life 总开关关着 ⇒ where/did/next 三段都 unreadable ⇒ quiet。
+        WA.store.transact(function (d) {
+          d.people = { 'p_见证路人': { name: '见证路人',
+            life: { schedule: [], goals: [], commitments: [], lastDecision: null } } };
+        }, 'witness:dr-quiet');
+        if (WA.life && typeof WA.life.setSettings === 'function') WA.life.setSettings({ enabled: false });
+        want('quiet', 'EXV6-2：有人但三段都无依据 ⇒ quiet（「读不到」不是「他们没有安排」）');
+        trip('quiet', function () { return DR.build().reason; });
+        // 还原现场（先还原人物面，再还原设置 —— 顺序与建立时相反）
+        if (snapSaved) {
+          WA.store.transact(function (d) { d.people = snapSaved.people || {}; }, 'witness:dr-restore');
+        }
+      } finally {
+        try { if (keepDR && typeof DR.setSettings === 'function') DR.setSettings(keepDR); } catch (e) {}
+        try { if (keepLife && WA.life && typeof WA.life.setSettings === 'function') WA.life.setSettings(keepLife); } catch (e) {}
+      }
+    }
+    // v2.267.0（EXV6-3）：关系温度计两码见证
+    const RT = WA.relationTemp;
+    if (RT && typeof RT.build === 'function') {
+      const keepRT = typeof RT.getSettings === 'function' ? RT.getSettings() : null;
+      try {
+        let snapKeep = null;
+        try { snapKeep = WA.store.get(); } catch (e) { snapKeep = null; }
+        const snapSaved = snapKeep ? JSON.parse(JSON.stringify(snapKeep)) : null;
+        WA.store.transact(function (d) { delete d.fondness; delete d.bonds; }, 'witness:rt-empty');
+        if (typeof RT.setSettings === 'function') RT.setSettings({ enabled: true });
+        want('no-records', 'EXV6-3：无关系/好感记录 ⇒ no-records');
+        trip('no-records', function () { return RT.build().reason; });
+
+        if (WA.bonds && typeof WA.bonds.setSettings === 'function') WA.bonds.setSettings({ enabled: true });
+        if (WA.fondness && typeof WA.fondness.setSettings === 'function') WA.fondness.setSettings({ enabled: true });
+        if (WA.fondness && typeof WA.fondness.apply === 'function') {
+          WA.fondness.apply('见证沈砚', { delta: 0.5, trust: 60, reason: '并肩断后' });
+        }
+        want('built', 'EXV6-3：关系温度正常生成 ⇒ built');
+        trip('built', function () { return RT.build().reason; });
+
+        if (snapSaved) {
+          WA.store.transact(function (d) {
+            if (snapSaved.fondness) d.fondness = snapSaved.fondness; else delete d.fondness;
+            if (snapSaved.bonds) d.bonds = snapSaved.bonds; else delete d.bonds;
+          }, 'witness:rt-restore');
+        }
+      } finally {
+        try { if (keepRT && typeof RT.setSettings === 'function') RT.setSettings(keepRT); } catch (e) {}
+      }
+    }
+  }
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
   });

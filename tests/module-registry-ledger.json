@@ -1,13 +1,13 @@
 {
- "version": "2.256.0",
- "loadOrderCount": 314,
- "loadedCount": 300,
+ "version": "2.274.0",
+ "loadOrderCount": 324,
+ "loadedCount": 310,
  "uiCount": 14,
- "nsCount": 309,
+ "nsCount": 319,
  "totals": {
-  "loadEdges": 187,
+  "loadEdges": 195,
   "hardEdges": 0,
-  "callRefs": 358,
+  "callRefs": 374,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -68,6 +68,7 @@
     "engines/contest.js",
     "engines/coop.js",
     "engines/coordinate.js",
+    "engines/day-route.js",
     "engines/deep-clean.js",
     "engines/demographic-flow.js",
     "engines/dep-check.js",
@@ -87,6 +88,7 @@
     "engines/family.js",
     "engines/farfield.js",
     "engines/fate.js",
+    "engines/first-run.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
     "engines/foreshadow.js",
@@ -96,6 +98,7 @@
     "engines/gen-timing.js",
     "engines/geo-tracker.js",
     "engines/group-refuse.js",
+    "engines/handoff-pack.js",
     "engines/hazard.js",
     "engines/history-search.js",
     "engines/inject-value.js",
@@ -156,6 +159,7 @@
     "engines/rehearse.js",
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
+    "engines/relation-temp.js",
     "engines/request-viewer.js",
     "engines/research-closure.js",
     "engines/research.js",
@@ -164,8 +168,10 @@
     "engines/rhythm-loop.js",
     "engines/risk-pooling.js",
     "engines/role-conflict.js",
+    "engines/round-cost.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
+    "engines/save-health.js",
     "engines/scene-narrative.js",
     "engines/scope-tag.js",
     "engines/sediment.js",
@@ -186,6 +192,7 @@
     "engines/survey.js",
     "engines/training.js",
     "engines/travel-desk.js",
+    "engines/undercurrent-calendar.js",
     "engines/userlock.js",
     "engines/vitals.js",
     "engines/wb-inject.js",
@@ -194,6 +201,7 @@
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-clock.js",
+    "engines/world-diary.js",
     "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
@@ -383,6 +391,7 @@
     "engines/contest.js",
     "engines/coop.js",
     "engines/coordinate.js",
+    "engines/day-route.js",
     "engines/deep-clean.js",
     "engines/demographic-flow.js",
     "engines/dep-check.js",
@@ -398,6 +407,7 @@
     "engines/family.js",
     "engines/farfield.js",
     "engines/fate.js",
+    "engines/first-run.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
     "engines/foreshadow.js",
@@ -407,6 +417,7 @@
     "engines/gen-timing.js",
     "engines/geo-tracker.js",
     "engines/group-refuse.js",
+    "engines/handoff-pack.js",
     "engines/history-search.js",
     "engines/inject-value.js",
     "engines/inst.js",
@@ -458,6 +469,7 @@
     "engines/rehearse.js",
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
+    "engines/relation-temp.js",
     "engines/request-viewer.js",
     "engines/research-closure.js",
     "engines/research.js",
@@ -466,8 +478,10 @@
     "engines/rhythm-loop.js",
     "engines/risk-pooling.js",
     "engines/role-conflict.js",
+    "engines/round-cost.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
+    "engines/save-health.js",
     "engines/scene-narrative.js",
     "engines/scope-tag.js",
     "engines/sediment.js",
@@ -487,6 +501,7 @@
     "engines/survey.js",
     "engines/training.js",
     "engines/travel-desk.js",
+    "engines/undercurrent-calendar.js",
     "engines/userlock.js",
     "engines/vitals.js",
     "engines/wb-search.js",
@@ -494,6 +509,7 @@
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-clock.js",
+    "engines/world-diary.js",
     "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
@@ -5697,6 +5713,202 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_observe_slice_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-diary.js": {
+   "ns": [
+    "worldDiary"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_diary_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/day-route.js": {
+   "ns": [
+    "dayRoute"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_day_route_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/relation-temp.js": {
+   "ns": [
+    "relationTemp"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_relation_temp_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/undercurrent-calendar.js": {
+   "ns": [
+    "undercurrentCalendar"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_undercurrent_calendar_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/round-cost.js": {
+   "ns": [
+    "roundCost"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_round_cost_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/save-health.js": {
+   "ns": [
+    "saveHealth"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_save_health_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/first-run.js": {
+   "ns": [
+    "firstRun"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_first_run_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/handoff-pack.js": {
+   "ns": [
+    "handoffPack"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_handoff_pack_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/capability-tier.js": {
+   "ns": [
+    "capabilityTier"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_capability_tier_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/capability-audit.js": {
+   "ns": [
+    "capabilityAudit"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_capability_audit_settings_v1"
    ],
    "consumedBy": []
   }

@@ -651,13 +651,43 @@
       occupied.push({ source: x.source, tokens: nt });
     });
 
+    // v2.261.0（V6 OPV6-6）：**余量必须是一个读数，不能是「读者自己拿 used 减 budget」**。
+    //   现场立据（tools/v6probes/p_budget2.js）：长局用到 2400 的 43%，余量 1368t 在
+    //   summaryText、诊断包、面板三处**全部不可见**——只有 `注入 500/2400t`。
+    //   「还剩多少」要能被直接读出来，否则「预算不够用」永远是玩家的第一直觉，
+    //   而真实结论是「额度用了不到一半，机制没开够」。
+    //   `spareSources` 的口径：按**本轮已落地源的平均体量**估算「同样的源还能再塞几个」。
+    //   它是**估算而不是承诺**（下一个源可能比平均大得多），故 note 里逐字写明。
+    const remainRaw = Math.max(0, budget - used);
+    const keptTokens = kept.map(function (x) { return x.tokens; })
+      .filter(function (t) { return typeof t === 'number' && t > 0; });
+    const avgKept = keptTokens.length
+      ? Math.floor(keptTokens.reduce(function (acc, t) { return acc + t; }, 0) / keptTokens.length) : null;
+    const spareSources = (avgKept && remainRaw > 0) ? Math.floor(remainRaw / avgKept) : 0;
     return {
       // v2.47.0: inputCount 让 apply 能判「这份计划是不是这份输入算出来的」——长度不符时
       //   退回按 source 名匹配（旧语义），避免把位置对账用在错的计划上。
       inputCount: list.length,
       // 本次输入里没有任何优先级声明的源（去重）。空数组 = 源面已全部被声明覆盖。
       unranked: unranked,
-      budget: budget, budgetSource: rb.source, contextSize: rb.contextSize, used: used, remain: Math.max(0, budget - used),
+      budget: budget, budgetSource: rb.source, contextSize: rb.contextSize, used: used, remain: remainRaw,
+      // v2.261.0（V6 OPV6-6）：档位口径随计划一起带出去（`-1 自动` / `0 不限` / 正数手动的区分）。
+      budgetMode: rb.mode || (rb.source === 'manual' ? 'manual' : 'auto-noctx'),
+      // v2.261.0（V6 OPV6-6）：**余量账**（纯观测，不改变任何裁决结果）。
+      //   `usedPct` / `freePct` 按**预算**算而不是按上下文窗口：读者关心的是「这份额度用了多少」。
+      //   `saturated` 的判据是「用满，或余量小到再放不下最小可保项（MIN_KEEP_TOKENS）」——
+      //   「还剩 12t」在工程上就是饱和，报「还有余量」等于骗人。
+      headroom: {
+        remain: remainRaw,
+        usedPct: budget > 0 ? Math.round((used / budget) * 1000) / 10 : (used > 0 ? 100 : 0),
+        freePct: budget > 0 ? Math.round((remainRaw / budget) * 1000) / 10 : 0,
+        saturated: used >= budget || remainRaw < MIN_KEEP_TOKENS,
+        avgKeptTokens: avgKept,
+        spareSources: spareSources,
+        note: avgKept
+          ? '可再开 ' + spareSources + ' 个源，按本轮已落地源的平均体量（' + avgKept + 't/源）估算，不是承诺'
+          : '本轮没有可参照的落地源体量，给不出「可再开几个源」'
+      },
       overBudget: used > budget,
       kept: kept, folded: folded, dropped: dropped,
       // v2.88.0 O1：**成本账**。调用方（render/inject.js）在唯一引擎调用出口上实测
@@ -734,10 +764,29 @@
     const raw = Math.round(cs * AUTO_RATIO);
     return { budget: Math.max(AUTO_MIN, Math.min(AUTO_MAX, raw)), source: 'auto', contextSize: cs };
   }
-  /** 统一入口：budget 为负数/未给 → 自动档 */
+  /**
+   * 统一入口：budget 为负数/未给 → 自动档。
+   *
+   * v2.261.0（V6 OPV6-6）：**`-1 自动` 与「从未配置」在读数上必须分得开**。
+   *   修前两支都回 `source:'default'`（`autoBudget()` 在拿不到上下文窗口时返回的就是它），
+   *   于是「玩家选了按上下文比例算、但上下文没量到」与「根本没配过、走默认 2400」在
+   *   诊断包与面板上逐字同形——玩家按 `-1` 的语义以为额度会随上下文长，实际恒 2400，
+   *   而界面上没有任何一处能告诉他这件事（假绿③：两种不同的原因共用一个读数）。
+   *   本版补两枚**只读**字段，不改任何裁决：
+   *     · `mode` —— 实际走了哪档。取值域 'auto'（真按 6% 推出来了）/ 'auto-noctx'
+   *       （要求自动但量不到上下文，回落 DEFAULT_BUDGET）/ 'manual'（正数上限）/ 'off'（0 = 不限）。
+   *     · `requested` —— 调用方要的是什么（原样回显，null = 未给）。
+   *   `source` 与 `contextSize` 的语义逐字不变（既有消费方零改动）。
+   */
   function resolveBudget(budget) {
-    if (budget == null || budget < 0) return autoBudget();
-    return { budget: budget | 0, source: 'manual', contextSize: null };
+    const req = (budget === undefined) ? null : budget;
+    if (budget == null || budget < 0) {
+      const a = autoBudget();
+      return { budget: a.budget, source: a.source, contextSize: a.contextSize,
+        mode: (a.source === 'auto') ? 'auto' : 'auto-noctx', requested: req };
+    }
+    const n = budget | 0;
+    return { budget: n, source: 'manual', contextSize: null, mode: (n === 0 ? 'off' : 'manual'), requested: req };
   }
 
   /**
@@ -899,6 +948,82 @@
         + '（源级依赖表本仓不存在，硬抽即新造第二套真源）'
     };
   }
+  /**
+   * v2.261.0（V6 OPV6-6）：**余量读数口**（纯函数，不读 store、不落盘）。
+   *
+   * 为什么要有它而不是让三个消费方各自 `b.cap - b.used`：
+   *   ① 「余量占几成」「算不算饱和」「还能再开几个源」是三条**判据**，不是三个减法——
+   *      各自现算必然漂移（`saturated` 用 `remain < MIN_KEEP_TOKENS` 这一条，面板算不对就是
+   *      两种结论）。
+   *   ② 面板读的是**存档快照**（`lastInjection.budget`），那个对象不是 plan 结果本身；
+   *      诊断包读的是同一份快照。两侧要吃同一口径，只能有一个函数。
+   *
+   * 入参容忍两种形态：plan() 的结果（带 `budget` / `headroom`），或落盘快照（带 `cap` /
+   *   `headroom`）。缺 headroom 时**按快照字段现算**并把 `derived` 标成 true——
+   *   如实说明「这份余量是事后推出来的，不是裁决当时记下的」。
+   */
+  function budgetView(p) {
+    if (!p || typeof p !== 'object') return null;
+    const cap = (typeof p.budget === 'number') ? p.budget : ((typeof p.cap === 'number') ? p.cap : null);
+    const used = (typeof p.used === 'number') ? p.used : null;
+    if (cap === null || used === null) return null;
+    const hr = (p.headroom && typeof p.headroom === 'object') ? p.headroom : null;
+    const remain = (hr && typeof hr.remain === 'number') ? hr.remain : Math.max(0, cap - used);
+    const derived = !hr;
+    const usedPct = cap > 0 ? Math.round((used / cap) * 1000) / 10 : (used > 0 ? 100 : 0);
+    const freePct = cap > 0 ? Math.round((remain / cap) * 1000) / 10 : 0;
+    const avg = (hr && typeof hr.avgKeptTokens === 'number') ? hr.avgKeptTokens : null;
+    const spare = (hr && typeof hr.spareSources === 'number') ? hr.spareSources : ((avg && remain > 0) ? Math.floor(remain / avg) : null);
+    const overBudget = (typeof p.overBudget === 'boolean') ? p.overBudget : (used > cap);
+    // v2.261.0（V6 OPV6-6）：**档位口径要说人话**。
+    //   `mode: 'auto-noctx'` 是「设了自动档但量不到上下文窗口」——这正是本项要治的现场：
+    //   玩家按 -1 的语义以为额度随上下文长，实际恒 DEFAULT_BUDGET，而旧读数上它与
+    //   「从未配置」逐字同形。`requested` 把它和「没给值」分开，`modeText` 把它说出来。
+    const mode = p.budgetMode || p.mode || (p.source === 'manual' ? 'manual' : null);
+    const req = (p.requested === undefined) ? undefined : p.requested;
+    const modeText = (function () {
+      if (mode === 'auto') return '自动档：按上下文 ' + ((typeof p.contextSize === 'number') ? p.contextSize : '?') + ' 的 6% 推出 ' + cap + 't';
+      if (mode === 'auto-noctx') {
+        return (req === -1 || req === '-1')
+          ? ('设为自动档（-1），但量不到上下文窗口，回落默认 ' + cap + 't——额度不会随上下文增长')
+          : ('未显式配置，走默认 ' + cap + 't（自动档量不到上下文窗口）');
+      }
+      if (mode === 'off') return '0 = 不设上限（本模块不裁决）';
+      if (mode === 'manual') return '手动上限 ' + cap + 't';
+      return (p.source === 'manual') ? ('手动上限 ' + cap + 't') : null;
+    })();
+    // v2.261.0（V6 OPV6-6）：**档位建议**。
+    //   计划原话：「不做『把预算调小』，而是……在未饱和时如实报余量」。故这里只**出建议**
+    //   （`advice`），绝不改任何配置、绝不静默收窄——写入口仍在玩家手里。
+    //   判据：闲置过半（freePct >= 50）且真裁过项（used > 0）才提，否则不提（不制造焦虑）。
+    const advice = (used > 0 && !overBudget && freePct >= 50 && remain >= (MIN_KEEP_TOKENS * 2))
+      ? ('额度有 ' + freePct + '% 闲置：本轮实际只需 ' + used + 't。'
+        + '收紧到 ≈' + Math.ceil(used / 200) * 200 + 't 也够用（省下的额度不会换来更多内容，'
+        + '但能让「额度不够」的错觉消失）；也可以不动——空闲额度没有代价。')
+      : ((used > 0 && !overBudget && remain > 0 && remain < MIN_KEEP_TOKENS)
+        ? ('余量只剩 ' + remain + 't，已等同饱和：下一个源进不来')
+        : null);
+    return {
+      used: used, cap: cap, remain: remain,
+      mode: p.budgetMode || p.mode || (p.source === 'manual' ? 'manual' : null),
+      source: p.budgetSource || p.source || null,
+      contextSize: (typeof p.contextSize === 'number') ? p.contextSize : null,
+      usedPct: usedPct, freePct: freePct,
+      saturated: overBudget || remain < MIN_KEEP_TOKENS,
+      overBudget: overBudget,
+      avgKeptTokens: avg, spareSources: spare,
+      derived: derived,
+      modeText: modeText, advice: advice,
+      // 一句话结论：未饱和时**必须**说得出来（这是本项的全部意义）。
+      text: overBudget
+        ? ('预算 ' + cap + 't 已超 ' + (used - cap) + 't：pinned 保底项不可裁')
+        : (used === 0
+          ? ('预算 ' + cap + 't 一分没用：本轮没有可裁项')
+          : ('用了 ' + used + '/' + cap + 't（' + usedPct + '%），余量 ' + remain + 't'
+            + (spare ? '，可再开 ' + spare + ' 个源' : '')
+            + (derived ? '（余量按快照现算，非裁决当时所记）' : '')))
+    };
+  }
   function summaryText(p) {
     if (!p) return '未规划';
     const tail = p.folded.length ? '｜折叠 ' + p.folded.length : '';
@@ -914,13 +1039,26 @@
     // v2.88.0 O1：**一个引擎源都没量到**要看得见（说明成本面根本没工作，而不是「很快」）。
     //   除此之外不报 unmeasured：快照总是非计量项，每轮都报就成了噪音，读的人会开始不看它。
     const abs = (p.cost && p.cost.measured === 0 && p.cost.unmeasuredCount) ? '｜本轮无引擎调用（' + p.cost.unmeasuredCount + ' 项非计量）' : '';
-    return '注入 ' + p.used + '/' + p.budget + 't' + tail + drop + un + cst + abs + (p.saved > 0 ? '｜省 ' + p.saved + 't' : '');
+    // v2.261.0（V6 OPV6-6）：**余量句**。只在真裁过项（used > 0）且未超支时报——
+    //   一项都没裁（items 为空 / 调用方传的是精简对象）时报余量纯属噪音；
+    //   超支时余量恒 0，报它只会和超支句打架，故两句话互斥。
+    const hr = p.headroom || null;
+    const gap = (hr && p.used > 0 && !p.overBudget && hr.remain > 0)
+      ? '｜余量 ' + hr.remain + 't(' + hr.freePct + '%)'
+        + (hr.spareSources > 0 ? '·可再开 ' + hr.spareSources + ' 源' : '')
+      : '';
+    const over = p.overBudget ? '｜超支 ' + (p.used - p.budget) + 't（pinned 保底项不可裁）' : '';
+    return '注入 ' + p.used + '/' + p.budget + 't' + over + gap + tail + drop + un + cst + abs + (p.saved > 0 ? '｜省 ' + p.saved + 't' : '');
   }
 
   WA.injectBudget = {
     DEFAULT_BUDGET, MIN_KEEP_TOKENS, FOLD_FLOOR_TOKENS, PRIORITY, AUTO_RATIO, AUTO_MIN, AUTO_MAX,
     autoBudget, resolveBudget, resolveContextSize,
     tokensOf, rankOf, foldable, trim, plan, apply, summaryText,
+    // v2.261.0（V6 OPV6-6）：余量读数口。三个真消费方：engines/tool-diag.js（诊断包
+    //   `budget.headroom`）、ui/panel.js（预算段余量行）、engines/backstage.js（`budgetHeadroom()`）。
+    //   本口仍是纯函数，不破坏本模块「不读 store、不写配置、不落地注入」的承诺。
+    budgetView,
     // v2.88.0 O1：成本面**只导出两个**，且两个都有真消费方：
     //   · costOf —— tool-diag 的 secInject 用它给「最慢 5 源」贴档位（分档只有贴到读数上才有人看）；
     //   · costView —— ui/panel.js 的「本轮注入」段用它渲染上轮耗时与科目分布。

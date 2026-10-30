@@ -56,3 +56,23 @@ tools/probe_*.js
 #   台账正文照旧落在 ITERATION_LOG.md / README（读数与人读的那份在文档里，不在 tools/ 里）。
 tools/_*.sh
 tools/_*.json
+# v2.274.0（V6 收口）：一次性取证物与本地备份按**形态**挡在库外。
+#   判据沿用本文件反复引用的那条：「只有被可执行代码引用的工具才入库」。
+#   实测（本版比对）：
+#     · tools/v6probes/ —— 29 个一次性探针，全仓只在**注释**里被提到
+#       （engines/inject-budget.js / round-cost.js / first-run.js 的「现场立据」），零 require、
+#       零 node 调用点 ⇒ 不是交付物。它们此前**漏进产品文件面**（product-files 的 SKIP_DIRS
+#       只排了顶层 `tools`、没排其子目录），使 refs / 命名空间 / 成员 / dead 四组冻结读数全部漂移
+#       （实测 productFiles 354 → 325）；本条把它们也挡在索引外，与那条修法成对。
+#     · tools/gate_all_226*.sh / tools/smoke_mounted_226*.js —— 本批一次性门禁串联与冒烟脚本，
+#       smoke_mounted 只在 rulepack-idem-v2264.js 的**注释**里被提到（「判挂载漏跑的唯一依据」），
+#       没有可执行引用。
+#     · tools/r21*.md / r22*.md —— 逐轮工单稿，正文台账在 ITERATION_LOG.md，这里不留副本。
+#     · tests/*.bak —— 门禁重写时留的本地备份（run.js / settle-v2830.js / module-cycle-gate-v2107.js），
+#       真源永远是被测的那一份；备份入库只会变成第二份会漂的读数。
+#   为什么不逐个登记文件名：那只是把下一次踩坑推迟 —— 本文件已用同一理由挡过 `_*.js` / `_*.sh` / `_*.json`。
+tools/v6probes/
+tools/gate_all_*.sh
+tools/smoke_mounted_*.js
+tools/r2*.md
+tests/*.bak

@@ -86,6 +86,9 @@
     // v2.203.0（Y8）：detects / rolls / composes / admits 四栏 —— 新增的四个功能各自有无台账，
     //   在诊断面上必须逐栏看得见（有功能没台账 = 出了事没人知道它被调过）。
     detects: 0, rolls: 0, composes: 0, admits: 0,
+    // v2.264.0（OPV6-9）：幂等闸命中数 —— 「跳过了几次重复切换」必须可数，
+    //   不可数等于没发生（与 detects/rolls 同一条纪律）。
+    idemSkips: 0,
     templateRuns: 0, templateRefused: 0, refused: 0, lastReason: '', faults: {},
     // v2.217.0（N6）：调度面三栏 —— 登记 / 按轮次跑 / 被拒。
     //   为什么与 templateRuns 分栏：「手动试跑了几次」与「按轮次自动跑了几次」
@@ -579,6 +582,34 @@
       fault('conflict');
       return { ok: false, reason: 'conflict', name: p.name, conflicts: a.conflicts, count: a.count,
         hint: a.hint };
+    }
+    // ── v2.264.0（OPV6-9）幂等闸：重复切同档，一次都不写 ──────────────────
+    //   「重复切同一个包」此前会完整走一遍：压栈 + 逐键写盘 + applies 计数 ——
+    //   结果没变，代价却照付：回滚栈被无意义条目挤占（MAX_HISTORY=12，塞满后真要回的
+    //   那一步反而被丢最旧），账面（applies）也虚高。判据**两向**：活跃标记就是这一包
+    //   **且** 包值逐键与当前面一致（口径与冲突检测同一把尺：keyClashes / asWritten，
+    //   不另造第二份比较逻辑）。两向缺一不可：只看名字，用户手改过键会被误跳过
+    //   （假幂等 —— 最坏的一种）；只看值，「切走又切回」那一轮会被误判（标记还没跟上）。
+    //   跳过时**零写盘**（不压栈、不写键、不动标记），只记台账 idemSkips，
+    //   回执带 idempotent:true 让调用方看得出「这次什么都没做」。
+    if ((cfg.active || '') === p.name) {
+      const snapNow = surface(cfg.maxKeys);
+      const idemDiff = keyClashes(p.values, (snapNow && snapNow.values) || {}, '包', '当前面');
+      if (!idemDiff.length) {
+        _stat.idemSkips++;
+        _stat.lastReason = 'idempotent';
+        const iUnreadable = Array.isArray(p.absent)
+          ? p.absent.map(function (x) { return x && x.key; }).filter(Boolean) : [];
+        const iSkipped = [];
+        Object.keys(p.values || {}).forEach(function (k) {
+          if (!regs().some(function (r) { return r.key === k; })) iSkipped.push({ key: k, why: 'key-not-registered' });
+        });
+        return { ok: true, name: p.name, idempotent: true, applied: [], failed: [],
+          skipped: iSkipped, unreadable: iUnreadable,
+          partial: iSkipped.length > 0 || iUnreadable.length > 0,
+          marker: true,
+          note: '幂等跳过：当前面已与这一包逐键一致 —— 未压栈、未写盘、applies 不涨、栈不占位' };
+      }
     }
     // 压栈：**写之前**先记下「现在长什么样」。压栈失败（设置写不进去）⇒ 整次切换不做 ——
     //   否则「切得回去」这句话在这一次就已经不成立了。
@@ -1091,6 +1122,7 @@
         conflict: '冲突**只报不判**：指出来是哪两条（同键两处写 / 两条政策互斥 / 两题材叠加），谁赢由你改 —— 不做「后启用的赢」',
         noCarry: '规则包**不得携带世界事实**（人物 / 事件 / 地图不进包）—— 导入时按显式名单在写盘之前拦下',
         rollback: '回滚栈里**只装规则面键值**，一条世界键都进不来；栈上限 ' + MAX_HISTORY + ' 条（超出丢最旧一条并如实回报）',
+        idempotent: '重复切同档是**零写盘**的幂等跳过（不压栈、applies 不涨）—— 回执带 idempotent:true，面板与账面都看得出这次什么都没做',
         compose: '组合口（开档即定档）是**只读**的：它不切规则、不种世界，只把「这两样配起来是什么样」摆出来',
         schedule: '调度面（`schedule.*`）与试跑面（`template.*`）**分工**：前者落盘、按轮次、预算跨刷新保留；后者是内存态的一次性试跑。两条路都只调封闭词表里的既有只读读口，都不执行用户 JavaScript、都不写世界状态'
       }

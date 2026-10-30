@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.256.0';
+  const VERSION = '2.274.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1121,6 +1121,48 @@
     'engines/relation-graph.js',
     'engines/solo-voice.js',
     'engines/observe-slice.js',
+    // v2.257.0（V6 OPV6-1 / OPV6-2）：能力档位与启用面可见。
+    //   位置在两处都是**末尾、ui/panel.js 之前**：两者都是「调用期读 WA 上的其他命名空间」
+    //   （capability-tier 要枚举所有引擎并调各自的 setSettings；capability-audit 要读
+    //   WA.__settingsRegs 与各引擎的 getSettings），装载期**零上游读、零 store 写、零落盘**。
+    //   故不进 __BOUNDED_CAPS / evict SITES 两张表。
+    //   ⚠ 顺序有讲究：audit 需在 tier **之后**（它要能看到 tier 自己的设置键），
+    //     而 tier 不读 audit。反过来会让 audit 在首次盘点时看不见档位键。
+    // v2.265.0（V6 EXV6-1）：世界日记 —— 镜头外真实结算的事实压成一到三句人话。
+    //   位置在 capability-tier **之前**：本模块装载期只登记自己的设置键（零上游读、零 store 写、
+    //   零落盘），排在 tier/audit 之前是为了让能力审计首次盘点就能看见它的键；否则「日记开没开」
+    //   会落在登记面之外，档位审计读不到、面板却念得出（两处口径分叉）。
+    'engines/world-diary.js',
+    // v2.266.0（V6 EXV6-2）：人物今日动线 —— 「今天在哪 / 做了什么 / 接下来」读成三句人话。
+    //   位置同世界日记：capability-tier **之前**。本模块装载期只登记自己的设置键，
+    //   零上游读、零 store 写、零落盘，排在 tier/audit 之前让「动线开没开」首次盘点就在登记面内。
+    //   与 world-diary 的相邻次序不是随意的：动线的边界面（地名可见性）**复用**世界日记的 boundary()，
+    //   装载先 diary 后 day-route，面板诊断节两节并列时可从同一批源取证。
+    'engines/day-route.js',
+    'engines/relation-temp.js',
+    // v2.268.0（V6 EXV6-4）：暗流日历 —— 未结算的事几时撞上。
+    //   位置同前面的只读读数模块（relation-temp 之后、tier 之前）。本模块装载期
+    //   只登记自己的设置键，零上游读、零 store 写、零落盘；它读的暗流来自 store.get().currents、
+    //   时间基准来自 clock/storyclock，两处都是运行期读口 —— 装载期不需要任何依赖在场。
+    'engines/undercurrent-calendar.js',
+    // v2.269.0（V6 EXV6-5）：单轮成本卡。位置同前面的只读读数模块（undercurrent-calendar
+    //   之后、capability-tier 之前）：装载期只登记自己的设置键，零上游读、零 store 写。
+    //   顺序也不是随意的 —— 它读的三源（injectBudget / injectValue / perfLedger）在
+    //   本清单里全部更早装载，破坏副本与专锁读到的是同一批邻接。
+    'engines/round-cost.js',
+    // v2.270.0（V6 EXV6-6）：存档体检。位置同前面的只读读数模块（round-cost 之后、
+    //   capability-tier 之前）：装载期只登记自己的设置键，零上游读、零 store 写。
+    //   它读的三源（store 字节口 / storageForecast / capacityAudit）在本清单里全部更早装载。
+    'engines/save-health.js',
+    // v2.271.0（V6 EXV6-7）：开局引导。位置同前面的只读读数模块（save-health 之后、
+    //   tier 之前）：装载期只登记自己的设置键，零上游读、零 store 写。
+    //   它读的三源（api-router / capability-tier / store）里，前两个在本清单里更早装载。
+    'engines/first-run.js',
+    // v2.273.0（V6 EXV6-9）：一键交班，与 index.js LOAD_ORDER 严格同序
+    //   （first-run 之后、capability-tier 之前）。
+    'engines/handoff-pack.js',
+    'engines/capability-tier.js',
+    'engines/capability-audit.js',
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；

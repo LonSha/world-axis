@@ -1022,6 +1022,95 @@ style: false,
     },
     getVisibility() { return loadVis(); },
     setVisibility(k, on) { const v = loadVis(); v[k] = !!on; WA.settingsBus.save(__REG, v); },
+    /**
+     * v2.260.0（V6 OPV6-5）：**可见性缺省 vs 启用面**的对账面（只读）。
+     *   它治的病：`worldaxis_inject_visibility_v1` 可以**整键不落盘**（实测 `null`），
+     *   于是 107 个源全走 `__REG.def` 的出厂缺省 —— 玩家从没配过、也没看过，却事实上
+     *   有一批源默认关着。这时「引擎开着、内容不注入」与「引擎压根关着」在现场长得一样，
+     *   玩家只会觉得「世界没内容」。
+     *
+     *   三条口径（与 faceAudit **分列不合并**：那一面答「每个源此刻是哪个面」，
+     *   本面答「缺省替你关了什么、那份缺省是不是真的在用」）：
+     *   ① **缺省是否在用**：`configured === false` 就如实报「未配置（全走出厂缺省）」，
+     *      不假装玩家配过（`filled` 是读入口的补子键计数，不是「玩家设置过」的证据）。
+     *   ② **静默组合必须点名**：`def=false` 且模块总开关**开着**的源，就是「引擎在跑、
+     *      内容不注入」那一类 —— 玩家最该看见的一行。**这一档不并入 faceAudit 的枚举**
+     *      （那一面是四态封闭集，有全景负控制盯着），故在这里以 `silent` 单列。
+     *   ③ **只报读数、不写配置**：本口一个 `save` 都不调（体检不许顺手改世界）。
+     *
+     * @returns {{configured, key, sources, defaultOff, silent, silentKeys, doubleOff,
+     *            doubleOffKeys, noSwitch, noSwitchKeys, faces, filled, lastAt, note}}
+     */
+    visibilityDefault() {
+      // 落盘判定走 `read()` 自己算出来的**读后来源**（v2.10.0 的 `lastRead.source`）：
+      //   disk / legacy = 磁盘上真有值；default = 从未配置；default-after-failure = 有值但读不出来。
+      //   ⚠ 实施期首版写成「读一遍 read() 再看返回值是不是空对象」—— 而 read() 会
+      //     `applyDefaults` 补齐**全部 107 个子键**，返回的永远是非空对象 ⇒ `configured`
+      //     恒为 true，出厂态被报成「玩家配过」（最典型的「默认值伪装成用户配置」）。
+      //     本仓那条判据早就有真源（readStat().sources / lastRead.source），必须用它。
+      // 走 `readEx` 而不是「read() 再手工取 stats.lastRead」：后者在**本函数自己的时序上**
+      //   虽然安全（read 紧跟着取值），但 `stats.lastRead` 是**全局单槽**——下方 faceAudit
+      //   会经 `moduleEnabled(k)` 去读各模块设置键，那些读会把 lastRead 覆盖成别的键。
+      //   实测（tools/v6probes/p_lastread_slot.js）：读完本键再读 chrono，lastRead.key 就变成
+      //   chrono。任何一次「取值」与「用值」之间插入别的读取，判据就会静默读到别人的来源。
+      //   `readEx` 是总线对外的**契约口**（.code 注释即「回答：我拿到的是用户配置还是兜底」），
+      //   它内部 read 后立即封装来源，故抗插队（p_readex.js 实测：中间插两个别的键仍报本键）。
+      let readSrc = 'default';
+      try {
+        const ex = (typeof WA.settingsBus.readEx === 'function')
+          ? WA.settingsBus.readEx(__REG)
+          : (WA.settingsBus.read(__REG), { source: 'default', key: null });
+        if (ex && ex.key === LS_KEY && ex.source) readSrc = ex.source;
+      } catch (e) { readSrc = 'default-after-failure'; }
+      const configured = (readSrc === 'disk' || readSrc === 'legacy');
+      const failed = (readSrc === 'default-after-failure');
+      const def = __REG.def;
+      const faces = (function () {
+        try { return WA.render.visibilityStat().faceAudit || []; } catch (e) { return []; }
+      })();
+      const faceOf = {};
+      faces.forEach(function (f) { faceOf[f.key] = f; });
+      const defaultOff = [], silent = [], doubleOff = [], noSwitch = [];
+      Object.keys(def).forEach(function (k) {
+        if (def[k] !== false) return;
+        defaultOff.push(k);
+        const f = faceOf[k];
+        if (!f) return;                        // def 有、源表无：那是 declaration 缺口，另一面在管
+        // ⚠ `moduleEnabled` 是**三态**（true / false / null），null = 该源无模块级总开关、由
+        //   store 直供（见 faceAudit 的 'unavailable' 分支）。实施期首版只写了 true/false
+        //   两支，null 被静默丢掉 —— 于是 3 个默认关的源里 2 个（echoes/style）在读数里
+        //   人间蒸发，读者会以为「只剩 1 个有问题」。第三态必须显式成桶。
+        if (f.moduleEnabled === true) silent.push(k);
+        else if (f.moduleEnabled === false) doubleOff.push(k);
+        else noSwitch.push(k);
+      });
+      return {
+        configured: configured,
+        key: LS_KEY,
+        sources: SOURCES.length,
+        // 「缺省替你关掉的源」——玩家可读的那一句就靠这三个数
+        defaultOff: defaultOff,
+        silent: silent.length, silentKeys: silent.slice(),
+        doubleOff: doubleOff.length, doubleOffKeys: doubleOff.slice(),
+        noSwitch: noSwitch.length, noSwitchKeys: noSwitch.slice(),
+        faces: faces.reduce(function (a, f) { a[f.face] = (a[f.face] || 0) + 1; return a; }, {}),
+        filled: __visStat.filled, lastAt: __visStat.lastAt,
+        note: !configured
+          ? ('可见性从未配置过（' + LS_KEY + ' 未落盘）：' + SOURCES.length
+            + ' 个源全走出厂缺省，其中 ' + defaultOff.length + ' 个默认关（'
+            + defaultOff.join('、') + '）。默认关**不等于**「你用不上」，只是没替你打开'
+            + (doubleOff.length
+              ? '；其中 ' + doubleOff.join('、') + ' 的模块总开关也是关的（双重关，先开模块才有效）'
+              : '')
+            + (noSwitch.length
+              ? '；' + noSwitch.join('、') + ' 无模块级总开关（由 store 直供），只能按可见性开关'
+              : ''))
+          : (silent.length > 0
+            ? ('有 ' + silent.length + ' 个源默认关着、而它们的模块总开关是开着的（'
+              + silent.join('、') + '）—— 引擎在跑，内容不会进正文')
+            : null)
+      };
+    },
 
     buildWorldSnapshot() {
       const vis = loadVis(); const s = WA.store.get() || {}; const parts = [];
@@ -1572,7 +1661,7 @@ style: false,
               return r;
             } catch (e) { return null; }
           })();
-          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, budgetMode: planInfo.budgetMode || null, headroom: planInfo.headroom ? { remain: planInfo.headroom.remain, usedPct: planInfo.headroom.usedPct, freePct: planInfo.headroom.freePct, saturated: !!planInfo.headroom.saturated, avgKeptTokens: planInfo.headroom.avgKeptTokens, spareSources: planInfo.headroom.spareSources, note: planInfo.headroom.note || '' } : null, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
           // v2.150.0(RP4): 价值观察的唯一生产方。位置刻意——必须在预算裁决(finalItems)
           //   与槽位路由都定完之后：观察面要的是「这一轮真落地了哪些源」，拿注入前的候选集
           //   来观察，会把被折叠/丢弃的项也记成「注入过却没被引用」——那是把没发生的事判成没用。

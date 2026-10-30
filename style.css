@@ -499,6 +499,196 @@ div.wa-dim {
   margin: 2px 0 5px;
 }
 
+/* ==========================================================================
+   v2.265.0（V6 EXV6-1）世界日记：概览页唯一一块「玩家面叙事」读数
+   ==========================================================================
+   与上面几条并列读数（wa-first / wa-cap-line …）的视觉分界：
+   那些是**诊断面**（一行一句话 + 数值），这里是**叙事面**（一到三句人话），
+   故给左侧一条细竖线 + 略宽松行距 —— 读者一眼能分出「这是正文的补充读物」，
+   不必读文字就知道这块与上面那几行不同类。零动画、零额外色块（本仓美化让位于性能）。
+   -------------------------------------------------------------------------- */
+.wa-diary {
+  margin: 4px 0 6px;
+  padding: 2px 0 2px 8px;
+  border-left: 2px solid var(--wa-accent, rgba(120, 180, 220, 0.55));
+}
+.wa-diary-line {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--wa-text, #d8dee6);
+  margin: 1px 0;
+}
+/* 空态不铺留白：一句话说明「确实没有」，左侧竖线降为虚线表示「这一刻无内容」 */
+.wa-diary-quiet {
+  border-left-style: dashed;
+  opacity: 0.75;
+}
+.wa-diary-quiet div.wa-dim {
+  margin: 0;
+}
+
+/* ==========================================================================
+   v2.266.0（V6 EXV6-2）人物动线：概览页第二块「玩家面叙事」读数
+   ==========================================================================
+   与上面世界日记的关系：日记是**过去**（镜头外发生过什么，多来源合流一句话一句），
+   动线是**现在**（这几个人此刻在哪 / 做了什么 / 接下来干嘛，一人一行）。
+   两块同类（叙事面），故视觉语言**同族但可区分**：
+     · 日记那条竖线是实线 + 单行，(空态) 转虚线；
+     · 动线用**同一色系但更浅的竖线 + 人名前缀加粗**，一眼能看出是「按人分栏」。
+   零动画、零新色相（本仓美化让位于性能）。第几日那行刻意压暗：它是锚点不是内容。
+   -------------------------------------------------------------------------- */
+.wa-route {
+  margin: 4px 0 6px;
+  padding: 2px 0 2px 8px;
+  border-left: 2px solid var(--wa-accent-soft, rgba(120, 180, 220, 0.32));
+}
+.wa-route-line {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--wa-text, #d8dee6);
+  margin: 1px 0;
+}
+/* 空态：一句话，虚线，略暗 —— 与「有内容」明确不同形 */
+.wa-route-quiet {
+  border-left-style: dashed;
+  opacity: 0.75;
+}
+.wa-route-quiet div.wa-dim {
+  margin: 0;
+}
+/* v2.267.0（EXV6-3）：关系温度计 */
+.wa-temp {
+  margin: 6px 0 10px;
+  padding: 6px 10px;
+  border-left: 3px solid #e06c75;
+  background: rgba(224,108,117,0.06);
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wa-temp-line {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--wa-text, #d8dee6);
+  margin: 1px 0;
+}
+.wa-temp-quiet {
+  border-left-style: dashed;
+  opacity: 0.75;
+}
+.wa-temp-quiet div.wa-dim {
+  margin: 0;
+}
+/* v2.268.0（EXV6-4）：暗流日历 */
+.wa-cal {
+  margin: 6px 0 10px;
+  padding: 6px 10px;
+  border-left: 3px solid #d19a66;
+  background: rgba(209,154,102,0.06);
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wa-cal-line {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--wa-text, #d8dee6);
+  margin: 1px 0;
+}
+.wa-cal-quiet {
+  border-left-style: dashed;
+  opacity: 0.75;
+}
+.wa-cal-quiet div.wa-dim {
+  margin: 0;
+}
+/* v2.269.0（EXV6-5）：单轮成本卡 */
+.wa-cost {
+  margin: 6px 0 10px;
+  padding: 6px 10px;
+  border-left: 3px solid #7f9bd1;
+  background: rgba(127,155,209,0.06);
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wa-cost-line {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--wa-text, #d8dee6);
+  margin: 1px 0;
+}
+.wa-cost-quiet {
+  border-left-style: dashed;
+  opacity: 0.75;
+}
+.wa-cost-quiet div.wa-dim {
+  margin: 0;
+}
+/* v2.270.0（EXV6-6）：存档体检 */
+.wa-save {
+  margin: 6px 0 10px;
+  padding: 6px 10px;
+  border-left: 3px solid #9b8fd1;
+  background: rgba(155,143,209,0.06);
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wa-save-line {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--wa-text, #d8dee6);
+  margin: 1px 0;
+}
+.wa-save-quiet {
+  border-left-style: dashed;
+  opacity: 0.75;
+}
+.wa-save-quiet div.wa-dim {
+  margin: 0;
+}
+.wa-save-urgent {
+  border-left-color: #d17f7f;
+  background: rgba(209,127,127,0.08);
+}
+/* v2.271.0（EXV6-7）：开局引导三步卡 */
+.wa-first {
+  margin: 6px 0 10px;
+  padding: 6px 10px;
+  border-left: 3px solid #66c2a5;
+  background: rgba(102,194,165,0.07);
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wa-first-line {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--wa-text, #d8dee6);
+  margin: 1px 0;
+}
+.wa-first-step {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 2px 0;
+}
+.wa-first-done {
+  opacity: 0.6;
+}
+.wa-first-todo {
+  font-weight: 600;
+}
+.wa-first-cannot {
+  opacity: 0.85;
+  font-style: italic;
+}
+.wa-first-go {
+  margin-left: auto;
+  cursor: pointer;
+}
+
 /* 键值对行：去除繁复虚线，保持干净利落 */
 .wa-kv {
   display: flex;

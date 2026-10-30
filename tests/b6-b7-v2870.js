@@ -128,6 +128,22 @@ function runAll(a) {
     const col = WA.toolDiag.collect();
     a(!!(col.modules && col.modules.theme) && !!(col.lonsha && col.lonsha.separation),
       'v2870/bb: [B7] 诊断面真消费题材与职责分离（否则就是死导出）');
+    // ── v2.258.0（OPV6-3）：本块**必须自己收尾** ────────────────────────────
+    //   治的病（实施期实测抓到的真污染）：题材自 v2.258.0 起**真开引擎**，而本块上面
+    //   调用了写入口却没清理 ⇒ campus+mystery 那 25 个机制一路活到别的用例。
+    //   现场证据（/tmp/p_pollute.js）：b6-b7 跑完后 `shadow.enabled === true`、
+    //   `threads.enabled === true`，于是 `shadow-v2630` / `threads-v2630` 的
+    //   「[1] 默认关闭（实 true）」当场红 —— 判据的成立与否取决于**前序节留下了什么**，
+    //   正是本仓反复点名的「靠顺序活着」。修法不是去改那两把锁（它们判的是对的），
+    //   而是让**写出副作用的那一块自己擦干净**。
+    const cleared = WA.theme.apply([]);
+    a(cleared.ok === true && (cleared.enginesOff || []).length > 0,
+      'v2870/bb: [B7-F] 清空题材连自己开的机制一并收回（实收回 ' + ((cleared.enginesOff || []).length) + ' 个）');
+    const leftOpen = (cleared.enginesGranted || []);
+    a(leftOpen.length === 0,
+      'v2870/bb: [B7-F] 清空后本模块不再按住任何引擎（实 ' + JSON.stringify(leftOpen) + '）—— 否则副作用外溢到后续用例');
+    a(WA.theme.activeModules() === null && (WA.rules.getAll().match(/模块·/g) || []).length === all0,
+      'v2870/bb: [B7-F] 清空后注入面回到全量（' + all0 + ' 模块，与本节开局逐字相同）');
   }
   // ───────────────────────── 运行时：A5 收口 ─────────────────────────
   {

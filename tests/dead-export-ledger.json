@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.256.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源；本版（v2.256.0）复算：README 治理门禁退役不触碰导出面，dead/uiDead 两面不变，uiDead ui.open 的 tref 由 30 回填为现场实测 31（账本滞后一格曾致证据复算类判据全红）",
-  "version": "2.256.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.274.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.274.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -594,6 +594,14 @@
       "tref": 3,
       "own": 3
     },
+    "backstage.budgetHeadroom": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/backstage.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 1
+    },
     "backstage.flushPersonaChannels": {
       "reason": "test-only",
       "detail": "engines/backstage.js 内部自用、外部零引用（过度导出）",
@@ -946,20 +954,12 @@
       "tref": 0,
       "own": 1
     },
-    "bonds.read": {
-      "reason": "test-only",
-      "detail": "engines/bonds.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/bonds.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 4
-    },
     "bonds.setSettings": {
       "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/bonds.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 8,
       "own": 1
     },
     "bonds.stat": {
@@ -2391,7 +2391,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/difficulty.js",
       "refs": 0,
-      "tref": 14,
+      "tref": 20,
       "own": 1
     },
     "difficulty.spanMinutes": {
@@ -3290,14 +3290,6 @@
       "tref": 2,
       "own": 3
     },
-    "fondness.read": {
-      "reason": "test-only",
-      "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/fondness.js",
-      "refs": 0,
-      "tref": 18,
-      "own": 4
-    },
     "fondness.readAffect": {
       "reason": "self-only",
       "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
@@ -3319,7 +3311,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/fondness.js",
       "refs": 0,
-      "tref": 24,
+      "tref": 29,
       "own": 1
     },
     "fondness.stat": {
@@ -3842,14 +3834,6 @@
       "tref": 3,
       "own": 3
     },
-    "injectBudget.resolveBudget": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/inject-budget.js",
-      "refs": 0,
-      "tref": 4,
-      "own": 3
-    },
     "injectBudget.resolveContextSize": {
       "reason": "self-only",
       "detail": "engines/inject-budget.js 内部自用、外部零引用（过度导出）",
@@ -4315,11 +4299,11 @@
       "own": 3
     },
     "laborSchedule.setSettings": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/labor-schedule.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 1
     },
     "laborSchedule.stat": {
@@ -6520,7 +6504,7 @@
       "src": "engines/recipe.js",
       "refs": 0,
       "tref": 0,
-      "own": 31
+      "own": 32
     },
     "refine.condense": {
       "reason": "self-only",
@@ -7890,14 +7874,6 @@
       "tref": 0,
       "own": 4
     },
-    "storyclock.readLatest": {
-      "reason": "self-only",
-      "detail": "engines/storyclock.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/storyclock.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "storyclock.setSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -8432,7 +8408,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 140
+      "own": 150
     },
     "toolDiag.secAgenda": {
       "reason": "self-only",
@@ -8648,7 +8624,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 19,
-      "own": 21
+      "own": 29
     },
     "toolImport.detect": {
       "reason": "test-only",
@@ -9433,7 +9409,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "ui/panel.js",
       "refs": 0,
-      "tref": 31,
+      "tref": 55,
       "own": 24
     },
     "ui.rerenderStat": {
@@ -9443,9 +9419,17 @@
       "refs": 0,
       "tref": 14,
       "own": 1
+    },
+    "uiSettings.laneApply": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "ui/settings.js",
+      "refs": 0,
+      "tref": 16,
+      "own": 5
     }
   },
   "advisory": {
-    "dataOnly": 526
+    "dataOnly": 548
   }
 }

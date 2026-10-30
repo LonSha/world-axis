@@ -37,7 +37,13 @@ function productFiles(root) {
       if (e.name === '.git' || e.name === 'node_modules') return;
       const p = path.join(dir, e.name);
       if (e.isDirectory()) return walk(p);
-      if (e.name.endsWith('.js') && SKIP_DIRS.indexOf(path.relative(root, dir)) < 0) out.push(path.relative(root, p));
+      // v2.274.0：判的是**顶层目录名**，不是整条相对路径。
+      //   原写法 `SKIP_DIRS.indexOf(path.relative(root, dir))` 只排掉了 `tools` 本身，
+      //   于是 `tools/v6probes/` 这类**子目录**整体漏进产品面（实测 p_allon.js 等 29 个
+      //   一次性探针被算成产品文件）⇒ refs / 命名空间 / 成员 / dead 四组冻结读数全部漂移，
+      //   而这四组读数正是出口面契约判据的输入。判词该问的是「这一层属于哪个顶层目录」。
+      if (e.name.endsWith('.js')
+        && SKIP_DIRS.indexOf(path.relative(root, dir).split(path.sep)[0]) < 0) out.push(path.relative(root, p));
     });
   })(root);
   return out.sort();

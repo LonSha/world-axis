@@ -260,6 +260,48 @@
 
   const backstage = WA.backstage = {
     getSettings: loadSettings,
+    /**
+     * v2.261.0（V6 OPV6-6）：**预算余量读口**（只读，不写配置、不裁决）。
+     *
+     * 为什么这个口要开在 backstage：预算档位 `injectBudget` 就是本模块的设置项，且
+     *   「-1 自动 / 0 不限 / 正数手动」三态与它的 `sentinels` 声明同住一份登记表。
+     *   玩家问「我的额度还剩多少、要不要调」时，回答必须从**同一处**出，不能由面板
+     *   各自拿 `lastInjection.budget.cap - used` 现算（那样「算不算饱和」会有两种结论）。
+     *
+     * 口径：
+     *   · `stored`   —— 落盘值原样回显（-1 / 0 / 正数），玩家能看见自己配的是什么；
+     *   · `resolved` —— 现算一档（`resolveBudget`），带 `mode` 与 `modeText`；
+     *   · `last`     —— 上一轮注入的实际用量（读 `store.lastInjection.budget`，走
+     *                  `injectBudget.budgetView` 同一判据）；**未注入过就是 null**，
+     *                  不拿 `resolved` 冒充「用过」。
+     *   `advice` 只是建议：本口**没有任何写路径**——改不改额度由玩家决定。
+     */
+    budgetHeadroom() {
+      const out = { stored: null, resolved: null, last: null, advice: null, note: '' };
+      let st = null;
+      try { st = loadSettings(); } catch (e) { out.note = '设置读取失败：' + (e && e.message); return out; }
+      out.stored = (st && typeof st.injectBudget === 'number') ? st.injectBudget : null;
+      // ① 现算一档：即便还没推演过，也要能回答「按你现在的配置，额度是多少」
+      try {
+        const rb = WA.injectBudget.resolveBudget(out.stored == null ? undefined : out.stored);
+        const bv = WA.injectBudget.budgetView({ budget: rb.budget, used: 0, overBudget: false, budgetMode: rb.mode, requested: rb.requested, contextSize: rb.contextSize, source: rb.source });
+        out.resolved = { budget: rb.budget, source: rb.source, mode: rb.mode, requested: rb.requested, contextSize: rb.contextSize, modeText: bv ? bv.modeText : null };
+      } catch (e2) { out.resolved = null; }
+      // ② 上一轮的真实用量：没有就是没有（不合成「用了 0」）
+      try {
+        const li = (WA.store && WA.store.get) ? WA.store.get().lastInjection : null;
+        const b = (li && li.budget) ? li.budget : null;
+        if (b) {
+          const bv = WA.injectBudget.budgetView(b);
+          out.last = bv;
+          out.advice = bv ? bv.advice : null;
+        }
+      } catch (e3) { out.last = null; }
+      out.note = (out.stored === -1 && out.resolved && out.resolved.mode === 'auto-noctx')
+        ? '存的是自动档（-1），但当前量不到宿主上下文窗口，实际额度恒为 ' + out.resolved.budget + 't'
+        : '';
+      return out;
+    },
     // v2.6.0: 回传写入结果——面板据此区分「真保存」与「被环境吞掉」，不再无条件报成功。
     // v2.7.0: 落盘前先归一（`settingsBus.normalize`）——区间/枚举的声明已在 __REG_B 上，
     //   写进去的就是界面显示的那份，不再有「磁盘 -5、引擎按 1 算」的隐性第二套值。

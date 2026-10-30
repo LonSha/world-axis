@@ -59,9 +59,17 @@
 
   function totalBytes() {
     // 单一真源：store 的字节数读数（auditTotal 在 store 内部派生 memCache/saveStat）。
+    // ⚠ v2.270.0 修：本条第一优先级**曾读 `r.totalBytes`** —— 而 `store.sizeAudit()` 返回的
+    //   字段叫 **`total`**（`totalBytes` 是 `sizeAll()` 那支的名字，两处不同源）。
+    //   于是第一优先级**永远读不到**，静默退到 `saveStat().bytes`（未落盘时为 0）——
+    //   实测同现场：`sizeAudit().total = 6692`、`sizeAudit().totalBytes = undefined`、
+    //   `saveStat().bytes = 0`。后果是预测器把水位记成一串 0、斜率恒 0、永远「到不了顶」，
+    //   而它看起来一如往常地正常（这正是本仓反复治的「读不存在的字段不会红」那类假绿）。
+    //   治法：读**真源字段名**（`total`），并把 `totalBytes` 留作兼容退路。
     try {
       if (WA.store && typeof WA.store.sizeAudit === 'function') {
-        const r = WA.store.sizeAudit({ maxDepth: 1, maxNodes: 8 });
+        const r = WA.store.sizeAudit();
+        if (r && typeof r.total === 'number' && isFinite(r.total)) return r.total;
         if (r && typeof r.totalBytes === 'number' && isFinite(r.totalBytes)) return r.totalBytes;
       }
       if (WA.store && typeof WA.store.saveStat === 'function') {
