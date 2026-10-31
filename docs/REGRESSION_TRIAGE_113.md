@@ -17,7 +17,7 @@
 | 类 | 条数 | 性质 | 处置 | 现状 |
 |---|---|---|---|---|
 | A 测试自身缺陷 | 6 | 判据前提失效，产品侧是对的 | 改测试 | ✅ 已修 → `60 pass / 0 fail` |
-| B 跨节状态污染 | ~34 | 单跑必绿、全量必红（「靠顺序活着」） | 改挂载面或补清理 | ⬜ 未定位，下一轮第一优先 |
+| B 跨节状态污染 | ~34 | 单跑必绿、全量必红（「靠顺序活着」） | 改挂载面或补清理 | ✅ 已修 → 全量 34 条全绿（提交 `6998c19`） |
 | C 读数漂移 | 5 | 实为**测试跨面取数**（UI 面 27 / 产品面 26），产品无缺陷 | 改测试登记点 | ✅ 已修 → `89 pass / 0 fail` |
 | D 存量红（未逐条归因） | ~67 | 分布于 20+ 老块 | 待分批 | ⬜ 待考古 |
 
@@ -91,10 +91,102 @@ node tests/settle-v2650.js       → pass（75 项）
 
 同一把锁、同一份源码，单跑绿、全量红 —— 这正是本仓点名的「靠顺序活着」。
 判据的成立与否取决于前序节留下了什么，而不是产品行为。
+### 根因已定位并修复（提交 `6998c19`）—— 靠**写时拦截**抓到现场栈
 
-### 已经排除的两个假设
+上面两条排除是对的，但结论下错了方向：问题既不在快照，也不在 `lsSnap2740` 本身，
+而在**没人给它覆盖到的那一段**。
 
-排查过程记录在案，避免下一轮重复劳动：
+**方法教训（比结论更值钱）**：静态扫「谁写了这个键」没有产出（前 18 把锁里只有
+`causal-v2620` 碰 `setSettings`，且动的是 causal 不是 world）；逐个真跑前 18 把锁，
+9 次读数全是「on=27 无漂移」—— **假设被证伪**；二分插桩发现 S44 就已经脏了，
+说明污染在 v2.44 之前，二分成本过高。最终改用**写时拦截**：包装 `LS.setItem`，
+只抓「键名 == `worldaxis_world_settings_v1` 且值含 `"enabled":true`」的第一次写入并打印堆栈，
+一次命中。**当「谁写的」无法靠读代码回答时，在写入点拦一层拿栈比逐段二分快得多。**
+
+```
+at LS.setItem (tests/run.js:53:62)
+at lsWrite (core/settings-bus.js:627:10)
+at Object.save (core/settings-bus.js:1809:21)
+at Object.saveOrThrow (core/settings-bus.js:1731:23)
+at saveSettings (engines/world.js:78:27)
+at setSettings (engines/world.js:1307:67)
+at turnOn (engines/capability-tier.js:174:19)
+at engines/capability-tier.js:258:43      ← applyTier 的 forEach
+at Array.forEach (<anonymous>)
+```
+
+栈落在 `■ G18 控件可点性` 这一块（`tests/run.js:13643`）。
+
+**完整链路**：`tests/ui-gate-sync.js:140` 的 `checkClickable` 逐页把 `body` 里每个
+`button,input,select,textarea` **真点一遍**（实测 **1574** 个），其中就有
+`ui/panel.js:3698-3700` 的 `#wa-ct-lite/standard/full` 三档按钮。点 `full` →
+`applyTier('full')` → `turnOn()` → `engines/world.js` 的 `setSettings` →
+`core/settings-bus.js` 的 `lsWrite`，把 `worldaxis_world_settings_v1` 写成
+`{"enabled":true,...}`。**该探针原本零收尾**，脏值就此留在 localStorage，
+后续每把锁 `fresh()` 重装引擎时都读到它 —— 这就是 `world-v2630 / shadow-v2630 /
+threads-v2630` 那些「[1] 默认关闭（实 true）」单跑必绿、全量必红的确切原因。
+
+**为什么 v2.274.0 的 `lsSnap2740` 治不住（两条独立原因，缺一不可）**：
+1. 它挂在 `runLock` 里，而 G18 是 `run.js` 的**内联块**，整段不经过 `runLock`，
+   没有任何快照保护；
+2. 更根本的是——即便收尾了 localStorage，`fresh()` 会把**同一个** `global.WorldAxis`
+   上的引擎重新求值，**读到的是磁盘上那份刚被改脏的值**，污染照样向下传。
+
+故修复点必须落在「**探针不许改变世界**」上，而不是「多包一层快照」。
+
+### 修法与读数
+
+**改动一 · `tests/ui-gate-sync.js`（`checkClickable` 自带收卷）**
+点击前遍历 `WA` 上所有同时具备 `getSettings`/`setSettings` 且 settings 含 `enabled` 键的模块，
+记一份 `{key: boolean}` 快照（`__swSnap`）；`finally` 里逐个比对现值，
+只写回不一致的，并累计 `out.restored`。**点击循环本身一字未改。**
+
+实测判别力未削弱：`controls=1574 / thrown=0 / rejections=0 / restored=36`；
+点击后 `world.enabled=false`、全局 on 27→27、**再 `fresh()` 一次仍为 false**
+（污染不再跨节存活，而不是靠全量跑一遍猜）。
+
+**改动二 · `tests/capability-tier-v2257.js`（测试面净场）**
+全量里本文件读到 187→188 个开关、`BASE_ON` 变 27（单跑稳定 187/26）。差别同样在
+`global.WorldAxis` 是**同一个对象**：`ui-gate-sync.fresh()` 会把 `ui/render-perf.js` 的
+`renderPerf` 装进来，而本文件 `fresh()` **只重装 `LOAD`、不装载却也不清除**。
+修法：装 `LOAD` 前把 `WA` 上残存成员逐个摘掉，使本测试面真的只有 `LOAD` 的东西。
+
+> ⚠ **顺序不可换：清空必须在 `require(mock.js)` 之前。** `tests/mock.js:173` 是
+> `const WA = global.WorldAxis = global.WorldAxis || {}` —— 它复用同一对象、
+> 只把自己那组基础设施桩（`log` / `eventLog` / `flushLog` / `on` / `emit`…）挂上去。
+> 本轮第一版把清空写在 `require` 之后，**把宿主桩一起摘掉了**，实测后果是全量里
+> `capability-ui-v2257` 三条 `WA.log is not a function`（产品模块装载第一句就打日志），
+> 而单跑因 require 缓存命中、旧的 `log` 还活着而看不见 —— 又一处「靠顺序活着」。
+> 已按「先清残留 → 再 require mock → 再装 LOAD」修正并复验为 0 条。
+>
+> 明确**不采用**「把 `BASE_ON` 改成全量时 27」—— 那等于让判据随跑的顺序变值。
+> 本测试面的定义是「只装 LOAD」，它就必须真的只有 LOAD。
+
+**全量读数（`/tmp/worldaxis-regression-nQu3OG`，`unchanged: true`）**：
+
+| | 上轮 `gVRfN8` | 本轮 `nQu3OG` |
+|---|---|---|
+| 断言 | 通过 23168 / 失败 69 | **通过 23237 / 失败 67** |
+| B 类（六个 v26x0 文件） | 0（上上轮 34 条已清） | **0（保持）** |
+| `capability-tier` B0b/B6d2/B8/B8b | 0 | **0**（全量实读 26 / 26 / 26·95 / 121，89 条全绿） |
+| `WA.log is not a function` | 3（本轮第一版引入） | **0（已修）** |
+
+在污染环境中自证：先跑 `ui-gate-sync.fresh()`（`WA` 成员 352、`renderPerf` 在场），
+再调 `capability-tier.runAll` → **79 pass / 0 fail**（修复前该面读到 27 而基线是 26）。
+
+**剩余红项差异核对**：本轮相对上轮唯一「新露出」的是
+`undefined: [D2] 三档按钮 + 退回按钮都渲染（缺 wa-set-tier-rollback）`。
+核对更早两轮日志（`COBwJJ` / `QWfouZ` 均已有该条）⇒ **存量债，不是本轮引入**；
+它在上一轮被 `WA.log` 抛出遮蔽，`WA.log` 修掉后重新露出来。
+
+### 纪律沉淀
+
+**取证不得改变被取证对象。** 任何「逐控件真点」的探针，只要面板上存在会改全局状态的
+按钮（今天是能力档位，明天可能是别的），就必须**自带收尾**；把收尾责任散落到各个调用方
+（G18 已有一处对折叠态的收尾）迟早再漏一份 —— 故修在**探针本体**上。
+
+### 已排除的两个假设（保留，避免重复劳动）
+
 
 1. **不是 localStorage 快照/还原的问题。**
    `/tmp/probe_ls_restore.js` 实测：`WA.mainWin.localStorage === global.localStorage`（同一对象），
@@ -104,25 +196,39 @@ node tests/settle-v2650.js       → pass（75 项）
 2. **不是 v2.274.0 新加的 `lsSnap2740` 失效。**
    该机制在 `tests/run.js:274-305`，快照/还原逻辑与探针实现逐字等价。
 
-### 仍未定位的部分（诚实记录）
+### 「未定位」记录的更正（保留原文以便对照）
 
-污染源没找到。插桩尝试（在 `runLock` 的 `finally` 后打印
-`worldaxis_world_settings_v1` 的值、并在 world-v2630 之后截断）因终端会话异常
-（Node worker 的 `process.exit` 在 stdio 已被关闭时触发 libuv 断言
-`Assertion failed: ((*__errno_location ())) == (9)`）而中断，
-run.log 停在 7514 行、`result.json` 仍为 `running`。
+上文「污染源没找到」是**当时**的诚实记录，现已由见上一节的写时拦截结论取代。
+本轮在此处付出的两次无效路径值得留账：
 
-插桩已完全回滚（`tests/run.js` 回到基线 `d036f464a56992559a9d394efa9b32c5`，
-`grep -c 'PROBE-CUT-HERE-DONE\|\[WL\]'` = 0，`node --check` 通过）。
+- **静态扫前 18 把锁**：只有 `causal-v2620` 出现 `setSettings({enabled:...})`，
+  但它动的是 causal 而非 world —— 读代码找写者**没有产出**。
+- **逐个真跑前 18 把锁**：9 次读数全是「on=27 无漂移」，**证伪了自己最初的假设**。
+- **二分插桩**：S44 就已经脏了，污染在 v2.44 之前，二分成本过高。
 
-**下一步排查建议**（成本从低到高）：
-1. 读 `tests/world-v2630.js` 的 `isolated()` —— 它在 `finally` 里 `restoreLS(snap)`，
-   但 `judge()` 内部是先 `fresh()` 再读 cfg。若前序节把**引擎实例**留在 `global.WorldAxis` 上，
-   `fresh()` 重装模块时闭包捕获的是旧实例的设置缓存，`restoreLS` 动不到它。
-2. 二分法：从 world-v2630 往前逐节注释掉，用 `--only-v-section` 不行（该节 `shared: ["runLock("]`，
-   属「共享上下文」会被 refuse），只能手工裁剪 `tests/run.js` 的调用序列。
-3. 直接给 `runLock` 加「引擎实例快照」维度：除 localStorage 外，把 `global.WorldAxis` 上
-   各引擎的 `getSettings()` 结果一并快照、跑完还原。
+破局点是**写时拦截**（包装 `LS.setItem` 打栈），一次命中，见上一节。
+
+另附本轮新增的两条工程障碍（都是环境层，不是判据红）：
+
+1. **`isolated-runner.js` 不自跑**：它只导出 `launch`，`node tests/isolated-runner.js`
+   会零输出退出（我第一趟误以为它在跑）。正确入口是
+   `require('./tests/isolated-runner.js').launch(root, { timeoutMs })`。
+   选区参数 `--only-v-section` 从 `process.argv` 读，直接当 `launch(root, {argv})` 传
+   **不会转发**（实测白跑一趟全量）。
+2. **本环境全量跑不完的真实原因分两类**，必须分开归因，不能一律记成「判据红」：
+   - `ENOSYS: function not implemented` + `node::ResetStdio` 断言（proot 系统调用层偶发），
+     日志停在崩溃点、`result.json` 仍为 `running`；
+   - 单纯 SIGKILL（内存压力：峰值 used 8.1G / 11G、swap 已用 4G），无任何报错。
+   故本轮以 `--max-old-space-size=6144` 起跑，并把「后台启动一律 `setsid` + 输出落盘」
+   当作固定做法（会话回收会带走普通 `nohup &` 的进程组，留下陈旧锁）。
+
+**下一步排查建议**（原三条已全部作废，替换为）：
+1. 剩余 67 条**全部**落在 D 类存量债，按 `docs/REGRESSION_TRIAGE_113.md` 的 D 类分批表推进；
+   优先拿 `v2820/cp [N3]`、`v2850/C1`×2 这类「守卫键/优先级声明」成组红项开刀。
+2. 任何新增的「逐控件真点 / 逐引擎真写」探针，先问一句「它会不会改变世界」，
+   会，就必须自带收尾（本轮 `checkClickable` 的教训）。
+3. 全量重跑前先跑 `node -e "require('./tests/isolated-runner.js').inspectLock(<lock>)"`，
+   各锁目录逐个查 `stale` / `no-owner` 后 `recoverLock`，避免被陈旧锁挡住。
 
 ## 五、C 类：读数漂移（5 条）—— 已定案：测试跨面取数，产品无缺陷（已修 → 89 pass / 0 fail）
 
@@ -246,17 +352,29 @@ B4 核对器整体为真（problems 9 / undecided 2 / tainted 0）
 ## 七、结论：这 113 条该不该修
 
 - **A 类 6 条已修完**（成本低，且不改会让下一轮继续误报）→ `capability-ui-v2257: 60 pass / 0 fail`。
-- **B 类 ~34 条是本轮最有价值的缺陷**：它证明「全量绿」这个信号本身不可靠 ——
-  判据的成立取决于跑的顺序。这不是某一把锁的问题，是挂载面的架构问题。
-  v2.274.0 已经试图用 localStorage 快照治它，实测**不够**（因为污染走的是内存实例，不是磁盘）。
-  **仍未定位，仍是下一轮第一优先。**
+- **B 类 ~34 条已闭环**（提交 `6998c19`）：根因是 `ui-gate-sync.js` 的 `checkClickable`
+  逐控件真点（1574 个）时点到了能力档位三档按钮，`full` 把 100 个引擎真写盘且**探针零收尾**。
+  证据来自**写时拦截**（包装 `LS.setItem` 打栈），不是推断。
+  修法两条：探针自带收卷（`__swSnap` 快照 + `finally` 写回）、测试面净场（装 `LOAD` 前清 `WA` 残留）。
+  全量 34 条全绿并保持（`nQu3OG`: 23237/67，B 类 0 条）。
+  **当时认为「污染走内存实例不走磁盘」，实测只对了一半**：磁盘上的脏值确实是入口，
+  而内存里的 `WA.renderPerf` 残留是另一条独立通路（`capability-tier` 的 27 vs 26），
+  两条都必须断。
 - **C 类 5 条已定案并修完**：不是产品漂移，是测试跨面取数（27 来自 UI 面、26 才是产品面）。
   → `capability-tier-v2257: 89 pass / 0 fail`，并顺手修掉让整个 N 段静默跳过的作用域 bug。
 - **D 类 ~67 条是存量债**，需分批考古，不适合一次性处理。
 
-**最重要的一条**：在 B 类解决之前，任何一轮「全量回归通过」都不能当作终态证据 ——
-因为把红项跑绿的方式可能只是「换了个顺序」。这也是为什么第三轮的真读数
-（23188 通过 / 113 失败）反而是本仓至今最可信的一次：它没有被任何一把锁提前 exit 掉。
+**修 B 类时自己踩出来的一个真教训**（已修，但要留账）：`tests/mock.js:173` 是
+`const WA = global.WorldAxis = global.WorldAxis || {}` —— mock 复用同一对象挂基础设施桩。
+第一版把「清残留」写在 `require(mock.js)` 之后，把 `WA.log` 一起摘掉了，
+全量里立刻长出 3 条 `WA.log is not a function`，而单跑看不见（require 缓存让旧 `log` 还活着）。
+**这说明「顺序依赖」不只存在于被测对象，也存在于修法本身**：改挂载顺序时，
+必须同时确认「谁在被摘之后重新提供了它」。
+
+**最重要的一条（已修订）**：B 类解决之后，「全量绿」才重新有资格当终态证据。
+在此之前它不可靠 —— 因为把红项跑绿的方式可能只是「换了个顺序」。
+第三轮的真读数（23188 通过 / 113 失败）仍是本仓里程碑式的一次：它没有被任何一把锁提前 exit 掉。
+本轮读数 **23237 通过 / 67 失败**，67 条**全部**是 D 类存量债（逐条差异已核）。
 
 ## 八、附录：本轮用到的探针与证据文件
 
@@ -286,13 +404,22 @@ B4 核对器整体为真（problems 9 / undecided 2 / tainted 0）
 /tmp/bak_cap_tier.js                capability-tier 修前备份
 tools/patch_a_class_capui.py        A 类修复脚本（.gitignore 的 tools/*.py，不入库）
 tools/patch_c_class_tier.py         C 类修复脚本（同上）
+
+# 本轮（B 类闭环）新增 —— 全量读数以 nQu3OG 为准
+/tmp/worldaxis-regression-gVRfN8    第一版修复后（B 类清零，但引入 WA.log 3 条）23168/69
+/tmp/worldaxis-regression-nQu3OG    **权威读数** 23237/67，unchanged:true
+/tmp/worldaxis-regression-A3akEQ    ENOSYS+ResetStdio 崩溃（proot 层，作废）
+/tmp/worldaxis-regression-WHNEPE    同上（ENOSYS，作废）
+/tmp/worldaxis-regression-6nLr1e    误用 `node tests/isolated-runner.js` 的空白趟（作废）
+/tmp/probe_cross_section.js         跨节自证：ui-gate-sync.fresh() 污染后 capability-tier 仍 79/0
+/tmp/probe_fix_verify.js            checkClickable 收卷读数（1574 控件 / restored=36 / 再 fresh 仍 false）
+/tmp/run_full_v2275.js              全量驱动（正确入口 launch，非直接跑 isolated-runner.js）
+/tmp/run_cap_only.js                定向跑试探（结论：这两节被门禁 refuse，只能全量验）
 ```
 
 现场状态（本文档更新时）：
 ```
-HEAD  7d5efe2 fix(tests): 修三条测试自身缺陷（A 类折叠态、C 类跨面基线、假绿灯 exit）
- M plans/V6_MASTER_PLAN.md
-?? docs/STORYLINES_NOT_STITCHED.md
-?? docs/REGRESSION_TRIAGE_113.md   ← 本文档
+HEAD  6998c19 fix(regression): B 类跨节污染根治（探针收卷 + 测试面净场）
+工作区 干净（除本文件本轮改动）
 ```
 `tests/run.js` 无改动（插桩已回滚，仍为基线 `d036f464`）。
