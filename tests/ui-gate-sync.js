@@ -146,6 +146,36 @@ async function checkClickable(env, opts) {
   if (!panel) { out.thrown.push('面板未注入（无法点击控件）'); return out; }
   const seen = [];
   const onRej = function (r) { seen.push(String((r && r.message) || r).slice(0, 200)); };
+  // ── v2.275.0（B 类跨节污染根治）：**本探针点完必须把「引擎启用面」放回原样** ─────────
+  //   治的病（全量回归实测立据，`[DBG-W]` 写时拦截抓到现场栈）：
+  //     本探针的口径是「逐页真点每一个控件，看会不会抛」（实测 1500+ 个），
+  //     而能力档位那三个按钮（`#wa-ct-lite/standard/full`）也在其中。点 `full` 会经
+  //     `capability-tier.applyTier('full')` → `turnOn()` 把**全部 100 个有注入面的引擎**
+  //     逐个真写盘。其中就包括 `engines/world.js`（出厂 `enabled:false`）——
+  //     `worldaxis_world_settings_v1` 于是被写成 `{"enabled":true,...}` 并留在 localStorage 里。
+  //   为什么单靠 run.js 的 lsSnap2740 治不住：那个快照是**挂在 runLock 里**的，
+  //     而 G18 这一段是 run.js 的**内联块**（不经过 runLock），整段没有任何收尾；
+  //     更根本的是——即便收尾了 localStorage，`fresh()` 会把同一个 global.WorldAxis 上的
+  //     引擎重新求值，**读到的是磁盘上那份刚被改脏的值**，于是污染继续向下传。
+  //   故修在**唯一真正的病灶**上：探针点的按钮不许改变世界。
+  //   口径：点击前对「所有带 getSettings/setSettings 的引擎」记一份 enabled 快照，
+  //     finally 里按快照逐个写回（只写与快照不一致的，避免无谓写盘）。
+  //     这也让本探针回到本仓纪律「取证不得改变被取证对象」。
+  const __swSnap = (function () {
+    const snap = {};
+    try {
+      Object.keys(WA).forEach(function (k) {
+        const m = WA[k];
+        if (!m || typeof m !== 'object') return;
+        if (typeof m.getSettings !== 'function' || typeof m.setSettings !== 'function') return;
+        let s = null;
+        try { s = m.getSettings(); } catch (e) { return; }
+        if (!s || !Object.prototype.hasOwnProperty.call(s, 'enabled')) return;
+        snap[k] = s.enabled === true;
+      });
+    } catch (e) { return null; }
+    return snap;
+  })();
   process.on('unhandledRejection', onRej);
   try {
     const pages = (WA.ui && typeof WA.ui.pages === 'function') ? WA.ui.pages() : [];
@@ -177,6 +207,19 @@ async function checkClickable(env, opts) {
     for (let i = 0; i < settleTicks; i++) await new Promise(function (r) { setTimeout(r, 20); });
   } finally {
     process.removeListener('unhandledRejection', onRej);
+    // 收卷：把被点开的引擎逐个关回点击前的样子（只写不一致的）
+    if (__swSnap) {
+      let restored = 0;
+      Object.keys(__swSnap).forEach(function (k) {
+        const m = WA[k];
+        if (!m || typeof m.getSettings !== 'function' || typeof m.setSettings !== 'function') return;
+        let cur = null;
+        try { const s = m.getSettings(); cur = s ? s.enabled === true : null; } catch (e) { return; }
+        if (cur === __swSnap[k]) return;
+        try { m.setSettings({ enabled: __swSnap[k] }); restored++; } catch (e) {}
+      });
+      if (restored) out.restored = restored;
+    }
   }
   out.rejections = seen;
   return out;

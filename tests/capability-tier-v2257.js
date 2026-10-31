@@ -102,6 +102,30 @@ function fresh(ov) {
   Object.keys(require.cache).forEach(function (k) {
     if (k.indexOf(path.join(BASE, 'tests')) === 0 || k.indexOf(path.join(BASE, 'engines')) === 0) delete require.cache[k];
   });
+  // ── v2.275.0：**先摘掉上一轮残留在 global.WorldAxis 上的成员** ──────────────────
+  //   治的病（全量回归实测立据）：本文件在**全量**里读到 187→188 个开关、BASE_ON 变 27，
+  //     而单跑稳定是 187/26。差别就在 `global.WorldAxis` 是**同一个对象**：
+  //     `tests/ui-gate-sync.js` 的 `fresh()` 会把 UI 层（含 `ui/render-perf.js` 导出的
+  //     `renderPerf`）装进来，而本文件的 `fresh()` 只重装 `LOAD` —— **不装载却也不清除**，
+  //     于是前序节留下的 `WA.renderPerf` 一路活着，`allSwitches()` 动态探测时把它算进开关集。
+  //   为什么必须在这里清（而不是把 BASE_ON 改成"全量时 27"）：那等于让判据随"跑的顺序"
+  //     变值 —— 正是本仓点名的「靠顺序活着」。本测试面的定义就是"只装 LOAD"，
+  //     所以它必须真的**只有** LOAD 装出来的东西。
+  //   口径：把 WA 上其余可枚举成员逐个摘掉；LOAD 装出来的产品层由下面重新求值重建。
+  //   ⚠ **顺序不可换：必须在 `require(mockPath)` 之前。** `tests/mock.js:173` 是
+  //     `const WA = global.WorldAxis = global.WorldAxis || {}` —— 它**复用同一个对象**、
+  //     只把自己那份基础设施桩（`WA.log` / `eventLog` / `flushLog` / `on` / `emit`…）
+  //     挂上去。先 require 再清空，等于把宿主桩一起摘掉：实测后果是全量里
+  //     `capability-ui-v2257` 三条 `WA.log is not a function`（产品模块装载第一句就打日志），
+  //     而单跑因 require 缓存命中、旧的 `log` 还活着而看不见 —— 又一处「靠顺序活着」。
+  //     故：先清残留 → 再 require mock（桩重建）→ 再装 LOAD（产品层重建）。
+  try {
+    if (global.WorldAxis && typeof global.WorldAxis === 'object') {
+      Object.keys(global.WorldAxis).forEach(function (k) {
+        try { delete global.WorldAxis[k]; } catch (e) {}
+      });
+    }
+  } catch (e) {}
   require(mockPath);
   // 清空 localStorage，保证每节从出厂态开始
   try {
