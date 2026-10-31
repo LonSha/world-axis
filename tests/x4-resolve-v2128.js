@@ -251,8 +251,33 @@ function runNegative(a) {
   const pCorr = function (WA) { const r = p(WA, S('support', 'witness'), S('support', 'witness')); return r.verdict || r.reason; };
   const pLvl = function (WA) { const r = p(WA, S('support', 'gut'), S('refute', 'witness')); return r.reason; };
   const pDir = function (WA) { const r = p(WA, S('maybe', 'witness'), S('refute', 'witness')); return r.reason; };
+  /**
+   * 净场（v2.128.0 收口）：把「本判据要的那条世界事实」显式摆好。
+   *
+   * 治的病（全量实测：N5 正例与 N6 正例在全量里红、单跑绿）：
+   *   `pAbsent` / `pRuling` 直接 `startChain('桥', ...)`，而 `startChain` 要求事实**已在
+   *   世界状态里登记**（`engines/rumor.js` 的 `factRow`：未登记 ⇒ `unknown-fact`，不凭空造链）。
+   *   单跑时这条件是前序断言（`env()` 里那次 `d.worldFacts = [{ key: '桥', ... }]`）留下的；
+   *   全量里 `fresh()` 读回的是**别人写过的那份 localStorage**，`worldFacts` 早已被覆盖成
+   *   空或别的键 ⇒ `startChain` 返回 `{ok:false, reason:'unknown-fact'}` ⇒ 拿 `c.id` 去
+   *   `investigate(undefined)` ⇒ 读数变成 `bad:false`，两条正例一起红。
+   *   判据本身没错（它要证的正是「附属面抛错只让裁决为 null」），错的是**前置条件靠继承**。
+   *   现在每个探针自己把事实摆好 —— 这也是本仓对「靠顺序活着」的统一修法。
+   */
+  const ensureFact = function (WA) {
+    try {
+      WA.rumor.setSettings({ enabled: true, maxChains: 8 });
+      WA.store.transact(function (d) {
+        d.worldFacts = [{ key: '桥', value: '桥在', at: 1 }];
+        // 链也清空：`startChain` 对同一 factKey 是「一事实一链」（重复即 `exists`），
+        //   前序节留下的同 id 链会让本探针读到 exists 而不是起新链。
+        d.rumor = { chains: [] };
+      }, TAG + 'ensureFact');
+    } catch (e) { /* 建场失败就让下面的断言自己去现形，不在这里吞结论 */ }
+  };
   const pRuling = function (WA) {
     try {
+      ensureFact(WA);
       const c = WA.rumor.startChain('桥', '起链');
       WA.rumor.relay(c.id, { from: '甲', to: '乙', layer: 'witness' });
       WA.rumor.relay(c.id, { from: '乙', to: '丙', layer: 'hearsay', motive: 'distort', value: '桥垮了' });
@@ -263,7 +288,7 @@ function runNegative(a) {
   const pAbsent = function (WA) {
     // 自带 catch：异常隔离闸被拆后这一抛会逃逸出负控制段。
     try {
-      WA.rumor.setSettings({ enabled: true });
+      ensureFact(WA);
       const c = WA.rumor.startChain('桥', '起链');
       const keep = WA.probe.resolve;
       WA.probe.resolve = function () { throw new Error('boom'); };

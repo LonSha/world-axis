@@ -197,7 +197,14 @@ function judgeLife(a) {
 function injectSources() {
   const src = fs.readFileSync(path.join(BASE, 'render', 'inject.js'), 'utf8');
   const out = [];
-  const re = /source:\s*'([^']+)'/g;
+  // 取样面必须是**真注入点**（`items.push({ source: 'X' })`），不是「文件里所有 source: 'X'」。
+  //   v2.85.0 首版用的是裸 `/source:\s*'([^']+)'/g`，它把 render/inject.js 里
+  //   `visibilityDefault()` 的兜底标注也算进来一个：
+  //     `: (WA.settingsBus.read(__REG), { source: 'default', key: null });` —— readEx 不可用时的
+  //   来源标签，说的是「这条设置没配过」，**不是一条注入源**。于是 srcs 里凭空多出一个 'default'，
+  //   C1a/C1b 两条判据齐红（未声明: default / 缺 ["default"]），而产品侧没有缺陷。
+  //   取证面串到无关代码上是判据自己的病 —— 判据要盯的是注入面，就得只取注入面。
+  const re = /items\.push\(\{\s*source:\s*'([^']+)'/g;
   let m;
   while ((m = re.exec(src))) if (out.indexOf(m[1]) < 0) out.push(m[1]);
   return out;

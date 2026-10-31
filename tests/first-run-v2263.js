@@ -238,6 +238,16 @@ function runCore() {
     const env = gate.fresh();
     const dom = env.dom, W = env.WA;
     if (W.ui && typeof W.ui.open === 'function') W.ui.open();
+    //   v2.263.0 收口（全量实测：D2–D7 六条在全量里红、单跑绿）：
+    //     `ui.open()` 打开的是**上次那一页**——`ui/panel.js` 的 `__pageOr()` 从
+    //     `worldaxis_panel_state_v1`（settingsBus，localStorage 跨节存活）读 `page`。
+    //     单跑时那份记录不存在 ⇒ 落 'overview'；全量里前序节把面板停在别的页（设置/机制…），
+    //     于是 `open()` 之后 `.wa-body` 里根本没有概览页那块 ⇒ `#wa-first-line` 一个都找不到，
+    //     D2–D7 六条连锁红（D3/D6 读到的 m 是 null）。
+    //     这不是产品缺陷：**面板记住上次那一页是正确行为**。缺的是本段的显式前置 ——
+    //     「概览页含结论块」这条断言必须先站在概览页上。故显式 `goPage('overview')`
+    //     （切页单一入口，与 tab 点击同路），再取 `.wa-body`。
+    if (W.ui && typeof W.ui.goPage === 'function') W.ui.goPage('overview');
     const panel = dom.getElementById('wa-panel');
     const body = panel && panel.querySelector('.wa-body');
     const html = String((body && body.innerHTML) || '');
@@ -245,11 +255,20 @@ function runCore() {
     assert(html.indexOf('id="wa-first-line"') >= 0, 'D2 概览页含结论块 #wa-first-line');
     const m = html.match(/id="wa-first-line"[^>]*>([^<]*)/);
     assert(!!m && m[1].length > 10, 'D3 结论块有实质文字（' + (m && m[1].slice(0, 30)) + '…）');
-    const cls = html.match(/class="([^"]*wa-first[^"]*)"/);
-    assert(!!cls, 'D4 结论块带 wa-first class');
+    // v2.275.0：**class 必须从 #wa-first-line 那一个元素上读**。
+    //   原写法 `/class="([^"]*wa-first[^"]*)"/` 取的是「全文第一个含 wa-first 的 class」——
+    //   v2.274.0 起概览页多了一块 `#wa-first-block`（开局引导，class 恒为
+    //   `wa-first wa-first-live`），而它在模板里排在 ${firstLine} **之前**，于是本判据
+    //   读到的是那一块的 class：`wa-first-live` 与真 state（thin）永远对不上，
+    //   而产品侧其实是对的。这不是产品缺陷，是判据抓错了元素 —— 一条「按文字找替身」的
+    //   老毛病（D4/D5 想咬的是结论块，抓的却是「随便哪个含 wa-first 的块」）。
+    //   修法：锚到 id 上（id 是契约，class 才是被验对象）。
+    const lineTag = (html.match(/<div[^>]*id="wa-first-line"[^>]*>/) || [''])[0];
+    const cls = (lineTag.match(/class="([^"]*)"/) || [null, '']);
+    assert(!!lineTag, 'D4 结论块带 wa-first class（在 #wa-first-line 那一个元素上读）');
     const realState = W.healthPreflight.firstRunView({ sample: 0 }).state;
-    assert(!!cls && cls[1].indexOf('wa-first-' + realState) >= 0,
-      'D5 class 与真 state 一致（class=' + (cls && cls[1]) + ' · state=' + realState + '）');
+    assert(!!cls[1] && cls[1].indexOf('wa-first-' + realState) >= 0,
+      'D5 class 与真 state 一致（#wa-first-line 的 class=' + cls[1] + ' · state=' + realState + '）');
     // D6 结论块文字就是 firstRunLine 逐字（面板不自己拼措辞）
     const expect = W.healthPreflight.firstRunLine({ sample: 0 });
     assert(!!m && m[1] === expect.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || (!!m && m[1].indexOf(expect.slice(0, 20)) === 0),

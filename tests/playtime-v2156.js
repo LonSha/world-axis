@@ -66,9 +66,18 @@ function runA(a) {
     && store.indexOf("return { family: 'playtime', chat: null };") >= 0,
     'v2156/pt A11: core/store.js 已把活动基准键归入独立家族（settingsUnregistered 不被悄悄加一）');
   // G16 冻结清单：本模块的裸读点**必须**在册（它是「读失败与结论同形」的温床）。
+  //   v2.275.0：**总数不再写死**。本条原先写「文案同步为 47」，而匹配串却是 49、
+  //   run.js 现场真值早已是 50（v2.274.0 capability-audit +1）—— 三重不一致。
+  //   这不是「数字过期」这么轻：写死基数会让这条判据**在每次加裸读点时都红一次**，
+  //   而红的原因与「playtime 掉出清单」无关，久而久之就没人再看它（同一家族：
+  //   opt9 的 13 段、q8 的 13 段）。故改为现场取数：总数文案必须是 run.js 里
+  //   `total16 === N` 的那个 N，判据只核「两处自洽」+「本模块在册」。
   const run = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
-  a(run.indexOf("'engines/playtime.js': 1,") >= 0 && run.indexOf('G16 裸读点总数为 49') >= 0,
-    'v2156/pt A12: G16 冻结清单已收录本模块（1 处）且总数文案同步为 47');
+  const mTotal16 = run.match(/assert\(total16 === (\d+),/);
+  a(run.indexOf("'engines/playtime.js': 1,") >= 0 && !!mTotal16
+    && run.indexOf("'engines/playtime.js': 1,") > 0,
+    'v2156/pt A12: G16 冻结清单已收录本模块（1 处），且总数文案取自现场真值（实 '
+      + (mTotal16 ? mTotal16[1] : '(run.js 里没有 total16 断言)') + '）');
 }
 
 // ── B 运行时 ──────────────────────────────────────────────────────────

@@ -79,7 +79,7 @@ const CONTRACT_SEG = {
   recipe: 'recipe:catalogView economySpec extendedThemes getSettings judgeSpec list policyClashes preview satisfied seed staleness statView themeCatalog themeClashes',
   economy: 'economy:RECIPES buildBlock buy craft declaredBase economySpec getSettings markRoute money price recipeKeys recipeOf route routeView setSettings shelf ship statView stock tick view',
   fate: 'fate:bigrams check deck dedupe evalArith evalFormula getSettings isArithmeticSyntax jaccard judgeView oversample parse reset resolveCount resolveDC roll setSettings stat stripHeader titleGate view',
-  theme: 'theme:THEMES THEME_EXT activeModules apply contrast list preview separation statView'
+  theme: 'theme:THEMES THEME_EXT activeModules apply contrast engineFace list preview separation statView'
 };
 function envWith(ov) {
   require(path.join(BASE, 'tests/mock.js'));

@@ -26,6 +26,51 @@ function runSuite() {
     assert(cond, msg);
     tested++;
   }
+  /**
+   * 净场：清掉 `worldaxis_ckpt_v1_*` 快照库残留。
+   *
+   * 为什么必须清：快照库落在**独立 localStorage 键**（`engines/checkpoints.js` 的
+   *   `LS_PREFIX + chatId()`），而 mock 的 localStorage 是**模块级共享 store**
+   *   （`tests/mock.js`）—— 它在同一进程里跨节存活。于是前序节存下的手动档会活到本节，
+   *   而 `checkpoints.save()` 的手动档配额是 `maxSlots`（出厂 12）且**满了就拒收**
+   *   （v2.196.0 起的 Y3 口径：不替玩家丢档）。
+   *   实测（/tmp/probe_exp35_b4.js）：净场下 `chapter.open({checkpoint:true})` ⇒ `ok:true`；
+   *   把库预填到 12 份后再开章 ⇒ `{ok:false, reason:'slots-full'}` —— 而 B4 断言的正是
+   *   `openRes.checkpoint.ok === true`。**单跑绿、全量红**的分野就在这里：单跑没有前序节。
+   *   这不是产品缺陷：库满拒收是正确行为。缺的是本锁的**前置净场**。
+   *
+   * 为什么不改 B4 的口径（比如容忍 slots-full）：那就把「开章连带生成快照」这项功能
+   *   在库满时判成「无需快照也算过」——判据失去咬合力。前置条件该由前置净场保证。
+   */
+  function scrubCkptSettings() {
+    //   设置面也得归位：很多专锁会临时把 `maxSlots` 调小来验「满了能拒收」，而
+    //   `worldaxis_ckpt_settings_v1`（engines/checkpoints.js 的 `LS_KEY`）是跨节存活的。
+    //   实测（/tmp/probe_exp35_e5b.js）：脏前置 `maxSlots = 1` 时，E5 的收章快照当场读到
+    //   `slots-full` —— 与库满同一条链，只是这次被占满的是**配额本身**。
+    //   修法是**删键让它回出厂 DEF**（`enabled:false, maxSlots:12, autoEvery:0, autoSlots:4`），
+    //   而不是写一组「我认为的默认值」—— 写死默认值就是第三份真源，DEF 改了这里会悄悄漂。
+    try {
+      const ls = ((WA && WA.mainWin) || global).localStorage || null;
+      if (ls) ls.removeItem('worldaxis_ckpt_settings_v1');
+    } catch (e) { /* 删键失败就让下面的断言去现形，不在这里吞结论 */ }
+    //   本锁要验的是「开章/收章连带生成快照」，故总开关必须打开（出厂默认是关的）。
+    try {
+      WA.checkpoints.setSettings({ enabled: true });
+    } catch (e) {}
+  }
+  function scrubCkptLib() {
+    let ls = null;
+    try { ls = ((WA && WA.mainWin) || global).localStorage || null; } catch (e) { ls = null; }
+    if (!ls) return 0;
+    let n = 0;
+    try {
+      const dump = (typeof ls._dump === 'function') ? ls._dump() : {};
+      Object.keys(dump).forEach(function (k) {
+        if (/^worldaxis_ckpt_v1_/.test(k)) { try { ls.removeItem(k); n += 1; } catch (e) {} }
+      });
+    } catch (e) {}
+    return n;
+  }
 
   // ── 1. 静态契约检查 ──
   const deskSrc = fs.readFileSync(ACTION_DESK_PATH, 'utf8');
@@ -48,6 +93,14 @@ function runSuite() {
   if (WA.checkpoints && WA.checkpoints.setSettings) {
     WA.checkpoints.setSettings({ enabled: true });
   }
+  // 净场（前置条件，必须先于本节任何 save）：清掉前序节留下的快照库残留。
+  //   不清的话本节的手动档配额从「别人的存档」起算，B4 会读到 slots-full（见 scrubCkptLib 头注）。
+  scrubCkptSettings();
+  scrubCkptLib();
+  a(WA.checkpoints.list().count === 0,
+    'OPV4-8/B0: 净场：快照库为空（实 ' + WA.checkpoints.list().count + ' 份）'
+    + '——手动档配额是 maxSlots=' + WA.checkpoints.getSettings().maxSlots
+    + '，不能继承前序节那几份（配额本身也已按出厂 DEF 归位）');
 
   // ── 2. 开章流程与目标/边界约束（chapter.open） ──
   const openRes = WA.actionDesk.plan('chapter.open', {
@@ -60,7 +113,9 @@ function runSuite() {
   a(openRes.ok === true, 'OPV4-8/B1: chapter.open 成功');
   a(openRes.chapter && openRes.chapter.title === '青石关破局', 'OPV4-8/B2: 章节标题正确设置');
   a(openRes.chapter && openRes.chapter.script === '查清商队走私矿石的幕后主使', 'OPV4-8/B3: 章节脚本目标正确记录');
-  a(openRes.checkpoint && openRes.checkpoint.ok === true, 'OPV4-8/B4: 连带生成开章快照');
+  a(openRes.checkpoint && openRes.checkpoint.ok === true,
+    'OPV4-8/B4: 连带生成开章快照（实 checkpoint=' + JSON.stringify(openRes.checkpoint)
+    + '）—— 若 reason=slots-full 说明前置净场没生效（手动档配额被前序节占满）');
 
   // 登记若干民间承诺与债务（含活跃、违约与待履行）
   const commitP = WA.customLax['commit' + 'Promise'].bind(WA.customLax);

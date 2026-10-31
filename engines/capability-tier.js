@@ -325,26 +325,49 @@
    */
   function view() {
     const cfg = settings();
+    // v2.275.0（OPT-9 回咬）：**一次 view() 每个引擎只读一次 getSettings**。
+    //   现场实测（v2.274.0，tools 页展开态）：worldSeed / worldBlueprint / … 各被读
+    //   **3 次**、checkpoints 4 次 —— 全由本函数造成，调用点全在 shapeOf()：
+    //     ① allSwitches() 建表一次；
+    //     ② tiers.map 的 standard/full 两档逐名复核各一次（每档 34 / 95 个 key）；
+    //     ③ gap 的 nextKeys 逐名复核又一次（next 是 full 时 probeFull 自己还再 allSwitches）。
+    //   这不是「少读几十次」的省钱问题：`getSettings()` 在多数引擎里不是常量读
+    //   （走 settingsBus.normalize 合并 def），179 个引擎 × 3~4 遍 = 单次工具页渲染
+    //   数百次设置读，而读数**同一时刻只有一份**。故改为「一次快照、多面复用」：
+    //   快照按 key 索引，后面全部从快照取，不再落回 shapeOf。
+    //   语义等价：同一时刻的快照正是三处判据本来的意思（原先四处各自取时刻，
+    //   引擎在两处之间改了状态就会自相矛盾 —— 那是更坏的一种「不一致」）。
     const rows = allSwitches();
+    const byKey = {};
+    rows.forEach(function (r) { byKey[r.key] = r; });
+    /** 快照里取一个 key 的形态；不在表里即 null（与 shapeOf 的缺席语义一致） */
+    function snapOf(k) {
+      const s = byKey[k];
+      return s ? s : null;
+    }
     const mech = rows.filter(function (r) { return r.hasBuild; });
     const running = mech.filter(function (r) { return r.on; });
     const dormant = mech.filter(function (r) { return !r.on; });
     const tier = String(cfg.tier || 'lite');
     const idx = TIER_NAMES.indexOf(tier);
     const next = idx >= 0 && idx < TIER_NAMES.length - 1 ? TIER_NAMES[idx + 1] : '';
+    // 只读快照**不记为探测**：`probeFull` 的 stat.probes 记的是「真跑了一次全量探测」
+    //   （applyTier 的路径）。展示面复用同一份快照不该把这个读数抬起来。
+    const __tierKeysSnap = function (n) {
+      if (n === 'full') return rows.filter(function (r) { return r.hasBuild && r.hasSet; }).map(function (r) { return r.key; });
+      return (TIERS[n] || []).slice();
+    };
     let gap = 0;
     if (next) {
-      const nextKeys = tierKeys(next);
-      const nextSet = {};
-      nextKeys.forEach(function (k) { nextSet[k] = true; });
-      gap = nextKeys.filter(function (k) { const sh = shapeOf(k); return !sh || sh.on !== true; }).length;
+      const nextKeys = __tierKeysSnap(next);
+      gap = nextKeys.filter(function (k) { const sh = snapOf(k); return !sh || sh.on !== true; }).length;
     }
     return {
       enabled: true,          // 动作模块恒可用（不是开关，是事实陈述）
       tier: tier,
       tiers: TIER_NAMES.map(function (n) {
-        const ks = tierKeys(n);
-        return { name: n, size: ks.length, on: ks.filter(function (k) { const sh = shapeOf(k); return !!(sh && sh.on); }).length };
+        const ks = __tierKeysSnap(n);
+        return { name: n, size: ks.length, on: ks.filter(function (k) { const sh = snapOf(k); return !!(sh && sh.on); }).length };
       }),
       next: next, gap: gap,
       switches: rows.length,

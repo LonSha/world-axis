@@ -468,6 +468,72 @@ function probeWiring(WA) {
   return [owner ? 'owner' : 'no-owner', inOrder ? 'order' : 'bad-order', inLoad ? 'load' : 'no-load',
     srcVis ? 'vis' : 'no-vis', inSkeleton ? 'in-skeleton' : 'outside', ck ? 'capped' : 'uncapped'].join('/');
 }
+/**
+ * v2.275.0：产品侧「瞬时快照」名单——**从现场读**，不在测试里抄字面量。
+ *   抄一份就等于第三处真源：产品改名单、测试照旧绿，成类锁会变成自我确认。
+ */
+function WAtransientKeys() {
+  const WA = fresh();
+  if (!WA.store || typeof WA.store.transientSnapshotKeys !== 'function') {
+    throw new Error('store.transientSnapshotKeys 不在场');
+  }
+  return WA.store.transientSnapshotKeys();
+}
+/** chatcache 的 HEAVY_KEYS —— 同样从现场读（走它导出的 stripHeavy 行为反解，不读源码字面量） */
+function heavyKeysFromChatcache() {
+  const WA = fresh();
+  const probe = ['lastInjection', 'slotErrors', 'nextTurnInjection', 'people', 'meta', 'evolution'];
+  const obj = {};
+  probe.forEach(function (k) { obj[k] = { x: 1 }; });
+  const out = JSON.parse(WA.chatcache.stripHeavy(JSON.stringify(obj)));
+  // 被剥离的键 = 存在于输入却不在输出里的
+  return probe.filter(function (k) { return !(k in out); });
+}
+/**
+ * v2.275.0：豁免面必须**窄**。三件事一起钉：
+ *   · 真·未登记累积容器仍进 unbounded（否则豁免变成后门）
+ *   · 近似名（`lastInjectionX`）不豁免（防「前缀包含」写宽了）
+ *   · 名单内三族整族不进 unbounded
+ */
+function probeExemptNarrow(WA) {
+  const out = [];
+  const ub = function () { return (WA.store.sizeAudit().unbounded || []); };
+  WA.store.transact(function (d) { d.__probeUnbounded2820 = { rows: [{ a: 1 }, { a: 2 }] }; });
+  const realCaught = ub().indexOf('__probeUnbounded2820.rows') >= 0;
+  WA.store.transact(function (d) { delete d.__probeUnbounded2820; });
+  WA.store.transact(function (d) { d.lastInjectionX = { rows: [{ a: 1 }] }; });
+  const nearMiss = ub().indexOf('lastInjectionX.rows') >= 0;
+  WA.store.transact(function (d) { delete d.lastInjectionX; });
+  const trans = WA.store.transientSnapshotKeys();
+  const leaked = [];
+  trans.forEach(function (k) {
+    WA.store.transact(function (d) { d[k] = { rows: [{ a: 1 }, { a: 2 }] }; });
+    ub().forEach(function (p) { if (p.split('.')[0] === k) leaked.push(p); });
+    WA.store.transact(function (d) { d[k] = null; });
+  });
+  if (!realCaught) out.push('真无界没被抓');
+  if (!nearMiss) out.push('近似名被豁免');
+  if (leaked.length) out.push('名单泄漏:' + leaked.join(','));
+  return out.length ? out.join(';') : 'narrow';
+}
+/** v2.275.0：摘的是结论不是读数——Top 排行（arrays）里瞬时快照行仍须在 */
+function probeExemptKeepsArrays(WA) {
+  WA.store.transact(function (d) {
+    d.lastInjection = { at: 1, sources: ['世界状态', '人物生活'], slots: { landed: ['h1'], keys: ['h1'] } };
+  });
+  //   v2.275.0 收口：**取全量排行，不用出厂 topN=12**。
+  //     原写法 `sizeAudit()` 走的是默认 topN=12（按字节降序取前 12 条）——
+  //     而本节探针塞进去的 `lastInjection.sources` 只有 2 项、字节极小。
+  //     单跑时世界里没有别的数组，它稳进前 12；**全量里前序节留下的数组一大把**，
+  //     它当场被挤出榜单 ⇒ 读到 'dropped'（现场实测 25053 行那条红）。
+  //     这是判据把「读数在不在」与「它排不排得进前 12」混成了一件事：
+  //     本探针要证的只有前者（豁免摘的是 unbounded **结论**，不是 arrays 这条**读数**）。
+  //     故显式要一个足够大的 topN —— 让它只受「在不在 arrays 里」影响。
+  const paths = (WA.store.sizeAudit({ topN: 4096 }).arrays || []).map(function (r) { return r.path; });
+  const ok = paths.indexOf('lastInjection.sources') >= 0;
+  WA.store.transact(function (d) { d.lastInjection = null; });
+  return ok ? 'kept' : 'dropped';
+}
 function probeSizeAudit(WA) {
   const a = WA.store.sizeAudit ? WA.store.sizeAudit() : null;
   const ub = (a && a.unbounded) || [];
@@ -706,6 +772,26 @@ function runNegative(a) {
   a(saGuard2820 === 'clean', 'v2820/cp: [N3] 守卫键破坏不影响容量审计'
     + (saGuard2820 === 'clean' ? '' : '（实 ' + saGuard2820 + '）'));
   a(probeWith(BROKEN[B.fmt], probeLibOutside) === 'outside', 'v2820/cp: [N3] 信封格式号破坏不影响「库在世界之外」');
+  // N3b 容量体检的**豁免面**成类锁（v2.275.0）
+  //   为什么 `[N3] 守卫键破坏不影响容量审计` 会单跑绿、全量红：它不是本模块的问题，
+  //   而是**前置节真的跑过一轮注入**，`store.lastInjection.slots.*` 于是有值，sizeAudit
+  //   把它们当「未见裁剪的持久数组」上报。v2.275.0 在产品侧把瞬时快照整族摘出
+  //   unbounded 口径（判据与 chatcache 的 HEAVY_KEYS 同集合）。此处只钉三件事：
+  //     ① 产品侧名单 ⇄ chatcache HEAVY_KEYS 逐字相等（两处真源不许单边漂移）
+  //     ② 豁免**只**放行那三族：真·无界容器照旧被抓（否则这条豁免会变成放行一切的后门）
+  //     ③ 摘的只是结论，不是读数：arrays（Top 排行）里那几行仍在
+  const trans = (function () {
+    try { return WAtransientKeys(); } catch (e) { return ['__err:' + (e && e.message)]; }
+  })();
+  a(JSON.stringify(trans) === JSON.stringify(heavyKeysFromChatcache()),
+    'v2820/cp: [N3b] 瞬时快照名单 ⇄ chatcache HEAVY_KEYS 逐字相等（实 '
+    + JSON.stringify(trans) + ' vs ' + JSON.stringify(heavyKeysFromChatcache()) + '）');
+  a(probeWith(BROKEN[B.guard], probeExemptNarrow) === 'narrow',
+    'v2820/cp: [N3b] 豁免面窄：真·无界容器照旧被抓、近似名不豁免（实 '
+    + probeWith(BROKEN[B.guard], probeExemptNarrow) + '）');
+  a(probeWith(BROKEN[B.guard], probeExemptKeepsArrays) === 'kept',
+    'v2820/cp: [N3b] 摘的只是结论不是读数：Top 排行里瞬时快照行仍在（实 '
+    + probeWith(BROKEN[B.guard], probeExemptKeepsArrays) + '）');
   // N4 真状态改变（判据非恒真）
   const chg = isolated(function () {
     const WA = fresh();

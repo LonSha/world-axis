@@ -106,6 +106,14 @@
    *  （已在 NEUTRAL_REVIEW）、其余四条不在扫描面，**全部移除** ——
    *  工具侧 `coverage()` 的 stale 判据就是为了让这类凭印象登记当场现形。 */
   const OVERRIDES = {
+    // v2.275.0（D 类第 11 组）：上面补进拒收面的 3 条里，两条规则表判不出
+    //   （`env-decides` 的 env/decides 与 `unusable` 都不在词表里），一条判得却**判错了档**：
+    //     · unknown-step 会被 `unknown` 抢成 request-setup（「先把缺的前置补上」）——
+    //       而它其实是**步骤 id 拼错**，该改的是输入，不是去补前置。故显式覆盖。
+    //   OVERRIDES 的键必须都在 REJECT_FACE 里（A8 咬这一条），上面三条已同批入面快照。
+    'env-decides': { kind: 'permanent-reject', why: '这一步环境判得出真读数，手动标记不许覆盖它 —— 不是重试能解决的' },
+    'unknown-step': { kind: 'adjust-input', why: '步骤 id 拼错了（开局三步只有 api / tier / talk）：改 id，不是去补前置' },
+    'unusable': { kind: 'manual-review', why: '交接包一块可用的都没有：修包还是弃包，机器判不了' },
     'unreadable': { kind: 'manual-review', why: '读不到：机器无从判断内容是否可用' },
     'lib-unreadable': { kind: 'manual-review', why: '依赖库读不到，同上' },
     'fault-handled': { kind: 'manual-review', why: '故障已被吞掉处理，结果不明确' },
@@ -226,6 +234,13 @@
    *  两种合法登记：给一个档（`kind`），或明说它不在这份契约里（`out:true` + why）。
    *  **未登记的判不出面码一律算缺口**（边界 ③）。 */
   const NEUTRAL_REVIEW = {
+    // ── v2.275.0（D 类第 11 组）：save-health 的两条「上游读数面缺席」。
+    //   为什么给档而不是 out:true —— 「模块没装上」是**可以动手补的**（装回来 / 查装载），
+    //   与「这条码本来就不是被拒」不同，故走 request-setup 而不折进 out-of-contract。
+    //   两条分开留（不合成一个 absent）：处置动作不同 ——
+    //   forecaster-absent 去查 storageForecast，audit-absent 去查 capacityAudit。
+    'audit-absent': { kind: 'request-setup', why: '容量清点面（capacityAudit）没装上：先把它装回来再看这条读数' },
+    'forecaster-absent': { kind: 'request-setup', why: '存储外推面（storageForecast）没装上：先把它装回来再看趋势' },
     'after-reply': { out: true, why: 'bridge 刷新触发理由，不是调用被拒' },
     'already-done': { kind: 'rollback', why: '该步已完成：不能原地重来，要按新状态改写' },
     'already-json': { out: true, why: '设置复活机制的结论「已是 JSON、无需复活」，非拒收' },
@@ -551,6 +566,17 @@
     //   这四条**都不是结构不可达**：扩展目录被部分同步、清理工具删掉文件、用户手改目录
     //   都会真触发它们 —— 故进快照与恢复档，不进死表（见证由 tests/reject-v2780.js 真跑）。
     'load-integrity', 'missing-rel', 'no-loader-state', 'not-failed',
+    // ── v2.275.0（全量回归排红 · D 类第 11 组）：现场复算面比快照多 9 条，
+    //   其中 3 条属拒收面。它们由 v2.263.0 ~ v2.274.0 之间落地的模块带出来，
+    //   一直**只进码面口径、没进本快照** —— 专锁 B3/B4/B6/C4 因此长期红着
+    //   （同一形态本仓已栽过五次：v2.203.0 / v2.209.0 / v2.221.0 / v2.222.0 / v2.231.0）。
+    //   逐条说清为什么是拒收面（三者都出现在 ok:false 对象里）：
+    //     · env-decides（engines/first-run.js）：开局引导「手动标记」被拒 ——
+    //       那一步环境判得出（done/todo），手勾不许覆盖真读数。这是拒收，不是决策理由。
+    //     · unknown-step（engines/first-run.js）：要标记的 stepId 不在三步里（拼错）。
+    //     · unusable（engines/handoff-pack.js）：交接包 verify() 判「一块都没有」，
+    //       restore 直接拒收 —— 与 partial（部分可用）分开报，处置不同。
+    'env-decides', 'unknown-step', 'unusable',
     // ── v2.211.0(优化 Q2):快照改名导入的身份完整性 ──
     //   现场实测 759 / 快照 758 ⇒ 差 1。该码来自 engines/world-snapshot.js 的
     //   `importSnapshot` 改名支:快照里人物记录的 `id` 与**自身键**不一致时如实拒收
@@ -676,6 +702,15 @@
     'no-knowledge-or-skill', 'not-queued', 'persona-drift-detected', 'plain', 'replay', 'same-cell',
     'same-sign', 'schedule-busy', 'target-traveling', 'two-too-close', 'unaware-of-outcome', 'uninformed',
     'unjustified-flattery-blocked', 'unskilled-reader', 'variant-unconfirmed',
+    // ── v2.275.0（同上，D 类第 11 组）：4 条成功面。共同点：**都是 ok:true 的空态答案**，
+    //   而空态恰恰最容易被当成「失败」写错 —— 它们必须是成功面，
+    //   否则 explain() 会给「这一次没内容」配一个恢复动作（= 教玩家去修一件本就正常的事）。
+    //     · built（engines/world-diary.js）：日记拼成了（哪怕只有一行）。
+    //     · no-people（engines/day-route.js）：人物面还没有生活记录 ——
+    //       它自己带 hint 说清「不是今天谁都没动」。与 quiet（真的没人动）分开报。
+    //     · no-records（engines/relation-temp.js）：关系变化暂未结算 —— 同上，带 quiet:true。
+    //     · quiet（engines/farfield.js）：这一段时长里没有该推的窗口（正常态）。
+    'built', 'no-people', 'no-records', 'quiet',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
@@ -698,6 +733,11 @@
     //   同批摘除 `missing-target`（已迁入拒收面，见该段说明）。
     'belief-distorted-or-hostile', 'dissatisfaction-threshold-reached', 'eligible-for-deeptalk', 'firm-belief-in-truth', 'insufficient-shared-experience', 'outbid-or-slots-full',
     'player-cancel', 'secret-protected', 'secret-protected-cross-region', 'tentative-belief', 'unaware-of-topic',
+    // ── v2.275.0（同上，D 类第 11 组）：2 条判不出面 —— engines/save-health.js 的
+    //   「上游读数面没装上」两态。它们出现在**不带 ok 的读数对象**里
+    //   （`trend: { available:false, reason:'forecaster-absent' }`），既不是调用被拒、
+    //   也不是成功返回，故归判不出面，并在 NEUTRAL_REVIEW 逐条给档（键集必须逐字相同）。
+    'audit-absent', 'forecaster-absent',
   ];
   /** 三快照查表 → 面。未命中即 `unknown`（**判不出就是判不出**，不拿规则表兜）。 */
   function frozenFace(c) {

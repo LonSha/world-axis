@@ -80,8 +80,23 @@ function runB(a) {
   a(PG.stat().faults['no-signal'] === 1, 'v2153/pg B3: 拒收进 faults 分桶（可归因）');
 
   // B2b 源在场但为空 ⇒ no-reading（**与 no-signal 不可合成**：一个要补数据源，一个要确认剧情进度）
+  //
+  //   v2.153.0 收口（全量实测：本判据在全量里红、单跑绿）：
+  //     原写法只调 `WA.store.init()` 就指望拿到「三源在场、各自为空」的出厂骨架。
+  //     而上一段（B2）刚把 `causal` / `memory` / `threads` **从活状态里 delete 掉**，
+  //     `init()` 读回的是同一份（可能已落盘的）状态 —— 全量里前序节留下的存档让
+  //     「读回来仍然缺键」成为常态，于是 `sources()` 数到 0、答 `no-signal`，
+  //     本判据便与 B2 撞成同一条读数（单跑时没有那份存档，故一直是绿的）。
+  //     现在**显式造出「在场但为空」**：本段要证的是「三容器都在、内容为空 ⇒ no-reading」，
+  //     这个前置条件本来就该由本段自己摆好，而不是继承上一段删完的现场。
+  //     （判据没放宽：它仍然要求 reason === 'no-reading' 且 faults 单独分桶。）
   WA.store.init();
   PG.reset();
+  const st0b = WA.store.get();
+  st0b.causal = { chains: [] };
+  st0b.memory = st0b.memory || {};
+  st0b.memory.foreshadows = [];
+  st0b.threads = [];
   const r0b = PG.tension();
   a(r0b.ok === false && r0b.reason === 'no-reading',
     'v2153/pg B2b: 源在场但为空世界 ⇒ no-reading（不是 no-signal，也不是 0 分）');

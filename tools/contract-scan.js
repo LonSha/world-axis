@@ -198,6 +198,23 @@ const EXEMPT = {
   KNOW: '同名不同义的「认知表」：survey=勘察认知三档（unknown/heard/confirmed，判据是「听没听到过、有没有亲自确认」，是外界的消息面）、vitals=孕况知情三档（unknown/suspected/confirmed，判据是「本人知不知道、是猜的还是已确认」，是自身的身体面）',
   OUTCOMES: '同名不同义的「结果表」：contest=对抗三档结果（success/partial/fail，判据是 margin 是否落进 PARTIAL_BAND）、shadow=心影事件闭环三态（open/kept/broken，判据是那件事的承诺有没有被守住）',
   ROLES: '同名不同义的「身份表」：activity=一场活动的三种参与身份（contestant/host/audience，判据是此人在这场活动里站哪一边）、org=组织四级职衔（novice/member/steward/chief ⇒ 帮闲/管事/主事/当家，判据是月俸与声望门槛）',
+  // v2.275.0（全量回归排红 · D 类第 05 组）：本版之前两条**真·同名不同义**一直在表外，
+  //   于是 B1（三面零漂移）与 B9/B10/B11（分歧必须在表里）同时红。逐条说清：
+  //     · LANES：economy=**货走哪条路**（road/river/sea/rail，判据是运力与运费）；
+  //       ui/settings=**设置页按哪条动线分组**（all/world/people/story/power/ui，判据是
+  //       这一格属于「世界怎么转 / 人怎么活 / 故事怎么讲 / 我有多少控制权 / 界面」哪一块）。
+  //       一个是「货的通道」，一个是「人的导航」—— 值域数量与语义都不通约，**不许互相校验**：
+  //       若强行统一，就会出现「设置页分组必须与运输通道同词」这种语义错配。
+  //       （region.js 第三个 LANES 是**速度表**（road:120/river:300/rail:600/word:40），
+  //       是对象不是数组，按本工具的静态口径认不出，故它不参与本判据 —— 如实在此登记。）
+  LANES: '同名不同义的「通道表」：economy=货运通道（road/river/sea/rail，判据是运力与运费）、ui/settings=设置页动线分组（all/world/people/story/power/ui，判据是这一格归哪块动线）',
+  //     · STEPS：lifeline=**照护流程七步**（triage/exam/diagnosis/treatment/monitoring/rehab/access，
+  //       判据是这条照护链走到哪一步、careGap 报哪几步还没落账）；
+  //       first-run=**开局引导三步**（api/tier/talk，判据是玩家配好 API / 选好档位 / 说过第一句话没有，
+  //       每步带 order/title/why/probe/exit 五个字段）。
+  //       一个是「医疗流程的阶段」，一个是「上手引导的步骤」—— 步数、元素形状、判据全不同，
+  //       **不许互相校验**：若强行统一，就会出现「开局三步要跟照护七步同词」这种语义错配。
+  STEPS: '同名不同义的「步骤表」：lifeline=照护流程七步（triage/exam/diagnosis/treatment/monitoring/rehab/access，判据是照护链走到哪、careGap 报哪几步未落账）、first-run=开局引导三步（api/tier/talk，每步带 order/title/why/probe/exit，判据是配 API/选档位/说第一句话）',
 };
 
 /** 具名常量数组（只认一行内形态）。 */

@@ -2080,12 +2080,44 @@
     const b = memStateBytes();
     return b >= 0 ? b : ((WA.store.saveStat ? WA.store.saveStat().bytes : 0) || 0);
   }
+  // ── v2.275.0：瞬时快照行不参与容量盘点 ────────────────────────────────
+  //   病（本轮实证）：真实跑完一轮注入后，`sizeAudit()` 的 unbounded 面恒带三条噪音：
+  //     lastInjection.sources / lastInjection.slots.landed / lastInjection.slots.keys
+  //   同族还有 nextTurnInjection.{required,conditional,suppress} 与顶层 slotErrors ——
+  //   实测把这三族逐个塞进 store，各自都会新长出 unbounded 行（worldPulse 不会，它只有标量）。
+  //
+  //   根因不是「漏登记」：`__BOUNDED_CAPS` 是 **world state 容量登记表**，它的另一半用途是
+  //   registryParity 的「每个登记键都在骨架里物化」判定。而这三族是**每轮整体覆盖的瞬时快照**
+  //   （诊断/撤销读一次就过期），既不累积、也没有裁剪点可写 —— 给它们编一个 cap 等于凭空
+  //   造一个假的「裁剪失效」判据，比噪音更糟。
+  //
+  //   为什么必须在本表里修而不是只改探针：这三族**会随 memCache 整份落盘**（core/store.js:599
+  //   主键写、:4420 恢复点写都是 `JSON.stringify(memCache)`），且 `engines/chatcache.js` 的
+  //   HEAVY_KEYS 已把三者列为「跨设备同步必须剥离」的名单 —— 也就是说产品自己就承认它们
+  //   不是世界事实。既然如此，容量体检把它们报成「未见裁剪的持久数组」就是**读数本身在说错话**：
+  //   真实用户每轮注入后，诊断面都会拿到这三条 unbounded（tool-diag 的 sizeAudit 段直接读它）。
+  //
+  //   判据与 chatcache 的 HEAVY_KEYS **同名同集合**（下方 TRANSIENT_SNAPSHOT_KEYS 是它的镜像，
+  //   由 tests/settle-v2820.js 的成类锁盯着两处逐字相等，防单边漂移）。
+  //   覆盖粒度：键本身及其全部子路径（`lastInjection.slots.landed` 这类由父键整体覆盖，
+  //   父键既然不累积，子路径自然也不累积）。
+  const TRANSIENT_SNAPSHOT_KEYS = ['lastInjection', 'slotErrors', 'nextTurnInjection'];
+  /** 该路径是否落在瞬时快照键之下（含键本身） */
+  function isTransientSnapshotPath(pathStr) {
+    if (!pathStr) return false;
+    const head = String(pathStr).replace(/\[(\d+)\]/g, '.$1').split('.')[0];
+    return TRANSIENT_SNAPSHOT_KEYS.indexOf(head) >= 0;
+  }
   /** 由数组明细派生 unbounded/suspects/drifted 结论 */
   function deriveAuditRows(arrays, minBytes, bloatBytes) {
     const BLOAT_MIN = (typeof bloatBytes === 'number' && bloatBytes > 0) ? bloatBytes : 65536;  // v1.8.0：字节膨胀告警阈值（默认 64KB）
     // 顶层路径才参与有界判定（a.b[0].c 这类元素内嵌数组由父容器隐式约束）
     const topRows = (arrays || []).filter(function (a) { return a.path.indexOf('[') < 0; });
-    const unregistered = topRows.filter(function (a) { return !a.bounded && a.len > 0; });
+    // v2.275.0：瞬时快照键整族摘除（理由见上方注释）。**只摘 unbounded 口径**——
+    //   arrays（Top 容器排行）照旧保留它们，因为「这一轮注入快照多大」是有用的体积读数；
+    //   被摘掉的只是「这条容器没有裁剪点 ⇒ 是容量洞」这个**结论**。两者不是一回事。
+    const auditableRows = topRows.filter(function (a) { return !isTransientSnapshotPath(a.path); });
+    const unregistered = auditableRows.filter(function (a) { return !a.bounded && a.len > 0; });
     // v0.1.48: 排序一律带 path 次级键——主键（bytes / 超容量）可能并列，
     // 而 sizeAudit(栈式DFS) 与 sizeAuditFull(分片合并) 的输入序不同，
     // 不稳定排序会让两入口结论逐字节不等。
@@ -2109,6 +2141,23 @@
     capsFor: capsFor,
     registryParity: registryParity,
     sizeCaps() { const c = {}; Object.keys(__BOUNDED_CAPS).forEach(function (k) { c[k] = { cap: __BOUNDED_CAPS[k].cap, site: __BOUNDED_CAPS[k].site, kind: __BOUNDED_CAPS[k].kind || 'array', wildcard: __BOUNDED_CAPS[k].wildcard === true ? true : undefined }; }); return c; },
+    /**
+     * v2.275.0：瞬时快照键名单只读副本（容量体检的豁免面）。
+     *
+     * 为什么必须**转出**而不是留在闭包里：这份名单是 `engines/chatcache.js` HEAVY_KEYS
+     *   的镜像，两处必须逐字相等 —— 一处管「跨设备同步剥离什么」，一处管「容量体检豁免什么」。
+     *   任何一边单独增删都会让同一批字段在两个面上得到相反结论（同步时被当脏数据剥掉、
+     *   体检时被当容量洞上报）。测试侧靠本口拿到现场值，与 chatcache 导出面对账，
+     *   不允许测试自己抄一份字面量（抄一份就等于第三处真源）。
+     */
+    transientSnapshotKeys() { return TRANSIENT_SNAPSHOT_KEYS.slice(); },
+    //   v2.275.0 收口：`isTransientSnapshotPath` **不导出**。
+    //     它一度跟着名单一起转出，死导出门禁当场判 self-only（core/store.js 内部自用、
+    //     外部零引用）—— 也就是「过度导出」。判据说的没错：`deriveAuditRows` 是本模块的
+    //     私有派生步骤，谁要判「某路径是否被豁免」应当问读数（unbounded 里有没有它），
+    //     而不是自己再调一遍产品内部谓词 —— 那等于把判据建在产品实现上，两处一起漂。
+    //     名单（transientSnapshotKeys）仍然转出：它是**契约**，要跟 chatcache 的 HEAVY_KEYS 对账；
+    //     谓词是**实现**，转出只会长出第二个真源。
     defaultWorldState,
     chatId: getChatId,        // v0.9.1: 供导出/诊断读取当前聊天id
     /** v2.159.0（TP1/TP2/TP4）：当前聊天纪元。init()（含切聊天）自增，是「这还是当初那个局吗」的权威判据。 */

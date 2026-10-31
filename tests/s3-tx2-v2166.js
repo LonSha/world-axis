@@ -47,6 +47,21 @@ function boot(srcOv) {
   return WA;
 }
 
+/**
+ * 净场：把 agency 的设置键清回出厂态。
+ *
+ * 为什么需要：`enabled: false` 是出厂默认，但它落在 `worldaxis_agency_settings_v1` 上，
+ *   而 mock 的 localStorage 是模块级共享 store —— 同一进程里跨节存活。前序节验过
+ *   「关了能开」之后，那份 true 一路活到本节。清键让 `settingsBus.read()` 重新取 DEF，
+ *   才是「出厂态」这个断言的真实前置条件。
+ */
+function scrubAgencySettings(WA) {
+  let ls = null;
+  try { ls = ((WA && WA.mainWin) || global).localStorage || null; } catch (e) { ls = null; }
+  if (!ls) return 0;
+  try { ls.removeItem('worldaxis_agency_settings_v1'); } catch (e) {}
+  return 1;
+}
 function runA(a) {
   const src = read(REL);
   // A1 导出成员恰 7
@@ -114,8 +129,20 @@ function runB(a) {
   });
 
   // B2 默认关
+  //
+  //   v2.166.0 收口（全量实测：B2/B3 在全量里红、单跑绿）：
+  //     `enabled: false` 是**出厂默认**，而它不是「每次读都重现的常量」——
+  //     `engines/agency.js` 把它落在 `worldaxis_agency_settings_v1`（localStorage，跨节存活）。
+  //     本文件 B4 起就会 `setSettings({ enabled: true })` 验「关了能开」，
+  //     而在**全量**里还有别的节也会开它；那份写盘一路活到本段 ⇒ 读到 true。
+  //     于是 B2 说「默认不是关着的」，B3 跟着读到调度真的排上了。
+  //     这不是产品缺陷：**设置本来就该记住玩家开过**。缺的是本段的前置净场 ——
+  //     「出厂默认」这个断言只有在**出厂态**上才成立，摆出出厂态是本段自己的责任。
+  //     （判据没放宽：仍然要求 enabled === false 且调度返回 disabled。）
+  scrubAgencySettings(WA);
+
   const cfg = WA.agency.getSettings();
-  a(cfg.enabled === false, 'v2166/tx2 B2: 默认 enabled=false');
+  a(cfg.enabled === false, 'v2166/tx2 B2: 默认 enabled=false（净场后实 ' + cfg.enabled + '）');
 
   // B3 disabled 时调度拒收
   const r1 = WA.agency.schedule('某人', Date.now());

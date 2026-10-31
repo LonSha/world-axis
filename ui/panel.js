@@ -3364,6 +3364,28 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       return (WA.capabilityAudit && WA.capabilityAudit.getSettings) ? WA.capabilityAudit.getSettings() : null;
     });
     const capSummaryOn = lazy(function () { const c = capAuditCfgL(); return !!(c && c.showSummary === true); });
+    // v2.274.0：capability 段的两个读数改为**模板外 lazy 辅助**（与上面 pblOn / capSummaryOn 同惯例）。
+    //   为什么不能留在段体内：那两段读数要在模板里做三元与字符串拼接，写成段体内局部量就得
+    //   用语句块（箭头函数直接花括号 + const + return），收尾形态变成「分号 + 三闭合符」，
+    //   与其余 13 段不同形 —— 而按「反引号紧跟右括号右花括号」计数的门禁（q8 B1d
+    //   「每段都有模板收尾」）在本段只数到 13/14，那条纪律于是**在本段空转**。
+    //   移到模板外后：段体是纯模板字面量，形态统一；惰性不变（lazy 只在段体求值时被调用）。
+    /** standard 档点开几个世界机制；tv 读不到或没有 standard 档 ⇒ null（渲染成「读不到」）。 */
+    const stdSizeL = lazy(function () {
+      const tv = tierViewL();
+      if (!tv) return null;
+      const std = (tv.tiers || []).filter(function (t) { return t.name === 'standard'; })[0];
+      if (!std || std.size === undefined) return null;
+      return std.size;
+    });
+    /** 「此刻」那一格：档位 / 在跑台数 / 可退回步数；读不到档位引擎时如实说读不到。 */
+    const tierLiveHTMLL = lazy(function () {
+      const tv = tierViewL();
+      if (!tv) return '读不到档位引擎';
+      return esc(String(tv.tier))
+        + '　在跑世界机制 ' + tv.running + ' / ' + tv.mechanisms + ' 台（关着 ' + tv.dormant + ' 台）'
+        + '　可退回 ' + tv.rollbackDepth + ' / ' + tv.rollbackCap + ' 步';
+    });
     // v2.184.0（E3）：存档槽的开关与三个容量参数常驻读数 ——
     //   「库是空的」与「这一面被关掉了」必须分得开（同 v2.164.0/v2.182.0 的惯例）。
     const ckcfg = (WA.checkpoints && WA.checkpoints.getSettings) ? WA.checkpoints.getSettings() : null;
@@ -3686,14 +3708,17 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-pbl-out" class="wa-out"></div>
       <div id="wa-diag-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'capability', '能力档位与启用面</div><div class="wa-dim">（OPV6-1/2：默认隐身 —— 想加多少能力，由你自己挑；关着的那些为什么关着，看得见）', () => {
+      ${foldSec('tools', 'capability', '能力档位与启用面</div><div class="wa-dim">（OPV6-1/2：默认隐身 —— 想加多少能力，由你自己挑；关着的那些为什么关着，看得见）', () => `
         // 读数在**段体内部**求值（OPT-9 的惰性约定）：收起态下这一整段不拼接，也就不读。
-        const tv = tierViewL();
-        const stdN = tv ? ((tv.tiers || []).filter(function (t) { return t.name === 'standard'; })[0] || {}).size : null;
-        return `      <div class="wa-dim">三档的定义是<b>「这一档要求哪些引擎开着」</b>，不是「这一档有多强」：
-        <b>lite</b> 一个都不额外开（只有出厂默认那几台在跑）；<b>standard</b> 按<b>静态白名单</b>逐名点开（${stdN === null ? '读不到' : stdN} 个世界机制）；<b>full</b> 在<b>运行时探测</b>——凡是有 buildBlock 又能被统一写入口打开的，一律点开（不写死名单，所以引擎增删不会让名单过期）。
+        // v2.274.0：段体改为**纯模板字面量**（与其余 13 段同形）。原先这里是语句块
+        //   （箭头函数直接花括号 + 两条 const + return），语法正确但收尾是多一个闭合符，
+        //   与另外 13 段不同形 ⇒ 按形态计数的门禁（q8 B1d）在本段只数到 13/14，
+        //   那条「每段都有模板收尾」的纪律在本段等于空转。
+        //   两条读数已上移到模板外做 lazy 辅助（stdSizeL / tierLiveHTMLL，见上文），
+        //   故这里只剩模板本身。惰性不变：收起态整段不求值，两个辅助也就不会被调用。      <div class="wa-dim">三档的定义是<b>「这一档要求哪些引擎开着」</b>，不是「这一档有多强」：
+        <b>lite</b> 一个都不额外开（只有出厂默认那几台在跑）；<b>standard</b> 按<b>静态白名单</b>逐名点开（${stdSizeL() === null ? '读不到' : stdSizeL()} 个世界机制）；<b>full</b> 在<b>运行时探测</b>——凡是有 buildBlock 又能被统一写入口打开的，一律点开（不写死名单，所以引擎增删不会让名单过期）。
         <br>边界：档位<b>只收回自己开过的</b>（granted）。玩家自己手动开的，切档不会被关掉；出厂就开着的，永远不在 granted 里 —— 因此切回 lite 不会把出厂能力误关（这是本模块最容易写错的一处，已在源码里留注）。
-        <br>此刻：<span id="wa-ct-live"><b>${tv ? esc(String(tv.tier)) : '读不到档位引擎'}</b>${tv ? ('　在跑世界机制 ' + tv.running + ' / ' + tv.mechanisms + ' 台（关着 ' + tv.dormant + ' 台）　可退回 ' + tv.rollbackDepth + ' / ' + tv.rollbackCap + ' 步') : ''}</span></div>
+        <br>此刻：<span id="wa-ct-live"><b>${tierLiveHTMLL()}</b></span></div>
       <div class="wa-row">
         <button class="wa-btn" id="wa-ct-lite" title="一个都不额外开：只留出厂默认在跑的那几台。档位只收回自己开过的 —— 玩家手动开的不会被关掉">lite｜只留出厂</button>
         <button class="wa-btn" id="wa-ct-standard" title="静态白名单逐名点开：每一个都会真写一次并回读确认，开不动的不静默算成功，逐条列进 notEffective">standard｜常用一套</button>
@@ -3712,8 +3737,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <label class="wa-row"><input id="wa-ca-summary" type="checkbox" ${capSummaryOn() ? 'checked' : ''}/> 在每轮注入末尾带一行启用面摘要<span class="wa-dim">（默认关 —— 摘要本身也占上下文，占不占由你定）</span></label>
       <div id="wa-ct-out" class="wa-out"></div>
-      `;
-      })}
+      `)}
       </div>`;
   }
   /**

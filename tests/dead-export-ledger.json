@@ -1263,7 +1263,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/chatcache.js",
       "refs": 0,
-      "tref": 5,
+      "tref": 6,
       "own": 3
     },
     "chatcache.writeNamespace": {

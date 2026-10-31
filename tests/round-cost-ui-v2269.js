@@ -30,7 +30,14 @@ const N_ANCHOR = {
   // 诊断节读数（负控制 N3 破坏它 ⇒ 诊断包里 state 恒 undefined）
   //   锚点取 `state: cardState,`（本版为治「拿旧判决描述本次状态」而引入的中间变量）——
   //   直接锚 `card.state` 会命中两处（中间变量定义 + 使用点），锚点必须唯一。
-  diagState: 'state: cardState,',
+  //   v2.275.0：**又撞了一次同名**。v2.270.0 的 secSaveHealth() 也写了
+  //   `const cardState = (card && card.state) || 'unknown';` + `state: cardState,` ——
+  //   于是这条锚点从「唯一」变成命中 2 处，N4/N7a/N7b 三条一起红。
+  //   修法不是放宽（「命中 ≥1 就算」会让 N7 的破坏可能打在**别的节**上：诊断包里
+  //   roundCost.state 缺席而 saveHealth.state 被改坏，判据照样绿 —— 那是假绿）。
+  //   故把锚点扩到**跨行唯一**：`state: cardState,` 紧跟 `used: …` 那一段只有 roundCost 有
+  //   （saveHealth 紧跟的是 bytes/usedPct 那一组，没有裸的 `used:`）。
+  diagState: '        state: cardState,\n        used: (card && card.used !== undefined) ? card.used : null,',
   // 「读不到 ≠ 零成本」在面板上的落地：空态必须说这一句
   panelNoReading: 'costBlock'
 };

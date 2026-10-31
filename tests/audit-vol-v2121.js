@@ -68,6 +68,51 @@ function hits(s, anchor) {
   return n;
 }
 function fresh(opts) { return gate.fresh(opts || {}).WA; }
+/**
+ * 净场：清掉 `worldaxis_state_*` 存档残留。
+ *
+ * 为什么必须清：`core/store.js` 的 `init()` 在载入一份**字段不全**的旧档时会走
+ *   `ensureShape` 补齐分支，补齐后调 `this.save()`；而 `save()` 成功会给审计真投一条事实
+ *   （`core/store.js` 里 `WA.auditLog.record('store.save', ...)`，v2.111.0 计划二 #67 的设计）。
+ *   也就是说：**别人的存档残留会替本段先记一笔**。实测（本轮）：造一份只剩 schemaVersion+meta
+ *   的瘦档再 `fresh()` ⇒ `inRing=1 records=1`，那一条是 `1:store.save@core/store.js`。
+ *   于是 B1 的 `entries===3` 读到 4、`seq 1..4`、`recorded===4` —— 与全量日志逐字吻合；
+ *   而单跑时存档键不存在（`load()` 为空 ⇒ `defaultWorldState()` ⇒ 无补齐 ⇒ 不落盘），故单跑绿。
+ *
+ * 为什么不做事后 `reset()`：`reset()` 只清 `_ring` / `_seq`，**不清 `_stat.records`**
+ *   （见 `core/audit-log.js` 的 reset 实现），事后清会让 `recorded === 3` 这类判据
+ *   继续读到一个与本节无关的累计数。清现场只能清在**记账之前**。
+ */
+function scrubStateKeys(WA) {
+  let ls = null;
+  try { ls = ((WA && WA.mainWin) || global).localStorage || null; } catch (e) { ls = null; }
+  if (!ls) return 0;
+  let n = 0;
+  try {
+    Object.keys(ls._dump ? ls._dump() : {}).forEach(function (k) {
+      // 两个面都得清，它们是两条独立的共享残留：
+      //   ① `worldaxis_state_*` —— `store.init` 补齐旧档会落盘并留一条痕（B1/B2/N1 的病根）；
+      //   ② `worldaxis_auditlog_v1` —— 审计自己的持久键，`restore()` 读的就是它，前一段 flush
+      //      过的行会活到后一段（N2 的病根，实测读到 2 条而不是本段写的 1 条）。
+      if (/^worldaxis_state_/.test(k) || k === 'worldaxis_auditlog_v1') {
+        try { ls.removeItem(k); n += 1; } catch (e) {}
+      }
+    });
+  } catch (e) {}
+  return n;
+}
+/** 净场 + fresh + **显式断言环为空**：绝对计数类判据的前置条件，不满足就当场说出来。 */
+function freshClean(a, opts) {
+  scrubStateKeys();
+  const WA = opts ? gate.fresh(opts).WA : fresh();
+  const st = WA.auditLog.stat();
+  if (a) {
+    a(st.inRing === 0 && st.records === 0,
+      'v2121: [B0] 净场：fresh 后审计环为空（实 inRing=' + st.inRing + ' records=' + st.records + '）'
+      + '——`store.init` 补齐旧档会落盘并留一条痕，本段不能继承别人那一条');
+  }
+  return WA;
+}
 /** 灌 n 条事实（判据须可复算：动作名/参数/结果全部写死） */
 function fill(WA, n) {
   const L = WA.auditLog;
@@ -124,7 +169,7 @@ function runAll(a) {
   // ─────────────── B 面：运行时 ───────────────
   {
     // B1 记录 → 导出
-    const WA = fresh();
+    const WA = freshClean(a);
     const L = fill(WA, 3);
     const v = L.exportVol();
     a(v && v.ok === true, 'v2121: [B1] 有环时导出一卷（ok=' + (v && v.ok) + '）');
@@ -165,7 +210,7 @@ function runAll(a) {
       'v2121: [B4] 且序号链照旧为真、总判否——「序号对得上」不掩盖「时间倒着走」');
 
     // B5 空环
-    const WA5 = fresh();
+    const WA5 = freshClean(a);
     const v5 = WA5.auditLog.exportVol();
     a(v5.ok === true && v5.entries === 0 && v5.rows.length === 0,
       'v2121: [B5] 空环导出成功但 0 条（「空环」与「导不出」是两件事）');
@@ -193,7 +238,7 @@ function runAll(a) {
     a(w3.seqOk === false, 'v2121: [B7] 删掉中间一条 ⇒ 序号跳号被抓（' + w3.seqBroken.length + ' 处断裂）——照搬 seq 的价值就在这里');
 
     // B8 挤出后的卷首
-    const WA8 = fresh();
+    const WA8 = freshClean(a);
     fill(WA8, 300);
     const v8 = WA8.auditLog.exportVol();
     a(v8.truncated === true && v8.dropped === 44 && v8.entries === 256,
@@ -210,7 +255,7 @@ function runAll(a) {
   // ─────────────── C 面：不变式 ───────────────
   {
     // C1 导出不改本侧
-    const WA = fresh();
+    const WA = freshClean(a);
     const L = fill(WA, 4);
     L.flush();                                   // 制造落盘面读数（导出不该碰它）
     const before = snap(WA);
@@ -225,7 +270,7 @@ function runAll(a) {
       'v2121: [C1] 连续导出两次拿到同一卷（导出不清环）');
 
     // C2 带外核对零状态触碰
-    const WA2 = fresh();
+    const WA2 = freshClean(a);
     WA2.mainWin.localStorage.clear();            // 存储是**共享的**（跨用例累积）⇒ 显式清一次
     const L2 = fill(WA2, 4);
     L2.flush();
@@ -247,7 +292,7 @@ function runAll(a) {
       'v2121: [C2] 核对之后照旧能继续记录（序号没被外来卷带偏）');
 
     // C3 口径分列
-    const WA3 = fresh();
+    const WA3 = freshClean(a);
     WA3.mainWin.localStorage.clear();
     const L3 = fill(WA3, 2);
     L3.flush();
@@ -258,7 +303,7 @@ function runAll(a) {
     a(byRestore.seqOk === undefined && byVerify.available === undefined,
       'v2121: [C3] 两个口互不替代（各报各的字段）——缺一留缝，故两个都留');
     // 核对一份卷**不读** localStorage：清空存储后照旧核得出
-    const WA4 = fresh();
+    const WA4 = freshClean(a);
     const L4 = fill(WA4, 2);
     const vol4 = JSON.parse(JSON.stringify(L4.exportVol()));
     L4.flush();
@@ -284,13 +329,13 @@ function runNegative(a) {
     '        })'
   ].join('\n'));
   a(brokenRows !== r, 'v2121: [N1] 破坏确实改写了源码（导出行面改成现算 seq）');
-  const WAo = fresh();
+  const WAo = freshClean(a);
   fill(WAo, 300);
   const vo = WAo.auditLog.exportVol();
   a(vo.rows[0].seq === 45, 'v2121: [N1] 对照：原版导出**照搬**被挤出后剩下的真实序号（实 ' + vo.rows[0].seq + '）——口径③的落点就在这里');
   a(vo.truncated === true && vo.rows[0].seq === 45,
     'v2121: [N1] 对照：原版上 truncated=true 与卷首 45 是**两条互证**的事实（都指向「缺头」）');
-  const WAn = gate.fresh({ srcOverride: { 'core/audit-log.js': brokenRows } }).WA;
+  const WAn = freshClean(a, { srcOverride: { 'core/audit-log.js': brokenRows } });
   fill(WAn, 300);
   const vn = WAn.auditLog.exportVol();
   a(vn.rows[0].seq === 1, 'v2121: [N1] 破坏版把 45 重算成 ' + vn.rows[0].seq + '——缺头被洗白成「自洽」');
@@ -312,7 +357,7 @@ function runNegative(a) {
     + '——垃圾行被伪装成核过的一条，这正是「静默跳过」那一类');
   a(rb.ok === true, 'v2121: [N1] 且它给的是「自洽」而不是「卷不合规」（ok=' + rb.ok + '）——两句话被混成一句');
   // N2：影响面有限——导出行面的破坏不影响 restore（它读的是 localStorage，不读卷的行面）
-  const WA2 = gate.fresh({ srcOverride: { 'core/audit-log.js': brokenRows } }).WA;
+  const WA2 = freshClean(a, { srcOverride: { 'core/audit-log.js': brokenRows } });
   const L2 = WA2.auditLog;
   L2.record('t.act', {});
   L2.flush();
@@ -320,7 +365,7 @@ function runNegative(a) {
   a(rs2.available === true && rs2.total === 1,
     'v2121: [N2] 影响面有限：restore（落盘读回）不读卷的行面，破坏后照旧为真（' + rs2.total + ' 条）');
   // N3：非恒真——原版上两条判据都能取到真值，且一次核对不改状态
-  const WA3 = fresh();
+  const WA3 = freshClean(a);
   const L3 = fill(WA3, 3);
   const v3 = L3.exportVol();
   a(L3.verifyVolWith(v3).ok === true, 'v2121: [N3] 非恒真：原版上带外核对为真（不是恒假）');

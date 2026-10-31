@@ -287,9 +287,24 @@ function judgePages(a, tag) {
     // 设置页在玩家模式下也可达（六日常页之一）—— 这正是它比机制页更该承载档位的原因。
     const r = pageHtml(env, 'settings');
     a(r.html.indexOf('世界规模') >= 0, tag + ': [D1] 设置页顶部出现「世界规模」档位块');
-    const IDS = ['wa-set-tier-lite', 'wa-set-tier-standard', 'wa-set-tier-full', 'wa-set-tier-rollback'];
+    //   D2 口径（v2.274.0 收口）：「三档按钮」与「退回按钮」不是同一类东西。
+    //     三档按钮**恒渲染**（每一档都是玩家此刻可达的选择）；退回按钮是**条件渲染** ——
+    //     `ui/settings.js` 写的是 `v.rollbackDepth > 0 ? 按钮 : 「（无可退回的档位变更）」`，
+    //     出厂态回滚栈空 ⇒ **正确行为就是不渲染这个按钮**。
+    //     旧判据把两者混在一个 IDS 里 ⇒ 出厂态必报「缺 wa-set-tier-rollback」，而那时
+    //     「没有可退的」恰是正确态。这不是判据手松，是判据把「有」当成了唯一正确态。
+    //     （同一处判断 `engines/tool-diag.js` 的 v2.274.0 收口也做过：rollback 从 ids 移入 cond。）
+    //     现在的口径是**两向**的：有可退 ⇒ 按钮必须在；无可退 ⇒ 必须如实出现那句说明。
+    const IDS = ['wa-set-tier-lite', 'wa-set-tier-standard', 'wa-set-tier-full'];
     const missing = IDS.filter(function (id) { return r.html.indexOf('id="' + id + '"') < 0; });
-    a(missing.length === 0, tag + ': [D2] 三档按钮 + 退回按钮都渲染（缺 ' + (missing.join('、') || '无') + '）');
+    a(missing.length === 0, tag + ': [D2] 三档按钮都渲染（缺 ' + (missing.join('、') || '无') + '）');
+    const vD2 = WA.capabilityTier.view();
+    const hasRb = r.html.indexOf('id="wa-set-tier-rollback"') >= 0;
+    const hasNoRb = r.html.indexOf('（无可退回的档位变更）') >= 0;
+    a(vD2.rollbackDepth > 0 ? hasRb : (hasRb === false && hasNoRb),
+      tag + ': [D2b] 退回按钮是条件渲染：rollbackDepth=' + vD2.rollbackDepth
+      + ' ⇒ ' + (vD2.rollbackDepth > 0 ? '按钮必须在（实 ' + hasRb + '）'
+        : '按钮不许出现且须如实说明无可退（按钮 ' + hasRb + ' / 说明 ' + hasNoRb + '）'));
     const v = WA.capabilityTier.view();
     const nowEl = env.dom.getElementById('wa-set-tier-now');
     const nowTxt = nowEl ? String(nowEl.textContent || '') : '';

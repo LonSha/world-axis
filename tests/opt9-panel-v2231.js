@@ -32,6 +32,9 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const SELF_REL = 'tests/opt9-panel-v2231.js';
 const FOLD = 'ui/panel-fold.js', PANEL = 'ui/panel.js';
+// v2.275.0：capability 段（v2.257.0）的 view() 是全渲染链上**唯一**会遍历全部引擎的读数面。
+//   它的重复读缺陷由 B3 的「扫描」那一格咬 —— 故本锁也要能装载它的破坏副本。
+const CAPTIER = 'engines/capability-tier.js';
 function rd(rel, ov) {
   if (ov && ov[rel] !== undefined) return ov[rel];
   return fs.readFileSync(path.join(BASE, rel), 'utf8');
@@ -50,7 +53,10 @@ const ANCHOR = {
   // ⑤ 折叠点击处的抓/放（保留位置）
   panelSnap: { rel: PANEL, txt: "        const __foldSnap = (WA.panelFold && typeof WA.panelFold.snapshot === 'function')" },
   panelRestore: { rel: PANEL, txt: "          WA.panelFold.restore(panelEl.querySelector('.wa-body'), __foldSnap, {});" },
-  // ⑥ 折叠模块侧的两个新口
+  // ⑥ view() 的「一次快照、多面复用」（v2.275.0 修掉的重复读缺陷点）
+  capTierSnap: { rel: CAPTIER,
+    txt: "    const rows = allSwitches();\n    const byKey = {};\n    rows.forEach(function (r) { byKey[r.key] = r; });" },
+  // ⑦ 折叠模块侧的两个新口
   foldSnapFn: { rel: FOLD, txt: "  function snapshot(body) {" },
   foldRestoreFn: { rel: FOLD, txt: "  function restore(body, snap, opt) {" }
 };
@@ -79,12 +85,26 @@ function spy(WA) {
   const names = ['worldSeed', 'worldBlueprint', 'capacityAudit', 'perfBaseline', 'depCheck', 'rulePack', 'worldLab', 'checkpoints'];
   const counters = {};
   const keep = {};
+  // v2.275.0：**按消费方分开记账**。同一个引擎在一次渲染里被读两次是正常的 ——
+  //   一次是它自己那一段拼模板，一次是 capability 段（v2.257.0）的 view() 全量快照
+  //   （「此刻在跑几台」必须扫过全部引擎）。两件事都是「各读一次」，不是重复读。
+  //   把它们混进一个计数器，判据就只能写「恰 1 次」，而那在 14 段时代**必然读错** ——
+  //   读出来的 2 会被当成缺陷：改产品改不动，改判据就会放宽阈值把纪律改坏。
+  //   故按调用栈归属：栈里出现 capability-tier.js ⇒ 记进 __scan，否则记进 __self。
   names.forEach(function (k) {
     counters[k] = 0;
+    counters[k + '__self'] = 0;
+    counters[k + '__scan'] = 0;
     const m = WA[k];
     if (!m || typeof m.getSettings !== 'function') return;
     keep[k] = m.getSettings;
-    m.getSettings = function () { counters[k]++; return keep[k].apply(this, arguments); };
+    m.getSettings = function () {
+      counters[k]++;
+      var scan = false;
+      try { scan = String(new Error().stack || '').indexOf('capability-tier.js') >= 0; } catch (e) {}
+      if (scan) counters[k + '__scan']++; else counters[k + '__self']++;
+      return keep[k].apply(this, arguments);
+    };
   });
   counters.worldLabKinds = 0;
   let keepKinds = null;
@@ -107,11 +127,15 @@ async function runAll(a, ov) {
       'A2: 惰性取值器只有一个实现（实 ' + cnt(P, 'const lazy = function (fn)') + ' 处 —— 散落就又是「同一件事两种写法」）');
     a(cnt(P, 'const html = function () { return (typeof body === \'function\') ? body() : body; };') === 1,
       'A2b: 段体惰性求值只有一个实现');
-    a(cnt(P, "() => `\n") >= 13 || /foldSec\('tools', '[a-z]+', [^\n`]*, \(\) => `/.test(P),
-      'A2c: 13 个 foldSec 的段体都传函数形态（模板字面量作为**参数**在调用前就求值完了）');
+    // 段数不写死：静态面自己数一遍，运行面另有权威（WA.panelFold.SECTIONS.length）。
+    //   v2.231.0 当初写的是 13；v2.257.0 折叠表加了第 14 段（capability），
+    //   这份锁于是在 6 个判据上一起读错基数 —— 那不是产品坏了，是**判据拿字面量当基数**。
     const callRe = /\$\{foldSec\('tools', '[a-z]+', [^\n`]*, \(\) => `/g;
     const calls = (P.match(callRe) || []).length;
-    a(calls === 13, 'A2d: 段体惰性形态的调用点恰 13 个（实 ' + calls + '）');
+    a(calls > 0, 'A2c: foldSec 段体都传函数形态（模板字面量作为**参数**在调用前就求值完了；实 ' + calls + ' 段）');
+    // 静态调用点 ⇄ 折叠表条数必须相等（两处指同一张表，任一处漂移都会被这条抓）
+    const tableRows = cnt(rd(FOLD), "{ page: 'tools', id: '");
+    a(calls === tableRows, 'A2d: 段体惰性形态的调用点与折叠表条数逐一对齐（调用 ' + calls + ' / 表 ' + tableRows + '）');
   })();
   (function () {
     const F = rd(FOLD, ov);
@@ -144,8 +168,15 @@ async function runAll(a, ov) {
   (function () {
     // 折叠表与守卫表的一致性由 q8 锁负责（不在此重写）；这里只钉「本版没有动折叠表」
     const F = rd(FOLD, ov);
-    a(cnt(F, "{ page: 'tools', id: '") === 13,
-      'A8: 折叠表仍是 13 条（本版不动清单，只改求值时机；实 ' + cnt(F, "{ page: 'tools', id: '") + '）');
+    // A8 原意：「本版不动折叠表，只改求值时机」。这句话不能靠写死条数表达 ——
+    //   写死会让清单每次合理增减都变成红灯（v2.257.0 加第 14 段就是现场）。
+    //   改成形态判据：折叠表条数 == 面板里 foldSec 调用条数（两边指同一张表），
+    //   并把**实测条数**打进读数 —— 增减时读数自己会变，判据不因升版变红。
+    const rowsA8 = cnt(F, "{ page: 'tools', id: '");
+    const callsA8 = (rd(PANEL, ov).match(/\$\{foldSec\('tools'/g) || []).length;
+    a(rowsA8 === callsA8 && rowsA8 > 0,
+      'A8: 折叠表与面板 foldSec 调用同宽（表 ' + rowsA8 + ' / 调用 ' + callsA8
+      + '）—— 只改求值时机、不动清单形态');
   })();
 
   /* ============ B 运行时：惰性求值 ============ */
@@ -158,7 +189,8 @@ async function runAll(a, ov) {
     W.panelFold.collapseAll('tools');
     b = toolsBody(env);
     const cCol = ctrls(b), hCol = b.innerHTML.length, fCol = b.querySelectorAll('[data-foldb]').length;
-    a(cCol < cExp && hCol < hExp && fCol === 0 && fExp === 13,
+    const SECTN = W.panelFold.SECTIONS.length;      // 运行期权威：折叠表装载后的条数
+    a(cCol < cExp && hCol < hExp && fCol === 0 && fExp === SECTN,
       'B1: 收起态真更轻（控件 ' + cExp + '→' + cCol + ' / HTML ' + hExp + '→' + hCol
         + ' / 段体 ' + fExp + '→' + fCol + '）—— 「收起」不是 display:none');
     W.panelFold.expandAll('tools');
@@ -190,10 +222,15 @@ async function runAll(a, ov) {
     const s = spy(W);
     toolsBody(env);
     const got = s.counters;
-    const bad = Object.keys(got).filter(function (k) { return got[k] !== 1; });
+    const SPY_KEYS = ['worldSeed', 'worldBlueprint', 'capacityAudit', 'perfBaseline', 'depCheck',
+      'rulePack', 'worldLab', 'checkpoints'];
+    const bad = SPY_KEYS.filter(function (k) {
+      return got[k + '__self'] !== 1 || got[k + '__scan'] !== 1;
+    });
     a(bad.length === 0,
-      'B3: 展开态下每个专家段读数恰 1 次（不合：' + bad.map(function (k) { return k + '=' + got[k]; }).join(',') + '）'
-        + '—— 惰性不是「少读」，是「该读时读一次」');
+      'B3: 展开态下每个专家段读数**每个消费方各恰 1 次**（不合：'
+        + bad.map(function (k) { return k + '[自身' + got[k + '__self'] + '/扫描' + got[k + '__scan'] + ']'; }).join(',') + '）'
+        + '—— 惰性不是「少读」，是「该读时读一次」；两个消费方各读一次不算重复读');
     s.restore();
   })();
   // B3b 同一次渲染里多处引用同一读数 ⇒ 仍只读一次（memo）
@@ -203,9 +240,9 @@ async function runAll(a, ov) {
     const s = spy(W);
     toolsBody(env); toolsBody(env); toolsBody(env);
     const got = s.counters;
-    a(got.worldSeed === 3 && got.worldLabKinds === 3,
-      'B3b: 三次重绘 ⇒ 各读 3 次（每渲染一次一次，不是累积也不漏；实 '
-        + got.worldSeed + '/' + got.worldLabKinds + '）');
+    a(got.worldSeed__self === 3 && got.worldSeed__scan === 3 && got.worldLabKinds === 3,
+      'B3b: 三次重绘 ⇒ 每渲染一次各读一次（自身 ' + got.worldSeed__self + ' / 扫描 '
+        + got.worldSeed__scan + ' / kinds ' + got.worldLabKinds + '，各应为 3）');
     s.restore();
   })();
   // B4 真缺陷修复：kinds 一次渲染只调一次（此前一次判真、一次取值）
@@ -224,8 +261,10 @@ async function runAll(a, ov) {
     const env = envWith(ov), W = env.WA;
     W.panelFold.expandAll('tools');
     const b = toolsBody(env);
-    a(b.querySelectorAll('[data-foldb]').length === 13 && b.querySelectorAll('[data-foldt]').length === 13,
-      'B4b: 展开态段体与钮都在（13/13）—— 惰性没有把段体吃掉');
+    const nB4b = b.querySelectorAll('[data-foldb]').length, tB4b = b.querySelectorAll('[data-foldt]').length;
+    a(nB4b === W.panelFold.SECTIONS.length && tB4b === W.panelFold.SECTIONS.length,
+      'B4b: 展开态段体与钮都在（' + nB4b + '/' + tB4b + '，表 ' + W.panelFold.SECTIONS.length
+      + '）—— 惰性没有把段体吃掉');
     a(cnt(b.innerHTML, '启用世界种子库') >= 1 && cnt(b.innerHTML, '启用世界实验室') >= 1,
       'B4c: 展开态的段体内容真的渲染出来了（不是空壳）');
   })();
@@ -423,7 +462,7 @@ async function runNegative(a, ov) {
     const cExp = ctrls(b);
     W.panelFold.collapseAll('tools');
     b = toolsBody(env);
-    a(ctrls(b) === cExp && b.querySelectorAll('[data-foldb]').length === 13,
+    a(ctrls(b) === cExp && b.querySelectorAll('[data-foldb]').length === W.panelFold.SECTIONS.length,
       'N2: 破坏版上收起态控件数**没变**（' + cExp + '→' + ctrls(b) + '）、段体照样在 DOM（实 '
         + b.querySelectorAll('[data-foldb]').length + ' 个）—— 假折叠真的会被抓；原版必变少（B1）⇒ 两向自证');
     W.panelFold.expandAll('tools');
@@ -480,6 +519,29 @@ async function runNegative(a, ov) {
         + '）⇒ 按次计费的旧写法会被抓；原版恰 1 次（B4）⇒ 两向自证');
     s.restore();
   })();
+  // N9 破坏（v2.275.0）：view() 退回「每处各自 shapeOf()」⇒ 同一引擎在一次渲染里被读多次。
+  //   这是 v2.257.0 ~ v2.274.0 的真实形态（现场实测 worldSeed 被读 3 次、checkpoints 4 次），
+  //   修法在 view() 里立「一次快照」。破坏只改**取数路径**（快照 → 逐次回源），不动语义。
+  (function () {
+    const C = rd(CAPTIER, ov);
+    const S9 = brk(C, ANCHOR.capTierSnap.txt,
+      '    const rows = allSwitches();\n'
+      + '    const byKey = {};\n'
+      + '    const __unused9 = rows.length;');
+    const S9b = brk(S9, '      const s = byKey[k];\n      return s ? s : null;',
+      '      return shapeOf(k);            // 破坏：每问一次回源读一次');
+    const ov9 = {}; ov9[CAPTIER] = S9b;
+    const env = envWith(ov9), W = env.WA;
+    W.panelFold.expandAll('tools');
+    const s = spy(W);
+    toolsBody(env);
+    const got = s.counters;
+    a(got.checkpoints__scan > 1 || got.worldSeed__scan > 1,
+      'N9: 破坏「一次快照」⇒ 扫描面对同一引擎读多次（实 checkpoints='
+        + got.checkpoints__scan + ' / worldSeed=' + got.worldSeed__scan
+        + '）⇒ B3 的扫描格会现形；原版各恰 1 次 ⇒ 两向自证');
+    s.restore();
+  })();
   // N6 破坏：抓/放散落到 renderBody（做成全局默认）⇒ A4 的「恰 1 处」判据现形
   (function () {
     const S6 = S.split('WA.panelFold.snapshot(').join('WA.panelFold2.snapshot(');
@@ -495,7 +557,8 @@ async function runNegative(a, ov) {
   try { brk(S, 'if (', 'x'); } catch (e) { threw = /anchor hits=\d+/.test(e.message) && e.message !== 'anchor hits=1'; }
   a(threw, 'N7b: 锚点不唯一必须抛');
   // N8 真源码逐字未变
-  a(rd(PANEL) === S && rd(FOLD) === F, 'N8: 被破坏过的真源码逐字未变（破坏只发生在内存副本上）');
+  a(rd(PANEL) === S && rd(FOLD) === F && rd(CAPTIER) === rd(CAPTIER, ov),
+    'N8: 被破坏过的真源码逐字未变（破坏只发生在内存副本上）');
 }
 
 module.exports = { runAll: runAll, runNegative: runNegative, ANCHOR: ANCHOR };

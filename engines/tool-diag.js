@@ -6433,6 +6433,26 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         lines.push('- 总体积: ' + ((aud.total && aud.total.bytes) || '?') + 'B · 超限: ' + ((aud.drifted || []).length) + ' · 疑似无界: ' + ((aud.suspects || []).length) + (aud.complete === false ? ' ·（分片未收敛，数据不完整）' : ''));
         (aud.drifted || []).forEach(function (x) { lines.push('  - drifted ' + x.path + '(' + x.len + '>' + x.cap + ')'); });
         (aud.suspects || []).slice(0, 10).forEach(function (x) { lines.push('  - suspect ' + x.path + '(' + x.len + '项/' + x.bytes + 'B)'); });
+        // ── v2.275.0：**豁免面必须当场说出来** ──────────────────────────────
+        //   治的病：`store.sizeAudit()` 的 unbounded 面把「每轮整体覆盖的瞬时快照」
+        //     （lastInjection / slotErrors / nextTurnInjection）整族摘掉了 —— 摘得对
+        //     （它们没有裁剪点，也没有累积），但摘了不说，读者会把「疑似无界 0」当成
+        //     「世界状态很干净」，而实际上有一批容器**从未进入体检**。
+        //   读数与结论必须分开交代：这里把豁免名单连同「它们为什么不算」一并印出来。
+        //   这是 `store.transientSnapshotKeys()` 的产品级消费方（诊断文本面），
+        //   也是「容量体检的范围」这件事唯一对玩家可见的地方。
+        let trans = [];
+        try {
+          if (WA.store && typeof WA.store.transientSnapshotKeys === 'function') {
+            trans = WA.store.transientSnapshotKeys() || [];
+          }
+        } catch (e) { trans = []; }
+        if (trans.length) {
+          lines.push('- 本趟豁免 ' + trans.length + ' 个瞬时快照键（每轮整体覆盖、无裁剪点，不计入「疑似无界」）: '
+            + trans.join('、'));
+        } else {
+          lines.push('- 瞬时快照豁免名单为空（容量体检覆盖全部顶层容器）');
+        }
       } else lines.push('- sizeAudit 不可用');
     } catch (e) { lines.push('- sizeAudit 异常: ' + String(e && e.message)); }
     lines.push('');
