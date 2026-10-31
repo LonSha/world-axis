@@ -76,6 +76,20 @@ function clickId(env, id) {
 }
 
 /** A 面：渲染成型 + 读数同源 */
+/** 折叠按钮当前是否处于**收起**态。
+ *  为什么需要它（v2.274.0 收口现场立据）：ui/panel-fold.js 的边界①逐字写着
+ *  「不改默认态（**默认全展开**）」，ui/panel.js 的 foldSec() 在 known=false 时
+ *  直接拼接 bodyHtml（不惰性）。本文件此前的写法是**无条件点一次**折叠按钮
+ *  ——在默认展开态下，那一次点击反而把段收起，于是 A2/A3/A4/C1/N4 与 D2 连锁变红。
+ *  实测（/tmp/probe_cap_ui2.js）：未点任何按钮时 html 长度=28842、含 wa-ct-lite=true、
+ *  按钮文案「▾ 能力档位与启用面」；点一次后 html 长度=26692、含 wa-ct-lite=false。
+ *  判据本身没错（控件确实该在产物里），错的是「先点一下」这个前提。
+ *  修法：读按钮文案前缀决定要不要点 —— 收起（▸）才点，展开（▾）就不动。 */
+function isFoldedBtn(btn) {
+  const t = String((btn && (btn.textContent || btn.innerHTML)) || '');
+  return t.indexOf('\u25b8') === 0;   // ▸ = 收起
+}
+
 function judgeRender(a, tag) {
   const env = gate.fresh();
   const WA = env.WA;
@@ -84,12 +98,14 @@ function judgeRender(a, tag) {
   a(html.indexOf('能力档位与启用面') >= 0, tag + ': [A1] 折叠段标题在树中');
   const IDS = ['wa-ct-lite', 'wa-ct-standard', 'wa-ct-full', 'wa-ct-rollback',
     'wa-ct-view', 'wa-ct-list', 'wa-ca-audit', 'wa-ca-dormant', 'wa-ca-preview', 'wa-ct-stat'];
-  // 折叠段收起态下段体不拼接（OPT-9 惰性）——先展开再查控件。
+  // 折叠段收起态下段体不拼接（OPT-9 惰性）——**确保处于展开态**再查控件。
+  //   ⚠ 不能无条件点：产品默认就是展开态（panel-fold.js 边界①「不改默认态」），
+  //     在展开态下点一次反而收起。判据要看的是展开态产物，故只在收起时才点。
   const foldT = r.panel.querySelectorAll('[data-foldt]').filter(function (b) {
     return String(b.getAttribute('data-foldt') || '').indexOf('tools:capability') === 0;
   })[0];
   let h2 = html;
-  if (foldT) { foldT.click(); const r2 = toolsHtml(env); h2 = r2.html; }
+  if (foldT && isFoldedBtn(foldT)) { foldT.click(); const r2 = toolsHtml(env); h2 = r2.html; }
   const missing = IDS.filter(function (id) { return h2.indexOf('id="' + id + '"') < 0; });
   a(missing.length === 0, tag + ': [A2] 十个控件全部进入渲染产物（缺 ' + (missing.join('、') || '无') + '）');
   const domIds = [];
@@ -117,11 +133,12 @@ function judgeClick(a, tag) {
   const env = gate.fresh();
   const WA = env.WA;
   const r = toolsHtml(env);
-  // 展开折叠段，控件的 onclick 才会被 bindBody 绑上
+  // 确保折叠段处于**展开**态，控件的 onclick 才会被 bindBody 绑上。
+  //   与 judgeRender 同因：默认就是展开态，无条件点一次反而收起（判定见 isFoldedBtn）。
   const foldT = r.panel.querySelectorAll('[data-foldt]').filter(function (b) {
     return String(b.getAttribute('data-foldt') || '').indexOf('tools:capability') === 0;
   })[0];
-  if (foldT) foldT.click();
+  if (foldT && isFoldedBtn(foldT)) foldT.click();
   toolsHtml(env);
 
   // B1 总览
@@ -233,7 +250,8 @@ function judgeDegrade(a, tag) {
   const foldT = r.panel.querySelectorAll('[data-foldt]').filter(function (b) {
     return String(b.getAttribute('data-foldt') || '').indexOf('tools:capability') === 0;
   })[0];
-  if (foldT) foldT.click();
+  // 与 judgeRender/judgeClick 同因：默认就是展开态，无条件点一次反而收起点不到控件。
+  if (foldT && isFoldedBtn(foldT)) foldT.click();
   toolsHtml(env);
   const saved = WA.capabilityTier;
   try {
@@ -385,7 +403,7 @@ function runNegative(a) {
     const foldB = rB.panel.querySelectorAll('[data-foldt]').filter(function (x) {
       return String(x.getAttribute('data-foldt') || '').indexOf('tools:capability') === 0;
     })[0];
-    if (foldB) foldB.click();
+    if (foldB && isFoldedBtn(foldB)) foldB.click();   // 同因：默认展开，无条件点反而收起
     const hB = toolsHtml(envB).html;
     cap(!!envB.dom.getElementById('wa-ct-out'), 'A2/A3（out 容器缺席时仍被判为在场）');
     cap(hB.indexOf('id="wa-ct-out"') >= 0, 'A2（产物里仍有 out 容器）');
@@ -404,7 +422,7 @@ function runNegative(a) {
     const foldB = rB.panel.querySelectorAll('[data-foldt]').filter(function (x) {
       return String(x.getAttribute('data-foldt') || '').indexOf('tools:capability') === 0;
     })[0];
-    if (foldB) foldB.click();
+    if (foldB && isFoldedBtn(foldB)) foldB.click();   // 同因：默认展开，无条件点反而收起
     toolsHtml(envB);
     clickId(envB, 'wa-ct-standard');
     a(WAB.capabilityTier.getSettings().tier === tierBefore,
@@ -428,7 +446,7 @@ function runNegative(a) {
     const foldB = rB.panel.querySelectorAll('[data-foldt]').filter(function (x) {
       return String(x.getAttribute('data-foldt') || '').indexOf('tools:capability') === 0;
     })[0];
-    if (foldB) foldB.click();
+    if (foldB && isFoldedBtn(foldB)) foldB.click();   // 同因：默认展开，无条件点反而收起
     toolsHtml(envB);
     clickId(envB, 'wa-ct-standard');   // 走 doTier → ctReport → ctRunning 这条真路径
     const o = outOf(envB);
@@ -447,7 +465,7 @@ function runNegative(a) {
     const foldOk = rOk.panel.querySelectorAll('[data-foldt]').filter(function (x) {
       return String(x.getAttribute('data-foldt') || '').indexOf('tools:capability') === 0;
     })[0];
-    if (foldOk) foldOk.click();
+    if (foldOk && isFoldedBtn(foldOk)) foldOk.click();   // 同因：默认展开
     const hOk = toolsHtml(envOk).html;
     a(hOk.indexOf('id="wa-ct-out"') >= 0,
       'v2257UI: [N5] 原版上同款判据仍成立（双向自证：不是把判据写死成恒真）');

@@ -505,8 +505,18 @@ function runAll(assertFn) {
   }
   return { pass: pass, fail: fail, fails: fails };
 }
-const r = runAll();
-console.log('══ EXV6-2 接线锁（day-route-ui-v2266）══');
-console.log('通过 ' + r.pass + ' / 失败 ' + r.fail);
-if (r.fail) { r.fails.forEach(function (f) { console.log('  ✗ ' + f); }); }
-process.exit(r.fail > 0 ? 1 : 0);
+// ── v2.274.0 挂载形态修正（本轮全量回归现场立据）────────────────────────
+//   本文件原先是**纯脚本体**：顶层直接 `runAll()` 再 `process.exit()`，且没有 module.exports。
+//   而 tests/run.js 的 runLock 语义是 `require(spec)[m](assert)` —— require 时顶层代码立刻跑，
+//   `process.exit(0)` 把整个回归 worker 直接杀掉：运行器读到 code=0 判 `passed`，
+//   其后的节一条都没跑，日志里的 ✗ 全部作废（实测只跑到本节就报「通过 57 / 失败 0」）。
+//   修法照仓库里其余 258 把锁的标准形状：导出 runAll + `require.main === module` 守卫。
+//   判据不变、断言不变，变的只是「谁在什么时候调用它」。
+module.exports = { runAll: runAll };
+if (require.main === module) {
+  const r = runAll();
+  console.log('══ EXV6-2 接线锁（day-route-ui-v2266）══');
+  console.log('通过 ' + r.pass + ' / 失败 ' + r.fail);
+  if (r.fail) { r.fails.forEach(function (f) { console.log('  ✗ ' + f); }); }
+  process.exit(r.fail > 0 ? 1 : 0);
+}

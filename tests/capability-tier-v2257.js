@@ -67,6 +67,32 @@ const A_REASON = '      if (!r.hasBuild) { reason = \'no-builder\'; byReason.noB
 // ⑥ 动作模块不设 enabled：def 里只有 tier/granted/history
 const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 
+// ═══ 出厂基线（**登记点**，不是魔法数；顶层声明，runB 与 runNegative 共用）════
+//   R1 lite 基线：机制 100、running 5、dormant 95。
+//   ⚠ BASE_ON 是「**本测试面**出厂态真的开着多少个带 enabled 的引擎」，v2.274.0 实测 26。
+//     它与 mechanisms(100)/running(5) 是**三个不同的面**，别混：
+//       · mechanisms 100 = 有 buildBlock（有注入面）的引擎
+//       · running      5 = 出厂开 且 有 buildBlock 的
+//       · BASE_ON     26 = 出厂开的全部（含 21 个无注入面的观测型引擎）
+//     恒等式：full 后 running = mechanisms + (BASE_ON − running0) = 100 + 21 = 121。
+//
+//   ⚠⚠ **26 而不是 27，是「面」的问题，不是引擎少了**（实施期实测立据，别再用 27）：
+//     本文件 `fresh()` 只装 `tests/run.js` 的 `LOAD` 清单 = **纯产品层**，开关 187 / 出厂开 26。
+//     而 `tests/ui-gate-sync.js` 的 `fresh()` 多装 UI 层，开关 188 / 出厂开 27 —— 多出来的那一个
+//     是 `renderPerf`（文件在 `ui/render-perf.js`，是 UI 层模块，不在 LOAD 里）。
+//     跨面取数会得到 27，然后本文件的每一条计数判据都会差 1（实测：B6d2/B8/B8b 三红）。
+//     故此处登记的必须是**本测试面**的真值。要数 UI 层的那个，另开一条判据，别混进这个基线。
+//
+//     历史：V6 批次新增 8 个默认开启的产品层引擎（worldDiary / dayRoute / relationTemp /
+//     undercurrentCalendar / roundCost / saveHealth / firstRun / handoffPack），故 18 → 26。
+//     **引擎出厂态变了就改这里，别改判据形态。**
+const BASE_ON = 26;         // 本测试面：出厂就开着的带 enabled 引擎数
+const MECH = 100;           // 有注入面的机制数
+const DORMANT = 95;         // 关着但有注入面的
+const RUNNING0 = 5;         // 出厂开 且 有注入面的
+// full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
+const FULL_RUNNING = MECH + (BASE_ON - RUNNING0);
+
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
 let __g = null;
 function fresh(ov) {
@@ -155,12 +181,18 @@ function runB(a) {
   const env = fresh();
   const T = env.WA.capabilityTier;
   const A = env.WA.capabilityAudit;
-  // B1 lite 基线：机制 100、running 18、dormant 95（与探针 p_off_classify 逐字同数）
+  // 基线常量在文件顶层声明（runNegative 也要用），此处不再重复定义。
+  // 出厂 on 集（逐名快照）—— B6d 拿它做集合相等，防「关一个开一个」计数照样对。
+  const ON0 = (function () { try { return T.list().on.slice().sort().join(','); } catch (e) { return ''; } })();
+  a(true, 'B0: 本文件以 BASE_ON=' + BASE_ON + ' / MECH=' + MECH + ' / DORMANT=' + DORMANT
+    + ' 为基线（本测试面真值，引擎出厂态变更时改这里）');
+  a(ON0.split(',').filter(Boolean).length === BASE_ON,
+    'B0b: 出厂 on 集快照的长度 = BASE_ON（实 ' + ON0.split(',').filter(Boolean).length + '）—— 基线登记值与本面实测自洽');
   const v0 = T.view();
   a(v0.tier === 'lite', 'B1: 出厂档位 lite（实 ' + v0.tier + '）');
-  a(v0.mechanisms === 100, 'B1b: 有注入面的机制 100 个（实 ' + v0.mechanisms + '，探针同数）');
-  a(v0.dormant === 95, 'B1c: 关着但有注入面的 95 个（实 ' + v0.dormant + '，探针同数）');
-  a(v0.running === 5, 'B1d: 出厂真在跑的机制 5 个（18 个开关里有注入面的那 5 个，实 ' + v0.running + '）');
+  a(v0.mechanisms === MECH, 'B1b: 有注入面的机制 ' + MECH + ' 个（实 ' + v0.mechanisms + '，探针同数）');
+  a(v0.dormant === DORMANT, 'B1c: 关着但有注入面的 ' + DORMANT + ' 个（实 ' + v0.dormant + '，探针同数）');
+  a(v0.running === RUNNING0, 'B1d: 出厂真在跑的机制 ' + RUNNING0 + ' 个（带开关且有注入面的，实 ' + v0.running + '）');
   a(v0.gap === 34, 'B1e: 离 standard 还差 34 个（实 ' + v0.gap + '）');
   // B2 standard：真开 34 个、零 notEffective、零 partial
   const r1 = T.applyTier('standard');
@@ -200,10 +232,16 @@ function runB(a) {
   a(r5.ok === true, 'B6: 切回 lite 成功');
   const vl = T.view();
   a(vl.running === 5, 'B6b: 切回 lite 后真在跑的仍是出厂 5 个（实 ' + vl.running + '，初版此处置 0/丢机制）');
-  a(vl.mechanisms === 100, 'B6c: 机制总数不因档位变化（实 ' + vl.mechanisms + '）');
-  // B6d 关键是「出厂那 18 个开关」一个不许被关
-  const onNow = T.list().on.length;
-  a(onNow === 18, 'B6d: 出厂 18 个开关全部完好（实 ' + onNow + '）—— 档位绝不收回不归自己开的东西');
+  a(vl.mechanisms === MECH, 'B6c: 机制总数不因档位变化（实 ' + vl.mechanisms + '）');
+  // B6d 关键是「出厂那批开关」一个不许被关。
+  //   ⚠ 判据升级（v2.274.0）：此前只数个数（=== 18），引擎一增长就红，
+  //     且数对了个数也不等于「没被换掉」——若档位关掉 A 又开了 B，计数照样对。
+  //     改成**集合相等**：出厂 on 集必须原样回来。这才是本版②号口径
+  //     「档位只收回自己开过的」的字面含义。
+  const onNow = T.list().on.slice().sort().join(',');
+  a(onNow === ON0, 'B6d: 出厂开关集全部完好（' + T.list().on.length + ' 个，逐名一致）'
+    + '—— 档位绝不收回不归自己开的东西' + (onNow === ON0 ? '' : '（现：' + onNow.slice(0, 120) + '）'));
+  a(T.list().on.length === BASE_ON, 'B6d2: 出厂开关数 = 基线 ' + BASE_ON + '（实 ' + T.list().on.length + '）');
   // B7 坏档名 / 空栈
   const r6 = T.applyTier('nope');
   a(r6.ok === false && r6.reason === 'bad-value', 'B7: 坏档名如实拒收 bad-value（实 ' + r6.reason + '）');
@@ -217,12 +255,18 @@ function runB(a) {
   const T3 = en2.WA.capabilityTier;
   const A3 = en2.WA.capabilityAudit;
   const s1 = A3.summary();
-  a(s1.running === 18 && s1.dormantWorld === 95, 'B8: 出厂 summary 读数为 18 开 / 95 可开（实 ' + s1.running + '/' + s1.dormantWorld + '）');
+  a(s1.running === BASE_ON && s1.dormantWorld === DORMANT,
+    'B8: 出厂 summary 读数为 ' + BASE_ON + ' 开 / ' + DORMANT + ' 可开（实 ' + s1.running + '/' + s1.dormantWorld + '）');
   T3.applyTier('full');
   const s2 = A3.summary();
-  a(s2.running === 113, 'B8b: full 后 summary 的 running 真涨到 113（实 ' + s2.running + '）—— 文案不是恒真');
+  // full 后的 running 用顶层恒等式 FULL_RUNNING（= MECH + BASE_ON − RUNNING0 = 100 + 26 − 5 = 121）
+  a(s2.running === FULL_RUNNING,
+    'B8b: full 后 summary 的 running 真涨到 ' + FULL_RUNNING + '（实 ' + s2.running
+    + ' = ' + MECH + ' 有注入面 + ' + (BASE_ON - RUNNING0) + ' 出厂开着的观测型）—— 文案不是恒真');
   a(s2.line !== s1.line, 'B8c: 玩家面结论随档位真的变了（「' + s1.line + '」→「' + s2.line + '」）');
-  a(s2.line.indexOf('113') >= 0, 'B8d: 结论里的数就是现场读数（不是写死文案）');
+  // 结论里出现的数必须是**现场读数**本身，而不是某个写死的字面量。
+  a(s2.line.indexOf(String(s2.running)) >= 0,
+    'B8d: 结论里的数就是现场读数（' + s2.running + ' 应出现在「' + s2.line + '」里）');
   // B9 纯只读模块不写任何引擎开关（audit 调 10 次，开关面一个不动）
   const beforeOn = T3.list().on.join(',');
   for (let i = 0; i < 10; i++) A3.audit();
@@ -391,7 +435,8 @@ function runNegative(a) {
     T.applyTier('full');
     T.applyTier('lite');
     const n = T.list().on.length;
-    a(n < 18, 'N2: 换回初版 granted 写法后切回 lite 出厂开关只剩 ' + n + ' 个（<18）⇒ B6d 不是恒真');
+    a(n < BASE_ON, 'N2: 换回初版 granted 写法后切回 lite 出厂开关只剩 ' + n
+      + ' 个（<' + BASE_ON + '）⇒ B6d 不是恒真');
   }
   // N3 摘掉幂等早退 ⇒ B3b「幂等不重复写盘」现形
   //   ⚠ 破坏不能只摘 `if` 早退：从 lite 切到 standard 时 from !== nm，即使没有幂等早退
