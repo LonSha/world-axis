@@ -767,6 +767,112 @@ OPV7-2 的 `unknown` 是「信息缺口」，OPV7-3 的 `trend=unknown` 是「�
 
 ---
 
+### 8.10 OPV7-6 交付与 19 项收口实测（v2.281.0）
+
+**这一项的病，立项读数已经写死了**：真实开局（`town-workshop`）后 `people 6 / places 12`，
+但 `life / plan / events / intel / bonds / org` 全是零状态 —— 开局只装了「人是谁、地方在哪」，
+没装「人在追什么、他们在图什么」。所以交付物不是又一个机制，是**开局流程末尾的一次播种**：
+按蓝图 `playDefs` 给每个 NPC 至少一条目标、一条日程、一条关系、一条势力归属。
+
+**四条硬纪律（写进文件头，锁里逐条钉）**：
+
+| # | 纪律 | 为什么它会破 | 锁怎么钉 |
+|---|---|---|---|
+| ① | 播种只走四个真写口（`life.addGoal` / `life.addSchedule` / `bonds.setBond` / `org.assignRole`），零 `store.transact/patch/set` | 直写最快，但会绕过各引擎的容量、去重、事务与拒收分桶 —— 于是「播了」与「引擎认为播了」分家 | 逐口 `cntCode(p + '(') === 1`（带左括号计数，防把存在性检查算成调用）+ 全文件零 `store.transact/patch/set` |
+| ② | 不造第二真源 | 蓝图本来就把人写进 `draft.people`、势力写进 `evolution.factions`；播种再写一遍就是两份会漂的账 | 代码行零 `draft.people`、零 `evolution.factions`、零 `world.factions` |
+| ③ | 不编事实 | 目标句要有个主语、有个动词才读得通，顺手补一个最省事 —— 而那句「事实」谁也没写过 | 目标句最后两个实词必须在蓝图 `playDefs` 原文里找得到，取不到整行不播并进 `noSource`；另钉「目标句零空括号」 |
+| ④ | 幂等 | 玩家点两次「补播」不该让世界变两遍 | 第二遍必须 `written:0` 且世界逐字未变 |
+
+**本版实测抓到的真缺陷：`bonds` 出厂 `enabled:false` 时幂等静默失效。**
+`bonds.read()` 在开关关着时回 `{ok:true, types:[], reason:'disabled'}`，而 `exists()` 只看
+`types.length` ⇒ **把「读不出来」判成「没有」**，关系行每播一次重写一次。它从不报错，因为
+`setBond` 是改写不是新增，行数不变。临时探针之所以没发现，是因为它调了
+`capabilityTier.applyTier('full')` 把 bonds 打开了 —— **换个开关态，同一条判据就假了**。
+治法不是加一个特判，是先认 `types` 非空、再用**容器直读兜底**（`st.bonds.rows` 里按
+`[a,b].sort().join('×')` 比 key）：真正要回答的是「现场有没有这一对」，那是容器里的事实，
+不依赖读口开不开。
+
+**顺带修掉的真缺陷**：`playable-blueprint` 此前把势力写进 `world.factions`，而该键**全仓零读口**
+⇒ `org.assignRole` 恒 `skipped:no-evolution-faction`。改走唯一合法写口
+`evolution.applyFactions(draft, factions)` 之后 `org.rosterView('工匠协会')` 读得到。
+这正是本项目第 **五** 次同型病：**写进一个没人读的键，看起来像写成了**。
+
+**三件齐做（本版口径：只做引擎不接面等于没做）**：引擎 + `tool-diag` 诊断节
+`secPlayableSeed()` + 面板 `#wa-seed-line`（读数行）/`#wa-seed-replay`（补播）/
+`#wa-seed-view`（读数）/`#wa-seed-out`（输出区，与 `#wa-bp-out` 分开：蓝图答「这个世界能不能
+原样搬走」，播种答「搬过来之后世界里有没有剧本」）。接线在 `installSample` 末尾自动播种
+（回带 `seeded` 读数，失败只作读数不改 `ok`），传 `{ noSeed: true }` 可跳过。
+
+#### 收口：19 项一次跑完，从「12 过 7 败」到「19 过 0 败」
+
+`tools/v7probes/p_closeout_2275.js` 在 OPV7-6 验收探针挂进来之后变成 **19 条**
+（预算量级不变，实测 185～226 s，对比全量回归 27～38 分钟）。首跑 `通过 12 / 失败 7`，
+七条红的归因如下 —— **只有一条是真缺陷，其余六条全是「新东西没跟到位」**：
+
+| 红项 | 真因 | 处置 |
+|---|---|---|
+| 死导出冻结：新增 4 项 | `playableSeed` 的 `getSettings/setSettings/preview/stat` 产品侧零消费者 | **真接线**（不是登记进账本）：面板补 `#wa-seed-enabled` 勾选框 + `onchange` 调 `setSettings`；`#wa-seed-view` 改写成「台账问 `stat()`、逐行明细问 `preview()`」并逐条渲染（`[目标] 名字 → 文本（src）`，最多 16 行） |
+| 死导出冻结：`toolDiag.safe` 归因失实、`playableBlueprint.getSample` 消失 | 账本陈旧 | `--update` 收敛（dead 1172 → 1171，账本 version=2.281.0，复跑「死子面无新增、归因可读、元数据同源、证据可复算」） |
+| 拒收码见证锁：未分类 2 个（`no-blueprint` / `seed-threw`） | 新写的两个**玩家真会看到**的失败归因 | **补可执行见证，不进基线**（登记成存量未分类等于承认「这两个码没人会跑到」）。`no-blueprint` 清空 `d.blueprint.installed` 后调 `seed({})`；`seed-threw` 临时把 `PS.seed` 换成抛异常函数再走 `installSample`。两者都在 `finally` 里 `store.transact` 恢复。见证 738 → **740** |
+| 散装读数 + 结算读数 | `settle-v2830.js` 三处旧读数（`loadEdges 195` / `callRefs 374` / `nsCount 322`）与真源 196/376/323 不符 | 两处断言改写（含 `loadedCount 314`），`SETTLE-V2830` 与 `U3` 一起转绿 |
+| 事实报告：`B4` 拒收码三集恒等式 | 见证集从 738 变 740，而 `u9` 记的是旧值 | 随上一条自动平账（1307 = 740 + 50 + 547） |
+| 计划状态块：四份计划块全 stale | 改计划**正文**不会同步 `O7:STATE` 块 | `node tools/gen-plan-status.js --write`（四份全 `same`/`replaced`），`PLAN-STATUS-GATE` 7 条红一次消除 |
+| **空产出归因（引擎面）：`判据 3 · life 状态确实变了`** | **真因不在探针 3 段，在 2 段的建场方式** | 见下 |
+
+**最后那条是本次最值得记的一笔**：OPV7-6 把 life 播进了开局蓝图 ⇒ `p_yield_attrib_final.js`
+判据 2 的 `installSample('town-workshop')` 装完世界**一开始就是 `yield`**，于是判据 3 想测的
+「开着但没内容 → 喂一条 → yield」这一态在现场根本不存在，`before/after` 都是 `yield`，
+非恒真判据当场为假。**新功能静默吃掉了旧探针的前提，而症状长得像「新功能坏了」**。
+修法不是放宽判据（那正是本仓反复付过价的假绿），是让探针自己把要测的态搭出来：
+判据 2 显式传 `noSeed: true`（它要的只是「蓝图装进世界了」），判据 3 的非恒真判据同时钉死两端
+`before === 'no-data' && after === 'yield'`。修完 29/29。
+
+#### 同一类病在探针内部又犯了一次：负控制咬不住
+
+`p_playable_seed.js` 首跑还有两条红，两条都不是笔误：
+
+- **`B3 播种不新增人物`**：基线取错位置。`installSample` 本来就该造人，拿「空世界」当基线
+  等于把蓝图造的人算到播种头上。修法是插入 `noSeed: true` 的中间态作基线，并顺手立三条新据
+  （`B1e` 装了且确实没播 / `B1f` 有 N 个人 / `B1g` 但 `goals` 仍是 0 —— **演员齐了，剧本空白**）。
+- **`N2b 破坏后 life 真没写进去`**：**负控制咬不住**。原锚点
+  `if (why0 === 'disabled') { note('disabled'); return false; }` 在四个写口上**恒不可达** ——
+  逐一查证 `life.addGoal`（life.js:252）/ `life.addSchedule`（life.js:278）/ `bonds.setBond`
+  （bonds.js:44）/ `org.assignRole`（org.js:321），**没有一个检查 `enabled`**。把那一行破坏掉，
+  行为一字不变 ⇒ 判据必假，这是**假绿**（负控制不起作用的静默失效）。
+  修法是换锚点，不是改断言：改用 `exists()` 里 bond 的容器直读兜底那一行（**本版真正修过、
+  也真正能改行为**的那处），破坏后 `written` 从 0 变 1、`byKind.bond === 1`、
+  `reasons.already === planned - 1`、关系行数不变。改动处留了长注释写明
+  「**宁可换成真的能改行为的锚点，也不留一条咬不住的负控制**」。
+
+探针最终 **103/103**（六段：A 结构 / A2 势力真源 / B 真值 / C 幂等 / D 不编事实 / E 势力真源 /
+N 负控制含判据纯度与工具两向自证），专锁 `v7-playable-seed-2281.js` **108/108**。
+另补两条元的：**N6 判据纯度**（读自身文件核三个锚点字面量各只出现一次、两个破坏串与各自锚点
+不同）与 **N7 工具两向自证**（幽灵锚点 ⇒ 字节不变；`A1 + '\n' + A1` 双份 ⇒ `cnt` 报 2；
+原版上仍各恰一处）。
+
+#### 跟版事务（新增 1 个文件 / 1 个命名空间 / 6 个成员）
+
+| 项 | 读数 |
+|---|---|
+| `tools/sync-hardcoded.js --write` | `refs 8857 → 8889`（3/3 站点）· `namespaces 324 → 325`（3/3）· `members 4058 → 4064`（3/3）· `dead 1172 → 1171`（4/4）· `deadInTestsOnly 411`（3/3）；写后校验通过 |
+| `tests/module-registry-gate.js --update` | `version 2.281.0 · 文件 314 · 命名空间 323 · 装载期边 196 · 硬边 0 · 调用期引用 376` |
+| `tests/module-cycle-gate-v2107.js` | `B1 329/329/327` · `B2 196+2544=2740` · `B3 orderLen 328` · `B5 369/323/332`（+13 条调用期边，六行分解写进注释） |
+| `tests/dead-export-ledger.json` | `dead 1171 · uiDead 6 · 证据 1177 条 · version 2.281.0` |
+
+**这里第二次踩到 v2.277.0 记过的同一条坑**：`playable-seed.js` 的别名写法若不套
+`const WA = (HOST.WorldAxis = HOST.WorldAxis || {})`，该文件**既不进提供方也不进引用方** ——
+账本上看起来「什么都没变」，而真源已经变了。修法是改源码，不是放宽 `ALIAS_RE`。
+
+#### 收口一句话
+
+**收口 19 · 通过 19 · 失败 0**（185～226 s，未执行 `tests/run.js` —— 纪律 12 仍在效期）。
+七条红里六条是账本与面接线不到位的**跟版事务**，一条是真缺陷（探针前提被新功能吃掉）。
+这说明 OPV7-6 的产品代码本身站得住，而**「新增」这件事的代价几乎全在跟随面上**：
+死导出账本、拒收码三集、散装读数、计划状态块、模块依赖图、硬读数族 —— 六本账各要一次
+专门的跟版动作，漏一本就是一条红。
+
+---
+
 ## 九、违规记录
 
 > 依据纪律第 12 款尾句：任何 `tests/run.js` 执行记录而无「18 项已全部交付」声明者，登记于此。
