@@ -302,7 +302,15 @@ function runCore() {
   {
     // 病态输入：摘掉预算裁判 ⇒ threeGates 门槛③ absent ⇒ g.absent = 1。
     //   这是「有一面读不到」的最真实形态（模块没装，不是读出错）。
-    const depsAbsent = { capabilityTier: WA.capabilityTier, render: WA.render, injectBudget: undefined };
+    // v2.278.0（V7 OPV7-2）：第四道门槛（drive）读 driverLedger。
+    //   deps 里必须把它一并带过去，否则破坏副本里 drive 会报 absent（缺件）而不是它本来的态 ——
+    //   那样测到的就不是「被点名那一行的破坏」，而是「夹具少给了一个依赖」。
+    //   实测代价：漏带 driverLedger 时 G1 从 running 变成 unknown，而根因是夹具不是产品。
+    // v2.279.0（V7 OPV7-3）：夹具改为**全量浅拷贝**，只把被测的那一项抠掉。
+    //   为什么：第五道门槛（yield）要读 store / evolution；只挑几个依赖传进去，
+    //   缺的那几项会让 yield 报 absent ⇒ state 变 unknown ⇒ G1 从 running 变 unknown。
+    //   那是**夹具缺件**，不是产品缺陷 —— 判据不跟着读数改，改夹具（这条已在本仓付过两次价）。
+    const depsAbsent = Object.assign({}, WA, { injectBudget: undefined });
     // ① 正版在这一组 deps 下必须报 unknown（A4 判序的运行时证明）
     const okOnAbsent = loadHPFrom(HP_SRC, 'N1ok', depsAbsent);
     assert(!!okOnAbsent, 'N1.0 正版副本装载成功');
@@ -328,7 +336,7 @@ function runCore() {
   // ═══════════════════════════════════════════════════════════════════════════
   section('G. 负控制 N2：删掉 thin 分支 ⇒ 出厂态（6/107）被报成 running');
   {
-    const deps = { capabilityTier: WA.capabilityTier, render: WA.render, injectBudget: WA.injectBudget };
+    const deps = Object.assign({}, WA);
     const bad = breakOnce(HP_SRC, A_THIN, "else if (false) state = 'thin';", 'N2');
     if (bad) {
       const u = loadHPFrom(bad, 'N2', deps);

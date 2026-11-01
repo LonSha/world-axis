@@ -71,7 +71,9 @@ const A_RATIO = "const visState = on.length === 0 ? 'blocked' : (ratio >= 0.5 ? 
 // ①-b 首版判据（负控制要装回去的那一句：把部分成功折成全成功）
 const A_RATIO_BAD = "const visState = on.length > 0 ? 'pass' : 'blocked';";
 // ② degraded ⇒ partial（摘掉它 ⇒ 有门槛只过一半也报 running）
-const A_DEG = "else if (degraded.length) verdict = 'partial';";
+// v2.278.0（V7 OPV7-2）：第四道门槛接入后，`degraded` 被拆成内容面与驱动面两桶 ——
+//   锚点跟着改成内容面那一桶（语义没变：内容只出来一部分 ⇒ partial）。
+const A_DEG = "else if (degradedContent.length) verdict = 'partial';";
 const A_DEG_OFF = "else if (false) verdict = 'partial';";
 // ③ absent ⇒ unknown（口径③：缺件不得当通过）
 const A_ABS = "else if (absent.length) verdict = 'unknown';";
@@ -166,11 +168,19 @@ function runB(a) {
   a(!!hp && typeof hp.threeGates === 'function', 'B1: 运行时有 threeGates');
   const r = hp.threeGates();
   // B2 三条门槛一条不少（缺一条 = 少了三分之一的诊断面）
-  a((r.gates || []).length === 3, 'B2: 恰好三条门槛（实 ' + (r.gates || []).length + '）');
+  // v2.278.0（V7 OPV7-2）：门槛从三条变**四条**（新增 drive）。
+  //   这里必须改常数而不是改成 `>= 3` —— 放宽下限会让「第五道门槛被悄悄加进来」静默通过。
+  // v2.279.0（V7 OPV7-3）：4 → **5**（新增 yield 产出面，排在 drive 之前）。
+  a((r.gates || []).length === 5, 'B2: 恰好五道门槛（实 ' + (r.gates || []).length + '）');
   const ids = (r.gates || []).map(function (g) { return g.id; }).join(',');
-  a(ids === 'engine,visibility,budget', 'B2b: 门槛身份与顺序固定（实 ' + ids + '）');
+  // 顺序也有语义：前三道是内容面，drive 排在最后（它只能把 running 往下拉，
+  //   排前面会让「先修哪条」指向一个不是靠按键能修的东西）。
+  a(ids === 'engine,visibility,budget,yield,drive', 'B2b: 门槛身份与顺序固定（实 ' + ids + '）');
   // B3 每条 gate 形态合法：state 四态封闭集、fix 为 null 或 {do,arg,hint}
-  const STATES = ['pass', 'blocked', 'degraded', 'absent'];
+  // v2.278.0（V7 OPV7-2）：新增第五个态 `unknown`（判不了）。
+  //   它不是「absent」（缺件）：缺件是模块没装上，判不了是装上了但读不全。
+  //   两者都会让 ok 为假吗？不 —— absent 会，unknown 不会（详见 threeGates 注释）。
+  const STATES = ['pass', 'blocked', 'degraded', 'absent', 'unknown'];
   const badState = (r.gates || []).filter(function (g) { return STATES.indexOf(g.state) < 0; });
   a(badState.length === 0, 'B3: state 落在四态封闭集里（越界 ' + badState.length + '）');
   const badFix = (r.gates || []).filter(function (g) {
@@ -252,8 +262,9 @@ function runC(a) {
     + '；b/d/a = ' + r.blocked + '/' + r.degraded + '/' + r.absent + '）');
   a(r.ok === (r.blocked === 0 && r.degraded === 0 && r.absent === 0),
     'C2b: ok 只在三门槛全 pass 时为真（无 blocked / degraded / absent，实 ' + r.ok + '）');
-  a(r.passed + r.blocked + r.degraded + r.absent === 3, 'C2c: 四态计数相加等于门槛数 3（实 '
-    + (r.passed + r.blocked + r.degraded + r.absent) + '）');
+  // v2.278.0（V7 OPV7-2）：五态相加 = 门槛数 4（含 unknown 那一桶）。
+  a(r.passed + r.blocked + r.degraded + r.absent + r.unverifiable === 5, 'C2c: 五态计数相加等于门槛数 3（实 '
+    + (r.passed + r.blocked + r.degraded + r.absent + r.unverifiable) + '）');
   // C3 【口径③】缺件如实报 absent，不假称通过
   const savedRender = WA.render;
   let rAbs = null;
@@ -296,7 +307,7 @@ function runD(a) {
     'D1b: health 节 verdict 与引擎直读一致（' + (h && h.verdict) + '）');
   a(!!h && typeof h.sourcePassing === 'number' && typeof h.sourceTotal === 'number',
     'D1c: health 节带「源全通 N/M」两个真数（' + (h && h.sourcePassing) + '/' + (h && h.sourceTotal) + '）');
-  a(!!h && (h.gates || []).length === 3, 'D1d: health 节带三条门槛（实 ' + ((h && h.gates) || []).length + '）');
+  a(!!h && (h.gates || []).length === 5, 'D1d: health 节带五道门槛（实 ' + ((h && h.gates) || []).length + '）');
   const badG = ((h && h.gates) || []).filter(function (g) { return !g.id || !g.state; });
   a(badG.length === 0, 'D1e: 逐条门槛都有 id 与 state（缺 ' + badG.length + '）');
   a(!!h && typeof h.line === 'string' && h.line.length > 0, 'D1f: health 节带整句 line（面板与诊断同一份措辞）');

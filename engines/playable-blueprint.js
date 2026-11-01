@@ -18,6 +18,12 @@
  *   3. 禁用一个可选玩法仍可开始基础剧情，玩家不必手填 JSON。
  *   4. 不是角色卡市场、发布平台或公开 API 项目。
  *   5. 三份样例蓝图（城镇工坊/探索聚落/科幻站点）可直接开局且各具名玩法定义确实可用。
+ *
+ * v2.281.0（V7 OPV7-6 · 开局即喂）两处改动：
+ *   · 势力改写进 `evolution.factions`（此前写零读口的 `world.factions`，实测导致
+ *     evoFactions 恒 0、org.assignRole 当场 missing-holder）；
+ *   · installSample 成功后调 `WA.playableSeed.seed()`（结构位播种，见 engines/playable-seed.js）。
+ *     传 `{ noSeed: true }` 可跳过；失败只进 `seeded` 读数，不改本安装器的 ok。
  */
 (function () {
   'use strict';
@@ -351,13 +357,21 @@
         if (places.length > 0 && !draft.region.currentPlace) {
           draft.region.currentPlace = places[0];
         }
-        draft.world.factions = draft.world.factions || [];
+        // ── v2.281.0（V7 OPV7-6）：势力写进**真源** `evolution.factions` ──────────────
+        //   病灶（探针 tools/v7probes/p_seed_gap.js 实测）：此前写 `draft.world.factions`，
+        //   而全仓对 `world.factions` **零读口** —— org.holder / editorFaction.list /
+        //   diplomacy.hasFaction / evolution.applyFactions / faction-graph / inspector-state
+        //   一律读 `evolution.factions`。写进没人读的键，在读数上与「没写」长得一样：
+        //   装完三份样例后 evoFactions 仍为 0，org.assignRole 因此当场 `missing-holder`
+        //   —— 那是播种链上的第一个硬阻塞，也是本项「装了人却装不进组织」的一半原因。
+        //   为什么走 evolution.applyFactions 而不在这里自己 push：容量（MAX_FACTIONS 环形
+        //   挤出）、status/relation 的合法值收敛、既有行的合并语义，全仓只有那一份实现。
+        //   这里再拼一遍就是第二个真源，下一次改容量时会有一半路径不跟。
+        draft.evolution = draft.evolution || {};
         var factions = (s.initConditions && s.initConditions.factions) || [];
-        factions.forEach(function (f) {
-          if (!draft.world.factions.some(function (x) { return x && x.name === f.name; })) {
-            draft.world.factions.push({ name: f.name, type: f.type || 'guild' });
-          }
-        });
+        if (factions.length && WA.evolution && typeof WA.evolution.applyFactions === 'function') {
+          WA.evolution.applyFactions(draft, factions);
+        }
         draft.blueprint = draft.blueprint || {};
         if (!draft.blueprint.installed || typeof draft.blueprint.installed !== 'object' || draft.blueprint.installed.sampleId) {
           draft.blueprint.installed = {};
@@ -460,10 +474,27 @@
         return true;
       }, 'playableBlueprint:install');
     }
+    // ── v2.281.0（V7 OPV7-6）：装完立刻播种（开局即喂）────────────────────────
+    //   为什么挂在安装器自己身上、而不是在面板按钮里「再点一下」：
+    //   开局路径有三条 —— 面板 / actionDesk.plan('playableBlueprint.installSample') /
+    //   代码直调引擎。只有挂在安装器上才不会漏掉后两条（计划原文要的是「开局流程末尾
+    //   播种」，不是「面板上多一个按钮」）。
+    //   默认就播（要跳过须显式 noSeed:true）：这一项治的恰恰是「装完世界是空舞台」，
+    //   默认关等于把缺口当成默认行为留着。
+    //   失败只作读数、不改 ok：安装本体已提交，播种失败不该让「装好了」变假
+    //   （与 backstage 把 intake 分发放在 tx.ok 之后、失败只记日志同规）。
+    var seeded = null;
+    try {
+      if (o.noSeed !== true && WA.playableSeed && typeof WA.playableSeed.seed === 'function') {
+        seeded = WA.playableSeed.seed({ sampleId: s.id, force: o.forceSeed === true });
+      }
+    } catch (e) { seeded = { ok: false, reason: 'seed-threw' }; }
+
     return {
       ok: true,
       sampleId: s.id,
       installed: installed,
+      seeded: seeded,
       note: '玩法包【' + s.label + '】已成功安装至世界真源'
     };
   }

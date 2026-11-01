@@ -828,6 +828,23 @@
         return '<div class="wa-dim" id="wa-cap-line">世界规模读数异常：' + esc((e && e.message) || e) + '</div>';
       }
     })();
+    // v2.280.0（V7 OPV7-4）：写口契约自述行 —— 「有多少写口拒了会说清下一步」。
+    //   三条口径（与 capLine / healthLine 同规）：
+    //   ① **只在值得说的时候说**：`withHint === 0` 就整行不出现（这是提示，不是装饰）；
+    //   ② **不冒充扫完**：`truncated` 时必须带「下界」二字 —— 截断后的数字不是全量；
+    //   ③ **措辞只此一份**：整句来自 `summaryText()`，面板不自己拼（第二个措辞真源 = 漂移源）。
+    //   为什么玩家面要有这一行：它是「这个世界的机制彼此之间讲不讲得通道理」的可见证据。
+    //   95 个写口写了下一步、其余一千多个没写 —— 玩家看不到这件事，就只能靠报错猜。
+    const wcLine = (function () {
+      try {
+        if (!WA.writeContract || typeof WA.writeContract.summaryText !== 'function') return '';
+        const st = (typeof WA.writeContract.stat === 'function') ? WA.writeContract.stat() : {};
+        if (!st || !(Number(st.withHint) > 0)) return '';
+        return '<div class="wa-dim" id="wa-wc-line">' + esc(WA.writeContract.summaryText()) + '</div>';
+      } catch (e) {
+        return '';   // 提示行不占屏的失败方式：静默不显示，不把异常砸到玩家面上
+      }
+    })();
     // v2.259.0（V6 OPV6-4）：首轮体检块 —— 「世界跑起来了，但内容只出来一部分」要说得出为什么。
     //   三条口径（与 capLine 同规）：
     //   ① **整句取自引擎原话**：`threeGatesLine()` 一句到底，面板不拼措辞（第二个措辞真源就是漂移源）。
@@ -841,6 +858,10 @@
           return '<div class="wa-dim" id="wa-health-line">体检读数不可用（engines/health-preflight.js 缺席）</div>';
         }
         const r = WA.healthPreflight.threeGates({ sample: 8 });
+        // v2.278.0（V7 OPV7-2）：consume 五态。dormant 必须占屏 —— 它是「世界看着在转、
+        //   一部分机制从来没被喂过」的唯一出口；把它跟 running 一起静默，玩家永远不会知道。
+        // v2.279.0（V7 OPV7-3）：产出面（yield）同理 —— 「这一轮世界一个字没说」
+        //   是玩家最该当场知道的事，它绝不能跟 running 一起静默。
         if (!r || r.verdict === 'running') return '';
         // 纯文本节点承载整句：ui-gate 与专锁按 textContent 比对，标签内嵌数值会漂位置（capLine 踩过）。
         return '<div class="wa-dim" id="wa-health-line">' + esc(WA.healthPreflight.threeGatesLine({ sample: 8 }))
@@ -3348,6 +3369,11 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     // v2.164.0（TX5 世界蓝图）：同款读数常驻（「库是空的」与「这一面被关掉了」必须分得开）。
     const bpCfgL = lazy(function () { return (WA.worldBlueprint && WA.worldBlueprint.getSettings) ? WA.worldBlueprint.getSettings() : null; });
     const bpOn = lazy(function () { const c = bpCfgL(); return !!(c && c.enabled); });
+    // v2.281.0（V7 OPV7-6）：开局播种的开关常驻读数 —— 同 v2.164.0 起的惯例，
+    //   「还没播过」与「这一面被关掉了」必须分得开（关着时 seed() 直接回 disabled，
+    //   台账一直空；那与「装了蓝图但一行都没播」不是一回事）。
+    const seedCfgL = lazy(function () { return (WA.playableSeed && WA.playableSeed.getSettings) ? WA.playableSeed.getSettings() : null; });
+    const seedOn = lazy(function () { const c = seedCfgL(); return !!(c && c.enabled); });
     // v2.182.0（O4 / O3）：同款读数常驻 ——「清点是空的」与「这一面被关掉了」必须分得开。
     const capCfgL = lazy(function () { return (WA.capacityAudit && WA.capacityAudit.getSettings) ? WA.capacityAudit.getSettings() : null; });
     const capOn = lazy(function () { const c = capCfgL(); return !!(c && c.enabled); });
@@ -3558,6 +3584,15 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-row"><button class="wa-btn" id="wa-bp-check" title="纯读：对库内一张蓝图跑引用完整性三判据（重复 ID / 悬空引用 / 未知顶层键）—— 这是安装前的**独立**校验口，与安装侧共用同一份判据，不另写一套">校验蓝图</button><button class="wa-btn" id="wa-bp-empty" title="纯读：当前世界是不是空新局（12 项逐格清点：人物/地点/道路/势力/轮次/纪事/暗流/回声/事实/货品/初始化来源/蓝图安装留痕）。答的是「现在能不能装」，不是「装过没有」">目标空局检查</button></div>
       <div class="wa-row"><input id="wa-bp-keep" class="wa-input" placeholder="保留层级 structure / roster / mech（留空=roster）"/><button class="wa-btn" id="wa-bp-preview" title="纯读预览：把库内一张蓝图映射到现有状态字段（六道门：版本/形状/白名单键/重复 ID/悬空引用/容量 + 目标非空）。预览只做一次映射，确认应用同一份">导入预览</button><button class="wa-btn" id="wa-bp-import" title="写口（大）：一次事务装完整结构（势力/人物/关系/地点/道路/时代），进度归零，写 blueprint.installed。只作用于空新局 —— 非空目标拒收 not-empty；无预览拒收 no-preview">安装蓝图</button></div>
       <div id="wa-bp-out" class="wa-out"></div>
+      <!-- v2.281.0（V7 OPV7-6）：开局即喂。装完蓝图会自动播种，这里给的是
+           「播了什么／有几行取不到实词」的读数与一个补播入口（补播为幂等）。 -->
+      <label class="wa-row"><input id="wa-seed-enabled" type="checkbox" ${seedOn() ? 'checked' : ''}/> 启用开局播种（关掉时「补播」直接回 disabled，读数一直空 —— 这与「装了蓝图但一行都没播」不是一回事）</label>
+      <div class="wa-dim" id="wa-seed-line"></div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-seed-replay" title="补播：按当前已安装的玩法蓝图再播一次结构化位（目标 / 日程 / 关系 / 势力归属）。幂等 —— 已有的行不会重复写；取不到实词的行不播并如实报，绝不编一句填进去">补播</button>
+        <button class="wa-btn" id="wa-seed-view" title="只读：要播几行、各是哪一类、有没有取不到实词的行、逐条拒因是什么">播种读数</button>
+      </div>
+      <div id="wa-seed-out" class="wa-out"></div>
       `)}
       ${foldSec('tools', 'depcheck', '依赖体检与迁移助手</div><div class="wa-dim">（E8：这一坨东西在你这台机器上到底能不能用）', () => `
       <div class="wa-dim">蓝图 / 种子 / 转移包 / 存档信封四类可搬物，粘进来逐项体检：<b>缺什么</b>（外部依赖 / 机制开关 / 配方真源）、
@@ -4023,6 +4058,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-bt-audit" title="计划复验（只读）：复验结论与依据面三个来源的现场计数 —— 本页不提供任何写按钮">计划复验</button>
         <button class="wa-btn" id="wa-bt-blocked" title="本刻谁在卡：读四引擎的最近一次拒收理由，汇成一句话">谁在卡</button>
         <button class="wa-btn" id="wa-bt-diag" title="自证面：四个引擎与门面的在场性、各自的启用态、以及本页读到的四个库面">诊断</button>
+        <button class="wa-btn" id="wa-bt-driver" title="驱动者台账（只读）：每台机制归到哪一档、凭什么。链上自动 / 路由登记 / 面板控件 / 引擎互调 / 只被诊断面读 / 没人碰。开关开着但没有驱动入口的机制，这一页才看得见">驱动者</button>
+        <button class="wa-btn" id="wa-bt-driver-sw" title="切换驱动者台账总开关。关掉后这一栏不参与任何面（面板不显示、诊断面报关着）。它只影响「要不要读这份台账」，不影响任何引擎的 enabled —— 开关面归 capabilityTier 管">台账开关</button>
       </div>
       <div id="wa-bt-out" class="wa-out"></div>`;
   }
@@ -7779,6 +7816,97 @@ on('#wa-desk-show', showDesk);
         + (s.hasPending ? '（有未确认的导入票据 —— 未确认不落盘）' : '')
         + (s.hasInstalled ? '（已安装留痕：v' + s.installedBpVer + ' · ' + s.installedSig + '）' : '')
         + (fk ? '｜拒收归因 ' + fk : ''), true);
+    });
+    // ── v2.281.0（V7 OPV7-6）：开局播种的两枚控件 + 一个输出区（渲染在蓝图折叠段内）。
+    //   与蓝图栏**分开**：那一栏答「这个世界能不能原样搬走」，本栏答「搬过来之后世界里
+    //   有没有剧本」—— 合成一栏就是把两件事说成一件事。读数由引擎 view() 现读，
+    //   面板不自己算「该播几行」（第二个措辞真源即漂移源）；只有「补播」真写，而写只走真写口。
+    const seedOut = function (text, keep) {
+      if (keep) panelEl.dataset.seedOut = text;
+      setOut('#wa-seed-out', text);
+    };
+    if (panelEl.dataset.seedOut) setOut('#wa-seed-out', panelEl.dataset.seedOut);
+    { const el = $('#wa-seed-enabled');
+      if (el) el.onchange = function () {
+        if (!WA.playableSeed || !WA.playableSeed.setSettings) return seedOut('开局播种不可用：module-missing（engines/playable-seed.js 缺席 —— 这一栏读的是它的开关与读数）', true);
+        WA.playableSeed.setSettings({ enabled: !!el.checked });
+        seedOut('已记录 ' + (el.checked ? 'enabled（装完蓝图会自动播种）' : 'disabled（补播与自动播种一并拒收；已播过的行不因此消失 —— 那是世界事实，不是开关）'), true);
+        renderBody();
+      };
+    }
+    const seedView = function () {
+      if (!WA.playableSeed || typeof WA.playableSeed.view !== 'function') return null;
+      try { return WA.playableSeed.view(); } catch (e) { return null; }
+    };
+    { const el = $('#wa-seed-line');
+      if (el) {
+        const sv = seedView();
+        if (!sv) el.textContent = '开局播种不可用（engines/playable-seed.js 缺席）';
+        else {
+          const s0 = sv.stat || {};
+          el.textContent = (sv.blueprint ? '' : '当前没有已安装的玩法蓝图 ⇒ 播种无输入。')
+            + '要播 ' + sv.planned + ' 行 · 写入 ' + (s0.written || 0)
+            + ' · 跳过 ' + (s0.skipped || 0) + ' · 受阻 ' + (s0.blocked || 0)
+            + ((sv.noSource || []).length ? '｜取不到实词 ' + sv.noSource.length + ' 行（不播，不编）' : '');
+        }
+      }
+    }
+    on('#wa-seed-view', () => {
+      const sv = seedView();
+      if (!sv) return seedOut('开局播种不可用：module-missing（engines/playable-seed.js 缺席 —— 这一栏读的是它的读数，缺席时不拿空表冒充）', true);
+      const c = sv.counts || {};
+      // 台账用 stat()、逐行明细用 preview()：前者是**本会话已发生的事**，后者是**此刻要播什么**。
+      //   两个问题不能拿一个读数答（view() 给的是汇总；「谁在追什么」只能逐行看）。
+      const s0 = (WA.playableSeed && typeof WA.playableSeed.stat === 'function')
+        ? WA.playableSeed.stat() : (sv.stat || {});
+      const pv = (WA.playableSeed && typeof WA.playableSeed.preview === 'function')
+        ? WA.playableSeed.preview({}) : null;
+      const rows = (pv && pv.ok && Array.isArray(pv.rows)) ? pv.rows : [];
+      const rs = s0.reasons || {};
+      const rk = Object.keys(rs).map(function (k) { return k + '×' + rs[k]; }).join('、');
+      const KIND_LABEL = { goal: '目标', schedule: '日程', bond: '关系', roster: '归属' };
+      seedOut('<div class="wa-log wa-log-info">蓝图：' + esc(sv.blueprint || '（无）')
+        + '｜要播 ' + sv.planned + ' 行 —— 目标 ' + (c.goal || 0) + ' · 日程 ' + (c.schedule || 0)
+        + ' · 关系 ' + (c.bond || 0) + ' · 势力归属 ' + (c.roster || 0) + '</div>'
+        + '<div class="wa-item">台账：写入 ' + (s0.written || 0) + ' · 跳过 ' + (s0.skipped || 0)
+        + ' · 受阻 ' + (s0.blocked || 0) + '｜本会话播过 ' + (s0.runs || 0) + ' 次'
+        + (s0.lastReason ? ' · 上次 ' + esc(s0.lastReason) : '')
+        + (rk ? '｜拒因 ' + esc(rk) : '') + '</div>'
+        + (rows.length
+          ? '<div class="wa-dim">逐行（这一局世界会拿到这些结构化位 —— 每条都带出处 <code>src</code>）：</div>'
+            + rows.slice(0, 16).map(function (r) {
+              const who = r.who || r.a || '';
+              const tail = (r.kind === 'goal' || r.kind === 'schedule')
+                ? esc(r.text || r.activity || '')
+                : (r.kind === 'bond'
+                  ? esc(r.a + ' ⇄ ' + r.b + ' · ' + (r.types || []).join('、'))
+                  : esc((r.faction || '') + ' · ' + (r.who || '') + ' · ' + (r.roleId || '')));
+              return '<div class="wa-item">[' + esc(KIND_LABEL[r.kind] || r.kind) + '] '
+                + (r.kind === 'bond' ? '' : esc(who) + ' → ') + tail
+                + (r.src ? ' <span class="wa-dim">（' + esc(r.src) + '）</span>' : '') + '</div>';
+            }).join('')
+            + (rows.length > 16 ? '<div class="wa-dim">…共 ' + rows.length + ' 行</div>' : '')
+          : '<div class="wa-dim">此刻没有可播的行（没有已安装蓝图，或蓝图本身没有 playDefs）。</div>')
+        + ((sv.noSource || []).length
+          ? '<div class="wa-item wa-log-warn">取不到实词的行（<b>不播</b> —— 播种只填结构位，取不到就不填）：'
+            + esc(sv.noSource.slice(0, 12).join('、'))
+            + (sv.noSource.length > 12 ? ' …共 ' + sv.noSource.length + ' 行' : '') + '</div>'
+          : '<div class="wa-dim">没有取不到实词的行。</div>')
+        + (sv.note ? '<div class="wa-dim">' + esc(sv.note) + '</div>' : ''), true);
+    });
+    on('#wa-seed-replay', () => {
+      if (!WA.playableSeed || typeof WA.playableSeed.seed !== 'function') return seedOut('开局播种不可用：module-missing（engines/playable-seed.js 缺席）', true);
+      const r = WA.playableSeed.seed({});
+      if (!r || !r.ok) {
+        // 「没有已安装蓝图」与「播了但被拒」是两种处置：前者先去装蓝图，后者去查拒因。
+        return seedOut('<div class="wa-log wa-log-warn">没播成：' + esc((r && r.reason) || '未知')
+          + '（' + ((r && r.reason === 'no-blueprint')
+            ? '当前没有已安装的玩法蓝图 —— 先去上面「安装蓝图」' : '这一栏读的是引擎的拒因，不猜')
+          + '）</div>', true);
+      }
+      seedOut('<div class="wa-log wa-log-info">播完：要播 ' + r.planned + ' 行 · 写入 ' + r.written
+        + ' · 跳过（已存在）' + r.skipped + ' · 受阻 ' + r.blocked + '</div>'
+        + '<div class="wa-dim">幂等：同一份蓝图播两次不会重复写 —— 跳过不是失败。</div>', true);
     });
     // ── v2.187.0（E8 依赖体检与迁移助手）：八枚控件 + 一个输出区（渲染在「工具」页）。
     //   三件齐做（渲染 + 绑定 + UI_BINDINGS 守卫登记）—— 理由与 v2.155.0 种子库 /
@@ -13873,6 +14001,68 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         + '<div class="wa-dim">闸门参数：整机 ' + esc(String(cfg.minGap)) + ' 轮　新章静默 ' + esc(String(cfg.quietRounds))
         + ' 轮　开新章 ' + esc(String(cfg.chapterGap)) + ' 轮　开间章 ' + esc(String(cfg.interludeGap)) + ' 轮'
         + '<br/>口径：按<b>轮</b>记账，绝不看墙钟；chapter / interlude-chapter 两档豁免整机闸门。</div>');
+    });
+    // v2.275.0（V7 OPV7-5）：驱动者台账读数。
+    //   调 `WA.driverLedger.<口>` 而不预先存局部变量：清册的引用面只认
+    //   `WA.<ns>.<mem>` 字面形态，存进变量后这些导出在静态面上仍是「产品零引用」，
+    //   死子面账本会记下与事实相反的证词（本仓 v2.149.0 在 perspective.getView 上踩过）。
+    //   三态分开：模块缺席 ⇒ 报缺；调用面读不全 ⇒ 报未判定（不是「没有」）；读得到 ⇒ 报读数。
+    on('#wa-bt-driver', () => {
+      if (!WA.driverLedger || typeof WA.driverLedger.view !== 'function') return btMiss('驱动者台账');
+      // 三态分开（与 bt 区其它 handler 同规）：模块缺席 ⇒ 报缺；面关着 ⇒ 报关；读得到 ⇒ 报读数。
+      //   关着时报的是「关着」，不是「没有驱动者」—— 与 health 节拒绝把「没有地名」和
+      //   「有但隐去」压成同一个 hidden 是同一条裁决。
+      const dcfg = (typeof WA.driverLedger.getSettings === 'function') ? WA.driverLedger.getSettings() : {};
+      if (!dcfg.enabled) {
+        return btOut('<div class="wa-log wa-log-warn">驱动者台账已关闭（<code>enabled=false</code>）—— '
+          + '这一栏现在是关着，不是「所有机制都有驱动入口」。要在诊断面看见它，先在这一页把它打开</div>');
+      }
+      const v = WA.driverLedger.view();
+      const c = v.counts || {};
+      const cmd = WA.driverLedger.summaryText();
+      const row = function (label, names, tone) {
+        if (!names || !names.length) return '';
+        return '<div class="wa-item"><span class="wa-dim">' + esc(label) + '</span> '
+          + '<span class="wa-log ' + (tone || 'wa-log-info') + '">' + esc(names.slice(0, 30).join('、'))
+          + (names.length > 30 ? ' …共 ' + names.length + ' 台' : '') + '</span></div>';
+      };
+      const ln = v.layerNames || {};
+      let html = '<div class="wa-item"><b>' + esc(cmd) + '</b></div>';
+      html += '<div class="wa-dim">' + esc(v.note || '') + '</div>';
+      html += row('链上自动 ' + (c.L1 || 0), ln.L1, 'wa-log-info');
+      html += row('路由登记 ' + (c.L2r || 0), ln.L2r, 'wa-log-info');
+      html += row('面板控件 ' + (c.L2p || 0), ln.L2p, 'wa-log-info');
+      html += row('引擎互调 ' + (c.L2e || 0), ln.L2e, 'wa-log-info');
+      html += row('只被诊断面读 ' + (c.L3a || 0), ln.L3a, 'wa-log-warn');
+      html += row('没人碰 ' + (c.L3b || 0), ln.L3b, 'wa-log-err');
+      html += row('未判定 ' + (c.undetermined || 0), v.undetermined, 'wa-log-warn');
+      // 扫描口径：这一页给的是「事实」还是「下界」，必须自己说清楚
+      html += '<div class="wa-dim">扫描面：' + esc(v.scan.level) + '（文件 ' + v.scan.files
+        + ' · 函数 ' + v.scan.fns + '）· 可下结论 ' + (v.scan.canConclude ? '是' : '否')
+        + ' · 互调可达 ' + v.scan.reachSize + ' 台 / ' + v.scan.reachRounds + ' 轮</div>';
+      // 逐台明细入口：读 why(ns) 才能回答「它凭什么归这一档」，只给档位不给依据等于没答。
+      //   取前 3 台没人碰的作样例 —— 面板一次全吐 33 条会淹掉页面。
+      const sample = (v.layerNames && v.layerNames.L3b || []).slice(0, 3);
+      if (sample.length) {
+        html += '<div class="wa-item"><span class="wa-dim">没人碰的前几台，凭什么这么判：</span></div>';
+        sample.forEach(function (ns) {
+          const w = WA.driverLedger.why(ns);
+          if (!w || !w.ok) return;
+          html += '<div class="wa-item"><code>' + esc(ns) + '</code> → '
+            + '<span class="wa-dim">' + esc(w.hint || '') + '</span></div>';
+        });
+      }
+      btOut(html);
+    });
+    // 台账总开关：与「驱动者」读数按钮分开 —— 一个是读，一个是改自己的开关。
+    //   它是本模块唯一可写面（只写自己的 settings，不碰任何引擎的 enabled）。
+    on('#wa-bt-driver-sw', () => {
+      if (!WA.driverLedger || typeof WA.driverLedger.setSettings !== 'function') return btMiss('驱动者台账');
+      const cur = (typeof WA.driverLedger.getSettings === 'function') ? WA.driverLedger.getSettings() : {};
+      const next = !cur.enabled;
+      WA.driverLedger.setSettings({ enabled: next });
+      btOut('<div class="wa-log wa-log-info">驱动者台账已' + (next ? '打开' : '关闭')
+        + '。这只影响这一栏要不要被读，不改任何引擎的 enabled</div>');
     });
     on('#wa-bt-audit', () => {
       if (!WA.planAudit || typeof WA.planAudit.diagnose !== 'function') return btMiss('计划复验引擎');

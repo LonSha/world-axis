@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.274.0';
+  const VERSION = '2.281.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -479,6 +479,11 @@
     'engines/service-network.js',
     // v2.231.0（优化 OP-9）：可玩的世界蓝图。样例、依赖检查、玩法定义导出。
     'engines/playable-blueprint.js',
+    // v2.281.0（V7 OPV7-6）：开局即喂。把已安装蓝图播种成结构化世界（目标/日程/关系/势力归属）。
+    //   位置**必须紧随 playable-blueprint**：调用期它读 WA.playableBlueprint.getSample（玩法定义
+    //   与初始条件的唯一真源）和各写口（life.addGoal/addSchedule、bonds.setBond、org.assignRole）。
+    //   装载期它只登记自己的设置键 —— 零上游读、零 store 写、零落盘，故排在这里不构成装载期依赖。
+    'engines/playable-seed.js',
     // v2.231.0（拓展 IN-7）：有承载力的环境。存量、再生、压力与恢复时滞。
     'engines/environmental-capacity.js',
     // v2.231.0（拓展 IN-8）：社会遗产。未完事业/设施/物件/师承/声誉的承接与见证。
@@ -1161,6 +1166,21 @@
     // v2.273.0（V6 EXV6-9）：一键交班，与 index.js LOAD_ORDER 严格同序
     //   （first-run 之后、capability-tier 之前）。
     'engines/handoff-pack.js',
+    // v2.275.0（V7 OPV7-5）：驱动者登记表。位置同前面的只读读数模块（handoff-pack 之后、
+    //   tier 之前）：装载期只登记自己的设置键，零上游读、零 store 写、零落盘。
+    //   它与 tier/audit 排在同一段末尾的理由不同 —— 本模块**调用期**要读 WA.workflow 的链清单
+    //   与产品源码（静态扫描），但两者都是惰性的：首次 view()/build() 才扫描，装载期不触任何上游。
+    //   排在 ui/panel.js 之前是为了让面板概览与诊断面在首屏就能念出分层读数。
+    'engines/driver-ledger.js',
+    // v2.277.0（V7 OPV7-1）：推演结果分发器。位置**必须**在 life/temperament/enigma/events 之后
+    //   （它调用期要调这四个引擎的写口，装载期只登记自己的设置键：零上游读、零 store 写、零落盘）。
+    //   排在 backstage 之后也不构成环：backstage 只在结算成功分支里**调用期**取 WA.intake。
+    //   排在 ui/panel.js 之前，让面板首屏就能念出分发读数。
+    'engines/intake-dispatch.js',
+    // v2.280.0（V7 OPV7-4）：写口契约自描述。位置**必须**在 capability-tier 之前、
+    //   driver-ledger 之后：它调用期要读任意引擎的导出函数体（toString），装载期零上游读。
+    //   排在这里不构成环：本模块只在自己被调用时才碰 WA 的其它命名空间。
+    'engines/write-contract.js',
     'engines/capability-tier.js',
     'engines/capability-audit.js',
     'ui/panel.js',

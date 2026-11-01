@@ -895,6 +895,152 @@
     });
   }
  /**
+   * v2.275.0（V7 OPV7-5）：驱动者登记表读数。谁在什么时机驱动哪个引擎。
+   *
+   *   与上方 `capability` 节（v2.257.0）**分列不合并**，也与 `health` 节（v2.259.0）分列：
+   *     · capability 答「179 个开关此刻谁在跑」——读的是 enabled 开关面；
+   *     · health    答「跑着的那些为什么内容还是没出来」——读的是注入门槛；
+   *     · 本节      答「这台机制有没有任何人会去驱动它」——读的是**调用面**。
+   *   三问正交。V7 立项抓的正是第三种：开关开着、门槛也过，但四条调用面一条都没登记它，
+   *   于是它永远不出内容 —— 前两节都读不出这一格。
+   *
+   *   本节只是转述 `driverLedger.view()` 的读数，**不做二次归类**：分层判据（L1 链自动 /
+   *   L2r 路由登记 / L2p 面板控件 / L2e 已可达引擎的互调 / L3a 只被诊断面读 / L3b 没人碰）
+   *   全部在引擎里，维护者面要的正是「这一台归到哪一档、凭什么」。
+   *
+   *   与 secSediment / secTapeStore 同规：**只报读数、不写世界** —— 不切档位、不开关引擎、
+   *   不改任何 enabled。`scan.canConclude === false` 时如实报「未判定」，不冒充「没有驱动者」。
+   */
+  /**
+   * v2.280.0（V7 OPV7-4）：写口契约自描述读数。
+   *
+   * 本节刻意**不做全表 dump**：`scan()` 会遍历 3000+ 导出函数、对每个做一次 toString，
+   *   诊断包塞满 1189 行契约表只会把真正有用的那几行埋掉。故只取读数与几个样例。
+   *
+   * 两件必须分开报的事：
+   *   ① **带 hint 的写口数 vs 全部有拒收码的写口数** —— 前者是「作者写了下一步」的那部分，
+   *      后者是「会拒收」的那部分。只报前者会让「大部分写口拒了不说怎么办」隐形。
+   *   ② **unreadable** —— 函数体读不到的写口。这不是「没有约束」，是「读不出来」，
+   *      两者的处置完全相反（前者可以直接调，后者要先确认运行环境）。
+   */
+  /**
+   * v2.281.0（V7 OPV7-6）：开局播种读数。
+   *
+   * 与相邻各节**分列不合并**（每节答一问，合并就丢掉归因）：
+   *   · `secCapability` 答「开关有没有开」；
+   *   · `secHealth`     答「跑着的为什么内容没出来」（三面门槛）；
+   *   · `secDriver`     答「有没有任何人会去驱动它」；
+   *   · 本节           答「**开局那一刻，结构化引擎里到底被喂进了什么**」。
+   * 第四问独有：探针实测真实开局后 people 6 / places 12，而 lifeGoals / schedule /
+   *   bonds / roster **全零** —— 世界有演员、没剧本。前四节都读不出这一格
+   *   （开关是开的、门槛是过的、写口也有人调，只是没人给它们内容）。
+   *
+   * 三件事必须分开报（否则本节的读数和「全空」长得一样）：
+   *   ① `planned` / `noSource` —— 要播几行、有几行**取不到实词**（不编值，如实不播）；
+   *   ② `stat.reasons` —— 逐条拒因（disabled / missing-holder / already / …）；
+   *   ③ `blueprint` —— 播的是哪份蓝图。**没有已安装蓝图**时如实报 `no-blueprint`，
+   *      不渲染成「播过了但没内容」（那是两种完全不同的处置）。
+   * 与 secSediment / secTapeStore 同规：**只读** —— 不触发播种、不改任何开关。
+   */
+  function secPlayableSeed() {
+    return safe(function () {
+      if (!WA.playableSeed || typeof WA.playableSeed.view !== 'function') {
+        return { error: 'engines/playable-seed.js 未加载（开局播种读数缺席）' };
+      }
+      const v = WA.playableSeed.view();
+      return {
+        enabled: v.enabled, bondPairs: v.bondPairs, roster: v.roster,
+        blueprint: v.blueprint,
+        planned: v.planned,
+        counts: v.counts,
+        // 取不到实词的行**必须点出来**：那是「这一行没播」的原因，不是噪声
+        noSource: (v.noSource || []).slice(0, 12),
+        noSourceCount: (v.noSource || []).length,
+        stat: v.stat,
+        note: v.blueprint
+          ? null
+          : '当前没有已安装的玩法蓝图：播种无输入（这不是「播过了但世界还是空」）',
+        line: '要播 ' + v.planned + ' 行（目标 ' + (v.counts || {}).goal + ' / 日程 '
+          + (v.counts || {}).schedule + ' / 关系 ' + (v.counts || {}).bond
+          + ' / 势力归属 ' + (v.counts || {}).roster + '）'
+          + ((v.noSource || []).length ? '｜取不到实词 ' + v.noSource.length + ' 行（不播，不编）' : '')
+      };
+    });
+  }
+
+  function secWriteContract() {
+    return safe(function () {
+      if (!WA.writeContract || typeof WA.writeContract.scan !== 'function') {
+        return { error: 'engines/write-contract.js 未加载（写口契约读数缺席）' };
+      }
+      const r = WA.writeContract.scan();
+      const st = (typeof WA.writeContract.stat === 'function') ? WA.writeContract.stat() : {};
+      const withHint = (r.rows || []).filter(function (x) { return x.hints && Object.keys(x.hints).length > 0; });
+      return {
+        scanned: r.scanned, truncated: r.truncated, cap: r.cap,
+        entries: r.entries, withHint: r.withHint, unreadable: r.unreadable,
+        line: (typeof WA.writeContract.summaryText === 'function') ? WA.writeContract.summaryText() : '',
+        // 样例：带自述的写口各取一条 hint 原文。它们**不是**精选的好例子，
+        //   而是「能拿到什么就报什么」—— 谁在第一页完全取决于 Object.keys 的顺序，不做美化。
+        samples: withHint.slice(0, 8).map(function (x) {
+          const code = Object.keys(x.hints)[0];
+          return { at: x.ns + '.' + x.method, code: code, hint: x.hints[code] };
+        }),
+        // 读不到的写口：名字必须点出来（这是要人在运行环境里确认的事，不是噪声）
+        unreadableRows: (r.rows || []).filter(function (x) { return x.readable === false; })
+          .slice(0, 20).map(function (x) { return x.ns + '.' + x.method; }),
+        stat: st
+      };
+    });
+  }
+
+  function secDriver() {
+    return safe(function () {
+      if (!WA.driverLedger || typeof WA.driverLedger.view !== 'function') {
+        return { error: 'engines/driver-ledger.js 未加载（驱动者读数缺席）' };
+      }
+      const v = WA.driverLedger.view();
+      const sm = (typeof WA.driverLedger.summaryText === 'function') ? WA.driverLedger.summaryText() : '';
+      const st = (typeof WA.driverLedger.stat === 'function') ? WA.driverLedger.stat() : {};
+      return {
+        total: v.total,
+        // 六档计数原样搬出。L3a 与 L3b 必须分开：一个还有人看（诊断面），一个彻底没人碰。
+        counts: Object.assign({}, v.counts || {}),
+        // 悬空清单：这是本节唯一值得玩家逐条看的东西。
+        //   清单本身要截断（面板不能一次吐 109 个名字），但**计数必须读引擎给的字段**，
+        //   不能拿 arr.length 当总数 —— 截断后长度就成了「上限 60」而不是真实条数，
+        //   那是最容易被当真的一类假读数（探针实测：blind 显示 30，实际 33）。
+        orphans: (v.orphans || []).slice(0, 60),
+        orphanCount: v.orphanCount,
+        diagOnlyOrphans: (v.diagOnlyOrphans || []).slice(0, 30),
+        diagOnlyOrphanCount: v.diagOnlyOrphanCount,
+        blindOrphans: (v.blindOrphans || []).slice(0, 30),
+        blindOrphanCount: v.blindOrphanCount,
+        // 各档名单（维护者面看名字，玩家面看 summary 那句）
+        layerNames: v.layerNames || {},
+        // 未判定必须对外可见：藏起来就会让读者把「未判定」读成「已确认没有驱动者」
+        undetermined: (v.undetermined || []).slice(0, 30),
+        undeterminedCount: v.undeterminedCount,
+        // 扫描口径自述：这一栏是「事实」还是「下界」，全看这几个字段
+        scan: Object.assign({}, v.scan || {}),
+        summary: sm,
+        // 归因句：与 capability 的 note 同规 —— 不给一句「全部正常」就算完
+        note: !v.scan || !v.scan.canConclude
+          ? ('本宿主读不到完整的调用面（' + ((v.scan && v.scan.level) || 'none') + '），'
+            + '未判定的 ' + (v.undeterminedCount || 0) + ' 台只说明「读到的面里没登记它」，'
+            + '不等于「没有驱动者」—— 要确认得在能读到全量产品源码的环境里跑一次')
+          : (v.orphanCount === 0
+            ? '所有机制都有产品登记的驱动入口（链/路由/面板/互调 四条面至少命中一条）'
+            : ('没有驱动入口的 ' + v.orphanCount + ' 台里，只被诊断面读的 '
+              + v.diagOnlyOrphanCount + ' 台 · 彻底没人碰的 '
+              + v.blindOrphanCount + ' 台；'
+              + '这些机制开关开着也不会出内容 —— 该补驱动入口，不是该开开关')),
+        reads: st.calls, lastAt: st.lastAt
+      };
+    });
+  }
+
+ /**
    * v2.259.0（V6 OPV6-4）：首轮零内容的三重门槛自检。
    *   与上方 `capability` 节（v2.257.0）**分列不合并**：那一节答「179 个开关此刻谁在跑」，
    *   本节答「跑着的那些，为什么内容还是没出来」。两问的失效模式完全不同 ——
@@ -907,6 +1053,66 @@
    *   不切档位、不开模块、不改可见性、不调预算（`fix` 只是「该按哪个写入口」的转述，
    *   点了才算数；本节目自己不点）。给不出动作的门槛如实报 `fix: null`。
    */
+  /**
+   * v2.276.0（V7 OPV7-7）：空产出归因。
+   *
+   * 与相邻两节的分工（三问都不合并）：
+   *   · `secCapability` —— 答「179 个开关此刻谁在跑」；
+   *   · `secHealth`     —— 答「跑着的那些，为什么内容还是没出来」（三面门槛）；
+   *   · 本节           —— 答「**具体哪几台引擎**在空着、各自卡在哪一面」（逐引擎）。
+   * 失效模式互不覆盖：门槛全过、首局在跑，照样可能有一批引擎永远空产。
+   *
+   * 本节是 `healthPreflight.yieldAttrib()` 在**产品侧的真读者**（口径：产品零引用即
+   * 冻结面）。与 secSediment / secHealth 同规：**只报读数、不写世界** ——
+   * 不切档位、不开模块、不改可见性；`action` 只是「该按哪个写入口」的转述，
+   * 点了才算数，本节目自己不点。
+   *
+   * 四态 + 两条单列名单必须一起报出，缺一样就答不出「哪种空」：
+   *   fault（构建抛异常）/ yield（有产出）/ off（开关关着）/ no-data（开着没内容）
+   *   + suspicious（有真实调用面却空：**嫌疑，不是结论**）
+   *   + weakRows（容器里有记录但从未被产出过：**判不了，如实报**）
+   */
+  function secYield() {
+    return safe(function () {
+      if (!WA.healthPreflight || typeof WA.healthPreflight.yieldAttrib !== 'function') {
+        return { error: 'engines/health-preflight.js 未加载或缺 yieldAttrib（空产出归因缺席）' };
+      }
+      const r = WA.healthPreflight.yieldAttrib({ limit: 20 });
+      const line = (typeof WA.healthPreflight.yieldAttribLine === 'function')
+        ? WA.healthPreflight.yieldAttribLine({})
+        : null;
+      return {
+        ok: r.ok,
+        // 四态计数：四者相加 = total，缺一项就无法对账
+        total: r.total, yield: r.yield, off: r.off, fault: r.fault, noData: r.noData,
+        // 巡视名单：只收「构建抛异常」—— 本仓唯一能自证的缺陷
+        faults: (r.faults || []).map(function (f) {
+          return { key: f.key, why: f.why, records: f.records, activity: f.activity,
+            injected: f.injected, lastReason: f.lastReason };
+        }),
+        // 关着的：一条动作就能救回来（开它就是），故与 faults 分列
+        offRows: (r.offRows || []).map(function (f) {
+          return { key: f.key, records: f.records, activity: f.activity, action: f.action };
+        }),
+        // 嫌疑：判不了是不是缺陷，如实单列（verdict 里写明 unattributed）
+        suspicious: (r.suspicious || []).map(function (f) {
+          return { key: f.key, why: f.why, records: f.records, mounts: f.mounts,
+            injected: f.injected, callFaults: f.callFaults, activity: f.activity, verdict: f.verdict };
+        }),
+        // 弱归因：容器有记录但没产出 —— 只报，不下结论
+        weakRows: (r.weakRows || []).map(function (f) {
+          return { key: f.key, records: f.records, mounts: f.mounts, injected: f.injected, activity: f.activity };
+        }),
+        // 调用面是否可用：诊断包要能分清「本轮没跑注入链」与「跑了但它没被调用」
+        callFace: r.callFace,
+        line: line,
+        at: r.at,
+        note: (r.fault !== 0 || (r.suspicious || []).length !== 0)
+          ? '有引擎交不出内容：抛异常的按 faults 逐个查；suspicious 那一组只能人去判断（本仓判不了）'
+          : null
+      };
+    }, {});
+  }
   function secHealth() {
     return safe(function () {
       if (!WA.healthPreflight || typeof WA.healthPreflight.threeGates !== 'function') {
@@ -917,10 +1123,26 @@
         ? WA.healthPreflight.threeGatesLine({ sample: 8 })
         : null;
       return {
-        // 三态结论：empty-risk（这一轮大概率零内容）/ partial（有内容但远少于该有的量）/
-        //   unknown（读数取不到，不假称健康）/ running（三道都过）。
+        // 五态结论（v2.278.0 起由三态扩为五态）：
+        //   empty-risk（这一轮大概率零内容）/ partial（有内容但远少于该有的量）/
+        //   dormant（能判的都过，但有一批机制开着却没人喂 —— 世界看着在转、一部分机制永不产出）/
+        //   unknown（读数取不到，不假称健康）/ running（能判的全都过）。
+        //   ⚠ 「五态」不是修辞：把 dormant 折进 running 就是本仓点名的「空转冒充健康」；
+        //     把它折进 partial 则会让「内容少」与「机制空转」两种病因在诊断包里同形。
         verdict: r.verdict, ok: r.ok,
         passed: r.passed, blocked: r.blocked, degraded: r.degraded, absent: r.absent,
+        // v2.278.0（V7 OPV7-2）：degraded 的两个子桶与「判不了」的个数**分列报出**。
+        //   degraded 合报会让诊断面失去归因（内容面 degraded 要切档，驱动面 degraded 要接写口），
+        //   unverifiable 不报则「不知道」在诊断包里静默消失。
+        degradedContent: r.degradedContent, degradedDrive: r.degradedDrive,
+        // v2.279.0（V7 OPV7-3）：产出面读数也带出 —— 它是「世界有没有在说话」的直接度量，
+        //   而上面的 gates 数组只有 state，看不到「几台有产出 / 趋势」。
+        //   这里刻意不复算：整块取自同一份 threeGates 返回体的 yield 门槛 nums。
+        yieldFace: (function () {
+          const gy = (r.gates || []).filter(function (g) { return g.id === 'yield'; })[0];
+          return gy ? Object.assign({ state: gy.state }, gy.nums || {}) : null;
+        })(),
+        unverifiable: r.unverifiable, unverifiableIds: (r.unverifiableIds || []).slice(),
         // 玩家实际能看到多少世界：这是本节最该被念出来的两个数
         sourcePassing: r.sourcePassing, sourceTotal: r.sourceTotal,
         gates: (r.gates || []).map(function (g) {
@@ -2822,6 +3044,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/service-network.js': 'serviceNetwork',
     // v2.231.0 (OP-9): playableBlueprint -- 可玩的世界蓝图（样例、依赖检查、玩法定义导出）
     'engines/playable-blueprint.js': 'playableBlueprint',
+    // v2.281.0 (OPV7-6): playableSeed -- 开局即喂（把已安装蓝图播种成目标/日程/关系/势力归属）
+    'engines/playable-seed.js': 'playableSeed',
     // v2.231.0 (IN-7): envCapacity -- 有承载力的环境（存量、再生、压力与恢复时滞）
     'engines/environmental-capacity.js': 'envCapacity',
     // v2.231.0 (IN-8): socialLegacy -- 社会遗产（未完事业/设施/物件/师承/声誉的承接与见证）
@@ -4293,6 +4517,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   不属任何单页，故归概览组 —— 同 v2.209.0 的 ui/panel-nav.js 一样，这两个控件
       //   「渲染了但绑定写错 id」这类断裂只有登记过才会被发现（本表的全部意义）。
       'wa-nav-out', 'wa-nav-back',
+      // v2.280.0（V7 OPV7-5）：写口契约的常驻读数行。它渲染在 renderOverview 里，但**不是
+      //   常在场** —— 只在 `stat().withHint > 0` 时才出现（没有自带 hint 的写口时整行不渲染），
+      //   也不占一行独立控件：它是「这一世界的机制彼此讲不讲得通道理」的可见证据。
+      //   本版补登记（v2.280 漏登，守卫表断言因此一直红）。
+      'wa-wc-line',
       // v2.273.0（V6 拓展线）：概览页九块只读读数容器一次登记到位。
       //   它们是**展示容器**（不是控件），本仓既有惯例同样登记 —— 见
       //   `wa-first-out` / `wa-lfn-out` 的先例：「输出区，与 wa-rec-out 同规格：
@@ -4359,7 +4588,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   否则「按钮渲染了但绑定的 id 写错/没登记」这一类断裂在新增出口上无人发现。
     //   六枚按钮全是**只读**口（当前拍 / 上一拍判定 / 闸门卡点 / 计划复验 / 谁在卡 / 诊断），
     //   守卫表只保证「渲染 ↔ 绑定」成对，不承诺它们背后是只读 —— 那条由专锁判。
-    { page: 'beat', ids: ['wa-bt-view', 'wa-bt-verdict', 'wa-bt-gates', 'wa-bt-audit', 'wa-bt-blocked', 'wa-bt-diag'],
+    { page: 'beat', ids: ['wa-bt-view', 'wa-bt-verdict', 'wa-bt-gates', 'wa-bt-audit', 'wa-bt-blocked', 'wa-bt-diag',
+      // v2.278.0（V7 OPV7-3）：驱动者台账的两枚 —— 一枚只读（每台机制归到哪一档、凭什么），
+      //   一枚是总开关（关掉后这一栏不参与任何面）。开关不改任何引擎的 enabled，只决定
+      //   「要不要读这份台账」，开关面归 capabilityTier 管。本版补登记（v2.278 漏登）。
+      'wa-bt-driver', 'wa-bt-driver-sw'],
       dynamic: ['wa-bt-out'] },
     // v2.199.0（Y2）：章节生成工作台六枚控件。同口径「渲染 + 绑定 + 守卫登记」三件齐做。
     //   id 前缀 `wa-chw-` 是**独占**的：v2.87.0 的因果工作台已占 `wa-cw-*`
@@ -4400,6 +4633,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-bp-export', 'wa-bp-list', 'wa-bp-stat', 'wa-bp-id', 'wa-bp-get', 'wa-bp-drop',
       'wa-bp-check', 'wa-bp-empty',
       'wa-bp-keep', 'wa-bp-preview', 'wa-bp-import', 'wa-bp-out'] },
+    // v2.281.0（V7 OPV7-6）：开局播种 4 个 id —— 面板「工具」页蓝图折叠段内。
+    //   它们与蓝图那栏**同页不同栏**：蓝图答「这个世界能不能原样搬走」，播种答「搬过来
+    //   之后世界里有没有剧本」。登记口径同 v2.164.0：无条件渲染 ⇒ 进 ids（而不是 cond /
+    //   dynamic）。两个按钮是「只读读数 + 幂等补播」，输出区是回显 —— 输出区照样登记，
+    //   同 wa-bp-out / wa-dc-out 的先例：渲染了没人收，这一半就没人看。
+    { page: 'tools', ids: ['wa-seed-enabled', 'wa-seed-line', 'wa-seed-replay', 'wa-seed-view', 'wa-seed-out'] },
     // v2.165.0（TX1）：势力外交 22 枚 —— 面板「世界」页（外交总览 / 查对 / 提案适用性 / 提提案 /
     //   答复 / 签约 / 履约 / 违约 / 到期 / 启用开关）。同口径：无条件渲染（diplomacy 是产品文件，
     //   缺席本身就是断裂，不降级成提示）；渲染了不登记 ⇒ 绑定断裂永不可见（v2.124.0 的
@@ -5448,10 +5687,28 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       worldBlueprint: secWorldBlueprint(),
       // v2.257.0（V6 OPV6-2）：启用面可见。与上方 capabilities 节分列（接口齐不齐 vs 机制跑没跑）。
       capability: secCapability(),
+      // v2.275.0（V7 OPV7-5）：驱动者登记表。与 capability 节分列不合并 ——
+      //   那一节读「开关有没有开」，本节读「有没有任何人会去驱动它」（调用面）。
+      //   开关开着但没有驱动者，正是 V7 立项要抓的那一类，前两节都读不出这一格。
+      driver: secDriver(),
+      // v2.280.0（V7 OPV7-4）：写口契约自描述。与 driver 节分列不合并 ——
+      //   那一节答「有没有人会驱动它」，本节答「驱动的时候该给什么形状、被拒了怎么办」。
+      //   实测：3335 个导出函数里 95 个在拒收时自带 hint，而那些 hint 只存在于函数体内部，
+      //   调用方拿到之前无从知道 ⇒ 同一类调用要试错三轮，每一轮都要真写一次世界。
+      //   本节是 writeContract 的产品侧真读者（维护者面：哪些写口带自述、哪些读不到）。
+      writeContract: secWriteContract(),
+      // v2.281.0（V7 OPV7-6）：开局播种读数。与 writeContract 节分列不合并 ——
+      //   那一节答「驱动的时候该给什么形状」，本节答「开局那一刻到底喂进去了什么」。
+      playableSeed: secPlayableSeed(),
       // v2.259.0（V6 OPV6-4）：三重门槛自检。与 capability 节分列不合并 ——
       //   那一节答「179 个开关谁在跑」，本节答「跑着的那些为什么内容还是没出来」
       //   （107 个源里三门槛全通只有 6 个）。本节是 threeGates 的产品侧唯一真读者。
       health: secHealth(),
+      // v2.276.0（V7 OPV7-7）：空产出归因。与 health 节分列不合并 ——
+      //   那一节答「三面门槛过没过」，本节答「**具体哪几台引擎**在空着、各自卡在哪一面」
+      //   （门槛全过、首局在跑，照样可能有一批引擎永远空产）。本节是
+      //   healthPreflight.yieldAttrib 的产品侧唯一真读者。
+      yieldAttrib: secYield(),
       // v2.265.0（V6 EXV6-1）：世界日记读数。与 health 节分列不合并 ——
       //   那一节答「机制跑没跑起来」，本节答「跑起来之后世界说出了什么」
       //   （三路来源哪一路不在场 / 边界是判不了还是真看不见）。

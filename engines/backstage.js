@@ -466,6 +466,23 @@
                   + (Object.keys(chStat.reasons || {}).length ? ' 拒因:' + JSON.stringify(chStat.reasons) : ''));
               }
             } catch (e) { WA.log('warn', '人格/关系落库异常', e && e.message); }
+            // ── v2.277.0（V7 OPV7-1）：把本轮 26 节事实**翻译**给结构化引擎 ──────────
+            //   病灶（OPV7-1 计划原文）：applyResult 把 26 节全部写进叙事存储，结构化引擎
+            //   零消费。实测 36 个目标引擎里 backstage 只调过 1 个（plan），18 个是零写口驱动。
+            //   位置三条理由（都不能换）：
+            //     ① **必须在 tx 之外**：写口内部各自 store.transact，嵌进来会回滚连锁；
+            //        与 flushPersonaChannels 同层就是因为它也是“事务后副作用”。
+            //     ② 必须在 tx.ok 之后：结算失败时世界里没有这批事实，分发出去就是无中生有。
+            //     ③ 必须在人格/关系之后：人格通道可能新建人物，分发器要写的人得先存在。
+            //   默认关（enabled:false）⇒ 本段逐字不影响旧行为；开了才分发。
+            //   返回的拒收分桶只作读数：**不抛错、不回滚世界写入**（推演本体已经落库，
+            //   分发失败不该让整个世界推演判失败）。
+            try {
+              if (WA.intake && typeof WA.intake.run === 'function') {
+                const __ir = WA.intake.run(clamped, anchor);
+                if (__ir && __ir.ok) __applyStat.intakeWritten = __ir.written | 0;
+              }
+            } catch (e) { WA.log('warn', '推演结果分发异常', e && e.message); }
             // v0.8 账本差分记录
             if (WA.ledger) WA.ledger.recordChanges();
           }

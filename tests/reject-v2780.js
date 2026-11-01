@@ -7909,11 +7909,86 @@ function runWitness(WA) {
       }
     }
   }
+
+  // ── v2.275.0（V7 · OPV7-5）：驱动者登记表的「查不到这个引擎」──
+  //   为什么要见证：`driverLedger.why(ns)` 是 OPV7-5 交付的**公开读口**，
+  //   面板与诊断面都会拿玩家点中的那个 ns 去问它。问不到时它回的是一句如实归因
+  //   （`unknown-engine`）而不是空对象 —— 这是「读不到不许写成没有」的同一口径。
+  //   不加见证的后果实测过：该码进扫描面却不在三集里，
+  //   三集恒等式 1303 ≠ 705+50+547、leftover=1（本条就是那一格的解法）。
+  //   见证条件由 `tools/v7probes/p_witness_unknown_engine.js` 先立据：
+  //     ① 非法名 ⇒ ok:false 且 reason 精确为 unknown-engine、ns 原样回显（5/5）；
+  //     ② 反向：合法名（coordinate，L1/workflow）必须 ok:true —— 否则
+  //        「永远返回 unknown-engine」也能骗过①；
+  //     ③ 扫描面活性：total=109、canConclude=true（空集上①②都会恒真）。
+  if (WA.driverLedger && typeof WA.driverLedger.why === 'function') {
+    want('unknown-engine',
+      'OPV7-5：why(ns) 查不到该引擎 ⇒ unknown-engine 并原样回显 ns —— '
+      + '「这个引擎我不知道」与「这个引擎没有驱动者」必须是两句话');
+    trip('unknown-engine', function () {
+      return WA.driverLedger.why('definitely-not-an-engine-275').reason;
+    });
+  }
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
   });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
+  // ── v2.280.0（V7 OPV7-4）：写口契约的两个「问错了」码 —— 必须带可执行见证 ──
+  //   它们不是「存量未分类」：本版新写的公开失败归因，调用方（诊断面 / 面板 / 未来的自愈重试）
+  //   真要消费它们。不给见证就等于让门禁替我们说「这些码没人会跑到」。
+  {
+    const WC = WA.writeContract;
+    if (WC && typeof WC.contractOf === 'function') {
+      want('unknown-namespace', 'OPV7-4：问了一个不存在的命名空间 ⇒ unknown-namespace（不是一句「查不到」）');
+      trip('unknown-namespace', function () { return WC.contractOf('__no_such_ns__', 'x').reason; });
+      want('unknown-method', 'OPV7-4：命名空间在、方法不在 ⇒ unknown-method（两者必须分开：前者是问错了引擎，后者是问错了方法）');
+      trip('unknown-method', function () { return WC.contractOf('production', '__no_such_method__').reason; });
+    }
+  }
+  // ── v2.281.0（V7 OPV7-6）：开局播种的两个码 —— 必须带可执行见证 ──
+  //   为什么不能进基线：`no-blueprint` 是**产品会日常说出**的那句话（玩家还没装蓝图时
+  //   面板「补播」与诊断面读到的就是它），`seed-threw` 是安装器对「播种炸了」的如实归因。
+  //   给它们登记成「存量未分类」等于让门禁替我们说「这两个码没人会跑到」—— 而它们恰恰
+  //   是玩家最可能看到的两句。
+  {
+    const PS = WA.playableSeed, BP = WA.playableBlueprint;
+    if (PS && typeof PS.seed === 'function' && BP && typeof BP.installSample === 'function') {
+      want('no-blueprint',
+        'OPV7-6：世界里没有已安装的玩法蓝图 ⇒ no-blueprint —— 「没有输入」不是「播过了但世界还是空」');
+      trip('no-blueprint', function () {
+        // 造「空世界」现场：撤掉安装留痕（只动 blueprint 容器，不碰播种引擎本身）。
+        //   不这么造的话，前面若干见证已经装过蓝图，本码永远跑不出来。
+        const keep = WA.store.get().blueprint;
+        try {
+          WA.store.transact(function (d) {
+            d.blueprint = Object.assign({}, d.blueprint || {});
+            d.blueprint.installed = {};
+            d.blueprint.latestInstalled = null;
+          }, 'witness:seed-noblueprint');
+          return PS.seed({}).reason;
+        } finally {
+          WA.store.transact(function (d) { d.blueprint = keep; }, 'witness:seed-noblueprint-restore');
+        }
+      });
+      want('seed-threw',
+        'OPV7-6：安装器里的播种被抛异常兜住 ⇒ seeded.reason = seed-threw，且安装本体仍 ok:true（「装好了」不因播种失败变假）');
+      trip('seed-threw', function () {
+        const realSeed = PS.seed;
+        const keep = WA.store.get().blueprint;
+        try {
+          // 让播种真的抛：这是唯一能跑到那个 catch 的路径（产品代码里 catch 就是为了它）。
+          PS.seed = function () { throw new Error('witness:seed-threw'); };
+          const r = BP.installSample('town-workshop', { force: true });
+          return (r && r.seeded && r.seeded.reason) ? [r.seeded.reason, r.ok ? 'install-ok' : 'install-bad'] : '';
+        } finally {
+          PS.seed = realSeed;
+          WA.store.transact(function (d) { d.blueprint = keep; }, 'witness:seed-threw-restore');
+        }
+      });
+    }
+  }
+
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected,
     asyncPumpProof: asyncPumpProof };
 }

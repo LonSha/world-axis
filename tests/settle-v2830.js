@@ -312,7 +312,7 @@ async function judge(a) {
 //   与 v2.229.0 / v2.230.0 记的「同型账」同一家族：**同一件事在多处各写一遍，改一处不等于改全**。
 //   归因实证（/tmp/probe_settle2.js）：用 HEAD 版 ui/panel.js 与工作区版各跑一次 measure()，
 //   四个数 Δ **全为 0** ⇒ 本轮改动与这组读数**无关**，余下差异是既有欠账，不是本轮引入。
-  a(led.totals.loadEdges === 195 && led.totals.callRefs === 374,
+  a(led.totals.loadEdges === 196 && led.totals.callRefs === 376,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 装载期边 +1(尾部调 registerModule)、调用期引用 +2(读 store 的 registerModule 与 settingsBus)、命名空间 +1、装载文件 +1 —— 本处四个数字由 U3 散装读数核对器(node tools/loose-readings.js)一次报出,不必等全量回归;\n    v2830/mr: 装载期边 108 / 调用期引用 212（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（引用多 ≠ 必须先装载；v2.187.0（第三批 E4/E6/E8）：新增 engines/campaign.js / engines/atlas.js / engines/dep-check.js ⇒ 装载期边 +3（尾部各调 registerModule）、调用期 +4；v2.135.0（E6）：新增 engines/foreshadow.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎尾部各调 registerModule ⇒ 装载期边 +12；其调用期读 store/clock/evict/settingsBus/apiRouter ⇒ 调用期 +24；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
@@ -326,10 +326,21 @@ async function judge(a) {
     'v2830/mr: 装载期依赖面**小于**调用期引用面（静态扫描给出 558 边全是幻影）');
   a(led.totals.hardEdges === 0 && Object.keys(led.loadErrors).length === 0,
     'v2830/mr: 零硬边、零装载失败（现有装载顺序满足全部装载期依赖）');
+  // v2.280.0（V7 OPV7-4）：散装读数 321/312 → **322/313**（真源 = tests/module-registry-ledger.json，
+  //   由 module-registry-gate --update 现场复算落定）。归因：新增 engines/write-contract.js 一个文件
+  //   ⇒ loadedCount +1；它自己 `WA.writeContract = {...}` 提供 writeContract 命名空间 ⇒ nsCount +1。
+  //   装载期边 195 / 调用期引用 374 均不变（前者不调 registerModule；后者是每文件去重后的引用面，
+  //   新文件读的 settingsBus/clock/__settingsRegs 与两个读者各自都已入账，不是新账）。
+  // v2.277.0（V7 OPV7-1）：散装读数 320/311 → **321/312**（真源 = tests/module-registry-ledger.json，
+  //   由 module-registry-gate --update 现场复算落定）。归因逐条：新增 engines/intake-dispatch.js
+  //   一个文件 ⇒ loadedCount +1；它自己 `WA.intake = {...}` 提供 intake 命名空间 ⇒ nsCount +1。
+  //   装载期边 195 不变（不调 registerModule）；调用期引用 374 不变（新文件的四条边在账本
+  //   callRefs 口径下不计入 —— 该数是每文件去重后的引用面，intake-dispatch 读的
+  //   settingsBus/log/__settingsRegs 与 backstage 读 intake 各自都已入账，不是新账）。
   // v2.254.0 补账：散装读数 308/299 → 309/300（真源 = tests/module-registry-ledger.json）。
 //   **先实测真值**（node tests/module-registry-gate.js --update 现场复算）：nsCount=309 / loadedCount=300。
 //   欠债来源同上一条：v2.224.0 加 branch-diff 引擎时改了账本却漏同步这两处散装读数。
-  a(led.nsCount === 319 && led.loadedCount === 310,
+  a(led.nsCount === 323 && led.loadedCount === 314,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 两边各 +1(装载期边与调用期引用另计,见上一条);本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出,不必等全量回归;\n    v2830/mr: 命名空间 213 / 装载文件 205（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（v2.187.0（第三批 E4/E6/E8）：campaign / atlas / depCheck 三命名空间 ⇒ 两边各 +1，叠加 ui/* 三件后装载文件面 194 → 197；v2.135.0（E6）新增 engines/foreshadow.js ⇒ 两边各 +1；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）十二个新引擎 ⇒ 两边各 +12；v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '
