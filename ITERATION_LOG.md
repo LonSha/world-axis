@@ -1,3 +1,22 @@
+### R228 · 2026-11-01 · v2.286.0：EXV7-1 世界简报 + EXV7-2 人物意图看板
+
+**批次**：V7 拓展线第一批（v2.285.0 / v2.286.0）；承接 R227 的 V7 优化线收口。
+
+#### 交付
+
+- **EXV7-1（v2.285.0）世界简报**：复用 OPV7-1 `intakeStat` 作为唯一数据源，接入启动重置、诊断节、概览页与设置面；专锁 `v7-briefing-2285.js` 已登记，验收探针为 `p_briefing_face.js`。
+- **EXV7-2（v2.286.0）人物意图看板**：新增 `engines/intent-board.js`，只读 `plan.chain`，不新建计划真源、不推断卡点、不把 pending/running 冒充事实；接入概览面板、设置页、诊断节与 backstage 提示词，并在启动阶段重置。
+- EXV7-2 验收探针 `p_intent_face.js`：**48 passed / 0 failed**；专锁 `v7-intent-board-2286.js`：**80 pass / 0 fail**。专锁覆盖无链跳过、拟稿事实边界、need/after 卡点逐字来源、关闭态、只读性与真实 DOM 点击链，并含真源码破坏两向自证。
+- 版本面与登记面统一到 `2.286.0`：`index.js`、`manifest.json`、dead-export ledger、module-registry ledger；两个专锁均已挂入 `tests/run.js`。
+
+#### 验证与边界
+
+- 已通过：version-surface、dead-export、test-surface、UI 本体、field-liveness、module-registry 门禁；`git diff --check` 通过。
+- 修复 `tests/run.js` 当前版本钉版错误消息对已不存在的 `__verPin284` 引用，统一改为 `__verPin286`；同时更新当前版本注释，避免消息面自相矛盾。
+- **按 V7 纪律 12 未执行完整 `node tests/run.js` 回归**；待 OPV7-1～9 与 EXV7-1～9 全部交付后，再在足够长窗口执行全量回归。
+
+---
+
 ### R227 · 2026-11-01 · v2.284.0：OPV7-8 悬空引擎档位下调 + OPV7-9 产出回归基线（V7 优化线收口，九项全交付）
 
 **批次**：V7 优化线末两项（OPV7-8 = v2.283.0 / OPV7-9 = v2.284.0，合并一轮交付）；

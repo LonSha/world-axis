@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.284.0';
+  const VERSION = '2.286.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1188,6 +1188,12 @@
     //   它的六源（life/events/intel/bonds/temperament/enigma）在本清单里全部更早装载，
     //   但都是调用期读口 —— 装载期不需要任何依赖在场。
     'engines/world-briefing.js',
+    // v2.286.0（V7 EXV7-2）：人物意图看板 —— 他在图什么、卡在哪一步。
+    //   与 world-briefing 同列（write-contract 之后、capability-tier 之前）：
+    //   装载期只登记自己的设置键，零上游读、零 store 写、零落盘；
+    //   它要读的 plan / agency 在本清单里更早装载，但那是**调用期**读口 ——
+    //   装载期不需要任何依赖在场。排在这里让「看板开没开」首次盘点就在登记面内。
+    'engines/intent-board.js',
     'engines/capability-tier.js',
     'engines/capability-audit.js',
     'ui/panel.js',
@@ -1632,6 +1638,9 @@
     __flush({ phase: 'stage-store' });
     try { WA.store && WA.store.init && WA.store.init(); __mark('store-ok'); }
     catch (e) { __mark('store-err', e); WA.log('error', 'store初始化失败', e); }
+    // v2.286.0（V7 EXV7-2）：瞬态读面在每次完整启动时归零；不改世界存档。
+    try { if (WA.worldBriefing && typeof WA.worldBriefing.reset === 'function') WA.worldBriefing.reset(); } catch (e) {}
+    try { if (WA.intentBoard && typeof WA.intentBoard.reset === 'function') WA.intentBoard.reset(); } catch (e) {}
     // v2.211.0(优化 Q1):闸门关着就**当场如实点名**。为什么必须在这里说:
     //   闸门拦的是「本次世界写未发生」,用户此时只看到「操作没反应」。没有这一句,
     //   「加载不全」对用户就是不可见的 —— 本仓治过的「静默降级」形态。

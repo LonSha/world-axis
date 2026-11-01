@@ -1,13 +1,13 @@
 {
- "version": "2.284.0",
- "loadOrderCount": 328,
- "loadedCount": 314,
+ "version": "2.286.0",
+ "loadOrderCount": 330,
+ "loadedCount": 316,
  "uiCount": 14,
- "nsCount": 323,
+ "nsCount": 325,
  "totals": {
-  "loadEdges": 196,
+  "loadEdges": 198,
   "hardEdges": 0,
-  "callRefs": 376,
+  "callRefs": 380,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -104,6 +104,7 @@
     "engines/inject-value.js",
     "engines/inst.js",
     "engines/institutional-inertia.js",
+    "engines/intent-board.js",
     "engines/investigation.js",
     "engines/kaleidoscope.js",
     "engines/knowledge-practice.js",
@@ -201,6 +202,7 @@
     "engines/word-budget.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-briefing.js",
     "engines/world-clock.js",
     "engines/world-diary.js",
     "engines/world-graph.js",
@@ -423,6 +425,7 @@
     "engines/inject-value.js",
     "engines/inst.js",
     "engines/institutional-inertia.js",
+    "engines/intent-board.js",
     "engines/investigation.js",
     "engines/knowledge-practice.js",
     "engines/labor-schedule.js",
@@ -510,6 +513,7 @@
     "engines/word-budget.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-briefing.js",
     "engines/world-clock.js",
     "engines/world-diary.js",
     "engines/world-graph.js",
@@ -5946,6 +5950,48 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_write_contract_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-briefing.js": {
+   "ns": [
+    "worldBriefing"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_briefing_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/intent-board.js": {
+   "ns": [
+    "intentBoard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_intent_board_settings_v1"
    ],
    "consumedBy": []
   },

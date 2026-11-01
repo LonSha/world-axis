@@ -625,6 +625,9 @@
         //   与注入侧的 `plan.buildBlock()` 分工明确：那个给**正文模型**（只说当前这一步），
         //   这个给**推演引擎**（要给链状态）。关闭 / 无计划时返回空串，零 token。
         (WA.plan && WA.plan.chainBlock ? WA.plan.chainBlock() : ''),
+        // v2.286.0（V7 EXV7-2）：受阻人物的意图读数进入推演上下文；
+        // 看板自身仍只读，buildBlock 只会输出 plan.chain 已明确的卡点。
+        (WA.intentBoard && WA.intentBoard.buildBlock ? WA.intentBoard.buildBlock() : ''),
         (WA.entities && WA.entities.buildEntitiesBlock ? WA.entities.buildEntitiesBlock() : ''),
         '【近期正文（最新锚点=m' + anchor.idx + '）】',
         recentText(8)

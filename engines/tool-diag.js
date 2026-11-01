@@ -1286,6 +1286,46 @@
     }, {});
   }
   /**
+   * v2.286.0（V7 EXV7-2）：人物意图看板读面。
+   *
+   * 本节要答的是**数据面那一侧**的问题，与面板那一栏不同：面板答「谁在图什么、卡在哪」，
+   * 本节答「为什么这一栏空着 / 这些读数可不可信」。三种空法必须分行，混在一起就再也答不出来：
+   *   ① **plan 引擎缺席** —— `WA.plan.chain` 不在场。这与「大家都没计划」同形（面板一样空），
+   *      但处置完全不同：一个是引擎没装，一个是世界确实还没长计划；
+   *   ② **查了但没人有链** —— 人在场、plan 也在场，只是没有一条能出行的链
+   *      （`checked` 有数、`rows` 为空）；
+   *   ③ **被行数上限压掉** —— `skipped` / `capped` 计的是「这些人在场上但进不了看板」，
+   *      不报这一格，玩家会以为世界上只有 8 个人。
+   *
+   * 只读：不 board（`board()` 会推进本模块自己的计量，诊断面不该污染它）——
+   *   本节读 `stat()` / `getSettings()`，两者都是纯读口。
+   */
+  function secIntentBoard() {
+    return safe(function () {
+      if (!WA.intentBoard || typeof WA.intentBoard.stat !== 'function') {
+        return { error: 'engines/intent-board.js 未加载（意图看板读数缺席）' };
+      }
+      const st = WA.intentBoard.stat();
+      const cfg = (typeof WA.intentBoard.getSettings === 'function') ? WA.intentBoard.getSettings() : null;
+      return {
+        enabled: !!(cfg && cfg.enabled === true),
+        settings: cfg ? { maxRows: cfg.maxRows, maxRest: cfg.maxRest } : null,
+        // plan 引擎在场与否：缺它不是「没人有计划」，是**没有可读的链**
+        planAvailable: st.planAvailable === true,
+        // 看板链面：压了几张 / 出行几人 / 跳过几人 / 其中受阻几人
+        boards: st.boards, rows: st.rows, skipped: st.skipped, blocked: st.blocked,
+        faults: Object.assign({}, st.faults || {}),
+        note: (cfg && cfg.enabled !== true)
+          ? '意图看板关着 —— 这一栏零读数是「关着」，不是「没人有计划」'
+          : (st.planAvailable !== true
+            ? 'plan 引擎缺席 —— 看板没有可读的链（这不是「世界上没人有目标」）'
+            : (st.boards === 0
+              ? '还没出过一张看板（没打开过概览页 / 引擎挂载点断了）—— 零读数不等于零计划'
+              : null))
+      };
+    }, {});
+  }
+  /**
    * v2.266.0（V6 EXV6-2）：人物今日动线读面。
    *
    * 本节要答的问题与世界日记节不同：那一节问「压了几句、隐了几条」，本节问
@@ -3024,6 +3064,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   不订阅总线（backstage 直调 snap()），漏登记时「自检看不见的黑盒」
     //   判据正是为这一格设的；与上面八台同一次补齐，避免又落下一格。
     'engines/world-briefing.js': 'worldBriefing',
+    // v2.286.0（V7 EXV7-2）：人物意图看板 —— 人物面只读聚合。
+    //   不订阅总线、不调写口（plan.expand/advance 一个都不碰），全部现读 plan.chain；
+    //   漏登记时「自检看不见的黑盒」判据正是为这一格设的，与上面同一次补齐。
+    'engines/intent-board.js': 'intentBoard',
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/input-guard.js': 'inputGuard', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块 —— 登记一次到位。
@@ -4596,7 +4640,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.285.0（V7 EXV7-1）：`wa-brief-block` 同理登 cond 层 —— 简报关着时整块不
       //   渲染（firstBlock 口径：关着不占屏）。它缺失是**设置态**（enabled:false），
       //   不是断裂；渲染了但 id 写错照样被咬到。
-      cond: ['wa-first-block', 'wa-wc-line', 'wa-brief-block'] },
+      // v2.286.0（V7 EXV7-2）：`wa-intent-block` 同登 cond 层 —— 看板关着时整块
+      //   不渲染（briefBlock 口径：关着不占屏），plan 引擎缺席时渲染的是**缺席提示**
+      //   而非数据行。它缺失是设置态 / 依赖态，不是断裂；渲染了但 id 写错照样被咬到。
+      cond: ['wa-first-block', 'wa-wc-line', 'wa-brief-block', 'wa-intent-block'] },
     { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat', 'wa-sed-out'] },
     // v2.151.0（RX2+RX3）：会话页十六枚控件（跨会话记忆锚八枚 + 远方世界脉搏四枚 + 共用输出区一枚）。
     //   守卫表是控件接线面的唯一真源：渲染了不登记 ⇒「渲染了但绑定的 id 写错」这类断裂
@@ -4790,6 +4837,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   注：`wa-dr-maxp` 是滑块、`wa-dr-maxpv` 是它的读数 span，两者必须同列
       //   （读数不跟随＝拖动无效，属真缺陷）。
       'wa-dr-enable', 'wa-dr-maxp', 'wa-dr-maxpv', 'wa-dr-next', 'wa-dr-hideplace', 'wa-dr-save', 'wa-dr-out',
+      // v2.286.0（V7 EXV7-2）：人物意图看板设置面七枚控件（渲染在设置页「人物意图看板」一格）。
+      //   同 v2.285.0 世界简报那组的理由：**渲染 + 绑定 + 守卫登记**三件齐做，否则
+      //   「控件渲染了但绑定的 id 写错」在这个新出口上无人发现。这一格同样有**静默失效**：
+      //   `wa-ib-enable` 关掉后概览页整块不渲染 —— 与「世界上没人有计划」在屏幕上是同一个
+      //   空白，玩家看不出「我改了但它没生效」，只有守卫能发现 id 写错。
+      //   注：`wa-ib-maxrows` / `wa-ib-maxrest` 是滑块、`...v` 是它们的读数 span，
+      //   两组必须同列（读数不跟随＝拖动无效，属真缺陷）。
       // v2.267.0（V6 EXV6-3）：关系温度计设置面七枚控件。
       'wa-rt-enable', 'wa-rt-maxp', 'wa-rt-maxpv', 'wa-rt-types', 'wa-rt-reason', 'wa-rt-save', 'wa-rt-out',
       // v2.268.0（V6 EXV6-4）：暗流日历设置面七枚控件（渲染在设置页「暗流日历」一格）。
@@ -5787,6 +5841,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   计数回落被吞了几次。快照由 backstage 直调不进总线，故挂载点断了
       //   只有这一节能看出来。
       worldBriefing: secWorldBriefing(),
+      // v2.286.0（V7 EXV7-2）：人物意图看板读数。与简报节分列不合并 ——
+      //   那一节答「机制这一轮吃了几笔」（系统面），本节答「人物这一侧有没有
+      //   可读的链、看板为什么空」（人物面）。plan 引擎缺席与「没人有计划」
+      //   在面板上同形，只有这一节能把两者分开。
+      intentBoard: secIntentBoard(),
       relationTemp: secRelationTemp(),
       undercurrentCalendar: secUndercurrentCalendar(),
       roundCost: secRoundCost(),

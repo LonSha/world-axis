@@ -403,6 +403,31 @@
             <div id="wa-wb-out" class="wa-out"></div>
             <div class="wa-dim">简报只读结构化引擎的写入计数差分（本轮新目标 / 新排期 / 新情报 / 关系变化……），不重算、不调模型；第 1 轮只建基线不报流水，核对不到的行如实不渲染。</div>`;
         })()}
+        <div class="wa-sec" data-wa-lane="people" data-wa-sec="人物意图看板">人物意图看板<span class="wa-dim">（概览页「他在图什么、卡在哪一步」怎么压）</span></div>
+        ${(() => {
+          // v2.286.0（V7 EXV7-2）：人物意图看板的设置面。
+          //   与人物动线段同规（两条纪律照抄）：
+          //   ① **只发动作**：写盘走 `intentBoard.setSettings`（引擎内唯一写路径，
+          //      内含 settingsBus.saveOrThrow 与 bounds 归一），本页不直写 localStorage；
+          //   ② **回显按真实结果**：`setSettings` 返回 ok:false 就报失败。
+          //   为什么它必须有入口：看板读的是**人物面**（谁在图什么、走到第几步），
+          //   `enabled:false` 时面板整块不渲染 —— 与「世界上没人有计划」在屏幕上是同一个
+          //   空白，得让玩家自己分得开、改得到。`maxRows` 是看板最多几人，`maxRest` 是
+          //   每人最多列几步后续（0 = 只报当前步）。
+          if (!WA.intentBoard || typeof WA.intentBoard.getSettings !== 'function') {
+            return '<div class="wa-dim">人物意图看板模块未加载（engines/intent-board.js 缺席）</div>';
+          }
+          const ib = WA.intentBoard.getSettings();
+          const bdIb = bd('worldaxis_intent_board_settings_v1');
+          const mr2 = rng(bdIb.maxRows, [1, 24]);
+          const rs2 = rng(bdIb.maxRest, [0, 8]);
+          return `<label class="wa-node"><input type="checkbox" id="wa-ib-enable" ${ib.enabled ? 'checked' : ''}/><span class="wa-node-label">在概览页显示人物意图看板</span></label>
+            <div class="wa-set-row"><span>最多看 <b id="wa-ib-maxrowsv">${ib.maxRows}</b> 人</span><input type="range" min="${mr2[0]}" max="${mr2[1]}" value="${ib.maxRows}" aria-label="最多看几人" id="wa-ib-maxrows" class="wa-range"/></div>
+            <div class="wa-set-row"><span>每人最多列 <b id="wa-ib-maxrestv">${ib.maxRest}</b> 步后续</span><input type="range" min="${rs2[0]}" max="${rs2[1]}" value="${ib.maxRest}" aria-label="每人最多列几步后续" id="wa-ib-maxrest" class="wa-range"/></div>
+            <button class="wa-btn" id="wa-ib-save">保存意图看板设置</button>
+            <div id="wa-ib-out" class="wa-out"></div>
+            <div class="wa-dim">看板只读既有计划链（第几步 / 缺什么前置 / 卡在哪），不推断卡点、不补空行、不调模型。还没结算的步骤标「打算」而不是「已结算」；链上报不出卡点的人不占一行。</div>`;
+        })()}
         <div class="wa-sec" data-wa-lane="people" data-wa-sec="人物今日动线">人物今日动线<span class="wa-dim">（概览页那几行「今天在哪、做了什么、接下来」怎么压）</span></div>
         ${(() => {
           // v2.266.0（V6 EXV6-2）：人物今日动线的设置面。
@@ -926,6 +951,26 @@
         if (r && r.ok === false) { say('✗ 保存失败：' + (r.reason || '未落盘') + '（改动未生效）'); return; }
         const now = WA.worldBriefing.getSettings();
         say('✓ 已保存（最多 ' + now.maxRows + ' 行' + (now.enabled ? '' : ' · 概览页已隐藏') + '）');
+      };
+      // v2.286.0（V7 EXV7-2）：人物意图看板设置绑定。与 wa-wd-save 同规。
+      const ibMr = $('#wa-ib-maxrows');
+      const ibRs = $('#wa-ib-maxrest');
+      if (ibMr) ibMr.oninput = () => { const v = $('#wa-ib-maxrowsv'); if (v) v.textContent = ibMr.value; };
+      if (ibRs) ibRs.oninput = () => { const v = $('#wa-ib-maxrestv'); if (v) v.textContent = ibRs.value; };
+      const ibSave = $('#wa-ib-save');
+      if (ibSave) ibSave.onclick = () => {
+        const ibOutEl = $('#wa-ib-out');
+        const sayIb = function (t) { if (ibOutEl) ibOutEl.textContent = t; };
+        if (!WA.intentBoard || typeof WA.intentBoard.setSettings !== 'function') { sayIb('✗ 保存失败：人物意图看板模块未加载'); return; }
+        const en = $('#wa-ib-enable');
+        const r = WA.intentBoard.setSettings({
+          enabled: en ? !!en.checked : true,
+          maxRows: +((ibMr && ibMr.value) || 8) || 8,
+          maxRest: (ibRs && ibRs.value !== undefined && ibRs.value !== '') ? +ibRs.value : 3
+        });
+        if (r && r.ok === false) { sayIb('✗ 保存失败：' + (r.reason || '未落盘') + '（改动未生效）'); return; }
+        const now = WA.intentBoard.getSettings();
+        sayIb('✓ 已保存（最多 ' + now.maxRows + ' 人 · 每人列 ' + now.maxRest + ' 步后续' + (now.enabled ? '' : ' · 概览页已隐藏') + '）');
       };
       // v2.266.0（V6 EXV6-2）：人物动线设置绑定。与 wa-wd-save 同规。
       const drMp = $('#wa-dr-maxp');

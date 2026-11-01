@@ -1221,6 +1221,65 @@
         return '<div class="wa-dim" id="wa-brief-block">世界简报读数异常：' + esc((e && e.message) || e) + '</div>';
       }
     })();
+    // v2.286.0（V7 EXV7-2）：人物意图看板 —— 「他在图什么、卡在哪一步」。
+    //   与 briefBlock 的分工：简报答「机制这一轮吃了几笔」（系统面），本块答
+    //   「**每个人**在图什么、走到第几步、卡在哪」（人物面）。数据全部读 plan.chain，
+    //   本块不推断、不补行。四条口径与 briefBlock 同规（整句取自引擎 / 关着不占屏 /
+    //   缺席如实报 / 异常不外抛）+ 三条本块特有：
+    //     ① **卡点单独成列**（资源缺口与前置未完成分两类，不合并成「受阻」）；
+    //     ② **拟稿不冒充事实** —— step.status 非 done 的行标「打算」，与 plan.review 的
+    //        asFact:false 同口径（看板说「他打算做」，不说「他做了」）；
+    //     ③ **chain 报不出卡点的人不进看板**（引擎侧已经这样做；面板不补「（无）」行）。
+    const intentBlock = (function () {
+      try {
+        if (!WA.intentBoard || typeof WA.intentBoard.view !== 'function') {
+          return '<div class="wa-dim" id="wa-intent-block">人物意图看板读数不可用（engines/intent-board.js 缺席）</div>';
+        }
+        const cfg = (typeof WA.intentBoard.getSettings === 'function') ? WA.intentBoard.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) return '';   // 关着就整块不渲染（同 briefBlock 口径）
+        // 直接消费 board() 读口：面板展示与诊断共用同一张实时看板，不再另造快照。
+        const v = WA.intentBoard.board();
+        if (!v || v.ok !== true) {
+          // 「这台引擎没装」与「大家都没计划」是两件事，分开报
+          if (v && v.reason === 'no-plan-engine') {
+            return '<div class="wa-dim" id="wa-intent-block">人物意图看板：plan 引擎缺席（engines/plan.js 未加载）—— 这栏空着不是「没人有计划」</div>';
+          }
+          return '<div class="wa-dim" id="wa-intent-block">人物意图看板读数不可用（' + esc(String((v && v.reason) || 'unknown')) + '）</div>';
+        }
+        if (v.empty === true) {
+          return '<div class="wa-dim" id="wa-intent-block">人物意图看板：查了 ' + esc(String(v.checked)) + ' 人，没人有可读的计划链</div>';
+        }
+        const one = function (r) {
+          const at = r.step
+            ? ('第 ' + esc(String(r.step.seq)) + '/' + esc(String(r.total)) + ' 步「' + esc(r.step.text) + '」')
+            : '（链上没有当前步）';
+          // 拟稿不冒充事实：只有 done 才算已结算，其余标「打算」
+          const mark = r.step ? (r.step.asFact === true
+            ? '<span class="wa-dim">已结算</span>'
+            : '<span class="wa-dim">打算</span>') : '';
+          const block = r.blocked.length
+            ? '<div class="wa-intent-block">卡在：' + esc(r.blocked.join('、')) + '</div>'
+            : '<div class="wa-dim">没卡点</div>';
+          const rest = r.rest.length
+            ? '<div class="wa-dim">后面还有 ' + esc(String(r.restTotal)) + ' 步：' + esc(r.rest.map(function (s) { return s.seq + '.' + s.text; }).join(' → ')) + '</div>'
+            : '';
+          return '<div class="wa-intent-row">'
+            + '<div class="wa-intent-line"><b>' + esc(r.name) + '</b> → ' + esc(r.goalText || '') + mark + '</div>'
+            + '<div class="wa-intent-line">' + esc(at) + (r.tries ? ' <span class="wa-dim">（已试 ' + esc(String(r.tries)) + ' 次）</span>' : '') + '</div>'
+            + block + rest
+            + '</div>';
+        };
+        // 受阻人数从逐行读数算（board() 只逐行给 isBlocked，不给顶层计数 —— 不另造一个会漂的汇总）
+        const nBlocked = v.rows.filter(function (r) { return r.isBlocked === true; }).length;
+        return '<div class="wa-intent wa-intent-live" id="wa-intent-block">'
+          + '<div class="wa-intent-line" style="font-weight:600;margin-bottom:3px;">人物意图看板（共 ' + esc(String(v.rows.length)) + ' 人 · 受阻 ' + esc(String(nBlocked)) + '）</div>'
+          + v.rows.map(one).join('')
+          + (v.capped === true ? '<div class="wa-dim">只展示前 ' + esc(String(v.maxRows)) + ' 人（看板行数上限可在设置页调）</div>' : '')
+          + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-intent-block">人物意图看板读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
     return `
       <div class="wa-stat-grid">
         <div class="wa-stat"><div class="wa-stat-v">${esc(s.clock.label || '未设定')}</div><div class="wa-stat-k">世界时间</div></div>
@@ -1234,6 +1293,7 @@
       ${firstLine}
       ${diaryBlock}
       ${briefBlock}
+      ${intentBlock}
       ${routeBlock}
       ${tempBlock}
       ${calBlock}
