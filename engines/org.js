@@ -1001,7 +1001,44 @@
     }
     return { ok: false, reason: 'bad-kind', want: ['faction', 'person'] };
   }
-  function ledgerView() {
+  /** EXV7-5：按势力聚合当前资源、名册、债权债务和项目缺口。纯读，不建立第二账本。 */
+  function factionAccounts(opts) {
+    const o = opts || {};
+    const cap = Math.max(1, Math.min(12, Number(o.maxRows) > 0 ? Math.floor(Number(o.maxRows)) : 8));
+    const itemCap = Math.max(1, Math.min(8, Number(o.maxItems) > 0 ? Math.floor(Number(o.maxItems)) : 5));
+    const projectCap = Math.max(1, Math.min(8, Number(o.maxProjects) > 0 ? Math.floor(Number(o.maxProjects)) : 4));
+    const st = state();
+    const facs = (((st.evolution || {}).factions) || []).filter(Boolean).slice().sort(function (a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+    const rows = facs.map(function (f) {
+      const name = clean(f.name, 40);
+      const mem = membersOf(f);
+      const debts = debtsView('faction', name);
+      const stock = stockOf(f);
+      const resources = Object.keys(stock).sort().map(function (k) { return { item: k, amount: qty(stock[k]) || 0 }; })
+        .filter(function (x) { return x.amount > 0; }).slice(0, itemCap);
+      const projects = projectRows(f).filter(function (p) { return p && isLive(p); }).map(function (p) {
+        const cov = coverageOf(f, p);
+        const missing = cov.filter(function (x) { return x.need !== null && x.gap > 0; })
+          .map(function (x) { return { item: x.item, gap: x.gap, have: x.have }; });
+        return { what: clean(p.what, 60), status: clean(p.status, 12), tier: tierOf(p), due: Number(p.due) || 0,
+          missing: missing.slice(0, itemCap), missingTotal: missing.reduce(function (n, x) { return n + x.gap; }, 0),
+          canClose: cov.every(function (x) { return x.need !== null && x.gap === 0; }) };
+      }).slice(0, projectCap);
+      const due = mem.reduce(function (n, m) { return n + (qty(m.due) || 0); }, 0);
+      const owed = mem.reduce(function (n, m) { return n + (qty(m.owed) || 0); }, 0);
+      return { faction: name, resources: resources, memberCount: mem.length, payrollDue: due, owedPayroll: owed,
+        receivable: debts && debts.ok ? debts.receivableTotal : null, payable: debts && debts.ok ? debts.payableTotal : null,
+        debts: debts && debts.ok ? { receivable: debts.receivable.slice(0, itemCap), payable: debts.payable.slice(0, itemCap),
+          receivableRows: debts.receivable.length, payableRows: debts.payable.length } : { error: (debts && debts.reason) || 'debts-unavailable' },
+        projects: projects, projectCount: projects.length, projectMissing: projects.reduce(function (n, p) { return n + p.missingTotal; }, 0) };
+    });
+    return { ok: true, total: rows.length, cap: cap, truncated: rows.length > cap, dropped: Math.max(0, rows.length - cap),
+      rows: rows.slice(0, cap), source: 'org', limits: { items: itemCap, projects: projectCap } };
+  }
+
+  function ledgerView(opts) {
     const st = state();
     const holders = [];
     const push = function (kind, name, res) {
@@ -1024,6 +1061,7 @@
       //   organizationSummary 是**内部面**（不单独导出）：它的真消费方就是这一行，
       //   于是「欠薪看得见」不必靠用户去点面板——账本读数里直接在场。
       organization: organizationSummary(),
+      accounts: factionAccounts(opts),
       reconciled: reconcile()
     };
   }
@@ -1033,6 +1071,7 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     grant: grant, transfer: transfer, canAfford: canAfford, stockOf: stockOf, buildBlock: buildBlock,
     // v2.92.0（O5）：账本读数两口。ledgerView → 诊断 secOrg + 面板「资源账本」按钮；
+
     //   reconcile → 诊断 secOrg（跨文件消费方）。**纯读**：不跑引擎、不改存档、不注入。
     ledgerView: ledgerView, reconcile: reconcile,
     // v2.94.0（O6）：流水导出/存档点三面。exportJournal → 面板「导出流水」按钮 + 诊断 secOrg；

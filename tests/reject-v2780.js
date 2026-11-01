@@ -7932,6 +7932,50 @@ function runWitness(WA) {
   Object.keys(__keepBeat).forEach(function (ns) {
     try { WA[ns].setSettings(__keepBeat[ns]); } catch (e) {}
   });
+  // ── v2.289.0（V7/EXV7-5 收口）：V7 交付面遗留的三个无归属码──
+  //   这三个码写在 EXV7-2/3/4 的真实路径上（看板 / 情报网 / 六型图），却一直没上见证表：
+  //   跑 reject-code-gate 时它们以「未分类」露头。登记进基线等于替产品说「这三句没人跑得到」，
+  //   而它们恰恰是玩家真会看到的三句。故一律走可执行见证（真 API 触发 + finally 还原）。
+  {
+    const RTw = WA.relationTemp, BSw = WA.bonds;
+    if (RTw && typeof RTw.network === 'function'
+      && BSw && typeof BSw.setSettings === 'function' && typeof BSw.getSettings === 'function') {
+      want('bonds-disabled',
+        'EXV7-4 六型图：bonds 登记模块关闭 ⇒ bonds-disabled（quiet）—— '
+        + '「模块没开」与「一条关系都没登记」必须是两句话');
+      trip('bonds-disabled', function () {
+        const keep = BSw.getSettings();
+        try { BSw.setSettings({ enabled: false }); return RTw.network().reason; }
+        finally { BSw.setSettings(keep); }
+      });
+    }
+    const IBw = WA.intentBoard;
+    if (IBw && typeof IBw.board === 'function' && typeof IBw.getSettings === 'function') {
+      want('no-plan-engine',
+        'EXV7-2 意图看板：plan 引擎缺席 ⇒ no-plan-engine（ok:false，且不给 rows）—— '
+        + '「这台引擎没装」不能被合成一张空看板');
+      trip('no-plan-engine', function () {
+        const keep = WA.plan;
+        try { delete WA.plan; return IBw.board().reason; }
+        finally { WA.plan = keep; }
+      });
+    }
+    const ITw = WA.intel;
+    if (ITw && typeof ITw.network === 'function' && WA.noesis) {
+      want('noesis-missing',
+        'EXV7-3 情报网：noesis 缺席时边界面如实报 noesis-missing —— '
+        + '「没法判边界」绝不可回落成「没有泄露」');
+      trip('noesis-missing', function () {
+        const keep = WA.noesis;
+        try {
+          try { delete WA.noesis; } catch (e) {}
+          if (WA.noesis) WA.noesis = undefined;
+          const b = ITw.network({ claims: [{ who: '甲', what: '一件秘密' }] }).boundary;
+          return b ? b.reason : '';
+        } finally { WA.noesis = keep; }
+      });
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   // ── v2.280.0（V7 OPV7-4）：写口契约的两个「问错了」码 —— 必须带可执行见证 ──

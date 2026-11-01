@@ -1,3 +1,15 @@
+### R231 · 2026-11-01 · v2.289.0：EXV7-5 势力账本
+- 在既有 `org` owner 上增加只读聚合 `factionAccounts()`，并以 `ledgerView(opts).accounts` 作为**唯一公开读口**：资源取 `evolution.factions[*].resources`、名册与工资取 `faction.roster` 经 `membersOf()`、双向债权债务复用 `debtsView('faction', name)`（不抵成净额）、项目缺口走 `coverageOf()`；不新建第二套账本容器也不把债务写进库存。
+- 有界且稳定排序：默认 `maxRows=8 / maxItems=5 / maxProjects=4`，硬上限 12/8/8，回带 `total/cap/truncated/dropped`；诊断 `secOrg()` 与面板「资源账本」按钮同源消费 `ledgerView().accounts`，不各自扇描存档。
+- 专锁 `tests/v7-faction-ledger-2289.js`：**pass (17)**，覆盖五类 owner 读数、双向债务证据、项目缺口、零写盘、容量截断与真源码破坏负控制；架构 Note 落 `.agents/notes/implemented/architecture/2026-11-01-exv75-faction-ledger.md`。
+- 同批清偿三个 V7 交付面遗留的无归属拒收码（`bonds-disabled` / `no-plan-engine` / `noesis-missing`）的可执行见证，拒收码门禁 1310 = 见证 743 / 死表 50 / 基线 547 全绿。
+#### 验收与边界
+- 已通过：EXV7-5 专锁 17/0、B5 组织 72、组织经济 76、journal 40、resource-ledger、economy、reject-lock 51、reject-code-gate、reject-code-coverage 60、q9-evidence 67、version-surface 14、module-registry、dead-export、o8-consumer 38、o7-plan-tree 69、o6-layer 71、o9-outlet 50（tier=full）、test-surface 395 文件／孤儿 0、q1-load-integrity 64、UI 渲染路径 53/0、u9-fact-report 51、contract-scan 55、字段活性与模块注册跟版。
+- **按 V7 纪律 12 未执行完整 `node tests/run.js` 回归**；待 EXV7-6～9 全部交付后在足够长窗口执行全量回归。
+### R230 · 2026-11-01 · v2.288.0：EXV7-4 关系六型图
+- `bonds.network()` 与 `relationTemp.network()` 合成六型关系图：关系结构取 `bonds` 登记面，玩家人物的温度与近期事件取 `fondness`；不含玩家的 NPC—NPC 关系不借用人物温度，如实返回无依据状态。
+- 接入人物页与诊断；bonds 模块关闭时如实报 `bonds-disabled`（quiet），不与「一条关系都没登记」混同。
+- 专锁 `tests/v7-relation-network-2288.js`：**pass (17)**；探针与 UI 面现场可复跑。
 ### R229 · 2026-11-01 · v2.287.0：EXV7-3 情报网
 
 - 在既有 `intel` owner 上增加只读 `network/networkStat` 聚合：人物持有情报、来源、等级/置信度、在途状态与明确 `ttlRounds` 的剩余轮次；未设期限如实显示，不以置信度猜寿命。

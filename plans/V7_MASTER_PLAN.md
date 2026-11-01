@@ -1,7 +1,7 @@
 # WorldAxis V7 全景双九项推进纲领与台账
 
 > **基线**：`v2.274.0` / `8fdb108` / 全量回归 `23326 / 0`
-> **当前**：`v2.288.0` · V7 优化线九项（OPV7-1 ～ OPV7-9）与拓展线 EXV7-1～4 **全部交付**（v2.285.0～v2.288.0 连续完成世界简报、人物意图看板、情报网与关系六型图）；下一步进入拓展线 EXV7-5
+> **当前**：`v2.289.0` · V7 优化线九项（OPV7-1 ～ OPV7-9）与拓展线 EXV7-1～5 **全部交付**（v2.285.0～v2.289.0 连续完成世界简报、人物意图看板、情报网、关系六型图与势力账本）；下一步进入拓展线 EXV7-6
 > **收口口径**：依纪律 12，18 项交付前不跑 `tests/run.js`；只跑专锁 + 三道版本门禁 + 三道实测账本门禁
 > **立项日期**：2026-10-31
 > **前代**：`plans/V6_MASTER_PLAN.md` 十八项全部交付（v2.257.0 ～ v2.274.0），保留为历史台账。
@@ -108,7 +108,7 @@ V7 要答的是另一句话：**开了以后，世界真的出内容吗？**
 | **EXV7-2** | 人物意图看板：他在图什么、卡在哪一步 | `engines/plan.js` + `engines/agency.js` + 面板 | `plan.expand(person, goalId, steps)` 已有完整链状态（第几步 / 缺什么前置 / 卡在哪），但面板从未把它呈现成人话。产出「目标 → 计划步骤 → 当前卡点」三列看板；数据全部读 `plan.chain`，不推断。 | **已交付**（v2.286.0；探针 48/48、专锁 80/80） |
 | **EXV7-3** | 情报网：谁知道了什么、从哪知道的 | `engines/intel.js` + `engines/noesis.js` | `intel.addIntel(person, item)` 有 `source` / `confidence`，`noesis` 有认知边界。把「谁信了什么、来源是谁、还能撑几轮」画成信息流；越界读取（某人知道了不该知道的）走既有 `noesis.leakScan` 标注，不另立判据。 | **已交付**（v2.287.0；情报网只读聚合 + noesis 泄露扫描接线） |
 | **EXV7-4** | 关系六型图：替身、寄生拯救、主权让渡… | `engines/bonds.js` + `engines/fondness.js` + `engines/relation-temp.js` | 六型结构由 bonds 登记行提供，温度由 fondness 提供，最近依据复用 history；关系六型图已接入人物页，关闭/空态/非玩家对温度缺席均分开表达。**v2.288.0 已交付**。 | ✅ 已交付 |
-| **EXV7-5** | 势力账本：谁欠谁、谁在付利息 | `engines/org.js` | `org` 有 21 个成员，含 `settleOwed` / `settleDebt` / `oweTo` / `debtsView` / `payroll` / `rosterView`，是全仓最完整的组织经济模型，但面板只暴露了 `grant` 与 `stockOf`。做出账本视图：债权债务、工资发放、名册变动、项目资金。只读聚合。 | 待实施 |
+| **EXV7-5** | 势力账本：谁欠谁、谁在付利息 | `engines/org.js` | `org` 有 21 个成员，含 `settleOwed` / `settleDebt` / `oweTo` / `debtsView` / `payroll` / `rosterView`，是全仓最完整的组织经济模型，但面板只暴露了 `grant` 与 `stockOf`。做出账本视图：债权债务、工资发放、名册变动、项目资金。只读聚合。 | **已交付**（v2.289.0；专锁 / 诊断 / 资源账本面已接线） |
 | **EXV7-6** | 地点沉积：这个地方记得什么 | `engines/sediment.js` | `sediment.settle(placeId, fact)` + `TRACES/LADDER/LABEL` 三级痕迹阶梯（实测 `settle` 返回 `trace:'minor'`）。按地点聚合沉积，给「此地经历过什么、痕迹还剩几级」；`world` 的地点表为索引，不新建地图真源。 | 待实施 |
 | **EXV7-7** | 事件日历：未来会发生什么，谁承诺了 | `engines/events.js` + `engines/life.js` | `events.schedule` 的四种 kind（`once/delayed/repeat/conditional`）+ `life` 的 `commitments`（承诺/欠债/秘密/合作/边界）合并成「未来时间轴」：已排期的事件、人物做出的承诺、到期窗口。只读，不改 stage。 | 待实施 |
 | **EXV7-8** | 世界自传：这一局跑下来，世界变成了什么样 | 新 `engines/world-autobiography.js` + 导出 | 复用 V6 世界日记 + EXV7-1 简报 + `chrono.chronicle`，按「章」压缩长局（每 N 轮一章），产出可导出的世界自传。**明确不做**：不生成新情节、不替玩家叙事、不碰 `store` 写面。 | 待实施 |

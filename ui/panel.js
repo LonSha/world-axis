@@ -6095,10 +6095,15 @@ on('#wa-desk-show', showDesk);
       let v = null; try { v = WA.org.ledgerView(); } catch (e) { return orgOut({ ok: false, reason: 'ledger-throw' }, true); }
       const ab = v.anomalies || { count: 0, stockDrift: [], negativeStock: [], overpay: [] };
       const rc = v.reconciled || {};
+      const ac = v.accounts || { total: 0, rows: [], truncated: false, dropped: 0 };
       // v2.92.0：失败分支必须给出**可读原因**。首版在断裂时留空 reason，面板于是印出
       //   「未记录：未知原因」——而事实是「存量与流水对不上」，两句话南辕北辙。
       const why = ab.count && rc.ok === false ? 'anomaly+reconcile-break' : (ab.count ? 'anomaly' : (rc.ok === false ? 'reconcile-break' : ''));
-      const summary = '持有者 ' + v.holderCount + ' · 流水 ' + v.entries + ' 笔（挤出 ' + v.dropped + '）· 流入 ' + v.flow.in + ' / 流出 ' + v.flow.out + ' · 异常笔 ' + ab.count
+      const accountText = (ac.rows || []).slice(0, 8).map(function (x) {
+        const res = (x.resources || []).map(function (r) { return r.item + r.amount; }).join('、') || '无库存';
+        return x.faction + '（' + x.memberCount + '人，待发 ' + x.payrollDue + '，欠薪 ' + x.owedPayroll + '，资源 ' + res + '，项目缺口 ' + x.projectMissing + '）';
+      }).join('；');
+      const summary = '持有者 ' + v.holderCount + ' · 势力账本 ' + (ac.total || 0) + ' 家' + (accountText ? '：' + accountText : '') + (ac.truncated ? '（另有 ' + ac.dropped + ' 家未展开）' : '') + ' · 流水 ' + v.entries + ' 笔（挤出 ' + v.dropped + '）· 流入 ' + v.flow.in + ' / 流出 ' + v.flow.out + ' · 异常笔 ' + ab.count
         + (ab.count ? '（负库存 ' + ab.negativeStock.length + ' / 前后值漂移 ' + ab.stockDrift.length + ' / 超额支付 ' + ab.overpay.length + '）' : '')
         + ' · 对账 ' + (rc.ok ? '自洽' : (rc.breakCount || 0) + ' 处断裂' + (rc.truncated ? '（流水已截断，仅核对带内）' : ''));
       // 读数与「写盘回执」分开措辞：账本按钮报的是**核对结论**，不是「刚才那笔记下来了」。

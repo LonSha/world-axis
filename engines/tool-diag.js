@@ -203,6 +203,8 @@
           reconciled: rc ? rc.ok : led.reconciled.ok, reconcileBreaks: rc ? rc.breakCount : led.reconciled.breakCount,
           truncated: led.reconciled.truncated
         } : { error: 'ledgerView 不可用' },
+        // v2.289.0（EXV7-5）：势力账本聚合与 ledgerView 同源，面板和诊断不各自扫描存档。
+        accounts: led && led.accounts ? led.accounts : { error: 'faction accounts 不可用' },
         // v2.94.0（O8）：经济风——引擎缺席 / 字段缺失 / 表外气候词三态照实带出，不回落成「平稳」。
         // v2.95.0（X2）：名册与欠薪——「组织面有没有人、欠着谁」在诊断里可读。
         organization: orgz ? { rosterCount: orgz.rosterCount, owedTotal: orgz.owedTotal,

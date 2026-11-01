@@ -160,9 +160,15 @@ function runNegative(a) {
   const cur = currentVersion();
   const curMinor = Number(cur.split('.')[1]);
   const prevMinor = curMinor - 1;
-  const needle = '|' + prevMinor + '|' + curMinor + ')';
+  // 旧白名单脚本可能落后于入口版本；N1 只要求选中的现场白名单确实包含当前版本，
+  //   破坏锚点取其末两项，不把历史文件的旧版本尾项误当作本版锚点。
+  const alt = scanSrc(src).filter(function (h) { return h.form === 'alt'; })[0];
+  const terms = alt ? alt.terms : [];
+  const last = terms[terms.length - 1];
+  const penult = terms[terms.length - 2];
+  const needle = '|' + penult + '|' + last + ')';
   a(src.split(needle).length - 1 === 1, 'v2185/vs N1: 破坏锚点 `' + needle + '` 在 ' + rel + ' 中恰 1 次（撞车 ⇒ 该条静默跳过）');
-  const broken = src.split(needle).join('|' + prevMinor + ')');
+  const broken = src.split(needle).join('|' + penult + ')');
   a(broken !== src, 'v2185/vs N1: 破坏真的改变了源码文本');
   const inMemory = scanSrc(broken);
   const hit = inMemory.filter(function (h) { return h.form === 'alt'; })[0];
