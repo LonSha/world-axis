@@ -30,7 +30,7 @@
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  const stat = { sets: 0, blocked: 0, lastReason: '', faults: {} };
+  const stat = { sets: 0, blocked: 0, lastReason: '', faults: {}, networkBuilds: 0, networkRows: 0, networkEmpty: 0, networkLastReason: '' };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -76,6 +76,43 @@
     if (!hit) { noteFault('missing'); return { ok: false, reason: 'missing', pair: key }; }
     return { ok: true, pair: key, types: hit.types.slice(), reason: 'applied' };
   }
+  /** EXV7-4: bounded read-only structural view owned by bonds. */
+  function network(opts) {
+    const o = opts || {};
+    const cfg = settings();
+    const rawCap = Number(o.maxRows);
+    const cap = Math.max(1, Math.min(24, isFinite(rawCap) && rawCap > 0 ? Math.floor(rawCap) : cfg.maxRows));
+    stat.networkBuilds++;
+    if (!cfg.enabled) {
+      stat.networkLastReason = 'disabled';
+      return { ok: false, reason: 'disabled', quiet: true, rows: [], total: 0, cap: cap, truncated: false, dropped: 0,
+        hint: '关系六型登记模块已关闭（不是没有关系记录）' };
+    }
+    const list = rows().filter(function (r) {
+      return r && r.a && r.b && Array.isArray(r.types) && r.types.length > 0;
+    }).map(function (r) {
+      const types = r.types.filter(function (t) { return TYPES.indexOf(t) >= 0; });
+      return { key: String(r.key || pairKey(r.a, r.b)), a: String(r.a), b: String(r.b), types: types,
+        at: r.at == null ? null : r.at };
+    }).filter(function (r) { return r.types.length > 0; });
+    list.sort(function (a, b) {
+      const atA = Number(a.at), atB = Number(b.at);
+      if (isFinite(atA) && isFinite(atB) && atB !== atA) return atB - atA;
+      if (isFinite(atB) !== isFinite(atA)) return isFinite(atB) ? 1 : -1;
+      return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0);
+    });
+    const dropped = Math.max(0, list.length - cap);
+    const visible = list.slice(0, cap).map(function (r) {
+      return { key: r.key, a: r.a, b: r.b, types: r.types.slice(), at: r.at };
+    });
+    stat.networkRows += visible.length;
+    stat.networkLastReason = list.length ? 'built' : 'no-records';
+    if (!list.length) stat.networkEmpty++;
+    return { ok: true, reason: list.length ? 'built' : 'no-records', quiet: !list.length,
+      hint: list.length ? '' : '暂无登记在案的关系六型', rows: visible, total: list.length, cap: cap,
+      truncated: dropped > 0, dropped: dropped };
+  }
+
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
     const list = rows().slice(-Math.max(1, cfg.maxRows));
@@ -113,7 +150,7 @@
   WA.bonds = {
     TYPES: TYPES.slice(),
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
-    setBond: setBond, read: read, buildBlock: buildBlock, evaluateDeepTalk: evaluateDeepTalk,
+    setBond: setBond, read: read, network: network, buildBlock: buildBlock, evaluateDeepTalk: evaluateDeepTalk,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

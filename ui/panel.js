@@ -1464,6 +1464,29 @@
     //   在这 27 个控件上永不可见（守卫表的全部意义正是拦这个）。本次把三件补齐。
     const svOn = !!(WA.survey && WA.survey.getSettings && WA.survey.getSettings().enabled);
     const s = WA.store.get();
+    const relationNetworkBlock = (function () {
+      try {
+        if (!WA.relationTemp || typeof WA.relationTemp.network !== 'function') return '<div class=\"wa-dim\" id=\"wa-bond-network-block\">关系六型图读数不可用（engines/relation-temp.js 缺席）</div>';
+        const r = WA.relationTemp.network();
+        if (!r || r.ok !== true) {
+          if (r && r.reason === 'bonds-disabled') return '<div class=\"wa-bond-network wa-bond-network-quiet\" id=\"wa-bond-network-block\">关系六型登记模块已关闭（不是没有关系记录）</div>';
+          return '<div class=\"wa-dim\" id=\"wa-bond-network-block\">关系六型图读数不可用（' + esc(String((r && r.reason) || 'unknown')) + '）</div>';
+        }
+        if (r.quiet === true) return '<div class=\"wa-bond-network wa-bond-network-quiet\" id=\"wa-bond-network-block\"><div class=\"wa-dim\">' + esc(r.hint || '暂无登记在案的关系六型') + '</div></div>';
+        const cfg = WA.relationTemp.getSettings ? WA.relationTemp.getSettings() : {};
+        const lines = r.rows.map(function (x) {
+          const typ = cfg.showTypes === false ? '结构显示已隐藏' : x.types.join('、');
+          let temp = '无对应人物温度记录';
+          if (x.temperature) temp = '温度 ' + x.temperature.value.toFixed(1) + '（' + x.temperature.band + '）' + (x.temperature.trust == null ? '' : ' · 信任 ' + x.temperature.trust);
+          let why = '';
+          if (cfg.showReason !== false) why = x.recent && x.recent.hasRecord ? (' · 最近依据：' + (x.recent.reason || '未注明原因')) : (' · 最近依据：' + ((x.recent && x.recent.reason) || '近期无事件记录'));
+          return '<div class=\"wa-bond-network-line\"><b>' + esc(x.a) + ' ↔ ' + esc(x.b) + '</b>｜结构：' + esc(typ) + '｜' + esc(temp) + esc(why) + '</div>';
+        }).join('');
+        return '<div class=\"wa-bond-network wa-bond-network-live\" id=\"wa-bond-network-block\"><div class=\"wa-bond-network-head\">关系六型图（' + esc(String(r.rows.length)) + ' 条' + (r.player ? ' · 温度基准：' + esc(r.player) : '') + '）</div>' + lines + (r.truncated ? '<div class=\"wa-dim\">另有 ' + esc(String(r.dropped)) + ' 条登记关系未展开（本屏上限 ' + esc(String(r.cap)) + ' 条）</div>' : '') + '</div>';
+      } catch (e) {
+        return '<div class=\"wa-dim\" id=\"wa-bond-network-block\">关系六型图读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
     const reg = WA.registry.list();
     const people = Object.values(s.people);
     // v2.209.0（优化 6）：人物行带**记录锚点**（导航协议用）。
@@ -1907,6 +1930,8 @@ const peopleIds = Object.keys(s.people);
         return ps.registered ? ('已建档 ' + ps.withProfile + '/' + ps.registered + ' 个 NPC（' + ps.entries + ' 条）— 点人名后的「档案」录入') : '尚无注册 NPC';
       })()}</div>
       <div id="wa-prof-out" class="wa-out"></div>
+      <div class="wa-sec">关系六型图<span class="wa-dim">（EXV7-4：登记结构 / 温度 / 最近依据分列；不替代关系图谱）</span></div>
+      ${relationNetworkBlock}
       <div class="wa-sec">关系图谱<span class="wa-dim">（v2.231.0 · OPT-6：存档为唯一真源 / 有向立场与边分开记）</span></div>
       <div id="wa-rel-row" class="wa-dim">${(() => {
         if (!WA.relationGraph || typeof WA.relationGraph.persisted !== 'function') return '关系图谱未加载';

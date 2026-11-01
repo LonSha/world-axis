@@ -58,7 +58,11 @@
     colderCount: 0,
     steadyCount: 0,
     lastReason: '',
-    faults: {}
+    faults: {},
+    networkBuilds: 0,
+    networkRows: 0,
+    networkEmpty: 0,
+    networkLastReason: ''
   };
 
   function fault(k) { __stat.faults[k] = (__stat.faults[k] || 0) + 1; }
@@ -101,6 +105,16 @@
     return types;
   }
 
+  function getPlayer() {
+    return safe(function () {
+      const wk = WA.worldBridge && typeof WA.worldBridge.worldKey === 'function' ? WA.worldBridge.worldKey() : null;
+      if (wk && wk.player) return txt(wk.player, 40);
+      const s = WA.store && typeof WA.store.get === 'function' ? WA.store.get() : null;
+      if (s && s.player && s.player.name) return txt(s.player.name, 40);
+      return '';
+    }, '');
+  }
+
   /**
    * 构建关系温度条目与人话说明
    */
@@ -124,13 +138,7 @@
     }
 
     // 获取玩家名（优先 worldBridge）
-    let player = safe(function () {
-      const wk = WA.worldBridge && typeof WA.worldBridge.worldKey === 'function' ? WA.worldBridge.worldKey() : null;
-      if (wk && wk.player) return txt(wk.player, 40);
-      const s = WA.store && typeof WA.store.get === 'function' ? WA.store.get() : null;
-      if (s && s.player && s.player.name) return txt(s.player.name, 40);
-      return '';
-    }, '');
+    let player = getPlayer();
 
     const DEFAULT_PLAYERS = ['玩家', 'player', 'User', 'user', '你', '我'];
     if (!player && o.player) player = txt(o.player, 40);
@@ -263,6 +271,80 @@
   }
 
 
+  /**
+   * EXV7-4: 六型关系图只读聚合。
+   * bonds 负责登记结构；fondness 负责玩家人物的温度与 history。
+   * 不含玩家的 NPC-NPC 关系不借用人物温度，明确返回无依据状态。
+   */
+  function network(opts) {
+    const o = opts || {};
+    const cfg = settings();
+    const rawCap = Number(o.maxRows || o.maxPeople);
+    const cap = Math.max(1, Math.min(24, isFinite(rawCap) && rawCap > 0 ? Math.floor(rawCap) : cfg.maxPeople));
+    __stat.networkBuilds++;
+    if (!WA.bonds || typeof WA.bonds.network !== 'function') {
+      __stat.networkLastReason = 'bonds-missing';
+      return { ok: false, reason: 'module-missing', rows: [], total: 0, cap: cap, truncated: false, dropped: 0 };
+    }
+    const br = safe(function () { return WA.bonds.network({ maxRows: cap }); }, null);
+    if (!br) {
+      __stat.networkLastReason = 'bonds-read-threw';
+      return { ok: false, reason: 'read-failed', rows: [], total: 0, cap: cap, truncated: false, dropped: 0 };
+    }
+    if (br.reason === 'disabled') {
+      __stat.networkLastReason = 'bonds-disabled';
+      return { ok: false, reason: 'bonds-disabled', quiet: true, rows: [], total: 0, cap: cap,
+        truncated: false, dropped: 0, hint: '关系六型登记模块已关闭（不是没有关系记录）' };
+    }
+    const player = txt(o.player || getPlayer(), 40);
+    const st = safe(function () { return WA.store && typeof WA.store.get === 'function' ? WA.store.get() : null; }, null) || {};
+    const fEnabled = !(WA.fondness && typeof WA.fondness.getSettings === 'function') || WA.fondness.getSettings().enabled === true;
+    const fRows = fEnabled && st.fondness && Array.isArray(st.fondness.rows) ? st.fondness.rows : [];
+    const bandOf = function (v) {
+      const bs = WA.fondness && Array.isArray(WA.fondness.BANDS) ? WA.fondness.BANDS : [];
+      for (let i = 0; i < bs.length; i++) if (v >= bs[i].lo && v <= bs[i].hi) return bs[i].name;
+      return '未设定';
+    };
+    const enrich = function (a, b) {
+      const who = player && a === player ? b : (player && b === player ? a : '');
+      if (!who) return { temperature: null, recent: { hasRecord: false, reason: '该登记关系不含玩家，现有好感温度不能归属于这对关系' } };
+      if (!fEnabled) return { temperature: null, recent: { hasRecord: false, reason: '好感审计模块已关闭' } };
+      const row = fRows.filter(function (r) { return r && r.person === who; })[0];
+      if (!row) return { temperature: null, recent: { hasRecord: false, reason: '没有对应的好感温度记录' } };
+      const value = num(row.value);
+      let delta = 0, dir = 'steady';
+      let recent = { hasRecord: false, reason: '近期无事件记录' };
+      if (Array.isArray(row.history) && row.history.length) {
+        const h = row.history[row.history.length - 1];
+        if (h) {
+          delta = +(num(h.to) - num(h.from)).toFixed(1);
+          dir = delta > 0 ? 'warmer' : (delta < 0 ? 'colder' : 'steady');
+          recent = { hasRecord: true, at: h.at == null ? null : h.at, from: num(h.from), to: num(h.to),
+            delta: delta, dir: dir, reason: txt(h.reason, 80), kind: txt(h.kind, 20) };
+        }
+      }
+      return { temperature: { person: who, value: value, trust: row.trust == null ? null : num(row.trust),
+        band: bandOf(value), delta: delta, dir: dir }, recent: recent };
+    };
+    const rows = (br.rows || []).map(function (r) {
+      const e = enrich(r.a, r.b);
+      return { key: r.key, a: r.a, b: r.b, types: r.types.slice(), at: r.at,
+        temperature: e.temperature, recent: e.recent };
+    });
+    __stat.networkRows += rows.length;
+    if (!rows.length) __stat.networkEmpty++;
+    __stat.networkLastReason = rows.length ? 'built' : 'no-records';
+    return { ok: true, reason: rows.length ? 'built' : 'no-records', quiet: !rows.length,
+      hint: rows.length ? '' : (br.hint || '暂无登记在案的关系六型'), rows: rows, total: br.total || 0,
+      cap: br.cap || cap, truncated: !!br.truncated, dropped: br.dropped || 0, player: player || null,
+      sources: { bonds: true, fondness: !!(WA.fondness && typeof WA.fondness.read === 'function'), fondnessEnabled: fEnabled } };
+  }
+
+  function networkStat() {
+    return { builds: __stat.networkBuilds, rowsEmitted: __stat.networkRows, emptyBuilds: __stat.networkEmpty,
+      lastReason: __stat.networkLastReason, enabled: true };
+  }
+
   function stat() {
     return Object.assign({}, __stat, {
       faults: Object.assign({}, __stat.faults),
@@ -288,6 +370,8 @@
     build: build,
     stat: stat,
     reset: reset,
+    network: network,
+    networkStat: networkStat,
     DEF: Object.assign({}, DEF)
   };
 

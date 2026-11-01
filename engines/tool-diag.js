@@ -1642,6 +1642,7 @@
         return { error: 'engines/relation-temp.js 未加载（关系温度计读数缺席）' };
       }
       const st = WA.relationTemp.stat();
+      const ns = typeof WA.relationTemp.networkStat === 'function' ? WA.relationTemp.networkStat() : {};
       const cfg = typeof WA.relationTemp.getSettings === 'function' ? WA.relationTemp.getSettings() : null;
       return {
         enabled: !!(cfg && cfg.enabled),
@@ -1655,6 +1656,14 @@
         sources: {
           bonds: !!(WA.bonds && typeof WA.bonds.read === 'function'),
           fondness: !!(WA.fondness && typeof WA.fondness.read === 'function')
+        },
+        network: {
+          builds: ns.builds || 0,
+          rowsEmitted: ns.rowsEmitted || 0,
+          emptyBuilds: ns.emptyBuilds || 0,
+          lastReason: ns.lastReason || '',
+          owner: !!(WA.bonds && typeof WA.bonds.network === 'function'),
+          enriched: !!(WA.relationTemp && typeof WA.relationTemp.network === 'function')
         },
         note: (cfg && cfg.enabled !== true)
           ? '关系温度计关着 —— 这一栏零读数是「关着」，不是「无关系记录」'
