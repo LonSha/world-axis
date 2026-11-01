@@ -1910,6 +1910,76 @@
   //     · perfBaseline  答「这一局属于哪一档、离预算多远」（失效在「没测过被写成小局」）；
   //     · worldHealth   答「我现在有什么没做完 / 卡住了 / 快满了」（失效在「三问都要逐个模块翻」）。
   //   共同纪律：只念现场，不替用户跑动作（跑清点 / 跑基准是面板出口的事）。
+  /**
+   * v2.291.0（V7 EXV7-7）：事件日历读数 —— 未来会发生什么、谁承诺了。
+   *   两条来源合在一节里，因为它们答的是**同一个问题**（「接下来」），
+   *   但**不合并成一个计数**：事件有确定时刻、承诺只有到期窗口，
+   *   合成一个数之后就再也答不出「这周是要跑事还是要还债」。
+   *
+   *   与 secSediment / secTapeStore 同规：**只报读数、不写世界** ——
+   *   不 claim、不 tick、不改 stage、不推进任何状态。
+   *
+   *   两种「没得看」必须分开报（本仓反复付过代价的那条）：
+   *     · 模块关着（disabled）≠ 表里空了（total:0）≠ 读不出来（error）；
+   *     · conditional 行**没有确定时刻**，进 untimed 而不是被猜一个日期。
+   */
+  function secCalendar() {
+    return safe(function () {
+      const out = { events: null, commitments: null };
+      // ① 事件钟未来轴
+      out.events = (function () {
+        if (!WA.events || typeof WA.events.timelineView !== 'function') {
+          return { error: 'engines/events.js 的 timelineView 缺席（未来轴不可用）' };
+        }
+        try {
+          const tv = WA.events.timelineView({ maxRows: 24 });
+          if (!tv || tv.ok !== true) return { error: (tv && tv.reason) || 'timelineView 拒收' };
+          return {
+            clock: tv.clock, now: tv.now,
+            total: tv.total, timedCount: tv.timedCount, untimedCount: tv.untimedCount,
+            dueCount: tv.dueCount, blockedCount: tv.blockedCount,
+            byKind: Object.assign({}, tv.byKind || {}), byStatus: Object.assign({}, tv.byStatus || {}),
+            truncated: !!tv.truncated, dropped: tv.dropped,
+            // 行的字段裁剪到「读者要判的那几个」：引擎把整行透出，但诊断面报全字段
+            //   会让「这一条在哪一刻、到没到点」淹没在 payload 里。
+            rows: (tv.rows || []).map(function (r) {
+              return { id: r.id, kind: r.kind, title: r.title, at: r.at, due: r.due,
+                unknown: r.unknown, blocked: r.blocked, priority: r.priority };
+            }),
+            calendarNote: tv.total + ' 条在未来轴上（有时间 ' + tv.timedCount + ' / 条件待触发 '
+              + tv.untimedCount + '）· 已到点未认领 ' + tv.dueCount + ' 条'
+              + (tv.truncated ? '（另有 ' + tv.dropped + ' 条未列出）' : '')
+          };
+        } catch (e) { return { error: 'timelineView 抛错: ' + (e && e.message ? e.message : String(e)) }; }
+      })();
+      // ② 承诺台账（人物许下的、欠下的、瞒着的、约定的、划下的）
+      out.commitments = (function () {
+        if (!WA.life || typeof WA.life.commitmentsView !== 'function') {
+          return { error: 'engines/life.js 的 commitmentsView 缺席（承诺台账不可用）' };
+        }
+        try {
+          const cv = WA.life.commitmentsView({});
+          if (!cv || cv.ok !== true) return { error: (cv && cv.reason) || 'commitmentsView 拒收' };
+          return {
+            total: cv.total, overdueCount: cv.overdueCount,
+            people: cv.people, peopleTotal: cv.peopleTotal, cap: cv.cap, truncated: !!cv.truncated,
+            byKind: Object.assign({}, cv.byKind || {}),
+            rows: (cv.rows || []).map(function (p) {
+              return { person: p.person, count: p.count, shown: p.shown,
+                overdue: (p.items || []).filter(function (i) { return i.overdue; }).length,
+                kinds: (p.items || []).map(function (i) { return i.kind; }) };
+            }),
+            commitNote: cv.people + ' 人有承诺（共 ' + cv.total + ' 条，其中已过期 '
+              + cv.overdueCount + ' 条）'
+              + (cv.truncated ? '（另有 ' + (cv.peopleTotal - cv.people) + ' 人未列出）' : '')
+          };
+        } catch (e) { return { error: 'commitmentsView 抛错: ' + (e && e.message ? e.message : String(e)) }; }
+      })();
+      out.note = '事件走事件钟、承诺只有到期窗口 —— 两条来源不合并成一个计数；'
+        + 'conditional 无确定时刻，不猜日期';
+      return out;
+    });
+  }
   function secAgenda() {
     return safe(function () {
       if (!WA.agenda || typeof WA.agenda.stat !== 'function') return { error: 'engines/agenda.js 未加载（世界日程读数缺席）' };
@@ -5033,6 +5103,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   渲染在 health 页的 wh 块里,故补登到**它们真正所在的那一组**。
     { page: 'health', ids: ['wa-wh-enabled', 'wa-wh-view', 'wa-wh-sources', 'wa-wh-diag', 'wa-wh-drill', 'wa-wh-drill-go',
         'wa-wh-ag-enabled', 'wa-wh-ag-view', 'wa-wh-ag-sources', 'wa-wh-ag-overdue',
+        // v2.291.0（EXV7-7）：事件日历两枚读口（事件钟未来轴 / 承诺台账）。
+        //   与上面四枚同组同页 —— 它们答的是同一个问题（「接下来」），
+        //   但**不共用一枚按钮**：合成一枚之后「事都要跑」与「债要还」在界面上分不开。
+        'wa-cal-events', 'wa-cal-commit',
         'wa-wh-cv-enabled', 'wa-wh-cv-view', 'wa-wh-cv-hidden', 'wa-wh-cv-diag',
         'wa-wh-cv-ref', 'wa-wh-cv-entry'],
       // 三块读数出口走 dynamic 层（同上面 tools 页两条的口径）。
@@ -5914,7 +5988,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.182.0（第二批 E2/E5/O4/O3/O5）：五只只读聚合面。五节分列不合并 ——
       //   诊断包是这些新面**唯一**的产品侧读者，漏登记 ⇒ 死导出面当场红灯
       //   （口径：产品零引用即冻结面）。
-      agenda: secAgenda(), chronicleView: secChronicleView(), capacityAudit: secCapacityAudit(),
+      agenda: secAgenda(), calendar: secCalendar(), chronicleView: secChronicleView(), capacityAudit: secCapacityAudit(),
       perfBaseline: secPerfBaseline(), worldHealth: secWorldHealth(),
       // v2.183.0（第一批 E1）：统一待办事项中心。与 worldHealth 的待办栏分列不合并 ——
       //   两者答的是**两个粒度**：世界健康栏答「还有几件事没做完」（计数 + 是否全清），

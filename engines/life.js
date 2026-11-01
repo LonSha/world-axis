@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/life.js (v2.52.0)
+ * WorldAxis engines/life.js (v2.291.0)
  * 人物生活：持续目标、关系承诺、基础日程、条件式行动。
  *
  * 设计边界：
@@ -446,6 +446,92 @@
     return true;
   }
 
+  /**
+   * v2.291.0（V7 EXV7-7）：**承诺**这一面的只读台账 —— 谁答应了什么、欠谁、到期没有。
+   *
+   * ── 它答什么（缺口）─────────────────────────────────────────
+   *   `buildBlock()` 里承诺只以「`kind`「`text`」」的短句出现，且**只取每人前 `maxItems` 条**、
+   *   只取 `active`、不报 due、不报谁许给谁。于是「这个人物到底欠着几笔、哪笔到期了」
+   *   在注入面上一格都没有。面板与诊断此前只能读 `WA.store.get().people` 自己遍历 ——
+   *   那是第二份遍历逻辑（本仓反复治理的「两处各说一遍」）。
+   *
+   * ── 五种 kind 的词表是唯一真源 ────────────────────────────────
+   *   `COMMITMENTS = ['promise','debt','secret','cooperation','boundary']` 已导出，
+   *   本口按它分组（`byKind` 恒含全部五个键，缺的报 0）——「这一类没有」与
+   *   「这一类不在词表里」必须可分：后者是代码 bug，前者是正常空集。
+   *
+   * ── 否定式边界 ────────────────────────────────────────────────
+   *   1 **只读**：不 tick、不推进状态、不改 `status`、不写盘（`commitmentReads` 只记读数）。
+   *   2 **不代判到期**：`due` 字段只是 `due <= now && due > 0` 的事实比对，
+   *      逾期与否的**处置**归 tick / 调用方；本口不把「过期」写成新状态。
+   *   3 **不补人**：只为存档里**真存在的**人物出行，绝不为词表补占位人物。
+   *   4 **不截断人**：`maxPeople` 夹在 1..8（与设置同区间），`order` 稳定，
+   *      被截掉的人报在 `dropped`，不静默丢。
+   *   5 关闭态如实拒收（`reason:'disabled'`）：与「没人许过诺」分开。
+   *   6 `secret` 不因「这是秘密」就被藏起来 —— 本口是**作者面/诊断面**读数，
+   *      藏起来等于让作者看不见自己写的秘密；对玩家可见性的裁剪是别的模块的事。
+   *
+   * @param {{maxPeople?:number, maxPer?:number, now?:number, person?:string}} [opts]
+   */
+  function commitmentsView(opts) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const o = (opts && typeof opts === 'object') ? opts : {};
+    const capPeople = Math.max(1, Math.min(8, Number(o.maxPeople) > 0 ? Math.floor(Number(o.maxPeople)) : cfg.maxPeople));
+    const capPer = Math.max(1, Math.min(12, Number(o.maxPer) > 0 ? Math.floor(Number(o.maxPer)) : 12));
+    const t = (isFinite(o.now) ? Number(o.now) : null) !== null ? Math.floor(Number(o.now)) : clockNow('life');
+    const only = o.person ? clean(o.person, 60) : '';
+    const people = (((WA.store && WA.store.get) ? WA.store.get() : {}) || {}).people || {};
+    const byKind = {};
+    COMMITMENTS.forEach(function (k) { byKind[k] = 0; });
+    const rows = [];
+    Object.keys(people).forEach(function (id) {
+      const p = people[id];
+      if (!p || !p.life || !Array.isArray(p.life.commitments)) return;
+      const name = clean(p.name || id, 60);
+      if (only && name !== only && String(id) !== only) return;
+      const list = p.life.commitments.filter(function (x) { return x && (x.status === undefined || x.status === 'active'); });
+      if (!list.length) return;
+      rows.push({ id: String(id), person: name, list: list });
+    });
+    // 稳定序：承诺多者在前，同数按名字升序（同输入同输出，无随机序）。
+    rows.sort(function (a, b) {
+      if (b.list.length !== a.list.length) return b.list.length - a.list.length;
+      return a.person < b.person ? -1 : (a.person > b.person ? 1 : 0);
+    });
+    const truncated = rows.length > capPeople;
+    const kept = truncated ? rows.slice(0, capPeople) : rows;
+    // 容量口径与 events.timelineView / bonds.view 同词表（truncated + dropped）：
+    //   **不用 `reason:`** —— 那是拒收码保留字，写在这里会被拒收码门禁当成
+    //   「第 1312 个拒收码」，逼着人把一次正常截断登记进死表（概念污染）。
+    const dropped = truncated ? rows.length - capPeople : 0;
+    let total = 0, overdue = 0;
+    const out = kept.map(function (r) {
+      const items = r.list.slice(0, capPer).map(function (x) {
+        const kind = COMMITMENTS.indexOf(String(x.kind)) >= 0 ? String(x.kind) : 'unknown';
+        if (byKind[kind] === undefined) byKind[kind] = 0;
+        byKind[kind]++;
+        total++;
+        const due = isFinite(Number(x.due)) && Number(x.due) > 0 ? Number(x.due) : null;
+        const isOverdue = due !== null && due <= t;
+        if (isOverdue) overdue++;
+        return { id: String(x.id || ''), kind: kind, target: clean(x.target, 60),
+          text: clean(x.text, 80), due: due, overdue: isOverdue,
+          status: String(x.status || 'active'), at: Number(x.at) || 0 };
+      });
+      return { id: r.id, person: r.person, count: r.list.length, shown: items.length,
+        truncated: r.list.length > capPer, items: items };
+    });
+    stat.commitmentReads = (stat.commitmentReads || 0) + 1;
+    return {
+      ok: true, now: t, total: total, overdueCount: overdue,
+      people: out.length, peopleTotal: rows.length, cap: capPeople,
+      truncated: truncated, dropped: dropped,
+      byKind: byKind, rows: out,
+      note: '只读：不改承诺状态、不代判逾期处置；五种 kind 的词表是唯一真源；'
+        + 'secret 不因是秘密而在作者面被藏起'
+    };
+  }
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
     const lines = [];
@@ -462,6 +548,8 @@
     ACTIONS: ['wait', 'advance', 'ask', 'hide', 'seek', 'pause', 'keep'], COMMITMENTS: COMMITMENTS,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     addGoal: addGoal, addCommitment: addCommitment, addSchedule: addSchedule, tick: tick, decide: decide, buildBlock: buildBlock,
+    // v2.291.0（EXV7-7）：承诺台账（只读投影；事件日历的第二条来源）。
+    commitmentsView: commitmentsView,
     // v2.156.0（SP2）：离线批（offline-return）的**结算入口**。tickDraft 在给定草稿上把一轮推完；
     //   makeBag/commitBag 是「试演期整体隔离、成功整体并回」的两端（失败路径整袋丢弃、零残留）。
     tickDraft: tickDraft, makeBag: makeBag, commitBag: commitBag,
@@ -474,6 +562,8 @@
     stat: function () { return Object.assign({}, stat, { lastTurn: _turn, turnRestored: _restored !== null,
       // v2.139.0（E8）：二阶公平读数挂在**既有成员**里——本仓纪律是「为读一个量新开一口，
       //   那一口当场就是死导出」，故 `life.fairness` 这个口**刻意不存在**。
-      fairness: fairnessOf() }); }
+      fairness: fairnessOf(),
+      // v2.291.0（EXV7-7）：承诺台账的读取次数（同 placesReads 口径：零计数 = 没被调用）。
+      commitmentReads: (stat.commitmentReads || 0) }); }
   };
 })();

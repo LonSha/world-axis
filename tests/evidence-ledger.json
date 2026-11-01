@@ -1,15 +1,15 @@
 {
   "_note": "WorldAxis 证据索引(Q9,v2.226.0)。每行 = 一个证据文件,六栏全部**现场复算**(文件 / sha / version / commit / wired / env、runnable),本表不存第二真源。**version 只认文件自述**(标题行提到本文件名的那行 > 头部前六行首个版本词),并回带 versionSource(title / head / null)自证来源;取不到如实标 null,**不猜**。fileAnchor = 文件名 `-v2NNN` 后缀**原样**,仅备查 —— 该后缀有损且二义(2.117.0 写作 2117、2.97.0 写作 2970;`2100` 既可读成 2.10.0 也可读成 2.100.0),**不作判据、不填进 version**。acceptance 四档:verified(被 run.js 引用 **且** 另有真跑面:导出 runAll 一族**且**带真源码破坏锚点)/ wired(存在 + 被 run.js 引用)/ consumed(未被 run.js 直接引用,但被其它测试 require 当公共基建)/ unwired。计划 Q9 原文「现有计划顶部存在+引用不等于功能验收」落在 verified 与 wired 的分界上 —— wired 一律不许写成 verified。stale 只认三档可复算的硬事实:sha-changed / file-missing / wired-lost;**不**把「version 落后于当前版本」算 stale(历史证据本就停在它交付的那一版)。边界:输出摘要不进记录;只登记 tests/ 下的 .js(不含 run.js 与账本 json)。",
-  "version": "2.290.0",
+  "version": "2.291.0",
   "counts": {
-    "total": 395,
+    "total": 396,
     "verified": 29,
-    "wired": 363,
+    "wired": 364,
     "consumed": 3,
     "unwired": 0,
     "browser": 0,
     "headlessGate": 22,
-    "headlessLock": 330,
+    "headlessLock": 331,
     "headlessScript": 43
   },
   "rows": [
@@ -4801,7 +4801,7 @@
     },
     {
       "file": "tests/s3-b1-e3-v2184.js",
-      "sha": "aa5aa29bbfb0",
+      "sha": "93aeccf6135e",
       "version": "2.184.0",
       "versionSource": "title",
       "fileAnchor": "2184",
@@ -4839,7 +4839,7 @@
     },
     {
       "file": "tests/s3-b2-e2-v2182.js",
-      "sha": "3917334e95db",
+      "sha": "4efc8d289e26",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -4856,7 +4856,7 @@
     },
     {
       "file": "tests/s3-b2-e5-v2182.js",
-      "sha": "3367b1eeedc9",
+      "sha": "172fe5b49dd6",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -4873,7 +4873,7 @@
     },
     {
       "file": "tests/s3-b2-o3-v2182.js",
-      "sha": "be682fc6116f",
+      "sha": "7198a9f242c8",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -4890,7 +4890,7 @@
     },
     {
       "file": "tests/s3-b2-o4-v2182.js",
-      "sha": "1b36ffcd9fd2",
+      "sha": "950a5beb3292",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -4909,7 +4909,7 @@
     },
     {
       "file": "tests/s3-b2-o5-v2182.js",
-      "sha": "3d5e411c03ea",
+      "sha": "a892cb9c0be7",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -5191,7 +5191,7 @@
     },
     {
       "file": "tests/s3-b4-n11-v2229.js",
-      "sha": "25c43adfcb5f",
+      "sha": "46862955f146",
       "version": "2.229.0",
       "versionSource": "title",
       "fileAnchor": "2229",
@@ -5446,7 +5446,7 @@
     },
     {
       "file": "tests/s3-tx2-v2166.js",
-      "sha": "036f69d77d77",
+      "sha": "74dba2eeee74",
       "version": "2.166.0",
       "versionSource": "head",
       "fileAnchor": "2166",
@@ -5466,7 +5466,7 @@
     },
     {
       "file": "tests/s3-tx3-v2167.js",
-      "sha": "7b3f6d246943",
+      "sha": "21c9568e1857",
       "version": "2.167.0",
       "versionSource": "head",
       "fileAnchor": "2167",
@@ -5483,7 +5483,7 @@
     },
     {
       "file": "tests/s3-tx4-v2168.js",
-      "sha": "1954bb96df00",
+      "sha": "8392f88ab992",
       "version": "2.168.0",
       "versionSource": "head",
       "fileAnchor": "2168",
@@ -5520,7 +5520,7 @@
     },
     {
       "file": "tests/s3-tx6-v2169.js",
-      "sha": "19d16689009b",
+      "sha": "69d9c5eb42aa",
       "version": "2.169.0",
       "versionSource": "head",
       "fileAnchor": "2169",
@@ -5537,7 +5537,7 @@
     },
     {
       "file": "tests/s3-tx7-v2170.js",
-      "sha": "949c42cbbc6c",
+      "sha": "d3c2e5635a74",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2170",
@@ -5554,7 +5554,7 @@
     },
     {
       "file": "tests/s3-tx8-v2171.js",
-      "sha": "3b5104196d1c",
+      "sha": "a7eaea8d46b9",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2171",
@@ -5571,7 +5571,7 @@
     },
     {
       "file": "tests/s3-tx9-v2172.js",
-      "sha": "7ca18acdb44b",
+      "sha": "e01a5ac316d8",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2172",
@@ -7726,6 +7726,26 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/v7-event-calendar-2291.js",
+      "sha": "16d5900db3fb",
+      "version": "2.291.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": null,
+      "wired": {
+        "form": "runLock",
+        "line": 25070
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
       "file": "tests/v7-faction-ledger-2289.js",
       "sha": "903687173900",
       "version": null,
@@ -7791,7 +7811,7 @@
       "version": "2.290.0",
       "versionSource": "head",
       "fileAnchor": null,
-      "commit": null,
+      "commit": "2314f23",
       "wired": {
         "form": "runLock",
         "line": 25061

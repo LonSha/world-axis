@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.290.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.290.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.291.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.291.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -1399,7 +1399,7 @@
       "detail": "core/clock.js 内部自用、外部零引用（过度导出）",
       "src": "core/clock.js",
       "refs": 0,
-      "tref": 5,
+      "tref": 7,
       "own": 3
     },
     "clock.frozen": {
@@ -2815,7 +2815,7 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 4,
+      "tref": 5,
       "own": 3
     },
     "events.claim": {
@@ -2840,7 +2840,7 @@
       "src": "engines/events.js",
       "refs": 0,
       "tref": 6,
-      "own": 3
+      "own": 5
     },
     "events.fails": {
       "reason": "test-only",
@@ -2871,7 +2871,7 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 63,
+      "tref": 69,
       "own": 3
     },
     "events.setSettings": {
@@ -2879,7 +2879,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 6,
       "own": 1
     },
     "events.stat": {
@@ -2887,8 +2887,8 @@
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
       "src": "engines/events.js",
       "refs": 0,
-      "tref": 9,
-      "own": 29
+      "tref": 11,
+      "own": 31
     },
     "evict.resetEvictStat": {
       "reason": "test-only",
@@ -8424,7 +8424,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 156
+      "own": 157
     },
     "toolDiag.secAgenda": {
       "reason": "self-only",

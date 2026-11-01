@@ -3986,6 +3986,18 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-wh-ag-overdue" title="已到期未收敛：已经到期但尚未收敛的条目（与阻塞栏同源）">看欠账</button>
         <button class="wa-btn" id="wa-wh-ag-sources" title="五源可用性：缺席的源如实报，不静默当作「这类条目没有」">源可用性</button>
       </div>
+      <div class="wa-sec">事件日历</div>
+      <div class="wa-dim">（EXV7-7：事件钟上的未来轴 + 人物承诺台账。与上面「世界日程」<b>不是同一把尺子</b>：
+        那栏走<b>剧情日</b>，本栏走<b>事件钟</b>（<code>events.scheduledAt</code> 的墙钟口径）——
+        两种时刻之间<b>没有换算率</b>，故本栏不折算成剧情日，逐行只报它自己的时刻。
+        四种排期语义分开表达：<b>once / delayed</b> 是「到点跑一次」；<b>repeat</b> 报剩余轮次；
+        <b>conditional</b> <b>没有确定时刻</b>（条件是外部事实）—— 单列在「条件待触发」，<b>不猜日期</b>。
+        两条读数<b>不共用一枚按钮</b>：事件是「要跑的事」，承诺是「许下的话」，合成一枚就再也分不开。
+        本页全是<b>只读</b>：不认领、不结算、不改任何状态。</div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-cal-events" title="事件钟未来轴（只读）：按时刻升序列出未来会发生什么。逐行标出是否已到点未认领（due）、周期还剩几轮（remainRuns）、条件触发的为什么没有时刻（unknown）。conditional 不排进时间序——条件是外部事实，本模块拒不猜它哪天成立">事件未来轴</button>
+        <button class="wa-btn" id="wa-cal-commit" title="承诺台账（只读）：谁许下/欠下/瞒着/约定/划下了什么，各自到期窗口与是否已过期。五种 kind 的词表是唯一真源，缺的那类报 0（不是不存在）。secret 不因是秘密就被藏起——本栏是作者面读数。只报到期<u>事实</u>，逾期怎么处置归 tick 与调用方">承诺台账</button>
+      </div>
       <div id="wa-wh-ag-out" class="wa-out"></div>
 
       <div class="wa-sec">世界纪事</div><div class="wa-dim">（E5：已经发生过什么、有哪些不给你看）</div>
@@ -13759,6 +13771,71 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
             return '<div class="wa-item">' + esc(x.name) + '：' + (x.available ? '在场' : '<span class="wa-dim">缺席</span>')
               + (x.note ? '<div class="wa-dim">' + esc(x.note) + '</div>' : '') + '</div>';
           }).join(''));
+      });
+      // v2.291.0（EXV7-7）：事件日历两枚读口。
+      //   三件齐做（渲染 + 绑定 + UI_BINDINGS 登记）—— 少任一件都会让「按钮渲染了但 id 写错」
+      //   这类断裂在新出口上永不可见（本仓反复付过代价的那条）。
+      //   四种「没得看」**分开报**，不塌成一句「无数据」：
+      //     模块缺席 / 开关关着 / 读不出来 / 真的空 —— 处置完全不同。
+      on('#wa-cal-events', () => {
+        if (!WA.events || !WA.events.timelineView) return agOut('<div class="wa-log wa-log-err">未记录：events 模块或 timelineView 缺席</div>');
+        const tv = WA.events.timelineView({ maxRows: 24 });
+        if (!tv.ok) {
+          return agOut('<div class="wa-log wa-log-warn">' + (tv.reason === 'disabled'
+            ? '事件调度关着（不是「没有排期」—— 开关打开后才有未来轴）'
+            : '未记录：' + esc(tv.reason || '未知原因')) + '</div>');
+        }
+        if (!tv.total) {
+          return agOut('<div class="wa-log wa-log-info">未来轴上此刻没有条目 —— <b>表里没有不等于不会发生</b>'
+            + '（事件只能被 schedule 登记，本栏不凭 kind 补占位行）</div>');
+        }
+        const rows = (tv.rows || []).map(function (x) {
+          const when = x.unknown ? '<span class="wa-dim">条件待触发（无确定时刻）</span>'
+            : ('第 ' + (x.at - tv.now) + ' ms 后' + (x.due ? ' <b>已到点</b>' : ''));
+          const extra = x.kind === 'repeat' ? ('　周期 ' + x.intervalMs + 'ms · 剩 ' + x.remainRuns + ' 轮') : '';
+          return '<div class="wa-item"><b>' + esc(x.title) + '</b> <span class="wa-badge">' + esc(x.kind) + '</span>'
+            + '<div class="wa-dim">' + when + ' · P' + esc(String(x.priority)) + extra
+            + (x.condition ? (' · 条件：' + esc(x.condition)) : '') + '</div></div>';
+        }).join('');
+        const dropped = tv.untimed ? tv.untimed.length : 0;
+        const untimedLine = dropped
+          ? ('<div class="wa-dim">另有 ' + dropped + ' 条条件触发条目没有确定时刻（未排进时间序）：'
+            + tv.untimed.map(function (x) { return esc(x.title); }).join('、') + '</div>')
+          : '';
+        agOut('<div class="wa-log wa-log-info">事件钟未来轴（now=' + tv.now + '）：共 ' + tv.total
+          + ' 条（有时间 ' + tv.timedCount + ' / 条件待触发 ' + tv.untimedCount + '）· 已到点未认领 '
+          + tv.dueCount + ' 条' + (tv.truncated ? ' <span class="wa-dim">已按上限截断，另有 ' + tv.dropped + ' 条未列出</span>' : '') + '</div>'
+          + rows + untimedLine
+          + '<div class="wa-dim">' + esc(tv.note) + '</div>');
+      });
+      on('#wa-cal-commit', () => {
+        if (!WA.life || !WA.life.commitmentsView) return agOut('<div class="wa-log wa-log-err">未记录：life 模块或 commitmentsView 缺席</div>');
+        const cv = WA.life.commitmentsView({});
+        if (!cv.ok) {
+          return agOut('<div class="wa-log wa-log-warn">' + (cv.reason === 'disabled'
+            ? '人物生活关着（不是「没人许过诺」—— 开关打开后才有承诺台账）'
+            : '未记录：' + esc(cv.reason || '未知原因')) + '</div>');
+        }
+        if (!cv.total) {
+          return agOut('<div class="wa-log wa-log-info">承诺台账此刻是空的 —— 这是「还没人许过诺」，'
+            + '不是「读不到」（五类词表照报：' + Object.keys(cv.byKind || {}).join('/') + '，各 0 条）</div>');
+        }
+        const rows = (cv.rows || []).map(function (p) {
+          const items = (p.items || []).map(function (i) {
+            return '<div class="wa-dim">· ' + esc(i.kind) + '「' + esc(i.text) + '」→ ' + esc(i.target || '—')
+              + (i.due ? ('　到期 ' + i.due + (i.overdue ? ' <b>已过期</b>' : '')) : '　<span class="wa-dim">无到期时刻</span>') + '</div>';
+          }).join('');
+          return '<div class="wa-item"><b>' + esc(p.person) + '</b> <span class="wa-badge">' + p.count + ' 条</span>'
+            + (p.truncated ? '<span class="wa-dim">（只列前 ' + p.shown + ' 条）</span>' : '') + items + '</div>';
+        }).join('');
+        const kindLine = Object.keys(cv.byKind || {}).map(function (k) {
+          return esc(k) + ' ' + cv.byKind[k];
+        }).join('　');
+        agOut('<div class="wa-log wa-log-info">承诺台账：' + cv.people + ' 人 / 共 ' + cv.total + ' 条，已过期 '
+          + cv.overdueCount + ' 条' + (cv.truncated ? ' <span class="wa-dim">（另有 '
+          + (cv.peopleTotal - cv.people) + ' 人未列出）</span>' : '') + '</div>'
+          + '<div class="wa-dim">五类分布：' + kindLine + '（缺的那类报 0 —— 「这一类没有」与「不在词表里」是两件事）</div>'
+          + rows + '<div class="wa-dim">' + esc(cv.note) + '</div>');
       });
 
       const cvOut = function (html) { const o = $('#wa-wh-cv-out'); if (o) o.innerHTML = html; };

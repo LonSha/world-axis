@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/events.js (v2.81.0) — 事件调度（第十五面：排期 ≠ 触发）
+ * WorldAxis engines/events.js (v2.291.0) — 事件调度（第十五面：排期 ≠ 触发）
  *
  * 为什么需要它（与既有四处的分工，先说清不重复）：
  *   · engines/causal.js          —— 因果链：原因→条件→行动→后果。**结算面**（事情怎么发生）。
@@ -95,7 +95,9 @@
   const MAX_PRIORITY = 9;
 
   const stat = { scheduled: 0, claimed: 0, completed: 0, cancelled: 0, replaced: 0, exhausted: 0, failed: 0,
-    conditionMisses: 0, reclaimed: 0, duplicates: 0, deferred: 0, late: 0, lastReason: '', faults: {} };
+    conditionMisses: 0, reclaimed: 0, duplicates: 0, deferred: 0, late: 0, lastReason: '', faults: {},
+    // v2.291.0（EXV7-7）：未来轴的读取次数 —— 零计数即「这个口没被调用过」。
+    timelineReads: 0 };
   function noteFault(reason) {
     const tag = String(reason == null ? 'unknown' : reason);
     stat.faults[tag] = (stat.faults[tag] || 0) + 1;
@@ -576,6 +578,124 @@
     return q.slice(-n).reverse().map(function (x) { return { id: x.id, at: x.at, note: x.note, retries: x.retries }; });
   }
 
+  /**
+   * v2.291.0（V7 EXV7-7）：**事件钟**上的未来时间轴。只读，不改 stage。
+   *
+   * ── 它答什么 ────────────────────────────────────────────────
+   *   `active()` 答「有哪些已排期」，但那是一份**状态清单**（按 priority 排序），
+   *   答不出「按时间看，接下来先后会到点什么」。`due()` 更窄：它只报**已经到点**的。
+   *   于是一个只想画时间轴的消费方（面板 / 诊断 / 未来的日历面）只能自己遍历 `rows()`
+   *   再逐条判 kind 与时间 —— 那是各自重算，不是一份读数（本仓反复治理的那条）。
+   *
+   * ── 时间基准：**事件钟**，不是剧情钟 ────────────────────────────
+   *   本模块的 `scheduledAt` 从它诞生的第一天起就写在 `clockNow('events')` 上
+   *   （墙钟口径：`nextAt = now + intervalMs` 这类推进只有在同一把尺子上才成立）。
+   *   而 `engines/agenda.js` 走的是**剧情日**（`playtime.story` / `store.clock.dayIndex`），
+   *   两者混算过一次的代价写在 agenda 的注释里（离线间隔被抹平）。
+   *   故这里**只报事件钟自己的时刻**，一行都不折算成剧情日：`day` 字段恒为 null，
+   *   理由不是「懒得算」，而是**这两种时刻之间没有换算率**。
+   *
+   * ── 四种 kind 各自的「什么时候」────────────────────────────────
+   *   不能把四个 kind 塞进一个 `at` 字段再排序 —— 它们答的不是同一个问题：
+   *     · once        —— 到点就跑一次：`at = scheduledAt`；
+   *     · delayed     —— 同 once（延迟只是排期时的一种写法），`at = scheduledAt`；
+   *     · repeat      —— 到点后**还会再来**：`at = scheduledAt`，另报 `nextAt` 与剩余轮次；
+   *     · conditional —— **没有确定时刻**：条件是外部事实，本模块拒不猜它哪天成立。
+   *                      故 `at = null` 且 `unknown = true`，单列到 `untimed`，不排进时间序。
+   *
+   * ── 否定式边界（每一条都对着本仓付过代价的坑）──────────────────
+   *   1 **只读**：不 claim、不取消、不改 `scheduledAt`、不写 stat 以外的任何字段
+   *     （写 stat 的 `timelineReads` 只是读数留痕，与 sediment 的 `placesReads` 同规）。
+   *   2 **不猜条件**：`conditional` 行不带时刻，也不拿「现在」冒充。
+   *   3 **不代判到期**：`due` 判定仍归 `due()` / `ready()`；本口只报时刻与状态，
+   *     且把「已到点未认领」与「未到点」在 `due` 字段上分开，不让消费方自己算。
+   *   4 **有界**：`cap` 夹在 1..48，`truncated` / `dropped` 如实报 —— 截断不静默。
+   *   5 **不自造事件**：只投影 `rows()` 里的真行，绝不按 kind 补齐占位行。
+   *   6 **关闭态如实拒收**（`reason:'disabled'`），不回落成空表 ——
+   *      「没排期」与「这个模块关着」在空表上长得一模一样。
+   *   7 未到点的行**一律** `due:false`；已到点但条件未满足的**不标 due**（那是 `due()` 的判定），
+   *     改为 `blocked:true` + `condition` 原文，让「等着」与「到点了」分开。
+   *
+   * @param {{maxRows?:number, includeTerminal?:boolean, now?:number}} [opts]
+   * @returns {{ok:boolean, reason?:string, now?:number, total?:number, cap?:number,
+   *   truncated?:boolean, dropped?:number, timedCount?:number, untimedCount?:number,
+   *   dueCount?:number, blockedCount?:number, byKind?:Object, byStatus?:Object,
+   *   rows?:Array, untimed?:Array, note?:string}}
+   */
+  function timelineView(opts) {
+    const cfg = settings();
+    if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const o = (opts && typeof opts === 'object') ? opts : {};
+    const cap = Math.max(1, Math.min(48, Number(o.maxRows) > 0 ? Math.floor(Number(o.maxRows)) : 24));
+    const t = isFinite(Number(o.now)) && Number(o.now) >= 0 ? Math.floor(Number(o.now)) : clockNow('events');
+    const all = rows();
+    const byKind = {}, byStatus = {};
+    const timed = [], untimed = [];
+    all.forEach(function (x) {
+      if (!x || !x.id) return;
+      const st = String(x.status || '');
+      // 终态行：默认不进未来轴（已经发生过的事不是「未来」）。
+      //   要复盘时给 includeTerminal —— 但那时它们仍不进 timed（时刻已过去）。
+      if (!o.includeTerminal && TERMINAL.indexOf(st) >= 0) return;
+      byStatus[st] = (byStatus[st] || 0) + 1;
+      byKind[String(x.kind || '')] = (byKind[String(x.kind || '')] || 0) + 1;
+      const at = isFinite(x.scheduledAt) && x.scheduledAt > 0 ? x.scheduledAt : null;
+      const cond = x.condition ? String(x.condition) : '';
+      // once / delayed / repeat 有确定时刻；conditional 没有 —— 不猜。
+      const hasAt = at !== null && String(x.kind) !== 'conditional';
+      const row = {
+        id: String(x.id), kind: String(x.kind || ''), title: String(x.title || ''),
+        status: st, priority: isFinite(x.priority) ? x.priority : 0,
+        at: hasAt ? at : null,
+        due: hasAt ? (x.status === 'pending' && at <= t) : false,
+        blocked: hasAt ? false : !!cond,
+        condition: cond,
+        unknown: !hasAt,
+        nextAt: null, remainRuns: null,
+        intervalMs: isFinite(x.intervalMs) && x.intervalMs > 0 ? x.intervalMs : null,
+        runs: isFinite(x.runs) ? x.runs : 0,
+        // 与 agenda 的行形状对齐一处：`canAct` 让消费方不必自己判「能不能动手」。
+        //   claimed（执行中、已认领未回报）**不可再触发** —— 重复触发是本模块最强的禁令。
+        canAct: st === 'pending',
+        ref: String(x.id), source: 'events'
+      };
+      if (row.kind === 'repeat') {
+        row.remainRuns = Math.max(0, cfg.maxRuns - row.runs);
+        // `nextAt` 只在「还没到点」时才有意义：到点之后的下一跳要等 claim 落地才定，
+        //   提前算出来就是把「还没发生的事」写成已知时刻（本仓的老病）。
+        row.nextAt = (hasAt && at > t) ? at : null;
+      }
+      if (hasAt) timed.push(row); else untimed.push(row);
+    });
+    // 排序：时刻升序；同刻按 priority 降序、再按 id 升序 —— 与 order() 同源口径，
+    //   但不复用它（order 吃的是原始行、且以 priority 为首键；未来轴以时刻为首键）。
+    timed.sort(function (a, b) {
+      if (a.at !== b.at) return a.at - b.at;
+      if ((b.priority || 0) !== (a.priority || 0)) return (b.priority || 0) - (a.priority || 0);
+      return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+    });
+    // 未知时刻者按 priority 降序、id 升序（稳定，不用「现在」冒充）。
+    untimed.sort(function (a, b) {
+      if ((b.priority || 0) !== (a.priority || 0)) return (b.priority || 0) - (a.priority || 0);
+      return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+    });
+    const merged = timed.concat(untimed);
+    const truncated = merged.length > cap;
+    const kept = truncated ? merged.slice(0, cap) : merged;
+    stat.timelineReads = (stat.timelineReads || 0) + 1;
+    return {
+      ok: true, now: t, clock: 'events',
+      total: merged.length, cap: cap, truncated: truncated, dropped: truncated ? merged.length - cap : 0,
+      timedCount: timed.length, untimedCount: untimed.length,
+      dueCount: timed.filter(function (r) { return r.due === true; }).length,
+      blockedCount: timed.filter(function (r) { return r.blocked === true; }).length,
+      byKind: byKind, byStatus: byStatus,
+      rows: kept.map(function (r) { return Object.assign({}, r); }),
+      untimed: untimed.slice(0, cap).map(function (r) { return Object.assign({}, r); }),
+      note: '事件钟（不是剧情日）：两种时刻之间没有换算率，故 day 恒为 null；'
+        + 'conditional 无确定时刻、不猜；已到点未认领才算 due；终态行默认不进未来轴'
+    };
+  }
   /** 注入块：只报已排期（含执行中），并明标「未到点 ≠ 已发生」。 */
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
@@ -599,6 +719,8 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     schedule: schedule, due: due, claim: claim, complete: complete, cancel: cancel, replace: replace,
     active: active, fails: fails, buildBlock: buildBlock,
+    // v2.291.0（EXV7-7）：事件钟上的未来时间轴（只读投影，不改 stage）。
+    timelineView: timelineView,
     stat: function () {
       return Object.assign({}, stat, {
         faults: Object.assign({}, stat.faults),
