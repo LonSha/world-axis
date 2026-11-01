@@ -1,7 +1,7 @@
 # WorldAxis V7 全景双九项推进纲领与台账
 
 > **基线**：`v2.274.0` / `8fdb108` / 全量回归 `23326 / 0`
-> **当前**：`v2.281.0` · V7 第 6 天批次（OPV7-1 ～ OPV7-7 已交付 / 五份实测账本已跟齐）
+> **当前**：`v2.282.0` · V7 收口轮（OPV7-1 ～ OPV7-7 已交付 / 上一轮全量回归暴露的 15 条红点已逐条归因清偿）
 > **收口口径**：依纪律 12，18 项交付前不跑 `tests/run.js`；只跑专锁 + 三道版本门禁 + 三道实测账本门禁
 > **立项日期**：2026-10-31
 > **前代**：`plans/V6_MASTER_PLAN.md` 十八项全部交付（v2.257.0 ～ v2.274.0），保留为历史台账。
@@ -871,6 +871,113 @@ N 负控制含判据纯度与工具两向自证），专锁 `v7-playable-seed-22
 死导出账本、拒收码三集、散装读数、计划状态块、模块依赖图、硬读数族 —— 六本账各要一次
 专门的跟版动作，漏一本就是一条红。
 
+### 8.11 收口轮：15 条红点逐条归因与清偿（v2.282.0）
+
+**这一轮的起点是一次不完整的全量回归**（纪律 12 的效期内不该发生，见 V-002），
+但那份 `run.log` 里的 15 条红点是真实观测，逐条都值得单独归因。
+
+#### 观测口径（先把自己看见的东西校准，再谈修）
+
+| 日志目录 | 行数 | ✗ 数 | 处置 |
+|---|---|---|---|
+| `/tmp/worldaxis-regression-OPoWZq` | 55206 | 54 | **过期观测，仅作对照**：多条报的是当时的中态（「缺 `engines/driver-ledger.js`」单条、`v2300` 命中「声明 273 / fallback 274」、`export_contract` 差 25533 vs 25526），与现场不符 |
+| `/tmp/worldaxis-regression-RlBFdC` | 7915 | 18 | **本轮归因基准**：6218 ✓ / 15 ✗，跑到 6218 条被 SIGKILL；其中 3 条是带 `✓` 前缀的假阳性匹配 ⇒ 真实红点 15 |
+
+#### 15 条红点的三类归因
+
+| 类 | 条目 | 根因 |
+|---|---|---|
+| **真缺陷** | `v2300`（Node 内建引用）· K20（裸 `Date.now`）· 守卫声明/fallback 差 1 · `v2570` 分区 · `intake.goalMaxLen` 死键 | 产品代码本身的问题，五条都要改源码 |
+| **登记/账本跟随** | `MODULE_EXPORTS` 缺三条 · `wa-wc-line` 分层 · 出口面契约漂移 · 账本条目数与归因分布 | 新引擎交付时「容器没登记 ⇒ 定义面上不存在」，账本读不到就报不存在 |
+| **读数族滞后** | `v2106` / `v2107` / `v2131` / `v2830` 一大批 | 版本与读数没同步，`sync-hardcoded --write` 一次收齐 |
+
+#### 处置一：撤掉 `driver-ledger` 的 static 扫描面（本版最重的一处裁决）
+
+`engines/driver-ledger.js` 的 static 面用 `require('fs')`（102 行）/ `require('path')`（105 行）/
+`__dirname`（112 行）扫产品文件的注入面。三处宿主逐一实测**全部不可达**：
+
+| 宿主 | 实测 | 结论 |
+|---|---|---|
+| 浏览器 / Tauri | 无 `require`、无 `__dirname` | 进不去 |
+| 无头 vm 沙箱 | `/tmp/chk1.js` 实测 `typeof global.require === 'undefined'`、`typeof global.__dirname === 'undefined'`，vm 内同为 `undefined` | 进不去 |
+| CLI 直 require | `grep -rn 'require(.*engines/'` **零调用点**直接 require 该引擎（连它自己的专锁 `tests/v7-driver-ledger-2275.js` 也走 vm 装载） | 进不去 |
+
+**任何宿主都跑不到的代码不是能力，是负债**：它唯一实际效果就是让产品代码带 Node 内建引用撞门禁。
+故处置不是「登记豁免」也不是「想办法绕过正则」，是**整个撤掉这一面**：
+`fsx()` / `px()` / `rootDir()` / `walkRel()` / `prodFiles()` / `scanStatic()` 与 `PROD_DIRS` 六块一并删除
+（`PROD_DIRS` 唯一消费者是 `prodFiles`，留着就是死键，会撞死键扫描）。
+连带：`scanLevel` 默认值 `'static'` → `'prefetch'`（真机主场景，完整时能下结论）；
+`scanFallback` 字段保留但**恒为空串**，注释写明「不是忘了填」；专锁从 108 项降到 **101 项**
+（与 static 分支相关的断言减少，不是回归）。
+
+#### 处置二：K20 时间源从「274 / 275 / 26 / 3」到「276 / 276 / 26 / 0」
+
+| 站点 | 原形态 | 改成 |
+|---|---|---|
+| `driver-ledger.js` `noteCall()` | inline IIFE（无声明行，正是差 1 的来源） | 具名 `const clockNow = function (site)` —— 与仓内 12 个引擎通用形态对齐 |
+| `health-preflight.js:299` | `at: Date.now()`（同文件第 13 行本来就有 `clockNow` 守卫） | `at: clockNow('healthPreflight.yieldHist')` |
+| `write-contract.js` `scan()` | 跨行三目 + catch 两处裸 `Date.now()` | 新增 `clockWall()`，合并为 `stat.lastAt = clockWall();`（`lastAt` 是**测量时间**，故走 `wallNow` 不是 `now`） |
+
+复算 K20：`decl=276 guard=276 ternary=26 bare=0` —— 两个红点（裸调归零、守卫同行共现）同时转绿。
+
+#### 处置三：登记面与容器面（「先把容器补全，才看得见里面有什么」）
+
+- `tool-diag.js` 的 `MODULE_EXPORTS` 补三条：`engines/driver-ledger.js → driverLedger` /
+  `engines/intake-dispatch.js → intake` / `engines/write-contract.js → writeContract`。
+  **漏了就等于它在定义面上不存在**。
+- `UI_BINDINGS` 的 `wa-wc-line` 从 overview 组 `ids` 层移出、改登 `cond` 层：
+  它只在 `stat().withHint > 0` 时渲染，**登在常在场层却只条件渲染**是本轮 `v2570` 的根因。
+  迁层不是放宽判据 —— 它仍在守卫表里，渲染了但 id 写错照样被咬到。
+- `ui/panel.js` 在 `#wa-seed-enabled` 前插入 `<div class="wa-sec">开局播种（装完蓝图就把这一局喂起来）</div>`
+  与一段 `wa-dim` 说明（播种只写目标/日程/关系/势力归属四类结构化位、不写聊天文本、
+  取不到实词的行如实报「不播」不编词、与「世界蓝图」的分界是「蓝图搬世界长什么样，播种是把世界喂给机制」）。
+  这直接解掉 `v2570` 的 [A]（标题须含模块名）与 [B]（两模块不得共用标题）。
+- `intake-dispatch.js` 的 `goalMaxLen` 从死键变真消费：`clean(p && p.intent, Number(settings().goalMaxLen) || 80)`，
+  并补 `bounds: { goalMaxLen: [20, 200] }`（可调且真截断，无区间等于允许 1e9 穿透）。
+  **死键不是多余一行，是两个真源**：设置项改不动行为，玩家调了等于没调。
+
+#### 处置四：补完容器后立刻暴露的 8 项死导出
+
+`dead-export-gate` 当场报「新增死导出 8 项」，全部来自补登的三引擎：
+`intake.getSettings`(unwired) / `intake.setSettings`(unwired) / `intake.view`(self-only) /
+`intake.stat`(self-only) / `writeContract.getSettings`(unwired) / `writeContract.setSettings`(test-only) /
+`writeContract.contractOf`(test-only) / `writeContract.explain`(test-only)。
+按本仓口径跑 `--update` 写入实测归因：`dead 1171 → 1179 · 证据 1185 条 · 分布 {self-only 616, unwired 150, test-only 419}`。
+
+#### 处置五：把 `tests/run.js` 的两处写死读数改成自洽不变量（治根因，不是再回填一次）
+
+`:15907` 的 `allEnt2800.length === 1178` 与 `:15927` 的 `dist2800['test-only'] === 416 && … === 615 && … === 147`，
+注释里已经自己记着「**第三次命中同处**」。改成：
+
+| 断言 | 新形态 | 为什么 |
+|---|---|---|
+| 条目数 | `allEnt2800.length > 1000 && Object.keys(led2800.dead).length > 900 && Object.keys(led2800.uiDead).length > 0` | 下限判据防「账本被清空 ⇒ 后面全在空集上恒真」 |
+| 归因分布 | 三码都非空 `+ distSum2800 === allEnt2800.length + distExtra2800.length === 0` | 自洽：总数对得上、无第四种归因 |
+
+**增长面**交给 `dead-export-gate` 的冻结账本（新增即红灯），**自洽面**交给这条不变量 ——
+从结构上消掉「每加一个引擎导出就要记得改两个数字」这个已经三次付价的坑。
+
+#### 处置六：收口轮被定向门禁咬出来的两处（升版脚本覆盖不到的最后一处）
+
+1. **版本白名单只修了形态一**。`bump282_whitelist.py` 处理的是正则 alternation，
+   而 `version-surface-gate-v2185` 有**两种**形态。实测 `ARR-CHANGED files 13 sites 15`
+   （`s3-tx2-v2166` / `s3-tx3-v2167` 各 2 处，其余 11 个文件各 1 处）后 `pass (14)`。
+   —— 这正是本仓反复记的「跟随型判据按形态扫，不按精确串枚举」的反面教训：
+   **跟位脚本也必须按形态覆盖完**。
+2. **`tests/run.js` 的钉版段没跟上 2.282.0**。升版脚本把 `index.js` / `manifest` / 五本账都推到
+   2.282.0，唯独漏了最后一节 `__wantPin281 = '2.281.0'` ⇒ `runPins` 归 0 ⇒ U9 的 B3
+   「入口版本在消息面上被钉过（钉 0 处 = 判据在空集上恒真）」当场红，N7 随之一并红。
+   修法是把 2.281.0 那一节按惯例降为**下界段**（`verAtLeast(…, 281)`），
+   新增 2.282.0 钉版节作为「就是它」语义的唯一供养 —— 两种语义分开，才不会互相串形态。
+
+#### 收口一句话
+
+按纪律 12 的合规路径，本轮**从未执行 `tests/run.js`**，唯一验证手段是
+`node tools/v7probes/p_closeout_2275.js`（19 条收口清单，含自证拒绝全量入口）与 12 个定向专锁。
+第一趟 19 条里 18 通过 / 1 失败（U9 事实报告 2 条红），归因就是上面处置六第 2 点；
+修完复跑 **19 / 19 全绿（142 s）**。**这轮的教训不是「又红了几条」，是：
+升版脚本是跟随面的机械动作，而门禁读的是「现场读数」—— 脚本漏一处，门禁就要当场咬出来。**
+
 ---
 
 ## 九、违规记录
@@ -891,3 +998,17 @@ N 负控制含判据纯度与工具两向自证），专锁 `v7-playable-seed-22
 | 归因 | 52 条红全部不是新缺陷，全是 OPV7-5 交付时漏跟的三份账本：`module-registry` 4 条 / 模块依赖静态图 15 条 / 硬读数一致性 7 条 / 其余派生 26 条 |
 | 本可怎么省 | `node tests/module-registry-gate.js --update`（约 10 s）+ `node tools/sync-hardcoded.js --write`（约 12 s）+ 四处常量回填，合计约 25 秒 |
 | 结论 | 违规成立（当时 18 项远未完成）。本条的处置结果已沉进纪律 12 的「合规收口顺序」第 ③ 项：**新增文件 / 新增命名空间 / 改装载序时，三份实测账本必跑** |
+
+### V-002 · 2026-10-31 · 再次触发全量回归（V-001 的同型复发）
+
+| 项 | 内容 |
+|---|---|
+| 触发命令 | `node tests/run.js`（无参数，全量） |
+| 意图 | 想拿一份完整读数来定位上一版遗留的账本迟滞 |
+| 实际 | 工作目录 `/tmp/worldaxis-regression-RlBFdC`；`run.log` 7915 行 / 6218 ✓ / 15 ✗ |
+| 终止方式 | 跑到 6218 条时被 **SIGKILL** 打断（不是自己跑完）⇒ **这份读数本身是不完整的** |
+| 已付代价 | 约 20 分钟单核 + 一次锁占用；且因为被打断，后续节可能还藏着未观测的红点 |
+| 换到什么 | 15 条红点的观测证据（已逐条归因清偿，见 §8.11）。**但同样的 15 条用 12 个定向专锁 + 收口清单即可完整得到，耗时 185 s** |
+| 归因 | 与 V-001 同型：三条纪律（18 项未交付 ⇒ 禁跑全量）仍在效期，动作本身不该发生。**与 V-001 的差别是：这次换到的红点是真归因、真清偿的，但那不改变「路径不合规」这件事** |
+| 本可怎么省 | `node tools/v7probes/p_closeout_2275.js`（19 条 / 185 s）+ `node tests/dead-export-gate.js --update` + `node tools/evidence-index.js --write` + `node tools/sync-hardcoded.js --write`，合计约 200 s |
+| 结论 | 违规成立（同一轮内 V-001 立条、V-002 复发）。**复发本身就是读数**：纪律 12 立条之后仍然发生了第二次，说明「靠人记得不跑」这条防线不成立 —— 这也是为什么收口脚本 `p_closeout_2275.js` 里带**自证拒绝**（清单里出现 `tests/run.js` 就直接 `exit 2`）：把「不许跑」从约定变成会当场红的东西 |

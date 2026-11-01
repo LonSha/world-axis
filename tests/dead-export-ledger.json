@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.281.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.281.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.282.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.282.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -4041,6 +4041,38 @@
       "refs": 0,
       "tref": 0,
       "own": 37
+    },
+    "intake.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/intake-dispatch.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "intake.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/intake-dispatch.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "intake.stat": {
+      "reason": "self-only",
+      "detail": "engines/intake-dispatch.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/intake-dispatch.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 25
+    },
+    "intake.view": {
+      "reason": "self-only",
+      "detail": "engines/intake-dispatch.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/intake-dispatch.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "intel.entitledTo": {
       "reason": "test-only",
@@ -9369,6 +9401,38 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "writeContract.contractOf": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/write-contract.js",
+      "refs": 0,
+      "tref": 11,
+      "own": 5
+    },
+    "writeContract.explain": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/write-contract.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 3
+    },
+    "writeContract.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/write-contract.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "writeContract.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/write-contract.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 1
     }
   },
   "uiDead": {
@@ -9422,6 +9486,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 547
+    "dataOnly": 548
   }
 }

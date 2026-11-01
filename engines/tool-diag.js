@@ -3454,7 +3454,14 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'ui/cyberpunk-logs.js': 'cyberLogs',
     'ui/cyberpunk-animations.js': 'cyberAnimate',
     'ui/cyberpunk-responsive.js': 'cyberResponsive',
-    'ui/theme-switch.js': 'themeSwitch'
+    'ui/theme-switch.js': 'themeSwitch',
+    // v2.282.0：V7 三个新引擎此前漏登记 —— 「诊断清单覆盖全部磁盘模块」判据当场报
+    //   「缺 engines/driver-ledger.js,engines/intake-dispatch.js,engines/write-contract.js」。
+    //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。ns 名取自各文件导出面实测。
+    'engines/driver-ledger.js': 'driverLedger',
+    'engines/intake-dispatch.js': 'intake',
+    'engines/write-contract.js': 'writeContract'
 
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
@@ -4517,11 +4524,6 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   不属任何单页，故归概览组 —— 同 v2.209.0 的 ui/panel-nav.js 一样，这两个控件
       //   「渲染了但绑定写错 id」这类断裂只有登记过才会被发现（本表的全部意义）。
       'wa-nav-out', 'wa-nav-back',
-      // v2.280.0（V7 OPV7-5）：写口契约的常驻读数行。它渲染在 renderOverview 里，但**不是
-      //   常在场** —— 只在 `stat().withHint > 0` 时才出现（没有自带 hint 的写口时整行不渲染），
-      //   也不占一行独立控件：它是「这一世界的机制彼此讲不讲得通道理」的可见证据。
-      //   本版补登记（v2.280 漏登，守卫表断言因此一直红）。
-      'wa-wc-line',
       // v2.273.0（V6 拓展线）：概览页九块只读读数容器一次登记到位。
       //   它们是**展示容器**（不是控件），本仓既有惯例同样登记 —— 见
       //   `wa-first-out` / `wa-lfn-out` 的先例：「输出区，与 wa-rec-out 同规格：
@@ -4534,7 +4536,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   `cond` 层承载：它缺失是**依赖态**，不判失败 —— 这与 first-run-ui 锁的 A8/A10
       //   「关闭时整块不渲染」是同一条口径，不然两处会互相打架。
       'wa-first-out'],
-      cond: ['wa-first-block'] },
+      // v2.282.0：`wa-wc-line` 从 ids 层迁到 cond 层。它**不是常在场** —— 只在
+      //   `stat().withHint > 0` 时才渲染（没有自带 hint 的写口时整行不渲染）。
+      //   v2.280.0 把它登进 ids 层，等于声称「这一页一定有它」；于是 H4「逐页无缺失」
+      //   在全量回归里报 overview:["wa-wc-line"] —— 断的不是控件，是**登记的分层口径**：
+      //   常在场登 ids、条件在场登 cond（与 wa-first-block 同列）。迁层不是放宽判据：
+      //   它仍在守卫表里，渲染了但 id 写错照样被咬到，只是不再要求「每次都在」。
+      cond: ['wa-first-block', 'wa-wc-line'] },
     { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat', 'wa-sed-out'] },
     // v2.151.0（RX2+RX3）：会话页十六枚控件（跨会话记忆锚八枚 + 远方世界脉搏四枚 + 共用输出区一枚）。
     //   守卫表是控件接线面的唯一真源：渲染了不登记 ⇒「渲染了但绑定的 id 写错」这类断裂

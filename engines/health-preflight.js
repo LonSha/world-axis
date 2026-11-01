@@ -296,7 +296,9 @@
       }
       // 按轮去重写入历史：同一轮重测（开关变了）是**覆盖**，不是新增一轮。
       if (rk.round !== null) {
-        const row = { round: rk.round, yield: ya.yield, total: ya.total, at: Date.now() };
+        // v2.282.0：本文件第 13 行就有时钟守卫 clockNow，这处却裸调 Date.now() ——
+        //   越过了冻结（历史轮次的时间戳要能随回放重现），且撞 G20 的裸调归零判据。
+        const row = { round: rk.round, yield: ya.yield, total: ya.total, at: clockNow('healthPreflight.yieldHist') };
         const idx = __yf.hist.map(function (x) { return x.round; }).indexOf(rk.round);
         if (idx >= 0) __yf.hist[idx] = row; else __yf.hist.push(row);
         if (__yf.hist.length > __YF_HIST) __yf.hist = __yf.hist.slice(-__YF_HIST);

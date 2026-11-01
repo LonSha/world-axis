@@ -69,6 +69,13 @@
       : merged;
   }
 
+  // v2.282.0：本模块原先在 scan() 里写 `(WA.clock && typeof WA.clock.wallNow === 'function')
+  //   ? WA.clock.wallNow() : Date.now()` 且 catch 分支再兜一次 Date.now()。两者都是**跨行**，
+  //   既不算 G20 的 guard（要求与守卫声明同行共现）也不算 ternary（要求同一行）
+  //   ⇒ 双双落进 bare，撞「产品代码零裸调 Date.now()」。
+  //   这里 lastAt 是**测量时间**（这一轮扫描发生在何时，供面板显示），故走 wallNow 而非 now：
+  //   「这一轮跑了多久」不受冻结影响，与 core/clock.js 的两类时间分界一致。
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const stat = { scans: 0, lastAt: 0, entries: 0, withHint: 0, unreadable: 0, lastReason: '' };
   function note(r) { stat.lastReason = r; }
 
@@ -228,8 +235,7 @@
   /** 全表盘点（只读；扫描面上限由 maxScan 控制）。 */
   function scan() {
     stat.scans++;
-    try { stat.lastAt = (WA.clock && typeof WA.clock.wallNow === 'function') ? WA.clock.wallNow() : Date.now(); }
-    catch (e) { stat.lastAt = Date.now(); }
+    stat.lastAt = clockWall();
     const cap = Number(settings().maxScan) || DEF.maxScan;
     const rows = [];
     let scanned = 0, truncated = false;

@@ -73,8 +73,6 @@
   //   诊断面的读取被归成 other，L3a 与 L3b 就分不开了。
   const DIAG_NS = { toolDiag: 1, worldHealth: 1 };
 
-  const PROD_DIRS = ['engines', 'core', 'ui', 'render', 'actors', 'direction', 'compat', 'design'];
-
   // 扫描结果缓存：同一进程内重复调用不重复读盘（面板会反复渲染）。
   //
   //   【缓存必须带签名，不能等外部来清】真机上预取是并行 fetch 的，面板有可能在预取完成前
@@ -96,41 +94,20 @@
   // 互调面（L2e）缓存：文件 → {defs, calls}，只在能读到源码时有值
   let __graph = null;
 
-  function fsx() {
-    // 只在使用时才取 fs：宿主（浏览器）里没有 fs，此时退回「静态表不可用」——
-    //   如实报 unavailable，而不是假装没有驱动者（那是把「读不到」写成「读到且为否」）。
-    try { return (typeof require === 'function') ? require('fs') : null; } catch (e) { return null; }
-  }
-  function px() {
-    try { return (typeof require === 'function') ? require('path') : null; } catch (e) { return null; }
-  }
-
-  function rootDir() {
-    const p = px();
-    if (!p) return null;
-    // 本文件的期望位置是 <root>/engines/driver-ledger.js
-    try { return p.join(__dirname, '..'); } catch (e) { return null; }
-  }
-
-  function walkRel(fs, path, base, rel, out) {
-    const abs = path.join(base, rel);
-    let st = null;
-    try { st = fs.statSync(abs); } catch (e) { return; }
-    if (st.isFile()) { if (/\.js$/.test(rel)) out.push(rel); return; }
-    let names = [];
-    try { names = fs.readdirSync(abs); } catch (e) { return; }
-    for (let i = 0; i < names.length; i++) walkRel(fs, path, base, rel + '/' + names[i], out);
-  }
-
-  /** 收集产品侧源码文件清单（不含 tests/ tools/）。 */
-  function prodFiles() {
-    const fs = fsx(), path = px(), base = rootDir();
-    if (!fs || !path || !base) return null;
-    const out = [];
-    for (let i = 0; i < PROD_DIRS.length; i++) walkRel(fs, path, base, PROD_DIRS[i], out);
-    walkRel(fs, path, base, 'index.js', out);
-    return { files: out, base: base, fs: fs, path: path };
-  }
+  // 【v2.282.0 撤回 static 扫描面 —— 它一个宿主都跑不到】
+  //   早先这里有一组 fsx()/px()/rootDir()/walkRel()/prodFiles()，靠 `require('fs')`、
+  //   `require('path')`、`__dirname` 直接读盘，号称「Node / 专锁 / CLI 现场」可用。
+  //   实测三处宿主全不可达：
+  //     · 浏览器 / Tauri：没有 require，也没有 __dirname ⇒ 本函数永远返回 no-fs；
+  //     · 无头 vm（tests/run.js 的 ctx、全部 v7probes、本模块专锁）：沙箱不注入
+  //       require 与 __dirname（实测 `typeof require === 'undefined'`）⇒ 同样 no-fs；
+  //     · 「专锁 / CLI 直接 require 引擎」这条路：全仓零调用点
+  //       （`grep -rn 'require(.*engines/driver-ledger'` 零命中，本模块专锁也走 vm）。
+  //   于是它是一块**任何宿主都进不去的死面**：唯一效果是让产品代码带上 Node 内建引用，
+  //   撞 v2.30.0 的「产品代码零 Node 内建引用（Browser 运行时守恒）」。
+  //   撤掉比登记豁免更干净：本仓的裁决是「读不到就如实报读不到」，而这一面连
+  //   「读不到」都报不出来（它连被调用的机会都没有）。扫描面剩 prefetch（真机主场景）
+  //   与 runtime（下界）两档 —— 与 v2275/B0b 的「能下结论的两档」同义。
 
   /** 命名空间 → 自身的引擎文件相对路径（用于排除「自己调自己」）。 */
   function selfFileOf(ns) {
@@ -269,29 +246,6 @@
   }
 
   /**
-   * 静态扫描（Node / 专锁 / 诊断 CLI 现场）：读产品源码文件。
-   *   【生产宿主里它必然不可用】index.js 在浏览器里靠 loadScript 取源码，FS 根本不存在；
-   *   无头 vm（tests/run.js 的 ctx）里 `require` 与 `__dirname` 同样都是 undefined。
-   *   故本函数报 no-fs 是**常态**，不是异常 —— 此时按强弱顺序退到 prefetch / runtime。
-   */
-  function scanStatic() {
-    const pk = prodFiles();
-    if (!pk) return { ok: false, level: 'none', why: 'no-fs' };
-    const fs = pk.fs, path = pk.path;
-    const byNs = {};
-    __graph = { files: {} };
-    for (let i = 0; i < pk.files.length; i++) {
-      const rel = pk.files[i];
-      let src = '';
-      try { src = fs.readFileSync(path.join(pk.base, rel), 'utf8'); } catch (e) { continue; }
-      if (!src) continue;
-      scanSource(byNs, src, rel, rel.indexOf('ui/') === 0);
-      buildGraph(byNs, src, rel);
-    }
-    return { ok: true, level: 'static', byNs: byNs, files: pk.files.length, fns: 0, why: '' };
-  }
-
-  /**
    * 运行期扫描（无预取时的兜底）：把 WA 树上每个导出函数 toString，扫函数体里的调用。
    *
    *   【它只能作正向证据，不能作反向证据 —— 这是本节最关键的一条裁决】
@@ -416,16 +370,15 @@
 
   /**
    * 扫描面选择，按「能读出多少真形态」从强到弱：
-   *   ① static     读产品源码文件（Node / 专锁 / CLI 现场）—— 完整，可下没有驱动者的结论
-   *   ② prefetch   Tauri 真机的预取全量源码 —— 完整时可下结论，不完整则退成下界
-   *   ③ runtime    导出函数体扫描 —— 只能作正向证据，**永不**用来下「没有」的结论
-   *   ④ none       两者都不可用 ⇒ 报缺席
+   *   ① prefetch   Tauri 真机的预取全量源码 —— 完整时可下结论，不完整则退成下界
+   *   ② runtime    导出函数体扫描 —— 只能作正向证据，**永不**用来下「没有」的结论
+   *   ③ none       两者都不可用 ⇒ 报缺席
+   *   （v2.282.0 撤掉了原先排第一的 static 面：它靠 Node fs 读盘，实测在任何宿主里都
+   *    进不去，只有「让产品代码带上 Node 内建引用」这一个副作用 —— 见上方撤回说明。）
    */
   function scan() {
     const sig = scanSig();
     if (__scan && __scanSig === sig) return __scan;
-    const st = scanStatic();
-    if (st && st.ok) { st.canConclude = true; __scan = st; __scanSig = sig; return __scan; }
     const pf = scanPrefetch();
     if (pf && pf.ok) {
       if (!pf.complete) {
@@ -437,8 +390,6 @@
       return __scan;
     }
     const rt = scanRuntime();
-    // 静态缺席的原因要留着：它是「为什么这一栏有一部分是未判定」的归因
-    if (rt && rt.ok && st && st.why) rt.fallbackWhy = st.why;
     __scan = rt;
     __scanSig = sig;
     return __scan;
@@ -653,7 +604,7 @@
       scannedFiles: sc.ok ? (sc.files || 0) : 0,
       scannedFns: sc.ok ? (sc.fns || 0) : 0,
       scanOk: !!sc.ok,
-      scanLevel: sc.ok ? (sc.level || 'static') : 'none',
+      scanLevel: sc.ok ? (sc.level || 'prefetch') : 'none',
       // 这一栏能不能下「没有驱动者」的结论 —— 由扫描面完整性决定，
       //   不由「扫描面叫什么名字」决定（见 scan() 注释）。
       scanCanConclude: canConclude,
@@ -661,6 +612,8 @@
       scanDeclared: sc.declared || 0,
       scanPrefetched: sc.prefetched || 0,
       scanWhy: sc.ok ? '' : (sc.why || 'unavailable'),
+      // v2.282.0：static 面撤回后已无「退到 runtime 时静态缺席的原因」这条归因，
+      //   字段保留给读数面（面板/诊断的字段集不变），恒为空串，不是「忘了填」。
       scanFallback: sc.ok && sc.fallbackWhy ? String(sc.fallbackWhy) : ''
     };
   }
@@ -841,7 +794,13 @@
 
   const stat = { calls: 0, lastAt: 0, lastLayer: '' };
   function statView() { return Object.assign({}, stat); }
-  function noteCall() { stat.calls++; stat.lastAt = (function () { try { return WA.clock.now('driverLedger'); } catch (e) { return Date.now(); } })(); }
+  // v2.282.0：原先这里是 inline IIFE `(function () { try { WA.clock.now() } catch { Date.now() } })()`，
+  //   形态上是合法守卫，但 G20 的「声明数 == fallback 数」判据认的是**具名声明行**
+  //   （`const clockNow = function (...) { try { return WA.clock.now(...) } catch (...) { return Date.now(); } }`）。
+  //   inline 形态没有声明行 ⇒ 声明 274 / fallback 275 差 1，红在「每个守卫 fallback 都与守卫声明同行共现」。
+  //   改成仓内 12 个引擎通用的具名形态，判据与实现一次对齐（不是放宽判据）。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  function noteCall() { stat.calls++; stat.lastAt = clockNow('driverLedger'); }
 
   // ── 导出面 ───────────────────────────────────────────────────────────
   //   刻意收窄到「产品侧真的有人调」的六口。早先还导出过 build / invalidate / DEF：

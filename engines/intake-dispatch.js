@@ -49,7 +49,10 @@
 
   const LS_KEY = 'worldaxis_intake_settings_v1';
   const DEF = { enabled: false, maxPerSection: 6, goalMaxLen: 80 };
-  const __REG = { key: LS_KEY, def: DEF, module: 'intake', bounds: { maxPerSection: [1, 12] } };
+  // v2.282.0：goalMaxLen 从「死键」变成真消费点后必须补区间声明 ——
+  //   它此前不在 bounds 里，因为没有读者（未声明 = 原样透传）；现在它真截断文本，
+  //   无区间就等于允许 maxLen=1e9 把整段意图写进 goal.text。
+  const __REG = { key: LS_KEY, def: DEF, module: 'intake', bounds: { maxPerSection: [1, 12], goalMaxLen: [20, 200] } };
 
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
@@ -81,7 +84,11 @@
       note: '人物意图 → 生活目标。intent 是「我要做什么」，goal.text 是目标陈述，语义同一。',
       // life.addGoal 的第二参是 goal 对象，first 是人名（人物载体，来自 people[].name）
       call: function (p, api) {
-        const text = clean(p && p.intent, 80);
+        // v2.282.0：这里原先把 80 写成字面量，而 DEF.goalMaxLen 声明了 80 却全仓零消费点
+        //   ⇒ 「登记表 def 子键全部有生产消费点」当场报 intake.goalMaxLen 死键。
+        //   死键不是「多余一行」，是**两个真源**：设置项改不动行为，玩家调了等于没调。
+        //   改成真读设置（截断上限由 goalMaxLen 决定），字面量随之消失。
+        const text = clean(p && p.intent, Number(settings().goalMaxLen) || 80);
         if (!text) return null;
         return [p.name, { text: text }];
       }
