@@ -380,6 +380,29 @@
             <div id="wa-wd-out" class="wa-out"></div>
             <div class="wa-dim">日记只读既有事实（幕后生活 / 幕后 NPC 近况 / 离线结算），不新记一份、不调模型；地点名按你对那一处的可见性决定说不说，人物名照实报。</div>`;
         })()}
+        <div class="wa-sec" data-wa-lane="world" data-wa-sec="今日世界简报">今日世界简报<span class="wa-dim">（概览页「这一轮世界动了哪几根弦」怎么压）</span></div>
+        ${(() => {
+          // v2.285.0（V7 EXV7-1）：今日世界简报的设置面。
+          //   与世界日记段同规（两条纪律照抄，同类问题不再二次踩）：
+          //   ① **只发动作**：写盘走 `worldBriefing.setSettings`（引擎内唯一写路径，
+          //      内含 settingsBus.saveOrThrow 与 bounds 归一），本页不直写 localStorage；
+          //   ② **回显按真实结果**：`setSettings` 返回 ok:false 就报失败（同 wa-set-save 的裁决）。
+          //   为什么它必须有入口：简报是**每轮结算后的差分流水**（本轮 life/events/intel/bonds/
+          //   temperament/enigma 各写入几笔），`enabled:false` 时面板不渲染、backstage 侧也不再
+          //   压快照——关掉它是一个「我不想知道世界动了什么」的内容取舍，得让玩家自己改得到。
+          //   `maxRows` 是六源流水最多展示几行（3~12，区间取自登记表声明）。
+          if (!WA.worldBriefing || typeof WA.worldBriefing.getSettings !== 'function') {
+            return '<div class="wa-dim">世界简报模块未加载（engines/world-briefing.js 缺席）</div>';
+          }
+          const wb = WA.worldBriefing.getSettings();
+          const bdWb = (WA.settingsBus && WA.settingsBus.boundsOf) ? WA.settingsBus.boundsOf('worldaxis_world_briefing_settings_v1') : {};
+          const mr = rng(bdWb.maxRows, [3, 12]);
+          return `<label class="wa-node"><input type="checkbox" id="wa-wb-enable" ${wb.enabled ? 'checked' : ''}/><span class="wa-node-label">在概览页显示今日世界简报</span></label>
+            <div class="wa-set-row"><span>最多展示 <b id="wa-wb-maxrowsv">${wb.maxRows}</b> 行</span><input type="range" min="${mr[0]}" max="${mr[1]}" value="${wb.maxRows}" aria-label="最多展示行数" id="wa-wb-maxrows" class="wa-range"/></div>
+            <button class="wa-btn" id="wa-wb-save">保存世界简报设置</button>
+            <div id="wa-wb-out" class="wa-out"></div>
+            <div class="wa-dim">简报只读结构化引擎的写入计数差分（本轮新目标 / 新排期 / 新情报 / 关系变化……），不重算、不调模型；第 1 轮只建基线不报流水，核对不到的行如实不渲染。</div>`;
+        })()}
         <div class="wa-sec" data-wa-lane="people" data-wa-sec="人物今日动线">人物今日动线<span class="wa-dim">（概览页那几行「今天在哪、做了什么、接下来」怎么压）</span></div>
         ${(() => {
           // v2.266.0（V6 EXV6-2）：人物今日动线的设置面。
@@ -886,6 +909,23 @@
         const now = WA.worldDiary.getSettings();
         say('✓ 已保存（每屏 ' + now.maxLines + ' 句' + (now.enabled ? '' : ' · 概览页已隐藏') + (now.includeOffline ? '' : ' · 不含离线段') + '）');
         // 概览页要立刻反映新设置：当前若停在别的页，切过去时才重绘，不必强刷
+      };
+      // v2.285.0（V7 EXV7-1）：世界简报设置绑定。与 wa-wd-save 同规。
+      const wbMr = $('#wa-wb-maxrows');
+      if (wbMr) wbMr.oninput = () => { const v = $('#wa-wb-maxrowsv'); if (v) v.textContent = wbMr.value; };
+      const wbSave = $('#wa-wb-save');
+      if (wbSave) wbSave.onclick = () => {
+        const wbOutEl = $('#wa-wb-out');
+        const say = function (t) { if (wbOutEl) wbOutEl.textContent = t; };
+        if (!WA.worldBriefing || typeof WA.worldBriefing.setSettings !== 'function') { say('✗ 保存失败：世界简报模块未加载'); return; }
+        const en = $('#wa-wb-enable');
+        const r = WA.worldBriefing.setSettings({
+          enabled: en ? !!en.checked : true,
+          maxRows: +((wbMr && wbMr.value) || 8) || 8
+        });
+        if (r && r.ok === false) { say('✗ 保存失败：' + (r.reason || '未落盘') + '（改动未生效）'); return; }
+        const now = WA.worldBriefing.getSettings();
+        say('✓ 已保存（最多 ' + now.maxRows + ' 行' + (now.enabled ? '' : ' · 概览页已隐藏') + '）');
       };
       // v2.266.0（V6 EXV6-2）：人物动线设置绑定。与 wa-wd-save 同规。
       const drMp = $('#wa-dr-maxp');

@@ -1181,6 +1181,13 @@
     //   driver-ledger 之后：它调用期要读任意引擎的导出函数体（toString），装载期零上游读。
     //   排在这里不构成环：本模块只在自己被调用时才碰 WA 的其它命名空间。
     'engines/write-contract.js',
+    // v2.285.0（V7 EXV7-1）：今日世界简报 —— 这一轮结构化引擎各自吃进了几笔。
+    //   位置在 write-contract 之后、capability-tier 之前（同前面的只读读数模块）：
+    //   装载期只登记自己的设置键（零上游读、零 store 写、零落盘），排在 tier/audit
+    //   之前让「简报开没开」首次盘点就在登记面内（同 world-diary 的口径）。
+    //   它的六源（life/events/intel/bonds/temperament/enigma）在本清单里全部更早装载，
+    //   但都是调用期读口 —— 装载期不需要任何依赖在场。
+    'engines/world-briefing.js',
     'engines/capability-tier.js',
     'engines/capability-audit.js',
     'ui/panel.js',

@@ -1239,6 +1239,53 @@
     }, {});
   }
   /**
+   * v2.285.0（V7 EXV7-1）：今日世界简报读面。
+   *
+   * 本节要答的问题与世界日记节不同：那一节问「压了几句、隐了几条」，
+   *   本节问「**快照链**断没断、六源核对到了几路」。简报是差分流水：
+   *   `snap()` 每轮被 backstage 在事务副作用层直调（不走总线订阅 —— 那会
+   *   污染 bridge 惰性订阅点的读数），故它的失效模式独有三种，混在一起
+   *   就再也答不出来：
+   *   ① **没被调过** —— backstage 挂载点断了 / 简报关着，`snaps === 0`。
+   *      这与「世界没动静」同形（面板一样显示 quiet），必须靠 stat 分行；
+   *   ② **六源核对不到** —— `sources` 里某一路 false 不是「那一轮没写入」，
+   *      是**那台引擎缺席**（engines/* 未加载或 stat 键变了）；
+   *   ③ **计数回落被吞** —— `dropped` 计的是「引擎计数比上次小」的次数。
+   *      该轮 delta 置 null 不冒充负流水，但这件事本身值得被看见。
+   *
+   * 只读：不 snap（`snap` 会改本模块自己的基线与计量，诊断面不该污染它）——
+   *   本节只读 `stat()` 与 `getSettings()`，两者都是纯读口。
+   */
+  function secWorldBriefing() {
+    return safe(function () {
+      if (!WA.worldBriefing || typeof WA.worldBriefing.stat !== 'function') {
+        return { error: 'engines/world-briefing.js 未加载（世界简报读数缺席）' };
+      }
+      const st = WA.worldBriefing.stat();
+      const cfg = (typeof WA.worldBriefing.getSettings === 'function') ? WA.worldBriefing.getSettings() : null;
+      const src = (st && st.sources) || {};
+      return {
+        enabled: !!(cfg && cfg.enabled === true),
+        // 设置面原样带出（诊断包要能复原「当时是按几行的上限压的」）
+        settings: cfg ? { maxRows: cfg.maxRows } : null,
+        // 快照链面：压了几次快照 / 最近一次在第几轮 / 最近一次为什么没压
+        snaps: st.snaps, lastRound: st.lastRound, lastReason: st.lastReason || null,
+        // 计数回落被吞的次数（该轮 delta 置 null，不是故障但要可见）
+        dropped: st.dropped, faults: Object.assign({}, st.faults || {}),
+        // 六源在场与否：缺一路不是「那一轮没写入」，是那台引擎缺席
+        sources: {
+          life: src.life === true, events: src.events === true, intel: src.intel === true,
+          bonds: src.bonds === true, temperament: src.temperament === true, enigma: src.enigma === true
+        },
+        note: (cfg && cfg.enabled !== true)
+          ? '世界简报关着 —— 这一栏零读数是「关着」，不是「没流水」'
+          : (st.snaps === 0
+            ? '还没压过一次快照（还没跑过一轮世界结算 / backstage 挂载点断了）—— 零读数不等于零流水'
+            : null)
+      };
+    }, {});
+  }
+  /**
    * v2.266.0（V6 EXV6-2）：人物今日动线读面。
    *
    * 本节要答的问题与世界日记节不同：那一节问「压了几句、隐了几条」，本节问
@@ -2973,6 +3020,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/save-health.js': 'saveHealth',
     'engines/first-run.js': 'firstRun',
     'engines/handoff-pack.js': 'handoffPack',
+    // v2.285.0（V7 EXV7-1）：今日世界简报 —— 差分流水引擎。
+    //   不订阅总线（backstage 直调 snap()），漏登记时「自检看不见的黑盒」
+    //   判据正是为这一格设的；与上面八台同一次补齐，避免又落下一格。
+    'engines/world-briefing.js': 'worldBriefing',
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/input-guard.js': 'inputGuard', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块 —— 登记一次到位。
@@ -4542,7 +4593,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   在全量回归里报 overview:["wa-wc-line"] —— 断的不是控件，是**登记的分层口径**：
       //   常在场登 ids、条件在场登 cond（与 wa-first-block 同列）。迁层不是放宽判据：
       //   它仍在守卫表里，渲染了但 id 写错照样被咬到，只是不再要求「每次都在」。
-      cond: ['wa-first-block', 'wa-wc-line'] },
+      // v2.285.0（V7 EXV7-1）：`wa-brief-block` 同理登 cond 层 —— 简报关着时整块不
+      //   渲染（firstBlock 口径：关着不占屏）。它缺失是**设置态**（enabled:false），
+      //   不是断裂；渲染了但 id 写错照样被咬到。
+      cond: ['wa-first-block', 'wa-wc-line', 'wa-brief-block'] },
     { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat', 'wa-sed-out'] },
     // v2.151.0（RX2+RX3）：会话页十六枚控件（跨会话记忆锚八枚 + 远方世界脉搏四枚 + 共用输出区一枚）。
     //   守卫表是控件接线面的唯一真源：渲染了不登记 ⇒「渲染了但绑定的 id 写错」这类断裂
@@ -4724,6 +4778,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   只是玩家改了「每屏句数」却不生效（滑块拖动、读数不跟随）。
       //   `wa-wd-out` 是结果出口，随渲染出 ⇒ 与 wa-rg-out 同列（不挂 cond：它恒在场）。
       'wa-wd-enable', 'wa-wd-maxlines', 'wa-wd-maxlinesv', 'wa-wd-offline', 'wa-wd-save', 'wa-wd-out',
+      // v2.285.0（V7 EXV7-1）：世界简报设置面五枚控件（渲染在设置页「今日世界简报」一格）。
+      //   同 v2.265.0 世界日记那组的理由：**渲染 + 绑定 + 守卫登记**三件齐做。
+      //   `wa-wb-maxrows` 是滑块、`wa-wb-maxrowsv` 是它的读数 span，两者必须同列
+      //   （读数不跟随＝拖动无效，属真缺陷）。
+      'wa-wb-enable', 'wa-wb-maxrows', 'wa-wb-maxrowsv', 'wa-wb-save', 'wa-wb-out',
       // v2.266.0（V6 EXV6-2）：人物动线设置面七枚控件（渲染在设置页「人物今日动线」一格）。
       //   同 v2.265.0 世界日记那组的理由，且这一格多一条**静默失效**：
       //   `wa-dr-next` / `wa-dr-hideplace` 关掉后动线照常显示，只是少一段/不报地名，
@@ -5722,6 +5781,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   （三路来源哪一路不在场 / 边界是判不了还是真看不见）。
       worldDiary: secWorldDiary(),
       dayRoute: secDayRoute(),
+      // v2.285.0（V7 EXV7-1）：今日世界简报读数。与世界日记节分列不合并 ——
+      //   那一节答「镜头外发生过什么（叙事面）」，本节答「这一轮结构化引擎
+      //   各自吃进了几笔（机制面）」：快照链断没断 / 六源核对到了几路 /
+      //   计数回落被吞了几次。快照由 backstage 直调不进总线，故挂载点断了
+      //   只有这一节能看出来。
+      worldBriefing: secWorldBriefing(),
       relationTemp: secRelationTemp(),
       undercurrentCalendar: secUndercurrentCalendar(),
       roundCost: secRoundCost(),

@@ -483,6 +483,18 @@
                 if (__ir && __ir.ok) __applyStat.intakeWritten = __ir.written | 0;
               }
             } catch (e) { WA.log('warn', '推演结果分发异常', e && e.message); }
+            // ── v2.285.0（V7 EXV7-1）：今日世界简报拍快照 ──────────────────────
+            //   与 intake.run 同层（事务后副作用），但方向相反：intake 是「把事实写进
+            //   引擎」，简报是「引擎吃进了多少，读出来」。位置必须在 intake 之后 ——
+            //   分发先落账，快照才拍得到这一轮的增量（反着排会把这轮的写入漏进
+            //   下一轮的简报里）。不走总线订阅（run.js 对 backstage:settled 的
+            //   监听位数有断言，新订阅者会污染那条读数），只走这个直调口。
+            //   失败不抛、不回滚、只作读数（观察层失败不许影响主链）。
+            try {
+              if (WA.worldBriefing && typeof WA.worldBriefing.snap === 'function') {
+                WA.worldBriefing.snap(anchor);
+              }
+            } catch (e) { WA.log('warn', '世界简报快照异常', e && e.message); }
             // v0.8 账本差分记录
             if (WA.ledger) WA.ledger.recordChanges();
           }

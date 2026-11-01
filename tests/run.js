@@ -878,6 +878,10 @@ const LOAD = [
   //   （intake-dispatch 之后、capability-tier 之前）。必须进 LOAD —— 验收探针要在同一个
   //   vm 里对真引擎的写口读契约；装载期它零上游读。
   'engines/write-contract.js',
+  // v2.285.0（V7 EXV7-1）：今日世界简报，与 index.js LOAD_ORDER 严格同序
+  //   （write-contract 之后、capability-tier 之前）。必须进 LOAD —— 验收探针要在同一个
+  //   vm 里把六源计数与快照差分接到真引擎 stat() 上跑；装载期它零上游读。
+  'engines/world-briefing.js',
   'engines/capability-tier.js',
   'engines/capability-audit.js',
   'compat/host.js', 'compat/mvu.js', 'compat/th-helper.js'

@@ -1179,6 +1179,48 @@
         return '<div class="wa-dim" id="wa-first-block">开局引导读数异常：' + esc((e && e.message) || e) + '</div>';
       }
     })();
+    // v2.285.0（V7 EXV7-1）：今日世界简报 —— 「这一轮结构化引擎各自吃进了几笔」。
+    //   与上面各玩家面块（diaryBlock / routeBlock / tempBlock）的分工：那些答「世界里
+    //   发生过什么」（叙事面），本块答「这一轮机制各消化了几笔」（流水面）。盯系统的人
+    //   看的就是它。四条口径与 diaryBlock 同规（整句取自引擎 / 三态零读数分开 / 关着不占
+    //   屏 / quiet 一句话）+ 一条本块特有的：**核对不到的行不渲染**（引擎缺席或 stat 缺键
+    //   的源，一行都不出，不补「（无）」）。
+    const briefBlock = (function () {
+      try {
+        if (!WA.worldBriefing || typeof WA.worldBriefing.view !== 'function') {
+          return '<div class="wa-dim" id="wa-brief-block">世界简报读数不可用（engines/world-briefing.js 缺席）</div>';
+        }
+        const cfg = (typeof WA.worldBriefing.getSettings === 'function') ? WA.worldBriefing.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) return '';   // 关着就整块不渲染（同 firstBlock 口径）
+        const v = WA.worldBriefing.view();
+        if (!v || v.available !== true) {
+          // 还没结算过：这是正常态（新开局），一句话说明，不冒充「零流水」
+          return '<div class="wa-dim" id="wa-brief-block">世界简报还没生成（每轮世界结算后更新一次）</div>';
+        }
+        const rows = (v.rows || []).filter(function (r) { return r.now !== null; });
+        if (!rows.length) {
+          return '<div class="wa-dim" id="wa-brief-block">世界简报：六源全部核对不到（引擎未加载）</div>';
+        }
+        if (v.firstRound === true) {
+          return '<div class="wa-brief wa-brief-live" id="wa-brief-block">'
+            + '<div class="wa-brief-line" style="font-weight:600;margin-bottom:3px;">今日世界简报（第 1 轮 · 基线建立）</div>'
+            + '<div class="wa-dim">开局第一轮只建立基线，不报流水 —— 播种存量的数字会在下一轮的差分里出现。</div>'
+            + '</div>';
+        }
+        const lineTxt = function (r) {
+          const d = (r.delta === null) ? '—' : ('+' + r.delta);
+          const state = r.on === false ? ' <span class="wa-dim">（引擎关着）</span>' : '';
+          return '<div class="wa-brief-line">' + esc(r.label) + '：' + esc(d) + state + '</div>';
+        };
+        return '<div class="wa-brief wa-brief-live" id="wa-brief-block">'
+          + '<div class="wa-brief-line" style="font-weight:600;margin-bottom:3px;">今日世界简报（第 ' + esc(String(v.round)) + ' 轮 · 共写入 ' + esc(String(v.written)) + ' 笔）</div>'
+          + rows.slice(0, v.maxRows || 8).map(lineTxt).join('')
+          + (v.quiet === true ? '<div class="wa-dim">这一轮没有新写入（世界在消化存量）</div>' : '')
+          + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-brief-block">世界简报读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
     return `
       <div class="wa-stat-grid">
         <div class="wa-stat"><div class="wa-stat-v">${esc(s.clock.label || '未设定')}</div><div class="wa-stat-k">世界时间</div></div>
@@ -1191,6 +1233,7 @@
       ${firstBlock}
       ${firstLine}
       ${diaryBlock}
+      ${briefBlock}
       ${routeBlock}
       ${tempBlock}
       ${calBlock}
