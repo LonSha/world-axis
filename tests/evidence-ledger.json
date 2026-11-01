@@ -1,15 +1,15 @@
 {
   "_note": "WorldAxis 证据索引(Q9,v2.226.0)。每行 = 一个证据文件,六栏全部**现场复算**(文件 / sha / version / commit / wired / env、runnable),本表不存第二真源。**version 只认文件自述**(标题行提到本文件名的那行 > 头部前六行首个版本词),并回带 versionSource(title / head / null)自证来源;取不到如实标 null,**不猜**。fileAnchor = 文件名 `-v2NNN` 后缀**原样**,仅备查 —— 该后缀有损且二义(2.117.0 写作 2117、2.97.0 写作 2970;`2100` 既可读成 2.10.0 也可读成 2.100.0),**不作判据、不填进 version**。acceptance 四档:verified(被 run.js 引用 **且** 另有真跑面:导出 runAll 一族**且**带真源码破坏锚点)/ wired(存在 + 被 run.js 引用)/ consumed(未被 run.js 直接引用,但被其它测试 require 当公共基建)/ unwired。计划 Q9 原文「现有计划顶部存在+引用不等于功能验收」落在 verified 与 wired 的分界上 —— wired 一律不许写成 verified。stale 只认三档可复算的硬事实:sha-changed / file-missing / wired-lost;**不**把「version 落后于当前版本」算 stale(历史证据本就停在它交付的那一版)。边界:输出摘要不进记录;只登记 tests/ 下的 .js(不含 run.js 与账本 json)。",
-  "version": "2.289.0",
+  "version": "2.290.0",
   "counts": {
-    "total": 394,
+    "total": 395,
     "verified": 29,
-    "wired": 362,
+    "wired": 363,
     "consumed": 3,
     "unwired": 0,
     "browser": 0,
     "headlessGate": 22,
-    "headlessLock": 329,
+    "headlessLock": 330,
     "headlessScript": 43
   },
   "rows": [
@@ -4801,7 +4801,7 @@
     },
     {
       "file": "tests/s3-b1-e3-v2184.js",
-      "sha": "9a967abe4d6e",
+      "sha": "aa5aa29bbfb0",
       "version": "2.184.0",
       "versionSource": "title",
       "fileAnchor": "2184",
@@ -4839,7 +4839,7 @@
     },
     {
       "file": "tests/s3-b2-e2-v2182.js",
-      "sha": "513e192039b5",
+      "sha": "3917334e95db",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -4856,7 +4856,7 @@
     },
     {
       "file": "tests/s3-b2-e5-v2182.js",
-      "sha": "ff14553128a6",
+      "sha": "3367b1eeedc9",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -4873,7 +4873,7 @@
     },
     {
       "file": "tests/s3-b2-o3-v2182.js",
-      "sha": "ea39ec40a589",
+      "sha": "be682fc6116f",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -4890,7 +4890,7 @@
     },
     {
       "file": "tests/s3-b2-o4-v2182.js",
-      "sha": "4532be45fd28",
+      "sha": "1b36ffcd9fd2",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -4909,7 +4909,7 @@
     },
     {
       "file": "tests/s3-b2-o5-v2182.js",
-      "sha": "76f9d10ec608",
+      "sha": "3d5e411c03ea",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -5191,7 +5191,7 @@
     },
     {
       "file": "tests/s3-b4-n11-v2229.js",
-      "sha": "903430e46aa7",
+      "sha": "25c43adfcb5f",
       "version": "2.229.0",
       "versionSource": "title",
       "fileAnchor": "2229",
@@ -5446,7 +5446,7 @@
     },
     {
       "file": "tests/s3-tx2-v2166.js",
-      "sha": "e8e53ea1d873",
+      "sha": "036f69d77d77",
       "version": "2.166.0",
       "versionSource": "head",
       "fileAnchor": "2166",
@@ -5466,7 +5466,7 @@
     },
     {
       "file": "tests/s3-tx3-v2167.js",
-      "sha": "bb73e851bf5f",
+      "sha": "7b3f6d246943",
       "version": "2.167.0",
       "versionSource": "head",
       "fileAnchor": "2167",
@@ -5483,7 +5483,7 @@
     },
     {
       "file": "tests/s3-tx4-v2168.js",
-      "sha": "d30fa2c9a85b",
+      "sha": "1954bb96df00",
       "version": "2.168.0",
       "versionSource": "head",
       "fileAnchor": "2168",
@@ -5520,7 +5520,7 @@
     },
     {
       "file": "tests/s3-tx6-v2169.js",
-      "sha": "577bba43fb19",
+      "sha": "19d16689009b",
       "version": "2.169.0",
       "versionSource": "head",
       "fileAnchor": "2169",
@@ -5537,7 +5537,7 @@
     },
     {
       "file": "tests/s3-tx7-v2170.js",
-      "sha": "2f4f562c7aec",
+      "sha": "949c42cbbc6c",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2170",
@@ -5554,7 +5554,7 @@
     },
     {
       "file": "tests/s3-tx8-v2171.js",
-      "sha": "5ca0796a4df9",
+      "sha": "3b5104196d1c",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2171",
@@ -5571,7 +5571,7 @@
     },
     {
       "file": "tests/s3-tx9-v2172.js",
-      "sha": "e2a0e0e01ae2",
+      "sha": "7ca18acdb44b",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2172",
@@ -7731,7 +7731,7 @@
       "version": null,
       "versionSource": null,
       "fileAnchor": null,
-      "commit": null,
+      "commit": "af44f9f",
       "wired": {
         "form": "runLock",
         "line": 25053
@@ -7775,6 +7775,26 @@
       "wired": {
         "form": "runLock",
         "line": 25036
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v7-place-sediment-2290.js",
+      "sha": "8a95a95258b8",
+      "version": "2.290.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": null,
+      "wired": {
+        "form": "runLock",
+        "line": 25061
       },
       "consumedBy": [],
       "env": "headless-lock",

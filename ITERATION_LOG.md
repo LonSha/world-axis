@@ -1,3 +1,12 @@
+### R232 · 2026-11-01 · v2.290.0：EXV7-6 地点沉积
+- `sediment` 新增 `placesView(opts)`：**跨地点**沉积台账（一屏答「世界哪些地方还留着事、各自当前最强档、几条已淡成传说」）。与既有 `feel(place)`（单地点）不重叠 —— 后者答「这个地方有什么」，前者答「这些地方各自怎么样」。
+- 三条口径：① **不自造地点**（只列 `rows` 里真沉积过的地名，`world.places` 有但没沉积过的不进表；「这里什么都没发生」与「这里是一处空地点」是两句话）；② **不写回衰减**（每行 `now`/`peak` 全走 `decayedTrace` 现算，不往任何字段回写档位）；③ **有界**（`maxPlaces` 默认 12 / 硬上限 48，回带 `total/cap/truncated/dropped`，截断如实报）。
+- 两条消费方同源接线：诊断 `secSediment()` 新增 `accountsView` 段（含 `placesNote` 人话摘要与 `placesView 缺席 / 拒收 / 抛错` 三个显式分支，不回落成空台账）；面板沉积页新增「地点沉积台账」按钮（`wa-sed-places`），**渲染 + 绑定 + `UI_BINDINGS` 登记三件齐做**。与既有「台账读数」分成两枚：那个答「一共多少」，这个答「分布在哪些地方、各自什么档」—— 合成一枚后「总数正常但某地痕迹全淡」在界面上看不出来。
+- 专锁 `tests/v7-place-sediment-2290.js`：**pass (30)**，覆盖导出/实现/消费方锚点（A0～A6）、聚合与稳定排序与不自造地点（B1～B8）、**冻结时钟下现算衰减**（B9～B11：`scar→marked`、`minor→legend`、存档原档不被改写）、零写盘与计数留痕与容量截断与关闭态拒收（C1～C5）、真源码破坏两向负控制（N0～N6）。
+- 同批：版本面统一到 `2.290.0`（`index.js` / `manifest.json` / 五本账 + 14 个 `s3-*` 白名单文件共 31 条形判据）；`tests/run.js` 钉版段把 289 段降为下界段并新增 290 严格钉版段；`evidence-ledger` 经 `evidence-index --write` 重建、`dead-export-ledger` 经 `--update` 复核 1184 条证据、`tests/run.js` 钉版读数经 `sync-hardcoded` 回填（refs 9007→9012 / members 4103→4104）、四份计划读数块经 `gen-plan-status --write` 跟版、拒收码手册 `docs/ERROR_CODES.md` 重新生成（1310 码）。
+#### 验收与边界
+- 已通过：EXV7-6 专锁 30/0、EXV7-1～5 全部专锁（80 / 20 / 17 / 17）、reject-lock 51、reject-code-gate（1310 = 见证 743 / 死表 50 / 基线 547）、reject-code-coverage 60、q9-evidence 67、readings-v2106 61、version-surface 14、module-registry（316 文件 / 325 命名空间 / 硬边 0）、dead-export（1178 / 6 / 550）、o8-consumer 38、o7-plan-tree 69、o6-layer 71、o9-outlet 50（tier=full）、test-surface（孤儿 0）、q1-load-integrity 64、UI 渲染路径 53、u9-fact-report 51、contract-scan 55、b5-org 72、economy 76、journal 40、fault-ledger-lock 22、v7-driver-ledger 101、readme-slim 71、lifeline、player-guide 25。
+- **按 V7 纪律 12 未执行完整 `node tests/run.js` 回归**；待 EXV7-7～9 全部交付后在足够长窗口执行全量回归。
 ### R231 · 2026-11-01 · v2.289.0：EXV7-5 势力账本
 - 在既有 `org` owner 上增加只读聚合 `factionAccounts()`，并以 `ledgerView(opts).accounts` 作为**唯一公开读口**：资源取 `evolution.factions[*].resources`、名册与工资取 `faction.roster` 经 `membersOf()`、双向债权债务复用 `debtsView('faction', name)`（不抵成净额）、项目缺口走 `coverageOf()`；不新建第二套账本容器也不把债务写进库存。
 - 有界且稳定排序：默认 `maxRows=8 / maxItems=5 / maxProjects=4`，硬上限 12/8/8，回带 `total/cap/truncated/dropped`；诊断 `secOrg()` 与面板「资源账本」按钮同源消费 `ledgerView().accounts`，不各自扇描存档。

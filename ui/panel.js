@@ -3176,7 +3176,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-row"><input id="wa-sed-place" class="wa-input" placeholder="地点（不填 = 此刻所在的场景）"/><select id="wa-sed-trace" class="wa-input wa-w60" aria-label="痕迹档（隐约可见/清晰可辨/遍地残骸）">${traces.map(opt).join('')}</select></div>
       <div class="wa-row"><input id="wa-sed-key" class="wa-input" placeholder="事实键（同一地点同一键只记一次）"/><input id="wa-sed-text" class="wa-input" placeholder="痕迹描述（如「墙根下还留着弹孔」）"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-sed-settle" title="登记一条痕迹。**这是本模块唯一的写口** —— 痕迹只能被登记，不能被推断。同一地点同一键重复登记只刷新痕迹与时间，且痕迹**只升不降**（后来者不许把「遍地残骸」降回「隐约可见」）">登记痕迹</button><button class="wa-btn" id="wa-sed-feel" title="读此地（只读）：列出此处全部痕迹与**当前**档位。衰减是现算的、不写回字段 —— 写回即第二真源。查不到就说查不到，不回落成「这里什么都没有发生过」">读此地</button></div>
-      <div class="wa-row"><button class="wa-btn" id="wa-sed-block" title="注入块预览（只读）：把此刻会递进正文的那一段原样打出来。传说档不进块（它已是最久远的底噪，再占预算就挤掉了近事）">注入块预览</button><button class="wa-btn" id="wa-sed-stat" title="只读：沉积台账（几处地方 / 几条痕迹 / 几条已降到传说档 / 三容器上限）。空集如实报 0，不编造">台账读数</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-sed-block" title="注入块预览（只读）：把此刻会递进正文的那一段原样打出来。传说档不进块（它已是最久远的底噪，再占预算就挤掉了近事）">注入块预览</button><button class="wa-btn" id="wa-sed-stat" title="只读：沉积台账（几处地方 / 几条痕迹 / 几条已降到传说档 / 三容器上限）。空集如实报 0，不编造">台账读数</button><button class="wa-btn" id="wa-sed-places" title="地点沉积台账（只读）：一屏列出**哪些地方还留着事**、各自当前最强档与有几条仍可辨。与「台账读数」的区别：那个报总数，这个报**分布**。只列已沉积过的地点 —— world 里有但没沉积过的地方不进表（「这里什么都没发生」与「这里是一处空地点」是两句话）">地点沉积台账</button></div>
       <div id="wa-sed-out" class="wa-out"></div>`;
 }
 
@@ -7174,6 +7174,21 @@ on('#wa-desk-show', showDesk);
       sedOut('沉积台账：' + (s.enabled ? '开' : '关') + '｜地方 ' + s.places + '/' + c.places
         + ' · 痕迹 ' + s.events + '/' + c.events + '（总上限 ' + c.total + '）'
         + ' · 已降到传说档 ' + s.legends + ' 条｜登记 ' + s.settled + ' 次 / 读 ' + s.feels + ' 次 / 出块 ' + s.blocks + ' 次', true);
+    });
+    // v2.290.0（EXV7-6）：跨地点台账。与「台账读数」分成两枚：那个答「一共多少」，
+    //   这个答「分布在哪些地方、各自什么档」。合成一枚之后，「总数正常但某地痕迹全淡」
+    //   这种局面在界面上看不出来。
+    on('#wa-sed-places', () => {
+      if (!WA.sediment || !WA.sediment.placesView) return sedOut('未记录：module-missing', true);
+      const pv = WA.sediment.placesView({ maxPlaces: 12 });
+      if (!pv.ok) return sedOut('未记录：' + (pv.reason || '未知原因'), true);
+      if (!pv.total) return sedOut('地点沉积台账：尚无任何地点留有痕迹（不是「都没了」—— 是还没登记过）', true);
+      sedOut('地点沉积台账：' + pv.total + ' 处（列出 ' + pv.rows.length + (pv.truncated ? '，已截断 ' + pv.dropped : '')
+        + '）｜仍可辨 ' + pv.aliveCount + ' 条 / 已淡为传说 ' + pv.legendCount + ' 条｜'
+        + pv.rows.map(function (x) {
+            return x.place + '：' + (x.peakLabel || '无') + '（' + x.alive + ' 条可辨'
+              + (x.legends ? ' / ' + x.legends + ' 条传说' : '') + '）';
+          }).join('；'), true);
     });
     // v2.151.0（RX2+RX3）：跨会话记忆锚八枚 + 远方脉搏四枚。
     //   与 v2.149.0（P3+X1）的同规格：渲染 + 绑定 + 守卫登记三件齐做，

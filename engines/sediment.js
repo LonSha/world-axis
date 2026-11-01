@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/sediment.js (v2.149.0) — 世界沉积层（X1）
+ * WorldAxis engines/sediment.js (v2.290.0) — 世界沉积层（X1；v2.290.0 增跨地点台账 placesView）
  *
  * ── 它治什么（缺口）──────────────────────────────────────────
  *   chronicle / echoes 都是**流水账**：事件发生了、记下来了，然后沉进环形缓冲区，
@@ -84,7 +84,7 @@
   const LADDER = { scar: 'marked', marked: 'minor', minor: 'legend', legend: 'legend' };
   const TRACE_LABEL = { minor: '隐约可见', marked: '清晰可辨', scar: '遍地残骸', legend: '传说' };
 
-  const stat = { settled: 0, feels: 0, blocks: 0, evicted: 0, byTrace: {}, faults: {} };
+  const stat = { settled: 0, feels: 0, blocks: 0, evicted: 0, placesReads: 0, byTrace: {}, faults: {} };
 
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 80) : String(v == null ? '' : v).slice(0, max || 80); }
@@ -216,6 +216,81 @@
   }
 
   /**
+   * v2.290.0（EXV7-6）：**地点沉积台账** —— 按地点聚合的「此地记得什么」。
+   *
+   * ── 它治什么（与 feel 的差别，不许重叠）───────────────────────────────
+   *   `feel(place)` 是**单地点**读数：进去一个地方、答那里有什么。
+   *   本口是**跨地点**台账：一屏之内答「世界哪些地方留有痕迹、各自最强的是什么档、
+   *   还有几条没淡到传说」—— 面板、诊断、导出要的都是这一份，而不是逐个地点循环 feel。
+   *   为什么不另立一张表：数据源**只有** sediment.rows 一处，本口是投影不是副本；
+   *   两处各算一遍「哪几处地方有事」= 本仓反复治理的第二真源。
+   *
+   * ── 三条口径（全是否定式）────────────────────────────────────────────
+   *   ① **不自造地点**：台账的行来自 rows 里**已沉积过**的地点；world.places 里有但
+   *      没沉积过的地点**不进表**（「这里什么都没发生」不等于「这里是一处空地点」——
+   *      前者是事实，后者要读 world，本口不跨界）。
+   *   ② **不写回衰减**：每行的 now/peak 都是**现算**（与 feel 同一条 decayedTrace），
+   *      不往任何字段写回档位（写回即第二真源，v2.149.0 已立）。
+   *   ③ **有界**：行数上限 maxPlaces（硬上限 48，与 capPlaces 同量级），回带
+   *      total/cap/truncated/dropped，截断如实报 —— 不许静默 slice。
+   *
+   * @param {{maxPlaces?:number, maxRows?:number}} opts
+   * @returns {{ok:boolean, reason?:string, total:number, cap:number, truncated:boolean,
+   *            dropped:number, peakCount:object, aliveCount:number, legendCount:number,
+   *            rows:Array}} rows 每行 =
+   *            { place, count, alive, legends, peak, peakLabel, freshest, lastAt,
+   *              traces:[{key, text, now, label, faded}] }
+   */
+  function placesView(opts) {
+    if (!cfgOn()) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const o = opts || {};
+    const cap = Math.max(1, Math.min(48, Number(o.maxPlaces) > 0 ? Math.floor(Number(o.maxPlaces))
+      : (Number(o.maxRows) > 0 ? Math.floor(Number(o.maxRows)) : 12)));
+    const cfg = settings();
+    const now = WA.clock ? WA.clock.now('sediment') : Date.now();
+    const alive = [];
+    rows().forEach(function (r) {
+      if (!r) return;
+      const place = clean(r.place, 40);
+      if (!place) return;
+      const evs = Array.isArray(r.events) ? r.events : [];
+      const traces = evs.map(function (e) {
+        const tr = decayedTrace(e.trace, e.at, now, cfg.traceWindowMs);
+        return { key: clean(e.key, 48), text: clean(e.text, 80), now: tr, label: TRACE_LABEL[tr] || tr,
+          kind: clean(e.kind, 20) || 'other', at: Number(e.at) || 0, faded: tr !== e.trace };
+      }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+      // peak：当前最强档。三档序 minor<marked<scar；legend 是永驻底噪（落在序外 = 最低）。
+      let peak = null;
+      traces.forEach(function (x) { if (peak === null || TRACES.indexOf(x.now) > TRACES.indexOf(peak)) peak = x.now; });
+      const legends = traces.filter(function (x) { return x.now === 'legend'; }).length;
+      alive.push({
+        place: place, count: traces.length, alive: traces.length - legends, legends: legends,
+        peak: peak, peakLabel: peak ? (TRACE_LABEL[peak] || peak) : null,
+        freshest: traces.length ? traces[0].label : null,
+        lastAt: traces.length ? traces[0].at : 0,
+        traces: traces
+      });
+    });
+    // 稳定排序：先按「最近一条痕迹的时刻」降序，同刻按地名升序（同输入同输出）。
+    alive.sort(function (a, b) {
+      if ((b.lastAt || 0) !== (a.lastAt || 0)) return (b.lastAt || 0) - (a.lastAt || 0);
+      return String(a.place).localeCompare(String(b.place));
+    });
+    const byPeak = {};
+    alive.forEach(function (x) { if (x.peak) byPeak[x.peak] = (byPeak[x.peak] || 0) + 1; });
+    stat.placesReads = (stat.placesReads || 0) + 1;
+    stat.lastReason = 'places-view';
+    return {
+      ok: true, total: alive.length, cap: cap,
+      truncated: alive.length > cap, dropped: Math.max(0, alive.length - cap),
+      peakCount: byPeak,
+      aliveCount: alive.reduce(function (n, x) { return n + x.alive; }, 0),
+      legendCount: alive.reduce(function (n, x) { return n + x.legends; }, 0),
+      rows: alive.slice(0, cap)
+    };
+  }
+
+  /**
    * 注入块：进入有沉积的地点时念「此地的历史痕迹」（预算内，只念非传说的前若干条）。
    *   不给 placeId 时从**当前场景**取地点（`sceneSlice` 是「此刻在哪个地点」的既有真源）——
    *   本模块**不另立一份「当前地点」**：那正是第二真源，会与 sceneSlice 漂移。
@@ -272,6 +347,8 @@
     // v2.149.0（X1 收口）：写口与读口成对（面板总开关的真消费方）。
     setSettings: saveSettings,
     settle: settle, feel: feel, buildBlock: buildBlock,
+    // v2.290.0（EXV7-6）：跨地点台账——面板「地点沉积台账」+ 诊断 secSediment 的真消费方。
+    placesView: placesView,
     stat: statOf
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/sediment.js', { kind: 'engine', ver: '2.149.0' });

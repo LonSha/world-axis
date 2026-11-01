@@ -495,6 +495,27 @@
         // 表外痕迹档 / 缺地点 / 缺键 的拒收分布：合成一个「没记上」之后，
         //   作者就再也知道该改档位写法、补地点，还是补键（与 secPerspective 的 faults 同规）。
         faults: Object.assign({}, st.faults || {}),
+        // v2.290.0（EXV7-6）：跨地点沉积台账。**只读投影**（placesView 不写盘、不改档位），
+        //   与「不跑 feel / 不跑 buildBlock」同规：诊断面不在任何面上留痕迹。
+        //   为什么必须在这里：此前 secSediment 只报「几处地方 / 几条痕迹」三个标量，
+        //   「哪几处地方还留着事、各自什么档」只能靠逐个地点 feel —— 那是面板逐个循环，
+        //   不是一份读数。缺这一面时的外显是「台账只有总数，点开哪个地点都得自己去猜」。
+        accountsView: (function () {
+          if (!WA.sediment || typeof WA.sediment.placesView !== 'function') return { error: 'placesView 缺席（沉积台账不可用）' };
+          try {
+            const pv = WA.sediment.placesView({ maxPlaces: 12 });
+            if (!pv || pv.ok !== true) return { error: (pv && pv.reason) || 'placesView 拒收' };
+            return { total: pv.total, cap: pv.cap, truncated: pv.truncated, dropped: pv.dropped,
+              peakCount: pv.peakCount || {}, aliveCount: pv.aliveCount, legendCount: pv.legendCount,
+              rows: (pv.rows || []).map(function (x) {
+                return { place: x.place, count: x.count, alive: x.alive, legends: x.legends,
+                  peak: x.peak, peakLabel: x.peakLabel };
+              }),
+              placesNote: pv.total + ' 处地点留有痕迹（' + pv.aliveCount + ' 条仍可辨 / '
+                + pv.legendCount + ' 条已淡为传说）'
+                + (pv.truncated ? '（另有 ' + pv.dropped + ' 处未列出）' : '') };
+          } catch (e) { return { error: 'placesView 抛错: ' + (e && e.message ? e.message : String(e)) }; }
+        })(),
         sedimentNote: st.places + '/' + (st.caps ? st.caps.places : '?') + ' 地点 · '
           + st.events + '/' + (st.caps ? st.caps.total : '?') + ' 条沉积'
           + (st.legends > 0 ? '（' + st.legends + ' 条已淡为传说）' : '')
@@ -4657,7 +4678,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   不渲染（briefBlock 口径：关着不占屏），plan 引擎缺席时渲染的是**缺席提示**
       //   而非数据行。它缺失是设置态 / 依赖态，不是断裂；渲染了但 id 写错照样被咬到。
       cond: ['wa-first-block', 'wa-wc-line', 'wa-brief-block', 'wa-intent-block'] },
-    { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat', 'wa-sed-out'] },
+    { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat',
+      // v2.290.0（EXV7-6）：跨地点沉积台账出口。三件齐做（渲染 + 绑定 + 守卫登记）——
+      //   理由与 v2.149.0 那批一致：只加按钮不加登记，「渲染了但绑定 id 写错」在本出口上永不可见。
+      'wa-sed-places', 'wa-sed-out'] },
     // v2.151.0（RX2+RX3）：会话页十六枚控件（跨会话记忆锚八枚 + 远方世界脉搏四枚 + 共用输出区一枚）。
     //   守卫表是控件接线面的唯一真源：渲染了不登记 ⇒「渲染了但绑定的 id 写错」这类断裂
     //   在这批控件上永不可见（v2.124.0 的 wa-perf-band 漏登记就是这么被漏掉的）。
