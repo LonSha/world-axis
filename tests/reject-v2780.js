@@ -8033,6 +8033,58 @@ function runWitness(WA) {
     }
   }
 
+  // ── v2.292.0（V7 EXV7-8）：世界自传的三个拒收码 —— 必须带可执行见证 ──
+  //   为什么不能进基线：它们是**产品会日常说出**的三句话（诊断节 secAutobio 与面板
+  //   autoWhy 都在消费）。登记成「存量未分类」等于让门禁替我们说「没人会跑到」——
+  //   而它们恰恰是读者最可能看到的那三句。
+  //   三码必须分开见证，因为它们是三种不同的坏法：
+  //     chrono-absent      上游整个不在场（装载问题 —— 去查 LOAD 链）
+  //     chrono-threw       上游在、读口抛错（上游内部炸了 —— 去看日志）
+  //     chronicle-refused  上游在、也没炸、但它拒收（配置/前置闸 —— 去开开关）
+  //   合成一个码，读者就再也分不出「没装」与「装了但坏了」与「装好了但关着」。
+  {
+    const AB = WA.worldAutobiography;
+    if (AB && typeof AB.autobiography === 'function') {
+      AB.setSettings({ enabled: true });
+      want('chrono-absent',
+        'EXV7-8：chrono 整个不在场 ⇒ reason=chrono-absent（装载问题，与「关着」的 disabled 分列）');
+      trip('chrono-absent', function () {
+        const keep = WA.chrono;
+        const out = [];
+        try {
+          WA.chrono = undefined;
+          out.push(AB.autobiography({}).reason);
+        } finally { WA.chrono = keep; }
+        return out;
+      });
+      want('chrono-threw',
+        'EXV7-8：chrono 在、但 chronicle 读口抛错 ⇒ reason=chrono-threw（上游内部炸了，不吞成「没有条目」）');
+      trip('chrono-threw', function () {
+        const keep = WA.chrono;
+        const out = [];
+        try {
+          WA.chrono = Object.assign({}, keep, { chronicle: function () { throw new Error('witness:chrono-threw'); } });
+          out.push(AB.autobiography({}).reason);
+        } finally { WA.chrono = keep; }
+        return out;
+      });
+      want('chronicle-refused',
+        'EXV7-8：chrono 在、没炸、但它 ok:false ⇒ reason=chronicle-refused（拒收与缺席分列：一个去开开关、一个去查装载）');
+      trip('chronicle-refused', function () {
+        const keep = WA.chrono;
+        const out = [];
+        try {
+          WA.chrono = Object.assign({}, keep, { chronicle: function () { return { ok: false, reason: 'witness-self' }; } });
+          out.push(AB.autobiography({}).reason);
+        } finally { WA.chrono = keep; }
+        return out;
+      });
+      // 收卷：见证过程改了设置就还原（同上面四拍引擎的收卷契约）。
+      AB.reset();
+      AB.setSettings({ enabled: true });
+    }
+  }
+
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected,
     asyncPumpProof: asyncPumpProof };
 }

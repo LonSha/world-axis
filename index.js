@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.291.0';
+  const VERSION = '2.292.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1194,6 +1194,11 @@
     //   它要读的 plan / agency 在本清单里更早装载，但那是**调用期**读口 ——
     //   装载期不需要任何依赖在场。排在这里让「看板开没开」首次盘点就在登记面内。
     'engines/intent-board.js',
+    // v2.292.0（V7 EXV7-8）：世界自传 —— 这一局跑下来，世界分几个阶段、各留了什么。
+    //   与 intent-board 同列（capability-tier 之前）：装载期只登记设置键、零上游读、
+    //   零 store 写、零落盘；三条源（chrono / worldDiary / worldBriefing）在本清单里
+    //   全部更早装载，但都是调用期读口。排在这里让它在首次盘点里就在登记面内。
+    'engines/world-autobiography.js',
     'engines/capability-tier.js',
     'engines/capability-audit.js',
     'ui/panel.js',

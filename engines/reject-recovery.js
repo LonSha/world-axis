@@ -416,6 +416,21 @@
     'unknown-order', 'unknown-party', 'unknown-scout', 'worn-out',
     'act-absent', 'act-unavailable', 'action-refused', 'action-throw', 'actor-claimed-by-other', 'add-chain-threw', 'adopt-budget-exhausted',
      'adopt-throw', 'auto-adopt-off',
+    // ── v2.292.0（V7 EXV7-8）：本批按现场复算一次收敛 —— 10 条现场有、快照里没有的码。
+    //   同一形态本仓已栽过五次（v2.203.0 的 17 条 / v2.209.0 的 14 条 / v2.221.0 的 3 条 /
+    //   v2.222.0 的 3 条 / v2.231.0 的 49 条）。本轮 B3/B4/C4 首跑即红，差异是：
+    //     · 3 条本版新码（世界自传三路源故障）—— 四种不同坏法不能合成一条，
+    //       否则「没装」「装了但坏了」「装好了但关着」在恢复建议里同形；
+    //     · 7 条**历史欠账**（bonds-disabled / no-blueprint / no-plan-engine /
+    //       noesis-missing / seed-threw / unknown-engine / unknown-method /
+    //       unknown-namespace 中的后七条）—— 它们各自在上一个版本就已落进 ok:false，
+    //       但那时没人跑这条锁，于是没人发现快照落后了。本轮一并补上，逐条不改档。
+    //   ⚠ `disabled` 不在此列：它是全仓数百处共用的关闭态码，早已登记在**判不出面**
+    //   （NEUTRAL_FACE 与 NEUTRAL_REVIEW 键集必须逐字相同），把它塞进拒收面会让两面相交
+    //   （A9 首跑即红，本轮实测）。
+    'chrono-absent', 'chrono-threw', 'chronicle-refused',
+    'bonds-disabled', 'no-plan-engine', 'noesis-missing', 'unknown-engine',
+    'unknown-method', 'unknown-namespace', 'no-blueprint', 'seed-threw',
     'aftermath-wait', 'ahead-of-head', 'alias-cycle', 'all-rejected', 'all-steps-refused', 'already-',
     'already-abandoned', 'already-adopted', 'already-answered', 'already-arrived', 'already-closed', 'already-confirmed',
     'already-covered', 'already-decided', 'already-delivered', 'already-in-transit', 'already-linked', 'already-locked',

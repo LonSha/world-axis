@@ -4000,6 +4000,24 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-wh-ag-out" class="wa-out"></div>
 
+      <div class="wa-sec">世界自传</div>
+      <div class="wa-dim">（EXV7-8：把整局归档压成<b>有边界的分章</b> —— 「世界分几个阶段、每个阶段留了什么」。
+        与上面「世界纪事」<b>不是同一问</b>：那栏逐条列出发生了什么（长局会滚成几百条），本栏只答阶段与每阶段留下的那几行。
+        章正文<b>逐条摘自归档原文</b>，<b>未生成新情节、未替玩家叙事</b>——没有文本的条目如实留空，不补写、不润色。
+        断章<b>只用轮差</b>（两个都带轮号的相邻条目之间的减法），<b>不折算时间</b>：
+        事件钟 / 剧情日 / 轮号是<b>三把不同的尺子</b>，本栏不互换。
+        缺轮号的条目<b>不补轮号</b>，只如实计入「轮坐标缺失」；同一时刻挂着两个不同轮号时，
+        该时刻的轮坐标<b>整格判为不可信</b> —— 宁可少一个边界，也不给一个错的阶段划分。
+        一条轮边界都找不到而长局又装不下时，退化成<b>按条数断章</b>并当场说破，
+        免得读者把「按体积切的」当成「按阶段切的」。
+        三种「没得看」<b>分开报</b>：模块关着 / 一条归档都没有 / 编年史读不出来。
+        本栏全是<b>只读</b>：不生成、不润色、不写盘 —— 导出只给一段可复制的文本，存到哪由你决定。</div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-auto-view" title="世界自传（只读分章）：整局归档按轮差压成若干章，每章报边界时刻、轮区间、条数与摘录行。三种「没得看」分开报 —— 关着 / 一条都没有 / 源读不出来，不合并成一句失败">看自传</button>
+        <button class="wa-btn" id="wa-auto-export" title="导出自传（只读文本）：给出可直接复制的 Markdown 全文。本按钮不写盘、不下载、不改任何状态 —— 文本只是显示出来，存到哪由你自己决定">导出自传</button>
+      </div>
+      <div id="wa-auto-out" class="wa-out"></div>
+
       <div class="wa-sec">世界纪事</div><div class="wa-dim">（E5：已经发生过什么、有哪些不给你看）</div>
       <div class="wa-dim">叙事化呈现但<b>每条都能下钻到来源</b>（编年史 / 时间轴 / 沉积 / 因果），事实不经改写。
         <b>空历史与读不到可分</b>：空 ⇒ 如实说「还没有记录」；读不到 ⇒ 报 no-store。
@@ -12099,7 +12117,11 @@ on('#wa-desk-show', showDesk);
         ['单轮成本', function () { return WA.roundCost && WA.roundCost.reset; }],
         ['存档体检', function () { return WA.saveHealth && WA.saveHealth.reset; }],
         ['开局引导', function () { return WA.firstRun && WA.firstRun.reset; }],
-        ['一键交班', function () { return WA.handoffPack && WA.handoffPack.reset; }]
+        ['一键交班', function () { return WA.handoffPack && WA.handoffPack.reset; }],
+        // v2.292.0（EXV7-8）：世界自传。它自报 reads / exports / chapters / lines /
+        //   dropped / byRound / byVolume / roundMisses 八格 —— 「跑了多少次、退化过几次、
+        //   有多少条因为缺轮号而算不出边界」全靠这些计数回答，所以它必须在清零表里。
+        ['世界自传', function () { return WA.worldAutobiography && WA.worldAutobiography.reset; }]
       ];
       const done = [], absent = [];
       gauges.forEach(function (g) {
@@ -13836,6 +13858,82 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
           + (cv.peopleTotal - cv.people) + ' 人未列出）</span>' : '') + '</div>'
           + '<div class="wa-dim">五类分布：' + kindLine + '（缺的那类报 0 —— 「这一类没有」与「不在词表里」是两件事）</div>'
           + rows + '<div class="wa-dim">' + esc(cv.note) + '</div>');
+      });
+
+      // ── v2.292.0（EXV7-8）：世界自传（分章压缩 + 只读导出）─────────────
+      //   两枚按钮共用一只输出容器（同一栏里读同一份东西，分容器只会让读者找不到），
+      //   但**两件事分两条路径**：看 = 章结构；导出 = 全文文本。
+      const autoOut = function (html) { const o = $('#wa-auto-out'); if (o) o.innerHTML = html; };
+      const autoWhy = function (reason) {
+        const M = {
+          disabled: '世界自传关着（不是「这一局没发生过事」—— 开关打开后才有自传）',
+          'chrono-absent': '读不到编年史（chrono 缺席）—— 这一栏此刻无从分章',
+          'chrono-threw': '编年史读口抛错 —— 拒绝给出半份自传',
+          'chronicle-refused': '编年史拒收（原因见「世界纪事」那一栏）'
+        };
+        return M[reason] || ('拒收：' + String(reason || '?'));
+      };
+      on('#wa-auto-view', () => {
+        if (!WA.worldAutobiography) return autoOut('<div class="wa-log wa-log-err">未记录：worldAutobiography 缺席</div>');
+        let a = null;
+        try { a = WA.worldAutobiography.autobiography({}); } catch (e) {
+          return autoOut('<div class="wa-log wa-log-err">读出时抛错：' + esc(e && e.message ? e.message : String(e)) + '</div>');
+        }
+        if (!a || a.ok !== true) return autoOut('<div class="wa-log wa-log-warn">' + esc(autoWhy(a && a.reason)) + '</div>');
+        if (!a.chapters) {
+          return autoOut('<div class="wa-log wa-log-info">这一局的归档里还没有任何一条已结算的事 —— 这是「还没发生」，'
+            + '不是「读不到」（不可见 ' + a.hiddenCount + ' 条 / 轮坐标缺失 ' + a.roundMisses + ' 条）</div>');
+        }
+        // 口径行：by-volume 必须说破，否则「按体积切的」会被当成「按阶段切的」
+        const modeLine = (a.chapterMode === 'by-volume')
+          ? '<div class="wa-log wa-log-warn">口径：<b>按条数断章</b>（本局没有任何两条相邻条目同时带轮号）'
+            + ' —— <b>这不是按轮切的</b>，章的先后只反映归档体积，不反映阶段</div>'
+          : '<div class="wa-dim">口径：按轮断章（只用两个都带轮号的相邻条目之间的轮差，不折算时间）'
+            + '　轮坐标缺失 ' + a.roundMisses + ' 条 —— 缺轮号可能漏掉一个真实边界，这是已知上限，不补轮号</div>';
+        const rows = (a.rows || []).map(function (c) {
+          const rl = c.rounds ? ('轮 ' + c.rounds.min + '～' + c.rounds.max + ' · ') : '';
+          const body = (c.lines && c.lines.length)
+            ? c.lines.map(function (l) { return '<div class="wa-dim">' + esc(l) + '</div>'; }).join('')
+            : '<div class="wa-dim">（本章没有可摘录的行 —— 归档条目本身没有文本，本栏不补写）</div>';
+          return '<div class="wa-item"><b>第 ' + c.index + ' 章</b> <span class="wa-badge">' + rl + c.count + ' 条</span>'
+            + (c.dropped ? '<span class="wa-dim">（本章只摘前 ' + c.shown + ' 条）</span>' : '') + body + '</div>';
+        }).join('');
+        const kindLine = Object.keys(a.byKind || {}).map(function (k) {
+          return esc(k) + ' ' + a.byKind[k];
+        }).join('　');
+        const app = [];
+        const d = a.appendix && a.appendix.diary;
+        if (d && d.absent) app.push('<div class="wa-dim">附记·世界日记：缺席（' + esc(d.why || '') + '）</div>');
+        else if (d) app.push('<div class="wa-dim">附记·世界日记：'
+          + ((d.quiet || !(d.lines || []).length) ? '这几轮镜头外无事（不是「没读到」）' : esc((d.lines || []).join('；'))) + '</div>');
+        const b = a.appendix && a.appendix.briefing;
+        if (b && b.absent) app.push('<div class="wa-dim">附记·本轮引擎产出：缺席（' + esc(b.why || '') + '）</div>');
+        else if (b) app.push('<div class="wa-dim">附记·本轮引擎产出：'
+          + ((b.lines && b.lines.length) ? esc(b.lines.join('；')) : '尚未结算过一轮（简报在每轮世界结算后生成）') + '</div>');
+        autoOut('<div class="wa-log wa-log-info">世界自传：' + a.chapters + ' 章 / 归档 ' + a.total
+          + ' 条 · 已摘 ' + a.lines + ' 行' + (a.droppedLines ? '（另有 ' + a.droppedLines + ' 行未摘录）' : '')
+          + (a.droppedChapters ? '（另有 ' + a.droppedChapters + ' 章已略去）' : '')
+          + (a.cappedBySource ? ' <span class="wa-dim">源已按上限截断</span>' : '') + '</div>'
+          + modeLine
+          + '<div class="wa-dim">归档分布：' + (kindLine || '（空）') + '</div>'
+          + rows + app.join('')
+          + '<div class="wa-dim">' + esc(a.note) + '</div>');
+      });
+      on('#wa-auto-export', () => {
+        if (!WA.worldAutobiography || !WA.worldAutobiography.exportText) {
+          return autoOut('<div class="wa-log wa-log-err">未记录：worldAutobiography.exportText 缺席</div>');
+        }
+        let x = null;
+        try { x = WA.worldAutobiography.exportText({}); } catch (e) {
+          return autoOut('<div class="wa-log wa-log-err">导出时抛错：' + esc(e && e.message ? e.message : String(e)) + '</div>');
+        }
+        if (!x || x.ok !== true) return autoOut('<div class="wa-log wa-log-warn">' + esc(autoWhy(x && x.reason)) + '</div>');
+        // 只读文本框：本模块不写盘、不下载、不弹保存框 —— 文本只显示，去处归用户。
+        autoOut('<div class="wa-log wa-log-info">可导出自传：' + x.chapters + ' 章 · ' + x.chars + ' 字符'
+          + (x.large ? ' <span class="wa-dim">（偏长，建议粘到编辑器再整理）</span>' : '') + '</div>'
+          + '<textarea class="wa-input" rows="16" readonly style="width:100%;box-sizing:border-box">'
+          + esc(x.markdown) + '</textarea>'
+          + '<div class="wa-dim">' + esc(x.note) + ' —— 这里只给文本，不替你保存。</div>');
       });
 
       const cvOut = function (html) { const o = $('#wa-wh-cv-out'); if (o) o.innerHTML = html; };

@@ -1,13 +1,13 @@
 {
- "version": "2.291.0",
- "loadOrderCount": 330,
- "loadedCount": 316,
+ "version": "2.292.0",
+ "loadOrderCount": 331,
+ "loadedCount": 317,
  "uiCount": 14,
- "nsCount": 325,
+ "nsCount": 326,
  "totals": {
-  "loadEdges": 198,
+  "loadEdges": 199,
   "hardEdges": 0,
-  "callRefs": 380,
+  "callRefs": 382,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -200,6 +200,7 @@
     "engines/wb-inject.js",
     "engines/wb-search.js",
     "engines/word-budget.js",
+    "engines/world-autobiography.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-briefing.js",
@@ -511,6 +512,7 @@
     "engines/vitals.js",
     "engines/wb-search.js",
     "engines/word-budget.js",
+    "engines/world-autobiography.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-briefing.js",
@@ -5992,6 +5994,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_intent_board_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-autobiography.js": {
+   "ns": [
+    "worldAutobiography"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_autobiography_settings_v1"
    ],
    "consumedBy": []
   },

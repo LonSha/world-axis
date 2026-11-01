@@ -189,6 +189,9 @@
     //   （源表只判在场），但**它的默认值没跟着登记进 _def**（见下第二处）——
     //   「源表有、默认值无」与「默认值有、源表无」是两个方向，本仓两面都锁。
     'retrieval',
+    // v2.292.0（V7 EXV7-8）：世界自传。与上面各源同批口径 —— 只加源表不加分支 =
+    //   声明了没人消费；只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻）。
+    'worldAutobiography',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
@@ -213,6 +216,11 @@ style: false,
         // v2.127.0（X2）：世界编年史。同一条理由——其模块总开关默认为关，故注入面取默认 true
         //   不给老用户凭空多出约束。
         chrono: true,
+        // v2.292.0（V7 EXV7-8）：世界自传注入源默认 **false**。
+        //   与 style 同一条理由：本模块的 DEF.enabled 为 true（诊断面要能读它），
+        //   若注入面也默认开，会让所有从没开过这个设置面的老用户凭空多出一段
+        //   「近三章归档摘录」的约束 —— 而他们看不到它是哪来的。
+        worldAutobiography: false,
         // v2.129.0：五条叙事纪律源。取默认 true（同四条理由——其模块总开关默认为关），
         //   不给老用户凭空多出约束。
         userlock: true, rhythmLoop: true, motif: true, beatMask: true, powerAnchor: true,
@@ -1401,6 +1409,13 @@ style: false,
       //   OR 规则(因果相关**或**被提及,任一成立即入包)的输入面就是玩家这一句话。
       //   取输入的口径与 memory.recentText 同源(chat 末条的 is_user 帧),
       //   不另探一份。无输入 / 关闭 / 无命中 ⇒ 返回空串,零 token 占用。
+      // v2.292.0（V7 EXV7-8）：世界自传。给的是「近三章各留了什么」的摘要行，
+      //   不是整部自传（整部有几百行，塞进正文会把正文挤没）。buildBlock 自己
+      //   在关闭态 / 空归档时返回空串，故缺模块或缺章节时静默不出块。
+      if (vis.worldAutobiography && WA.worldAutobiography) {
+        const ab = engineCall('worldAutobiography', function () { return WA.worldAutobiography.buildBlock(); });
+        if (ab) items.push({ source: '世界自传', content: ab });
+      }
       if (vis.retrieval && WA.retrieval) {
         const rq = (function () {
           try {

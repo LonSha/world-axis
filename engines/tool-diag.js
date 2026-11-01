@@ -1980,6 +1980,92 @@
       return out;
     });
   }
+  /**
+   * v2.292.0（V7 EXV7-8）：世界自传读数 —— 长局分几个阶段、每个阶段留了什么。
+   *
+   *   与相邻两节答的**不是同一问**（这也是它不能并进任何一节的理由）：
+   *     · secChronicleView 答「逐条发生了什么」（扁平时间序，长局滚成几百条）；
+   *     · 本节答「整局下来世界分几个阶段、每阶段留了什么」——把扁平列表压成有边界的分章；
+   *     · 世界日记 / 简报**只作尾部附记**（覆盖最近几轮 / 单轮流水，不属于任何一章）。
+   *
+   *   三种「没得看」必须分开报（本仓反复付过代价的那条）：
+   *     · 模块关着（disabled）≠ 一条归档都没有（chapters:0，ok:true）
+   *       ≠ 源读不出来（chrono-absent / chrono-threw / chronicle-refused，各自如实报）。
+   *   把这几个合成一句「失败」，读者就再也分不清「没发生过」与「看不到」。
+   *
+   *   与 secSediment / secTapeStore 同规：**只报读数、不写世界** ——
+   *   不生成情节、不润色、不写盘；本模块本身没有写口。
+   */
+  function secAutobio() {
+    return safe(function () {
+      if (!WA.worldAutobiography || typeof WA.worldAutobiography.autobiography !== 'function') {
+        return { error: 'engines/world-autobiography.js 未加载（世界自传读数缺席）' };
+      }
+      const cfg = (typeof WA.worldAutobiography.getSettings === 'function')
+        ? WA.worldAutobiography.getSettings() : {};
+      let a = null;
+      try { a = WA.worldAutobiography.autobiography({}); }
+      catch (e) { return { error: 'autobiography 抛错: ' + (e && e.message ? e.message : String(e)) }; }
+      if (!a || a.ok !== true) {
+        const why = (a && a.reason) || 'refused';
+        return {
+          enabled: !!cfg.enabled,
+          reason: why,
+          chapters: 0,
+          // 关着 ≠ 读不到：两者的处置完全不同（一个去开开关，一个去查源）
+          note: (why === 'disabled')
+            ? '世界自传关着 —— 这不是「这一局没发生过事」，开关打开后才有自传'
+            : '编年史这一侧读不出来（' + String(why) + '）—— 拒绝给出半份自传'
+        };
+      }
+      return {
+        enabled: true,
+        chapterMode: a.chapterMode, degraded: !!a.degraded,
+        chapters: a.chapters, chaptersTotal: a.chaptersTotal, droppedChapters: a.droppedChapters,
+        total: a.total, lines: a.lines, droppedLines: a.droppedLines,
+        hiddenCount: a.hiddenCount, roundMisses: a.roundMisses,
+        cappedBySource: !!a.cappedBySource,
+        byKind: Object.assign({}, a.byKind || {}),
+        storyLabel: a.storyLabel,
+        // 章只报「边界 + 计数 + 头两行」：诊断包是读数面，不是第二份自传
+        chaptersList: (a.rows || []).map(function (c) {
+          return {
+            index: c.index, from: c.from, to: c.to, rounds: c.rounds,
+            count: c.count, shown: c.shown, dropped: c.dropped,
+            kinds: Object.assign({}, c.kinds || {}),
+            head: (c.lines || []).slice(0, 2)
+          };
+        }),
+        appendix: {
+          diary: (a.appendix && a.appendix.diary) ? {
+            absent: !!a.appendix.diary.absent, quiet: !!a.appendix.diary.quiet,
+            why: a.appendix.diary.why || '',
+            lines: (a.appendix.diary.lines || []).slice(0, 2)
+          } : null,
+          briefing: (a.appendix && a.appendix.briefing) ? {
+            absent: !!a.appendix.briefing.absent, quiet: !!a.appendix.briefing.quiet,
+            why: a.appendix.briefing.why || '',
+            round: a.appendix.briefing.round,
+            sources: a.appendix.briefing.sources,
+            lines: (a.appendix.briefing.lines || []).slice(0, 2)
+          } : null
+        },
+        // by-volume 必须说破：不写这句，读者会把「按体积切的」当成「按阶段切的」。
+        modeNote: (a.chapterMode === 'by-volume')
+          ? '本局没有任何两条相邻条目同时带轮号 ⇒ 按条数断章（by-volume）——'
+            + '章的先后只反映归档体积，不反映阶段'
+          : '按轮断章：只用两个都带轮号的相邻条目之间的轮差，不折算时间',
+        // 本读口自己的观测计数（reads / exports / byRound / byVolume / roundMisses）：
+        //   它是「这个读口被用过几次、退化过几次」的唯一答案，诊断包不读就没人读。
+        //   取不到就如实报 null —— 不拿一份全零冒充「从没跑过」。
+        stat: (typeof WA.worldAutobiography.stat === 'function') ? WA.worldAutobiography.stat() : null,
+        autobioNote: a.chapters + ' 章 / 归档 ' + a.total + ' 条 · 已摘 ' + a.lines + ' 行'
+          + (a.droppedLines ? '（另有 ' + a.droppedLines + ' 行未摘录）' : '')
+          + (a.droppedChapters ? '（另有 ' + a.droppedChapters + ' 章已略去）' : '')
+          + ' · 轮坐标缺失 ' + a.roundMisses + ' 条（缺轮号可能漏掉真实边界 —— 已知上限，不补轮号）'
+      };
+    });
+  }
   function secAgenda() {
     return safe(function () {
       if (!WA.agenda || typeof WA.agenda.stat !== 'function') return { error: 'engines/agenda.js 未加载（世界日程读数缺席）' };
@@ -3172,6 +3258,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   不订阅总线、不调写口（plan.expand/advance 一个都不碰），全部现读 plan.chain；
     //   漏登记时「自检看不见的黑盒」判据正是为这一格设的，与上面同一次补齐。
     'engines/intent-board.js': 'intentBoard',
+    // v2.292.0（V7 EXV7-8）：世界自传 —— 分章压缩聚合。
+    //   与上面两台同规：不订阅总线、零写口，全部现读 chrono.chronicle；
+    //   漏登记时「自检看不见的黑盒」判据正是为这一格设的（这一格漏过一次，
+    //   症状是 export-contract 里整个 worldAutobiography 命名空间缺席 ——
+    //   守卫与契约面同时看不见它，而专锁照绿）。
+    'engines/world-autobiography.js': 'worldAutobiography',
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/input-guard.js': 'inputGuard', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块 —— 登记一次到位。
@@ -5107,10 +5199,14 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         //   与上面四枚同组同页 —— 它们答的是同一个问题（「接下来」），
         //   但**不共用一枚按钮**：合成一枚之后「事都要跑」与「债要还」在界面上分不开。
         'wa-cal-events', 'wa-cal-commit',
+        // v2.292.0（EXV7-8）：世界自传两枚（看 / 导出）。
+        //   与上面两枚同组同页（都在健康页的世界侧读数块里），但**不共用一枚按钮**：
+        //   合成一枚之后「章算错了」与「导不出来」在界面上同形。
+        'wa-auto-view', 'wa-auto-export',
         'wa-wh-cv-enabled', 'wa-wh-cv-view', 'wa-wh-cv-hidden', 'wa-wh-cv-diag',
         'wa-wh-cv-ref', 'wa-wh-cv-entry'],
       // 三块读数出口走 dynamic 层（同上面 tools 页两条的口径）。
-      dynamic: ['wa-wh-out', 'wa-wh-ag-out', 'wa-wh-cv-out'] },
+      dynamic: ['wa-wh-out', 'wa-wh-ag-out', 'wa-wh-cv-out', 'wa-auto-out'] },
     // v2.183.0（第一批 E1）：统一待办事项中心 —— 7 静态控件 + 1 动态读数出口。
     //   与上一组同登记到 health 页（本模块的区块渲染在健康页里，与三块合页同规格）。
     //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
@@ -5989,6 +6085,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   诊断包是这些新面**唯一**的产品侧读者，漏登记 ⇒ 死导出面当场红灯
       //   （口径：产品零引用即冻结面）。
       agenda: secAgenda(), calendar: secCalendar(), chronicleView: secChronicleView(), capacityAudit: secCapacityAudit(),
+      // v2.292.0（EXV7-8）：世界自传。与 chronicleView 分列不合并 ——
+      //   一个答「逐条发生了什么」，一个答「分几个阶段、每阶段留了什么」；
+      //   合成一节之后「长局滚成几百条」与「阶段划错了」在读数面上同形。
+      autobiography: secAutobio(),
       perfBaseline: secPerfBaseline(), worldHealth: secWorldHealth(),
       // v2.183.0（第一批 E1）：统一待办事项中心。与 worldHealth 的待办栏分列不合并 ——
       //   两者答的是**两个粒度**：世界健康栏答「还有几件事没做完」（计数 + 是否全清），

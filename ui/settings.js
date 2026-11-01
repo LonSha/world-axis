@@ -403,6 +403,31 @@
             <div id="wa-wb-out" class="wa-out"></div>
             <div class="wa-dim">简报只读结构化引擎的写入计数差分（本轮新目标 / 新排期 / 新情报 / 关系变化……），不重算、不调模型；第 1 轮只建基线不报流水，核对不到的行如实不渲染。</div>`;
         })()}
+        <div class="wa-sec" data-wa-lane="world" data-wa-sec="世界自传">世界自传<span class="wa-dim">（长局按几轮断一章、最多留几章、每章摘几行）</span></div>
+        ${(() => {
+          // v2.292.0（V7 EXV7-8）：世界自传的设置面。与世界日记 / 世界简报两段同规：
+          //   ① **只发动作**：写盘走 `worldAutobiography.setSettings`（引擎内唯一写路径，
+          //      内含 settingsBus.saveOrThrow 与 bounds 归一），本页不直写 localStorage；
+          //   ② **回显按真实结果**：`setSettings` 返回 ok:false 就报失败。
+          //   为什么它必须有入口：`chapterRounds` 直接决定「什么算一个新阶段」——
+          //   设太大了整局只成一章（等于没分），设太小了每个小动静都自成一章（等于没压）。
+          //   这个取舍只有玩家自己知道，出厂值只是个起点。
+          if (!WA.worldAutobiography || typeof WA.worldAutobiography.getSettings !== 'function') {
+            return '<div class="wa-dim">世界自传模块未加载（engines/world-autobiography.js 缺席）</div>';
+          }
+          const ab = WA.worldAutobiography.getSettings();
+          const bdAb = bd('worldaxis_world_autobiography_settings_v1');
+          const cr = rng(bdAb.chapterRounds, [1, 30]);
+          const mc = rng(bdAb.maxChapters, [1, 24]);
+          const ml = rng(bdAb.maxLines, [1, 12]);
+          return `<label class="wa-node"><input type="checkbox" id="wa-ab-enable" ${ab.enabled ? 'checked' : ''}/><span class="wa-node-label">启用世界自传（关掉则整份拒收，不是「这一局没发生过事」）</span></label>
+            <div class="wa-set-row"><span>相邻两条轮差 ≥ <b id="wa-ab-roundsv">${ab.chapterRounds}</b> 轮就断章</span><input type="range" min="${cr[0]}" max="${cr[1]}" value="${ab.chapterRounds}" aria-label="断章轮差" id="wa-ab-rounds" class="wa-range"/></div>
+            <div class="wa-set-row"><span>最多留 <b id="wa-ab-chaptersv">${ab.maxChapters}</b> 章</span><input type="range" min="${mc[0]}" max="${mc[1]}" value="${ab.maxChapters}" aria-label="最多留几章" id="wa-ab-chapters" class="wa-range"/></div>
+            <div class="wa-set-row"><span>每章最多摘 <b id="wa-ab-linesv">${ab.maxLines}</b> 行</span><input type="range" min="${ml[0]}" max="${ml[1]}" value="${ab.maxLines}" aria-label="每章最多摘几行" id="wa-ab-lines" class="wa-range"/></div>
+            <button class="wa-btn" id="wa-ab-save">保存世界自传设置</button>
+            <div id="wa-ab-out" class="wa-out"></div>
+            <div class="wa-dim">断章<b>只用轮差</b>（两个都带轮号的相邻条目之间的减法），<b>不折算时间</b>；缺轮号的条目<b>不补轮号</b>，只计入「轮坐标缺失」——它可能让一个真实边界被漏掉，这是已知上限，不是缺陷。章正文逐条摘自归档原文，不生成新情节。</div>`;
+        })()}
         <div class="wa-sec" data-wa-lane="people" data-wa-sec="人物意图看板">人物意图看板<span class="wa-dim">（概览页「他在图什么、卡在哪一步」怎么压）</span></div>
         ${(() => {
           // v2.286.0（V7 EXV7-2）：人物意图看板的设置面。
@@ -951,6 +976,32 @@
         if (r && r.ok === false) { say('✗ 保存失败：' + (r.reason || '未落盘') + '（改动未生效）'); return; }
         const now = WA.worldBriefing.getSettings();
         say('✓ 已保存（最多 ' + now.maxRows + ' 行' + (now.enabled ? '' : ' · 概览页已隐藏') + '）');
+      };
+      // v2.292.0（V7 EXV7-8）：世界自传设置绑定。与 wa-wd-save 同规。
+      const abCr = $('#wa-ab-rounds');
+      const abMc = $('#wa-ab-chapters');
+      const abMl = $('#wa-ab-lines');
+      if (abCr) abCr.oninput = () => { const v = $('#wa-ab-roundsv'); if (v) v.textContent = abCr.value; };
+      if (abMc) abMc.oninput = () => { const v = $('#wa-ab-chaptersv'); if (v) v.textContent = abMc.value; };
+      if (abMl) abMl.oninput = () => { const v = $('#wa-ab-linesv'); if (v) v.textContent = abMl.value; };
+      const abSave = $('#wa-ab-save');
+      if (abSave) abSave.onclick = () => {
+        const abOutEl = $('#wa-ab-out');
+        const sayAb = function (t) { if (abOutEl) abOutEl.textContent = t; };
+        if (!WA.worldAutobiography || typeof WA.worldAutobiography.setSettings !== 'function') {
+          sayAb('✗ 保存失败：世界自传模块未加载'); return;
+        }
+        const en = $('#wa-ab-enable');
+        const r = WA.worldAutobiography.setSettings({
+          enabled: en ? !!en.checked : true,
+          chapterRounds: +((abCr && abCr.value) || 5) || 5,
+          maxChapters: +((abMc && abMc.value) || 12) || 12,
+          maxLines: +((abMl && abMl.value) || 6) || 6
+        });
+        if (r && r.ok === false) { sayAb('✗ 保存失败：' + (r.reason || '未落盘') + '（改动未生效）'); return; }
+        const now = WA.worldAutobiography.getSettings();
+        sayAb('✓ 已保存（轮差 ≥ ' + now.chapterRounds + ' 轮断章 · 最多 ' + now.maxChapters
+          + ' 章 · 每章 ' + now.maxLines + ' 行' + (now.enabled ? '' : ' · 整份拒收') + '）');
       };
       // v2.286.0（V7 EXV7-2）：人物意图看板设置绑定。与 wa-wd-save 同规。
       const ibMr = $('#wa-ib-maxrows');
