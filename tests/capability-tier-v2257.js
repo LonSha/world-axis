@@ -86,12 +86,13 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //     历史：V6 批次新增 8 个默认开启的产品层引擎（worldDiary / dayRoute / relationTemp /
 //     undercurrentCalendar / roundCost / saveHealth / firstRun / handoffPack），故 18 → 26。
 //     **引擎出厂态变了就改这里，别改判据形态。**
-const BASE_ON = 26;         // 本测试面：出厂就开着的带 enabled 引擎数
+const BASE_ON = 29;         // 本测试面：出厂就开着的带 enabled 引擎数
 const MECH = 100;           // 有注入面的机制数
 const DORMANT = 95;         // 关着但有注入面的
 const RUNNING0 = 5;         // 出厂开 且 有注入面的
 // full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
-const FULL_RUNNING = MECH + (BASE_ON - RUNNING0);
+const FULL_MECH = 65; // OPV7-8 下调排除 35 个悬空机制后为 65
+const FULL_RUNNING = FULL_MECH + (BASE_ON - RUNNING0);
 
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
 let __g = null;
@@ -242,10 +243,10 @@ function runB(a) {
   // B4 full：本次新开 61 个（100 个有注入面的 − 已开的 39 = 5 出厂 + 34 standard）
   const r3 = T.applyTier('full');
   a(r3.ok === true, 'B4: 切 full 成功');
-  a(r3.turnedOn.length === 61, 'B4b: full 本次新开 61 个（100 − 39 已开，实 ' + r3.turnedOn.length + '）');
+  a(r3.turnedOn.length === 35, 'B4b: full 本次新开 35 个（65 − 30 已开，实 ' + r3.turnedOn.length + '）');
   const vf = T.view();
-  a(vf.running === 100, 'B4c: full 后 100 个机制全在跑（实 ' + vf.running + '）');
-  a(vf.dormant === 0, 'B4d: full 后零休眠机制（实 ' + vf.dormant + '）');
+  a(vf.running === FULL_MECH, 'B4c: full 后 ' + FULL_MECH + ' 个机制在跑（OPV7-8 下调排除 35 悬空，实 ' + vf.running + '）');
+  a(vf.dormant === 35, 'B4d: full 后休眠机制为 35 个（OPV7-8 排除的悬空机制，实 ' + vf.dormant + '）');
   // B5 回滚：full → standard（栈顶是 standard→full 那行，from=standard）
   const r4 = T.rollback();
   a(r4.ok === true, 'B5: 回滚成功');
@@ -311,7 +312,7 @@ function runC(a) {
   // C3 出厂态：defaultOff 95 / userOff 0 / noBuilder 66（与探针逐字同数）
   a(au.byReason.defaultOff === 95, 'C3: 出厂关（有注入面）95 个（实 ' + au.byReason.defaultOff + '）');
   a(au.byReason.userOff === 0, 'C3b: 出厂态玩家关掉 0 个（干净盘上没有表态）');
-  a(au.byReason.noBuilder === 66, 'C3c: 没有注入面 66 个（实 ' + au.byReason.noBuilder + '，100 机制 vs 179 开关）');
+  a(au.byReason.noBuilder === 67, 'C3c: 没有注入面 67 个（实 ' + au.byReason.noBuilder + '，100 机制 vs 196 开关）');
   // C4 玩家手动关掉一个默认开的 ⇒ 归因变 user-off（不是 default-off）
   const onRow = au.runningRows.filter(function (r) { return r.hasBuild; })[0];
   a(!!onRow, 'C4: 找一个出厂开着的世界机制做样本（' + (onRow ? onRow.ns : '无') + '）');
@@ -370,7 +371,7 @@ function runD(a) {
   a(T2.view().granted.length === 0, 'D2: 出厂 granted 为空（出厂机制不进 granted，实 ' + T2.view().granted.length + '）');
   T2.applyTier('full');
   const g = T2.view().granted;
-  a(g.length === 95, 'D2b: full 后 granted 恰好是本次真开的 95 个（实 ' + g.length + '，不含出厂 5 个）');
+  a(g.length === 60, 'D2b: full 后 granted 恰好是本次真开的 60 个（实 ' + g.length + '，不含出厂 5 个，OPV7-8 下调后）');
   a(g.indexOf('livingWorld') < 0, 'D2c: 出厂就开着的 livingWorld 不在 granted 里 —— 它不该被档位收回');
   // D3 回滚栈只装启用面（不装世界键、不装引擎设置副本）
   const cfg = T2.getSettings();

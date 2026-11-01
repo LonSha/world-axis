@@ -136,13 +136,29 @@
     return out;
   }
   /**
-   * 完整档的目标集：**现场探测**「带 enabled + 有 buildBlock + 有写入口」的全部引擎。
-   * 不写死名单的理由：写死的那份名单在下一个引擎落地那天就开始撒谎，而撒谎的方向
-   * 恰好是玩家看不见的方向（新机制默认关、档位说「已完整」）。
+   * 35 个无驱动者、需要手动录入数据才会动的悬空引擎白名单（OPV7-8）。
+   * 详见 plans/V7_MASTER_PLAN.md §8.12 与 tools/v7probes/p_four_layer.js 实测。
+   * full 档承诺的是「开得起来的世界」，不是「看起来很多的世界」。
+   * 这 35 个机制从 full 档默认开启面中移除；玩家若需要可在面板手动录入并开启。
+   */
+  const L3_EXCLUDES = [
+    'contest', 'ruling', 'backstageTone', 'fondness', 'tolerance', 'events',
+    'genTiming', 'spotlight', 'motif', 'beatMask', 'lingqi', 'ladder',
+    'karma', 'marginal', 'userlock', 'powerAnchor', 'memoryTiers', 'temporalLock',
+    'beastBond', 'rivalry', 'enigma', 'tempo', 'quota', 'rhythmLoop',
+    'masks', 'parallelEvents', 'warrant', 'appearance', 'sceneSlice', 'genGate',
+    'reasoning', 'storyTone', 'temperament', 'beatReport', 'eraCycle'
+  ];
+
+  /**
+   * 完整档的目标集：现场探测「带 enabled + 有 buildBlock + 有写入口」的全部引擎，
+   * 并下调排除 35 个没有自动驱动者、需要手动录入数据才会动的悬空引擎（OPV7-8）。
    * 未开与已开都返回（已开的由调用方的 toOn 过滤），故目标集不随当前开关漂移。
    */
   function probeFull() {
-    const rows = allSwitches().filter(function (r) { return r.hasBuild && r.hasSet; });
+    const rows = allSwitches().filter(function (r) {
+      return r.hasBuild && r.hasSet && L3_EXCLUDES.indexOf(r.key) < 0;
+    });
     stat.probes++;
     return rows.map(function (r) { return r.key; });
   }
@@ -354,7 +370,7 @@
     // 只读快照**不记为探测**：`probeFull` 的 stat.probes 记的是「真跑了一次全量探测」
     //   （applyTier 的路径）。展示面复用同一份快照不该把这个读数抬起来。
     const __tierKeysSnap = function (n) {
-      if (n === 'full') return rows.filter(function (r) { return r.hasBuild && r.hasSet; }).map(function (r) { return r.key; });
+      if (n === 'full') return rows.filter(function (r) { return r.hasBuild && r.hasSet && L3_EXCLUDES.indexOf(r.key) < 0; }).map(function (r) { return r.key; });
       return (TIERS[n] || []).slice();
     };
     let gap = 0;
@@ -367,8 +383,18 @@
       tier: tier,
       tiers: TIER_NAMES.map(function (n) {
         const ks = __tierKeysSnap(n);
-        return { name: n, size: ks.length, on: ks.filter(function (k) { const sh = snapOf(k); return !!(sh && sh.on); }).length };
+        const item = {
+          name: n,
+          size: ks.length,
+          on: ks.filter(function (k) { const sh = snapOf(k); return !!(sh && sh.on); }).length
+        };
+        if (n === 'full') {
+          item.note = '开得起来的世界（已下调排除 35 个需手动录入数据的悬空机制）';
+        }
+        return item;
       }),
+      manualOnly: L3_EXCLUDES.slice(),
+      manualNote: '这些机制需要你手动录入数据才会动（35 个，已从 full 档出厂开启面下调移除）',
       next: next, gap: gap,
       switches: rows.length,
       mechanisms: mech.length,
@@ -394,6 +420,7 @@
   WA.capabilityTier = {
     TIERS: TIERS,
     TIER_NAMES: TIER_NAMES,
+    L3_EXCLUDES: L3_EXCLUDES,
     MAX_HISTORY: MAX_HISTORY,
     getSettings: settings,
     // v2.257.0 收尾：`setSettings` **刻意不导出**。

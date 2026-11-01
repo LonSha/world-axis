@@ -53,6 +53,15 @@ function loadAll(ov) {
   try { WA.store.init(); } catch (e) {}
   return WA;
 }
+// v2.283.0（OPV7-8）后：full 档出厂面下调 35 个 manualOnly 机制 ⇒ B6 断言前提
+//   「full 全开 ⇒ off=0」不再成立（那是比例判据的预期行为，不是缺陷）。
+//   修法与 p_drive_gate 同源：setup 里走 capabilityTier.flipSwitch 共用写入口
+//   把下调面显式 flip 回开，不造第二套写法。
+function openExcluded(W) {
+  (W.capabilityTier.L3_EXCLUDES || []).forEach(function (k) {
+    try { W.capabilityTier.flipSwitch(k, true); } catch (e) {}
+  });
+}
 function setRound(WA, n) {
   // 轮次的真源是 store.lastInjection.round（缺失时回落 evolution.roundOf）。
   //   直接写 lastInjection 是**模拟一次注入已经发生过**，不是伪造别的什么。
@@ -85,6 +94,7 @@ A(DIAG_SRC.indexOf('degradedContent: r.degradedContent') >= 0,
 head('B 现场：full 档有产出 ⇒ pass，计数与 yieldAttrib 同源');
 let WA = loadAll();
 try { WA.capabilityTier.applyTier('full'); } catch (e) {}
+openExcluded(WA);   // OPV7-8 后补 flip：B6 的「full 全开 ⇒ off=0」前提需显式补齐下调面
 const rB = WA.healthPreflight.threeGates({ sample: 3 });
 const gB = yieldOf(rB);
 A(!!gB, 'B1 读数里有 yield 门槛');

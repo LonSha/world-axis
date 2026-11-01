@@ -65,6 +65,17 @@ function driveOf(r) {
   const g = (r.gates || []).filter(function (x) { return x.id === 'drive'; });
   return g.length === 1 ? g[0] : null;
 }
+// v2.283.0（OPV7-8）后：full 档出厂面下调了 35 个 manualOnly 机制 ⇒ faceAudit 的
+//   mod-off 占比过半、visibility 门槛如实落 degraded。这不是缺陷（v2.91.0 比例判据的
+//   预期行为，「部分成功就是部分成功」），但本探针 B/C/N 段的断言前提是
+//   「除 drive 外其余门槛全 pass」。故把 35 个被下调机制**显式** flip 回开——
+//   走 capabilityTier.flipSwitch 共用写入口（enabled + setSettings + 回读复核），
+//   不造第二套写法；rOff 段（lite 档）不 flip，那边测的是关着的 L3 报 pass。
+function openExcluded(W) {
+  (W.capabilityTier.L3_EXCLUDES || []).forEach(function (k) {
+    try { W.capabilityTier.flipSwitch(k, true); } catch (e) {}
+  });
+}
 
 // ═══ A 结构面 ═══════════════════════════════════════════════════════════
 head('A 结构面：门槛只接在 threeGates 一处，不造第二套');
@@ -90,6 +101,7 @@ A(PANEL_SRC.indexOf('WA.healthPreflight.threeGatesLine') >= 0, 'A5b 面板真读
 head('B 判不了时如实报 unknown，且不拖累 ok');
 let WA = loadAll();
 try { WA.capabilityTier.applyTier('full'); } catch (e) {}
+openExcluded(WA);   // OPV7-8 后必须补：把下调的 35 个 flip 回开，否则 visibility degraded 牵连 B6/B6b/B7b
 const rB = WA.healthPreflight.threeGates({ sample: 3 });
 const gB = driveOf(rB);
 A(!!gB, 'B1 现场读数里有 drive 门槛');
@@ -131,6 +143,7 @@ function withFakeLedger(listedOn, opts) {
   };
   const W = loadAll();
   if (o.tier) { try { W.capabilityTier.applyTier(o.tier); } catch (e) {} }
+  if (o.tier === 'full') openExcluded(W);   // OPV7-8 后 full 档需补 flip，保证 visibility 不降级
   // intake 出厂 enabled:false 且不在任何档位里 —— 本段要测的是「开着的 L3」，
   //   所以必须**显式**把它打开（而不是指望档位），否则测到的是「关着的 L3 报 pass」那一支。
   if (o.turnOn) { try { W[o.turnOn].setSettings({ enabled: true }); } catch (e) {} }
@@ -188,6 +201,7 @@ A(gT.why.indexOf('截断') >= 0, 'D1c why 说明是截断而不是「都有人�
 head('E 缺件进 absent 桶（ok 为假），不是 unknown');
 WA = loadAll();
 try { WA.capabilityTier.applyTier('full'); } catch (e) {}
+openExcluded(WA);   // OPV7-8 后补 flip：visibility 须 pass 才能单看 absent 分支
 WA.driverLedger = undefined;
 const rN = WA.healthPreflight.threeGates({ sample: 3 });
 const gN = driveOf(rN);
@@ -254,6 +268,7 @@ A(rN1.unverifiable === 0, 'N1c: 顶层 unverifiable 归零（实 ' + rN1.unverif
   const W2 = loadAll({ 'engines/health-preflight.js': broken });
   const fake = fakeLedger(['intake']);            // 独立持有，下面才挂（见上方夹具唷）
   try { W2.capabilityTier.applyTier('full'); } catch (e) {}
+  openExcluded(W2);   // OPV7-8 后补 flip：visibility 须 pass，N2b 的 pass 才归因于破坏
   try { W2.intake.setSettings({ enabled: true }); } catch (e) {}
   W2.driverLedger = fake;
   const r = W2.healthPreflight.threeGates({ sample: 3 });
@@ -270,6 +285,7 @@ A(rN1.unverifiable === 0, 'N1c: 顶层 unverifiable 归零（实 ' + rN1.unverif
   const W2 = loadAll({ 'engines/health-preflight.js': broken });
   const fake = fakeLedger(['intake']);
   try { W2.capabilityTier.applyTier('full'); } catch (e) {}
+  openExcluded(W2);   // OPV7-8 后补 flip：visibility 须 pass，N3b 才单验 dormant 分支
   try { W2.intake.setSettings({ enabled: true }); } catch (e) {}
   W2.driverLedger = fake;
   const r = W2.healthPreflight.threeGates({ sample: 3 });
@@ -280,6 +296,7 @@ A(brokenCount === 3, 'N4 三处破坏全部真的改到了源码（实 ' + broke
 // N5 两向自证：恢复原版后判据重新为真
 WA = loadAll();
 try { WA.capabilityTier.applyTier('full'); } catch (e) {}
+openExcluded(WA);   // OPV7-8 后补 flip：同 B 段，visibility 须 pass 才回 unknown 前提
 const gBack = driveOf(WA.healthPreflight.threeGates({ sample: 2 }));
 A(gBack.state === 'unknown', 'N5 原版恢复后回到 unknown（实 ' + gBack.state + '）—— 两向自证成立');
 A(cnt(HP_SRC, "if (!canConclude) {\n          driveState = 'unknown';") === 1

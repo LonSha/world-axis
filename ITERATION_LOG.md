@@ -1,3 +1,52 @@
+### R227 · 2026-11-01 · v2.284.0：OPV7-8 悬空引擎档位下调 + OPV7-9 产出回归基线（V7 优化线收口，九项全交付）
+
+**批次**：V7 优化线末两项（OPV7-8 = v2.283.0 / OPV7-9 = v2.284.0，合并一轮交付）；
+前序对话已交付 OPV7-1～7（v2.275.0 ～ v2.281.0）与 v2.282.0 收口轮。
+
+#### 这一版治的玩家问题（一句话）
+full 档点开后 100 个机制「看起来都开着」，但其中 35 个永远不会有内容——
+因为它们没有自动驱动者、需要手动录入数据才会动；开了等于给玩家看一批假灯。
+
+#### 这一版治的制卡者问题（一句话）
+重构极易让关键业务引擎静默失效或产出塌陷，而产出面此前没有防衰退底线门禁——
+「非空产出数」只升不降这件事没有一盏灯看着。
+
+#### 交付
+
+- **OPV7-8（v2.283.0）悬空引擎出厂档位下调**：
+  `engines/capability-tier.js` 新增 `L3_EXCLUDES`（35 名单，真源是 `p_four_layer.js` 实测四层可达性），
+  `probeFull()` 与 `view()` 的 full 档快照同时排除该名单；`view().manualOnly` / `manualNote`
+  标注「这些机制需要你手动录入数据才会动」；`ui/panel.js` 三档说明同步，full 按钮改「full｜开得起来」。
+  改动实绩：full 档开启面 100 → 65，休眠 0 → 35；切档仍逐引擎真实 `setSettings` 且复核 `notEffective=[]`（纪律 3 不变）。
+  验收 `p_cap_tier_opv78.js` 40/40、专锁 `v7-cap-tier-2283.js` 65/65（A 结构与常量 / B 档位动作 65/35 /
+  C view 暴露与 manualOnly / D 回滚 5/95 + N 四处真源码破坏）。
+- **OPV7-8 连带清偿（两把 V7 探针的断言前提被本版改动破坏）**：
+  full 档下调 35 个机制后，`p_drive_gate` / `p_yield_face` 的 B/C/E/N 段前提「full 档下除目标门槛外其余全 pass」失效——
+  visibility 门槛按 v2.91.0 比例判据（on 不足半数 ⇒ degraded，「部分成功就是部分成功」）如实降级，
+  这是判据的预期行为而非缺陷。修法：两探针 setup 补 `openExcluded(W)`
+  （遍历 `W.capabilityTier.L3_EXCLUDES` 逐个 `flipSwitch(k, true)`，走共用写入口 turnOn 三判据：
+  enabled + setSettings + 当场回读复核），修复后 `p_drive_gate` 53/0、`p_yield_face` 50/0。
+  修复只改探针（+11 / +10 行），未动产品源码（health-preflight / inject / capability-tier 零改动）。
+- **OPV7-9（v2.284.0）产出回归基线**：新专锁 `tests/v7-yield-baseline-2284.js`
+  （A 主基线非退单调性：空世界 ≥ 4 / 真实开局 ≥ 14 / 推演分发 ≥ 14，读探针实测值、允许上漂、禁止下漂；
+  B 核心引擎契约：life/org/world/difficulty/bonds/perspective 六台核心业务引擎 `buildBlock()` 非空断言；
+  N 三处真源码破坏）。验收探针 `p_yield_baseline.js` 50/50。
+- **跟版事务**：版本面 `index.js` / `manifest.json` / 五本账 → 2.284.0（跳号 283 无独立钉版段，
+  run.js 的 282 钉版段降为下界段、新增 284 钉版段作为「就是它」语义的唯一供养）；
+  `tools/bump284.py` + `tools/bump284_whitelist.py`（白名单一次补 283|284 两档，14 文件 31 站点）；
+  `sync-hardcoded --write`（members 4083→4084：`L3_EXCLUDES` 导出 +1；dataOnly 548→549）；
+  `gen-plan-status --write` 四份计划读数块同步；
+  `v7-yield-baseline-2284.js` 头注释版本号修正（2.283.0 → 2.284.0）；
+  `plans/V7_MASTER_PLAN.md` OPV7-8/9 状态 → ✅ 已交付，头部入口更新（优化线九项全交付，下一步 EXV7-1）。
+
+#### 验证（纪律 12 合规路径，全程未执行 `tests/run.js`）
+
+- 三道版本门禁：`version-surface-gate` pass(14) · `readme-slim` pass(71) · `plan-tree-gate` pass(69)。
+- `sync-hardcoded`：无需回填，全部读数族与现场实测同源。
+- `tools/v7probes/p_closeout_2275.js`：19 条全 PASS（收口器逐条清单见输出；六把 V7 探针全绿）。
+
+---
+
 ### R226 · 2026-10-31 · v2.282.0 收口轮：15 条红点逐条归因，撤掉一只任何宿主都进不去的扫描面
 
 **批次**：V7 收口轮（承接 R225 之后的 V7 优化线七项；本版不加新机制，只清偿红点与治根因）。

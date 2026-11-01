@@ -3760,13 +3760,13 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         //   那条「每段都有模板收尾」的纪律在本段等于空转。
         //   两条读数已上移到模板外做 lazy 辅助（stdSizeL / tierLiveHTMLL，见上文），
         //   故这里只剩模板本身。惰性不变：收起态整段不求值，两个辅助也就不会被调用。      <div class="wa-dim">三档的定义是<b>「这一档要求哪些引擎开着」</b>，不是「这一档有多强」：
-        <b>lite</b> 一个都不额外开（只有出厂默认那几台在跑）；<b>standard</b> 按<b>静态白名单</b>逐名点开（${stdSizeL() === null ? '读不到' : stdSizeL()} 个世界机制）；<b>full</b> 在<b>运行时探测</b>——凡是有 buildBlock 又能被统一写入口打开的，一律点开（不写死名单，所以引擎增删不会让名单过期）。
+        <b>lite</b> 一个都不额外开（只有出厂默认那几台在跑）；<b>standard</b> 按<b>静态白名单</b>逐名点开（${stdSizeL() === null ? '读不到' : stdSizeL()} 个世界机制）；<b>full</b> 承诺<b>「开得起来的世界」</b>：点开所有有驱动 WorldAxis 机制（运行时探测，已排除 35 个需手动录入数据的悬空机制）。
         <br>边界：档位<b>只收回自己开过的</b>（granted）。玩家自己手动开的，切档不会被关掉；出厂就开着的，永远不在 granted 里 —— 因此切回 lite 不会把出厂能力误关（这是本模块最容易写错的一处，已在源码里留注）。
         <br>此刻：<span id="wa-ct-live"><b>${tierLiveHTMLL()}</b></span></div>
       <div class="wa-row">
         <button class="wa-btn" id="wa-ct-lite" title="一个都不额外开：只留出厂默认在跑的那几台。档位只收回自己开过的 —— 玩家手动开的不会被关掉">lite｜只留出厂</button>
         <button class="wa-btn" id="wa-ct-standard" title="静态白名单逐名点开：每一个都会真写一次并回读确认，开不动的不静默算成功，逐条列进 notEffective">standard｜常用一套</button>
-        <button class="wa-btn" id="wa-ct-full" title="运行时探测：凡有 buildBlock 又能被统一写入口打开的，一律点开（不写死名单）。探测 100 台需要点时间">full｜全都打开</button>
+        <button class="wa-btn" id="wa-ct-full" title="承诺开得起来的世界：点开所有有驱动的世界机制；下调移除需手动录入数据的悬空机制">full｜开得起来</button>
         <button class="wa-btn" id="wa-ct-rollback" title="退回上一档：栈里只装「启用面」的变更（不含玩家手动操作），最多 12 步，与规则包同规格">退回上一档</button>
       </div>
       <div class="wa-row">
