@@ -173,7 +173,9 @@
     return safe(function () {
       if (!WA.intel || typeof WA.intel.stat !== 'function') return { error: 'intel 模块不可用' };
       const st = WA.intel.stat(); const cfg = WA.intel.getSettings ? WA.intel.getSettings() : {};
-      return { enabled: !!cfg.enabled, links: st.links || 0, intel: st.intel || 0, blocked: st.blocked || 0, lastReason: st.lastReason || '', levels: WA.intel.LEVELS || [] };
+      const nw = typeof WA.intel.networkStat === 'function' ? WA.intel.networkStat() : null;
+      return { enabled: !!cfg.enabled, links: st.links || 0, intel: st.intel || 0, blocked: st.blocked || 0, lastReason: st.lastReason || '', levels: WA.intel.LEVELS || [],
+        network: nw ? { people: nw.people, held: nw.held, inTransit: nw.inTransit, currentRound: nw.currentRound, cap: nw.cap } : { error: 'networkStat 不可用' } };
     });
   }
 

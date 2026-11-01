@@ -78,6 +78,30 @@
     const q = state().intelQueue;
     return Array.isArray(q) ? q : [];
   }
+  // EXV7-3：轮次只从既有 evolution.round 读。没有明确 ttlRounds 时不猜寿命。
+  function roundNow() {
+    const r = state().evolution && state().evolution.round;
+    return isFinite(Number(r)) ? Number(r) : 0;
+  }
+  function ttlOf(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return isFinite(n) && n >= 0 ? Math.min(64, Math.floor(n)) : null;
+  }
+  function horizonOf(row, nowRound) {
+    const atRound = isFinite(Number(row && row.atRound)) ? Number(row.atRound) : null;
+    const ttl = ttlOf(row && row.ttlRounds);
+    const exp = isFinite(Number(row && row.expiresAtRound)) ? Number(row.expiresAtRound)
+      : (atRound !== null && ttl !== null ? atRound + ttl : null);
+    return { atRound: atRound, ttlRounds: ttl, expiresAtRound: exp,
+      remainingRounds: exp === null ? null : Math.max(0, Math.floor(exp - nowRound)),
+      horizon: exp === null ? 'unbounded' : (exp <= nowRound ? 'expired' : 'expiring') };
+  }
+  function intelMeta(item, atRound) {
+    const ttl = ttlOf(item && item.ttlRounds);
+    return { atRound: atRound, ttlRounds: ttl,
+      expiresAtRound: ttl === null ? null : atRound + ttl };
+  }
   /** \u8def\u9014\u8017\u65f6\u53ea\u95ee world.reach\u3002world \u672a\u88c5\u8f7d\u6216\u8def\u4e0d\u901a\u90fd\u4e0d\u5f97\u731c\u4e00\u4e2a\u5206\u949f\u6570\u3002 */
   function travelOf(from, to) {
     if (!WA.world || typeof WA.world.reach !== 'function') return { ok: false, reason: 'world-missing' };
@@ -106,7 +130,8 @@
           p.knowledge.intel = Array.isArray(p.knowledge.intel) ? p.knowledge.intel : [];
           p.knowledge.intel = p.knowledge.intel.concat([{
             id: x.id, claim: x.claim, source: x.source, level: x.level, confidence: x.confidence,
-            about: x.about, status: x.status, at: x.due, from: x.from, to: x.to
+            about: x.about, status: x.status, at: x.due, from: x.from, to: x.to,
+            atRound: x.atRound, ttlRounds: x.ttlRounds, expiresAtRound: x.expiresAtRound
           }]).slice(-12);
           n++;
         } else keep.push(x);
@@ -132,10 +157,13 @@
         let queued = null;
         WA.store.transact(function (draft) {
           draft.intelQueue = Array.isArray(draft.intelQueue) ? draft.intelQueue : [];
+          const ar = roundNow();
+          const meta = intelMeta(item, ar);
           const row = { id: 'intel_' + clockNow('intel') + '_' + draft.intelQueue.length,
             person: who, claim: claim, source: source, level: level, confidence: CONF[level],
             about: about, status: CONF[level] >= 75 ? 'believed' : 'suspected',
-            from: from, to: to, due: due, at: clockNow('intel') };
+            from: from, to: to, due: due, at: clockNow('intel'), atRound: meta.atRound,
+            ttlRounds: meta.ttlRounds, expiresAtRound: meta.expiresAtRound };
           draft.intelQueue.push(row);
           WA.evict.array(draft.intelQueue, 'intel.queue');
           queued = { ok: true, id: row.id, status: 'in-transit', due: due, minutes: tv.minutes };
@@ -154,7 +182,9 @@
       p.lastSeenAt = clockNow('intel'); p.updatedAt = p.lastSeenAt;
       p.knowledge = p.knowledge && typeof p.knowledge === 'object' ? p.knowledge : {};
       p.knowledge.intel = Array.isArray(p.knowledge.intel) ? p.knowledge.intel : [];
-      const row = { id: 'intel_' + clockNow('intel') + '_' + p.knowledge.intel.length, claim: claim, source: source, level: level, confidence: CONF[level], about: about, status: CONF[level] >= 75 ? 'believed' : 'suspected', at: clockNow('intel') };
+      const ar = roundNow();
+      const meta = intelMeta(item, ar);
+      const row = { id: 'intel_' + clockNow('intel') + '_' + p.knowledge.intel.length, claim: claim, source: source, level: level, confidence: CONF[level], about: about, status: CONF[level] >= 75 ? 'believed' : 'suspected', at: clockNow('intel'), atRound: meta.atRound, ttlRounds: meta.ttlRounds, expiresAtRound: meta.expiresAtRound };
       p.knowledge.intel = p.knowledge.intel.concat([row]).slice(-12);
       out = { ok: true, id: row.id, status: row.status };
     }, 'intel:add');
@@ -361,13 +391,57 @@
       seen: seen, withheld: 0, guessed: guessed, knows: known, mayAssert: known,
       reason: live.length ? (known ? 'matches' : 'differs') : 'no-knowledge' };
   }
+  /** EXV7-3：只读情报网，复用 intel 行与 intelQueue；claims 存在时才转交 noesis。 */
+  function network(opts) {
+    const cfg = settings();
+    if (!cfg.enabled) return { ok: false, reason: 'disabled', rows: [], currentRound: roundNow() };
+    const st = state(), nowRound = roundNow(), rows = [], people = {};
+    const ps = st.people && typeof st.people === 'object' ? st.people : {};
+    Object.keys(ps).forEach(function (key) {
+      const p = ps[key], name = p && p.name ? String(p.name) : key.replace(/^p_/, '');
+      const src = p && p.knowledge && Array.isArray(p.knowledge.intel) ? p.knowledge.intel : [];
+      src.filter(function (x) { return x && x.status !== 'retracted' && x.status !== 'superseded'; }).forEach(function (x) {
+        people[name] = (people[name] || 0) + 1;
+        rows.push(Object.assign({ person: name, state: 'held' }, x, horizonOf(x, nowRound)));
+      });
+    });
+    const iq = queue();
+    iq.forEach(function (x) {
+      if (!x) return;
+      rows.push(Object.assign({ person: x.person || '', state: 'in-transit' }, x, horizonOf(x, nowRound)));
+    });
+    rows.sort(function (a, b) { return (Number(b.at || b.due) || 0) - (Number(a.at || a.due) || 0); });
+    const cap = 48, truncated = rows.length > cap, shown = rows.slice(0, cap), sources = {};
+    shown.forEach(function (x) { if (x.source) sources[x.source] = (sources[x.source] || 0) + 1; });
+    let boundary = null;
+    if (opts && Array.isArray(opts.claims)) {
+      boundary = WA.noesis && typeof WA.noesis.leakScan === 'function'
+        ? WA.noesis.leakScan(opts.claims)
+        : { ok: false, reason: 'noesis-missing', leaks: [], count: 0, scanned: opts.claims.length };
+    }
+    return { ok: true, rows: shown, people: Object.keys(people).length,
+      held: shown.filter(function (x) { return x.state === 'held'; }).length,
+      inTransit: iq.length, currentRound: nowRound, sources: sources,
+      truncated: truncated, cap: cap, boundary: boundary };
+  }
+  function networkStat() {
+    const cfg = settings(), st = state(), ps = st.people && typeof st.people === 'object' ? st.people : {};
+    let held = 0, people = 0;
+    Object.keys(ps).forEach(function (k) {
+      const p = ps[k], rows = p && p.knowledge && Array.isArray(p.knowledge.intel) ? p.knowledge.intel : [];
+      const n = rows.filter(function (x) { return x && x.status !== 'retracted' && x.status !== 'superseded'; }).length;
+      if (n) { people++; held += n; }
+    });
+    return { enabled: !!cfg.enabled, people: people, held: held, inTransit: queue().length,
+      currentRound: roundNow(), cap: 48 };
+  }
   WA.intel = {
     LEVELS: LEVELS, CONFIDENCE: CONF,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     addLink: addLink, addIntel: addIntel, releaseDue: releaseDue, visibleTo: visibleTo, explain: explain, knownCause: knownCause, buildBlock: buildBlock,
     // v2.117.0（B3）：认知层——真相只读、相信不改事实、弱证据不抬升、辟谣只对收到者生效。
     truthOf: truthOf, rowsOf: rowsOf, entitledTo: entitledTo, believe: believe,
-    verify: verify, correct: correct, project: project,
+    verify: verify, correct: correct, project: project, network: network, networkStat: networkStat,
     stat: function () { return Object.assign({}, stat); }
   };
 })();

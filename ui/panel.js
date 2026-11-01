@@ -1230,6 +1230,23 @@
     //     ② **拟稿不冒充事实** —— step.status 非 done 的行标「打算」，与 plan.review 的
     //        asFact:false 同口径（看板说「他打算做」，不说「他做了」）；
     //     ③ **chain 报不出卡点的人不进看板**（引擎侧已经这样做；面板不补「（无）」行）。
+    const intelNetworkBlock = (function () {
+      try {
+        if (!WA.intel || typeof WA.intel.network !== 'function') return '<div class="wa-dim" id="wa-intel-network-block">情报网读数不可用（engines/intel.js 缺席）</div>';
+        const cfg = typeof WA.intel.getSettings === 'function' ? WA.intel.getSettings() : null;
+        if (!cfg || cfg.enabled !== true) return '';
+        const v = WA.intel.network();
+        if (!v || v.ok !== true) return '<div class="wa-dim" id="wa-intel-network-block">情报网读数不可用（' + esc(String((v && v.reason) || 'unknown')) + '）</div>';
+        if (!v.rows.length) return '<div class="wa-dim" id="wa-intel-network-block">情报网：目前没有人物持有情报' + (v.inTransit ? '，但有 ' + v.inTransit + ' 条在途' : '') + '</div>';
+        const line = function (r) {
+          const horizon = r.remainingRounds === null ? '未设期限' : ('还能撑 ' + r.remainingRounds + ' 轮');
+          return '<div class="wa-intel-net-line"><b>' + esc(r.person) + '</b>：' + esc(r.claim || '') + ' · 来源 ' + esc(r.source || '未记录') + ' · 置信 ' + esc(String(r.confidence == null ? '?' : r.confidence)) + ' · ' + (r.state === 'in-transit' ? '在途' : '已持有') + ' · ' + horizon + '</div>';
+        };
+        return '<div class="wa-intel-net wa-intel-net-live" id="wa-intel-network-block"><div class="wa-intel-net-head">情报网（' + esc(String(v.people)) + ' 人 · ' + esc(String(v.rows.length)) + ' 条' + (v.inTransit ? ' · 在途 ' + esc(String(v.inTransit)) : '') + '）</div>' + v.rows.map(line).join('') + (v.truncated ? '<div class="wa-dim">只展示最近 ' + esc(String(v.cap)) + ' 条</div>' : '') + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-intel-network-block">情报网读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
     const intentBlock = (function () {
       try {
         if (!WA.intentBoard || typeof WA.intentBoard.view !== 'function') {
@@ -1294,6 +1311,7 @@
       ${diaryBlock}
       ${briefBlock}
       ${intentBlock}
+      ${intelNetworkBlock}
       ${routeBlock}
       ${tempBlock}
       ${calBlock}
@@ -1533,7 +1551,7 @@ const peopleIds = Object.keys(s.people);
       <label class="wa-row"><input id="wa-intel-enabled" type="checkbox" ${WA.intel && WA.intel.getSettings().enabled ? 'checked' : ''}/> 启用因果与情报</label>
       <div class="wa-row"><input id="wa-intel-cause" class="wa-input" placeholder="已有前因"/><input id="wa-intel-effect" class="wa-input" placeholder="结果"/></div>
       <div class="wa-row"><input id="wa-intel-person" class="wa-input" placeholder="知情人物"/><input id="wa-intel-claim" class="wa-input" placeholder="情报"/><input id="wa-intel-source" class="wa-input" placeholder="来源"/></div>
-      <div class="wa-row"><button class="wa-btn" id="wa-intel-link">加因果</button><button class="wa-btn" id="wa-intel-add">加情报</button><button class="wa-btn" id="wa-intel-project" title="认知投影（只读）：这个人此刻对这一条「知道多少」。走 intel.project —— 真相只读，谁有资格听由取证档决定；无资格时**只报条数、不报内容**（「他手上有东西但看不到真相」与「他什么都没听说」是两种处境：前者会被一轮追问逼出破绽，后者不会）。查不出来与「知道得对」不许同形">查认知投影</button><button class="wa-btn" id="wa-intel-correct" title="更正：辟谣只对收到过该说法的人生效。此人从没听说过这条就报 nothing-to-correct —— 不做「更正」旁路把一条新说法塞进空脑子（那与 addIntel 是不同的口子）。旧说法标 retracted 并留痕，不删行">更正认知</button></div>
+      <div class="wa-row"><button class="wa-btn" id="wa-intel-link">加因果</button><button class="wa-btn" id="wa-intel-add">加情报</button><button class="wa-btn" id="wa-intel-network" title="只读情报网；如同时填了防全知人物/事实，则转交 noesis.leakScan">情报网</button><button class="wa-btn" id="wa-intel-project" title="认知投影（只读）：这个人此刻对这一条「知道多少」。走 intel.project —— 真相只读，谁有资格听由取证档决定；无资格时**只报条数、不报内容**（「他手上有东西但看不到真相」与「他什么都没听说」是两种处境：前者会被一轮追问逼出破绽，后者不会）。查不出来与「知道得对」不许同形">查认知投影</button><button class="wa-btn" id="wa-intel-correct" title="更正：辟谣只对收到过该说法的人生效。此人从没听说过这条就报 nothing-to-correct —— 不做「更正」旁路把一条新说法塞进空脑子（那与 addIntel 是不同的口子）。旧说法标 retracted 并留痕，不删行">更正认知</button></div>
       <div id="wa-intel-out" class="wa-out"></div>
       <div class="wa-sec">防全知闸门（这个人此刻该不该知道这件事）</div>
       <label class="wa-row"><input id="wa-noe-enabled" type="checkbox" ${WA.noesis && WA.noesis.getSettings().enabled ? 'checked' : ''}/> 启用防全知闸门</label>
@@ -6780,6 +6798,16 @@ on('#wa-desk-show', showDesk);
     // v2.142.0（D2 收口）：`intel.project` / `intel.correct` 的真读者**就在这** ——
     //   用户输入的人物与事由是真输入，读数落在既有 `wa-intel-out` 节点上（与 X4 的
     //   auditRecord ← 面板「看卷宗」同款口径：「能力申报」不算读者）。
+    on('#wa-intel-network', () => {
+      if (!WA.intel || typeof WA.intel.network !== 'function') return intelOut({ ok: false, reason: 'module-missing' }, true);
+      const cp = (($( '#wa-noe-person') || {}).value || '').trim();
+      const cf = (($( '#wa-noe-fact') || {}).value || '').trim();
+      const r = WA.intel.network(cp && cf ? { claims: [{ person: cp, factId: cf, uttered: true }] } : null);
+      if (!r || r.ok !== true) return intelOut({ ok: false, reason: (r && r.reason) || 'unknown' }, true);
+      const first = (r.rows || []).slice(0, 6).map(function (x) { return x.person + '·' + (x.claim || '') + '←' + (x.source || '未记录') + '/' + (x.remainingRounds === null ? '未设期限' : ('余' + x.remainingRounds + '轮')); }).join('；');
+      const leak = r.boundary && r.boundary.count ? ' · 越界留痕 ' + r.boundary.count + '（走 noesis.leakScan）' : '';
+      intelOut({ ok: true, id: '情报网 ' + r.rows.length + ' 条' + leak + (first ? '：' + first : '：暂无情报') }, true);
+    });
     on('#wa-intel-project', () => {
       if (!WA.intel || !WA.intel.project) return intelOut({ ok: false, reason: 'module-missing' }, true);
       const person = intelVal('#wa-intel-person'), about = intelVal('#wa-intel-effect');

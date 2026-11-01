@@ -25035,6 +25035,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./v7-intent-board-2286.js', 'runAll');
   }
+  // ── v2.287.0（V7/EXV7-3）：情报网专锁 ──
+  section('v2.287.0 (V7/EXV7-3): 情报网专锁（来源 / 在途 / 期限 / noesis 接线）');
+  {
+    await runLock('./v7-intel-network-2287.js', 'runAll');
+    await runLock('./v7-intel-network-2287.js', 'runNegative');
+  }
   // ── v2.277.0（V7 OPV7-1）：入口版本**不早于**（历史段，防回退）──────────────
   //   ⚠ 形态必须是「不早于」而不是「等于」：上一段（v2.276.0）踩过前缀锁，本段若写成
   //     相等，下一个版本又要回来改一次 —— 历史段就该永不过期。
@@ -25098,18 +25104,15 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(verAtLeast(__verPin282, 282),
       '入口 VERSION 不早于 2.282.0（实 ' + __verPin282 + '）—— 版本面不许往回退');
   }
-  // ── v2.286.0（V7 EXV7-1/2）：入口版本**严格钉当前版**（runPins 的唯一供养）────
-  //   本段是唯一一处写「就是当前这个版本号」的地方：升版时只改这里，
-  //   历史段一律只守下界 —— 两种语义分开，才不会互相串形态（此前已反复付价）。
-  //   v2.285.0 / v2.286.0 依次交付 EXV7-1 世界简报与 EXV7-2 人物意图看板，
-  //   当前版本钉在 286，历史下界段继续负责防回退语义。
-  section('v2.286.0: 入口版本钉版（当前版本在消息面上可见）');
+  // ── v2.287.0（V7 EXV7-3）：入口版本**严格钉当前版**（runPins 的唯一供养）────
+  //   EXV7-3 情报网：intel 只读聚合、明确期限、在途信息流与 noesis 泄露扫描接线。
+  section('v2.287.0: 入口版本钉版（当前版本在消息面上可见）');
   {
-    const __verPin286 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
+    const __verPin287 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
       .match(/const VERSION = '([\d.]+)'/) || [])[1];
-    const __wantPin286 = '2.286.0';
-    assert(__verPin286 === __wantPin286,
-      '入口 VERSION === ' + __wantPin286 + '（实 ' + __verPin286 + '）—— 严格相等，不是前缀；'
+    const __wantPin287 = '2.287.0';
+    assert(__verPin287 === __wantPin287,
+      '入口 VERSION === ' + __wantPin287 + '（实 ' + __verPin287 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');
   }
   // ── 汇总 ──
