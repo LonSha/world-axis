@@ -4018,6 +4018,23 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-auto-out" class="wa-out"></div>
 
+      <div class="wa-sec">一键播种</div>
+      <div class="wa-dim">（EXV7-9：给<b>空世界</b>种一批人 —— 选地区 + 人物数 + 关系密度 + 势力数，
+        按各引擎<b>真写口</b>批量种出人物、地点、道路、势力、名册、关系与目标。
+        这是 V7 九项里<b>唯一带写面</b>的一项，因此两件事写死：
+        ① <b>先看再播</b>——「会播什么」是纯读的计划，一个写口都不碰；
+        ② <b>满则如实拒收</b>——五个容器（人物 48 / 地点 24 / 道路 40 / 势力 16 / 关系 24）
+        的上限现场复读 <code>evict.siteDecls()</code>（不写死数字），
+        余量不够就<b>少播并报出差额</b>，绝不「按要的数目硬写」把你自己填的真人<b>静默挤掉</b>。
+        关系型一律<b>「平行共存」</b>、职阶一律<b>「novice」</b>：此刻没有任何事件依据能支撑
+        「这两人是替身」「此人是当家」，播一个更好看的型就是<b>把解读当事实写进世界</b>。
+        四路「播不动」<b>分开报</b>：关着 / 写面不全 / 容器满 / 参数被夹。</div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-pop-plan" title="先看会播什么（只读）：给出这一批要种的人名、地点、道路条数、势力名、关系对数与每人目标，并把「你要几个」与「真能写几个」并列 —— 差额如实标出。本按钮一个写口都不碰">先看会播什么</button>
+        <button class="wa-btn" id="wa-pop-seed" title="播种（会真写世界）：按计划批量调各引擎真写口。写完逐笔报账（写成几笔、拒了几笔、拒在哪），不合成一句「播种失败」。容器余量不够时少播并报差额，不会挤掉既有的人">播种</button>
+      </div>
+      <div id="wa-pop-out" class="wa-out"></div>
+
       <div class="wa-sec">世界纪事</div><div class="wa-dim">（E5：已经发生过什么、有哪些不给你看）</div>
       <div class="wa-dim">叙事化呈现但<b>每条都能下钻到来源</b>（编年史 / 时间轴 / 沉积 / 因果），事实不经改写。
         <b>空历史与读不到可分</b>：空 ⇒ 如实说「还没有记录」；读不到 ⇒ 报 no-store。
@@ -12121,7 +12138,11 @@ on('#wa-desk-show', showDesk);
         // v2.292.0（EXV7-8）：世界自传。它自报 reads / exports / chapters / lines /
         //   dropped / byRound / byVolume / roundMisses 八格 —— 「跑了多少次、退化过几次、
         //   有多少条因为缺轮号而算不出边界」全靠这些计数回答，所以它必须在清零表里。
-        ['世界自传', function () { return WA.worldAutobiography && WA.worldAutobiography.reset; }]
+        ['世界自传', function () { return WA.worldAutobiography && WA.worldAutobiography.reset; }],
+        // v2.293.0（EXV7-9）：一键播种。它记 runs / plans / planned / written / blocked /
+        //   reasons / byKind —— 「播了几次、成几笔、拒几笔」全是进程态读数，与存档无关，
+        //   故可清零；清零**不动世界**（它是读数仪，不是撤销器）。
+        ['一键播种', function () { return WA.populate && WA.populate.reset; }]
       ];
       const done = [], absent = [];
       gauges.forEach(function (g) {
@@ -13936,6 +13957,69 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
           + '<div class="wa-dim">' + esc(x.note) + ' —— 这里只给文本，不替你保存。</div>');
       });
 
+      // ── v2.293.0（EXV7-9）：一键播种（唯一带写面的入口）─────────────────
+      const popOut = function (html) { const o = $('#wa-pop-out'); if (o) o.innerHTML = html; };
+      // 四路「播不动」各自一句人话 —— 合成一句「播种失败」就再也分不清该去改什么
+      const popWhy = function (r) {
+        const why = (r && r.reason) || 'unknown';
+        const M = {
+          disabled: '一键播种关着（设置页可开）—— 这不是「世界已经满了」',
+          'writes-absent': '写口或容器上限登记不全 —— 这是装配问题，不是参数问题'
+            + (r && r.missing && r.missing.length ? '：缺 ' + esc(r.missing.join('、')) : ''),
+          'no-room': '容器没有余量了 —— 不是「参数错了」，是这个世界的容器装满了'
+        };
+        return M[why] || ('拒收：' + esc(why) + (r && r.note ? ' —— ' + esc(r.note) : ''));
+      };
+      on('#wa-pop-plan', () => {
+        if (!WA.populate || !WA.populate.plan) {
+          return popOut('<div class="wa-log wa-log-err">一键播种未加载（engines/populate.js 缺席）</div>');
+        }
+        let p = null;
+        try { p = WA.populate.plan({}); } catch (e) {
+          return popOut('<div class="wa-log wa-log-err">计划时抛错：' + esc(e && e.message ? e.message : String(e)) + '</div>');
+        }
+        if (!p || p.ok !== true) return popOut('<div class="wa-log wa-log-warn">' + popWhy(p) + '</div>');
+        const kOf = ['places', 'people', 'roads', 'factions', 'bonds', 'goals', 'grants'];
+        const kName = { places: '地点', people: '人物', roads: '道路', factions: '势力', bonds: '关系', goals: '目标', grants: '口粮' };
+        const diffs = kOf.filter(function (k) { return (p.will[k] || 0) < (p.want[k] || 0); })
+          .map(function (k) { return kName[k] + ' ' + p.will[k] + '/' + p.want[k]; });
+        popOut('<div class="wa-log wa-log-info">这一批会播：'
+          + kOf.map(function (k) { return kName[k] + ' ' + (p.will[k] || 0); }).join(' · ') + '</div>'
+          + (diffs.length
+            ? '<div class="wa-log wa-log-warn">被容器余量收窄：' + esc(diffs.join('、'))
+              + ' <span class="wa-dim">（格式「能写/你要」——收窄不是失败，是不挤掉既有的人）</span></div>'
+            : '')
+          + '<div class="wa-item">地区：<b>' + esc(p.region) + '</b> <span class="wa-dim">'
+          + (p.regionSource === 'created' ? '本批新建' : '已登记，直接挂靠') + '</span></div>'
+          + (p.names.length ? '<div class="wa-dim">人名：' + esc(p.names.join('、')) + '</div>' : '')
+          + (p.places.length ? '<div class="wa-dim">地点：' + esc(p.places.map(function (x) { return x.name + '（' + x.kind + '）'; }).join('、')) + '</div>' : '')
+          + (p.factions.length ? '<div class="wa-dim">势力：' + esc(p.factions.map(function (x) { return x.name + '（' + x.core_person + '）'; }).join('、')) + '</div>' : '')
+          + '<div class="wa-dim">可复现：' + (p.reproducible
+            ? '是（世界种子在场：' + esc(String(p.seed.seed)) + '）—— 同参数同种子播出来是同一批人'
+            : '否（世界种子不在场）—— 再播一次会得到另一批人；这不是参数没生效') + '</div>'
+          + '<div class="wa-dim">' + esc(p.note) + '</div>');
+      });
+      on('#wa-pop-seed', () => {
+        if (!WA.populate || !WA.populate.seed) {
+          return popOut('<div class="wa-log wa-log-err">一键播种未加载（engines/populate.js 缺席）</div>');
+        }
+        let r = null;
+        try { r = WA.populate.seed({}); } catch (e) {
+          return popOut('<div class="wa-log wa-log-err">播种时抛错：' + esc(e && e.message ? e.message : String(e)) + '</div>');
+        }
+        if (!r || r.ok !== true) return popOut('<div class="wa-log wa-log-warn">' + popWhy(r) + '</div>');
+        const bad = (r.rows || []).filter(function (x) { return x.ok !== true; });
+        popOut('<div class="wa-log ' + (bad.length ? 'wa-log-warn' : 'wa-log-info') + '">播种写 ' + r.written + ' 笔'
+          + (bad.length ? ' · <b>拒 ' + bad.length + ' 笔</b>（逐笔见下）' : ' · 全部落笔')
+          + (r.skipped ? ' · 跳过 ' + r.skipped + ' 笔（已存在，不重复占容量）' : '') + '</div>'
+          + '<div class="wa-dim">地区：' + esc(r.region) + '（' + (r.regionSource === 'created' ? '本批新建' : '既有') + '）</div>'
+          + (bad.length
+            ? '<div class="wa-item">' + bad.slice(0, 20).map(function (x) {
+              return '<div>' + esc(x.kind) + ' · ' + esc(x.name) + ' <span class="wa-dim">← ' + esc(x.via || '?') + ' 拒于 ' + esc(x.reason) + '</span></div>';
+            }).join('') + '</div>'
+            : '')
+          + '<div class="wa-dim">' + esc(r.note) + '</div>');
+      });
       const cvOut = function (html) { const o = $('#wa-wh-cv-out'); if (o) o.innerHTML = html; };
       const cvWhy = function (reason) {
         const M = { disabled: '这一面关着（上面的开关打开后才有纪事）', 'no-store': '读不到 store —— 这一栏此刻无从计算' };

@@ -428,6 +428,41 @@
             <div id="wa-ab-out" class="wa-out"></div>
             <div class="wa-dim">断章<b>只用轮差</b>（两个都带轮号的相邻条目之间的减法），<b>不折算时间</b>；缺轮号的条目<b>不补轮号</b>，只计入「轮坐标缺失」——它可能让一个真实边界被漏掉，这是已知上限，不是缺陷。章正文逐条摘自归档原文，不生成新情节。</div>`;
         })()}
+        <div class="wa-sec" data-wa-lane="world" data-wa-sec="一键播种">一键播种<span class="wa-dim">（给空世界种几个人、几处地方、几条关系）</span></div>
+        ${(() => {
+          // v2.293.0（V7 EXV7-9）：一键播种的设置面。与世界自传段同规：
+          //   ① **只发动作**：写盘走 `populate.setSettings`（引擎内唯一写路径，内含
+          //      settingsBus.saveOrThrow 与 bounds 归一），本页不直写 localStorage；
+          //   ② **回显按真实结果**：`setSettings` 返回 ok:false 就报失败。
+          //   为什么它必须有入口：这是 V7 九项里**唯一带写面**的一项，七个旋钮每一个都
+          //   直接决定往世界里落多少笔 —— `people` 决定占几个 people 名额（共 48），
+          //   `bondDensity` 决定占几条关系行（共 24）。给固定数字而不给入口，
+          //   就等于替玩家决定了「他这局能填几个人」。出厂值只是起点。
+          //   ⚠ 本页设置**不触发任何写**：改旋钮不动世界，真播只在面板两枚按钮上。
+          if (!WA.populate || typeof WA.populate.getSettings !== 'function') {
+            return '<div class="wa-dim">一键播种模块未加载（engines/populate.js 缺席）</div>';
+          }
+          const po = WA.populate.getSettings();
+          const bdPo = bd('worldaxis_populate_settings_v1');
+          const pF = rng(bdPo.people, [1, 16]);
+          const pL = rng(bdPo.places, [0, 12]);
+          const pR = rng(bdPo.roads, [0, 12]);
+          const pFa = rng(bdPo.factions, [0, 4]);
+          const pBd = rng(bdPo.bondDensity, [0, 100]);
+          const pGp = rng(bdPo.goalsPerPerson, [0, 2]);
+          const pGa = rng(bdPo.grantAmount, [0, 200]);
+          return `<label class="wa-node"><input type="checkbox" id="wa-po-enable" ${po.enabled ? 'checked' : ''}/><span class="wa-node-label">允许播种（关掉则整口拒收 disabled，不是「世界已经满了」）</span></label>
+            <div class="wa-set-row"><span>一批种 <b id="wa-po-peoplev">${po.people}</b> 个人</span><input type="range" min="${pF[0]}" max="${pF[1]}" value="${po.people}" aria-label="一批种几个人" id="wa-po-people" class="wa-range"/></div>
+            <div class="wa-set-row"><span>建 <b id="wa-po-placesv">${po.places}</b> 处地方</span><input type="range" min="${pL[0]}" max="${pL[1]}" value="${po.places}" aria-label="建几处地方" id="wa-po-places" class="wa-range"/></div>
+            <div class="wa-set-row"><span>修 <b id="wa-po-roadsv">${po.roads}</b> 条路</span><input type="range" min="${pR[0]}" max="${pR[1]}" value="${po.roads}" aria-label="修几条路" id="wa-po-roads" class="wa-range"/></div>
+            <div class="wa-set-row"><span>立 <b id="wa-po-factionsv">${po.factions}</b> 个势力</span><input type="range" min="${pFa[0]}" max="${pFa[1]}" value="${po.factions}" aria-label="立几个势力" id="wa-po-factions" class="wa-range"/></div>
+            <div class="wa-set-row"><span>关系密度 <b id="wa-po-densityv">${po.bondDensity}</b>%（新人两两组合里取多少对）</span><input type="range" min="${pBd[0]}" max="${pBd[1]}" value="${po.bondDensity}" aria-label="关系密度" id="wa-po-density" class="wa-range"/></div>
+            <div class="wa-set-row"><span>每人 <b id="wa-po-goalsv">${po.goalsPerPerson}</b> 条目标</span><input type="range" min="${pGp[0]}" max="${pGp[1]}" value="${po.goalsPerPerson}" aria-label="每人几条目标" id="wa-po-goals" class="wa-range"/></div>
+            <div class="wa-set-row"><span>每人发 <b id="wa-po-grantv">${po.grantAmount}</b> 口粮（0 = 不发）</span><input type="range" min="${pGa[0]}" max="${pGa[1]}" value="${po.grantAmount}" aria-label="每人发多少口粮" id="wa-po-grant" class="wa-range"/></div>
+            <button class="wa-btn" id="wa-po-save">保存播种设置</button>
+            <div id="wa-po-out" class="wa-out"></div>
+            <div class="wa-dim">改这里<b>不会动世界</b>——真播只在概览页「一键播种」那两枚按钮上（先看会播什么 / 播种）。五个容器（人物 48 / 地点 24 / 道路 40 / 势力 16 / 关系 24）的上限现场复读，余量不够就少播并报差额，<b>不挤掉你自己填的真人</b>。关系型一律「平行共存」、职阶一律「novice」——播种不替作者做剧情判断。</div>`;
+        })()}
         <div class="wa-sec" data-wa-lane="people" data-wa-sec="人物意图看板">人物意图看板<span class="wa-dim">（概览页「他在图什么、卡在哪一步」怎么压）</span></div>
         ${(() => {
           // v2.286.0（V7 EXV7-2）：人物意图看板的设置面。
@@ -1002,6 +1037,38 @@
         const now = WA.worldAutobiography.getSettings();
         sayAb('✓ 已保存（轮差 ≥ ' + now.chapterRounds + ' 轮断章 · 最多 ' + now.maxChapters
           + ' 章 · 每章 ' + now.maxLines + ' 行' + (now.enabled ? '' : ' · 整份拒收') + '）');
+      };
+      // v2.293.0（V7 EXV7-9）：一键播种设置绑定。与 wa-ab-save 同规。
+      const poIds = [['#wa-po-people', '#wa-po-peoplev'], ['#wa-po-places', '#wa-po-placesv'],
+        ['#wa-po-roads', '#wa-po-roadsv'], ['#wa-po-factions', '#wa-po-factionsv'],
+        ['#wa-po-density', '#wa-po-densityv'], ['#wa-po-goals', '#wa-po-goalsv'],
+        ['#wa-po-grant', '#wa-po-grantv']];
+      poIds.forEach(function (pair) {
+        const el = $(pair[0]);
+        if (el) el.oninput = () => { const v = $(pair[1]); if (v) v.textContent = el.value; };
+      });
+      const poSave = $('#wa-po-save');
+      if (poSave) poSave.onclick = () => {
+        const poOutEl = $('#wa-po-out');
+        const sayPo = function (t) { if (poOutEl) poOutEl.textContent = t; };
+        if (!WA.populate || typeof WA.populate.setSettings !== 'function') {
+          sayPo('✗ 保存失败：一键播种模块未加载'); return;
+        }
+        const num = function (sel, fb) { const e = $(sel); const n = +(e && e.value); return isFinite(n) ? n : fb; };
+        const en = $('#wa-po-enable');
+        const r = WA.populate.setSettings({
+          enabled: en ? !!en.checked : true,
+          people: num('#wa-po-people', 8), places: num('#wa-po-places', 6),
+          roads: num('#wa-po-roads', 5), factions: num('#wa-po-factions', 2),
+          bondDensity: num('#wa-po-density', 50), goalsPerPerson: num('#wa-po-goals', 1),
+          grantAmount: num('#wa-po-grant', 20)
+        });
+        if (r && r.ok === false) { sayPo('✗ 保存失败：' + (r.reason || '未落盘') + '（改动未生效）'); return; }
+        const now = WA.populate.getSettings();
+        sayPo('✓ 已保存（' + now.people + ' 人 · ' + now.places + ' 处地方 · ' + now.roads + ' 条路 · '
+          + now.factions + ' 个势力 · 密度 ' + now.bondDensity + '% · 每人 ' + now.goalsPerPerson + ' 条目标 · 口粮 '
+          + now.grantAmount + (now.enabled ? '' : ' · 已停用（整口拒收）') + '）'
+          + ' —— 这些数字只决定「下次点播种写多少」，此刻世界一笔未动');
       };
       // v2.286.0（V7 EXV7-2）：人物意图看板设置绑定。与 wa-wd-save 同规。
       const ibMr = $('#wa-ib-maxrows');

@@ -1,7 +1,7 @@
 # WorldAxis V7 全景双九项推进纲领与台账
 
 > **基线**：`v2.274.0` / `8fdb108` / 全量回归 `23326 / 0`
-> **当前**：`v2.292.0` · V7 优化线九项（OPV7-1 ～ OPV7-9）与拓展线 EXV7-1～8 **全部交付**（v2.285.0～v2.292.0 连续完成世界简报、人物意图看板、情报网、关系六型图、势力账本、地点沉积、事件日历与世界自传）；下一步进入拓展线 EXV7-9（一键播种）—— 这是 V7 的最后一项，也是九项中**唯一带写面**的一项
+> **当前**：`v2.293.0` · V7 双九项（OPV7-1 ～ OPV7-9 与 EXV7-1 ～ EXV7-9）**十八项全部交付**（v2.275.0 ～ v2.293.0）。EXV7-9 一键播种为收口项 —— 九项中**唯一带写面**的一项，按 OPV7-4 写口契约的规矩只走真写口（`world.addPlace/addRoad`、`life.addGoal`、`bonds.setBond`、`org.grant/assignRole`、`editorFaction.add`、`registry.ensurePerson`），容量全部现场复读 `evict.siteDecls()`，满则如实拒收 `no-room`
 > **收口口径**：依纪律 12，18 项交付前不跑 `tests/run.js`；只跑专锁 + 三道版本门禁 + 三道实测账本门禁
 > **立项日期**：2026-10-31
 > **前代**：`plans/V6_MASTER_PLAN.md` 十八项全部交付（v2.257.0 ～ v2.274.0），保留为历史台账。
@@ -112,7 +112,7 @@ V7 要答的是另一句话：**开了以后，世界真的出内容吗？**
 | **EXV7-6** | 地点沉积：这个地方记得什么 | `engines/sediment.js` | `sediment.settle(placeId, fact)` + `TRACES/LADDER/LABEL` 三级痕迹阶梯（实测 `settle` 返回 `trace:'minor'`）。按地点聚合沉积，给「此地经历过什么、痕迹还剩几级」；`world` 的地点表为索引，不新建地图真源。 | **已交付**（v2.290.0；`placesView` 跨地点台账 / 专锁 30 / 诊断 + 面板双消费方接线） |
 | **EXV7-7** | 事件日历：未来会发生什么，谁承诺了 | `engines/events.js` + `engines/life.js` | `events.schedule` 的四种 kind（`once/delayed/repeat/conditional`）+ `life` 的 `commitments`（承诺/欠债/秘密/合作/边界）合并成「未来时间轴」：已排期的事件、人物做出的承诺、到期窗口。只读，不改 stage。 | **已交付**（v2.291.0；`events.timelineView` 事件钟未来轴 + `life.commitmentsView` 承诺台账 / 专锁 62 / 诊断 + 面板双消费方接线）。**落点偏离规格已记录**：没有做成一个「合并器」，而是两份投影在展示层并列 —— `events` 的时刻走**事件钟**（`clockNow('events')`）、`life` 的 `due` 只有到期窗口，两者之间**没有换算率**，合成一个计数就只能靠折算，而折算在本仓付过代价（`agenda` 注释原文：「真实时间与剧情时间混算过一次，代价是离线间隔被抹平」）。另：**未**把两源补进 `engines/agenda.js`（它已是五源聚合器且恰好缺这两个）—— `agenda` 走剧情日、拿不到剧情钟就整表拒算，把事件钟的时刻塞进去必然误导；且 `agenda` 的 `EXPORT_COUNT=9` / `sources().length===5` 被三把既有锁逐字钉住。 |
 | **EXV7-8** | 世界自传：这一局跑下来，世界变成了什么样 | 新 `engines/world-autobiography.js` + 导出 | 复用 V6 世界日记 + EXV7-1 简报 + `chrono.chronicle`，按「章」压缩长局（每 N 轮一章），产出可导出的世界自传。**明确不做**：不生成新情节、不替玩家叙事、不碰 `store` 写面。 | **已交付**（v2.292.0；导出七口、专锁 79、四条消费方齐接、拒收码三路源故障各带见证）。**落点偏离规格一处**：断章只用「两个都带轮号的相邻条目之间的**轮差**」，而 `chrono.chronicle()` 的行**不带 `round`**（它刻意把内部轮号从读数面剥掉）—— 故轮坐标从存档 `store.chronicle` 按 `at` 反查；同一 `at` 挂两个不同轮号时整格判不可信记 null。这不是降级，是规格里没写、实现时必须自己定的一条边界：**宁可少一个轮标签，也不给错轮号**。连带后果已如实报在 `roundMisses` 里 —— 真实写入方（backstage / regional）大量条目不带 round，故 `by-volume` 退化路径会被频繁触发，且退化时 `chapterMode` 与 `note` 都当场说破「这不是按轮切的」。 |
-| **EXV7-9** | 一键播种：给这个世界种一批人 | 新 `engines/populate.js`（复用 `OPV7-1` 分发器 + `OPV7-6` 播种） | 空世界最痛的不是没机制，是没数据。给一个「播种入口」：选地区 + 人物数量 + 关系密度 + 势力数，按 `world.addPlace/addRoad` + `life.addGoal` + `bonds.setBond` + `org.grant` 的**真写口**批量种出可用的一批人。种子走 `core/rand.js` 既有随机源（可复现），容量全部登记 `__BOUNDED_CAPS`。 | 待实施 |
+| **EXV7-9** | 一键播种：给这个世界种一批人 | 新 `engines/populate.js`（复用 `OPV7-1` 分发器 + `OPV7-6` 播种） | 空世界最痛的不是没机制，是没数据。给一个「播种入口」：选地区 + 人物数量 + 关系密度 + 势力数，按 `world.addPlace/addRoad` + `life.addGoal` + `bonds.setBond` + `org.grant` 的**真写口**批量种出可用的一批人。种子走 `core/rand.js` 既有随机源（可复现），容量全部登记 `__BOUNDED_CAPS`。 | **已实施（v2.293.0）**：导出七口 `getSettings / setSettings / plan / seed / view / stat / reset`；零 `draft.X =` 直写（唯一 `store.transact` 是把 draft 委托给 `registry.ensurePerson` / `editorFaction.add`）；余量现场复读 `evict.siteDecls()` 且读不到即 `writes-absent`；满则 `no-room` 并点满容器；关系型一律「平行共存」、职阶一律 `novice`（不替作者做 剧情判断）；四路「播不动」`disabled / writes-absent / no-room / 参数夹取` 分列不合成；实测空世界 一次播 8 人 / 7 地 / 5 路 / 2 势力 / 14 关系 / 60 笔写入零拒笔。 |
 
 ---
 

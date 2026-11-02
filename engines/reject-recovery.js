@@ -428,6 +428,9 @@
     //   ⚠ `disabled` 不在此列：它是全仓数百处共用的关闭态码，早已登记在**判不出面**
     //   （NEUTRAL_FACE 与 NEUTRAL_REVIEW 键集必须逐字相同），把它塞进拒收面会让两面相交
     //   （A9 首跑即红，本轮实测）。
+    // v2.293.0 (V7 EXV7-9): three new codes of yi-jian-bo-zhong, witnessed.
+    'no-room', 'writes-absent',
+    'no-core-person', 'write-threw',
     'chrono-absent', 'chrono-threw', 'chronicle-refused',
     'bonds-disabled', 'no-plan-engine', 'noesis-missing', 'unknown-engine',
     'unknown-method', 'unknown-namespace', 'no-blueprint', 'seed-threw',

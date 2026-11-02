@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.292.0';
+  const VERSION = '2.293.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1199,6 +1199,13 @@
     //   零 store 写、零落盘；三条源（chrono / worldDiary / worldBriefing）在本清单里
     //   全部更早装载，但都是调用期读口。排在这里让它在首次盘点里就在登记面内。
     'engines/world-autobiography.js',
+    // v2.293.0（V7 EXV7-9）：一键播种 —— 给空世界种一批人。
+    //   位置在 capability-tier 之前、world-autobiography 之后：装载期只登记自己的
+    //   设置键（零上游读、零 store 写、零落盘）。它调用期要读的九个写口
+    //   （world/life/bonds/org/editorFaction/registry/evict/rand/store）在本清单里
+    //   全部更早装载，但都是**调用期**读口 —— 装载期不需要任何依赖在场。
+    //   排在这里让「播种开没开」首次盘点就在登记面内（同 world-diary 的口径）。
+    'engines/populate.js',
     'engines/capability-tier.js',
     'engines/capability-audit.js',
     'ui/panel.js',

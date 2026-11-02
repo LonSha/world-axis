@@ -8085,6 +8085,108 @@ function runWitness(WA) {
     }
   }
 
+  // ── v2.293.0（V7 EXV7-9）：一键播种（本仓第一处批量写面）的四个码 —— 必须带可执行见证 ──
+  //   为什么不能进基线：诊断节 secPopulate 的三路「播不动」与面板 popWhy 都在**日常**消费
+  //   这些码。登记成「存量未分类」等于让门禁替我们说「没人会跑到」—— 而空世界开局恰恰是
+  //   玩家最可能撞上的局面。
+  //   四码必须分开见证，因为处置方向各不相同：
+  //     writes-absent  写口/上限表读不到 —— 去查 LOAD 链与 evict.siteDecls（拒绝按感觉写）
+  //     no-room        容器满了 —— 什么都不用改，这是本分（不许硬写把既有的人挤掉）
+  //     no-core-person 势力要的核心人一个都没落成 —— 不许借一个不在册的人把势力立起来
+  //     write-threw    写口自己抛错 —— 去看日志；壳子吞掉它，但不许吞成「播种成功」
+  //   见证纪律（同本文件各段）：
+  //     ① 局面造在**内存替身**上（摘 WA.world 的写口、替换 registry.ensurePerson），
+  //        并整份快照/还原 people / world / bonds / evolution —— 不给后面的段留下
+  //        一个残废或半播的世界；
+  //     ② 每个局面都靠**产品真 API** 跑出来（P.plan / P.seed），不直接构造返回体。
+  {
+    const P = WA.populate;
+    if (P && typeof P.plan === 'function' && typeof P.seed === 'function') {
+      const __keepPop = (typeof P.getSettings === 'function') ? P.getSettings() : null;
+      const __snap = function () {
+        const s = WA.store.get() || {};
+        return {
+          people: JSON.parse(JSON.stringify(s.people || {})),
+          world: JSON.parse(JSON.stringify(s.world || {})),
+          bonds: JSON.parse(JSON.stringify(s.bonds || {})),
+          evolution: JSON.parse(JSON.stringify(s.evolution || {}))
+        };
+      };
+      const __rest = function (b) {
+        WA.store.transact(function (d) {
+          d.people = b.people;
+          d.world = b.world;
+          d.bonds = b.bonds;
+          d.evolution = b.evolution;
+        }, 'witness:populate-restore');
+      };
+      // ① 写口缺席：半套写面播出来的世界没法回滚，故整口拒收并点名缺谁
+      want('writes-absent',
+        'EXV7-9：写口缺席（摘掉 world.addRoad）⇒ writes-absent 且 missing 点名 addRoad（拒绝在半套写面上播种）');
+      trip('writes-absent', function () {
+        const keep = WA.world;
+        const out = [];
+        try {
+          WA.world = Object.assign({}, keep, { addRoad: undefined });
+          const r1 = P.plan({});
+          out.push(r1.reason);
+          out.push((r1.missing || []).join(','));
+        } finally { WA.world = keep; }
+        return out;
+      });
+      // ② 容器满：地点 24 格全占、且地区根还得再占一格 ⇒ 连根都放不下，如实拒收
+      want('no-room',
+        'EXV7-9：地点容器满（24 格全占、地区根还要一格）⇒ no-room 且 site 点名满了的容器（不是「参数错了」）');
+      trip('no-room', function () {
+        const out = [];
+        const b = __snap();
+        try {
+          WA.store.transact(function (d) {
+            d.world = d.world || {};
+            d.world.places = [];
+            for (let i = 0; i < 24; i++) d.world.places.push({ id: 'pl_w9_' + i, name: '证地九' + i, kind: 'public' });
+          }, 'witness:no-room-fill');
+          const r2 = P.plan({ region: '证镇二九三' });
+          out.push(r2.reason);
+          out.push(Array.isArray(r2.site) ? r2.site.join(',') : String(r2.site));
+        } finally { __rest(b); }
+        return out;
+      });
+      // ③ 核心人没落成：建档口把本批人全拒了 ⇒ 势力不许借「不在册的人」立起来
+      want('no-core-person',
+        'EXV7-9：建档口把本批人全拒 ⇒ 势力行记 no-core-person（不许拿一个不在册的人当 core_person）');
+      trip('no-core-person', function () {
+        const keep = WA.registry.ensurePerson;
+        const out = [];
+        const b = __snap();
+        try {
+          WA.registry.ensurePerson = function () { return { ok: false, reason: 'witness-person-refused' }; };
+          const r3 = P.seed({ people: 2, places: 1, roads: 0, factions: 1, bondDensity: 0, goalsPerPerson: 0 });
+          (r3.rows || []).forEach(function (x) { if (x && x.reason) out.push(x.reason); });
+        } finally { WA.registry.ensurePerson = keep; __rest(b); }
+        return out;
+      });
+      // ④ 写口自己抛错：壳子必须吞住（不许中断整批），但逐笔如实记 write-threw
+      want('write-threw',
+        'EXV7-9：写口抛错由 safe() 吞住并逐笔记 write-threw（整批不中断，也不吞成「播种成功」）');
+      trip('write-threw', function () {
+        const keep = WA.world;
+        const out = [];
+        const b = __snap();
+        try {
+          WA.world = Object.assign({}, keep, {
+            addPlace: function () { throw new Error('witness:write-threw'); }
+          });
+          const r4 = P.seed({ people: 1, places: 1, roads: 0, factions: 0, bondDensity: 0, goalsPerPerson: 0 });
+          (r4.rows || []).forEach(function (x) { if (x && x.reason) out.push(x.reason); });
+        } finally { WA.world = keep; __rest(b); }
+        return out;
+      });
+      // 收卷：设置面还原成见证前的样子（同本文件各段契约）。
+      if (typeof P.reset === 'function') P.reset();
+      if (__keepPop && typeof P.setSettings === 'function') P.setSettings({ enabled: true });
+    }
+  }
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected,
     asyncPumpProof: asyncPumpProof };
 }

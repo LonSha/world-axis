@@ -1,13 +1,13 @@
 {
- "version": "2.292.0",
- "loadOrderCount": 331,
- "loadedCount": 317,
+ "version": "2.293.0",
+ "loadOrderCount": 332,
+ "loadedCount": 318,
  "uiCount": 14,
- "nsCount": 326,
+ "nsCount": 327,
  "totals": {
-  "loadEdges": 199,
+  "loadEdges": 200,
   "hardEdges": 0,
-  "callRefs": 382,
+  "callRefs": 384,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -143,6 +143,7 @@
     "engines/plot-gauge.js",
     "engines/pmem.js",
     "engines/polish.js",
+    "engines/populate.js",
     "engines/portal.js",
     "engines/power-anchor.js",
     "engines/prefilter-gate.js",
@@ -459,6 +460,7 @@
     "engines/playtime.js",
     "engines/plot-gauge.js",
     "engines/polish.js",
+    "engines/populate.js",
     "engines/portal.js",
     "engines/power-anchor.js",
     "engines/prefilter-gate.js",
@@ -6015,6 +6017,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_world_autobiography_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/populate.js": {
+   "ns": [
+    "populate"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_populate_settings_v1"
    ],
    "consumedBy": []
   },

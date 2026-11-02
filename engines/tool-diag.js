@@ -1996,6 +1996,72 @@
    *   与 secSediment / secTapeStore 同规：**只报读数、不写世界** ——
    *   不生成情节、不润色、不写盘；本模块本身没有写口。
    */
+  /**
+   * v2.293.0（V7 EXV7-9）：一键播种读数 —— 空世界能种出什么、种不动是因为哪一条。
+   *
+   *   本节**只读**：它调 `view()`（读数）与 `plan()`（只算不写），**绝不调 `seed()`** ——
+   *   诊断面一旦写世界，「点开诊断看一眼」就等于播了一批人，那是本仓最不能接受的那种副作用
+   *   （与 world-autobiography / sediment 各节同规：诊断节永不写）。
+   *
+   *   为什么 `plan` 不算「写」：它只现场抽一份名单给你看（`names` / `places` / `roads` /
+   *   `factions` / `pairs` / `goals`），一个写口都不碰。计划里的 `will` 与 `want` 并列 ——
+   *   「你要几个」与「真能写几个」分开报，是因为缩水（容器没余量）与参数没生效在读数上同形。
+   *
+   *   四路「播不动」必须分列（不许合成一句失败）：
+   *     · `disabled`      —— 入口关着（去开开关）；
+   *     · `writes-absent` —— 写口/上限登记不全（去查装配，不是去改参数）；
+   *     · `no-room`       —— 容器真满了（去清理，或换一局）；
+   *     · 参数夹取 `clamped` —— 参数合法但被夹（去改参数）。
+   */
+  function secPopulate() {
+    return safe(function () {
+      if (!WA.populate || typeof WA.populate.view !== 'function') {
+        return { error: 'engines/populate.js 未加载（一键播种读数缺席）' };
+      }
+      const v = WA.populate.view();
+      const out = {
+        enabled: !!v.enabled,
+        writesPresent: !!v.writesPresent,
+        writesMissing: (v.writesMissing || []).slice(),
+        used: Object.assign({}, v.used || {}),
+        rooms: Object.assign({}, v.rooms || {}),
+        // 三路「播不动」的原因分列（view 已经算好；缺失即为空串 = 没有拦路石）
+        blockedWhy: v.blockedWhy || '',
+        cfg: Object.assign({}, v.cfg || {}),
+        seed: Object.assign({}, v.seed || {}),
+        // stat 走**自己的读口**，不套在 view() 的返回体里：view 答「此刻能不能播」、
+        //   stat 答「此前播过几次、成了几笔」。混在一处之后，「还没播过」与「播了但没记」同形。
+        stat: (typeof WA.populate.stat === 'function')
+          ? Object.assign({}, WA.populate.stat() || {})
+          : Object.assign({}, v.stat || {}),
+        note: v.note || ''
+      };
+      // 计划预览：只在「开且写面齐」时才算 —— 其余情形算出来的 plan 一定是 ok:false，
+      //   把它塞进读数只会让诊断包多一张「必然失败」的表，读者反而看不见真正的拦路石。
+      if (v.enabled && v.writesPresent) {
+        let p = null;
+        try { p = WA.populate.plan({}); } catch (e) {
+          return Object.assign(out, { planError: 'plan 抛错: ' + (e && e.message ? e.message : String(e)) });
+        }
+        if (p && p.ok === true) {
+          out.plan = {
+            region: p.region, regionSource: p.regionSource,
+            want: Object.assign({}, p.want), will: Object.assign({}, p.will),
+            clamped: (p.clamped || []).slice(),
+            names: (p.names || []).slice(0, 16),
+            places: (p.places || []).map(function (x) { return x.name; }).slice(0, 12),
+            roads: (p.roads || []).length, factions: (p.factions || []).map(function (x) { return x.name; }),
+            bonds: (p.pairs || []).length, goals: (p.goals || []).length
+          };
+        } else {
+          out.planRefused = { reason: (p && p.reason) || 'unknown',
+            note: (p && p.note) || '', missing: (p && p.missing) || null };
+        }
+      }
+      out.note2 = '本节只读：调 view() 与 plan()，绝不调 seed() —— 看诊断不该播出一批人';
+      return out;
+    });
+  }
   function secAutobio() {
     return safe(function () {
       if (!WA.worldAutobiography || typeof WA.worldAutobiography.autobiography !== 'function') {
@@ -3264,6 +3330,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   症状是 export-contract 里整个 worldAutobiography 命名空间缺席 ——
     //   守卫与契约面同时看不见它，而专锁照绿）。
     'engines/world-autobiography.js': 'worldAutobiography',
+    'engines/populate.js': 'populate',
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/input-guard.js': 'inputGuard', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块 —— 登记一次到位。
@@ -5203,10 +5270,16 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         //   与上面两枚同组同页（都在健康页的世界侧读数块里），但**不共用一枚按钮**：
         //   合成一枚之后「章算错了」与「导不出来」在界面上同形。
         'wa-auto-view', 'wa-auto-export',
+        // v2.293.0（EXV7-9）：一键播种两枚。与上面的自传两枚同规 ——
+        //   渲染 + 绑定 + 守卫登记三件齐做，否则「按钮渲染了但绑定写错 id」
+        //   在新增出口上无人发现。
+        'wa-pop-plan', 'wa-pop-seed',
         'wa-wh-cv-enabled', 'wa-wh-cv-view', 'wa-wh-cv-hidden', 'wa-wh-cv-diag',
         'wa-wh-cv-ref', 'wa-wh-cv-entry'],
       // 三块读数出口走 dynamic 层（同上面 tools 页两条的口径）。
-      dynamic: ['wa-wh-out', 'wa-wh-ag-out', 'wa-wh-cv-out', 'wa-auto-out'] },
+      dynamic: ['wa-wh-out', 'wa-wh-ag-out', 'wa-wh-cv-out', 'wa-auto-out',
+        // v2.293.0（EXV7-9）：播种输出容器。动态 = 内容由 handler 现场渲染。
+        'wa-pop-out'] },
     // v2.183.0（第一批 E1）：统一待办事项中心 —— 7 静态控件 + 1 动态读数出口。
     //   与上一组同登记到 health 页（本模块的区块渲染在健康页里，与三块合页同规格）。
     //   登记错页比不登记更坏（看起来已被覆盖，实际永远查不到）。
@@ -6089,6 +6162,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   一个答「逐条发生了什么」，一个答「分几个阶段、每阶段留了什么」；
       //   合成一节之后「长局滚成几百条」与「阶段划错了」在读数面上同形。
       autobiography: secAutobio(),
+      // v2.293.0（EXV7-9）：一键播种。与 autobiography 分列不合并 ——
+      //   一个答「这局跑成什么样了」（只读），一个答「空世界能种出什么」（唯一带写面的入口）；
+      //   合成一节之后「自传读不出」与「播不动」在读数面上会同形。
+      populate: secPopulate(),
       perfBaseline: secPerfBaseline(), worldHealth: secWorldHealth(),
       // v2.183.0（第一批 E1）：统一待办事项中心。与 worldHealth 的待办栏分列不合并 ——
       //   两者答的是**两个粒度**：世界健康栏答「还有几件事没做完」（计数 + 是否全清），
