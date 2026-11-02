@@ -63,6 +63,14 @@ function loadList() {
   LOAD = vm.runInNewContext('[' + m[1] + ']');
   return LOAD;
 }
+// OPV7-8 连带（与 tools/v7probes/p_drive_gate.js 同款修法）：full 档把下调的悬空引擎
+//   逐个 flip 回开 —— 否则 visibility 门按 v2.91.0 比例判据如实落 degraded，
+//   而 B/C/E/N 各段的前提是「除目标门槛外其余全 pass」（visibility 判据本身没有错）。
+function openExcluded(W) {
+  (W.capabilityTier.L3_EXCLUDES || []).forEach(function (k) {
+    try { W.capabilityTier.flipSwitch(k, true); } catch (e) {}
+  });
+}
 function loadAll(ov) {
   Object.keys(require.cache).forEach(function (k) {
     if (k.indexOf(path.join(BASE, 'tests')) === 0 || k.indexOf(path.join(BASE, 'engines')) === 0) delete require.cache[k];
@@ -138,6 +146,7 @@ function runB() {
   section('B. 判不了时如实报 unknown，且不拖累 ok');
   const WA = loadAll();
   try { WA.capabilityTier.applyTier('full'); } catch (e) {}
+  openExcluded(WA);
   // B0 前提：本宿主真的判不了（否则本段整段测空）
   const dv = WA.driverLedger.view();
   assert(dv.scan.canConclude === false,
@@ -170,6 +179,7 @@ function runC() {
   const W1 = loadAll();
   const fake1 = fakeLedger(['intake']);
   try { W1.capabilityTier.applyTier('full'); } catch (e) {}
+  openExcluded(W1);
   try { W1.intake.setSettings({ enabled: true }); } catch (e) {}
   eq((W1.capabilityTier.shapeOf('intake') || {}).on, true, 'C1 前提：intake 真被打开了');
   W1.driverLedger = fake1;
@@ -201,6 +211,7 @@ function runC() {
   const W3 = loadAll();
   const fake3 = fakeLedger(['intake'], { canConclude: false });
   try { W3.capabilityTier.applyTier('full'); } catch (e) {}
+  openExcluded(W3);
   try { W3.intake.setSettings({ enabled: true }); } catch (e) {}
   W3.driverLedger = fake3;
   const g3 = driveOf(W3.healthPreflight.threeGates({ sample: 3 }));
@@ -225,6 +236,7 @@ function runD() {
   // D2 不截断时同一份夹具必须真能判（否则 D1 的 unknown 是恒真）
   const W2 = loadAll();
   try { W2.capabilityTier.applyTier('full'); } catch (e) {}
+  openExcluded(W2);
   try { W2.intake.setSettings({ enabled: true }); } catch (e) {}
   W2.driverLedger = fakeLedger(['intake']);
   const g2 = driveOf(W2.healthPreflight.threeGates({ sample: 3 }));
@@ -236,6 +248,7 @@ function runE() {
   section('E. 缺件进 absent 桶（ok 为假），不是 unknown');
   const W = loadAll();
   try { W.capabilityTier.applyTier('full'); } catch (e) {}
+  openExcluded(W);
   W.driverLedger = undefined;
   const r = W.healthPreflight.threeGates({ sample: 3 });
   const g = driveOf(r);
@@ -290,6 +303,7 @@ function runNegative() {
     const ov = {}; ov[HP_REL] = b;
     const W = loadAll(ov);
     try { W.capabilityTier.applyTier('full'); } catch (e) {}
+    openExcluded(W);
     const r = W.healthPreflight.threeGates({ sample: 3 });
     const g = driveOf(r);
     assert(g.state !== 'unknown', 'N1b 破坏后不再报判不了（实 ' + g.state + '）—— 判据现形');
@@ -306,6 +320,7 @@ function runNegative() {
     const W = loadAll(ov);
     const fake = fakeLedger(['intake']);
     try { W.capabilityTier.applyTier('full'); } catch (e) {}
+    openExcluded(W);
     try { W.intake.setSettings({ enabled: true }); } catch (e) {}
     W.driverLedger = fake;
     const r = W.healthPreflight.threeGates({ sample: 3 });
@@ -325,6 +340,7 @@ function runNegative() {
     const W = loadAll(ov);
     const fake = fakeLedger(['intake']);
     try { W.capabilityTier.applyTier('full'); } catch (e) {}
+    openExcluded(W);
     try { W.intake.setSettings({ enabled: true }); } catch (e) {}
     W.driverLedger = fake;
     const r = W.healthPreflight.threeGates({ sample: 3 });
@@ -336,6 +352,7 @@ function runNegative() {
   // N5 两向自证：恢复原版后判据重新为真
   const W = loadAll();
   try { W.capabilityTier.applyTier('full'); } catch (e) {}
+  openExcluded(W);
   eq(driveOf(W.healthPreflight.threeGates({ sample: 2 })).state, 'unknown',
     'N5 原版恢复后回到 unknown（两向自证成立）');
   // N6 三个锚点在磁盘原版上各恰 1 次（负控制全跑在内存副本上，零文件改写）

@@ -86,12 +86,23 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //     历史：V6 批次新增 8 个默认开启的产品层引擎（worldDiary / dayRoute / relationTemp /
 //     undercurrentCalendar / roundCost / saveHealth / firstRun / handoffPack），故 18 → 26。
 //     **引擎出厂态变了就改这里，别改判据形态。**
-const BASE_ON = 29;         // 本测试面：出厂就开着的带 enabled 引擎数
-const MECH = 100;           // 有注入面的机制数
+// v2.293.0（V7 收口 · 基线跟位）：V7 九项（EXV7-1..9）逐个落地后出厂态又长了一截，
+//   四个基线常量随之跟位。**只动登记值，不动判据形态**（同 v2.274.0 的口径）：
+//     · BASE_ON  29 → 33：V7 新增 4 个默认开启的产品层引擎（worldBrief / dayRoute 侧
+//       的 EXV7-1/2/8/9 四批：世界简报 / 人物意图看板 / 世界自传 / 一键播种）。
+//     · MECH    100 → 102：有 buildBlock（= 有注入面）的引擎数多了两个 —— 世界自传与
+//       一键播种的读数面各带一个 buildBlock。
+//     · RUNNING0  5 → 7：出厂开 **且** 有注入面的，随上面两枚一起从 5 涨到 7。
+//     · FULL_MECH 65 → 67：= MECH − 35（L3_EXCLUDES 悬空名单未变）。
+//   DORMANT 仍是 95：它算的是「关着但有注入面的」，本次两枚新引擎出厂是开的，
+//   不进这一桶 —— 与 MECH − RUNNING0 的恒等式同时成立（102 − 7 = 95）。
+const BASE_ON = 33;         // 本测试面：出厂就开着的带 enabled 引擎数
+const MECH = 102;           // 有注入面的机制数
 const DORMANT = 95;         // 关着但有注入面的
-const RUNNING0 = 5;         // 出厂开 且 有注入面的
+const RUNNING0 = 7;         // 出厂开 且 有注入面的
 // full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
-const FULL_MECH = 65; // OPV7-8 下调排除 35 个悬空机制后为 65
+// v2.293.0：= MECH(102) − L3_EXCLUDES(35)。排除名单本身未变，变的只有 MECH。
+const FULL_MECH = 67; // OPV7-8 下调排除 35 个悬空机制后为 65 → v2.293.0 随 MECH 到 67
 const FULL_RUNNING = FULL_MECH + (BASE_ON - RUNNING0);
 
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
@@ -251,12 +262,12 @@ function runB(a) {
   const r4 = T.rollback();
   a(r4.ok === true, 'B5: 回滚成功');
   a(r4.tier === 'standard', 'B5b: 回滚回到 standard（实 ' + r4.tier + '）');
-  a(T.view().running === 39, 'B5c: 回到 standard 的 39 个（34 白名单 + 5 出厂，实 ' + T.view().running + '）');
+  a(T.view().running === 41, 'B5c: 回到 standard 的 41 个（34 白名单 + 7 出厂，实 ' + T.view().running + '）');
   // B6 **本版最要紧的一条**：full → lite 后出厂机制一个不少（初版缺陷在此）
   const r5 = T.applyTier('lite');
   a(r5.ok === true, 'B6: 切回 lite 成功');
   const vl = T.view();
-  a(vl.running === 5, 'B6b: 切回 lite 后真在跑的仍是出厂 5 个（实 ' + vl.running + '，初版此处置 0/丢机制）');
+  a(vl.running === 7, 'B6b: 切回 lite 后真在跑的仍是出厂 7 个（实 ' + vl.running + '，初版此处置 0/丢机制）');
   a(vl.mechanisms === MECH, 'B6c: 机制总数不因档位变化（实 ' + vl.mechanisms + '）');
   // B6d 关键是「出厂那批开关」一个不许被关。
   //   ⚠ 判据升级（v2.274.0）：此前只数个数（=== 18），引擎一增长就红，

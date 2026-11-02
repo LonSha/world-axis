@@ -107,7 +107,9 @@ function runB(WA) {
 
   eq(liteItem && liteItem.size, 0, 'B4: lite 档规模为 0（不额外开）');
   eq(stdItem && stdItem.size, 34, 'B5: standard 档规模为 34');
-  eq(fullItem && fullItem.size, 65, 'B6: full 档下调后规模恰为 65（100 - 35）');
+  //   v2.293.0（V7 收口 · 基线跟位）：MECH 100 → 102（世界自传 + 一键播种两个注入面），
+  //   排除名单仍是 35 ⇒ 规模 65 → 67。判据形态未变（仍是「有注入面的 − 排除」）。
+  eq(fullItem && fullItem.size, 67, 'B6: full 档下调后规模恰为 67（102 - 35）');
   assert(fullItem && typeof fullItem.note === 'string' && fullItem.note.indexOf('35') >= 0, 'B7: full 档包含 35 排除注记');
 
   assert(Array.isArray(v.manualOnly) && v.manualOnly.length === 35, 'B8: view().manualOnly 暴露 35 个排除机制');
@@ -124,9 +126,12 @@ function runC(WA) {
   eq(rFull.tier, 'full', 'C2: applyTier 返回 tier 为 full');
   assert(Array.isArray(rFull.notEffective) && rFull.notEffective.length === 0, 'C3: notEffective 为空（全部当场复核生效）');
   eq(rFull.turnedOn.length, 60, 'C4: full 档新开 60 个（65 目标 - 5 出厂机制）');
+  //   注：v2.293.0 复核发现本行**与 B6/C5 自相矛盾**（65 目标下新开应为 60，随目标
+  //   涨到 67、出厂涨到 7，新开仍恰为 60 —— 60 = 67 − 7 与 65 − 5 同值，故**本行不该变**）。
+  //   这正是「只改登记值」的边界：目标与出厂同涨同落时，差值判据保持不变。
 
   const vFull = cap.view();
-  eq(vFull.running, 65, 'C5: full 档运行机制数为 65');
+  eq(vFull.running, 67, 'C5: full 档运行机制数为 67（= MECH 102 − 排除 35）');
   eq(vFull.dormant, 35, 'C6: full 档休眠机制数为 35');
 
   // 验证 35 个排除机制无一被打开
@@ -147,8 +152,8 @@ function runC(WA) {
   eq(rRoll.tier, 'lite', 'C10: 回滚后返回 tier 为 lite');
 
   const vLite = cap.view();
-  eq(vLite.running, 5, 'C11: 回滚后运行机制数恢复出厂 5 台');
-  eq(vLite.dormant, 95, 'C12: 回滚后休眠机制数恢复 95 台');
+  eq(vLite.running, 7, 'C11: 回滚后运行机制数恢复出厂 7 台（v2.293.0：自传 + 播种）');
+  eq(vLite.dormant, 95, 'C12: 回滚后休眠机制数恢复 95 台（102 − 7，未随 BASE_ON 变）');
 }
 
 function runD() {

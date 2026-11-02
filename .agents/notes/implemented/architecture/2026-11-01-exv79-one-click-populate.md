@@ -60,3 +60,15 @@ V7 立项的硬读数里最疼的一条是「带 `buildBlock` 的引擎 109 个 
 - 已知上限（如实记，不当缺陷修）：`plan()` 会消耗随机序列（它现场抽一份给你看），这是随机源的
   正常行为，已在文件头与 `reproducible` 说破；`REGION` 只有 6 个名字，全占时如实拒收而不编第七个。
 - 未做：不做「按名字模板生成势力履历」「按剧情生成关系强度」——那些是替作者做判断。
+## Alternatives considered
+- **Direct writes to `draft.X` containers from the UI handler**: rejected — every write must go
+  through the owning engine's public API (`registry.ensurePerson` / `editorFaction.add`), otherwise
+  the write-contract becomes decorative and the reject-recovery layer never sees the笔. The
+  nine-step真写 path exists precisely so one button cannot bypass per-engine guards.
+- **Accept `seed()` on a full world with a partial report**: rejected — "容器满还报 ok:true" is
+  the exact failure mode EXV7-9 was created to kill (see the v2.289.0 postmortem above). Hence
+  the region-root slot guard in `plan()` and the `no-room` reject code: a full world must be
+  reported as a refusal, never as a success with fewer writes.
+- **Registering `rand.seeded` as an accepted no-consumer export** in the O8 ledger: rejected —
+  the consumer exists (`populate.seedInfo()` reads it for `reproducible`), so the correct fix was
+  to delete the stale registration, not to bless the ledger entry. "登记不是豁免".

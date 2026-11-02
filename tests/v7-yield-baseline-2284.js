@@ -12,6 +12,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const os = require('os');   // v2.293.0：负控制探针临时文件改走 os.tmpdir()，消除 /tmp 死路径字面量（v2410）
 const vm = require('vm');
 
 const BASE = path.join(__dirname, '..');
@@ -87,7 +88,7 @@ function runNegative() {
   let n1Threw = false;
   try {
     const brokenSrc = PROBE_SRC.replace(A_BOTTOM_EMPTY, "a(res.empty.count >= 999, '空世界非空产出 >= 4");
-    const tmpFile = path.join(BASE, '/tmp/_n1_probe.js');
+    const tmpFile = path.join(os.tmpdir(), '_n1_probe.js');   // v2.293.0：/tmp 死路径 → os.tmpdir()（v2410）
     fs.writeFileSync(tmpFile, brokenSrc);
     const r = require('child_process').spawnSync('node', [tmpFile], { cwd: BASE, encoding: 'utf8' });
     try { fs.unlinkSync(tmpFile); } catch (e) {}
@@ -99,7 +100,7 @@ function runNegative() {
   let n2Threw = false;
   try {
     const brokenSrc = PROBE_SRC.replace(A_BOTTOM_SEEDED, "a(res.seeded.count >= 999, '真实开局后非空产出 >= 14");
-    const tmpFile = path.join(BASE, '/tmp/_n2_probe.js');
+    const tmpFile = path.join(os.tmpdir(), '_n2_probe.js');   // v2.293.0：/tmp 死路径 → os.tmpdir()（v2410）
     fs.writeFileSync(tmpFile, brokenSrc);
     const r = require('child_process').spawnSync('node', [tmpFile], { cwd: BASE, encoding: 'utf8' });
     try { fs.unlinkSync(tmpFile); } catch (e) {}

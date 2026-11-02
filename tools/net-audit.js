@@ -91,7 +91,10 @@ function audit(opt) {
   files.forEach(function (rel) {
     const face = faceOf(rel);
     PROBES.forEach(function (form) {
-      const n = face.split(form).length - 1;
+      // 词边界计数：`scanPrefetch(` 等标识符内含 `fetch(` 子串不是外呼点（v2.293.0 修）
+      const esc = form.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp('(?<![A-Za-z0-9_$])' + esc, 'g');
+      const n = (face.match(re) || []).length;
       for (let i = 0; i < n; i++) sites.push({ rel: rel, form: form });
     });
     // 动态 import：外部 URL ⇒ egress；同源/相对路径 ⇒ hostImports（如实登记，不报红）

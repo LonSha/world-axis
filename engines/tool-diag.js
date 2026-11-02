@@ -4612,7 +4612,16 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         //   但壳若不提供这个输入（或回落成「未注明」），那道闸在真实使用里永不触发。
         'wa-org-project', 'wa-org-needs', 'wa-org-due', 'wa-org-why', 'wa-org-proj-open', 'wa-org-proj-deliver',
         'wa-org-proj-view', 'wa-org-proj-close', 'wa-org-owe', 'wa-org-debt-settle', 'wa-org-debts',
-       'wa-org-person', 'wa-org-role', 'wa-org-assign', 'wa-org-credit', 'wa-org-promote', 'wa-org-roster', 'wa-org-pay', 'wa-org-settle', 'wa-org-penalize', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-intel-project', 'wa-intel-correct', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
+       'wa-org-person', 'wa-org-role', 'wa-org-assign', 'wa-org-credit', 'wa-org-promote', 'wa-org-roster', 'wa-org-pay', 'wa-org-settle', 'wa-org-penalize', 'wa-intel-enabled', 'wa-intel-cause', 'wa-intel-effect', 'wa-intel-person', 'wa-intel-claim', 'wa-intel-source', 'wa-intel-link', 'wa-intel-add', 'wa-intel-out', 'wa-intel-project', 'wa-intel-correct',
+      // v2.293.0（收口）：情报网读数按钮。它在 ui/panel.js 与上面几枚同一个 wa-row 里
+      //   无条件渲染、绑定在 on('#wa-intel-network')，此前从未登记 —— 于是
+      //   「渲染了但绑定写错 id」在这一枚上永不可见（守卫表是本仓唯一互校渲染↔绑定的面）。
+      // v2.293.0（EXV7-3 收口跟位）：情报网读数**块容器** id（ui/panel.js 情报网 5 个
+      //   渲染分支共用的 div id）与按钮同组登记，缺它则 H2「渲染↔守卫互校」如实报未覆盖。
+      //   v2.293.0 收口修正：它登 **cond** 层不登 ids——ui/panel.js 实测该块在
+      //   `cfg.enabled !== true` 时整块不渲染（briefBlock 口径：关着不占屏），缺失是
+      //   设置态不是断裂（v2.282.0 wa-wc-line 同款分层口径；渲染了但 id 写错照样被咬到）。
+      'wa-intel-network', 'wa-life-enabled', 'wa-life-person', 'wa-life-text', 'wa-life-goal', 'wa-life-promise', 'wa-life-schedule', 'wa-life-tick', 'wa-life-out', 'wa-npc-name', 'wa-npc-add', 'wa-observe-out', 'wa-prof-mini', 'wa-prof-out',
        // v2.62.0: 因果结算控件（渲染在人物页）+ 稳定人物 ID 控件。
        //   同 v2.51.0 的理由：新控件必须同时「渲染 + 绑定 + 守卫登记」，
        //   否则「按钮渲染了但绑定的 id 写错」在新增出口上无人发现。
@@ -4759,7 +4768,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
        // v2.139.0（E11）：偏离度两枚入口（偏离度 / 偏离曲线）。同 v2.51.0 起的理由：
        //   新控件「渲染 + 绑定 + 守卫登记」三件齐做，否则 id 写错无人发现。
        'wa-cn-deviation', 'wa-cn-trend'],
-      dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'] },
+      dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'],
+      cond: ['wa-intel-network-block'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text',
       // v2.139.0（E9）：势力关系网三枚读数入口（渲染在事件页「势力」区下方）。
       //   上面那段注释写了三枚，这里必须真有 —— 注释不是登记。
@@ -5110,6 +5120,30 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   空白，玩家看不出「我改了但它没生效」，只有守卫能发现 id 写错。
       //   注：`wa-ib-maxrows` / `wa-ib-maxrest` 是滑块、`...v` 是它们的读数 span，
       //   两组必须同列（读数不跟随＝拖动无效，属真缺陷）。
+      //   注：`wa-ib-maxrows` / `wa-ib-maxrest` 是滑块、`...v` 是它们的读数 span，
+      //   两组必须同列（读数不跟随＝拖动无效，属真缺陷）。
+      //   v2.293.0（收口）：上面这段注释自 v2.286.0 起就在，但**控件名一行都没登记**
+      //   ——注释写着「三件齐做」，实际只做了前两件。全量回归的
+      //   「panel 渲染的每个控件都在守卫表内」把它们全部当成未覆盖控件报了出来。
+      'wa-ib-enable', 'wa-ib-maxrows', 'wa-ib-maxrowsv', 'wa-ib-maxrest', 'wa-ib-maxrestv',
+      'wa-ib-save', 'wa-ib-out',
+      // v2.292.0（V7 EXV7-8）：世界自传设置面七枚控件（渲染在设置页「世界自传」一格）。
+      //   同前几组的理由；这一格多一条**静默失效**：`wa-ab-enable` 关掉后整份自传
+      //   拒收（不是在屏幕上少一块）—— 玩家看不出「我关了它」，只有守卫能发现 id 写错。
+      //   注：`wa-ab-rounds` / `wa-ab-chapters` / `wa-ab-lines` 是滑块、`...v` 是读数 span，
+      //   三组必须同列（读数不跟随＝拖动无效，属真缺陷）。
+      'wa-ab-enable', 'wa-ab-rounds', 'wa-ab-roundsv', 'wa-ab-chapters', 'wa-ab-chaptersv',
+      'wa-ab-lines', 'wa-ab-linesv', 'wa-ab-save', 'wa-ab-out',
+      // v2.293.0（V7 EXV7-9）：一键播种设置面八枚控件（渲染在设置页「一键播种」一格）。
+      //   这是 V7 九项里**唯一带写面**的一项，七个旋钮每一个都直接决定往世界里落多少笔
+      //   （`people` 占 people 名额、`bondDensity` 占关系行）——「改了不生效」在这里
+      //   不会留下任何可见痕迹，只有守卫能发现 id 写错。
+      //   注：七个滑块 `wa-po-people/places/roads/factions/density/goals/grant` 各配
+      //   一个 `...v` 读数 span，必须同列。
+      'wa-po-enable', 'wa-po-people', 'wa-po-peoplev', 'wa-po-places', 'wa-po-placesv',
+      'wa-po-roads', 'wa-po-roadsv', 'wa-po-factions', 'wa-po-factionsv',
+      'wa-po-density', 'wa-po-densityv', 'wa-po-goals', 'wa-po-goalsv',
+      'wa-po-grant', 'wa-po-grantv', 'wa-po-save', 'wa-po-out',
       // v2.267.0（V6 EXV6-3）：关系温度计设置面七枚控件。
       'wa-rt-enable', 'wa-rt-maxp', 'wa-rt-maxpv', 'wa-rt-types', 'wa-rt-reason', 'wa-rt-save', 'wa-rt-out',
       // v2.268.0（V6 EXV6-4）：暗流日历设置面七枚控件（渲染在设置页「暗流日历」一格）。

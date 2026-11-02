@@ -165,7 +165,11 @@
     //   注入分支也写进了 source 名，唯独本表漏了 ⇒ 面板上这一项没有中文名（裸露英文键），
     //   用户找不到「摊位寄售」的开关。
     stall: '摊位寄售',
-        chrono: '世界编年史' };
+        chrono: '世界编年史',
+        // v2.292.0（V7 EXV7-8）：世界自传。与 render/inject.js 的 SOURCES / SRC_NAME 逐字同批
+        //   登记 —— 只加源表不加显示名 ⇒ 注入页/导演页裸露英文键 `worldAutobiography`，
+        //   而那是玩家唯一能开关它的地方。
+        worldAutobiography: '世界自传' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {

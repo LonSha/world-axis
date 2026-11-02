@@ -152,8 +152,9 @@ function runCore() {
   // v2.271.0（EXV6-7）：新增「开局引导」一段 ⇒ 20→21 处源码 / 17→18 段运行时。
   // v2.272.0（EXV6-8）：新增「玩家说明书」一段 ⇒ 21→22 处源码 / 18→19 段运行时。
   // v2.273.0（EXV6-9）：新增「一键交班」一段 ⇒ 22→23 处源码 / 19→20 段运行时。
+  // v2.284~v2.293.0（EXV7-6~9）：新增「世界简报」「人物意图看板」「世界自传」「一键播种」四段 ⇒ 23→27 处源码 / 20→24 段运行时。
   //   段数必须跟着涨：不涨的话，下一次新增漏标那一段时本判据会沉默（它就是那个数）。
-  assert(secDivCount === 23, 'A3 源码字面量 wa-sec 恰 23 处（运行时渲染 20 段，差 3 为分支块备用标注）');
+  assert(secDivCount === 27, 'A3 源码字面量 wa-sec 恰 27 处（运行时渲染 24 段，差 3 为分支块备用标注）');
   eq((SET_SRC.match(/const LANES = \[/g) || []).length, 1, 'A4 LANES 表定义恰 1 处（单一真源）');
   eq((SET_SRC.match(/function laneNavHtml\(\)/g) || []).length, 1, 'A5 laneNavHtml 定义恰 1 处');
   eq((SET_SRC.match(/function laneApply\(rootEl, lane\)/g) || []).length, 1, 'A6 laneApply 定义恰 1 处');
@@ -212,7 +213,7 @@ function runCore() {
     assert(html.indexOf('id="' + id + '"') >= 0, 'C3.' + i + ' 渲染含 ' + id);
   });
   const rendered = (html.match(/data-wa-lane="([a-z]+)"/g) || []).map(function (x) { return x.slice(14, -1); });
-  eq(rendered.length, 20, 'C4 运行时渲染出 20 段（与运行时 wa-sec 数一致；v2.273.0 新增一键交班一段）');
+  eq(rendered.length, 24, 'C4 运行时渲染出 24 段（与运行时 wa-sec 数一致；EXV7 四段后 20→24）');
   eq((html.match(/<div class="wa-sec">/g) || []).length, 0, 'C5 零个「无 lane 的 wa-sec」（漏标会被这条抓到）');
   const dist = {};
   rendered.forEach(function (l) { dist[l] = (dist[l] || 0) + 1; });
@@ -222,7 +223,7 @@ function runCore() {
   eq(Object.keys(dist).length, 5, 'C7 渲染面只出现取值域内的 5 个 lane（all 不落在任何 sec 上）');
   // 每段都带名字（玩家据此认段）
   const secNames = (html.match(/data-wa-sec="([^"]+)"/g) || []).map(function (x) { return x.slice(13, -1); });
-  eq(secNames.length, 20, 'C8 20 段全部带 data-wa-sec 名');
+  eq(secNames.length, 24, 'C8 24 段全部带 data-wa-sec 名');
   secNames.forEach(function (n, i) { assert(n.length > 0, 'C9.' + i + ' 段名非空'); });
   // 面板渲染 HTML 而非 markdown：任何 `**` 都会原样露出（本版修掉的两处，见 O 段）
   eq((html.match(/\*\*/g) || []).length, 0, 'C10 渲染结果零 markdown 星号（title 属性也不许有）');

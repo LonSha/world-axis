@@ -17266,7 +17266,7 @@ assert(r2900.dead.length === 1177 && r2900.uiDead.length === 6 && r2900.dataOnly
       return bodySnap.indexOf("vis." + k) < 0;
     });
     assert(missingVis.length === 0, "v2380: 门禁——SOURCES 每项都在快照里有真读（缺: " + missingVis.join(",") + "）");
-    assert((W.render.SOURCES || []).length === 107, "v2380: SOURCES 为 107 项（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
+    assert((W.render.SOURCES || []).length === 108, "v2380: SOURCES 为 108 项（v2.292.0（EXV7-8）：新增世界自传 worldAutobiography 注入源 ⇒ 107 → 108）（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
     // E. 负向自证：把 echoes 分支从源码里抹掉 ⇒ 门禁必须现形
     const broken2380 = srcIj2380.split("if (vis.echoes)").join("if (false)");
     assert(broken2380 !== srcIj2380, "v2380: （负向自证）破坏锚点在真源码中恰命中（可观测改行为）");
@@ -20715,7 +20715,8 @@ assert(r2900.dead.length === 1177 && r2900.uiDead.length === 6 && r2900.dataOnly
       .match(/const VERSION = '([\d.]+)'/) || [])[1];
     const msgSites = [];
     //   逐行扫原始行（不先 filter）：实行号是报警时读的人唯一能用的坐标。
-    fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8').split('\n').forEach(function (l, i) {
+    const o16Lines = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8').split('\n');
+    o16Lines.forEach(function (l, i) {
       if (/^\s*(\/\/|\*|\/\*)/.test(l)) return;   // 注释行门（同 O16 原口径）
       const m = l.match(/入口\s*(?:版本为 |VERSION = |版本不早于 |VERSION 不早于 )2\.\d+\.\d+（实 /g);
       if (!m) return;
@@ -20726,8 +20727,14 @@ assert(r2900.dead.length === 1177 && r2900.uiDead.length === 6 && r2900.dataOnly
       //   为什么必须有②：现场 6 处全是地板形态，而消息文本写的是 `2.256.0` ——
       //     比地板 2.266.0 还**低**，读的人会照着一个既不等于比较值、也不等于入口的号去查。
       //     旧判据只认①，于是把这 6 处判成 `cmpVer=null` 的漂移，却给不出正确期望值。
-      const cmpEq = (l.match(/===\s*'(\d+\.\d+\.\d+)'/) || [])[1] || null;
-      const cmpFloor = (l.match(/verAtLeast\(\s*[\w.$]+\s*,\s*(\d+)\s*\)/) || [])[1] || null;
+      // v2.293.0（O16 第三刀）：取值面补「两行 assert 形态」。现场 14 处站点把
+      //   `assert(verAtLeast(__verPinNNN, N),` 写在消息行**上一行**，本取值面只扫消息行
+      //   ⇒ floor 取不到、期望=null，口号与真比较值一致仍报失配（假阳性实测 14/21）。
+      //   依据本判据自己的「判据范围必须与被测对象同宽」（v2.133.0 O18 第二刀）：
+      //   两行 assert 是合法形态，取值面向前看一行（断言行），消息行自带的比较值仍优先。
+      const probe = l + '\n' + (i > 0 ? o16Lines[i - 1] : '');
+      const cmpEq = (probe.match(/===\s*'(\d+\.\d+\.\d+)'/) || [])[1] || null;
+      const cmpFloor = (probe.match(/verAtLeast\(\s*[\w.$]+\s*,\s*(\d+)\s*\)/) || [])[1] || null;
       const expect = cmpEq || (cmpFloor ? ('2.' + cmpFloor + '.0') : null);
       const exact = !!cmpEq;
       m.forEach(function (x) {

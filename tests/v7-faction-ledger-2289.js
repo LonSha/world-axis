@@ -55,10 +55,15 @@ function runAll(assertFn) {
   const WA = load();
   const aa = function (ok, msg) { a(ok, msg); if (assertFn) assertFn(ok, msg); };
   aa(typeof WA.org.ledgerView === 'function', 'A0 ledgerView export');
-  aa(ORG_SRC.indexOf('function factionAccounts(') >= 0, 'A1 factionAccounts implementation');
-  aa(ORG_SRC.indexOf('accounts: factionAccounts(opts)') >= 0, 'A2 ledgerView consumes accounts');
-  aa(DIAG_SRC.indexOf('accounts: led && led.accounts') >= 0, 'A3 diagnostic consumes ledgerView accounts');
-  aa(PANEL_SRC.indexOf('势力账本') >= 0 && PANEL_SRC.indexOf('ac.rows') >= 0, 'A4 panel renders account summary');
+  // v2.293.0（v2133 清偿）：锚点面从 `indexOf >= 0` 在场断言升级为 must1 恰 1 断言
+  //   （五个字面量在各自目标实测恰 1 次，升级不改变真值；must1 是本仓 EXV7-4 起的
+  //   锚点断言惯用写法，锚点扫描器按 must1-arg 形态识别——此前本锁整体落「未识别」。
+  //   顺带消灭死辅助函数：must1 从「定义了从不调用」变为真消费）。
+  must1(ORG_SRC, 'function factionAccounts(', 'A1 factionAccounts implementation');
+  must1(ORG_SRC, 'accounts: factionAccounts(opts)', 'A2 ledgerView consumes accounts');
+  must1(DIAG_SRC, 'accounts: led && led.accounts', 'A3 diagnostic consumes ledgerView accounts');
+  must1(PANEL_SRC, '势力账本', 'A4a panel renders account summary');
+  must1(PANEL_SRC, 'ac.rows', 'A4b panel renders ac.rows');
   seed(WA, 1);
   const empty = WA.org.ledgerView().accounts;
   aa(empty.ok === true && empty.total === 1 && empty.rows.length === 1, 'B1 faction row and explicit bounds');

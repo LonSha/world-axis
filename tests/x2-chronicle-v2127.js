@@ -49,7 +49,7 @@ const ANCHORS = {
   injSrc: { rel: INJ, txt: "'chrono'];" },
   injName: { rel: INJ, txt: "chrono: '世界编年史'," },
   injMod: { rel: INJ, txt: "worldaxis_chrono_settings_v1'," },
-  panelName: { rel: PANEL, txt: "chrono: '世界编年史' };" },
+  panelName: { rel: PANEL, txt: "worldAutobiography: '世界自传' };" },  // EXV7-8 后 VIS_NAMES 末项；与 injName 锚点互不重叠
   diagRead: { rel: DIAG, txt: "const cr = WA.chrono.chronicle({ limit: 12 });" }
 };
 const TAG = '__x2_2127_';
@@ -272,8 +272,8 @@ function runNegative(a) {
   a(n7.indexOf('WA.chrono.chronicle(') < 0,
     'v2127/x2: [N7] 诊断不再读 chronicle 时该读数为零（C 面判据不是恒真）');
   // N8 显示名不登记 ⇒ 裸露英文键
-  const n8 = breakOnce(P0, ANCHORS.panelName.txt, 'chronoStub: \'世界编年史\' };', 'N8');
-  a(hits(n8, 'chrono: \'世界编年史\'') === 0,
+  const n8 = breakOnce(P0, ANCHORS.panelName.txt, 'worldAutoStub: \'世界自传\' };', 'N8');
+  a(hits(n8, 'worldAutobiography: \'世界自传\'') === 0,
     'v2127/x2: [N8] 面板显示名不登记时该键缺失（C 面判据不是恒真）');
   // N9 纯度：全部负控制跑完后四个真文件逐字未变 + 原版同款判据成立
   a(src(CH) === C0 && src(INJ) === I0 && src(DIAG) === D0 && src(PANEL) === P0,

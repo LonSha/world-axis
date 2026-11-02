@@ -451,7 +451,7 @@
           const pBd = rng(bdPo.bondDensity, [0, 100]);
           const pGp = rng(bdPo.goalsPerPerson, [0, 2]);
           const pGa = rng(bdPo.grantAmount, [0, 200]);
-          return `<label class="wa-node"><input type="checkbox" id="wa-po-enable" ${po.enabled ? 'checked' : ''}/><span class="wa-node-label">允许播种（关掉则整口拒收 disabled，不是「世界已经满了」）</span></label>
+          return `<label class="wa-node"><input type="checkbox" id="wa-po-enable" ${po.enabled ? 'checked' : ''}/><span class="wa-node-label">允许播种（关掉则整口拒收，不是「世界已经满了」）</span></label>
             <div class="wa-set-row"><span>一批种 <b id="wa-po-peoplev">${po.people}</b> 个人</span><input type="range" min="${pF[0]}" max="${pF[1]}" value="${po.people}" aria-label="一批种几个人" id="wa-po-people" class="wa-range"/></div>
             <div class="wa-set-row"><span>建 <b id="wa-po-placesv">${po.places}</b> 处地方</span><input type="range" min="${pL[0]}" max="${pL[1]}" value="${po.places}" aria-label="建几处地方" id="wa-po-places" class="wa-range"/></div>
             <div class="wa-set-row"><span>修 <b id="wa-po-roadsv">${po.roads}</b> 条路</span><input type="range" min="${pR[0]}" max="${pR[1]}" value="${po.roads}" aria-label="修几条路" id="wa-po-roads" class="wa-range"/></div>

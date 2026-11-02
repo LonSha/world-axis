@@ -165,7 +165,7 @@ function runAll(assertFn) {
     const out = dom.getElementById('wa-diag-out');
     a(!!out && String(out.innerHTML).indexOf('读数仪已清零') >= 0,
       'v2274/C3: 面板给出清零反馈（不静默；实 ' + j(out && String(out.textContent).slice(0, 40)) + '）');
-    a(String(out && out.innerHTML).indexOf('8') >= 0, 'v2274/C3b: 反馈里报出清零台数（八台都在场）');
+    a(String(out && out.innerHTML).indexOf('10') >= 0, 'v2274/C3b: 反馈里报出清零台数（EXV7-8/9 后十台都在场）');
   }
   {
     // C4 「知道了」：点一下引导必须收起（此前 dismiss 未导出，界面上根本没有这个动作）
