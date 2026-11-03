@@ -1,4 +1,5 @@
 # Agent Note: EXV7-6 地点沉积跨地点台账
+
 Status: implemented
 ## Problem
 `engines/sediment.js` 自 v2.149.0 起提供 `settle(placeId, fact)`（按地点入账一条沉积，痕迹档由调用方显式给出 `minor` / `marked` / `scar`）与 `feel(placeId)`（答**单个地点**此刻留下什么，含按 `traceWindowMs` 现算的衰减）。但没有任何跨地点的读口：`stat()` 只给「几处地点 / 几条痕迹 / 几条已淡成传说」三个标量，答不出「**哪几处**地方还留着事、各自当前最强是什么档、有几条已经淡成传说」。任何想问这个问题的消费方（面板、诊断、导出）都只能自己遍历 `store` 的 `sediment.rows` 再逐个调 `feel` —— 那是每个消费方各自重算一遍聚合，正是本仓反复治理的「两处各说一遍」。若为此另建一张聚合表，就会给 `rows` 造一个会漂移的副本。

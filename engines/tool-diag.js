@@ -1097,6 +1097,57 @@
    *   + suspicious（有真实调用面却空：**嫌疑，不是结论**）
    *   + weakRows（容器里有记录但从未被产出过：**判不了，如实报**）
    */
+  // Runtime receipts are evidence, not guessed stat-field semantics. No diagnostic writes.
+  function secPanelYield() {
+    return safe(function () {
+      const ledger = WA.driverLedger.view();
+      const keys = (ledger.layerNames || {}).L2p || [];
+      const sampled = WA.healthPreflight.yieldAttrib({ limit: 100, keys: keys });
+      const activity = WA.writeDesk ? WA.writeDesk.stat().activity || {} : {};
+      const rows = keys.map(function (key) {
+        let raw = (sampled.rows || []).filter(function (r) { return r.key === key; })[0];
+        // Some builders intentionally have no enabled setting: capabilityTier.shapeOf excludes them.
+        // Their absence from that switch inventory is not a failed builder.
+        if (!raw) {
+          try {
+            const text = WA[key].buildBlock();
+            raw = { state: text ? 'yield' : 'no-data', len: String(text || '').length, signals: { records: 0 } };
+          } catch (e) { raw = { state: 'fault', threw: String(e && e.message || e), len: -1, signals: { records: 0 } }; }
+        }
+        const receipt = activity[key] || { calls: 0, written: 0, rejected: 0 };
+        let state = raw ? raw.state : 'fault';
+        let why = raw ? (raw.threw || '') : 'builder-read-unavailable';
+        if (raw && state === 'no-data' && receipt.written > 0 && raw.signals.records > 0) {
+          state = 'fault'; why = 'written-container-without-yield';
+        }
+        return { key: key, state: state, why: why, receipt: receipt,
+          records: raw ? raw.signals.records : null, len: raw ? raw.len : null,
+          evidence: receipt.calls > 0 ? 'write-desk' : 'not-observed' };
+      });
+      const count = function (s) { return rows.filter(function (r) { return r.state === s; }).length; };
+      return { ok: !!(sampled.ok && ledger.scan && ledger.scan.canConclude), total: rows.length,
+        yield: count('yield'), off: count('off'), fault: count('fault'), noData: count('no-data'), rows: rows,
+        scan: ledger.scan, receiptScope: 'write-desk-only; dedicated panel writes not inferred' };
+    }, { ok: false, reason: 'panel-yield-unavailable' });
+  }
+  function secControlUsage() {
+    return safe(function () {
+      if (!WA.ui || typeof WA.ui.usageStat !== 'function') return { ok: false, reason: 'ui-not-loaded' };
+      const use = WA.ui.usageStat(), calls = use.controls || {};
+      const rows = [];
+      UI_BINDINGS.forEach(function (g) {
+        ['ids', 'cond', 'dynamic'].forEach(function (layer) {
+          (g[layer] || []).forEach(function (entry) {
+            const id = typeof entry === 'string' ? entry : entry.id;
+            if (id) rows.push({ page: g.page, id: id, layer: layer, calls: calls[id] || 0 });
+          });
+        });
+      });
+      return { ok: true, observed: use.events, since: 'current-runtime', rows: rows,
+        zero: rows.filter(function (r) { return r.calls === 0; }),
+        note: 'zero means no captured user click/change in this runtime, not unreachable; dynamic/conditional outputs may have no input action' };
+    }, { ok: false, reason: 'control-usage-unavailable' });
+  }
   function secYield() {
     return safe(function () {
       if (!WA.healthPreflight || typeof WA.healthPreflight.yieldAttrib !== 'function') {
@@ -1132,6 +1183,10 @@
         callFace: r.callFace,
         line: line,
         at: r.at,
+        panelYield: secPanelYield(),
+        controlUsage: secControlUsage(),
+        injectionVolume: ((WA.store.get() || {}).lastInjection || {}).volume || null,
+        collector: WA.injectCollector ? WA.injectCollector.stat() : null,
         note: (r.fault !== 0 || (r.suspicious || []).length !== 0)
           ? '有引擎交不出内容：抛异常的按 faults 逐个查；suspicious 那一组只能人去判断（本仓判不了）'
           : null
@@ -2022,6 +2077,7 @@
       const out = {
         enabled: !!v.enabled,
         writesPresent: !!v.writesPresent,
+        yieldVerification: v.yieldVerification || null,
         writesMissing: (v.writesMissing || []).slice(),
         used: Object.assign({}, v.used || {}),
         rooms: Object.assign({}, v.rooms || {}),
@@ -3330,6 +3386,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   症状是 export-contract 里整个 worldAutobiography 命名空间缺席 ——
     //   守卫与契约面同时看不见它，而专锁照绿）。
     'engines/world-autobiography.js': 'worldAutobiography',
+    'engines/player-archive.js': 'playerArchive',
     'engines/populate.js': 'populate',
     'core/clock.js': 'clock',
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/input-guard.js': 'inputGuard', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
@@ -3819,8 +3876,15 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。ns 名取自各文件导出面实测。
     'engines/driver-ledger.js': 'driverLedger',
     'engines/intake-dispatch.js': 'intake',
-    'engines/write-contract.js': 'writeContract'
-
+    'engines/write-contract.js': 'writeContract',
+    'engines/round-drivers.js': 'roundDrivers',
+    'engines/write-desk.js': 'writeDesk',
+    'engines/inject-collector.js': 'injectCollector',
+    // v2.294.0（V8 收口）：玩家归档（EXV8-6 带离包）此前漏登记在本表。
+    //   后果正是本表注释写的那个：inventory 的定义面与出口面契约都从本表取，
+    //   漏了就等于它在定义面上不存在（自检看不见的黑盒）—— 回归里
+    //   「store 台账的每个归因来源都有可读标签（实缺 1：playerArchive）」就是它现形。
+    'engines/player-archive.js': 'playerArchive'
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
   // v2.152.0：新增 ui 模块（ui/render-perf.js）同步进本名单 —— 漏登记的后果不是「少一行字」，
@@ -4532,7 +4596,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     }, { error: 'commit 节采集失败' });
   }
   const UI_BINDINGS = [
-    { page: 'tools', ids: ['wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-faces', 'wa-snap-subset', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out',
+    { page: 'tools', ids: ['wa-events-auto', 'wa-par-every', 'wa-par-max', 'wa-par-enabled', 'wa-par-export', 'wa-par-view', 'wa-par-seed', 'wa-par-import', 'wa-par-input', 'wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-faces', 'wa-snap-subset', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out',
       // v2.2.0: 诊断出口收口——三个新增控件同样纳入「渲染 ↔ 绑定」一致性校验
       'wa-stat-reset', 'wa-compat-view', 'wa-wf-reset',
       // v2.274.0：读数仪清零出口。八台读数引擎的 reset() 此前零消费（导出面有口、无人调），
@@ -4590,13 +4654,18 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   它是**设置型**控件而非按钮，但同属接线面，一并登记。
       'wa-ca-summary'],
       cond: ['wa-orph-all', 'wa-settle-unforce'],
-      dynamic: ['wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue',
+      dynamic: ['wa-par-out', 'wa-diag-out', 'wa-an-out', 'wa-snap-out', 'wa-imp-out', 'wa-key-sweep-go', 'wa-key-sweep-ghost', 'wa-q-restore', 'wa-q-drop', 'wa-conf-dl', 'wa-conf-drop', 'wa-settle-force', 'wa-rv-confirm', 'wa-rv-cancel', 'wa-mirror-rescue',
       // v2.83.0（B6）：配置包面板里的动态控件（点开才渲染）。
       //   wa-cfg-copy / wa-cfg-import 在第一屏；wa-cfg-text / wa-cfg-check / wa-cfg-go /
       //   wa-cfg-abort / wa-cfg-cancel 在「粘贴 → 校验 → 二次确认」两步流程里逐步出现。
       'wa-cfg-copy', 'wa-cfg-import', 'wa-cfg-text', 'wa-cfg-check', 'wa-cfg-cancel', 'wa-cfg-go', 'wa-cfg-abort',
       // v2.184.0（E3）：存档槽的读数出口（动态写入，同上面 tools 页两条的口径）。
       'wa-ck-out'] },
+    { page: 'desk', ids: ['wa-wdesk-ns', 'wa-wdesk-load', 'wa-wdesk-stat',
+      // v2.294.0（V8 EXV8-2）：写口台页。同 v2.197.0 的理由——新控件必须「渲染 + 绑定 + 守卫登记」
+      //   三件齐做，否则「按钮渲染了但绑定的 id 写错」永远不会被守卫表发现。
+      //   wa-wdesk-ports / wa-wdesk-out 是输出区（同 v2.151.0 wa-ot-out 的口径：面板回显，也登记）。
+      'wa-wdesk-ports', 'wa-wdesk-out'] },
     { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg', 'wa-next-day', 'wa-wb-trigger', 'wa-wb-refresh', 'wa-wb-preview', 'wa-wb-scan', 'wa-wb-list', 'wa-wb-out'], dynamic: ['wa-conc-v'] },
     { page: 'people', ids: ['wa-ll-enabled', 'wa-ll-id', 'wa-ll-due', 'wa-ll-promise', 'wa-ll-sweep', 'wa-ll-out', 'wa-org-enabled', 'wa-org-kind', 'wa-org-name', 'wa-org-item', 'wa-org-qty', 'wa-org-to-kind', 'wa-org-to-name', 'wa-org-grant', 'wa-org-transfer', 'wa-org-check', 'wa-org-ledger', 'wa-org-out',
        // v2.94.0（O6）：流水导出 / 带外对账 / 经济风三控件。同 v2.51.0 的理由——新控件必须
@@ -4768,7 +4837,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
        // v2.139.0（E11）：偏离度两枚入口（偏离度 / 偏离曲线）。同 v2.51.0 起的理由：
        //   新控件「渲染 + 绑定 + 守卫登记」三件齐做，否则 id 写错无人发现。
        'wa-cn-deviation', 'wa-cn-trend'],
-      dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg'],
+      dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg', 'wa-prof-personality', 'wa-prof-worldview', 'wa-prof-family', 'wa-prof-memory', 'wa-prof-relationships'],
       cond: ['wa-intel-network-block'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text',
       // v2.139.0（E9）：势力关系网三枚读数入口（渲染在事件页「势力」区下方）。
@@ -6040,6 +6109,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), perfLedger: secPerfLedger(), tapeStore: secTapeStore(), intel: secIntel(), perspective: secPerspective(), sediment: secSediment(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       // v2.231.0（OPT-8）：世界词汇面（货币 / 配方 / 判定维度 / 题材目录 + 逐配方前置自洽）。
       //   与 recipe 节分列：那一节答「这一局按哪张配方跑」，本节答「这一局用哪些词」。
+      playerArchive: safe(function () { const v = WA.playerArchive.view(); return { settings: WA.playerArchive.getSettings(), count: v.works.length, rounds: v.works.map(function (x) { return x.round; }), note: v.note }; }, {}),
       worldLexicon: secWorldLexicon(),
       // v2.231.0（拓展 EXP-1）：能力成长面（声明 + 逐人进度 + 台账）。
       //   与 life / plan 节分列：那两节答「他打算做什么」，本节答「他已经会了什么」。
@@ -6732,6 +6802,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         //   漏进本表 ⇒ 诊断包退回裸桶名；而「读不到后备键」与「没有后备键」是两种完全不同的
         //   处置建议（前者查环境/隐私模式，后者查备份周期是否跑过），不可混同。
         recoverBak: '后备存档读回（读失败 ⇒ L2 自愈不可用）',
+        // v2.294.0（V8 收口）：player-archive 投递 reportReadFail('playerArchive')。
+        //   三份标签表（store.LAB / panel.LAB_P / toolDiag.SRC_LABEL）同源同键集 ——
+        //   缺这一条时诊断包会退回裸桶名 reader，等于「有归因但看不懂」。
+        playerArchive: '玩家归档读回（读失败 ⇒ 会答成「还没归档过」）',
         // v2.113.0（A1 收口）: 审计落盘面新增两个 store 域归因来源。
         //   成因与 recoverBak 同型：v2.112.0 给 auditLog 加了落盘（flush / restore），两处裸读
         //   localStorage 却**不投递归因**——「盘坏了」与「盘上本来就没历史」在诊断上同形。
@@ -7795,6 +7869,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     PACKAGE_FORMAT, PACKAGE_VERSION, MODULE_EXPORTS, UI_BINDINGS,
     collect, verdict, toJSON, summaryText, flatten, download, buildErrorReport,
     OPTIONAL_EXPORTS,
+    secPanelYield, secControlUsage,
     secMeta, secEnv, secModules, secVisibility, secInject, secWorldState, secRuntime, secUi, secCapabilities, secCompat,
     secHostWb, secFloorChanges, secLedgerTimeline,   // v2.50.0（第三十五面）
     secFaultLedger, // v2.80.0（第十四面）

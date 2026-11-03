@@ -122,6 +122,21 @@
         if (!title) return null;
         return [{ id: 'intake_' + api.floor + '_' + api.i, title: title, kind: 'once' }];
       }
+    },
+    {
+      // v2.294.0（V8 EXV8-2）：纪事 → 浅浅结。契约 chronicle 有 title/summary/refs 三件，
+      //   knot(key, text, {source}) 三个必填位全部同名可得（source 取 refs 首个楼层引用；
+      //   无 refs 时以「本轮」为来源标识——「本轮发生了什么」正是纪事的来源口径）。
+      //   与 chronicle→sediment 的 BLOCKED（缺 place）不同：knot 不需要地点。
+      key: 'memoryTiers.knot', sec: 'chronicle', engine: 'memoryTiers', method: 'knot', per: 'row',
+      note: '纪事条目 → 浅层记忆结。title→key（同一件事的归并键），summary→text（结的正文），refs→source（来源楼层）。',
+      call: function (c, api) {
+        const key = clean(c && c.title, 60);
+        const text = clean(c && c.summary, 160);
+        if (!key || !text) return null;
+        const refs = (c && Array.isArray(c.refs) && c.refs.length) ? String(c.refs[0]) : ('floor:' + api.floor);
+        return [key, text, { source: refs }];
+      }
     }
   ];
 

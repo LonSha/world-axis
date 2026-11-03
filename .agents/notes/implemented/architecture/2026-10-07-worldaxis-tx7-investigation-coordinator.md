@@ -1,4 +1,5 @@
 # Agent Note: TX7 — 线索调查、证据核验与秘密揭示（engines/investigation.js）
+
 Status: implemented
 **版本**: v2.170.0
 **模块**: engines/investigation.js (320 行, 12 exports)

@@ -25,7 +25,7 @@
 //   A 结构：PLAYER_PAGES 六页清单 / devMode 状态三件套（init/read-true/export）/
 //          syncTabs 双过滤 / __setDevMode 单一口径 / buildPanel 末尾藏分类条 /
 //          connect label 改 API / PAGES 长度与顺序逐字未动
-//   B 运行时：真实渲染路径下玩家模式恰好 6 页可见且是那 6 个；开开发者模式后 31 页
+//   B 运行时：真实渲染路径下玩家模式恰好 6 页可见且是那 6 个；开开发者模式后 32 页
 //            可见、分类条显示；关掉后回到 6 页、停在机制页则弹回 overview
 //   C 持久化：devMode 落盘（关面板重开仍是开发者模式）/ 默认 false（旧档无字段回落）
 //   D 边界：#wa-set-devmode 三件齐（渲染 + 绑定 + 守卫登记）/ 拒收码 ui-missing 已登记 /
@@ -78,8 +78,8 @@ const A_SETID = 'id="wa-set-devmode"';
 const A_SETBIND = '      if (devCb) devCb.onchange = function () {';
 // ⑬ 守卫登记（tool-diag 的 settings 页 ids）
 const A_GUARD = "      'wa-set-devmode',";
-// ── PAGES 冻结清单（本版前 31 页的 id 与顺序，逐字比对 —— 删页/插页/重排全红灯）──
-const PAGES_FROZEN = ["overview","world","people","memory","enemies","parallel","inject","sediment","offline","net","health","beat","chapter","todo","port","find","graph","travel","supply","evidence","branchdiff","storyloop","retrieval","actiondesk","events","director","settings","connect","assistant","tools","logs"];
+// ── PAGES 冻结清单（v2.294.0 起 32 页的 id 与顺序，逐字比对 —— 删页/插页/重排全红灯）──
+const PAGES_FROZEN = ["overview","world","people","memory","enemies","parallel","inject","sediment","offline","net","health","beat","chapter","todo","port","find","graph","travel","supply","evidence","branchdiff","storyloop","retrieval","actiondesk","events","director","settings","connect","desk","assistant","tools","logs"];
 // ── 环境：真实 UI 渲染路径 ───────────────────────────────────────────
 let gate = null;
 function envWith(ov) {
@@ -173,15 +173,15 @@ function runB(a) {
     'B1b: 可见页即动线六页（实 ' + JSON.stringify(vis) + '）—— 填 API → 看世界 → 看人物 → 看事件 → 设设置');
   // B2 全量页签仍在 DOM（可见性层过滤，不是删节点）
   const all = allPages(env);
-  a(all.length === 31, 'B2: 31 个页签全部仍在 DOM（可见性过滤而非删除，实 ' + all.length + '）');
+  a(all.length === 32, 'B2: 32 个页签全部仍在 DOM（可见性过滤而非删除，实 ' + all.length + '）');
   // B3 分类条对玩家隐藏
   a(catbarVisible(env) === false, 'B3: 分类条对玩家隐藏（核心/世界/工坊/系统是另一套要学的黑话）');
-  // B4 打开开发者模式：31 页可见、分类条显示
+  // B4 打开开发者模式：32 页可见、分类条显示
   const env2 = envWith(null);
   const WA2 = env2.WA;
   WA2.ui.setDevMode(true);
   const vis2 = visiblePages(env2);
-  a(vis2.length === 31, 'B4: 开发者模式后 31 页全部可见（实 ' + vis2.length + '）—— currentCat 旁路 + 切回 all，不是「开了还是 6 页」');
+  a(vis2.length === 32, 'B4: 开发者模式后 32 页全部可见（实 ' + vis2.length + '）—— currentCat 旁路 + 切回 all，不是「开了还是 6 页」');
   a(catbarVisible(env2) === true, 'B4b: 开发者模式分类条显示（恢复完整导航）');
   a(WA2.ui.devMode() === true, 'B4c: devMode() 读口与界面一致');
   // B5 关掉：停在玩家页留在原页；停在机制页弹回 overview
@@ -238,13 +238,13 @@ function runC(a) {
   try { global.localStorage.setItem(KEY, JSON.stringify({ page: 'overview', devMode: true })); } catch (e) {}
   const env3 = envWith(null);
   a(env3.WA.ui.devMode() === true, 'C3: 落盘 devMode:true 重开面板后仍是开发者模式（关面板再开不丢）');
-  a(visiblePages(env3).length === 31, 'C3b: 持久化的开发者模式装载即 31 页可见（不闪 6 页）');
+  a(visiblePages(env3).length === 32, 'C3b: 持久化的开发者模式装载即 32 页可见（不闪 6 页）');
   // 收尾：清掉本节写的状态键（与 ui-components-v2109 同口径：storage 属 soft 面，本节自己收）
   try { global.localStorage.removeItem(KEY); } catch (e) {}
 }
 // ═══ D 面：边界与不变量 ═══════════════════════════════════════════
 function runD(a) {
-  // D1 可见性过滤零新页签（31 页签数量两次装载一致）
+  // D1 可见性过滤零新页签（32 页签数量两次装载一致）
   const p1 = allPages(envWith(null));
   const p2 = allPages(envWith(null));
   a(p1.length === p2.length, 'D1: 过滤不新增页签（两次装载页数一致：' + p1.length + ' / ' + p2.length + '）');
@@ -299,13 +299,13 @@ function runNegative(a) {
   must1(D0, A_GUARD, 'N0 守卫登记');
   const KEY = 'worldaxis_ui_panel_state_v1';
   try { global.localStorage.removeItem(KEY); } catch (e) {}
-  // N1 摘掉 syncTabs 模式过滤（__vis 恒真）⇒ B1 判据现形（31 页全可见）
+  // N1 摘掉 syncTabs 模式过滤（__vis 恒真）⇒ B1 判据现形（32 页全可见）
   {
     const P1 = brk(P0, A_VIS,
       '        const __vis = true && __catOK;', 'N1');
     const env = envWith({ [PANEL]: P1 });
     const n = visiblePages(env).length;
-    a(n === 31, 'N1: 摘掉模式过滤后 31 页全可见（实 ' + n + '）⇒ B1 的「恰好 6 页」不是恒真');
+    a(n === 32, 'N1: 摘掉模式过滤后 32 页全可见（实 ' + n + '）⇒ B1 的「恰好 6 页」不是恒真');
   }
   // N2 摘掉分类旁路 ⇒ **玩家模式**判据现形（旁路摘掉后玩家只剩 core 类 2 页）
   //   注：不能在破坏副本上走 setDevMode(true)——syncTabs 开头「currentCat = pageCat」会顺着
@@ -335,7 +335,7 @@ function runNegative(a) {
     try { global.localStorage.setItem(KEY, JSON.stringify({ page: 'overview', devMode: true })); } catch (e) {}
     const env = envWith({ [PANEL]: P3 });
     const n = visiblePages(env).length;
-    a(n < 31, 'N3: 摘掉两处「切回 all」后装载即开只亮 core 类 + 玩家旁路页（实 ' + n + ' 页 < 31）⇒ B4/C3b 不是恒真');
+    a(n < 32, 'N3: 摘掉两处「切回 all」后装载即开只亮 core 类 + 玩家旁路页（实 ' + n + ' 页 < 32）⇒ B4/C3b 不是恒真');
     try { global.localStorage.removeItem(KEY); } catch (e) {}
   }
   // N4 摘掉 buildPanel 藏分类条 ⇒ B3 判据现形（分类条对玩家可见）

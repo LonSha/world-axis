@@ -71,7 +71,7 @@
   //   理由：因果链是**历史**（挤掉最旧的仍答得出「发生过什么」），排期是**待办**
   //   （挤掉最旧的就是把那件事悄悄取消了，而调用方会以为它还在队列里）。
   //   `cancel()` 是唯一合法的取消入口——「世界没发生这件事」必须说得出口。
-  const DEF = { enabled: false, maxRows: 24, maxRuns: 12, maxFails: 12, retryDelayMs: 1000, maxRetries: 2,
+  const DEF = { enabled: false, autoFulfill: false, maxRows: 24, maxRuns: 12, maxFails: 12, retryDelayMs: 1000, maxRetries: 2,
     maxClaims: 24, leaseMs: 0 };
   const __REG = { key: LS_KEY, def: DEF, module: 'events',
     bounds: { maxRows: [1, 24], maxRuns: [1, 60], maxFails: [1, 24], retryDelayMs: [0, 600000], maxRetries: [0, 5],
@@ -418,6 +418,12 @@
       //    拒收它会让调用方连「这笔做完了」都提交不了）。回收与回报谁先到，这里读得出来。
       const lateOne = isFinite(x.leaseUntil) && x.leaseUntil > 0 && now >= x.leaseUntil;
       if (r.ok === true) {
+        if (r.archiveScheduled === true) {
+          if (!WA.backstage || typeof WA.backstage.archiveScheduled !== 'function') {
+            out = { ok: false, reason: 'bridge-missing', id: rid }; return false;
+          }
+          WA.backstage.archiveScheduled(draft, x.title, x.id, key);
+        }
         x.runs = (x.runs || 0) + 1;
         x.lastExecutedAt = now;
         x.lastNote = note;
@@ -696,11 +702,40 @@
         + 'conditional 无确定时刻、不猜；已到点未认领才算 due；终态行默认不进未来轴'
     };
   }
+  /** V8: opt-in schedule-to-archive bridge. Never resolves unproven conditions or guesses payload facts. */
+  function fulfillDue(opts) {
+    const cfg = settings();
+    if (!cfg.enabled || !cfg.autoFulfill) return { ok: false, reason: 'disabled' };
+    if (!WA.backstage || typeof WA.backstage.archiveScheduled !== 'function') return { ok: false, reason: 'bridge-missing' };
+    // Do not claim rows already owned by another executor; crash-reclaimed rows use the same owner.
+    const live = active();
+    if (live.some(function (x) { return x.status === 'claimed' && x.owner !== 'events.archive'; })) {
+      return { ok: false, reason: 'foreign-owner' };
+    }
+    const asked = Number((opts || {}).max);
+    const budget = isFinite(asked) && asked > 0 ? Math.max(1, Math.min(Math.floor(asked), cfg.maxClaims)) : cfg.maxClaims;
+    const retry = live.filter(function (x) { return x.status === 'claimed' && x.owner === 'events.archive'; }).slice(0, budget);
+    const c = retry.length < budget ? claim(undefined, Object.assign({}, opts || {}, { owner: 'events.archive', max: budget - retry.length }))
+      : { ok: true, items: [], blocked: [], deferred: [] };
+    if (!c.ok) return c;
+    const results = retry.concat(c.items).map(function (x) {
+      try { return complete(x.id, { ok: true, opId: x.opId, archiveScheduled: true, note: 'scheduled title archived' }); }
+      catch (e) { return { ok: false, reason: 'archive-failed', id: x.id, error: String(e && e.message || e).slice(0, 120) }; }
+    });
+    return { ok: results.every(function (r) { return r.ok; }), count: results.filter(function (r) { return r.ok; }).length, results: results, blocked: c.blocked, deferred: c.deferred };
+  }
+  function fulfilledBlock() {
+    const s = state(), chron = Array.isArray(s.chronicle) ? s.chronicle : [];
+    const recent = chron.filter(function (c) { return c && c.kind === 'scheduled-event' && c.visibility !== 'hidden'; }).slice(-settings().maxRows);
+    return recent.length ? '[排期事件·已兑现]\n' + recent.map(function (c) { return '· ' + c.title; }).join('\n')
+      + '\n以上仅为已登记排期的兑现记录；不得补造结果或人物反应。' : '';
+  }
   /** 注入块：只报已排期（含执行中），并明标「未到点 ≠ 已发生」。 */
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
     const live = active();
-    if (!live.length) return '';
+    const archived = fulfilledBlock();
+    if (!live.length) return archived;
     const now = clockNow('events');
     const lines = live.map(function (x) {
       const when = x.status === 'claimed' ? '执行中（已认领、未回报）'
@@ -709,7 +744,7 @@
       const rep = x.kind === 'repeat' ? ('；周期 ' + x.intervalMs + 'ms × ' + x.runs + '/' + cfg.maxRuns) : '';
       return '· [P' + x.priority + '] ' + x.title + '（' + x.kind + '；' + when + cond + rep + '）';
     });
-    return '[事件调度]\n' + lines.join('\n')
+    return (archived ? archived + '\n' : '') + '[事件调度]\n' + lines.join('\n')
       + '\n以上是**已排期**的事件（含执行中与未到点）。未到点的事件不得写成已发生；'
       + '条件未满足时必须停住，不得替它提前完成；已认领未回报的事件不得重复触发。';
   }
@@ -717,7 +752,7 @@
   WA.events = {
     KINDS: KINDS, ACTIVE: ACTIVE, TERMINAL: TERMINAL,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
-    schedule: schedule, due: due, claim: claim, complete: complete, cancel: cancel, replace: replace,
+    schedule: schedule, due: due, claim: claim, complete: complete, cancel: cancel, replace: replace, fulfillDue: fulfillDue,
     active: active, fails: fails, buildBlock: buildBlock,
     // v2.291.0（EXV7-7）：事件钟上的未来时间轴（只读投影，不改 stage）。
     timelineView: timelineView,
@@ -729,4 +764,6 @@
       });
     }
   };
+  WA.workflow.register({ id: 'events.fulfill', chain: 'before', order: 7, critical: false, label: '排期事件兑现',
+    run: function (ctx) { return WA.events.fulfillDue({ metConditions: (ctx && ctx.metConditions) || [] }); } });
 })();

@@ -65,17 +65,21 @@ const ANCHOR = {
   // ② 运行期拿不到源码 ⇒ 互调图必须清空（面与图同源）
   runtimeClearGraph: "    __graph = null;\n    let names = [];",
   // ③ 互调扩散只从 engines/ 与 core/ 出发（render/ 的 buildBlock 是渲染读，不是喂食）
+  // v2.294.0（V8 OPV8-4）：reachSet 多了两段播种（宿主入口 / actionDesk 本体），
+  //   锚点取「目录过滤」这一行 —— 它仍是「扩散范围」的唯一开关，破坏它 = 放开范围。
   reachScope: "return r.indexOf('engines/') === 0 || r.indexOf('core/') === 0;",
   // ④ 同一个文件里调自己的命名空间不算外部驱动
   selfCallSkip: "if (verbatim.defs.indexOf(dst) >= 0) continue;   // 自己文件调自己",
   // ⑤ 缓存自带签名（扫描面一变就重扫）
   cacheSig: 'if (__scan && __scanSig === sig) return __scan;',
   // ⑥ 清单可截断，但计数必须是真实条数
-  blindCount: 'blindOrphanCount: b.blindOrphans.length,',
+  blindCount: 'diagOnlyOrphanCount: b.diagOnlyOrphans.length,\n      blindOrphans: b.blindOrphans.slice(0, maxList),\n      blindOrphanCount: b.blindOrphans.length,',
   // ⑦ 诊断面按文件认（静态面）；运行期另按命名空间认（DIAG_NS）
   diagFace: "return READ_FACES[rel] ? 'diag' : 'other';",
   // ⑧ 互调档排在面板之后、未判定之前
-  l2eGate: "else if (reached[ns] === 'call') { layer = 'L2e'; driver = 'engine'; }",
+  // v2.294.0（V8 OPV8-4）：L2e 判据同时认 'call' 与 'entry'（入口边同样是驱动）。
+  //   锚点必须与产品源码逐字一致，否则 N7 会在「锚点不是恰 1 次」上抛出原因不对的红。
+  l2eGate: "else if (reached[ns] === 'call' || reached[ns] === 'entry') { layer = 'L2e'; driver = 'engine'; }",
   // ⑨ 面板档的字面判据（用作两向自证的「正面」那一向）
   panelGate: "else if (panelM.length) { layer = 'L2p'; driver = 'panel'; }",
   // ⑩ 三个下界面合并时 diag 桶不许漏
@@ -93,9 +97,9 @@ const BREAK = {
   reachScope: 'return true;',
   selfCallSkip: 'if (false) continue;   // 自己文件调自己',
   cacheSig: 'if (__scan) return __scan;',
-  blindCount: 'blindOrphanCount: b.blindOrphans.slice(0, 10).length,',
+  blindCount: 'diagOnlyOrphanCount: b.diagOnlyOrphans.slice(0, 2).length,\n      blindOrphans: b.blindOrphans.slice(0, 10),\n      blindOrphanCount: b.blindOrphans.slice(0, 10).length,',
   diagFace: "return 'other';",
-  l2eGate: "else if (reached[ns] === 'call' && false) { layer = 'L2e'; driver = 'engine'; }",
+  l2eGate: "else if ((reached[ns] === 'call' || reached[ns] === 'entry') && false) { layer = 'L2e'; driver = 'engine'; }",
   panelGate: 'else if (panelM.length && false) { layer = \'L2p\'; driver = \'panel\'; }',
   mergeDiag: "['panel', 'other'].forEach(",
   hintPanel: 'const ps = r.panelMembers;',
@@ -581,13 +585,25 @@ function runNegative(assertFn) {
     O.WA.driverLedger.setSettings({ maxList: 10 });
     const vo = O.WA.driverLedger.view();
     a(vo.blindOrphanCount === vo.counts.L3b, 'N6a（正面）：原版计数 = 真实条数');
+    // 【v2.294.0（V8 OPV8-4）】被截断档从 L3b 换成 L3a：
+    //   OPV8-4 修完两处假阴性后 L3b 真实归零（5 台进 L2e、survival 进 L2e、4 台留 L3a），
+    //   原前提「真实 L3b > 上限」结构性消失。这里改用仍有真实样本的 L3a，
+    //   并把上限压到 2 —— 判据语义不变（计数必须是真实条数，不是 slice 后长度）。
+    //   不选「往 L3b 塞假引擎」：那是拿锁给假读数背书。
+    const lim = 2;
     const P = boot(broken('blindCount'));
     setPrefetch(P.WA, null);
-    P.WA.driverLedger.setSettings({ maxList: 10 });
+    P.WA.driverLedger.setSettings({ maxList: lim });
     const vp = P.WA.driverLedger.view();
-    a(vp.counts.L3b > 10, 'N6b（前提）：真实 L3b 超过清单上限 10（实 ' + vp.counts.L3b + '）');
-    a(vp.blindOrphanCount <= 10, 'N6c（现形）：计数退化成截断长度（' + vp.blindOrphanCount
-      + ' vs 真实 ' + vp.counts.L3b + '）—— 少报的 23 台从此看不见');
+    a(vp.diagOnlyOrphanCount <= lim,
+      'N6c（现形）：计数退化成截断长度（' + vp.diagOnlyOrphanCount
+      + ' vs 真实 ' + vp.counts.L3a + '）—— 少报的 ' + (vp.counts.L3a - vp.diagOnlyOrphanCount)
+      + ' 台从此看不见');
+    // 前提必须独立成立：真实条数确实超过上限，否则上面那条会因「本来就小于上限」而恒真。
+    a(vp.counts.L3a > lim, 'N6b（前提）：真实 L3a 超过清单上限 ' + lim + '（实 ' + vp.counts.L3a + '）');
+    // L3b 侧补一条：真实为 0 时计数也必须报 0，不许编数。
+    a(vp.counts.L3b === 0 ? vp.blindOrphanCount === 0 : vp.blindOrphanCount === vp.counts.L3b,
+      'N6d：L3b 计数与真实条数一致（' + vp.blindOrphanCount + ' vs ' + vp.counts.L3b + '）');
   }
 
   // N7 破坏「诊断面按文件认」⇒ L3a 与 L3b 分不开（只诊断读被折进「没人碰」）

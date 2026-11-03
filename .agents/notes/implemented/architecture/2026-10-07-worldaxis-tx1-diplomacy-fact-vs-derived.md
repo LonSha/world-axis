@@ -1,4 +1,5 @@
 # Agent Note: Diplomacy fact layer vs. faction-graph derived layer — six boundaries and the wiring-not-update decision
+
 Status: implemented
 
 ## Problem

@@ -1,4 +1,5 @@
 # Agent Note: TX4 — Story Choice Coordinator Boundaries
+
 Status: implemented
 
 ## Problem

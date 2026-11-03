@@ -909,6 +909,7 @@
       let sh = null;
       try { sh = WA.capabilityTier.shapeOf(key); } catch (e) { sh = null; }
       if (!sh || !sh.hasBuild) return;
+      if (Array.isArray(o.keys) && o.keys.indexOf(key) < 0) return;
       const m = WA[key];
       let len = -1, threw = null;
       try { len = String(m.buildBlock() || '').length; } catch (e) { threw = String((e && e.message) || e).slice(0, 80); }

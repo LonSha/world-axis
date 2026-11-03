@@ -54,6 +54,9 @@
     // v2.117.0（计划二 B1）：人物行动。与注入分支同批登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
     'events', 'checkpoints', 'rumor', 'canon', 'act',
+    // v2.294.0（V8 OPV8-1）：正文注面汇流器。与注入分支同批登记 ——
+    //   只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻）。
+    'injectCollector',
     // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。与注入分支同批登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻）。
     'plan', 'mend',
@@ -253,6 +256,10 @@ style: false,
         //   sediment 的 DEF.enabled=false，未开时 buildBlock 返回空串），
         //   不给老用户凭空多出约束。
         sediment: true,
+
+        // v2.294.0（V8 OPV8-1）：结构汇流。取默认 true（其模块总开关默认为关，
+        //   未开时 buildBlock 返回空串），不给老用户凭空多出约束。
+        injectCollector: true,
         // v2.151.0（RX2+RX3）：两条新源。取默认 true（同四条理由——其模块总开关默认为关：
         //   offlineTick / farfield 的 DEF.enabled 皆为 false，未开时 buildBlock 返回空串），
         //   不给老用户凭空多出约束。
@@ -528,6 +535,9 @@ style: false,
     //   而是那份「已经用过了、不要重演」的名单（闸门判定本身不进正文）。
     beatReport: '拍回报', genGate: '要避开的东西',
     sediment: '此地沉积',
+
+    // v2.294.0（V8 OPV8-1）：结构汇流显示名。缺此项 ⇒ 失败台账（SRC_NAME）报英文键名。
+    injectCollector: '结构汇流',
     shadow: '社交漩涡', threads: '悬案',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
@@ -575,6 +585,11 @@ style: false,
     //   用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，排查方向被指错。
     //   同一类漏登记 v2.99.0 已为 rumor/canon 各付过一次学费。
     chrono: 'worldaxis_chrono_settings_v1',
+
+    // v2.294.0（V8 OPV8-1）：结构汇流确有模块级总开关（engines/inject-collector.js 的
+    //   worldaxis_inject_collector_settings_v1）。不登记 ⇒ moduleEnabled 查不到键返回
+    //   null，对账面一律落 unavailable（同 v2.99.0 rumor/canon 漏登记的教训）。
+    injectCollector: 'worldaxis_inject_collector_settings_v1',
     // v2.130.0（拓展计划 A4 / C2）：两条新源**确有**模块级总开关
     //   （worldaxis_reasoning_settings_v1 / worldaxis_storytone_settings_v1）。
     //   不登记会怎样：moduleEnabled 查不到键就返回 null，于是对账面上本源一律落在
@@ -1419,6 +1434,46 @@ style: false,
         const ab = engineCall('worldAutobiography', function () { return WA.worldAutobiography.buildBlock(); });
         if (ab) items.push({ source: '世界自传', content: ab });
       }
+
+      // v2.294.0（V8 OPV8-1）：正文注面汇流器。五台结构化引擎的深层读口（生活承诺、
+      //   意图链卡点、到期事件、情报流、关系登记）第一次进正文。只读 owner 读口，
+      //   关闭（模块总开关或可见性）时 buildBlock 返回空串，注入链逐字无变化。
+      if (vis.injectCollector && WA.injectCollector) {
+        // v2.294.0（V8 EXV8-1 收口）：场景口径接**产品真实场景读口**，不从正文猜。
+        //   缺陷（实测立据）：此前只读 ctx.people / ctx.place，而 core/interceptor.js 构造的
+        //   标准 ctx 只有 type/chat/abort/store/branchId/injections/canceled —— 这两个字段在
+        //   默认生产路径上**根本不存在**，于是「场景相关性」那一维恒为 0，汇流退化成全局排序
+        //   （「场景换了但选的一样」不是算法保守，是输入从来没到过）。
+        //   真源：WA.sceneNarrative.currentScene() —— 它按**物理地点**过滤在场人（traveling /
+        //   on_the_road / transit 一律不算在场），place 也来自 region.currentPlace。这是产品里
+        //   「此刻谁在这个场景」的唯一既有读口，故不新造第二个。
+        //   边界：① 读口缺席 / 关闭 ⇒ 退回 ctx 字段（保留既有的显式入参通道，harness 与
+        //   未来宿主仍可用）；② 只有**真实读到**才用它，读不到不猜（不从 chat 文本里认人名，
+        //   那会把「模型提过谁」当成「谁在场」）；
+        //   ③ 读口抛错整段吞掉并退回 ctx —— 一个场景读数异常不该让整条注入链失败。
+        const sceneSee = (function () {
+          try {
+            if (!WA.sceneNarrative || typeof WA.sceneNarrative.currentScene !== 'function') return null;
+            const sc = WA.sceneNarrative.currentScene({});
+            if (!sc || !sc.ok) return null;
+            return { people: Array.isArray(sc.present) ? sc.present : [], place: sc.place || '' };
+          } catch (e) { return null; }
+        })();
+        const cPeople = sceneSee ? sceneSee.people : (Array.isArray(ctx.people) ? ctx.people : []);
+        const cPlace = sceneSee ? sceneSee.place : (ctx.place || '');
+        const cb = engineCall('injectCollector', function () {
+          const out = WA.injectCollector.buildBlock({ people: cPeople, place: cPlace, visibility: vis });
+          // 读数侧留痕：场景到底从哪来（真源 / ctx / 都没有），便于「选了但没变」时一眼分诊。
+          try {
+            if (WA.injectCollector.noteScene) {
+              WA.injectCollector.noteScene({ from: sceneSee ? 'sceneNarrative' : (cPeople.length || cPlace ? 'ctx' : 'none'),
+                people: cPeople.slice(0, 8), place: cPlace });
+            }
+          } catch (e) { /* 留痕失败不影响注入 */ }
+          return out;
+        });
+        if (cb) items.push({ source: '结构汇流', content: cb });
+      }
       if (vis.retrieval && WA.retrieval) {
         const rq = (function () {
           try {
@@ -1679,7 +1734,7 @@ style: false,
               return r;
             } catch (e) { return null; }
           })();
-          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, budgetMode: planInfo.budgetMode || null, headroom: planInfo.headroom ? { remain: planInfo.headroom.remain, usedPct: planInfo.headroom.usedPct, freePct: planInfo.headroom.freePct, saturated: !!planInfo.headroom.saturated, avgKeptTokens: planInfo.headroom.avgKeptTokens, spareSources: planInfo.headroom.spareSources, note: planInfo.headroom.note || '' } : null, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, volume: WA.injectBudget && WA.injectBudget.volumeView ? WA.injectBudget.volumeView(items, finalItems, { totalCap: planInfo ? planInfo.budget : null }) : null, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, budgetMode: planInfo.budgetMode || null, headroom: planInfo.headroom ? { remain: planInfo.headroom.remain, usedPct: planInfo.headroom.usedPct, freePct: planInfo.headroom.freePct, saturated: !!planInfo.headroom.saturated, avgKeptTokens: planInfo.headroom.avgKeptTokens, spareSources: planInfo.headroom.spareSources, note: planInfo.headroom.note || '' } : null, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
           // v2.150.0(RP4): 价值观察的唯一生产方。位置刻意——必须在预算裁决(finalItems)
           //   与槽位路由都定完之后：观察面要的是「这一轮真落地了哪些源」，拿注入前的候选集
           //   来观察，会把被折叠/丢弃的项也记成「注入过却没被引用」——那是把没发生的事判成没用。

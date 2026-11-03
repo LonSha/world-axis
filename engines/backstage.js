@@ -483,6 +483,16 @@
                 if (__ir && __ir.ok) __applyStat.intakeWritten = __ir.written | 0;
               }
             } catch (e) { WA.log('warn', '推演结果分发异常', e && e.message); }
+            // ── v2.294.0（V8 OPV8-4/EXV8-2）：轮次驱动器 ──────────────────────
+            //   把「每轮只需推进状态」的悬空引擎（tolerance/motif/marginal/quota/
+            //   spotlight/rhythmLoop/eraCycle）推进一轮。与 intake.run 同层的
+            //   事务后副作用；各引擎自读开关、关着如实回 disabled。默认关，
+            //   不开则本段逐字不影响旧行为。失败不抛、不回滚（同 intake 口径）。
+            try {
+              if (WA.roundDrivers && typeof WA.roundDrivers.tickAll === 'function') {
+                WA.roundDrivers.tickAll();
+              }
+            } catch (e) { WA.log('warn', '轮次驱动异常', e && e.message); }
             // ── v2.285.0（V7 EXV7-1）：今日世界简报拍快照 ──────────────────────
             //   与 intake.run 同层（事务后副作用），但方向相反：intake 是「把事实写进
             //   引擎」，简报是「引擎吃进了多少，读出来」。位置必须在 intake 之后 ——
@@ -493,6 +503,10 @@
             try {
               if (WA.worldBriefing && typeof WA.worldBriefing.snap === 'function') {
                 WA.worldBriefing.snap(anchor);
+                if (WA.playerArchive && WA.playerArchive.checkpoint) {
+                  const ar = WA.playerArchive.checkpoint();
+                  if (WA.ledgerTimeline) WA.ledgerTimeline.note('playerArchive', ar.ok, ar.reason || ar.status || 'captured');
+                }
               }
             } catch (e) { WA.log('warn', '世界简报快照异常', e && e.message); }
             // v0.8 账本差分记录
@@ -653,6 +667,12 @@
     // ════════════════════════════════════════════════════
     // 结算器（全量入账）
     // ════════════════════════════════════════════════════
+    /** V8 scheduled archive writer. Caller owns transaction; no digest/model/network side effects. */
+    archiveScheduled(draft, title, eventId, opId) {
+      draft.chronicle.push({ id: WA.rand.id('ch', 4, 'id'), kind: 'scheduled-event', title: title,
+        summary: '', at: clockNow('backstage'), refs: [], eventId: eventId, eventOpId: opId });
+      WA.evict.array(draft.chronicle, 'backstage.chronicle');
+    },
     applyResult(draft, r, anchor) {
       __personaWrites.length = 0; __relationWrites.length = 0;   // v2.51.0：每次结算从零开始收
       __applyStat.chanPersona = 0; __applyStat.chanRelation = 0;

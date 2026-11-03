@@ -155,6 +155,185 @@
    * 并下调排除 35 个没有自动驱动者、需要手动录入数据才会动的悬空引擎（OPV7-8）。
    * 未开与已开都返回（已开的由调用方的 toOn 过滤），故目标集不随当前开关漂移。
    */
+  // V8: historical tier exclusions are opt-in policies, NOT current reachability claims.
+  // Connected routes below remain gated by their owner/dispatcher switches.
+  const V8_DISPOSITIONS = {
+  "contest": [
+    "manual",
+    "writeDesk:contest.open",
+    "胜负与参赛者必须由玩家登记"
+  ],
+  "ruling": [
+    "manual",
+    "writeDesk:ruling.open",
+    "裁决对象与证据不得自动编造"
+  ],
+  "backstageTone": [
+    "manual",
+    "writeDesk:backstageTone.era",
+    "语调是玩家决策"
+  ],
+  "fondness": [
+    "manual",
+    "writeDesk:fondness.propose",
+    "关系变动必须有显式输入"
+  ],
+  "tolerance": [
+    "connected",
+    "roundDrivers:tolerance.tick",
+    "零参窗口衰减，需显式启用轮驱动"
+  ],
+  "events": [
+    "connected",
+    "intake:events_create + before:events.fulfill",
+    "仅转写已登记排期，兑现须单独授权"
+  ],
+  "genTiming": [
+    "manual",
+    "writeDesk:genTiming",
+    "节拍参数由玩家指定"
+  ],
+  "spotlight": [
+    "connected",
+    "roundDrivers:spotlight.idle",
+    "零参久缺结算，需显式启用轮驱动"
+  ],
+  "motif": [
+    "connected",
+    "roundDrivers:motif.tick",
+    "只推进既有主题窗口"
+  ],
+  "beatMask": [
+    "manual",
+    "writeDesk:beatMask",
+    "叙事遮罩由玩家指定"
+  ],
+  "lingqi": [
+    "manual",
+    "writeDesk:lingqi",
+    "境界与资源事实不得自动补造"
+  ],
+  "ladder": [
+    "manual",
+    "writeDesk:ladder",
+    "阶序身份必须显式登记"
+  ],
+  "karma": [
+    "manual",
+    "writeDesk:karma.record",
+    "因果账必须有来源事实"
+  ],
+  "marginal": [
+    "connected",
+    "roundDrivers:marginal.tick",
+    "零参冷却结算"
+  ],
+  "userlock": [
+    "manual",
+    "writeDesk:userlock.lock",
+    "锁定对象是玩家权限"
+  ],
+  "powerAnchor": [
+    "manual",
+    "writeDesk:powerAnchor",
+    "战力锚点是外部事实"
+  ],
+  "memoryTiers": [
+    "connected",
+    "intake:memoryTiers.knot",
+    "仅消费契约可忠实映射的输入"
+  ],
+  "temporalLock": [
+    "manual",
+    "writeDesk:temporalLock",
+    "时序锁不能由模型自授权"
+  ],
+  "beastBond": [
+    "manual",
+    "writeDesk:beastBond.train",
+    "训练行为需显式输入"
+  ],
+  "rivalry": [
+    "manual",
+    "writeDesk:rivalry",
+    "敌对关系不得从空局猜测"
+  ],
+  "enigma": [
+    "connected",
+    "intake:enigma",
+    "秘密事件仅从声明输入写入"
+  ],
+  "tempo": [
+    "manual",
+    "writeDesk:tempo.setGear",
+    "节奏档由玩家选择"
+  ],
+  "quota": [
+    "connected",
+    "roundDrivers:quota.tick",
+    "零参额度老化"
+  ],
+  "rhythmLoop": [
+    "connected",
+    "roundDrivers:rhythmLoop.step",
+    "零参相位推进"
+  ],
+  "masks": [
+    "manual",
+    "writeDesk:masks",
+    "伪装身份必须显式登记"
+  ],
+  "parallelEvents": [
+    "manual",
+    "writeDesk:parallelEvents",
+    "并行事件需明确事实"
+  ],
+  "warrant": [
+    "manual",
+    "writeDesk:warrant",
+    "授权事实不得自动生成"
+  ],
+  "appearance": [
+    "manual",
+    "writeDesk:appearance",
+    "外观由玩家登记"
+  ],
+  "sceneSlice": [
+    "manual",
+    "writeDesk:sceneSlice",
+    "切片边界由玩家指定"
+  ],
+  "genGate": [
+    "manual",
+    "writeDesk:genGate",
+    "生成门控属于玩家决策"
+  ],
+  "reasoning": [
+    "manual",
+    "writeDesk:reasoning",
+    "推理约束须显式配置"
+  ],
+  "storyTone": [
+    "manual",
+    "writeDesk:storyTone.set",
+    "文风由玩家配置"
+  ],
+  "temperament": [
+    "connected",
+    "intake:temperament",
+    "只写明示人格语料"
+  ],
+  "beatReport": [
+    "manual",
+    "beatFacade:report",
+    "节拍报告需输入依据"
+  ],
+  "eraCycle": [
+    "connected",
+    "roundDrivers:eraCycle.tick",
+    "零参时代轮转"
+  ]
+};
   function probeFull() {
     const rows = allSwitches().filter(function (r) {
       return r.hasBuild && r.hasSet && L3_EXCLUDES.indexOf(r.key) < 0;
@@ -392,6 +571,11 @@
           item.note = '开得起来的世界（已下调排除 35 个需手动录入数据的悬空机制）';
         }
         return item;
+      }),
+      dispositions: L3_EXCLUDES.map(function (key) {
+        const d = V8_DISPOSITIONS[key];
+        return { key: key, decision: d ? d[0] : 'unresolved', route: d ? d[1] : '', reason: d ? d[2] : '',
+          tierPolicy: 'explicit-opt-in; full does not silently enable gameplay writes' };
       }),
       manualOnly: L3_EXCLUDES.slice(),
       manualNote: '这些机制需要你手动录入数据才会动（35 个，已从 full 档出厂开启面下调移除）',

@@ -82,3 +82,5 @@ Status: implemented
 - `dead-export-gate`：1178 / 6 / 551（四个导出接线后回到基线）
 - `reject-recovery-lock`：149 / 0（`REJECT_FACE` 快照补齐 10 条）
 - 其余定向门禁全绿（见 `ITERATION_LOG.md` R234「验收与边界」）
+## Related V8 boundary
+[V8 只读汇流、兑现与归档边界](2026-11-03-v8-projection-archive-boundaries.md) 扩展此决定的消费链，不替换原有 owner 与可见性口径。

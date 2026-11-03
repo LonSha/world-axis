@@ -1,4 +1,5 @@
 # Agent Note: TX8 aftermath.js (v2.171.0) — location effects and repair lifecycle
+
 Status: implemented
 
 ## Module: engines/aftermath.js

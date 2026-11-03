@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.293.0';
+  const VERSION = '2.294.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -865,6 +865,9 @@
     //   零 store 写:没有 transact、没有 draft 赋值;只有自己那一格
     //   localStorage 偏好键(worldaxis_retrieval_v1)。
     'engines/retrieval.js',
+    // v2.294.0（V8 OPV8-1）：正文注面汇流器。位置须早于 render/inject.js（注入落地时读
+    //   injectCollector.buildBlock()）；零 store 写、只读五台结构化引擎的既有读口。
+    'engines/inject-collector.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',
@@ -1199,6 +1202,7 @@
     //   零 store 写、零落盘；三条源（chrono / worldDiary / worldBriefing）在本清单里
     //   全部更早装载，但都是调用期读口。排在这里让它在首次盘点里就在登记面内。
     'engines/world-autobiography.js',
+    'engines/player-archive.js',
     // v2.293.0（V7 EXV7-9）：一键播种 —— 给空世界种一批人。
     //   位置在 capability-tier 之前、world-autobiography 之后：装载期只登记自己的
     //   设置键（零上游读、零 store 写、零落盘）。它调用期要读的九个写口
@@ -1206,6 +1210,17 @@
     //   全部更早装载，但都是**调用期**读口 —— 装载期不需要任何依赖在场。
     //   排在这里让「播种开没开」首次盘点就在登记面内（同 world-diary 的口径）。
     'engines/populate.js',
+    // v2.294.0（V8 OPV8-4/EXV8-2）：轮次驱动器 —— 把「每轮只需推进状态」的
+    //   悬空引擎（tolerance/motif/marginal/quota/spotlight/rhythmLoop/eraCycle）
+    //   挂进真实轮次循环。装载期只登记自己的设置键（零上游读、零 store 写、
+    //   零落盘）；backstage 在结算成功分支**调用期**取 WA.roundDrivers（与
+    //   intake 同形态），不构成环。七台目标引擎在本清单里全部更早装载。
+    'engines/round-drivers.js',
+    // v2.294.0（V8 EXV8-2）：写口台 —— 悬空引擎的统一手动写入口。
+    //   台面清单从 write-contract 契约现场读（参数形状/拒收码/hint），
+    //   装载期零上游读、零 store 写、零落盘。排在 round-drivers 之后、
+    //   capability-tier 之前，让首次盘点就在登记面内。
+    'engines/write-desk.js',
     'engines/capability-tier.js',
     'engines/capability-audit.js',
     'ui/panel.js',

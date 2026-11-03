@@ -128,6 +128,22 @@
     'bottom': { kind: 'adjust-input', why: '已到底，不能再往下：改方向而不是重试' },
     'burst': { kind: 'adjust-input', why: '同一轮重复次数超限：改输入节奏' },
     'claimed-by-other': { kind: 'retry-same-input', why: '被别的会话占着：等对方释放后同输入再来' },
+    // v2.294.0（V8 收口）：events.fulfillDue 的 foreign-owner —— 排期行已被别的执行器认领
+    //   （engines/events.js 的 status==='claimed' && owner!=='events.archive'）。
+    //   与 claimed-by-other 同病因同恢复动作：等对方释放后同输入再来，不是改输入也不是回滚。
+    'foreign-owner': { kind: 'retry-same-input', why: '该排期已被别的执行器认领：等它释放后同输入再来' },
+    // ── v2.294.0（V8 收口）：11 个新拒收码的恢复档（逐条读源码定因，不按词根猜）──
+    'archive-failed': { kind: 'manual-review', why: '归档写失败：机器分不清该重试还是该弃，看一眼' },
+    'archive-too-big': { kind: 'adjust-input', why: '归档体积超上限：要减少内容，不是重试' },
+    'archive-write-failed': { kind: 'request-setup', why: '存储写被拒（配额满/隐私模式）：先修存储再归档' },
+    'bridge-missing': { kind: 'request-setup', why: '归档桥（backstage.archiveScheduled）没装上：先把它装回来' },
+    'contract-unavailable': { kind: 'request-setup', why: '契约面读不到：先把契约面恢复再来' },
+    'control-usage-unavailable': { kind: 'manual-review', why: '控件使用读数取不到：机器判不了该不该动它' },
+    'engine-missing': { kind: 'request-setup', why: '该引擎没装载：先把它装回来' },
+    'not-on-desk': { kind: 'adjust-input', why: '该动作不在当前台面上：换一个可用动作' },
+    'panel-yield-unavailable': { kind: 'manual-review', why: '面板让出读数取不到：需人看一眼当前面板态' },
+    'projection-failed': { kind: 'manual-review', why: '投影失败：机器判不了该修数据还是该弃这份投影' },
+    'ui-not-loaded': { kind: 'request-setup', why: 'UI 面没装载：先把面板装起来再操作' },
     'coalesced': { kind: 'retry-same-input', why: '本次触发被并入上一次：等下一窗口再来' },
     'conflicts-unresolved': { kind: 'request-setup', why: '还有未解冲突：先解掉再走这条' },
     'dangling-ref': { kind: 'request-setup', why: '引用悬空：先把被引的对象补上' },
@@ -480,7 +496,7 @@
     // v2.225.0(Q8 面板减负):面板专家的折叠面 —— 面板侧在折叠模块缺席时如实报出
     //   (不静默当展开:那会让「模块没装上」与「用户就是展开着」长得一样)。
     'fold-module-missing',
-    'fondness-missing', 'foreign-chat', 'fork-failed', 'frozen', 'future-event', 'gated-off',
+    'fondness-missing', 'foreign-chat', 'foreign-owner', 'fork-failed', 'frozen', 'future-event', 'gated-off',
     'goal-not-active', 'goods-full', 'guarded-key', 'hard-cut', 'hops-full', 'identical',
     'identity-incomplete', 'in-replay', 'in-transit', 'in-transit-full', 'inbound-bridge-missing', 'incomplete-dice', 'insufficient',
     'insufficient-budget', 'insufficient-contrib', 'insufficient-evidence', 'insufficient-funds', 'insufficient-progress', 'insufficient-samples',
@@ -691,6 +707,12 @@
     'unauthorized-practice', 'unauthorized-trustee', 'unhandled-obligations', 'unit-not-found', 'unknown-prereq-type', 'unknown-rank',
     'unknown-solution', 'unknown-task', 'unmet-env-conditions', 'unplaced', 'unqualified-master', 'unrecognized-material',
     'unsupported', 'unsupported-format-rejected', 'variant-not-found', 'vital-exhaustion-blocked', 'wear-failed',
+    // ── v2.294.0（V8 收口）：本批 11 个新拒收码。它们此前只在码面口径里（能扫到、门禁有归属），
+    //   但没进本快照 —— 与本仓已栽过四次的同形态（v2.203.0 / v2.209.0 / v2.221.0 / v2.222.0）。
+    //   两侧比对前都会 sort，故追加在末尾不改任何既有位置（见 tools/reject-recovery.js:129）。
+    'archive-failed', 'archive-too-big', 'archive-write-failed', 'bridge-missing',
+    'contract-unavailable', 'control-usage-unavailable', 'engine-missing', 'not-on-desk',
+    'panel-yield-unavailable', 'projection-failed', 'ui-not-loaded',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。

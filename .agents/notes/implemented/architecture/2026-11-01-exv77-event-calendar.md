@@ -1,4 +1,5 @@
 # Agent Note: EXV7-7 事件日历（事件钟未来轴 + 承诺台账）
+
 Status: implemented
 ## Problem
 「未来会发生什么、谁承诺了什么」在 v2.290.0 的现场没有一处能一屏答出来，两侧各有缺口：
@@ -37,3 +38,5 @@ Status: implemented
 - N0～N10：真源码破坏两向自证 —— 摘掉 `conditional` 排除条件则 `timed=1 untimed=0` 当场现形（N0/N1）、负控制不改动真源码（N2）、原版同判据仍真（N3）、摘掉五类词表初始化则 `byKind` 只剩 1 个键（N4/N5/N6）、摘掉两个导出则 API 真消失（N7～N10）。
 
 **未执行完整 `node tests/run.js`**：V7 纪律 12 在效期（EXV7-1～9 全部交付前禁止全量回归）。本轮验证为定向门禁集合，清单见 `ITERATION_LOG.md` 的 R233「验收与边界」。
+## Related V8 boundary
+[V8 只读汇流、兑现与归档边界](2026-11-03-v8-projection-archive-boundaries.md) 扩展此决定的消费链，不替换原有 owner 与可见性口径。

@@ -240,7 +240,11 @@ function runAll(A) {
   //   文件/别名/有引用 331/331/329。这里钉现场读数，不放宽覆盖率判据。
   // v2.293.0（EXV7-4~9 收口跟位）：EXV7-5~8 各新增 1 个模块文件 ⇒ 文件/别名/有引用
   //   331/331/329 → 333/333/331（实测回填；此后各版新增文件照此口径续记）。
-  A(a.files === 333 && a.aliasFiles === 333 && a.refFiles === 331,
+  // v2.294.0（V8 EXV8-2）：文件/别名/有引用 333/333/331 → 335/335/333
+  //   （新增 engines/round-drivers.js 与 engines/write-desk.js，两文件都有真引用）。
+  // v2.294.0（V8 收口）：335/335/333 -> 337/337/335（新增 inject-collector 与
+  //   player-archive 两文件，两者都被产品面真引用）。
+  A(a.files === 337 && a.aliasFiles === 337 && a.refFiles === 335,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -357,7 +361,16 @@ function runAll(A) {
   // v2.293.0（EXV7-4~9 收口跟位）：装载期 198 → 200（EXV7-8 新增 world-autobiography /
   //   EXV7-9 新增 populate 一键播种，两模块尾部各调 WA.registerModule ⇒ 各 +1 装载期边）；
   //   调用期 2565 → 2597（新引擎族调用接线累积，实测回填）⇒ 合计 2763 → 2797。
-  A(a.edgesLoad === 200 && a.edgesCall === 2597 && a.edgesAll === 2797 && a.identityOk,
+  // v2.294.0（V8 EXV8-2）：装载期 200 → 202（新增 engines/round-drivers.js 与
+  //   engines/write-desk.js，两文件尾部各调 WA.registerModule ⇒ 各 +1 装载期边）；
+  //   调用期 2597 → 2604、合计 2797 → 2806（roundDrivers 被 backstage 调、writeDesk
+  //   读 writeContract 与 33 台引擎面，实测回填）。LOAD_ORDER 332 → 334；
+  //   命名空间三面 373/327/336 → 375/329/338（roundDrivers / writeDesk 双双入账）。
+  // v2.294.0（V8 收口跟位）：装载期 202 → 205、调用期 2604 → 2636、合计 2806 → 2841。
+  //   增量来自 V8 新增的三台引擎（inject-collector / player-archive / round-drivers 等）：
+  //   尾部各调 WA.registerModule ⇒ 装载期各 +1；它们在调用期读 store / clock /
+  //   injectCollector / writeDesk 等既有命名空间。恒等式仍然成立，B4 零次序违规不动。
+  A(a.edgesLoad === 205 && a.edgesCall === 2636 && a.edgesAll === 2841 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -434,7 +447,8 @@ function runAll(A) {
   // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
   // v2.287.0（EXV7-3）：LOAD_ORDER 现场长度为 330；仍只对运行期定案的装载边判序。
   // v2.293.0（EXV7-4~9 收口跟位）：world-autobiography 与 populate 两模块入序 ⇒ LOAD_ORDER 330 → 332。
-  A(a.edgesLoad >= 20 && a.orderLen === 332,
+  // v2.294.0（V8 收口）：LOAD_ORDER 334 → 336（新增两台入序引擎）。
+  A(a.edgesLoad >= 20 && a.orderLen === 336,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -475,7 +489,9 @@ function runAll(A) {
   //   提供方与账本仍保持 46 项有理由差集，nsFaceDrift 另行钉零。
   // v2.293.0（EXV7-4~9 收口跟位）：新 ns 三面同步生长 ⇒ 371/325/334 → 373/327/336
   //   （差集 46 不变，B6 判据不动；实测回填）。
-  A(a.nsProvided === 373 && a.nsLedger === 327 && a.nsRead === 336,
+  // v2.294.0（V8 收口）：三面 375/329/338 → 377/331/340（新增 ns 同步入账、入读面）。
+  //   差集 46 不变 ⇒ B6 判据不动。
+  A(a.nsProvided === 377 && a.nsLedger === 331 && a.nsRead === 340,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。

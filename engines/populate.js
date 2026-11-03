@@ -460,6 +460,17 @@
    *   名册只认在册者），故次序不是排版偏好，是正确性。
    *   每笔写**逐笔记账**（`rows`），拒了要能念出拒在哪 —— 不静默丢，也不把失败合成一句「播种失败」。
    */
+  function yieldSnapshot() {
+    const nonempty = [], faults = [];
+    Object.keys(WA).forEach(function (key) {
+      const m = WA[key];
+      if (!m || typeof m.buildBlock !== 'function') return;
+      try { const block = m.buildBlock(); if (typeof block === 'string' && block.trim()) nonempty.push(key); }
+      catch (e) { faults.push({ key: key, error: String(e && e.message || e).slice(0, 120) }); }
+    });
+    return { count: nonempty.length, nonempty: nonempty.sort(), faults: faults };
+  }
+  let lastYield = null;
   function seed(opts) {
     __stat.runs++;
     const cfg = norm(opts);
@@ -468,6 +479,7 @@
     if (lack.length) { note('writes-absent'); return { ok: false, reason: 'writes-absent', missing: lack, note: '写口缺席：' + lack.join('、') }; }
     const p = plan(opts);
     if (!p.ok) { note(p.reason); return p; }
+    const yieldBefore = yieldSnapshot();
     __stat.seed = p.seed;
     __stat.planned += Object.keys(p.will).reduce(function (a, k) { return a + p.will[k]; }, 0);
     const rows = [];
@@ -556,8 +568,18 @@
       });
     }
     const blocked = rows.filter(function (x) { return x.ok !== true; }).length;
+    const yieldAfter = yieldSnapshot();
+    lastYield = { before: yieldBefore, after: yieldAfter,
+      nondecreasing: yieldAfter.count >= yieldBefore.count,
+      gained: yieldAfter.nonempty.filter(function (k) { return yieldBefore.nonempty.indexOf(k) < 0; }),
+      lost: yieldBefore.nonempty.filter(function (k) { return yieldAfter.nonempty.indexOf(k) < 0; }),
+      errors: yieldBefore.faults.length + yieldAfter.faults.length };
+    lastYield.grew = yieldAfter.count > yieldBefore.count;
+    lastYield.ok = lastYield.nondecreasing && lastYield.grew && lastYield.errors === 0;
+    lastYield.verdict = lastYield.errors ? 'builder-fault' : !lastYield.nondecreasing ? 'regression' : !lastYield.grew ? 'no-growth' : 'grown';
     return {
       ok: true, region: p.region, regionSource: p.regionSource,
+      yieldVerification: JSON.parse(JSON.stringify(lastYield)),
       written: rows.filter(function (x) { return x.ok === true; }).length,
       blocked: blocked,
       skipped: Object.keys(__stat.byKind).reduce(function (a, k) { return a + (__stat.byKind[k].skipped || 0); }, 0),
@@ -593,13 +615,14 @@
       blockedWhy: (!cfg.enabled) ? 'disabled'
         : (lack.length ? 'writes-absent'
           : (Object.keys(rooms).some(function (k) { return rooms[k] && rooms[k].free === 0; }) ? 'no-room' : '')),
-      seed: seedInfo(), stat: stat(), note: TEMPLATE.note
+      seed: seedInfo(), stat: stat(), note: TEMPLATE.note,
+      yieldVerification: lastYield ? JSON.parse(JSON.stringify(lastYield)) : null
     };
   }
   function reset() {
     __stat.runs = 0; __stat.plans = 0; __stat.planned = 0; __stat.written = 0;
     __stat.skipped = 0; __stat.blocked = 0; __stat.lastReason = '';
-    __stat.reasons = {}; __stat.byKind = {}; __stat.seed = null;
+    __stat.reasons = {}; __stat.byKind = {}; __stat.seed = null; lastYield = null;
     return true;
   }
   WA.populate = {

@@ -1947,6 +1947,10 @@
     'people.*.profile.relations': { cap: 40, wildcard: true, site: 'actors/registry.js 关系量值写入（上限取自本登记表；单次变化±20 硬边界）' },
     // v1.5.0 补登：people.<id>.knowledge 对象键容器（backstage 按 at 排序逐出，保留 30 键）
     'people.*.knowledge': { cap: 30, kind: 'object', wildcard: true, site: 'backstage.js knowledge 容量30逐出' },
+    // V8: verified owner write caps, not invented audit exemptions.
+    'people.*.life.goals': { cap: 8, wildcard: true, site: 'life.js addGoal concat/slice(-8)' },
+    'people.*.life.commitments': { cap: 12, wildcard: true, site: 'life.js addCommitment concat/slice(-12)' },
+    'people.*.life.schedule': { cap: 12, wildcard: true, site: 'life.js addSchedule concat/slice(-12)' },
     // v2.13.0 补登（挤出侧广谱侦察发现的**真盲区**）：阶段纪要 / 大总述环形。
     //   此前这两条**根本没在本登记表上**，于是 sizeAudit 把它们报成 unbounded
     //   （全库唯一两条），而代码其实一直在 slice(-N) 静默裁剪——「被误判为无界」
@@ -2948,6 +2952,11 @@
           //   标签缺失会让这一格在诊断上退回裸桶名，而它恰好是「世界回不去」时最该被读懂的一格：
           //   读不到后备键 ≠ 没有后备键（后者是「从未写过」，前者是「写过但环境不让读」）。
           recoverBak: '后备存档读回（L2 自愈的取回路径）',
+          // v2.294.0（V8 收口）：engines/player-archive.js 投递 reportReadFail('playerArchive')。
+          //   三份真源（本表 / ui/panel.js 的 LAB_P / engines/tool-diag.js 的 SRC_LABEL）同键集。
+          //   缺这一条时，「存储读失败」与「玩家还没归档过」在诊断上同形 —— 前者要查预处理，
+          //   后者是正常态，两侧补救完全不同。
+          playerArchive: '玩家归档读回（读失败 ⇒ 会答成「还没归档过」）',
           // v2.113.0（A1 收口）: 审计落盘面两处裸读补投归因（与 tool-diag 的 SRC_LABEL 同批）。
           auditlogFlush: '审计日志落盘前的历史读回（按「无历史」重建）',
           auditlogRestore: '审计日志历史读回（与「本次会话没有历史」同形）',

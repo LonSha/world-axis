@@ -1,4 +1,5 @@
 # Agent Note: EXV7-9 一键播种（本仓第一处批量写面）
+
 Status: implemented
 
 ## Problem
@@ -72,3 +73,6 @@ V7 立项的硬读数里最疼的一条是「带 `buildBlock` 的引擎 109 个 
 - **Registering `rand.seeded` as an accepted no-consumer export** in the O8 ledger: rejected —
   the consumer exists (`populate.seedInfo()` reads it for `reproducible`), so the correct fix was
   to delete the stale registration, not to bless the ledger entry. "登记不是豁免".
+
+## Related V8 boundary
+[V8 只读汇流、兑现与归档边界](2026-11-03-v8-projection-archive-boundaries.md) 扩展此决定的消费链，不替换原有 owner 与可见性口径。

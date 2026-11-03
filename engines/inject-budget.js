@@ -128,6 +128,11 @@
     '幕后风物': { rank: 7, fold: true },
     '楼层快照': { rank: 8, fold: true },
     '玲七管家': { rank: 8, fold: true },
+    // v2.294.0（V8 OPV8-1）：结构汇流。与 ACCOUNTS 同批登记 ——
+    //   tests/cost-v2880.js 的 A1/A2/B7 成类锁盯着「源面 ⇄ PRIORITY ⇄ ACCOUNTS」三者
+    //   逐字同键集。落 rank 5：它承载的是五台结构化引擎的深层读口（到期未了、已声明
+    //   未结算），与「人物生活」「因果与情报」同层，丢了「什么正压着这个世界」就不可见。
+    '结构汇流': { rank: 5, fold: true },
     // v2.250.0（四个真空区收口）：九条新注入源的优先级。
     //   不登记就全部静默落 DEFAULT_RANK(6)，「绝不静默丢弃」对它们不成立（C1a 当场可
     //   见，本版实测正是被它抓出）。档位仍按可替代性取：
@@ -441,6 +446,10 @@
   ['幕后风物', '环境与氛围', '承载'],
   ['楼层快照', '账目与观测', '计量'],
   ['玲七管家', '账目与观测', '呈现'],
+
+  // v2.294.0（V8 OPV8-1）：结构汇流。与 PRIORITY 同批登记 ——
+  //   tests/cost-v2880.js 的 B7/C1 成类锁盯着真注入链上无未归类源。
+  ['结构汇流', '叙事推进', '承载'],
   // v2.231.6（收口 · 补 v2.231.0 的漏登记）：四个新引擎注入源的科目。
   //   与 PRIORITY 同批登记 —— tests/cost-v2880.js 的 A1/A2/B7 成类锁盯着
   //   「源面 ⇄ PRIORITY ⇄ 本表」三者逐字同键集（条目数必须与源面数相等）。
@@ -1060,10 +1069,52 @@
     return '注入 ' + p.used + '/' + p.budget + 't' + over + gap + tail + drop + un + cst + abs + (p.saved > 0 ? '｜省 ' + p.saved + 't' : '');
   }
 
+  /** Actual volume, not requested budget. Duplicate names aggregate, item positions remain separate. */
+  function volumeView(items, landed, opts) {
+    const src = Array.isArray(items) ? items : [], out = Array.isArray(landed) ? landed : src;
+    const o = opts || {}, by = Object.create(null);
+    function bytes(s) {
+      let n = 0;
+      for (const ch of s) { const cp = ch.codePointAt(0); n += cp < 128 ? 1 : cp < 2048 ? 2 : cp < 65536 ? 3 : 4; }
+      return n;
+    }
+    function visit(list, stage) {
+      list.forEach(function (it) {
+        if (!it) return;
+        const name = String(it.source || '未命名'), text = String(it.content || '');
+        const r = by[name] || (by[name] = { source: name, inputChars: 0, inputBytes: 0, inputTokens: 0,
+          inputItems: 0, chars: 0, bytes: 0, tokens: 0, items: 0 });
+        if (stage === 'input') { r.inputChars += text.length; r.inputBytes += bytes(text);
+          r.inputTokens += tokensOf(text); r.inputItems++; }
+        else { r.chars += text.length; r.bytes += bytes(text); r.tokens += tokensOf(text); r.items++; }
+      });
+    }
+    visit(src, 'input'); visit(out, 'output');
+    const witnesses = [];
+    const rows = Object.keys(by).sort().map(function (name) {
+      const r = by[name];
+      const lim = Number((o.limits || {})[name]);
+      r.cap = isFinite(lim) && lim >= 0 ? lim : null;
+      r.remain = r.cap === null ? null : Math.max(0, r.cap - r.tokens);
+      r.over = r.cap !== null && r.tokens > r.cap;
+      if (r.over) witnesses.push({ source: name, used: r.tokens, cap: r.cap, excess: r.tokens - r.cap });
+      return r;
+    });
+    const totalTokens = rows.reduce(function (n, r) { return n + r.tokens; }, 0);
+    const totalCap = typeof o.totalCap === 'number' && isFinite(o.totalCap) && o.totalCap > 0 ? o.totalCap : null;
+    const poolRemain = totalCap === null ? null : Math.max(0, totalCap - totalTokens);
+    rows.forEach(function (r) { r.poolRemain = poolRemain; });
+    if (totalCap !== null && totalTokens > totalCap) witnesses.push({ source: '*shared*', used: totalTokens, cap: totalCap, excess: totalTokens - totalCap });
+    return { totalCap: totalCap, poolRemain: poolRemain, capScope: 'shared-pool; source caps only when explicitly provided', ok: witnesses.length === 0, reason: witnesses.length ? 'budget-exceeded' : '',
+      rows: rows, witnesses: witnesses, inputItems: src.length, items: out.length,
+      chars: rows.reduce(function (n, r) { return n + r.chars; }, 0),
+      bytes: rows.reduce(function (n, r) { return n + r.bytes; }, 0),
+      tokens: rows.reduce(function (n, r) { return n + r.tokens; }, 0) };
+  }
   WA.injectBudget = {
     DEFAULT_BUDGET, MIN_KEEP_TOKENS, FOLD_FLOOR_TOKENS, PRIORITY, AUTO_RATIO, AUTO_MIN, AUTO_MAX,
     autoBudget, resolveBudget, resolveContextSize,
-    tokensOf, rankOf, foldable, trim, plan, apply, summaryText,
+    tokensOf, rankOf, foldable, trim, plan, apply, summaryText, volumeView,
     // v2.261.0（V6 OPV6-6）：余量读数口。三个真消费方：engines/tool-diag.js（诊断包
     //   `budget.headroom`）、ui/panel.js（预算段余量行）、engines/backstage.js（`budgetHeadroom()`）。
     //   本口仍是纯函数，不破坏本模块「不读 store、不写配置、不落地注入」的承诺。

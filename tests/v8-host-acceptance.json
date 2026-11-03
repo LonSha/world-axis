@@ -1,0 +1,130 @@
+{
+  "version": "2.294.0",
+  "attemptedAt": "2026-11-02T20:11:17.320Z",
+  "attempts": [
+    {
+      "url": "http://127.0.0.1:8000",
+      "reachable": false,
+      "error": "ECONNREFUSED"
+    },
+    {
+      "url": "http://127.0.0.1:8080",
+      "reachable": false,
+      "error": "ECONNREFUSED"
+    },
+    {
+      "url": "http://127.0.0.1:8001",
+      "reachable": false,
+      "error": "ECONNREFUSED"
+    }
+  ],
+  "hostFound": false,
+  "hostUrl": null,
+  "debts": [
+    {
+      "id": "S1",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "S2",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TX1",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TX2",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TX3",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TX4",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TX5",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TX6",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TX7",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TX8",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TX9",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TP7",
+      "status": "cancelled-environment-unreachable",
+      "reason": "本机探测未发现可达的真实 SillyTavern 宿主（探了 http://127.0.0.1:8000、http://127.0.0.1:8080、http://127.0.0.1:8001，结果见 attempts）——该项验收需要真实宿主，终端内不可完成",
+      "evidence": "read-only HTTP discovery: [{\"url\":\"http://127.0.0.1:8000\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8080\",\"reachable\":false,\"error\":\"ECONNREFUSED\"},{\"url\":\"http://127.0.0.1:8001\",\"reachable\":false,\"error\":\"ECONNREFUSED\"}]",
+      "passed": false
+    },
+    {
+      "id": "TP6",
+      "status": "cancelled-needs-physical-device",
+      "reason": "该欠账需要真实手机上的 p50/p95 时延读数，终端环境无法采集；与宿主可达性无关",
+      "evidence": "environment capability check (no device timing channel)",
+      "passed": false
+    },
+    {
+      "id": "TP8",
+      "status": "cancelled-needs-physical-device",
+      "reason": "该欠账需要真实手机上的 p50/p95 时延读数，终端环境无法采集；与宿主可达性无关",
+      "evidence": "environment capability check (no device timing channel)",
+      "passed": false
+    }
+  ],
+  "counts": {
+    "passed": 0,
+    "failed": 0,
+    "cancelled": 14,
+    "total": 14
+  },
+  "note": "注销只在本轮**实测不可达**后写下，不是「未验」两不管。Chromium stub 绿不能替代真实宿主证据；手机 p50/p95 需真机，单独记理由。"
+}

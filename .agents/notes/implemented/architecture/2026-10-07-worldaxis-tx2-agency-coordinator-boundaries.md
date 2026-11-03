@@ -1,4 +1,5 @@
 # Agent Note: Agency coordinator — seven boundaries, key-pipeline alignment, and reject-code DEAD table expansion
+
 Status: implemented
 ## Problem
 

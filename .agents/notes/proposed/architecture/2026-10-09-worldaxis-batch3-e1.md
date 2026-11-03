@@ -1,4 +1,5 @@
 # Agent Note: WorldAxis 第三批执行单（O6/O7/O8 + E1/E3）
+
 Status: implementing（2026-10-09 起）
 依据：[plans/O_OPTIMIZATION.md](../plans/O_OPTIMIZATION.md) 与 [plans/E_EXPANSION.md](../plans/E_EXPANSION.md) 的「实施顺序」表。
 

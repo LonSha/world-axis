@@ -1,4 +1,5 @@
 # Agent Note: TX6 — 多阶段委托、交付核验与资源履约（engines/commission.js）
+
 Status: implemented
 
 **版本**: v2.169.0

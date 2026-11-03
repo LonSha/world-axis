@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.293.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.293.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.294.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.294.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -2808,7 +2808,7 @@
       "src": "engines/events.js",
       "refs": 0,
       "tref": 3,
-      "own": 4
+      "own": 5
     },
     "events.cancel": {
       "reason": "test-only",
@@ -2824,7 +2824,7 @@
       "src": "engines/events.js",
       "refs": 0,
       "tref": 26,
-      "own": 3
+      "own": 4
     },
     "events.complete": {
       "reason": "test-only",
@@ -2832,7 +2832,7 @@
       "src": "engines/events.js",
       "refs": 0,
       "tref": 11,
-      "own": 3
+      "own": 4
     },
     "events.due": {
       "reason": "test-only",
@@ -2850,14 +2850,6 @@
       "tref": 2,
       "own": 3
     },
-    "events.getSettings": {
-      "reason": "test-only",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/events.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 1
-    },
     "events.replace": {
       "reason": "test-only",
       "detail": "engines/events.js 内部自用、外部零引用（过度导出）",
@@ -2873,14 +2865,6 @@
       "refs": 0,
       "tref": 69,
       "own": 3
-    },
-    "events.setSettings": {
-      "reason": "test-only",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/events.js",
-      "refs": 0,
-      "tref": 6,
-      "own": 1
     },
     "events.stat": {
       "reason": "test-only",
@@ -3818,14 +3802,6 @@
       "tref": 3,
       "own": 3
     },
-    "injectBudget.rankOf": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/inject-budget.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 3
-    },
     "injectBudget.resolveContextSize": {
       "reason": "self-only",
       "detail": "engines/inject-budget.js 内部自用、外部零引用（过度导出）",
@@ -3840,7 +3816,7 @@
       "src": "engines/inject-budget.js",
       "refs": 0,
       "tref": 7,
-      "own": 13
+      "own": 15
     },
     "injectBudget.trim": {
       "reason": "test-only",
@@ -3857,6 +3833,30 @@
       "refs": 0,
       "tref": 7,
       "own": 4
+    },
+    "injectCollector.getSettings": {
+      "reason": "self-only",
+      "detail": "engines/inject-collector.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/inject-collector.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "injectCollector.sceneStat": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/inject-collector.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "injectCollector.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/inject-collector.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
     },
     "injectInspector.classify": {
       "reason": "test-only",
@@ -4401,14 +4401,6 @@
       "refs": 0,
       "tref": 0,
       "own": 13
-    },
-    "ledgerTimeline.note": {
-      "reason": "self-only",
-      "detail": "engines/ledger-timeline.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/ledger-timeline.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 4
     },
     "ledgerTimeline.probe": {
       "reason": "self-only",
@@ -6986,6 +6978,38 @@
       "tref": 8,
       "own": 1
     },
+    "roundDrivers.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/round-drivers.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "roundDrivers.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/round-drivers.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 1
+    },
+    "roundDrivers.stat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/round-drivers.js",
+      "refs": 0,
+      "tref": 5,
+      "own": 10
+    },
+    "roundDrivers.view": {
+      "reason": "self-only",
+      "detail": "engines/round-drivers.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/round-drivers.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "ruling.caseOf": {
       "reason": "self-only",
       "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
@@ -8416,7 +8440,7 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 4,
-      "own": 159
+      "own": 162
     },
     "toolDiag.secAgenda": {
       "reason": "self-only",
@@ -8456,6 +8480,14 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 3,
+      "own": 3
+    },
+    "toolDiag.secControlUsage": {
+      "reason": "test-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 2,
       "own": 3
     },
     "toolDiag.secEnemies": {
@@ -8544,6 +8576,14 @@
       "src": "engines/tool-diag.js",
       "refs": 0,
       "tref": 1,
+      "own": 3
+    },
+    "toolDiag.secPanelYield": {
+      "reason": "self-only",
+      "detail": "engines/tool-diag.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tool-diag.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "toolDiag.secParallelWorld": {
@@ -9386,14 +9426,6 @@
       "tref": 0,
       "own": 3
     },
-    "writeContract.contractOf": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/write-contract.js",
-      "refs": 0,
-      "tref": 11,
-      "own": 5
-    },
     "writeContract.explain": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -9470,6 +9502,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 552
+    "dataOnly": 553
   }
 }

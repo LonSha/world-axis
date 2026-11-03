@@ -1,13 +1,13 @@
 {
- "version": "2.293.0",
- "loadOrderCount": 332,
- "loadedCount": 318,
+ "version": "2.294.0",
+ "loadOrderCount": 336,
+ "loadedCount": 322,
  "uiCount": 14,
- "nsCount": 327,
+ "nsCount": 331,
  "totals": {
-  "loadEdges": 200,
+  "loadEdges": 205,
   "hardEdges": 0,
-  "callRefs": 384,
+  "callRefs": 394,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -82,6 +82,7 @@
     "engines/ensemble.js",
     "engines/entry-router.js",
     "engines/environmental-capacity.js",
+    "engines/events.js",
     "engines/evidence-board.js",
     "engines/evolution.js",
     "engines/faction-graph.js",
@@ -101,6 +102,7 @@
     "engines/handoff-pack.js",
     "engines/hazard.js",
     "engines/history-search.js",
+    "engines/inject-collector.js",
     "engines/inject-value.js",
     "engines/inst.js",
     "engines/institutional-inertia.js",
@@ -139,6 +141,7 @@
     "engines/plan.js",
     "engines/playable-blueprint.js",
     "engines/playable-seed.js",
+    "engines/player-archive.js",
     "engines/playtime.js",
     "engines/plot-gauge.js",
     "engines/pmem.js",
@@ -172,6 +175,7 @@
     "engines/risk-pooling.js",
     "engines/role-conflict.js",
     "engines/round-cost.js",
+    "engines/round-drivers.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
     "engines/save-health.js",
@@ -212,6 +216,7 @@
     "engines/world-lab.js",
     "engines/world-seed.js",
     "engines/world-snapshot.js",
+    "engines/write-desk.js",
     "render/map-viewport.js",
     "render/purifier.js"
    ]
@@ -327,6 +332,7 @@
     "engines/elsewhere.js",
     "engines/enemies.js",
     "engines/entry-router.js",
+    "engines/events.js",
     "engines/evolution.js",
     "engines/farfield.js",
     "engines/hazard.js",
@@ -424,6 +430,7 @@
     "engines/group-refuse.js",
     "engines/handoff-pack.js",
     "engines/history-search.js",
+    "engines/inject-collector.js",
     "engines/inject-value.js",
     "engines/inst.js",
     "engines/institutional-inertia.js",
@@ -457,6 +464,7 @@
     "engines/plan.js",
     "engines/playable-blueprint.js",
     "engines/playable-seed.js",
+    "engines/player-archive.js",
     "engines/playtime.js",
     "engines/plot-gauge.js",
     "engines/polish.js",
@@ -487,6 +495,7 @@
     "engines/risk-pooling.js",
     "engines/role-conflict.js",
     "engines/round-cost.js",
+    "engines/round-drivers.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
     "engines/save-health.js",
@@ -525,6 +534,7 @@
     "engines/world-lab.js",
     "engines/world-seed.js",
     "engines/world-snapshot.js",
+    "engines/write-desk.js",
     "render/map-viewport.js"
    ]
   },
@@ -650,6 +660,7 @@
     "engines/elsewhere.js",
     "engines/enemies.js",
     "engines/entry-router.js",
+    "engines/events.js",
     "engines/evolution.js",
     "engines/farfield.js",
     "engines/hazard.js",
@@ -3158,10 +3169,17 @@
    "ns": [
     "events"
    ],
-   "requires": [],
-   "requiresFiles": [],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
    "providerOrderOk": true,
-   "callRefs": [],
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_events_settings_v1"
@@ -4452,6 +4470,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_retrieval_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/inject-collector.js": {
+   "ns": [
+    "injectCollector"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_inject_collector_settings_v1"
    ],
    "consumedBy": []
   },
@@ -6020,6 +6059,27 @@
    ],
    "consumedBy": []
   },
+  "engines/player-archive.js": {
+   "ns": [
+    "playerArchive"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_player_archive_settings_v1"
+   ],
+   "consumedBy": []
+  },
   "engines/populate.js": {
    "ns": [
     "populate"
@@ -6039,6 +6099,46 @@
    "stateKeys": [
     "worldaxis_populate_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/round-drivers.js": {
+   "ns": [
+    "roundDrivers"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_round_drivers_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/write-desk.js": {
+   "ns": [
+    "writeDesk"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/capability-tier.js": {

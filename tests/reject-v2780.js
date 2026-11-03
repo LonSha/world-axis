@@ -326,6 +326,33 @@ const DEAD = {
   'transfer-failed': {
     anchor: "if (!tr || !tr.ok) { noteFault('transfer-failed'); return { ok: false, reason: 'transfer-failed', detail: tr ? tr.reason : 'none' }; }",
     why: 'operations.disburse: org.transfer failed. Needs transfer to fail.'
+  },
+  // v2.294.0（V8）：tool-diag 两个分区读口的 **safe() 兜底字面量**，结构不可达 ——
+  //   `safe(fn, fallback)` 的取值面是：① fn() 返回非 undefined ⇒ 返回它；② fn() 抛错 ⇒ {error}；
+  //   ③ fn() 返回 undefined ⇒ fallback。而这两个分区函数体**每一条路径都 return 对象**
+  //   （secPanelYield 的 return 在函数末尾无条件执行；secControlUsage 的两处 return 也都是对象），
+  //   异常又被 ② 吃掉 ⇒ ③ 永不取。实测（/tmp/probe_v8_wit2.js 与 wit9.js）：
+  //   把 WA.driverLedger 摘成 undefined 或换成一个 view() 会抛的对象，得到的都是
+  //   {error: 'Cannot read properties of undefined ...'} / {error: 'probe:driver-ledger-broke'}，
+  //   而不是这两个码 —— 即 fallback 那一路**没有任何输入能走到**。
+  //   它们是**版面兜底文案**，不是产品侧的拒收归因（与 v2.109.0 摘掉 'no-result' 同判据：
+  //   把缺陷/兜底文案登记成拒收码，等于让台账替它背书）。
+  //   不删：safe() 的契约将来若改成「fn 返回 undefined 也走 fallback」，它们是第一道防线；
+  //   届时本门禁会以 deadLeak 提醒「该码可能复活」。
+  'panel-yield-unavailable': {
+    anchor: "}, { ok: false, reason: 'panel-yield-unavailable' });",
+    why: 'tool-diag.secPanelYield 的 safe() 第二实参：内层函数体每条路径都 return 对象（末尾无条件 return，'
+      + '早退分支也 return 对象），异常被 safe 的 catch 转成 {error} —— 故「fn 返回 undefined」这一路'
+      + '没有任何输入能构造出来，兜底字面量结构不可达。实测见 /tmp/probe_v8_wit2.js / wit9.js：'
+      + '摘掉 WA.driverLedger（undefined）与换成 view() 抛错的对象两种破坏，返回的都是 {error}。'
+      + '不删：safe() 契约若放宽，它是第一道防线（deadLeak 会提醒它可能复活）。'
+  },
+  'control-usage-unavailable': {
+    anchor: "}, { ok: false, reason: 'control-usage-unavailable' });",
+    why: '同上：tool-diag.secControlUsage 的 safe() 第二实参。内层两条 return 都是对象'
+      + '（ui 缺席时 return {ok:false, reason: "ui-not-loaded"}，正常时 return 行表），'
+      + '异常被 safe 吃掉 ⇒ fallback 永不取。实测 /tmp/probe_v8_wit2.js：摘掉 WA.ui 得到的是'
+      + 'ui-not-loaded（不是本码）。不删：safe() 契约若放宽，它是第一道防线。'
   }
 };
 
@@ -7973,6 +8000,167 @@ function runWitness(WA) {
           const b = ITw.network({ claims: [{ who: '甲', what: '一件秘密' }] }).boundary;
           return b ? b.reason : '';
         } finally { WA.noesis = keep; }
+      });
+    }
+  }
+  // ── v2.294.0（V8 单版本清偿）：本版新增的 9 个产品侧内联拒收码，全部当场归类 ──
+  //   台账规矩是两向的：新码一律**走见证**（不进 base），真不可达的才进死表。
+  //   这 9 条里 7 条实测可跑出码（探针 /tmp/probe_v8_wit2..10.js 逐条跑过），2 条是
+  //   tool-diag 的 safe() 兜底字面量（结构不可达，已进死表，见 DEAD 末两条）。
+  //   为什么这 7 条不是「存量未分类」：它们是本版 OPV8-9 / EXV8-3 / EXV8-6 / EXV8-8 四条
+  //   交付的公开失败归因 —— 面板读口、排期兑现桥、作者私密归档都要消费它们。
+  //   不给见证，就等于让门禁替我们说「这些码没人会跑到」。
+  {
+    const Ev8 = WA.events;
+    if (Ev8 && typeof Ev8.fulfillDue === 'function') {
+      want('bridge-missing',
+        'EXV8-3 排期兑现：backstage.archiveScheduled 缺席 ⇒ fulfillDue 第一道门就报 bridge-missing'
+        + '（不许在没有归档写口时把待办标成已兑现）');
+      trip('bridge-missing', function () {
+        const keepSet = Ev8.getSettings();
+        const keepB = WA.backstage;
+        try {
+          Ev8.setSettings({ enabled: true, autoFulfill: true });
+          WA.backstage = undefined;
+          return Ev8.fulfillDue({ max: 1 }).reason;
+        } finally { WA.backstage = keepB; Ev8.setSettings(keepSet); }
+      });
+
+      want('foreign-owner',
+        'EXV8-3 排期兑现：本轮存在**别的执行者**认领的活动行 ⇒ 让路并报 foreign-owner'
+        + '（不抢外部 owner 的租约，也不把自己的抢不到说成「没有待办」）');
+      trip('foreign-owner', function () {
+        const keepSet = Ev8.getSettings();
+        let id = '';
+        try {
+          Ev8.setSettings({ enabled: true, autoFulfill: true });
+          const r = Ev8.schedule({ id: 'wit_v8_foreign', title: '见证·异主认领' });
+          id = (r && r.id) || '';
+          Ev8.claim(undefined, { owner: 'witness:other', max: 1 });
+          return Ev8.fulfillDue({ max: 4 }).reason;
+        } finally {
+          try { if (id) Ev8.cancel(id, 'witness:done'); } catch (e) {}
+          Ev8.setSettings(keepSet);
+        }
+      });
+
+      want('archive-failed',
+        'EXV8-3 排期兑现：归档写口**当场抛错** ⇒ 该笔如实记 archive-failed（不吞成兑现成功，'
+        + '整批其余行照常）');
+      trip('archive-failed', function () {
+        const keepSet = Ev8.getSettings();
+        const keepT = WA.store.transact;
+        let id = '';
+        try {
+          Ev8.setSettings({ enabled: true, autoFulfill: true });
+          const r = Ev8.schedule({ id: 'wit_v8_archfail', title: '见证·归档抛错' });
+          id = (r && r.id) || '';
+          Ev8.claim(undefined, { owner: 'events.archive', max: 4 });
+          // claim 的 transact 放行、只让 complete 的抛错 —— 这条码的语义是「归档这一步炸了」，
+          //   不是「认领都没成」，故不能把 claim 一起打断（否则测的就不是这个码）。
+          WA.store.transact = function (fn, label) {
+            if (String(label) === 'events:complete') throw new Error('witness:archive-failed');
+            return keepT.apply(WA.store, arguments);
+          };
+          const out = Ev8.fulfillDue({ max: 4 });
+          return (out.results || []).map(function (x) { return x && x.reason; });
+        } finally {
+          WA.store.transact = keepT;
+          try { if (id) Ev8.cancel(id, 'witness:done'); } catch (e) {}
+          Ev8.setSettings(keepSet);
+        }
+      });
+    }
+
+    const PA8 = WA.playerArchive;
+    if (PA8 && typeof PA8.checkpoint === 'function') {
+      want('projection-failed',
+        'EXV8-6 作者私密归档：任一投影源抛错 ⇒ projection-failed 并点名坏掉的源'
+        + '（不许写进一份「缺了一路」的包冒充完整快照）');
+      trip('projection-failed', function () {
+        const keepSet = PA8.getSettings();
+        const keepV = WA.worldBriefing && WA.worldBriefing.view;
+        try {
+          PA8.setSettings({ enabled: true, every: 1, maxWorks: 24 });
+          WA.store.transact(function (d) { d.evolution = d.evolution || {}; d.evolution.round = 1; }, 'witness:round');
+          WA.worldBriefing.view = function () { throw new Error('witness:projection-broke'); };
+          return PA8.checkpoint().reason;
+        } finally {
+          if (keepV) WA.worldBriefing.view = keepV;
+          PA8.setSettings(keepSet);
+        }
+      });
+
+      want('archive-write-failed',
+        'EXV8-6 作者私密归档：本机存储写失败（配额/私隐模式）⇒ archive-write-failed 并带回错误'
+        + '（不许报 captured 而其实一份都没落下）');
+      trip('archive-write-failed', function () {
+        const keepSet = PA8.getSettings();
+        const w = window, keepLS = w.localStorage;
+        const worksKey = 'worldaxis_player_works_v1_' + encodeURIComponent(String(WA.store.chatId() || 'wa_default'));
+        try {
+          PA8.setSettings({ enabled: true, every: 1, maxWorks: 24 });
+          WA.store.transact(function (d) { d.evolution = d.evolution || {}; d.evolution.round = 2; }, 'witness:round');
+          // 只拦「作品列表」这一个键，其余（含设置面）照真实读写 —— 否则会把
+          //   「设置读不出来 ⇒ disabled」误当成写失败，测的就不是这个码了。
+          w.localStorage = {
+            getItem: function (k) { return k === worksKey ? '[]' : keepLS.getItem(k); },
+            setItem: function (k) { if (k === worksKey) throw new Error('witness:quota'); return keepLS.setItem(k, arguments[1]); },
+            removeItem: function (k) { return keepLS.removeItem(k); }
+          };
+          return PA8.checkpoint().reason;
+        } finally { w.localStorage = keepLS; PA8.setSettings(keepSet); }
+      });
+
+      want('archive-too-big',
+        'EXV8-6 作者私密归档：攒到上限份数后总量越过 524288 字符 ⇒ archive-too-big 并给出真实体量'
+        + '（长局不静默丢作品，也不写一份被截断的包）');
+      trip('archive-too-big', function () {
+        const keepSet = PA8.getSettings();
+        const w = window;
+        const worksKey = 'worldaxis_player_works_v1_' + encodeURIComponent(String(WA.store.chatId() || 'wa_default'));
+        const keepChron = WA.store.get() && WA.store.get().chronicle;
+        const keepRound = WA.evolution.roundOf(WA.store.get());
+        try {
+          PA8.setSettings({ enabled: true, every: 1, maxWorks: 24 });
+          // 真实长局形状：chronicle 填到 store 登记的真实上限 200 条，每行取满 chrono 的
+          //   txt 上限 ⇒ 单份投影 ≈ 100KB，第 8 个 cycle 自然越过 524288。
+          //   不是伪造投影：填的是产品自己的容器、走的是产品自己的截断口径。
+          WA.store.transact(function (d) {
+            d.evolution = d.evolution || {};
+            d.chronicle = [];
+            const head = new Array(78).join('事'), body = new Array(118).join('录');
+            for (let i = 0; i < 200; i++) {
+              d.chronicle.push({ at: 1000 + i, kind: 'event', title: '交接' + i + head,
+                summary: body, refs: ['a', 'b', 'c', 'd'], visibility: 'public' });
+            }
+          }, 'witness:long-chronicle');
+          let hit = '';
+          for (let r = 1; r <= 12 && !hit; r++) {
+            WA.store.transact(function (d) { d.evolution.round = r; }, 'witness:round');
+            const res = PA8.checkpoint();
+            if (res && res.reason === 'archive-too-big') hit = res.reason;
+          }
+          return hit;
+        } finally {
+          try { w.localStorage.removeItem(worksKey); } catch (e) {}
+          WA.store.transact(function (d) {
+            if (d.evolution) d.evolution.round = keepRound;
+            d.chronicle = Array.isArray(keepChron) ? keepChron : [];
+          }, 'witness:restore');
+          PA8.setSettings(keepSet);
+        }
+      });
+    }
+
+    if (WA.toolDiag && typeof WA.toolDiag.secControlUsage === 'function') {
+      want('ui-not-loaded',
+        'EXV8-8 控件活跃度：UI 面未装载 ⇒ secControlUsage 如实报 ui-not-loaded'
+        + '（「没装 UI」与「一个控件都没被点过」必须是两句话）');
+      trip('ui-not-loaded', function () {
+        const keep = WA.ui;
+        try { WA.ui = undefined; return WA.toolDiag.secControlUsage().reason; }
+        finally { WA.ui = keep; }
       });
     }
   }

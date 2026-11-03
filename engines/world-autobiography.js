@@ -337,14 +337,14 @@
       if (c.dropped > 0) body.push('（本章另有 ' + c.dropped + ' 条未摘录）');
     });
     const app = [];
-    const d = r.appendix.diary;
+    const d = (r.appendix || {}).diary;
     if (d && !d.absent) {
       app.push('');
       app.push('### 附记 · 世界日记（最近几轮镜头外）');
       if (!d.lines || !d.lines.length) app.push('（这几轮镜头外无事 —— 不是「没读到」）');
       else d.lines.forEach(function (l) { app.push('· ' + l); });
     }
-    const b = r.appendix.briefing;
+    const b = (r.appendix || {}).briefing;
     if (b && !b.absent) {
       app.push('');
       app.push('### 附记 · 本轮引擎产出');

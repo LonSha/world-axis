@@ -45,6 +45,7 @@
   const VIS_NAMES = { clock: '世界时间', background: '世界背景', people: '人物', currents: '暗流', echoes: '回声', memory: '记忆', opinion: '舆情', pulse: '世界脉搏', ledger: '重大事件账本', digest: '世界推演', style: '叙事工艺',
     // v2.56.0: v2.52.0~v2.55.0 新增的四条注入分支此前未登记源表，也**没在这里登记显示名**
     //   —— 面板会裸露英文键名（life/intel/org/longline）。补名与补源表是同一件事的两面。
+    injectCollector: '结构汇流',
     life: '人物生活', intel: '因果与情报', org: '资源与组织', longline: '长线伏笔',
     // v2.62.0: 因果结算。与 SOURCES 同批登记（只加源表不加显示名 ⇒ 面板裸露英文键名）。
     causal: '因果结算',
@@ -318,6 +319,11 @@
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置' },
     { id: 'connect', icon: '🔌', label: 'API' },
+    // v2.294.0（V8 EXV8-2）：写口台 —— 悬空引擎的统一手动写入口。
+    //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    //   插在 assistant 之前：这一页答「这个机制怎么手动喂它」——与工具族相邻。
+    //   台面清单从 write-contract 契约现场读，本页零业务逻辑、零事实编造。
+    { id: 'desk', icon: '🎛', label: '写口台' },
     { id: 'assistant', icon: '💬', label: '助手' },
     { id: 'tools', icon: '🧰', label: '工具' },
     { id: 'logs', icon: '📋', label: '日志' }
@@ -326,7 +332,8 @@
     overview: 'core', chapter: 'core', beat: 'core', todo: 'core', events: 'core', director: 'core', actiondesk: 'core',
     world: 'world', people: 'world', memory: 'world', enemies: 'world', parallel: 'world', travel: 'world', sediment: 'world', offline: 'world',
     inject: 'workshop', supply: 'workshop', evidence: 'workshop', branchdiff: 'workshop', storyloop: 'workshop', retrieval: 'workshop', port: 'workshop', find: 'workshop', graph: 'workshop', net: 'workshop',
-    settings: 'system', health: 'system', connect: 'system', assistant: 'system', tools: 'system', logs: 'system'
+    settings: 'system', health: 'system', connect: 'system', assistant: 'system', tools: 'system', logs: 'system',
+    desk: 'system'
   };
   let currentCat = 'core';
 
@@ -3701,6 +3708,16 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-dim">只读体检：模块装载完整性、上轮注入是否真进 prompt、面板控件绑定、视图开关、工作流与API通道。不含聊天正文与密钥。</div>
 
       `)}
+      ${foldSec('tools', 'playerarchive', '世界作品与带离包 · 每5轮归档作品（作者侧私密归档）', () => `
+      <div class="wa-dim">含秘密与情报持有人，请勿公开分发。周期作品保存在本机当前聊天；带离包请自行复制备份。自传仅作来源附件，不移植为目标局历史。</div>
+      <label><input id="wa-par-enabled" type="checkbox" ${WA.playerArchive && WA.playerArchive.getSettings().enabled ? 'checked' : ''}/> 每${WA.playerArchive ? WA.playerArchive.getSettings().every : 5}轮归档作品（默认关闭）</label>
+      <label><input id="wa-events-auto" type="checkbox" ${WA.events && WA.events.getSettings().autoFulfill ? 'checked' : ''}/> 自动归档到期排期标题（默认关闭，需同时启用事件模块；不代判条件）</label>
+      <label>作品周期<input class="wa-input" type="number" id="wa-par-every" min="1" max="50" value="${WA.playerArchive ? WA.playerArchive.getSettings().every : 5}"/></label>
+      <label>保留份数<input class="wa-input" type="number" id="wa-par-max" min="1" max="24" value="${WA.playerArchive ? WA.playerArchive.getSettings().maxWorks : 12}"/></label>
+      <div class="wa-row"><button class="wa-btn" id="wa-par-export">导出当期投影JSON</button><button class="wa-btn" id="wa-par-view">周期作品</button><button class="wa-btn" id="wa-par-seed">保存自传新局包</button></div>
+      <textarea class="wa-input" id="wa-par-input" placeholder="目标空新聊天粘贴自传新局包"></textarea><button class="wa-btn" id="wa-par-import">导入格局附件</button>
+      <div id="wa-par-out" class="wa-out"></div>
+      `)}
       ${foldSec('tools', 'seedlib', '世界种子库（把这一局的格局存下来，换一局再开）', () => `
       <div class="wa-dim">种子存的是<b>骨头</b>：势力格局 / 人物关系网 / 地理 / 时代背景。它<b>不含</b>编年史 / 暗流 / 回声 / 章节 ——
         存了进度就不是新局，是同一个世界的续集。签名的输入只有结构面，故<b>换个名字存同一格局仍会被去重</b>。
@@ -4136,7 +4153,39 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     </div>`;
   }
 
-  const RENDERERS = { actiondesk: renderActionDesk, overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs,
+    // v2.294.0（V8 EXV8-2）：写口台页 —— 悬空引擎的统一手动写入口。
+  //   台面清单从 writeDesk.catalog() 现场读（真源是 write-contract 的函数体契约），
+  //   本页零业务逻辑：选引擎 → 选写口 → 按契约参数表填值 → 透传给真写口。
+  //   拒收（含 disabled）原样展示，不代答、不重试、不编参数。
+  function renderWriteDesk() {
+    const D = WA.writeDesk;
+    if (!D || typeof D.catalog !== 'function') return '<div class="wa-empty">写口台模块未加载</div>';
+    const cat = D.catalog();
+    if (!cat || cat.ok !== true) {
+      return '<div class="wa-empty">写口契约读不出（writeDesk.catalog ' + esc(cat && cat.reason || 'unavailable') + '）</div>';
+    }
+    const rows = cat.rows || [];
+    const byNs = {};
+    rows.forEach(function (r) { (byNs[r.ns] = byNs[r.ns] || []).push(r); });
+    const st = (typeof D.stat === 'function') ? D.stat() : {};
+    const nsOpts = Object.keys(byNs).sort().map(function (ns) {
+      return '<option value="' + esc(ns) + '">' + esc(ns) + '（' + byNs[ns].length + ' 口）</option>';
+    }).join('');
+    return `
+      <div class="wa-sec">写口台（把悬空的机制手动喂起来）</div>
+      <div class="wa-dim">台面清单从 write-contract 契约现场读（参数形状 / 拒收码 / hint），
+        本页不手抄任何参数表 —— 契约变了台面自动跟。每次调用的拒收回执原样展示：
+        「为什么没写进去」与「写进去了」同样可见。成员 <b>${rows.length}</b> 口，
+        累计调用 <b>${st.calls || 0}</b>、成功 <b>${st.ok || 0}</b>。</div>
+      <div class="wa-row">
+        引擎：<select id="wa-wdesk-ns" class="wa-inp" aria-label="写口台：选择引擎">${nsOpts}</select>
+        <button class="wa-btn" id="wa-wdesk-load" title="列出该引擎在台面上的写口与契约">列出写口</button>
+        <button class="wa-btn" id="wa-wdesk-stat" title="写口台调用台账">台账</button>
+      </div>
+      <div id="wa-wdesk-ports" class="wa-out"></div>
+      <div id="wa-wdesk-out" class="wa-out"></div>`;
+  }
+  const RENDERERS = { actiondesk: renderActionDesk, overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs, desk: renderWriteDesk,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -7866,6 +7915,19 @@ on('#wa-desk-show', showDesk);
       wsOut('已删除 ' + r.id + '｜库内剩 ' + r.total + ' 个', true);
       renderBody();
     });
+    // V8 archive handlers delegate every write/import to the owning engine.
+    const parOut = function (r) { const o = $('#wa-par-out'); if (o) o.innerHTML = '<pre style="white-space:pre-wrap;overflow-wrap:anywhere">' + esc(r && r.json || JSON.stringify(r, null, 2)) + '</pre>'; };
+    const eventAuto = $('#wa-events-auto');
+    if (eventAuto) eventAuto.onchange = function () { parOut(WA.events.setSettings({autoFulfill: !!eventAuto.checked})); };
+    const parEvery = $('#wa-par-every'), parMax = $('#wa-par-max');
+    if (parEvery) parEvery.onchange = function () { parOut(WA.playerArchive.setSettings({every: Number(parEvery.value)})); renderBody(); };
+    if (parMax) parMax.onchange = function () { parOut(WA.playerArchive.setSettings({maxWorks: Number(parMax.value)})); renderBody(); };
+    const parCfg = $('#wa-par-enabled');
+    if (parCfg) parCfg.onchange = function () { parOut(WA.playerArchive.setSettings({enabled: !!parCfg.checked})); };
+    const parExport = $('#wa-par-export'); if (parExport) parExport.onclick = function () { parOut(WA.playerArchive.exportJSON()); };
+    const parView = $('#wa-par-view'); if (parView) parView.onclick = function () { parOut(WA.playerArchive.view()); };
+    const parSeed = $('#wa-par-seed'); if (parSeed) parSeed.onclick = function () { parOut(WA.playerArchive.seedPack('自传格局新局')); };
+    const parImport = $('#wa-par-import'); if (parImport) parImport.onclick = function () { const r = WA.playerArchive.importSeedPack(($('#wa-par-input') || {}).value || ''); if (r && r.id && $('#wa-ws-id')) $('#wa-ws-id').value = r.id; parOut(r); };
     // v2.158.0（S3 + SP6）：转移包 / 导入包 / 初始化预览 / 初始化确认 四处理器。
     on('#wa-ws-pack', () => {
       if (!WA.worldSeed || !WA.worldSeed.transferPack) return wsOut('未记录：module-missing', true);
@@ -12760,6 +12822,9 @@ on('#wa-desk-show', showDesk);
             uninjectLedger: '撤销账本', eventLog: '事件日志', errorLog: '错误日志',
             // v2.108.0 (plan-1 #18): 与 store.LAB / toolDiag.SRC_LABEL 同源同键集（三份真源一同登记）
             recoverBak: '后备存档读回',
+            // v2.294.0（V8 收口）：engines/player-archive.js 投递 reportReadFail('playerArchive')，
+            //   三份标签表（store.LAB / panel.LAB_P / toolDiag.SRC_LABEL）必须同源同键集。
+            playerArchive: '玩家归档读回',
             // v2.114.0：审计落盘面两处读失败来源（core/audit-log.js 投递）。
             //   三份真源缺一份，那一份的消费端就退回裸桶名——面板这格是「历史读不到」时
             //   用户唯一能看见的读数，裸桶名等于没有归因。
@@ -12911,6 +12976,84 @@ on('#wa-desk-show', showDesk);
         else out.textContent = block;
       } catch (e) { out.textContent = block; }
     };
+    // ── v2.294.0（V8 EXV8-2）：写口台页 ──
+    //   三件齐做（渲染 + 绑定 + UI_BINDINGS 守卫登记）——理由同 v2.197.0：
+    //   渲染了不登记 ⇒ 守卫永远查不到它，而「按钮渲染了但绑定的 id 写错」这类断裂
+    //   只有在登记过的控件上才会被发现。本页绑定不猜契约：参数表从 catalog 现读，
+    //   调用透传 writeDesk.call，拒收回执原样转述（不代答、不重试、不编参数）。
+    const wdOut = function (text) { setOut('#wa-wdesk-out', text); };
+    // Only locally constructed markup; every catalog string is escaped below. Receipts stay text.
+    const wdPortsOut = function (html) { const el = $('#wa-wdesk-ports'); if (el) el.innerHTML = html; };
+    // 列出写口：按契约现读参数形状/拒收码/hint，一条一卡。每张卡带一枚调用按钮——
+    //   点击时在该卡内联展开参数行 + 「执行」按钮（不写死引擎/写口名）。
+    const wdListPorts = function () {
+      const D = WA.writeDesk;
+      if (!D || typeof D.catalog !== 'function') { wdPortsOut('写口台模块未加载'); return; }
+      const ns = ($('#wa-wdesk-ns') && $('#wa-wdesk-ns').value) || '';
+      const cat = D.catalog();
+      if (!cat || cat.ok !== true) { wdPortsOut('写口契约读不出：' + ((cat && cat.reason) || 'unavailable')); return; }
+      const rows = (cat.rows || []).filter(function (r) { return r.ns === ns; });
+      if (!rows.length) { wdPortsOut('该引擎在台面上无写口'); return; }
+      wdPortsOut(rows.map(function (r) {
+        const ps = (r.params && r.params.length) ? r.params.map(function (p, i) {
+          return esc(typeof p === 'string' ? p : (p.name || ('arg' + (i + 1))));
+        }).join('，') : '（零参）';
+        const rs = (r.reasons && r.reasons.length) ? esc(r.reasons.join(' / ')) : '';
+        const ht = (r.hints && r.hints.length) ? esc(r.hints.join('；')) : '';
+        return '<div class="wa-row"><b>' + esc(r.method) + '</b>(' + ps + ')'
+          + (rs ? ' <span class="wa-dim">拒收码：' + rs + '</span>' : '')
+          + (ht ? ' <span class="wa-dim">提示：' + ht + '</span>' : '')
+          + ' <button class="wa-btn wa-mini" data-wdcall="' + esc(r.ns) + '|' + esc(r.method) + '">调用</button></div>';
+      }).join(''));
+      panelEl.querySelectorAll('[data-wdcall]').forEach(function (b) {
+        b.onclick = function () {
+          const pair = b.dataset.wdcall.split('|');
+          const ns2 = pair[0], m = pair[1];
+          const c = WA.writeDesk.catalog();
+          const row = ((c && c.rows) || []).filter(function (x) { return x.ns === ns2 && x.method === m; })[0];
+          const names = (row && row.params) ? row.params.map(function (p, i) {
+            return typeof p === 'string' ? p : (p.name || ('arg' + (i + 1)));
+          }) : [];
+          if (!names.length) {
+            // 零参写口：直接透传调用，回执原样展示
+            const r0 = WA.writeDesk.call(ns2, m, []);
+            wdOut('『' + ns2 + '.' + m + '()』回执：' + JSON.stringify(r0));
+            return;
+          }
+          // 带参写口：内联展开参数输入行 + 执行按钮
+          const wrap = mainDoc.createElement('div');
+          wrap.className = 'wa-row';
+          wrap.innerHTML = names.map(function (n, i) {
+            return '<input class="wa-input" data-wdarg="' + i + '" placeholder="' + esc(n) + '"/>';
+          }).join('') + '<button class="wa-btn wa-mini" data-wdgo="1">执行</button>';
+          b.parentNode.appendChild(wrap);
+          wrap.querySelector('[data-wdgo]').onclick = function () {
+            const args = names.map(function (n, i) {
+              const el = wrap.querySelector('[data-wdarg="' + i + '"]');
+              const raw = (el && el.value !== undefined) ? String(el.value).trim() : '';
+              if (raw === '') return undefined;
+              if (/^-?\d+(\.\d+)?$/.test(raw)) return Number(raw);
+              if (raw.charAt(0) === '{' || raw.charAt(0) === '[') {
+                try { return JSON.parse(raw); } catch (e) { return raw; }   // 解析失败原样传，让引擎拒收 bad-* 如实回显
+              }
+              return raw;
+            });
+            const r2 = WA.writeDesk.call(ns2, m, args);
+            wdOut('『' + ns2 + '.' + m + '(' + names.join(', ') + ')』回执：' + JSON.stringify(r2));
+          };
+        };
+      });
+    };
+    const wdLoadBtn = $('#wa-wdesk-load');
+    if (wdLoadBtn) wdLoadBtn.onclick = wdListPorts;
+    const wdStatBtn = $('#wa-wdesk-stat');
+    if (wdStatBtn) wdStatBtn.onclick = function () {
+      const D = WA.writeDesk;
+      if (!D || typeof D.stat !== 'function') { wdOut('写口台模块未加载'); return; }
+      const st = D.stat();
+      wdOut('累计调用 ' + st.calls + ' · 成功 ' + st.ok + ' · 拒收 ' + st.rejected + (st.lastReason ? ' · 最近：' + st.lastReason : '') + '\n' + Object.keys(st.byEngine || {}).sort().map(function (k) { return k + ' ×' + st.byEngine[k]; }).join('；'));
+    };
+    // Receipts are plain text, never interpret engine-provided strings as HTML.
     // ── v2.33.0：记忆页 ──
     //   删除/停用均走 store.patch（受控写入 → 自动入撤销栈），失败不静默；
     //   任一修改后重绘本页，保证「界面上的 = 磁盘上的」。
@@ -14013,7 +14156,9 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         }
         if (!r || r.ok !== true) return popOut('<div class="wa-log wa-log-warn">' + popWhy(r) + '</div>');
         const bad = (r.rows || []).filter(function (x) { return x.ok !== true; });
-        popOut('<div class="wa-log ' + (bad.length ? 'wa-log-warn' : 'wa-log-info') + '">播种写 ' + r.written + ' 笔'
+        const yv = r.yieldVerification;
+        const yieldHtml = yv ? '<div class="wa-log ' + (yv.ok ? 'wa-log-info' : 'wa-log-err') + '">产出复核：' + yv.before.count + ' → ' + yv.after.count + ' · ' + esc(yv.verdict) + '（写入已完成，复核失败不表示回滚）</div>' : '<div class="wa-log wa-log-err">产出复核缺席</div>';
+        popOut(yieldHtml + '<div class="wa-log ' + (bad.length ? 'wa-log-warn' : 'wa-log-info') + '">播种写 ' + r.written + ' 笔'
           + (bad.length ? ' · <b>拒 ' + bad.length + ' 笔</b>（逐笔见下）' : ' · 全部落笔')
           + (r.skipped ? ' · 跳过 ' + r.skipped + ' 笔（已存在，不重复占容量）' : '') + '</div>'
           + '<div class="wa-dim">地区：' + esc(r.region) + '（' + (r.regionSource === 'created' ? '本批新建' : '既有') + '）</div>'
@@ -16284,8 +16429,18 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
     // v2.196.0（U2 批次⑥）：推演结算**失败**此前不发声（backstage 旧路径无论成败都只发 settled）。
     //   现在失败发 failed：面板因此得以重绘（否则「推演运行态」抹上去就擦不掉）。
     'backstage:failed'];
+  // Delegated listener survives body redraws; never wraps business handlers or changes their return values.
+  const __usage = { events: 0, controls: Object.create(null) };
+  function captureControlUse(event) {
+    let el = event.target;
+    while (el && el !== panelEl) {
+      if (el.id) { __usage.events++; __usage.controls[el.id] = (__usage.controls[el.id] || 0) + 1; return; }
+      el = el.parentElement;
+    }
+  }
   WA.ui = {
     STATE_EVENTS: STATE_EVENTS,
+    usageStat() { return JSON.parse(JSON.stringify(__usage)); },
     // v2.2.0: 当前页只读访问（UI 绑定守卫需要区分「非当前页控件不在 DOM」与「真断裂」）
     currentPage() { return currentPage; },
     pages() { return PAGES.map(function (p) { return p.id; }); },
@@ -16312,6 +16467,8 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         }
       } catch (e) {}
       buildPanel(); buildOrb();
+      panelEl.addEventListener('click', captureControlUse, true);
+      panelEl.addEventListener('change', captureControlUse, true);
       // 世界推演状态事件 → 悬浮球呼吸
       WA.on('backstage:started', () => orbEl && orbEl.classList.add('wa-busy'));
       WA.on('backstage:settled', () => orbEl && orbEl.classList.remove('wa-busy'));

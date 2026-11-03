@@ -196,8 +196,18 @@
     while ((m = dRe.exec(src)) !== null) {
       if (f.defs.indexOf(m[1]) < 0) f.defs.push(m[1]);
     }
+    // 【v2.294.0（V8 OPV8-4）宿主钩子入口】SillyTavern 直接调用的边界函数不挂在 WA 上：
+    //   `window.worldAxisGenerateInterceptor = async function (...)`（core/interceptor.js）。
+    //   它不是引擎、没有 buildBlock、也不进盘点表，但它发出的调用边是**外部真在驱动**。
+    //   只认这一种形状（window.<name> = function），不认 `WA.x.y = function`：
+    //   后者是模块内部挂成员，扩散本来就是靠它的 defs 走的。
+    if (/window\.[A-Za-z_$][\w$]*\s*=\s*(async\s+)?function/.test(src)) f.entry = true;
     const cRe = /WA\.([A-Za-z_$][\w$]*)\s*\.\s*([A-Za-z_$][\w$]*)\s*\(/g;
     while ((m = cRe.exec(src)) !== null) f.calls.push([m[1], m[2]]);
+    if (rel === 'engines/round-drivers.js' && src.indexOf('eng[d.method]') >= 0) {
+      const re = /\{ engine: '([^']+)', method: '([^']+)' \}/g;
+      while ((m = re.exec(src)) !== null) f.calls.push([m[1], m[2]]);
+    }
     return f;
   }
 
@@ -218,11 +228,46 @@
     const src = {};
     let i;
     for (i = 0; i < baseNs.length; i++) out[baseNs[i]] = 'face';
+    // 【v2.294.0（V8 OPV8-4）路由执行面本体作为起点】L2r 的引擎名单是从
+    //   WA.actionDesk.ROUTES 的键名算出来的 —— 也就是说「谁是路由驱动的引擎」认得出，
+    //   但给出这张表的**本体** WA.actionDesk 没有 buildBlock、不进盘点表，从不进 out，
+    //   于是 engines/action-desk.js 里发出的调用边（每个路由处理函数调的那批引擎）
+    //   全部被丢弃。实测受害最明确的一台：survival —— action-desk.js:855 的
+    //   statusOf(w) 在每次动作可行性判定上真实调用它（vital-exhaustion-blocked 拦截），
+    //   账本却把它写成「谁都不碰」。
+    //   这里只加本体、不改目录过滤：render/ 与 ui/ 仍不参与扩散（N3 负控所挡的方向）。
+    if (baseNs.indexOf('actionDesk') < 0) out.actionDesk = 'face';
     const g = __graph;
     if (!g) return { set: out, via: src, ok: false };
     const rels = Object.keys(g.files).filter(function (r) {
       return r.indexOf('engines/') === 0 || r.indexOf('core/') === 0;
     });
+    // 【v2.294.0（V8 OPV8-4）入口播种】宿主钩子入口文件的调用边直接记为可达。
+    //   为什么不并进下面的不动点循环：不动点要求「文件里定义的可达命名空间」才能扩散，
+    //   而入口文件（core/interceptor.js）虽然定义了 WA.interceptor，却不是三条自证面之一
+    //   （没有 buildBlock，玩家点不到、链上不走、路由不登记）——它永远进不了 out，
+    //   于是它发出的边永远扩散不出去。这不是「没人喂」，是「喂的人不在这张图里」。
+    //   边界：只对 engines/ 与 core/ 下的入口文件生效（与扩散来源同一范围），
+    //   不放开 render/ 与 ui/ —— 那是 N3 负控所挡的假阳性方向。
+    const entryEdges = [];
+    for (let e = 0; e < rels.length; e++) {
+      const ef = g.files[rels[e]];
+      if (!ef || !ef.entry) continue;
+      for (let c2 = 0; c2 < ef.calls.length; c2++) {
+        const d2 = ef.calls[c2][0];
+        if (ef.defs.indexOf(d2) >= 0) continue;
+        if (out[d2]) continue;
+        out[d2] = 'entry';
+        // 驱动者名字必须是「命名空间.成员」（v2275/B6 的形态约束）：
+        //   入口文件自己就定义了 WA.interceptor，轮边界的调用确实是它发出的，
+        //   所以记 `interceptor.applyInjections` 比记文件路径更真实、也满足形态。
+        //   兜底：入口文件没有任何 WA.x = { 定义时，退化成文件名 basename。
+        const ownerNs = ef.defs.length ? ef.defs[0]
+          : String(rels[e]).replace(/^.*\//, '').replace(/\.js$/, '');
+        src[d2] = ownerNs + '.' + ef.calls[c2][1];
+        entryEdges.push(d2);
+      }
+    }
     let round = 0;
     while (round < 8) {
       round++;
@@ -478,6 +523,14 @@
     const cd = chainDrivers();
     const rt = routesFace();
     const canConclude = !!(sc.ok && sc.canConclude);
+    const deskMembers = {};
+    // Catalog alone is not an entrance: require an actual panel consumer of writeDesk.call.
+    if (sc.ok && sc.byNs.writeDesk && (sc.byNs.writeDesk.panel || {}).call && WA.writeDesk) {
+      try { (WA.writeDesk.catalog().rows || []).forEach(function (r) {
+        if (!WA[r.ns] || typeof WA[r.ns][r.method] !== 'function') return;
+        (deskMembers[r.ns] || (deskMembers[r.ns] = [])).push('writeDesk:' + r.method);
+      }); } catch (e) {}
+    }
 
     // 三条自证面的名单先算出来：它们是互调扩散的**起点**。
     //   注意顺序依赖：扩散必须先知道「谁是自证面」才能开始，故不能边遍历边算。
@@ -494,7 +547,7 @@
         if (chainStepsFor(ns0, cd)) { faceOf[ns0] = 'L1'; continue; }
         if (rt[ns0] && rt[ns0].length) { faceOf[ns0] = 'L2r'; continue; }
         const c0 = (sc.ok && sc.byNs[ns0]) ? sc.byNs[ns0] : null;
-        if (c0 && Object.keys(c0.panel || {}).length) { faceOf[ns0] = 'L2p'; continue; }
+        if ((c0 && Object.keys(c0.panel || {}).length) || (deskMembers[ns0] || []).length) { faceOf[ns0] = 'L2p'; continue; }
       }
     })();
     // 可达集：三条面 + 沿引擎互调扩散。图不可用（运行期口径）时 only face，报 ok=false。
@@ -511,7 +564,7 @@
       if (typeof mod.buildBlock !== 'function') continue;
 
       const call = (sc.ok && sc.byNs[ns]) ? sc.byNs[ns] : null;
-      const panelM = call ? Object.keys(call.panel || {}) : [];
+      const panelM = (call ? Object.keys(call.panel || {}) : []).concat(deskMembers[ns] || []);
       const diagM = call ? Object.keys(call.diag || {}) : [];
       const otherM = call ? Object.keys(call.other || {}) : [];
       const chain = chainStepsFor(ns, cd) || [];
@@ -530,7 +583,9 @@
       else if (panelM.length) { layer = 'L2p'; driver = 'panel'; }
       // L2e：只有「已可达引擎」调它才算数 —— 未可达引擎之间的互引不构成驱动。
       //   排在面板之后：面板是玩家直接可操作，互调只是逻辑传导，强度弱一档。
-      else if (reached[ns] === 'call') { layer = 'L2e'; driver = 'engine'; }
+      // 入口边（宿主钩子直接调）与互调边同等算驱动：都是「产品内部有人在喂」，
+      //   区别只在驱动者是不是玩家面可达 —— 轮边界恰恰是最强的那条驱动。
+      else if (reached[ns] === 'call' || reached[ns] === 'entry') { layer = 'L2e'; driver = 'engine'; }
       else if (!canConclude) { layer = 'L?'; driver = 'undetermined'; }
       else if (diagM.length) { layer = 'L3a'; driver = 'diagOnly'; }
       else { layer = 'L3b'; driver = 'none'; }
@@ -549,7 +604,7 @@
         driverNames: byPriority(drivers),
         driverCount: drivers.length,
         // L2e 的驱动者名字：是哪个可达引擎调了它（能点出名字，不只是一句「有引擎在用」）
-        reachVia: (reached[ns] === 'call' && reach.via[ns]) ? reach.via[ns] : '',
+        reachVia: ((reached[ns] === 'call' || reached[ns] === 'entry') && reach.via[ns]) ? reach.via[ns] : '',
         diagOnlyMembers: byPriority(diagOnly),
         diagOnlyCount: diagOnly.length,
         hasSwitch: (function () {
@@ -600,6 +655,10 @@
       //   否则读者会把「没扩散」当成「扩散后也没有」。
       reachOk: !!reach.ok,
       reachSize: Object.keys(reached).length,
+      // 入口边条数：让「有几台是被宿主钩子喂的」这一面可观测。
+      //   不给这个读数，修完之后只能看到 L2e 涨了几台，说不出涨的是哪一类驱动。
+      reachEntry: Object.keys(reached).filter(function (k) { return reached[k] === 'entry'; }).length,
+      reachEntryList: Object.keys(reached).filter(function (k) { return reached[k] === 'entry'; }),
       reachRounds: reach.rounds || 0,
       scannedFiles: sc.ok ? (sc.files || 0) : 0,
       scannedFns: sc.ok ? (sc.fns || 0) : 0,
@@ -653,7 +712,8 @@
         declared: b.scanDeclared, prefetched: b.scanPrefetched,
         why: b.scanWhy, fallback: b.scanFallback,
         chainSteps: b.chainSteps, routeKeys: b.routeKeys,
-        reachOk: b.reachOk, reachSize: b.reachSize, reachRounds: b.reachRounds },
+        reachOk: b.reachOk, reachSize: b.reachSize, reachRounds: b.reachRounds,
+        reachEntry: b.reachEntry, reachEntryList: b.reachEntryList },
       // 判据自述：面板与诊断面共用同一句，避免两处措辞分叉
       note: '本节读「调用面」，判据是四条可自证的面：工作流链（L1）、'
         + 'actionDesk 路由表（L2r）、面板控件（L2p）、已可达引擎的互调（L2e）。'
@@ -713,8 +773,18 @@
         + '面板没有控件、路由没登记、链上不走，但引擎逻辑链能从玩家面传导到这里。';
     }
     if (r.layer === 'L3a') {
+      // 【v2.294.0（V8 OPV8-4）措辞改正】原先这里写「链上不走、路由没登记、面板没控件」，
+      //   读者会把三件事读成「开关开着也不会出内容」。实测不成立：render/inject.js 的注入链
+      //   里有 103 个 buildBlock 分支，覆盖盘点面 92%，L3a 的每一台都在里面、每轮都被调用。
+      //   所以这档如实是「有消费、但消费方是注入链而不是三种驱动登记面」。
+      //   为什么注入链不计入驱动面：覆盖率 92% 的面没有区分度，记进来 L3 会整档归零
+      //   （N3 负控所挡的方向）——它只说得出「注入链会读它」，说不出「有没有人喂」。
       return '只有诊断/健康聚合在读它（' + r.diagOnlyMembers.slice(0, 3).join('、') + '）—— '
-        + '读口被诊断面调用不等于有驱动者：链上不走、路由没登记、面板没控件。';
+        + '读口被诊断面调用不等于有驱动者：链上不走、路由没登记、面板没控件。'
+        + (r.otherCallers.length
+          ? '另有 ' + r.otherCallers.length + ' 处注入链消费（' + r.otherCallers.slice(0, 3).join('、')
+            + '），说明它每轮会出内容，但那是读侧汇流、不是驱动入口。'
+          : '');
     }
     if (r.layer === 'L3b') {
       return '链上不走、路由没登记、面板没控件、诊断面也没念它'
@@ -739,8 +809,20 @@
       const noDriver = c.L3a + c.L3b;
       s += ' · 没有驱动入口 ' + noDriver;
       if (noDriver > 0) {
-        s += '（只被诊断面读 ' + c.L3a + ' · 没人碰 ' + c.L3b + '）。'
-          + '这 ' + noDriver + ' 个机制开关开着也不会出内容：链上不走、路由没登记、面板没控件。';
+        // 【v2.294.0（V8 OPV8-4）措辞改正】原句是「这 N 个机制开关开着也不会出内容」，
+        //   实测对 L3a 是假话：它们在注入链里有分支、每轮被调（dream 启用即产出 24 字节块）。
+        //   如实说法要分成两种病因：L3a = 有注入链消费但没有驱动登记入口；
+        //   L3b = 连注入链都不消费、诊断面也不念它。压成一句就会把两种相反的病因混成一个数。
+        s += '（只被诊断面读 ' + c.L3a + ' · 没人碰 ' + c.L3b + '）。';
+        if (c.L3a > 0) {
+          s += '其中 ' + c.L3a + ' 个仍会被注入链每轮消费（注入链有分支、有产出），'
+            + '缺的是**驱动登记入口**：链上不走、路由没登记、面板没控件，'
+            + '所以它们的数据只能靠宿主/玩家另行录入，不会自行推进。';
+        }
+        if (c.L3b > 0) {
+          s += (c.L3a > 0 ? '另有 ' : '') + c.L3b + ' 个连注入链都不消费、诊断面也不念它，'
+            + '开关开着确实不会出内容。';
+        }
       } else s += '。所有机制都有产品登记的驱动入口。';
     } else {
       s += ' · 未判定 ' + c.undetermined;
