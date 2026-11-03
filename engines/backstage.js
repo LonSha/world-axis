@@ -372,6 +372,8 @@
     },
 
     async _start(anchor, reason) {
+      let changeBefore=null;
+      try { if(WA.worldChanges) changeBefore=WA.worldChanges.capture(); } catch(e) { WA.log('warn','世界变化基线异常',e&&e.message); }
       const id = ++taskSeq;
       const ac = new AbortController();
       currentTask = { id, ac, anchor, reason };
@@ -493,6 +495,10 @@
                 WA.roundDrivers.tickAll();
               }
             } catch (e) { WA.log('warn', '轮次驱动异常', e && e.message); }
+            try {
+              if (WA.storylineAdvance && typeof WA.storylineAdvance.tick === 'function') WA.storylineAdvance.tick();
+            } catch (e) { WA.log('warn', '暗流阶段推进异常', e && e.message); }
+            try { if (WA.worldChanges) WA.worldChanges.settle(changeBefore); } catch (e) { WA.log('warn', '世界变化摘要异常', e && e.message); }
             // ── v2.285.0（V7 EXV7-1）：今日世界简报拍快照 ──────────────────────
             //   与 intake.run 同层（事务后副作用），但方向相反：intake 是「把事实写进
             //   引擎」，简报是「引擎吃进了多少，读出来」。位置必须在 intake 之后 ——
@@ -673,6 +679,42 @@
         summary: '', at: clockNow('backstage'), refs: [], eventId: eventId, eventOpId: opId });
       WA.evict.array(draft.chronicle, 'backstage.chronicle');
     },
+    /** V9: explicitly enroll a current; scheduling is not inferred from calendar ETA. */
+    setCurrentAdvance(id, enabled) {
+      if (typeof enabled !== 'boolean') return {ok:false,reason:'bad-enabled'};
+      let result={ok:false,reason:'current-missing'};
+      const tx=WA.store.transact(d=>{
+        const c=(d.currents||[]).find(c=>c.id===id);
+        if(!c)return false;
+        if(['起线','延展','成形','收束','淡出'].indexOf(c.stage)<0){result={ok:false,reason:'unsupported-stage'};return false;}
+        c.autoAdvance=enabled;c.advanceAtRound=WA.evolution.roundOf(d);delete c.advanceLast;
+        result={ok:true,id:c.id,enabled:enabled};return true;
+      },'backstage:current-enroll');
+      return tx&&tx.ok?result:(!result.ok?result:{ok:false,reason:'transaction-failed'});
+    },
+    /** Narrow owner write. No summary rewriting, no ETA→deadline conversion, no second container. */
+    advanceManagedCurrents(opts) {
+      const o=opts||{},round=o.round,steps=['起线','延展','成形','收束','淡出'];
+      if(!Number.isSafeInteger(round)||round<0)return {ok:false,reason:'bad-round'};
+      const interval=Math.max(1,Math.min(30,Math.floor(Number(o.turnsPerStage)||3)));
+      let moved=0,skipped=0;
+      const eligible=(WA.store.get().currents||[]).some(c=>c&&c.autoAdvance===true&&steps.indexOf(c.stage)>=0&&steps.indexOf(c.stage)<steps.length-1&&Number.isSafeInteger(c.advanceAtRound)&&c.advanceAtRound>=0&&round>c.advanceAtRound&&round-c.advanceAtRound>=interval);
+      if(!eligible)return {ok:true,moved:0,skipped:(WA.store.get().currents||[]).filter(c=>c&&c.autoAdvance===true).length};
+      const tx=WA.store.transact(d=>{
+        (d.currents||[]).forEach(c=>{
+          if(!c||c.autoAdvance!==true)return;
+          const ix=steps.indexOf(c.stage);
+          if(ix<0||ix===steps.length-1){skipped++;return;}
+          if(!Number.isSafeInteger(c.advanceAtRound)||c.advanceAtRound<0){c.advanceAtRound=round;skipped++;return;}
+          // Re-answer/duplicate calls and clock rollback cannot advance stages.
+          if(round<=c.advanceAtRound||round-c.advanceAtRound<interval){skipped++;return;}
+          const from=c.stage;c.stage=steps[ix+1];c.advanceAtRound=round;
+          c.advanceLast={from:from,to:c.stage,round:round};c.updatedAt=clockNow('backstage');moved++;
+        });
+        return moved>0;
+      },'backstage:current-advance');
+      return tx&&tx.ok?{ok:true,moved:moved,skipped:skipped}:{ok:false,reason:'transaction-failed',moved:0};
+    },
     applyResult(draft, r, anchor) {
       __personaWrites.length = 0; __relationWrites.length = 0;   // v2.51.0：每次结算从零开始收
       __applyStat.chanPersona = 0; __applyStat.chanRelation = 0;
@@ -783,6 +825,9 @@
         const old = draft.currents.find(x => x.title === c.title);
         if (old) {
           old.summary = c.summary || old.summary;
+          if (c.stage && c.stage !== old.stage && old.autoAdvance === true) {
+            old.advanceAtRound = WA.evolution.roundOf(draft); delete old.advanceLast;
+          }
           old.stage = c.stage || old.stage;
           old.visibility = c.visibility || old.visibility;
           old.publicity = c.publicity || old.publicity || 'private';

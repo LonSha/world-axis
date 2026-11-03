@@ -459,9 +459,22 @@
     const projs = (bag.projects || []).slice(-Math.max(1, cfg.maxProjects));
     if (!projs.length) return '';
     const lines = projs.map(function (p) {
-      return p.id + '：' + p.hypothesis.slice(0, 30) + '（' + p.status + '，' + p.phase + '/' + p.phases + '）→ ' + p.result;
+      // General narration has no authenticated viewer. Private project names, inputs and
+      // results stay in the author view()/list(); a disclaimer is not access control.
+      if (p.scope !== 'public') return p.id + '：受限研究（' + p.status + '，' + p.phase + '/' + p.phases
+        + '）；研究者：' + p.by + '；传播范围：' + (p.scope || 'secret')
+        + '；实验结果：' + (p.status === 'confirmed' ? '已确认（内容受限）' : (p.status === 'failed' ? '失败' : '未定'));
+
+      const spent = Object.keys(p.consumed || {}).sort().slice(0, 12).map(function (k) {
+        return clean(k, 40) + '×' + p.consumed[k];
+      }).join('、') || '无';
+      return p.id + '：' + clean(p.hypothesis, 120) + '（' + p.status + '，' + p.phase + '/' + p.phases + '）'
+        + '；研究者：' + p.by + '；已耗资源：' + spent
+        + '；目标成果：' + (p.result || '未登记')
+        + '；实验结果：' + (p.status === 'confirmed' ? ('已确认 ' + p.result) : (p.status === 'failed' ? '失败' : '未定'))
+        + '；传播范围：' + (p.scope || 'secret') + '（研究者认知，不赋予其他人物知情权）';
     });
-    return '[研究]\n' + lines.join('\n') + '\\n成果需经实验确认方可使用；传播范围控制使用权。\n';
+    return '[研究]\n' + lines.join('\n') + '\n成果需经实验确认方可使用；传播范围控制使用权。\n';
   }
 
   WA.research = {

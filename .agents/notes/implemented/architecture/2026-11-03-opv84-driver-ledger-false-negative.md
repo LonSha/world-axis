@@ -45,6 +45,15 @@ oneShotMod、outputGuard、personaAnchor、survival〕。
 每轮消费（有分支、有产出），缺的是**驱动登记入口**」；L3b 才是「连注入链都不消费、诊断面也
 不念它，开关开着确实不会出内容」。两种病因必须分开念 —— 压成一句就把相反的病因混成一个数。
 
+## Alternatives considered
+- **给这两个口各接一个面板入口凑消费**。两处都不该有面板：`sceneStat` 的分区计数
+  供程序化核对注入选取与落盘一致，`getSettings` 的读口已被 settingsBus 登记路径替代性覆盖。
+  为过门禁而造没人需要的面板入口，是「改产品迁就台账」。
+- **从产品里删掉这两个口**。`sceneStat` 是本轮 OPV8-4 驱动账本排障时真用过的核对读数；
+  `getSettings` 与同族 settings-registry-only 口保持同形。删功能凑数会同时破坏
+  `tests/v8-driver-l3-2294.js` 的现场判据。
+- 结论：按 O8 规则显式登记为「仅程序化接口」，写明理由与复核窗口，不动产品。
+
 ## Alternatives rejected
 
 - **让 `render/inject.js` 参与扩散**（最直觉的「放开一步」）。实测会新增一批可达、

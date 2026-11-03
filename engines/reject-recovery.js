@@ -120,6 +120,9 @@
     'pre-violation': { kind: 'manual-review', why: '违规前置态，需人确认是否已发生' },
     'tries-exhausted': { kind: 'permanent-reject', why: '重试次数已用尽，别再试' },
     'cannot-afford': { kind: 'request-setup', why: '资源不够：先补资源再提交' },
+    // ── v2.295.0（V9 十八项）：续接链路两条分词判不出档的新码（词表收不住，逐条显式登记）。
+    'continuation-tail-required': { kind: 'request-setup', why: '续接前须先回放尾巴：先补齐尾巴前置，再重发同一次续接' },
+    'dangling-continuation-relation': { kind: 'manual-review', why: '续接指向的关系已悬空：修边还是弃续接，机器判不了' },
     // ── v2.192.0 首轮分面后补登的 33 条（拒收面规则表判不了，逐条显式登记）──
     'aftermath-wait': { kind: 'retry-same-input', why: '章间冷却期未过：等窗口过去同输入再来' },
     'ahead-of-head': { kind: 'rollback', why: '客户端序号超过服务端头，说明这份状态不该落' },
@@ -713,6 +716,22 @@
     'archive-failed', 'archive-too-big', 'archive-write-failed', 'bridge-missing',
     'contract-unavailable', 'control-usage-unavailable', 'engine-missing', 'not-on-desk',
     'panel-yield-unavailable', 'projection-failed', 'ui-not-loaded',
+    // ── v2.295.0（V9 十八项）：本批 18 个续接链路新拒收码（engines/world-seed.js /
+    //   engines/continuation.js 等续接面）。此前只在码面口径里，没进本快照 —— 与本仓
+    //   已栽过六次的同形态（v2.203.0 / v2.209.0 / v2.221.0 / v2.222.0 / v2.231.0 / 体检批次）。
+    //   两侧比对前都会 sort，故追加在末尾不改任何既有位置。
+    //   恢复档：16 条由规则表词族收住（bad-* / stale-* / missing / changed / nothing-to-* /
+    //   *-failed / *-rewound 等分词，实测 via:'rule'），不写 OVERRIDES（重复登记会让 A8 与
+    //   规则表打架）；仅 2 条分词判不出档，在 OVERRIDES 显式登记：
+    //     · continuation-tail-required：续接需要先回放尾巴 —— 是「补前置」而非改输入；
+    //     · dangling-continuation-relation：续接指向的关系已悬空 —— 机器判不了该修边
+    //       还是该弃这条续接，降级人工。
+    'archive-tail-unavailable', 'bad-continuation', 'bad-continuation-current',
+    'bad-continuation-pack', 'bad-continuation-person', 'bad-continuation-relation',
+    'bad-enabled', 'chat-changed', 'continuation-seed-mismatch', 'continuation-tail-required',
+    'current-missing', 'dangling-continuation-relation', 'nothing-to-continue',
+    'owner-missing', 'round-rewound', 'stale-continuation', 'transaction-failed',
+    'unsupported-stage',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。

@@ -84,8 +84,10 @@ function setPrefetch(WA) {
 /** 被假阴性误伤的六台（五台轮边界 + survival）。 */
 const MISLABELED = ['antiOmniscience', 'moodGlide', 'oneShotMod', 'outputGuard',
   'personaAnchor', 'survival'];
-/** 由注入链消费、没有独立驱动登记入口的四台（真实 L3a，不该被洗白）。 */
-const INJECT_CONSUMED = ['dream', 'floorSnapshot', 'gauge', 'injectCollector'];
+/** 由注入链消费、没有独立驱动登记入口的三台（真实 L3a，不该被洗白）。
+ *   v2.295.0（V9）：injectCollector 获得面板设置控件（「结构汇流选材」分区），
+ *   由 L3a 升为 L2p（面板驱动）—— 不再列在本表，另由 P3f 单独钉住。 */
+const INJECT_CONSUMED = ['dream', 'floorSnapshot', 'gauge'];
 
 function runAll(assertFn) {
   const a = assertFn || function (c, m) { if (!c) throw new Error(m); };
@@ -127,7 +129,12 @@ function runAll(assertFn) {
     a(/注入链消费/.test(w.hint), 'P3b(' + ns + '): hint 点出「注入链消费」这一事实（实 ' + w.hint.slice(0, 60) + '…）');
     a(/不是驱动入口/.test(w.hint), 'P3c(' + ns + '): hint 说清「那不是驱动入口」（不把读侧当驱动）');
   });
-  const summary = WA.driverLedger.summaryText();
+  // ── P3f v2.295.0（V9）升档如实跟位：injectCollector 有了真面板控件 ──
+  a((v.layerNames.L2p || []).indexOf('injectCollector') >= 0,
+    'P3f(injectCollector): V9 面板设置分区落成 ⇒ 由 L3a 升为 L2p（面板驱动，不再挂孤儿档）');
+  a((v.layerNames.L3a || []).indexOf('injectCollector') < 0,
+    'P3f2(injectCollector): 不再被误标为「只被诊断面读」（L3a 名单不含它）');
+const summary = WA.driverLedger.summaryText();
   // 本轮实际修掉的假读数：原句「这 N 个机制开关开着也不会出内容」对 L3a 是假话
   a(!/开关开着也不会出内容/.test(summary),
     'P3d: 摘要不再把 L3a 说成「开关开着也不会出内容」（实测 dream 启用即产出）');

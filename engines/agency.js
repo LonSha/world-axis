@@ -530,7 +530,7 @@
         lines.push(p.name + '：' + goals[0].text + ' | 待调度');
       }
     });
-    return lines.length ? '[行动调度]\\n' + lines.join('\\n') + '\\n以上是当前行动闭环状态；未结算的行动回执不自动推进计划步。' : '';
+    return lines.length ? '[行动调度]\n' + lines.join('\n') + '\n以上是当前行动闭环状态；未结算的行动回执不自动推进计划步。' : '';
   }
 
   // ── 诊断面 ──

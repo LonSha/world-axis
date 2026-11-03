@@ -5,9 +5,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
-  const DEF = { enabled: false, maxItems: 4, maxChars: 2400 };
+  const DEF = { enabled: false, maxItems: 4, maxChars: 2400, maxTokens: 0 };
   const REG = { key: 'worldaxis_inject_collector_settings_v1', def: DEF,
-    module: 'injectCollector', bounds: { maxItems: [1, 12], maxChars: [400, 12000] } };
+    module: 'injectCollector', bounds: { maxItems: [1, 12], maxChars: [400, 12000], maxTokens: [0, 12000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([REG]);
   let last = { enabled: false, selected: 0, folded: 0, chars: 0, rows: [], faults: [] };
   // V8 EXV8-1：场景来源留痕。为什么要单独一格而不是塞进 last：
@@ -111,19 +111,30 @@
     const header = '[结构汇流]\n';
     const footer = '\n只按持有人/当前场景呈现；承诺、拟稿、到期不是已完成，禁止替未登记内容补写。';
     const picked = [], counts = {}, skipped = {};
+    // Local material ceiling, not a second allocation from render's shared pool.
+    const tokenCap = Math.max(0, Math.floor(Number(cfg.maxTokens) || 0));
+    const tokenCost = WA.injectBudget.tokensOf;
+    function compose(rows, omitted) {
+      return rows.length ? header + rows.map(function(r){return r.content;}).join('\n')
+        + (omitted ? '\n其余折叠：' + omitted + ' 条' : '') + footer : '';
+    }
+    // Reserve an exact worst-case omission marker; final text is re-counted below.
+    const reserve = tokenCost(header + footer + '\n其余折叠：' + candidates.length + ' 条');
+    let tokenUsed = reserve;
     let used = header.length + footer.length + 100; // reserve collapse counters
     candidates.forEach(function (r) {
       const text = '· ' + r.label + '：' + r.text;
-      if ((counts[r.owner] || 0) >= max || used + text.length + 1 > cap) {
+      if ((counts[r.owner] || 0) >= max || used + text.length + 1 > cap || (tokenCap > 0 && tokenUsed + tokenCost(text + "\n") > tokenCap)) {
         skipped[r.owner] = (skipped[r.owner] || 0) + 1; return;
       }
       counts[r.owner] = (counts[r.owner] || 0) + 1;
-      picked.push(Object.assign({}, r, { content: text })); used += text.length + 1;
+      picked.push(Object.assign({}, r, { content: text })); used += text.length + 1; tokenUsed += tokenCost(text + "\n");
     });
-    let block = picked.length ? header + picked.map(function (r) { return r.content; }).join('\n')
-      + (Object.keys(skipped).length ? '\n其余折叠：' + Object.keys(skipped).sort().map(function (k) { return k + '=' + skipped[k]; }).join('，') : '') + footer : '';
+    const block = compose(picked, candidates.length - picked.length);
+    const inputs = candidates.map(function(r){return {source:'结构汇流',content:'· '+r.label+'：'+r.text};});
+    const volume = WA.injectBudget.volumeView(inputs, block ? [{source:'结构汇流',content:block}] : []);
     last = { enabled: true, selected: picked.length, folded: candidates.length - picked.length,
-      chars: block.length, cap: cap, rows: picked, skipped: skipped, faults: faults };
+      chars: block.length, cap: cap, tokenCap: tokenCap, tokens: tokenCost(block), candidateCount: candidates.length, inputTokens: inputs.reduce(function(n,r){return n+tokenCost(r.content);},0), volume: volume, rows: picked, skipped: skipped, faults: faults, chatId: WA.store.chatId() };
     return block;
   }
   WA.injectCollector = {
@@ -131,6 +142,15 @@
     setSettings: function (patch) { return WA.settingsBus.saveOrThrow(REG,
       WA.settingsBus.normalize(REG, Object.assign({}, settings(), patch || {}))); },
     buildBlock: buildBlock,
+    diagnose: function () {
+      const cfg=settings(),s=WA.store.get()||{};
+      if(!cfg.enabled)return {ok:true,status:'disabled',faults:[]};
+      if(last.chatId!==WA.store.chatId()||last.enabled!==true)return {ok:true,status:'not-collected',faults:[]};
+      const populated=Object.keys(s.people||{}).length>0||(s.currents||[]).length>0||(s.events&&s.events.rows||[]).length>0;
+      const faults=last.faults.slice();
+      if(populated&&last.candidateCount===0)faults.push({fault:'state-but-no-candidate',scope:'collector-five-owners',note:'可能是源关闭/可见性过滤或无适用材料，不代表整个世界注入失败'});
+      return {ok:faults.length===0,status:faults.length?'attention':'ok',candidateCount:last.candidateCount,selected:last.selected,faults:faults};
+    },
     noteScene: function (info) {
       const i = info || {};
       const from = ['sceneNarrative', 'ctx', 'none'].indexOf(i.from) >= 0 ? i.from : 'none';

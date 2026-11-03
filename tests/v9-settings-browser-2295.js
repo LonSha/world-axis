@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('fs'),live=require('./ui-live');
+const probe=`(function(){const W=window.WorldAxis;W.ui.open();const p=document.getElementById('wa-panel'),tab=k=>Array.from(p.querySelectorAll('.wa-tab')).find(x=>x.dataset.page===k).click();tab('events');
+ const defs=[['sc','storyChoice','maxPending'],['cm','commission','maxContracts'],['inv','investigation','maxClues'],['af','aftermath','maxEffects'],['ops','operations','maxProjects']],reads=[];
+ for(const row of defs){const el=document.getElementById('wa-'+row[0]+'-capacity');if(!el)return {ok:false,why:'missing-'+row[0]};el.value='12';el.dispatchEvent(new Event('change',{bubbles:true}));reads.push(W[row[1]].getSettings()[row[2]]===12);}
+ const before=JSON.stringify(defs.map(row=>W[row[1]].getSettings()));const search=document.getElementById('wa-setting-search');search.value='委托容量';search.dispatchEvent(new Event('input',{bubbles:true}));
+ const match=document.getElementById('wa-cm-capacity').closest('label'),miss=document.getElementById('wa-af-capacity').closest('label');const filtered=!match.hidden&&miss.hidden&&!!match.style.backgroundColor;
+ const noWrite=JSON.stringify(defs.map(row=>W[row[1]].getSettings()))===before;search.value='';search.dispatchEvent(new Event('input',{bubbles:true}));const reset=!miss.hidden&&!match.hidden;
+ W.store.transact(d=>{d.lastInjection={volume:{tokens:17,totalCap:100,rows:[{source:'共同生活',tokens:17}]},budget:{folded:[{source:'共同生活'}],dropped:[]}};});tab('inject');const board=document.getElementById('wa-budget-source-board'),budget=!!board&&board.textContent.includes('17%')&&board.textContent.includes('17 tokens')&&board.textContent.includes('折叠 1');
+ return {ok:reads.every(Boolean)&&filtered&&noWrite&&reset&&budget,reads,filtered,noWrite,reset,budget};})()`;
+(async()=>{const r=await live.runLive({skipClick:true,probeSource:probe});const ok=r.tier==='full'&&r.probe&&r.probe.ok&&!r.probeError&&!r.pageErrors.length&&!r.failedLoad.length;fs.writeFileSync(require('path').join(require('os').tmpdir(),'v9-settings-browser-report.json'),JSON.stringify(r,null,2));console.log('v9 settings browser: '+(ok?'1 / 失败 0':'0 / 失败 1'));console.log(JSON.stringify({probe:r.probe,error:r.probeError,errors:r.pageErrors}));process.exitCode=ok?0:1;})().catch(e=>{console.error(e.stack);process.exitCode=1;});

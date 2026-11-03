@@ -254,7 +254,7 @@
     if (!cur) return '';
     stat.blocks++;
     const v = view();
-    const rows = (v.rows || []).slice(-16);
+    const rows = (v.rows || []).filter(function (r) { return r.status === 'landed' || r.no === cur.no; }).slice(-16);
     const marks = rows.map(function (r) { return (r.status === 'landed' ? '✔' : (r.no === cur.no ? '▶' : '·')) + r.no + '.' + r.title; });
     const lines = ['[拍账] 当前拍：**第 ' + cur.no + ' 拍 · ' + cur.title + '**（' + marks.join('  ') + '）'];
     lines.push('节奏铁律一：**拍号由引擎推进** —— 你自己改 `当前拍` 不算数（引擎会当场拒收并留痕）。');

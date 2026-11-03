@@ -41,7 +41,7 @@ const ANCHOR_WHAT_INITFROM = "what.push('initFrom');";
 const ANCHOR_ALREADY = "if (s.meta && s.meta.initFrom) {";
 const ANCHOR_NO_PREVIEW = "reason: 'no-preview', hint: '先 initPreview() 再 initConfirm()'";
 const ANCHOR_FIXED = '_fixed: true';
-const ANCHOR_ROOT_INITFROM = 'root.meta.initFrom = { seedId: t.seedId';
+const ANCHOR_ROOT_INITFROM = "root.meta.initFrom = { mode:plan.mode||'structural', seedId: t.seedId";
 const ANCHOR_BAD_SEED_KEYS = "SEED_KEYS.indexOf(k) < 0";
 const ANCHOR_META_SKELETON = 'lastSettle: null, initFrom: null }';
 const ANCHOR_RETAIN_NOTE = 'const RETAIN_NOTE =';

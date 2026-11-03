@@ -102,7 +102,16 @@ function loadDriver() {
 }
 /** 浏览器缓存根（PLAYWRIGHT_BROWSERS_PATH 可覆盖——不写死某一台机器的布局）。 */
 function browsersRoot() {
-  return process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(os.homedir(), '.cache', 'ms-playwright');
+  if (process.env.PLAYWRIGHT_BROWSERS_PATH) return process.env.PLAYWRIGHT_BROWSERS_PATH;
+  const isDir = function (p) { try { return fs.statSync(p).isDirectory(); } catch (e) { return false; } };
+  // v2.295.0（V9 收口）：隔离回归把 HOME 重定向到 task 目录后，os.homedir() 指向任务目录，
+  //   而浏览器缓存在**账户**的 passwd 家目录下 —— 与 v2.163.0 补 SYSTEM_BROWSER_PATHS 是
+  //   同一类问题的新形态（那次补的是系统级安装位，这次补的是账户级缓存位）。
+  //   os.userInfo().homedir 读 getpwuid（跟 uid 走，不吃 $HOME），两处都试，在场者优先。
+  const candidates = [path.join(os.homedir(), '.cache', 'ms-playwright')];
+  try { candidates.push(path.join(os.userInfo().homedir, '.cache', 'ms-playwright')); } catch (e) { /* 无 passwd 时照旧 */ }
+  for (const c of candidates) { if (isDir(c)) return c; }
+  return candidates[0];
 }
 /**
  * 系统级浏览器安装位置（发行版/打包器的**标准**落点，与本机布局无关）。

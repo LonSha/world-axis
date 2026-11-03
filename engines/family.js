@@ -442,9 +442,25 @@
     const units = (bag.units || []).slice(-Math.max(1, cfg.maxUnits));
     if (!units.length) return '';
     const lines = units.map(function (u) {
-      return u.name + '（' + u.type + '，' + u.members.length + '人）';
+      const lines = [u.name + '（' + u.type + '，' + u.members.length + '人）'];
+      const balance = Object.keys(u.treasury || {}).sort().slice(0, 12).map(function (k) {
+        return clean(k, 40) + '×' + u.treasury[k];
+      });
+      lines.push('公共池余额：' + (balance.join('、') || '未登记资源'));
+      (u.care || []).filter(function (c) { return c.active; }).slice(-6).forEach(function (c) {
+        lines.push('已确认照护：' + c.caregiver + '→' + c.ward
+          + (c.notes ? '（' + clean(c.notes, 120) + '）' : '') + '；期限未登记');
+        (c.history || []).slice(-1).forEach(function (h) {
+          lines.push('照护交接：' + h.from + '→' + h.to + '；原因：' + clean(h.reason, 120));
+        });
+      });
+      (u.inheritances || []).slice(-2).forEach(function (h) {
+        lines.push('已完成财产交接：' + h.deceased + '→' + (h.heirs || []).join('、')
+          + '；事件：' + clean(h.event, 120) + '（不继承私密记忆）');
+      });
+      return lines.join('\n');
     });
-    return '[家庭]\n' + lines.join('\n') + '\\n共同生活单位的照护与开支按已确认安排执行。\n';
+    return '[家庭]\n' + lines.join('\n') + '\n共同生活单位的照护与开支按已确认安排执行。\n';
   }
 
   WA.family = {

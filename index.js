@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.294.0';
+  const VERSION = '2.295.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1153,6 +1153,8 @@
     //   只登记自己的设置键，零上游读、零 store 写、零落盘；它读的暗流来自 store.get().currents、
     //   时间基准来自 clock/storyclock，两处都是运行期读口 —— 装载期不需要任何依赖在场。
     'engines/undercurrent-calendar.js',
+    'engines/storyline-advance.js',
+    'engines/world-changes.js',
     // v2.269.0（V6 EXV6-5）：单轮成本卡。位置同前面的只读读数模块（undercurrent-calendar
     //   之后、capability-tier 之前）：装载期只登记自己的设置键，零上游读、零 store 写。
     //   顺序也不是随意的 —— 它读的三源（injectBudget / injectValue / perfLedger）在

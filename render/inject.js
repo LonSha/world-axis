@@ -162,6 +162,7 @@
     //   本表另一项 `genGate` 答「这一刻**允不允许生成**、还有哪些东西已经用过了」。
     //   两者都不列未到达的内容 —— 与 beatMask「绝不列未到达节拍的内容」同一条防剧透纪律。
     'beatReport', 'genGate',
+    'beatLedger', 'family', 'research', 'opportunity', 'storylineAdvance', 'worldChanges',
     // v2.228.0(拓展 N10):历史留存与检索。与注入分支**同批**登记 ——
     //   只加源表不加分支 = 声明了没人消费;只加分支不加源表 = 开关点了零效果
     //   (v2.38.0 的 echoes 原样复刻)。键名 = 命名空间名。插在 chrono 行**之前**
@@ -275,6 +276,7 @@ style: false,
         //   beatReport 的 DEF.enabled=false、genGate 的 DEF.enabled=false，未开时 buildBlock
         //   返回空串），不给老用户凭空多出约束。
         beatReport: true, genGate: true,
+        beatLedger: true, family: true, research: true, opportunity: true, storylineAdvance: true, worldChanges: true,
         // v2.228.0(拓展 N10):历史留存。取默认 true(同四条理由——其模块总开关默认为关:
         //   retrieval 的 DEF.enabled=false,未开时 buildBlock 返回空串),不给老用户凭空多出约束。
         // v2.230.0（拓展 N12）：六条新源。取默认 true（同四条理由——其模块总开关
@@ -534,6 +536,7 @@ style: false,
     //   `genGate` 取「要避开的东西」而非「生成闸门」—— 这一段进正文的**不是闸门读数**，
     //   而是那份「已经用过了、不要重演」的名单（闸门判定本身不进正文）。
     beatReport: '拍回报', genGate: '要避开的东西',
+    beatLedger: '当前拍账', family: '共同生活', research: '研究进程', opportunity: '机会窗口', storylineAdvance: '暗流阶段推进', worldChanges: '世界变化摘要',
     sediment: '此地沉积',
 
     // v2.294.0（V8 OPV8-1）：结构汇流显示名。缺此项 ⇒ 失败台账（SRC_NAME）报英文键名。
@@ -659,6 +662,10 @@ style: false,
     //   （v2.127.0）、reasoning/storyTone（v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0）、
     //   sediment（v2.149.0）、worldBridge（v2.154.0）、diplomacy（v2.165.0）各付过一次学费。
     beatReport: 'worldaxis_beat_report_settings_v1',
+    storylineAdvance: 'worldaxis_storyline_advance_settings_v1',
+    worldChanges: 'worldaxis_world_changes_settings_v1',
+    beatLedger: 'worldaxis_beat_ledger_settings_v1', family: 'worldaxis_family_settings_v1',
+    research: 'worldaxis_research_settings_v1', opportunity: 'worldaxis_opportunity_settings_v1',
     // ⚠ genGate 例外：它的**数据键是第二把**（`worldaxis_gen_gate_data_v1`，名单与闸门账），
     //   这里登记的是它的**设置键**（同注册表 `__REG.key`）—— 两把键各司其职，
     //   拿数据键当模块总开关读会永远读到「未设」而判成 unavailable。
@@ -1423,6 +1430,13 @@ style: false,
       //   本块是要治「演得出来但缺一步因」与「根本立不住」在正文里长得一样：前者只需补一句，
       //   后者才该重排；合成一个「不通过」会让模型被反复重排而缺的那一步因永远补不上。
       if (vis.beatReport && WA.beatReport) { const brb = engineCall('beatReport', function () { return WA.beatReport.buildBlock(); }); if (brb) items.push({ source: '拍回报', content: brb }); }
+      // V9: owner projections only; facade aggregation would duplicate beatReport/genGate.
+      if (vis.beatLedger && WA.beatLedger) { const b = engineCall('beatLedger', function () { return WA.beatLedger.buildBlock(); }); if (b) items.push({ source: '当前拍账', content: b }); }
+      if (vis.worldChanges && WA.worldChanges) { const wcb = engineCall('worldChanges', function () { return WA.worldChanges.buildBlock(); }); if(wcb) items.push({source:'世界变化摘要',content:wcb}); }
+      if (vis.storylineAdvance && WA.storylineAdvance) { const sab = engineCall('storylineAdvance', function () { return WA.storylineAdvance.buildBlock(); }); if (sab) items.push({ source: '暗流阶段推进', content: sab }); }
+      if (vis.family && WA.family) { const b = engineCall('family', function () { return WA.family.buildBlock(); }); if (b) items.push({ source: '共同生活', content: b }); }
+      if (vis.research && WA.research) { const b = engineCall('research', function () { return WA.research.buildBlock(); }); if (b) items.push({ source: '研究进程', content: b }); }
+      if (vis.opportunity && WA.opportunity) { const b = engineCall('opportunity', function () { return WA.opportunity.buildBlock(); }); if (b) items.push({ source: '机会窗口', content: b }); }
       // v2.228.0(拓展 N10):历史留存与检索。**本源是本模块唯一需要「本轮输入」的注入源** ——
       //   OR 规则(因果相关**或**被提及,任一成立即入包)的输入面就是玩家这一句话。
       //   取输入的口径与 memory.recentText 同源(chat 末条的 is_user 帧),

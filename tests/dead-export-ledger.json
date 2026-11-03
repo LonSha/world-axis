@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.294.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.294.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.295.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.295.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -713,14 +713,6 @@
       "refs": 0,
       "tref": 0,
       "own": 5
-    },
-    "beatLedger.buildBlock": {
-      "reason": "self-only",
-      "detail": "engines/beat-ledger.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/beat-ledger.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "beatLedger.claim": {
       "reason": "self-only",
@@ -2994,14 +2986,6 @@
       "tref": 0,
       "own": 3
     },
-    "family.buildBlock": {
-      "reason": "self-only",
-      "detail": "engines/family.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/family.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "family.createUnit": {
       "reason": "self-only",
       "detail": "engines/family.js 内部自用、外部零引用（过度导出）",
@@ -3810,14 +3794,6 @@
       "tref": 0,
       "own": 3
     },
-    "injectBudget.tokensOf": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/inject-budget.js",
-      "refs": 0,
-      "tref": 7,
-      "own": 15
-    },
     "injectBudget.trim": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -3834,23 +3810,7 @@
       "tref": 7,
       "own": 4
     },
-    "injectCollector.getSettings": {
-      "reason": "self-only",
-      "detail": "engines/inject-collector.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/inject-collector.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "injectCollector.sceneStat": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/inject-collector.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
-    },
-    "injectCollector.setSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/inject-collector.js",
@@ -5216,14 +5176,6 @@
       "src": "engines/operations.js",
       "refs": 0,
       "tref": 1,
-      "own": 3
-    },
-    "opportunity.buildBlock": {
-      "reason": "self-only",
-      "detail": "engines/opportunity.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/opportunity.js",
-      "refs": 0,
-      "tref": 0,
       "own": 3
     },
     "opportunity.respond": {
@@ -6745,14 +6697,6 @@
       "refs": 0,
       "tref": 0,
       "own": 15
-    },
-    "research.buildBlock": {
-      "reason": "self-only",
-      "detail": "engines/research.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/research.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "research.getSettings": {
       "reason": "unwired",

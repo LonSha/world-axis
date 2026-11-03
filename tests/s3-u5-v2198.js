@@ -462,7 +462,8 @@ a(kc.length === 20 && kc.indexOf('effect') >= 0 && kc.indexOf('pending') >= 0,
 const kb = Object.keys(C0.worldBlueprint);
 a(kb.length === 15, 'D5b world-blueprint 导出面仍 15 项（本批零新增导出；实得 ' + kb.length + '）');
 const ks = Object.keys(C0.worldSeed);
-a(ks.length === 16, 'D5c world-seed 导出面仍 16 项（本批零新增导出；实得 ' + ks.length + '）');
+a(ks.length === 18 && ks.indexOf('requireContinuation') >= 0 && ks.indexOf('validateContinuation') >= 0,
+  'D5c world-seed 导出面 18 项且含续接两新口 requireContinuation / validateContinuation（v2.295.0（V9）续接链路新增 requireContinuation / validateContinuation / stat 等 ⇒ 16 → 18；本锁交付时 16，判据随新现实更正）（实得 ' + ks.length + '：' + J(ks) + '）');
 const modV = function (rel) { return (C0.modules[rel] || {}).ver; };
 a(modV('core/commit.js') === '2.195.0' && modV('engines/world-blueprint.js') === '2.195.0'
   && modV('engines/world-seed.js') === '2.195.0',

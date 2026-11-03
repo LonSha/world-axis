@@ -97,7 +97,20 @@
     // 收尾/平息
     '收尾': { etaDays: 1, turns: '1轮', urgency: 'low', name: '余波整理', windowText: '收尾·接近平息' },
     '退潮': { etaDays: 1, turns: '1轮', urgency: 'low', name: '余波整理', windowText: '收尾·接近平息' },
-    'subsiding': { etaDays: 1, turns: '1轮', urgency: 'low', name: '余波整理', windowText: '收尾·接近平息' }
+    'subsiding': { etaDays: 1, turns: '1轮', urgency: 'low', name: '余波整理', windowText: '收尾·接近平息' },
+
+    // v2.295.0（OPV9-5）：五段弧线正式入表。
+    //   为什么必须显式登记而不是靠包含式兜底：兜底是按关键字猜的，实测四种写法全猜错 ——
+    //     · '延展' 含「展」→ 被兜底成「发展」（etaDays 2，比真实档位早 2 天撞上）；
+    //     · '收束' / '成形' / '淡出' / '起线' 一个关键字都不命中 → 落进最后那行
+    //       「持续推演 / etaDays 2」的通用默认值，四条弧线段全被压成同一档。
+    //   兜底链保留（外面还在传自由文本），但只作为最后一级，不再吃这五个正式段名。
+    //   档位口径：起线最远（7 天）、延展 4、成形 2、收束 1、淡出 0（当天就是淡出时刻）。
+    '起线': { etaDays: 7, turns: '7-14轮', urgency: 'low', name: '新线起头', windowText: '远端·刚起头' },
+    '延展': { etaDays: 4, turns: '4-8轮', urgency: 'low', name: '线在延展', windowText: '尚早·正在铺开' },
+    '成形': { etaDays: 2, turns: '2-4轮', urgency: 'medium', name: '态势成形', windowText: '观察·已有形状' },
+    '收束': { etaDays: 1, turns: '1轮', urgency: 'low', name: '正在收束', windowText: '收束·接近落定' },
+    '淡出': { etaDays: 0, turns: '0轮', urgency: 'low', name: '正在淡出', windowText: '已过峰值·余温' }
   };
 
   const CLOSED_STAGES = new Set(['已结束', 'closed', '已结案', '终局', 'recycled', 'dropped']);

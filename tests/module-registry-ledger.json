@@ -1,13 +1,13 @@
 {
- "version": "2.294.0",
- "loadOrderCount": 336,
- "loadedCount": 322,
+ "version": "2.295.0",
+ "loadOrderCount": 338,
+ "loadedCount": 324,
  "uiCount": 14,
- "nsCount": 331,
+ "nsCount": 333,
  "totals": {
-  "loadEdges": 205,
+  "loadEdges": 207,
   "hardEdges": 0,
-  "callRefs": 394,
+  "callRefs": 398,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -194,6 +194,7 @@
     "engines/story-loop.js",
     "engines/story-tone.js",
     "engines/storyclock.js",
+    "engines/storyline-advance.js",
     "engines/summarizer.js",
     "engines/supply-chain.js",
     "engines/survey.js",
@@ -209,6 +210,7 @@
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-briefing.js",
+    "engines/world-changes.js",
     "engines/world-clock.js",
     "engines/world-diary.js",
     "engines/world-graph.js",
@@ -514,6 +516,7 @@
     "engines/story-loop.js",
     "engines/story-tone.js",
     "engines/storyclock.js",
+    "engines/storyline-advance.js",
     "engines/supply-chain.js",
     "engines/survey.js",
     "engines/training.js",
@@ -527,6 +530,7 @@
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
     "engines/world-briefing.js",
+    "engines/world-changes.js",
     "engines/world-clock.js",
     "engines/world-diary.js",
     "engines/world-graph.js",
@@ -5867,6 +5871,48 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_undercurrent_calendar_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/storyline-advance.js": {
+   "ns": [
+    "storylineAdvance"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_storyline_advance_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-changes.js": {
+   "ns": [
+    "worldChanges"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_world_changes_settings_v1"
    ],
    "consumedBy": []
   },

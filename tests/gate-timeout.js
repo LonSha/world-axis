@@ -13,7 +13,7 @@
 //   module-registry-gate 0.16s · field-liveness-gate 0.40s · isolated-runner-lock 2.7s ·
 //   tar（排除 .git）0.10s · node --check tests/run.js 0.12s。
 //   计划里的「export-contract 3s」只有 5 倍余量；「全量 20s」与实测 6~8 分钟差一个量级。
-//   ⇒ 预算 =「**最重那道门禁**的实测 × 8 倍」= 96000ms，全表统一（多一档就多一处会漂移的
+//   ⇒ 预算 =「**最重那道门禁**的实测 × 8 倍」= 1344000ms，全表统一（多一档就多一处会漂移的
 //     地方——本模块第一次落盘就踩到：逐道表算出 96s、武装值写了 90s，同一份口径里出现两个
 //     spawn 预算）。逐门禁实测值只作**证据**保留，由 coherence() 守「宣称/预算/证据」自洽。
 //   为什么不逐道各算：门禁里有几道跨 git 版本会明显变重（P1 计划里就有「从 git 读上版快照
@@ -50,20 +50,22 @@ const RATIOS = { spawn: 8, inline: 4, heavy: 4 };
 
 /**
  * 预算单一真源。
- *   spawnMs  = 最重门禁（dead-export-gate 12s）实测 × 8 —— **全部调用点共用**（现场数由 siteStats 给出）；
+ *   spawnMs  = 最重门禁实测 × 8 —— **全部调用点共用**（现场数由 siteStats 给出）。
+ *     v2.295.0（V9 收口）：真浏览器实机通道在隔离环境可用后，最重门禁由 dead-export-gate
+ *     （12s）变为 ui-live-2137 端到端（实测 168s，见 GATES 表末条），预算按同一口径重算。
  *   shellMs  = tar 那句的 shell 侧保险丝（240s：它治「永远不返回」，不是「慢」）。
  */
 const GATE_TIMEOUTS = {
-  spawnMs: 96000,
+  spawnMs: 1344000,
   shellMs: 240
 };
 /**
  * v2.203.0：**外壳硬超时**的默认值（isolated-runner 的 `opts.timeoutMs || DEFAULT`）。
  *   与 GATE_TIMEOUTS 是**两个预算**：那一张管「单道门禁不许卡死」（96s），
- *   这一条管「整趟不许跑不完」（3420000ms）。两者的口径都不是拍脑袋：
+ *   这一条管「整趟不许跑不完」（5100000ms）。两者的口径都不是拍脑袋：
  *   本值 = 现场实测节内合计 x 1.5 向上取整到分钟（与 tools/slow-sections.js 的同一公式）。
  *   沿革：600000（初值）→ 660000（v2.131.0，实测 439s x 1.5）→ 2280000（v2.203.0，实测 1487.44s x 1.5）
- *        → 3420000（v2.274.0 收口：实测 2278.99s x 1.5）。
+ *        → 3420000（v2.274.0 收口：实测 2278.99s x 1.5）→ 5100000（v2.295.0 V9 收口：实测 3394.68s x 1.5，真浏览器实机门入表后整趟变重）。
  *        **第三次现形**：v2.274.0 收口轮的一趟全量跑到 38 分整被 SIGKILL，`result.json` 写的是
  *        `Status: source-changed` + `结束原因 timeout`，而它其实已经跑完 418/419 节 ——
  *        只剩末尾两节没跑完。上一版默认值 2280000ms 恰好等于 38.0 分钟，**比实测总时长还短 1 秒**，
@@ -73,7 +75,7 @@ const GATE_TIMEOUTS = {
  *   两次现形的形态完全一致 —— **默认值比实测总时长还短 ⇒ 每趟末尾被 SIGKILL，**
  *   **现场只留 Status: interrupted（读起来像环境问题）**。
  */
-const RUNNER_TIMEOUT_DEFAULT_MS = 3420000;
+const RUNNER_TIMEOUT_DEFAULT_MS = 5100000;
 
 /**
  * run.js 现场武装表。**现场调用点全部入表**（病根就在「无一声明 timeout」，
@@ -86,157 +88,157 @@ const RUNNER_TIMEOUT_DEFAULT_MS = 3420000;
  *   `optionKey` = 现场真读的选项名（专锁逐字比对现场文本）。
  */
 const TIMEOUT_ARMED = {
-  'negative-probe-broken': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'dead-export-json': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'export-contract': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'tar-copy': { value: 96000, mode: 'spawn+shell', optionKey: 'timeout', shellFuse: 240 },
-  'syntax-check': { value: 96000, mode: 'spawn-only', optionKey: 'timeout' },
-  'export-contract-external': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'negative-probe-v2410': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'field-liveness-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'module-registry-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'isolated-runner-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'negative-probe-broken': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'dead-export-json': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'export-contract': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'tar-copy': { value: 1344000, mode: 'spawn+shell', optionKey: 'timeout', shellFuse: 240 },
+  'syntax-check': { value: 1344000, mode: 'spawn-only', optionKey: 'timeout' },
+  'export-contract-external': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'negative-probe-v2410': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'field-liveness-gate': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'module-registry-gate': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'isolated-runner-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.210.0（拓展 8）：与 ARMED_SITES 同批入表（两张表各说一套时，逐站点核对与
   //   「入表了却没人核」会同时发生）。
-  'e8-travel-desk-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'ui-gate-2136': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'e8-travel-desk-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'ui-gate-2136': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.137.0（O14）：UI 实机通道的调用点。**它比 ui-gate.js 重一档**——后者是 mini-DOM 上的
   //   端到端（~12s），前者要真起 Chromium 跑 9 轮（1 轮原版 + C1/C2/C3/C4 各一轮破坏 + 每轮
-  //   还夹一轮原版对照），实测约 60s。预算仍走统一值 96000ms（口径一：统一预算不许逐道紧贴），
-  //   但把 raw 实测登记进 GATES 供 coherence() 自洽核对（96000 ≥ 60000×? 见 GATES 条目）。
-  'ui-live-2137': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  //   还夹一轮原版对照），实测约 60s。预算仍走统一值 1344000ms（口径一：统一预算不许逐道紧贴），
+  //   但把 raw 实测登记进 GATES 供 coherence() 自洽核对（1344000 ≥ 60000×? 见 GATES 条目）。
+  'ui-live-2137': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.145.0（O23）：实机读数行面调用点（ui-live.js 的 runLive，读 readings.length）。
-  'ui-live-2145': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'ui-live-2145': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.163.0（O14 驱动面）：同一支实机通道的**驱动面**探针（run.js 的 v2.163.0 段，
   //   真跑内置 CDP 驱动并读 tier/loaded/readings/fillErr/routeErr/errs 七字段）。
   //   它与 ui-live-2145 是**两个不同调用点**（前者读 ui-live-v2137 专锁，后者读 ui-live.js
   //   的 runLive 探针），故各占一条；新开调用点不入表正是本模块治的病。
-  'ui-live-2163': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'ui-live-2163': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.173.0（TX4b 收尾）：TX1–TX9 批次的 14 个子进程调用点（8 个 TX 专锁 + 6 个
   //   tx*_smoke 工具）。它们此前既未声明 timeout、也未入表 —— 正是本模块治的病
   //   （「留一个没声明的调用点就是留一条静默挂起的路径」）。全量回归第二轮暴露。
-  'tx1-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx2-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx3-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx4-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx6-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx6-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx7-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx8-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'tx9-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'tx1-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx2-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx3-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx3-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx4-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx4-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx6-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx6-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx7-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx7-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx8-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx8-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx9-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'tx9-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.182.0（第二批 O3+O4+O5+E2+E5）：五把新专锁 + 五个冒烟工具共 10 个新调用点。
   //   它们此前既未声明 timeout、也未入表 —— 正是本模块治的病
   //   （「留一个没声明的调用点就是留一条静默挂起的路径」）。全量回归首跑暴露。
-  'b2-e2-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-e2-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-e5-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-e5-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-o3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-o3-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-o4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-o4-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-o5-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b2-o5-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-e2-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-e2-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-e5-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-e5-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o3-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o3-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o4-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o4-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o5-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b2-o5-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.183.0 / v2.184.0（第一、三批 · E1 统一待办中心 / E3 存档槽面板接线）：
   //   三把新调用点（E1 专锁 + pending_center_smoke + E3 专锁）此前只落了现场 timeout、
   //   没入表 —— 与 TX4b、第二批同款病（「新开的调用点不入表即红」，A6/A13b/B5 会点名）。
-  'b1-e1-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b1-e1-smoke': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b1-e3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b1-e1-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b1-e1-smoke': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b1-e3-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.186.0（第一批 · O9 + O1）：**同一个锁被挂成多个调用点**，五处逐一入表。
-  //   为什么一个锁要挂五处：两把锁的实机层各自超过统一预算 96000ms（O9 一轮全跑约 49s、
+  //   为什么一个锁要挂五处：两把锁的实机层各自超过统一预算 1344000ms（O9 一轮全跑约 49s、
   //   O1 一轮全跑约 94s）—— 按方法名拆开之后每段都落在既有统一预算内，**单一真源没被撕**
-  //   （现场仍是同一个 96000，拆的是调用点，不是预算）。
+  //   （现场仍是同一个 1344000，拆的是调用点，不是预算）。
   //   本条同时是 A16 那一条判据的现场证据：新开的调用点不入表即红。
-  'o9-static': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'o9-live': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'o1-static': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'o1-live-c': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'o1-live-n': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'o9-static': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'o9-live': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'o1-static': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'o1-live-c': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'o1-live-n': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.187.0（第三批 · O7）：计划文件与笔记树门禁的新调用点（同一形态：并入统一预算，不新开第二预算）。
-  'o7-plan-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'o7-plan-gate': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.187.0（第三批 · O6）：分层选区门禁的新调用点。**并入统一预算**（不新开第二预算）——
   //   实测该门禁约 2 秒（它拿真函数的真返回驱动收尾三态，不做全量真跑），
   //   统一预算对它宽松得很，但那正是本模块的口径：预算不逐道紧贴，见 coherence()。
-  'o6-layer-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'o6-layer-gate': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.187.0（第三批 · O8）：消费者类型门禁的新调用点。实测约 10 秒
   //   （它要跑 5 条真破坏负控，每条都真装载一次工具），**并入统一预算**、不新开第二预算。
-  'o8-consumer-gate': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'o8-consumer-gate': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.187.0（第三批 · E4）：战役层专锁的新调用点。实测约 1 秒（合成宿主批量装载），
   //   **并入统一预算**、不新开第二预算。
-  'b3-e4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b3-e4-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.187.0（第三批 · E6 / E8）：两把专锁的新调用点。实测各约 1~2 秒
   //   （E6 走合成宿主；E8 八条真源码破坏 + 两向自证，每个破坏都真装载一次），
   //   **并入统一预算**、不新开第二预算。
   //   注：本段注释**不许出现「预算字段后跟数字」的字面形态** —— 现场预算计数按
   //     该形态全局匹配（不剥注释），注释里写一个就凭空多出一处无调用点的预算。
-  'b3-e6-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b3-e8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b3-e6-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b3-e8-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.224.0(N8)补账:s3-b3-* 系列八把专锁的调用点此前**已开未入表** ——
   //   现场实测(用本模块自己的 parseCallBlocks 逐行比对)武装表 60 / 调用点块 68,
   //   差 8 条全在这一族;4 处红(A6/A13b/B13/N7)在 v2.223.0 基线上原样存在。
   //   本仓判决词:新开的调用点不入表即红,处置是入表而不是放宽。
-  'b3-e8-2217-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'b3-n1-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'b3-n5-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'b3-n2-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'b3-n3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'b3-n4-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'b3-n7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'b3-n8-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-e8-2217-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n1-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n5-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n2-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n3-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n4-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n7-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b3-n8-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   // v2.227.0(N9):与 ARMED_SITES 同批入表。**新开的调用点不入表即红**正是这道门禁存在的理由,
   //   故处置是入表而不是放宽(与 N8 那八条同一处置)。
-  'b3-n9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  // v2.188.0（第四批 · E7 + E9）：两把新专锁的调用点，同 B3 批次口径（统一预算 96000ms）。
-  'b3-e7-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
-  'b3-e9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b3-n9-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  // v2.188.0（第四批 · E7 + E9）：两把新专锁的调用点，同 B3 批次口径（统一预算 1344000ms）。
+  'b3-e7-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  'b3-e9-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎的专锁调用点。
   //   新开的调用点不入表即红（本模块治的正是「无一声明 timeout = 一条静默挂起的路径」）。
-  'b4-beat-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b4-beat-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.208.0：待办×期限专锁的调用点（锚点**必须带左值名** rB1E1c —— 与 rB1E1、rB1E1b
   //   只差最后一个字母，不带左值名会 ambiguous）。
-  'b1-e1c-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b1-e1c-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.206.0（拓展 2 · E1b）：可处理待办工作台专锁的调用点。
   //   它由**中档回归**（tools/mid-tier.js）当场逮住 —— 新开的调用点只带了 timeout 字面量、
   //   没入两张表（现场 56 块 vs 表内 55 条，A6/A13b/B13/N7 四处同时现形）。
   //   这正是「新开的调用点不入表即红」这条判据的第一次实战命中，也是中档存在的意义：
   //   在 29 分钟的全量之前先把这一类知道掉。
-  'b1-e1b-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'b1-e1b-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.208.0（E1 证据问答）：新项专锁的调用点，并入统一预算（不新开第二预算）。
   //   本条是「两张表各说一套」的现场记档：站点表先登记、武装表漏登记那次，
   //   coherence 报的正是 site-not-armed —— 只加锚点不够，两张表必须同时落。
-  'ev1-evidence-qa-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'ev1-evidence-qa-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.209.0（优化 6）：面板导航协议专锁。与上一项同规 —— **两张表同批落**
   //   （站点表漏登记那次的红就是 `site-not-armed`）。
-  'ev6-panel-nav-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout' },
+  'ev6-panel-nav-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
   // v2.228.0 / v2.229.0(N10 / N11):两把新专锁的调用点在本版新开 ⇒ 同批入表。
   //   **新开的调用点不入表即红**正是这道门禁存在的理由,故处置是入表而不是放宽。
-  'b4-n10-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'b4-n11-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b4-n10-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'b4-n11-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   // v2.253.0（收口）：纯脚本体锁的统一挂载口。run.js 的 runScript(spec) 是**一个**调用点、
   //   服务**多把**纯脚本锁（顶层直接 runAll() 跑完即退、无 module.exports 可挂的那批），
   //   因此它在武装表里是**一条**，而不是每把锁一条 —— 站点是「调用点」不是「被跑的脚本」。
   //   与 v2.186.0 拆 O9/O1 站点时的口径一致：现场有几个 spawn 调用点，表里就有几条。
-  'script-body-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'script-body-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   // v2.253.0（收口）：TODO-2114 十二个集成演示锁的调用点，与 ARMED_SITES 同批入表。
   //   两张表各说一套时，coherence 会当场报 site-not-armed（本轮实测正是这 12 项）。
-  'wp-integration-locks': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'wp-a2-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'wp-a3-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'wp-b1-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'wp-b2-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'wp-c-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'v3-a-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'v3-ab-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'v3-b-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'v3-op9-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'v3-c-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'v2232-integration-lock': { value: 96000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' }
+  'wp-integration-locks': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-a2-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-a3-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-b1-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-b2-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wp-c-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-a-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-ab-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-b-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-op9-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v3-c-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'v2232-integration-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' }
 };
 
 /**
@@ -244,7 +246,7 @@ const TIMEOUT_ARMED = {
  *   anchor = 从 run.js 现场读出来的、**在 run.js 里恰中 1 次**的调用行行首片段。
  *   【为什么不用模块内的 key 去现场定位】这是本版第一次落盘的真实缺陷：key 只活在本模块里，
  *     run.js 一个字都没有 ⇒ 十处全部报 site-missing，判据从第一天起就恒假。
- *   【为什么锚点不用 options 片段】options 行多处同形（`{ encoding: 'utf8', timeout: 96000 }`），
+ *   【为什么锚点不用 options 片段】options 行多处同形（`{ encoding: 'utf8', timeout: 1344000 }`），
  *     拿它定位必然 ambiguous；「调用行整行」才天然唯一。
  *   【kill】现场是否显式给强杀信号（SIGKILL）。子进程可以忽略 SIGTERM，出口三处必须真死。
  *   【shellFuse】该站点另有 shell 侧保险丝（秒）。
@@ -269,7 +271,7 @@ const ARMED_SITES = [
   { key: 'export-contract-external', mode: 'spawn', kill: true,
     anchor: "const r4100 = cp4100.spawnSync(process.execPath, [path4100.join(BASE, 'tests/export-contract.js')]," },
   { key: 'negative-probe-v2410', mode: 'spawn', kill: true,
-    // 【锚点不许包含它要守卫的那个值】本行初版把整行（含 `timeout: 96000, killSignal: 'SIGKILL'`）
+    // 【锚点不许包含它要守卫的那个值】本行初版把整行（含 `timeout: 1344000, killSignal: 'SIGKILL'`）
     //   当锚点 ⇒ 一旦预算被改动（**正是本锁要守的东西**），锚点先失效、报出来的是
     //   site-missing 而不是 value-mismatch —— 判据被它要抓的破坏顺手打掉了（自我指涉）。
     //   故锚点截到 options 之前：唯一性照样成立（整行唯一 ⇒ 任何前缀也唯一）。
@@ -461,7 +463,7 @@ const ARMED_SITES = [
   //   这 12 处在全量回归里一直是「现场调用点 ≠ 武装表条数」的差额来源：HEAD 基线实测
   //   现场 83 个调用点 vs 表内 71 条 ⇒ A13b（84 vs 71）从登记那天起就是红的，
   //   A6 却因为「调用点 = 武装点 = 预算处」三数相等而看着绿 —— 两数不同源正是本门禁
-  //   要防的形态。既然它们确实都带统一预算 96000 + SIGKILL，处置就是**入表**（不是放宽）。
+  //   要防的形态。既然它们确实都带统一预算 1344000 + SIGKILL，处置就是**入表**（不是放宽）。
   //   行号严格递增：这 12 处在 run.js 里是同一区块的连续 12 行，故一并落在表末尾。
   { key: 'wp-integration-locks', mode: 'spawn', kill: true,
     anchor: "const rWPA1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a1-integration.js')]," },
@@ -579,7 +581,12 @@ const GATES = [
   { key: 'tar-copy', rel: '', argv: ['sh', '-c', 'timeout -k 5 240 tar --exclude=.git -cf - . | (cd <tmp> && tar -xf -)'], kind: 'spawn+shell', raw: 100, why: '仓库副本（外部命令；另有 240s 的 shell 侧保险丝）' },
   { key: 'negative-probe-v2410', rel: 'tests/inventory.js', argv: ['<tmp>/notdir.js'], kind: 'heavy', raw: 700, why: 'v2.41.0 负向自证：BASE 指向不存在目录 ⇒ 非零退出' },
   { key: 'syntax-check', rel: 'tests/run.js', argv: ['--check', '<副本>/tests/run.js'], kind: 'spawn-only', raw: 120, why: '破坏副本的语法校验（node --check 读全文件）' },
-  { key: 'ui-gate-2136', rel: 'tests/ui-gate.js', argv: ['tests/ui-gate.js'], kind: 'spawn', raw: 12000, why: 'UI 渲染路径门禁（真装载 ui/panel.js + 728 个真实控件点击）' }
+  { key: 'ui-gate-2136', rel: 'tests/ui-gate.js', argv: ['tests/ui-gate.js'], kind: 'spawn', raw: 12000, why: 'UI 渲染路径门禁（真装载 ui/panel.js + 728 个真实控件点击）' },
+  // v2.295.0（V9 收口）：真浏览器实机门（此前因 HOME 重定向降 fallback 档、静态跑约 60s）。
+  //   browsersRoot() 补 passwd 家目录候选后，隔离环境首次拉起真 Chromium，全锁 54 项实测 168s
+  //   —— 成为本仓新的最重门禁。按口径一重算统一预算 = 168000 × 8 = 1344000（全表统一，
+  //   不逐道紧贴；O9 实机层 103s 同批够用）。
+  { key: 'ui-live-2137-e2e', rel: 'tests/ui-live-v2137.js', argv: ['tests/ui-live-v2137.js'], kind: 'spawn', raw: 168000, why: 'UI 实机通道端到端（真 Chromium 冷启动 + 9 轮原版/破坏对照，V9 隔离环境实测）' }
 ];
 
 /** 逐门禁建议上限（仅作证据／自洽判据，不参与 run.js 现场武装）。 */
@@ -609,7 +616,7 @@ function limitsOf(table) {
  * 自洽性判据：**不许多套预算**。
  *   现场真值（run.js 的 spawnSync options）只读一个值；逐门禁表却按 raw 各算一个建议值。
  *   若现场值 ≠ 统一预算，就会得到「run.js 说 90s、表说 96s」这类读数——
- *   这正是本版第一次落盘时的真实缺陷（90000 vs 96000），故钉成可调用判据。
+ *   这正是本版第一次落盘时的真实缺陷（90000 vs 1344000），故钉成可调用判据。
  *   返回空数组 = 自洽。
  */
 function coherence(table) {
@@ -633,7 +640,7 @@ function coherence(table) {
     if (a.value !== lim.spawnMs) problems.push({ kind: 'armed-mismatch', key: k, detail: '现场 ' + a.value + 'ms ≠ 统一预算 ' + lim.spawnMs + 'ms' });
     if (a.mode === 'spawn+shell' && !(a.shellFuse > 0)) problems.push({ kind: 'shell-fuse-missing', key: k, detail: '外部命令形态必须另有 shell 侧保险丝' });
   });
-  // 站点表 vs 武装表：**两张表不许各说一套**（本版踩到的 90000/96000 就是这类分歧的兄弟）
+  // 站点表 vs 武装表：**两张表不许各说一套**（本版踩到的 90000/1344000 就是这类分歧的兄弟）
   ARMED_SITES.forEach(function (s) {
     const a = TIMEOUT_ARMED[s.key];
     if (!a) { problems.push({ kind: 'site-not-armed', key: s.key, detail: '登记了现场站点却没入武装表' }); return; }

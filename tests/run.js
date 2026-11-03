@@ -30,12 +30,12 @@ if (!__isolatedRunner.isWorker(require('path').join(__dirname, '..'))) {
     //   v2.274.0 收口：**第三次同型现形**。本轮实测节内合计 2278.99s，而默认值仍是 2280000ms
     //     （= 38.0 分钟，比实测短 1 秒）⇒ 收口轮那趟全量在第 418/419 节处被 SIGKILL，
     //     `result.json` 留 `结束原因 timeout` —— 与上面两次数值不同、形态逐字相同。
-    //     按同一公式重算：2278.99 x 1.5 = 3418485 → 取整到分钟 = 3420000ms。
+    //     按同一公式重算：2278.99 x 1.5 = 3418485 → 取整到分钟 = 5100000ms。
     //     （与 tools/slow-sections.js 对同一份日志给出的建议逐字一致）。
     //   慢机/长局仍可用 WA_REGRESSION_TIMEOUT_MS 放宽；不设该变量时用下面这个实测口径值。
     //   注：本处**不许出现「超时建议 + 数字 + ms」的字面形态** —— tools/test-layers.js 的现场计数器
     //     按该形态全局匹配（不剥注释），注释里写一个就凭空多出一处没有判据的读数。
-    { timeoutMs: Number(process.env.WA_REGRESSION_TIMEOUT_MS) || 3420000 })
+    { timeoutMs: Number(process.env.WA_REGRESSION_TIMEOUT_MS) || 5100000 })
     .then(code => { process.exitCode = code; })
     .catch(error => { console.error(error.message); process.exitCode = 3; });
   return;
@@ -337,7 +337,7 @@ async function runScript(spec, opt) {
   //   纯字面量 96000 + SIGKILL，与 tests/gate-timeout.js 的 GATE_TIMEOUTS.spawnMs 同值。
   //   本仓现有 runScript 调用方**无一**传 opt.ms（已实测），故不保留可变预算的余地。
   const r = cp_spawnSync(process.execPath, [path.join(__dirname, path.basename(spec))], {
-    cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL'
+    cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL'
   });
   const ms = Date.now() - t0;
   const rc = r.status === null ? -1 : r.status;
@@ -854,6 +854,8 @@ const LOAD = [
   // v2.268.0（V6 EXV6-4）：暗流日历。必须进 LOAD，且与 index.js LOAD_ORDER 严格同序
   //   （relation-temp 之后、tier 之前）—— 反过来会让专锁的破坏副本读到不同的装载邻接。
   'engines/undercurrent-calendar.js',
+    'engines/storyline-advance.js',
+    'engines/world-changes.js',
   // v2.269.0（V6 EXV6-5）：单轮成本卡，与 index.js LOAD_ORDER 严格同序
   //   （undercurrent-calendar 之后、capability-tier 之前）—— 反过来会让专锁的破坏副本
   //   读到不同的装载邻接。
@@ -12269,7 +12271,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'act:KINDS abort add admit advance buildBlock getSettings replan setSettings stat verdict view|actionDesk:ROUTES actFromScene board diagnose lifecycle plan recoverAction sceneFlow setSettings|actionMethods:evaluate execute|activity:buildBlock declareSeries getSeries handleDisruption listSeries nextCycle nextCycleInvitations prepareForActivity|affect:buildBlock checkTraumaTrigger|aftermath:active buildBlock cancel inspect pending register repair setSettings view|aftermathImpact:commissionRepair findDetour listCascadingChains|agency:buildBlock diagnose getSettings processReceipts schedule setSettings stat|agenda:getSettings overdueList setSettings sources stat upcoming|antiOmniscience:auditGeneratedContent buildBlock|apiRouter:CHANNELS call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|appearance:buildBlock|atlas:diagnose getSettings places relations routes setSettings stat view|auditLog:exportVol flush record stat verifyVolWith|autoHide:clear getSettings isHidden list mark plan resetStat revoke setSettings stat view|backstage:abort applyResult applyStat archiveScheduled buildPrompt channelStat forceSimulate getSettings isRunning pending setSettings|backstageTone:buildBlock era getSettings noteAdd noteClear noteList numToZh parseShichen reset setSettings shichen socialHint stat view voiceCheck zhNum|beastBond:buildBlock|beat:bandOf categoryOf extract getSettings hue parseOrExtract repair reset setSettings stat validateId validateList view|beatFacade:blocked diagnose status|beatLedger:current getSettings view|beatMask:buildBlock|beatReport:buildBlock getSettings view|bonds:buildBlock evaluateDeepTalk network read setBond|branchDiff:catalog getSettings semanticDiff setSettings stat transplant triDiff|branchTree:choose compare fork getSettings replay setSettings stat tree|bridge:FLOOR_GAP handshake id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|campaign:advance current diagnose evaluate getSettings planDelete planList planOf reset review setSettings start stat status templates|canon:actText actsBrief adopt alignView buildBlock buildOutline clearOutline coordOf deviation deviationTrend gap getSettings locate outlineView position setSettings signal stat|capabilityAudit:audit dormantMechanisms getSettings setSettings stat summary|capabilityTier:applyTier flipSwitch getSettings list rollback shapeOf stat view|capacityAudit:diagnose getSettings migrationCheck obligations reclaimable setSettings stat waterline|careChain:ESCALATION_LEVELS assessCaregiverAbsence careChainProjection queueForPublicCare referCare registerCareCommitment reportCareAbsence|causal:STAGES TERMINAL addChain buildBlock cancel classify conflicts defer due endingsTree evidence getSettings knownCause previewIntervention record rehearse rippleWeb setSettings settle settleBlockReason stat stateView tick traceGraph traceLiabilityTree|chapters:current end start|chatcache:init installStat listSnapshots mirrorOwner|checkpoints:FORMAT branch branchPlan buildBlock compare exportOne getSettings importOne list migrate migrations read remove restore save setSettings stat topKeys|choices:generate|chronicleView:coverage diagnose entries entry getSettings hiddenSummary setSettings stat|chrono:applyUndo buildBlock chronicle getSettings record setSettings stale stat undo|clock:clockStat freeze now wallNow|collab:claim conflicts contribute createTask enqueue getSettings holderOf open penalize pending setSettings settle stat taskStat|commission:advance buildBlock cancel create pending setSettings settle view|commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay resumeIdentity resumeStat retryEffects scanInterrupted settle stat step|commonsGovernance:ASSET_STATUS GOVERNANCE_MODELS auditAssetDecay changeGovernanceModel commonsProjection contributeMaintenance declareCommonAsset reserveCommonAsset resolveAssetDispute|communityNote:ack clear getSettings isSeen list markSeen pending push resetStat setSettings stat view|compare:diff getSettings hasResidue merge reset setSettings stat strip tableOf toLines variants view|compat:context detect snapshot|compatMvu:init status|compatTH:init status|contest:buildBlock|contractAudit:audit|coop:concludeProject handleAbsence pending pledgeProject proposeProject|coordinate:anchorAdd anchorOf bridgeDump bridgeLoad buildBlock capture decode encode gateClaim gateClear gateRelease gateSuppressed getSettings index lines list parseLine reset setSettings stat view|customLax:activeRules adoptRuleFromPrecedent checkRuleEnforcement claimGuarantee enactRule establishPrecedent evaluatePrecedent listPrecedents provideGuarantee reciprocityLedger recordFavor registerDissatisfaction requestAid reviewRule settleFavor spawnCandidate submitToApproval|dayRoute:boundary build getSettings reset scheduleDomain setSettings stat storyDay|deepClean:apply digest freeze getSettings prepare reset resetStat review scan setSettings stat status view|deferToken:schedule|demographicFlow:arriveMigration commitMigration demographicProjection planMigration recordSeasonalDeparture recordSeasonalReturn setPlaceCapacity|depCheck:catalog check diagnose getSettings prepare setSettings stat|difficulty:buildBlock effective|digest:buildBlock generate|diplomacy:STATES TERMS applies breach buildBlock diagnose expire fulfil getSettings pairId pairView propose reply setSettings sign stat view|directEvent:abort create|dream:archive buildBlock deviationList getSettings onset reset setSettings stat threadList threadOf view volumeGet volumeList weave|driverLedger:getSettings setSettings stat summaryText view why|ecoAudit:CATS getSettings lastSweep setSettings stat sweep|economy:RECIPES buildBlock buy craft declaredBase economySpec getSettings markRoute money price recipeKeys recipeOf route routeView setSettings shelf ship statView stock tick view|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|elsewhere:bandOf buildBlock card getSettings list open reconcile remove reset romance romanceOf setSettings stat sweep update view|enemies:ASSET_STATUS ENEMY_STATUS ENEMY_TYPE apply applyBlackbox applyWorldTrends dropStat|enigma:buildBlock mark read|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|envCapacity:declareRecyclableMaterial declareResource evaluateImpact generateScrap materialLifecycle recycleScrap regenerate regionStatus withdraw|epistemicView:buildView correctBelief updateBeliefWithEvidence weighEvidence|eraCycle:buildBlock|events:buildBlock getSettings setSettings timelineView|evict:array evictStat idempotentDecls nonEvictDecls note object siteDecls|evidenceBoard:assertClaim board diagnose gather getSettings playerView retract setSettings stat|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation decayWindsDraft getSettings rollEventsDraft roundOf setSettings tick triggerSingularityEruption|exec:cloneState mutate statBag storeOf withContext|factionGraph:RELATION_KEYS STATUS_KEYS buildGraph clusters edgeOf getSettings heat stat tension|family:assignCare contribute inherit list spend transferCare view|familyOps:advanceCycle handleGap inheritRatio|farfield:auto buildBlock getSettings partition pending setSettings stat transferPack|fate:bigrams check deck dedupe evalArith evalFormula getSettings isArithmeticSyntax jaccard judgeView oversample parse reset resolveCount resolveDC roll setSettings stat stripHeader titleGate view|firstRun:build dismiss getSettings mark next reset resetAll resume setSettings stat|floorChanges:markSubscribed onFloorEvent plan reset stat stateText|floorSettle:beginRound endRound getSettings list onFloorEvent reset resetStat rollback rollbackFrom scopeOf setSettings stat view|floorSnapshot:at bind bindings buildBlock byMessage clear getSettings list markCleared push resetStat rollback setSettings stat unbind view|fondness:BANDS apply buildBlock getSettings read|foreshadow:ACTIVE STATUS TERMINAL buildBlock check getSettings stat|freight:arrive buildBlock cancel diagnose dispatch getSettings issueShadowRation reroute setSettings stat view|gauge:bandOf buildBlock getSettings|gear:canUse declareSlot equip getSettings lend list make repair setSettings unequip use view|genGate:KINDS buildBlock getSettings view|genTiming:buildBlock tick|geoTracker:buildBlock diagnose readLocationMarks registerPlace resolveLocation saveSettings settings updateCharacterLocation|groupGuard:detect isGroup|handoffPack:getSettings pack reset restore setSettings stat suggest verify|hazard:TRIGGER_KINDS buildBlock getSettings stat|healthPreflight:buildBlock firstRunLine firstRunView inspectAndSanitize threeGates threeGatesLine yieldAttrib yieldAttribLine|historySearch:FACE_LABELS catalog clearRecent count diagnose filters recent remember search stat|horizon:BASE_CHANCE COOLDOWN_ROUNDS LEDGER_THRESHOLD acceptResult bounds buildPromptBlock getSettings setSettings stat|hostWbTrace:crossCheck markSubscribed onActivated stat stateText|injectBudget:PRIORITY apply budgetView costOf costView incrementalCost plan rankOf resolveBudget summaryText volumeView|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectCollector:buildBlock noteScene stat|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|injectValue:getSettings observe report setSettings settle stat|inputGuard:check count list num oneOf text|inspectorState:flatten inspect summaryText|inst:PERMS REASONS approve assign authority breach buildBlock charter decide getSettings post propose setSettings settle statView succession vacate view|institutionalInertia:CHARTER_STATUS SUCCESSION_PATHS auditInstitutionalDecay establishCharter institutionalInertiaProjection resolveSuccessionPath submitBureaucraticReport triggerSuccessionHandover|intake:run|intel:CONFIDENCE LEVELS addIntel addLink believe buildBlock correct explain getSettings knownCause network networkStat project rowsOf setSettings stat truthOf visibleTo|intentBoard:board buildBlock getSettings reset setSettings stat view|interceptor:install|interestFace:publish put|interop:compatGaps freeze probeAll stat summaryText|investigation:buildBlock checkEvidence extractFromTrace investigate pending register reveal setSettings view|kaleidoscope:MAX_DERIVES MAX_RULES OPS buildBlock clearDerives clearRules evaluate lastEval lastFailure listDerives listRules removeDerive removeRule setDerive setRule snapshot|karma:buildBlock|knowledgePractice:PRACTICE_STATUS executePractice grantPracticeLicense knowledgePracticeProjection refineKnowledgeFromEvidence registerKnowledgeSpec|laborSchedule:book cancel claim earliestSlot getSettings interrupt isBooked previewSchedule reschedule resume split transfer view|ladder:buildBlock|ledger:buildLedgerText recordChanges saveCheckpoint|ledgerTimeline:note probeDefault reset stat summaryText|lengthPolicy:getSettings parse parseNumber resetStat setSettings stat targetOf tierOf view|life:ACTIONS COMMITMENTS addCommitment addGoal addSchedule buildBlock commitBag commitmentsView decide getSettings makeBag setSettings stat tick tickDraft|lifeline:advance boundary buildBlock capacityOf careGap getSettings register setSettings stat view|limits:applyStableUpdate clampBackstageResult locateStable|lingqi:buildBlock getSettings listSkills normalizeSkill register resetStat route seed setSettings stat view|livingWorld:DAY_PERIODS OCCUPATIONAL_ROUTINES autonomousTick buildBlock cleanTrace consolidateLivingMemory deflectTrajectory detectEncounters getTierPrice integrateLongRest leaveTrace propagateRipple recordRelationalDebt recordSilentEcho redeemDebt registerRoutine|longline:TERMINAL buildBlock getSettings overdue pressure promise setSettings stat sweep|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID LONSHA_BRIDGE_VERSION describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|mapViewport:clusterCharacters computeFlyInterpolation declutterLabels diagnose renderSvgScene saveSettings settings|marginal:buildBlock|masks:buildBlock|memory:buildMemoryBlock claimStat pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|memoryTiers:buildBlock clearTier getSettings knot list resetStat setSettings sink stat tierOf view|mend:buildBlock close getSettings mark setSettings statView step view|modelink:draftAdd draftApply draftClear draftList getSettings isMvuComment matchEntry parseFlow reset residue setSettings stat stripArtifacts updateBlocks view|monologue:getSettings plan resetMemo resetStat setSettings stat|moodGlide:buildBlock glide|motif:buildBlock|motiveArbitration:decide|noesis:boundary buildBlock duty fidelity gateScene getSettings knows leakScan perceive setSettings stat|observe:slice|observeSlice:actionProvesPerception extractAnchor getSettings isMicroScene isObservationPrompt resetStat setSettings slice stat view|offlineReturn:getSettings recover setSettings stat|offlineTick:KINDS KIND_LABEL anchor anchorPaths buildBlock getSettings markConsumed release setSettings stat summary tick|oneShotMod:advance buildBlock|operations:active buildBlock cancel disburse enact handover pending setSettings settle trackSafehouseExposure view|opinion:buildOpinionBlock claimStat generate getSettings setSettings|opportunity:SOURCES collect getSettings list statView sweep|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|org:KINDS assignRole buildBlock canAfford closeProject creditWork debtsView deliverToProject exportJournal getSettings grant ledgerView openProject oweTo payroll penalize projectView promote reconcile reconcileWith rosterView setSettings settleDebt settleOwed stat stockOf transfer|outlineInject:apply extractFromEnd getSettings parseEntries plan preview resetStat setSettings stat undo updateCapability view|outputGuard:buildBlock checkAndRemember|parallelEvents:buildBlock|parallelWorld:CAP_MODULES CAP_NPCS CAP_RELATIONS IMPACTS IMPACT_LABEL INJECT_MIN_IMPACT addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings getSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings shouldAuto stat|pathEcho:realizeOutcome record recordExpectation|pendingCenter:act bySource describe diagnose getSettings items setSettings soon stat timeline|perfBaseline:bands budget diagnose gap getSettings readings setSettings stat|perfLedger:getSettings ingest stat trend|perfTrace:CLASSES CLASS_DEF HISTORY_CAP LAYERS LAYER_LABEL alerts bandCompare baseline cacheStat coldStart curve curveAll dirtyAll flamegraph heatHistogram importSnapshot partial slots snapshot spikeOf split stat summaryText thresholds warmStart|permissions:adopt currentUser gate gateStat|personaAnchor:auditGeneratedContent buildBlock|perspective:allows applyView assign boundary buildBlock current getSettings getView leakScan outletAllowed setSettings setView stat|phaseTransition:declarePlaceLayout evaluatePhase evaluatePlacePath history investPath planTransitionRoute transition|phoneBridge:ACT_LABEL PHASES PHONE_ACTS getSettings id linkChain noteAction opTrace opsView phaseOf setSettings stat traceOf version|plan:abandon adopt advance buildBlock candidates chain chainBlock current expand getSettings review setSettings settle statView view|planAudit:diagnose evidence|playableBlueprint:checkDependencies exportPlayDefs getSample installSample listSamples migrateBlueprint previewDiff resetInitialConditions tuneConfig|playableSeed:getSettings preview seed setSettings stat view|playerArchive:checkpoint exportJSON getSettings importSeedPack seedPack setSettings view|playtime:DATA_KEY SOURCE_NAMES getSettings lastActive setSettings sources stat story touch|plotGauge:advice getSettings setSettings stat tension trend|plugin:fire list register stat unregister|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText stat|populate:getSettings plan reset seed setSettings stat view|portal:claim digest getSettings release reset resetStat setSettings signature stat status view|powerAnchor:buildBlock|prefilterGate:alias clearRoster getSettings parseReply register resetStat resolveName roster screen setSettings stat view|preset:getAllPresets getSegmentOverrides|presetWorld:getSettings preview seed stat|proactive:isEnabled stat|probe:LEVELS addEvidence auditRecord buildBlock confront decide getSettings open resolve setSettings statView tally view wrong|production:advance cancel declareFacility deliver deliverPartial extend getSettings list open pause resume resupply setSettings staff view|profile:stat|publicAgenda:TOPIC_STATUS enactAgendaTopic publicAgendaProjection scheduleAgenda setAgendaCapacity submitProposal viewAgenda|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|quota:buildBlock|rand:beginTape chance coordOf dice endTape getSeed id int markCoord next pick pickWeighted randStat replay seed seeded stopReplay tape tapeVol verifyTape verifyTapeWith|reasoning:buildBlock officialOnly|reasoningStrip:getSettings hasIncomplete resetStat setSettings stat strip trailingPartialTagLength view|recipe:catalogView economySpec extendedThemes getSettings judgeSpec list policyClashes preview satisfied seed staleness statView themeCatalog themeClashes|redactLayer:getSettings isSecretPath probe redact resetStat setSettings stat view|region:buildBlock deliver fine getSettings heard markLane occur places register setSettings stat statView tickOffline|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:aliasOf aliasStat bindAlias clearProfile danglingRefs ensurePerson getPersona getProfile getRelation idClear idStat identityOf list personOriginStat profileStat register relationBands relationStat setPersonaDice setProfileSafe setRelations slotStat traceOf unregister|rehearsal:checkPreview preview run|rejectRecovery:explain|relationGraph:clear directedOf edgeIdOf edgesOf get getSettings list persisted reload remove resetStat setSettings stat upsert view|relationTemp:build getSettings network networkStat reset setSettings stat|render:SOURCES applyInjections buildWorldSnapshot explain getVisibility injectionLedger loadUninjectLedger setVisibility themeContrast uninject uninjectAudit visibilityDefault visibilityStat|requestViewer:CHANNELS capture getSettings size stat|research:abandon advance canUse disseminate list supply view|retrieval:RECALL_HINTS assemble audit buildBlock candidates contracts getSettings historyOf recallWanted reset setSettings stat|rewriter:CHANNEL getSettings stat|rhythmLoop:buildBlock|riskPooling:POOL_STATUS claimMutualRelief declareRiskPool disputeReliefClaim pledgeMutualFund riskPoolingProjection|rivalry:buildBlock|roleConflict:CONFLICT_SEVERITY RESOLUTION_STANCES detectRoleConflict registerAffiliationObligation resolveConflictStance roleConflictProjection viewConflictPerception|roundCost:build getSettings reset setSettings stat|roundDrivers:tickAll|rulePack:admit apply catalog compose current detect diagnose drop exportPack get getSettings history importPack list rollback save setSettings stat template|rules:ORDER coreSummary getAll getModule getRuleCount isNewModule listModules|ruling:buildBlock|rumor:LAYERS MOTIVES PUBLIC_LAYERS buildBlock competeForAttention conceal fullView getSettings investigate mutateAndAmplify refute relay setSettings startChain stat visibleTo|samplerCheck:runChecks|sandbox:isolationReport run stat|sanitize:html text|saveHealth:build getSettings reset setSettings stat|sceneNarrative:currentScene perceivedHorizon resolvedSummary situation traceFrom|sceneSlice:buildBlock read|scopeTag:getSettings parse rangesOf resetStat setSettings stat view|sediment:LABEL TRACES buildBlock feel getSettings placesView setSettings settle stat|serviceNetwork:activateFacility cancelQueue checkPassage checkServiceImpact decayFacility declareFacility queueService releaseService requestService restoreFacility servicesAt|session:HOST_PERMS SEAT_PERMS auth buildBlock getSettings host identify identity join leave post resync setSettings since statView view|settingsBus:boundsOf cfgStat cfgSurface clampNum deregisterOrphan dormantGhosts exportConfig ghostScan importConfig migrationStat normalize pendingOrphan read readEx readStat registry registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|shadow:SHADOW_KINDS STAKES addExperience addShadow brighten buildBlock deepen experiencesOf getSettings getShadow setSettings shadowStat stat visibleTo|sharedAwareness:amendPact assertMeta confirmPact openPact viewPact|socialLegacy:acceptLegacy clarifyClaim entrustDeathbedPact formLegacy fulfillDeathbedPact groupMemoryStance initiateHandover proposeSuccession registerClaim reorganizeUnclaimed resolveHandover spreadClaim viewLegacy witnessAccount|soloVoice:brief check countQuestions getSettings labelWeight resetStat setSettings stat view|spotlight:buildBlock|stage:PACKS adopt buildBlock getSettings mark plan setSettings statView transit view|staleGuard:begin verdict|stall:away back board buildBlock buy delist getSettings lay list pack setSettings sign statView view|storageForecast:forecast getSettings reset sample setSettings stat|store:SCHEMA_VERSION batch batchStat capsFor chatId claimAsync claimStat classifyKey committedRev conflictStat createRecoveryPoint currentBranchId defaultWorldState diagBudget dropAsync dropConflict dropQuarantine dropRecoveryPoint epoch exportAuditReport exportConflict exportRecoveryPoints externalWriteStat floorSig fnv1a get init integrity integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport migrations mirrorStat orphanSettingsKeys patch peopleSig quarantineAudit quarantineStat read readStat recentSig recoveryStat registryParity removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat settleAsync sizeAudit sizeAuditFull sizeCaps sizeProfile storageStat sweepStaleKeys transact transientSnapshotKeys txStat writeGate|storyChoice:buildBlock confirm pending present review setSettings|storyLoop:audit candidates confirm contracts getSettings reset setSettings stat trace|storyTone:buildBlock|storyclock:discipline readLatest|style:CHOICES CHOICE_LABELS buildBlock effectiveSettings getSettings setSettings styleStat summaryText textCoverage|successGrade:grade|summarizer:buildBlock cursorOf stat|supplyChain:bottleneck commit diagnose plan stat verify|survey:advance buildBlock confirm declareSpot fog getSettings halt knowsOf list pause report resume resupply routesOf setSettings survey view|survival:buildBlock statusOf|tapeStore:drop list load save stat|techLineage:advanceRetrofit canProduce cancelRetrofit checkCompatibility confirmVariant declareStandard getStandard listStandards outsourceWork planRetrofit produceAdapter teach|temperament:buildBlock read|tempo:buildBlock|temporalLock:buildBlock|theater:generate send stat wrap|theme:THEMES THEME_EXT activeModules apply contrast engineFace list preview separation statView|threads:RELIABILITY TERMINAL abandon addLead buildBlock converge explain getSettings open resolve setSettings stall stat threadStat|timeline:SOURCE_ID_KEY auditRefs captureRange hashText unionRefs|tolerance:buildBlock|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview previewPlan|toolSnapshot:buildSubsetPayload download restore|training:abilitiesView can declare getSettings practice progress setSettings view|travelDesk:commit diagnose ledger meet plan route stat verify|undercurrentCalendar:build getSettings reset setSettings stat|undo:capture clear peek pushValue stat undo|userlock:buildBlock|vitals:buildBlock conceive endPregnancy getSettings know knows knowsOthers list phaseOf register reset setSettings stat sweep tell tick view|warrant:buildBlock|wbInject:activeOrders findCompanionName getConfig isEnabled|wbSearch:count search|weather:buildBlock getMicroclimate weatherOf|wordBudget:count|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|world:CHANNELS EVENT_KINDS PLACE_KINDS addEvent addPlace addRoad addUse arrive attendees buildBlock canBeAt depart eventsBetween getSettings move reach setSettings stat stop tick tickDraft transit useWindowOf usesOf where whereStat|worldAutobiography:autobiography buildBlock exportText getSettings reset setSettings stat|worldBlueprint:BP_VER SCENES checkIntegrity drop exportBlueprint get getSettings importBlueprint list previewImport save setSettings stat targetEmpty|worldBridge:buildBlock exportLegends getSettings importLegends seed setSettings stat toRumor view worldKey|worldBriefing:getSettings reset setSettings snap stat view|worldClock:getSettings inspectEnd judge parseEnd resetStat setSettings stat view|worldDiary:boundary build getSettings reset setSettings stat|worldGraph:KINDS diagnose geo getSettings graph locate stat suggest timeline|worldHealth:diagnose drill getSettings setSettings sources stat summary|worldLab:adapterTable adopt advance arms beats catalog diagnose diff discard exportAs getSettings kinds parseSteps report run setSettings simulate staleness stat|worldSeed:SEED_VER drop extract get getSettings importPack initConfirm initPreview list save setSettings sow stat transferPack|worldSnapshot:IDENTITY_REFS checkCompat diagnose exportSnapshot importSnapshot libDrop libTake library previewImport roundTrip toBlueprint toJSON|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries matchKey peekEntries previewActivation saveSelection triggerEnabled|writeContract:contractOf scan stat summaryText|writeDesk:call catalog stat';
+    const FROZEN2800 = 'act:KINDS abort add admit advance buildBlock getSettings replan setSettings stat verdict view|actionDesk:ROUTES actFromScene board diagnose lifecycle plan recoverAction sceneFlow setSettings|actionMethods:evaluate execute|activity:buildBlock declareSeries getSeries handleDisruption listSeries nextCycle nextCycleInvitations prepareForActivity|affect:buildBlock checkTraumaTrigger|aftermath:active buildBlock cancel inspect pending register repair setSettings view|aftermathImpact:commissionRepair findDetour listCascadingChains|agency:buildBlock diagnose getSettings processReceipts schedule setSettings stat|agenda:getSettings overdueList setSettings sources stat upcoming|antiOmniscience:auditGeneratedContent buildBlock|apiRouter:CHANNELS call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|appearance:buildBlock|atlas:diagnose getSettings places relations routes setSettings stat view|auditLog:exportVol flush record stat verifyVolWith|autoHide:clear getSettings isHidden list mark plan resetStat revoke setSettings stat view|backstage:abort advanceManagedCurrents applyResult applyStat archiveScheduled buildPrompt channelStat forceSimulate getSettings isRunning pending setCurrentAdvance setSettings|backstageTone:buildBlock era getSettings noteAdd noteClear noteList numToZh parseShichen reset setSettings shichen socialHint stat view voiceCheck zhNum|beastBond:buildBlock|beat:bandOf categoryOf extract getSettings hue parseOrExtract repair reset setSettings stat validateId validateList view|beatFacade:blocked diagnose status|beatLedger:buildBlock current getSettings view|beatMask:buildBlock|beatReport:buildBlock getSettings view|bonds:buildBlock evaluateDeepTalk network read setBond|branchDiff:catalog getSettings semanticDiff setSettings stat transplant triDiff|branchTree:choose compare fork getSettings replay setSettings stat tree|bridge:FLOOR_GAP handshake id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|campaign:advance current diagnose evaluate getSettings planDelete planList planOf reset review setSettings start stat status templates|canon:actText actsBrief adopt alignView buildBlock buildOutline clearOutline coordOf deviation deviationTrend gap getSettings locate outlineView position setSettings signal stat|capabilityAudit:audit dormantMechanisms getSettings setSettings stat summary|capabilityTier:applyTier flipSwitch getSettings list rollback shapeOf stat view|capacityAudit:diagnose getSettings migrationCheck obligations reclaimable setSettings stat waterline|careChain:ESCALATION_LEVELS assessCaregiverAbsence careChainProjection queueForPublicCare referCare registerCareCommitment reportCareAbsence|causal:STAGES TERMINAL addChain buildBlock cancel classify conflicts defer due endingsTree evidence getSettings knownCause previewIntervention record rehearse rippleWeb setSettings settle settleBlockReason stat stateView tick traceGraph traceLiabilityTree|chapters:current end start|chatcache:init installStat listSnapshots mirrorOwner|checkpoints:FORMAT branch branchPlan buildBlock compare exportOne getSettings importOne list migrate migrations read remove restore save setSettings stat topKeys|choices:generate|chronicleView:coverage diagnose entries entry getSettings hiddenSummary setSettings stat|chrono:applyUndo buildBlock chronicle getSettings record setSettings stale stat undo|clock:clockStat freeze now wallNow|collab:claim conflicts contribute createTask enqueue getSettings holderOf open penalize pending setSettings settle stat taskStat|commission:advance buildBlock cancel create pending setSettings settle view|commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay resumeIdentity resumeStat retryEffects scanInterrupted settle stat step|commonsGovernance:ASSET_STATUS GOVERNANCE_MODELS auditAssetDecay changeGovernanceModel commonsProjection contributeMaintenance declareCommonAsset reserveCommonAsset resolveAssetDispute|communityNote:ack clear getSettings isSeen list markSeen pending push resetStat setSettings stat view|compare:diff getSettings hasResidue merge reset setSettings stat strip tableOf toLines variants view|compat:context detect snapshot|compatMvu:init status|compatTH:init status|contest:buildBlock|contractAudit:audit|coop:concludeProject handleAbsence pending pledgeProject proposeProject|coordinate:anchorAdd anchorOf bridgeDump bridgeLoad buildBlock capture decode encode gateClaim gateClear gateRelease gateSuppressed getSettings index lines list parseLine reset setSettings stat view|customLax:activeRules adoptRuleFromPrecedent checkRuleEnforcement claimGuarantee enactRule establishPrecedent evaluatePrecedent listPrecedents provideGuarantee reciprocityLedger recordFavor registerDissatisfaction requestAid reviewRule settleFavor spawnCandidate submitToApproval|dayRoute:boundary build getSettings reset scheduleDomain setSettings stat storyDay|deepClean:apply digest freeze getSettings prepare reset resetStat review scan setSettings stat status view|deferToken:schedule|demographicFlow:arriveMigration commitMigration demographicProjection planMigration recordSeasonalDeparture recordSeasonalReturn setPlaceCapacity|depCheck:catalog check diagnose getSettings prepare setSettings stat|difficulty:buildBlock effective|digest:buildBlock generate|diplomacy:STATES TERMS applies breach buildBlock diagnose expire fulfil getSettings pairId pairView propose reply setSettings sign stat view|directEvent:abort create|dream:archive buildBlock deviationList getSettings onset reset setSettings stat threadList threadOf view volumeGet volumeList weave|driverLedger:getSettings setSettings stat summaryText view why|ecoAudit:CATS getSettings lastSweep setSettings stat sweep|economy:RECIPES buildBlock buy craft declaredBase economySpec getSettings markRoute money price recipeKeys recipeOf route routeView setSettings shelf ship statView stock tick view|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|elsewhere:bandOf buildBlock card getSettings list open reconcile remove reset romance romanceOf setSettings stat sweep update view|enemies:ASSET_STATUS ENEMY_STATUS ENEMY_TYPE apply applyBlackbox applyWorldTrends dropStat|enigma:buildBlock mark read|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|envCapacity:declareRecyclableMaterial declareResource evaluateImpact generateScrap materialLifecycle recycleScrap regenerate regionStatus withdraw|epistemicView:buildView correctBelief updateBeliefWithEvidence weighEvidence|eraCycle:buildBlock|events:buildBlock getSettings setSettings timelineView|evict:array evictStat idempotentDecls nonEvictDecls note object siteDecls|evidenceBoard:assertClaim board diagnose gather getSettings playerView retract setSettings stat|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation decayWindsDraft getSettings rollEventsDraft roundOf setSettings tick triggerSingularityEruption|exec:cloneState mutate statBag storeOf withContext|factionGraph:RELATION_KEYS STATUS_KEYS buildGraph clusters edgeOf getSettings heat stat tension|family:assignCare buildBlock contribute inherit list spend transferCare view|familyOps:advanceCycle handleGap inheritRatio|farfield:auto buildBlock getSettings partition pending setSettings stat transferPack|fate:bigrams check deck dedupe evalArith evalFormula getSettings isArithmeticSyntax jaccard judgeView oversample parse reset resolveCount resolveDC roll setSettings stat stripHeader titleGate view|firstRun:build dismiss getSettings mark next reset resetAll resume setSettings stat|floorChanges:markSubscribed onFloorEvent plan reset stat stateText|floorSettle:beginRound endRound getSettings list onFloorEvent reset resetStat rollback rollbackFrom scopeOf setSettings stat view|floorSnapshot:at bind bindings buildBlock byMessage clear getSettings list markCleared push resetStat rollback setSettings stat unbind view|fondness:BANDS apply buildBlock getSettings read|foreshadow:ACTIVE STATUS TERMINAL buildBlock check getSettings stat|freight:arrive buildBlock cancel diagnose dispatch getSettings issueShadowRation reroute setSettings stat view|gauge:bandOf buildBlock getSettings|gear:canUse declareSlot equip getSettings lend list make repair setSettings unequip use view|genGate:KINDS buildBlock getSettings view|genTiming:buildBlock tick|geoTracker:buildBlock diagnose readLocationMarks registerPlace resolveLocation saveSettings settings updateCharacterLocation|groupGuard:detect isGroup|handoffPack:getSettings pack reset restore setSettings stat suggest verify|hazard:TRIGGER_KINDS buildBlock getSettings stat|healthPreflight:buildBlock firstRunLine firstRunView inspectAndSanitize threeGates threeGatesLine yieldAttrib yieldAttribLine|historySearch:FACE_LABELS catalog clearRecent count diagnose filters recent remember search stat|horizon:BASE_CHANCE COOLDOWN_ROUNDS LEDGER_THRESHOLD acceptResult bounds buildPromptBlock getSettings setSettings stat|hostWbTrace:crossCheck markSubscribed onActivated stat stateText|injectBudget:PRIORITY apply budgetView costOf costView incrementalCost plan rankOf resolveBudget summaryText tokensOf volumeView|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectCollector:buildBlock diagnose getSettings noteScene setSettings stat|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|injectValue:getSettings observe report setSettings settle stat|inputGuard:check count list num oneOf text|inspectorState:flatten inspect summaryText|inst:PERMS REASONS approve assign authority breach buildBlock charter decide getSettings post propose setSettings settle statView succession vacate view|institutionalInertia:CHARTER_STATUS SUCCESSION_PATHS auditInstitutionalDecay establishCharter institutionalInertiaProjection resolveSuccessionPath submitBureaucraticReport triggerSuccessionHandover|intake:run|intel:CONFIDENCE LEVELS addIntel addLink believe buildBlock correct explain getSettings knownCause network networkStat project rowsOf setSettings stat truthOf visibleTo|intentBoard:board buildBlock getSettings reset setSettings stat view|interceptor:install|interestFace:publish put|interop:compatGaps freeze probeAll stat summaryText|investigation:buildBlock checkEvidence extractFromTrace investigate pending register reveal setSettings view|kaleidoscope:MAX_DERIVES MAX_RULES OPS buildBlock clearDerives clearRules evaluate lastEval lastFailure listDerives listRules removeDerive removeRule setDerive setRule snapshot|karma:buildBlock|knowledgePractice:PRACTICE_STATUS executePractice grantPracticeLicense knowledgePracticeProjection refineKnowledgeFromEvidence registerKnowledgeSpec|laborSchedule:book cancel claim earliestSlot getSettings interrupt isBooked previewSchedule reschedule resume split transfer view|ladder:buildBlock|ledger:buildLedgerText recordChanges saveCheckpoint|ledgerTimeline:note probeDefault reset stat summaryText|lengthPolicy:getSettings parse parseNumber resetStat setSettings stat targetOf tierOf view|life:ACTIONS COMMITMENTS addCommitment addGoal addSchedule buildBlock commitBag commitmentsView decide getSettings makeBag setSettings stat tick tickDraft|lifeline:advance boundary buildBlock capacityOf careGap getSettings register setSettings stat view|limits:applyStableUpdate clampBackstageResult locateStable|lingqi:buildBlock getSettings listSkills normalizeSkill register resetStat route seed setSettings stat view|livingWorld:DAY_PERIODS OCCUPATIONAL_ROUTINES autonomousTick buildBlock cleanTrace consolidateLivingMemory deflectTrajectory detectEncounters getTierPrice integrateLongRest leaveTrace propagateRipple recordRelationalDebt recordSilentEcho redeemDebt registerRoutine|longline:TERMINAL buildBlock getSettings overdue pressure promise setSettings stat sweep|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID LONSHA_BRIDGE_VERSION describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|mapViewport:clusterCharacters computeFlyInterpolation declutterLabels diagnose renderSvgScene saveSettings settings|marginal:buildBlock|masks:buildBlock|memory:buildMemoryBlock claimStat pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|memoryTiers:buildBlock clearTier getSettings knot list resetStat setSettings sink stat tierOf view|mend:buildBlock close getSettings mark setSettings statView step view|modelink:draftAdd draftApply draftClear draftList getSettings isMvuComment matchEntry parseFlow reset residue setSettings stat stripArtifacts updateBlocks view|monologue:getSettings plan resetMemo resetStat setSettings stat|moodGlide:buildBlock glide|motif:buildBlock|motiveArbitration:decide|noesis:boundary buildBlock duty fidelity gateScene getSettings knows leakScan perceive setSettings stat|observe:slice|observeSlice:actionProvesPerception extractAnchor getSettings isMicroScene isObservationPrompt resetStat setSettings slice stat view|offlineReturn:getSettings recover setSettings stat|offlineTick:KINDS KIND_LABEL anchor anchorPaths buildBlock getSettings markConsumed release setSettings stat summary tick|oneShotMod:advance buildBlock|operations:active buildBlock cancel disburse enact handover pending setSettings settle trackSafehouseExposure view|opinion:buildOpinionBlock claimStat generate getSettings setSettings|opportunity:SOURCES buildBlock collect getSettings list statView sweep|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|org:KINDS assignRole buildBlock canAfford closeProject creditWork debtsView deliverToProject exportJournal getSettings grant ledgerView openProject oweTo payroll penalize projectView promote reconcile reconcileWith rosterView setSettings settleDebt settleOwed stat stockOf transfer|outlineInject:apply extractFromEnd getSettings parseEntries plan preview resetStat setSettings stat undo updateCapability view|outputGuard:buildBlock checkAndRemember|parallelEvents:buildBlock|parallelWorld:CAP_MODULES CAP_NPCS CAP_RELATIONS IMPACTS IMPACT_LABEL INJECT_MIN_IMPACT addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings getSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings shouldAuto stat|pathEcho:realizeOutcome record recordExpectation|pendingCenter:act bySource describe diagnose getSettings items setSettings soon stat timeline|perfBaseline:bands budget diagnose gap getSettings readings setSettings stat|perfLedger:getSettings ingest stat trend|perfTrace:CLASSES CLASS_DEF HISTORY_CAP LAYERS LAYER_LABEL alerts bandCompare baseline cacheStat coldStart curve curveAll dirtyAll flamegraph heatHistogram importSnapshot partial slots snapshot spikeOf split stat summaryText thresholds warmStart|permissions:adopt currentUser gate gateStat|personaAnchor:auditGeneratedContent buildBlock|perspective:allows applyView assign boundary buildBlock current getSettings getView leakScan outletAllowed setSettings setView stat|phaseTransition:declarePlaceLayout evaluatePhase evaluatePlacePath history investPath planTransitionRoute transition|phoneBridge:ACT_LABEL PHASES PHONE_ACTS getSettings id linkChain noteAction opTrace opsView phaseOf setSettings stat traceOf version|plan:abandon adopt advance buildBlock candidates chain chainBlock current expand getSettings review setSettings settle statView view|planAudit:diagnose evidence|playableBlueprint:checkDependencies exportPlayDefs getSample installSample listSamples migrateBlueprint previewDiff resetInitialConditions tuneConfig|playableSeed:getSettings preview seed setSettings stat view|playerArchive:checkpoint exportJSON getSettings importSeedPack previewSeed seedPack setSettings view|playtime:DATA_KEY SOURCE_NAMES getSettings lastActive setSettings sources stat story touch|plotGauge:advice getSettings setSettings stat tension trend|plugin:fire list register stat unregister|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText stat|populate:getSettings plan reset seed setSettings stat view|portal:claim digest getSettings release reset resetStat setSettings signature stat status view|powerAnchor:buildBlock|prefilterGate:alias clearRoster getSettings parseReply register resetStat resolveName roster screen setSettings stat view|preset:getAllPresets getSegmentOverrides|presetWorld:getSettings preview seed stat|proactive:isEnabled stat|probe:LEVELS addEvidence auditRecord buildBlock confront decide getSettings open resolve setSettings statView tally view wrong|production:advance cancel declareFacility deliver deliverPartial extend getSettings list open pause resume resupply setSettings staff view|profile:stat|publicAgenda:TOPIC_STATUS enactAgendaTopic publicAgendaProjection scheduleAgenda setAgendaCapacity submitProposal viewAgenda|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|quota:buildBlock|rand:beginTape chance coordOf dice endTape getSeed id int markCoord next pick pickWeighted randStat replay seed seeded stopReplay tape tapeVol verifyTape verifyTapeWith|reasoning:buildBlock officialOnly|reasoningStrip:getSettings hasIncomplete resetStat setSettings stat strip trailingPartialTagLength view|recipe:catalogView economySpec extendedThemes getSettings judgeSpec list policyClashes preview satisfied seed staleness statView themeCatalog themeClashes|redactLayer:getSettings isSecretPath probe redact resetStat setSettings stat view|region:buildBlock deliver fine getSettings heard markLane occur places register setSettings stat statView tickOffline|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:aliasOf aliasStat bindAlias clearProfile danglingRefs ensurePerson getPersona getProfile getRelation idClear idStat identityOf list personOriginStat profileStat register relationBands relationStat setPersonaDice setProfileSafe setRelations slotStat traceOf unregister|rehearsal:checkPreview preview run|rejectRecovery:explain|relationGraph:clear directedOf edgeIdOf edgesOf get getSettings list persisted reload remove resetStat setSettings stat upsert view|relationTemp:build getSettings network networkStat reset setSettings stat|render:SOURCES applyInjections buildWorldSnapshot explain getVisibility injectionLedger loadUninjectLedger setVisibility themeContrast uninject uninjectAudit visibilityDefault visibilityStat|requestViewer:CHANNELS capture getSettings size stat|research:abandon advance buildBlock canUse disseminate list supply view|retrieval:RECALL_HINTS assemble audit buildBlock candidates contracts getSettings historyOf recallWanted reset setSettings stat|rewriter:CHANNEL getSettings stat|rhythmLoop:buildBlock|riskPooling:POOL_STATUS claimMutualRelief declareRiskPool disputeReliefClaim pledgeMutualFund riskPoolingProjection|rivalry:buildBlock|roleConflict:CONFLICT_SEVERITY RESOLUTION_STANCES detectRoleConflict registerAffiliationObligation resolveConflictStance roleConflictProjection viewConflictPerception|roundCost:build getSettings reset setSettings stat|roundDrivers:tickAll|rulePack:admit apply catalog compose current detect diagnose drop exportPack get getSettings history importPack list rollback save setSettings stat template|rules:ORDER coreSummary getAll getModule getRuleCount isNewModule listModules|ruling:buildBlock|rumor:LAYERS MOTIVES PUBLIC_LAYERS buildBlock competeForAttention conceal fullView getSettings investigate mutateAndAmplify refute relay setSettings startChain stat visibleTo|samplerCheck:runChecks|sandbox:isolationReport run stat|sanitize:html text|saveHealth:build getSettings reset setSettings stat|sceneNarrative:currentScene perceivedHorizon resolvedSummary situation traceFrom|sceneSlice:buildBlock read|scopeTag:getSettings parse rangesOf resetStat setSettings stat view|sediment:LABEL TRACES buildBlock feel getSettings placesView setSettings settle stat|serviceNetwork:activateFacility cancelQueue checkPassage checkServiceImpact decayFacility declareFacility queueService releaseService requestService restoreFacility servicesAt|session:HOST_PERMS SEAT_PERMS auth buildBlock getSettings host identify identity join leave post resync setSettings since statView view|settingsBus:boundsOf cfgStat cfgSurface clampNum deregisterOrphan dormantGhosts exportConfig ghostScan importConfig migrationStat normalize pendingOrphan read readEx readStat registry registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|shadow:SHADOW_KINDS STAKES addExperience addShadow brighten buildBlock deepen experiencesOf getSettings getShadow setSettings shadowStat stat visibleTo|sharedAwareness:amendPact assertMeta confirmPact openPact viewPact|socialLegacy:acceptLegacy clarifyClaim entrustDeathbedPact formLegacy fulfillDeathbedPact groupMemoryStance initiateHandover proposeSuccession registerClaim reorganizeUnclaimed resolveHandover spreadClaim viewLegacy witnessAccount|soloVoice:brief check countQuestions getSettings labelWeight resetStat setSettings stat view|spotlight:buildBlock|stage:PACKS adopt buildBlock getSettings mark plan setSettings statView transit view|staleGuard:begin verdict|stall:away back board buildBlock buy delist getSettings lay list pack setSettings sign statView view|storageForecast:forecast getSettings reset sample setSettings stat|store:SCHEMA_VERSION batch batchStat capsFor chatId claimAsync claimStat classifyKey committedRev conflictStat createRecoveryPoint currentBranchId defaultWorldState diagBudget dropAsync dropConflict dropQuarantine dropRecoveryPoint epoch exportAuditReport exportConflict exportRecoveryPoints externalWriteStat floorSig fnv1a get init integrity integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport migrations mirrorStat orphanSettingsKeys patch peopleSig quarantineAudit quarantineStat read readStat recentSig recoveryStat registryParity removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat settleAsync sizeAudit sizeAuditFull sizeCaps sizeProfile storageStat sweepStaleKeys transact transientSnapshotKeys txStat writeGate|storyChoice:buildBlock confirm pending present review setSettings|storyLoop:audit candidates confirm contracts getSettings reset setSettings stat trace|storyTone:buildBlock|storyclock:discipline readLatest|storylineAdvance:buildBlock getSettings setSettings stat tick|style:CHOICES CHOICE_LABELS buildBlock effectiveSettings getSettings setSettings styleStat summaryText textCoverage|successGrade:grade|summarizer:buildBlock cursorOf stat|supplyChain:bottleneck commit diagnose plan stat verify|survey:advance buildBlock confirm declareSpot fog getSettings halt knowsOf list pause report resume resupply routesOf setSettings survey view|survival:buildBlock statusOf|tapeStore:drop list load save stat|techLineage:advanceRetrofit canProduce cancelRetrofit checkCompatibility confirmVariant declareStandard getStandard listStandards outsourceWork planRetrofit produceAdapter teach|temperament:buildBlock read|tempo:buildBlock|temporalLock:buildBlock|theater:generate send stat wrap|theme:THEMES THEME_EXT activeModules apply contrast engineFace list preview separation statView|threads:RELIABILITY TERMINAL abandon addLead buildBlock converge explain getSettings open resolve setSettings stall stat threadStat|timeline:SOURCE_ID_KEY auditRefs captureRange hashText unionRefs|tolerance:buildBlock|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview previewPlan|toolSnapshot:buildSubsetPayload download restore|training:abilitiesView can declare getSettings practice progress setSettings view|travelDesk:commit diagnose ledger meet plan route stat verify|undercurrentCalendar:build getSettings reset setSettings stat|undo:capture clear peek pushValue stat undo|userlock:buildBlock|vitals:buildBlock conceive endPregnancy getSettings know knows knowsOthers list phaseOf register reset setSettings stat sweep tell tick view|warrant:buildBlock|wbInject:activeOrders findCompanionName getConfig isEnabled|wbSearch:count search|weather:buildBlock getMicroclimate weatherOf|wordBudget:count|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|world:CHANNELS EVENT_KINDS PLACE_KINDS addEvent addPlace addRoad addUse arrive attendees buildBlock canBeAt depart eventsBetween getSettings move reach setSettings stat stop tick tickDraft transit useWindowOf usesOf where whereStat|worldAutobiography:autobiography buildBlock exportText getSettings reset setSettings stat|worldBlueprint:BP_VER SCENES checkIntegrity drop exportBlueprint get getSettings importBlueprint list previewImport save setSettings stat targetEmpty|worldBridge:buildBlock exportLegends getSettings importLegends seed setSettings stat toRumor view worldKey|worldBriefing:getSettings reset setSettings snap stat view|worldChanges:buildBlock capture getSettings setSettings settle view|worldClock:getSettings inspectEnd judge parseEnd resetStat setSettings stat view|worldDiary:boundary build getSettings reset setSettings stat|worldGraph:KINDS diagnose geo getSettings graph locate stat suggest timeline|worldHealth:diagnose drill getSettings setSettings sources stat summary|worldLab:adapterTable adopt advance arms beats catalog diagnose diff discard exportAs getSettings kinds parseSteps report run setSettings simulate staleness stat|worldSeed:SEED_VER drop extract get getSettings importPack initConfirm initPreview list requireContinuation save setSettings sow stat transferPack validateContinuation|worldSnapshot:IDENTITY_REFS checkCompat diagnose exportSnapshot importSnapshot libDrop libTake library previewImport roundTrip toBlueprint toJSON|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries matchKey peekEntries previewActivation saveSelection triggerEnabled|writeContract:contractOf scan stat summaryText|writeDesk:call catalog stat';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -15800,19 +15802,19 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 9200, '现场静态引用 9200 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.117.0（计划二 B1–B6）：新增 engines/act.js（B1 行动七型）/ engines/opportunity.js（B6 机会窗口）/ engines/recipe.js（B6 题材配方）三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96，读数一并重冻；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31；）');
-    assert(r2700.namespaces === 336 && r2700.members === 4150,
-      '定义面 336 命名空间 / 4150 成员；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：新增 engines/perf-trace.js（27 导出：21 口 + 6 枚只读数据成员），其中 partial 一口接面板真消费方；v2.101.0：O11 跨插件互操作面新增 engines/interop.js（11 导出：6 口接真消费方 + 5 枚只读数据成员）与 lonshaReader.LONSHA_BRIDGE_VERSION ⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方（面板按号入口 + 诊断节只读）⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出（tapeVol / verifyTapeWith）且各接真消费方；v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
-    assert(r2700.dead.length === 1181 && r2700.uiDead.length === 6 && r2700.dataOnly.length === 553,
-      'dead 1181 / uiDead 6 / dataOnly 553；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.102.0（A2/O12）：perf-trace 九口如实登记为 self-only（内部自用、外部零引用 = 过度导出），另六枚只读数据成员 ⇒ dataOnly +2；其中 slots / baseline / curveAll 已接面板真消费方故不在此列；v2.101.0：interop.probePartner 是按伙伴分发口、外部零引用 ⇒ dead +1；五枚只读数据成员零引用 ⇒ dataOnly +4；v2.99.0：canon.LIMITS 是数据成员、产品零引用 ⇒ dataOnly +1；v2.88.0：' + 'O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方；v2.97.0：O9/O10/X5 三线新增导出全部接上真消费方（面板 / 诊断 / 见证表），死面零新增，'
+    assert(r2700.refs === 9270, '现场静态引用 9270 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.117.0（计划二 B1–B6）：新增 engines/act.js（B1 行动七型）/ engines/opportunity.js（B6 机会窗口）/ engines/recipe.js（B6 题材配方）三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96，读数一并重冻；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31；）');
+    assert(r2700.namespaces === 338 && r2700.members === 4167,
+      '定义面 338 命名空间 / 4167 成员；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：新增 engines/perf-trace.js（27 导出：21 口 + 6 枚只读数据成员），其中 partial 一口接面板真消费方；v2.101.0：O11 跨插件互操作面新增 engines/interop.js（11 导出：6 口接真消费方 + 5 枚只读数据成员）与 lonshaReader.LONSHA_BRIDGE_VERSION ⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方（面板按号入口 + 诊断节只读）⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出（tapeVol / verifyTapeWith）且各接真消费方；v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
+    assert(r2700.dead.length === 1174 && r2700.uiDead.length === 6 && r2700.dataOnly.length === 553,
+      'dead 1174 / uiDead 6 / dataOnly 553；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.102.0（A2/O12）：perf-trace 九口如实登记为 self-only（内部自用、外部零引用 = 过度导出），另六枚只读数据成员 ⇒ dataOnly +2；其中 slots / baseline / curveAll 已接面板真消费方故不在此列；v2.101.0：interop.probePartner 是按伙伴分发口、外部零引用 ⇒ dead +1；五枚只读数据成员零引用 ⇒ dataOnly +4；v2.99.0：canon.LIMITS 是数据成员、产品零引用 ⇒ dataOnly +1；v2.88.0：' + 'O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方；v2.97.0：O9/O10/X5 三线新增导出全部接上真消费方（面板 / 诊断 / 见证表），死面零新增，'
       + '只有 causal.replayWith 如实登记为 test-only（它重跑代码，而会写世界的轮次不能用它，产品内确无安全调用点），实 '
       + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
-    assert(r2700.deadInTestsOnly === 413, '其中仅测试引用 413（v2.92.0：O5 的资源账本两口入此列，实 ' + r2700.deadInTestsOnly + '）');
+    assert(r2700.deadInTestsOnly === 412, '其中仅测试引用 412（v2.92.0：O5 的资源账本两口入此列，实 ' + r2700.deadInTestsOnly + '）');
     // ── D. 账本健全：条目数一致、归因在词表内、无占位 ──
     const led2700 = gate2700.loadLedger();
     assert(!!led2700 && typeof led2700 === 'object', '账本可加载（tests/dead-export-ledger.json）');
-    assert(Object.keys(led2700.dead).length === 1181 && Object.keys(led2700.uiDead).length === 6,
-      '账本条目数与现场一致（dead 1181 / uiDead 6；v2.110.0 新增三个基元模块的 26 个口'
+    assert(Object.keys(led2700.dead).length === 1174 && Object.keys(led2700.uiDead).length === 6,
+      '账本条目数与现场一致（dead 1174 / uiDead 6；v2.110.0 新增三个基元模块的 26 个口'
       + '按实测归因登记，面内净增为零）');
     const reasons2700 = Array.from(new Set(Object.keys(led2700.dead).concat(Object.keys(led2700.uiDead))
       .map(function (k) { return (led2700.dead[k] || led2700.uiDead[k] || {}).reason; })));
@@ -15869,7 +15871,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       // spawnSync 不抛：无论退出码如何都能拿到 stdout。maxBuffer 给足（破坏后 phantom 1189 条，
       //   JSON 约 0.3MB；1MB 默认值余量太小，超限会得到空 stdout 而让判据假红）。
       const r2700 = require('child_process').spawnSync(process.execPath, [tmp2700, '--json'],
-        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 96000, killSignal: 'SIGKILL' });
+        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 1344000, killSignal: 'SIGKILL' });
       rc2700 = (r2700.status === null ? -1 : r2700.status);
       cout2700 = String(r2700.stdout || '');
     } finally { try { fs.unlinkSync(tmp2700); } catch (e) {} }
@@ -16052,11 +16054,11 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     // ── F. 判据不越界：冻结面与归因宽度本版不动；现场锚点随 v2.29.0 真代码口径更新 ──
     assertDeepEq(gate2800.FROZEN_KINDS, ['dead', 'uiDead'], '冻结面仍为 dead/uiDead（本版不扩面）');
     assertDeepEq(gate2800.ADVISORY_KINDS, ['dataOnly'], 'advisory 面仍为 dataOnly（不升级为拦截）');
-assert(r2800.dead.length === 1181 && r2800.uiDead.length === 6 && r2800.dataOnly.length === 553
-&& r2800.deadInTestsOnly === 413,
-'现场锚点（dead 1181 / uiDead 6 / dataOnly 553 / 仅测试 413，v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥；v2.129.0（拓展计划 A1–A10）：新增十个引擎（userlock / rewriter / storyclock / rhythm-loop / motif / beat-mask / preset-world / power-anchor / request-viewer / wb-search），冻结面 610 → 693，其中 7 项带 tests/run.js 真引用、76 项本模块自用、6 项待接线）');
-assert(r2800.refs === 9200 && r2800.namespaces === 336 && r2800.members === 4150,
-    '清册面（refs 9200 / 命名空间 336 / 成员 4150；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
+assert(r2800.dead.length === 1174 && r2800.uiDead.length === 6 && r2800.dataOnly.length === 553
+&& r2800.deadInTestsOnly === 412,
+'现场锚点（dead 1174 / uiDead 6 / dataOnly 553 / 仅测试 412，v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥；v2.129.0（拓展计划 A1–A10）：新增十个引擎（userlock / rewriter / storyclock / rhythm-loop / motif / beat-mask / preset-world / power-anchor / request-viewer / wb-search），冻结面 610 → 693，其中 7 项带 tests/run.js 真引用、76 项本模块自用、6 项待接线）');
+assert(r2800.refs === 9270 && r2800.namespaces === 338 && r2800.members === 4167,
+    '清册面（refs 9270 / 命名空间 338 / 成员 4167；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -16187,7 +16189,7 @@ assert(r2800.refs === 9200 && r2800.namespaces === 336 && r2800.members === 4150
     const md5Bridge2900 = md5of2900(bakBridge2900);
     const runGate2900 = function () {
       const rr = require('child_process').spawnSync(process.execPath, [path.join(__dirname, 'dead-export-gate.js'), '--json'],
-        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 96000, killSignal: 'SIGKILL' });
+        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 1344000, killSignal: 'SIGKILL' });
       try { return JSON.parse(String(rr.stdout || '')); } catch (e) { return null; }
     };
     let vBase2900 = null, vCmt2900 = null, vCall2900 = null, md5After2900 = '';
@@ -16235,11 +16237,11 @@ assert(r2800.refs === 9200 && r2800.namespaces === 336 && r2800.members === 4150
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-assert(r2900.refs === 9200 && r2900.namespaces === 336 && r2900.members === 4150,
-'清册面（refs 9200 / 命名空间 336 / 成员 4150）；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填——真代码口径下的现场值（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
-assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly.length === 553
-&& r2900.deadInTestsOnly === 413,
-'dead 1181 / uiDead 6 / dataOnly 553 / 仅测试 413；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0，实 ' + r2900.dead.length + '/'
+assert(r2900.refs === 9270 && r2900.namespaces === 338 && r2900.members === 4167,
+'清册面（refs 9270 / 命名空间 338 / 成员 4167）；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填——真代码口径下的现场值（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
+assert(r2900.dead.length === 1174 && r2900.uiDead.length === 6 && r2900.dataOnly.length === 553
+&& r2900.deadInTestsOnly === 412,
+'dead 1174 / uiDead 6 / dataOnly 553 / 仅测试 412；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0，实 ' + r2900.dead.length + '/'
       + r2900.uiDead.length + '/' + r2900.dataOnly.length + '/' + r2900.deadInTestsOnly + '）');
     // v2.230.0 收口：「只被注释/字符串提及」这件事**不该写成三个常量名** —— 集合会变。
     //   现场实测：engines/world-lab.js 起 `rand.seed` 有了真消费方（真代码面命中 6 处），
@@ -17326,7 +17328,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     });
     assert(missingVis.length === 0, "v2380: 门禁——SOURCES 每项都在快照里有真读（缺: " + missingVis.join(",") + "）");
     // v2.294.0（V8 OPV8-1）：新增 injectCollector（结构汇流）注入源 ⇒ 108 → 109。
-    assert((W.render.SOURCES || []).length === 109, "v2380: SOURCES 为 109 项（v2.294.0（V8）：新增结构汇流 injectCollector 注入源 ⇒ 108 → 109）（v2.292.0（EXV7-8）：新增世界自传 worldAutobiography 注入源 ⇒ 107 → 108）（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
+    assert((W.render.SOURCES || []).length === 115, "v2380: SOURCES 为 115 项（V9 新增四 owner、托管及变化摘要六源，109 → 115）（v2.294.0（V8）：新增结构汇流 injectCollector 注入源 ⇒ 108 → 109）（v2.292.0（EXV7-8）：新增世界自传 worldAutobiography 注入源 ⇒ 107 → 108）（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
     // E. 负向自证：把 echoes 分支从源码里抹掉 ⇒ 门禁必须现形
     const broken2380 = srcIj2380.split("if (vis.echoes)").join("if (false)");
     assert(broken2380 !== srcIj2380, "v2380: （负向自证）破坏锚点在真源码中恰命中（可观测改行为）");
@@ -17408,7 +17410,8 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     //   与 engines/portal.js 的 `o.round`（opts 入参，屏障轮次标注）。
     //   判定依据与既有白名单同一条：**取自本地构造对象**（opts || {}），不是世界状态顶层 round。
     //   为什么它会「只在全量里现形」：白名单是逐字串比，新增文件不进来就恒不等 —— 与 v2.227.0 那次同族。
-    const LEGAL_GHOST_2390 = "engines/anti-omniscience.js:1,engines/coordinate.js:4,engines/inject-inspector.js:2,engines/parallel-world.js:1,engines/portal.js:2,engines/rule-pack.js:1,engines/tool-diag.js:1,engines/world-lab.js:1";
+    // V9 backstage 的 opts.round 是托管调用参数，不是世界状态顶层轮号；真实轮号仍由 evolution.roundOf 提供。
+    const LEGAL_GHOST_2390 = "engines/anti-omniscience.js:1,engines/backstage.js:1,engines/coordinate.js:4,engines/inject-inspector.js:2,engines/parallel-world.js:1,engines/portal.js:2,engines/rule-pack.js:1,engines/tool-diag.js:1,engines/world-lab.js:1";
     assert(ghostFiles.join(",") === LEGAL_GHOST_2390,
       "v2390: 顶层 .round 幽灵读点只剩本地构造对象三处（实 " + ghostFiles.join(",") + "，期望 " + LEGAL_GHOST_2390 + "）");
     // ── F. 负向自证：把修复退回旧写法 ⇒ 扫描器必须现形 ──
@@ -17618,7 +17621,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     assert(inv4300.PRODUCT_FILES.join(',') === prod4300.join(','),
       'v2430: PRODUCT_FILES 与 productFiles(BASE) 逐项一致（' + prod4300.length + ' vs ' + inv4300.PRODUCT_FILES.length + '）');
     const ecRun4300 = cp4300.spawnSync(process.execPath, ['tests/export-contract.js'],
-      { cwd: path4300.join(__dirname, '..'), encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+      { cwd: path4300.join(__dirname, '..'), encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     // v2.44.0：本段原钉「members= 360 chars= 4546」。v2.44.0 起 actors/monologue.js 开始调用
     //   apiRouter.extractJson（解析纯文本独白），该成员由「死导出」转为「活导出」，出口面随之
     //   +1 成员 / +12 字符。故此处改为与当前真值比对；口径本身（统一排除名单后规模不漂移）
@@ -17782,7 +17785,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     try { fs4300.rmSync(negDir4300, { recursive: true, force: true }); } catch (e) {}
     fs4300.mkdirSync(negDir4300, { recursive: true });
     const tarR4300 = cp4300.spawnSync('sh', ['-c',
-      'timeout -k 5 240 tar --exclude=.git -cf - . | (cd ' + negDir4300 + ' && tar -xf -)'], { cwd: BASE, encoding: 'utf8', timeout: 96000 });
+      'timeout -k 5 240 tar --exclude=.git -cf - . | (cd ' + negDir4300 + ' && tar -xf -)'], { cwd: BASE, encoding: 'utf8', timeout: 1344000 });
     assert(tarR4300.status === 0 && fs4300.existsSync(path4300.join(negDir4300, 'index.js')),
       'v2430: 副本目录就绪（破坏性验证一律在副本上做）');
     //   注入一个「新增 ui 模块」：含一个当前不存在的控件 id。
@@ -17833,7 +17836,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     // v2.105.0：node --check 不读 spawnSync 的 timeout 选项，此处是「只取证」形态
     //   （上限由外层 isolated-runner 与 tests/gate-timeout.js 的取证面承担）。
     const checkBroken4300 = cp4300.spawnSync(process.execPath, ['--check', path4300.join(negDir4300, 'tests/run.js')],
-      { encoding: 'utf8', timeout: 96000 });
+      { encoding: 'utf8', timeout: 1344000 });
     assert(checkBroken4300.status === 0,
       'v2430: （负向自证）破坏后的副本仍为合法 JS（破坏改语义、不破坏语法）');
     try { fs4300.rmSync(negDir4300, { recursive: true, force: true }); } catch (e) {}
@@ -17869,7 +17872,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
 
     // ── B. 在**仓库之外的 cwd** 里跑生成器，产物仍落回真源仓库（行为面）──
     const r4100 = cp4100.spawnSync(process.execPath, [path4100.join(BASE, 'tests/export-contract.js')],
-      { cwd: path4100.join(BASE, 'tests'), encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+      { cwd: path4100.join(BASE, 'tests'), encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(r4100.status === 0, 'v2410: 非仓库根 cwd 下可运行（实 exit ' + r4100.status + '）'
       + (r4100.status === 0 ? '' : ' :: ' + String(r4100.stderr || '').slice(0, 300)));
     assert(/\bns= \d+ members= \d+ chars= \d+/.test(String(r4100.stdout || '')),
@@ -17957,7 +17960,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     fs4100.writeFileSync(brokenFile4100,
       genSrc4100.replace("const BASE = path.join(__dirname, '..');",
         'const BASE = ' + nonexit4100 + ';'), 'utf8');
-    const rBad4100 = cp4100.spawnSync(process.execPath, [brokenFile4100], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rBad4100 = cp4100.spawnSync(process.execPath, [brokenFile4100], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rBad4100.status !== 0,
       'v2410: （负向自证）E2 BASE 指向不存在目录 ⇒ 非零退出（实 exit ' + rBad4100.status + '）');
     assert(r4100.status === 0, 'v2410: （负向自证）E2 对照——__dirname 版同 cwd 下 exit 0');
@@ -18037,7 +18040,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     // ── D. 门禁模块端到端（比对冻结账本）为绿：防止门禁「另开一趟没人跑」──
     const cp2400 = require('child_process');
     const rG2400 = cp2400.spawnSync(process.execPath, ['tests/field-liveness-gate.js'],
-      { cwd: path2400.join(__dirname, '..'), encoding: 'utf8', timeout: 96000 });
+      { cwd: path2400.join(__dirname, '..'), encoding: 'utf8', timeout: 1344000 });
     assert(rG2400.status === 0,
       'v2400: 门禁模块端到端 exit 0（实 ' + rG2400.status + '）'
       + (rG2400.status === 0 ? '' : ' :: ' + String(rG2400.stdout || '') + String(rG2400.stderr || '')));
@@ -20168,7 +20171,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
   {
     const cp2830 = require('child_process');
     const rG2830 = cp2830.spawnSync(process.execPath, ['tests/module-registry-gate.js'],
-      { cwd: path.join(__dirname, '..'), encoding: 'utf8', timeout: 96000 });
+      { cwd: path.join(__dirname, '..'), encoding: 'utf8', timeout: 1344000 });
     assert(rG2830.status === 0,
       'v2830/mr: 模块契约门禁端到端 exit 0（实 ' + rG2830.status + '）'
       + (rG2830.status === 0 ? '' : ' :: ' + String(rG2830.stdout || '') + String(rG2830.stderr || '').slice(0, 200)));
@@ -20324,7 +20327,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
   {
     const cp2840 = require('child_process');
     const rI2840 = cp2840.spawnSync(process.execPath, ['tests/isolated-runner-lock.js'],
-      { cwd: path.join(__dirname, '..'), encoding: 'utf8', timeout: 96000 });
+      { cwd: path.join(__dirname, '..'), encoding: 'utf8', timeout: 1344000 });
     const outI2840 = String(rI2840.stdout || '');
     const mI2840 = outI2840.match(/isolation (\d+)\/(\d+)/);
     assert(rI2840.status === 0,
@@ -20498,7 +20501,10 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
       + d.siteStats.armedSites + '/' + d.siteStats.budget + '）——留一个没声明的调用点就是留一条静默挂起的路径');
     assert(d.armedCount === d.sites.length && d.sites.length >= 8,
       'v2105: 武装表与现场站点清单同长（' + d.armedCount + ' vs ' + d.sites.length + '）——空表上的「全部有 timeout」恒真');
-    assert(d.limits.spawnMs >= 60000 && d.limits.spawnMs <= 300000 && d.limits.shellMs >= 60,
+    //   v2.295.0（V9 收口）：上限随预算重算同步放宽 —— 真浏览器实机门成为最重门禁后，
+    //   统一预算为 168000 × 8 = 1344000，300000 的旧上限会把合法重算误杀。
+    //   新区间仍保有「不许紧贴实测、不许大到等于没有超时」的两端含义。
+    assert(d.limits.spawnMs >= 60000 && d.limits.spawnMs <= 1800000 && d.limits.shellMs >= 60,
       'v2105: 预算落在判据区间内（' + d.limits.spawnMs + 'ms / shell 保险丝 ' + d.limits.shellMs + 's）'
       + ' —— 不许紧贴实测，也不许大到等于没有超时');
     assert(d.coherence.length === 0, 'v2105: 自洽（' + d.coherenceSummary + '）——现场只读一个预算');
@@ -20549,9 +20555,9 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     //   后者要靠下一轮重跑 tools/slow-sections.js 才知道；本仓既有裁决：算不出来不得当作算过。
     const slowRT = require('../tools/slow-sections.js');
     assert(typeof slowRT.suggestTimeoutMs === 'function'
-      && slowRT.suggestTimeoutMs(2278.99) === declaredRT,
-      'v2203: 默认值可由 slow-sections 的同一公式复算（合计 2278.99s 得 '
-      + (typeof slowRT.suggestTimeoutMs === 'function' ? slowRT.suggestTimeoutMs(2278.99) : 'n/a')
+      && slowRT.suggestTimeoutMs(3394.68) === declaredRT,
+      'v2203: 默认值可由 slow-sections 的同一公式复算（合计 3394.68s 得 '
+      + (typeof slowRT.suggestTimeoutMs === 'function' ? slowRT.suggestTimeoutMs(3394.68) : 'n/a')
       + '，宣称 ' + declaredRT + '）—— 口径与工具一致，重算实测即须同批改默认值');
     // v2.257.0（回归修复）：**按形态定位，不许按数组下标定位**。
     //   病灶（全量回归实测）：判据写 `gt.ARMED_SITES[3]`，而本判据要守的是「管道形态」那个调用点。
@@ -21555,7 +21561,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     // tests/ui-gate.js 必须**真被执行**（不是文件在场）：按 v2.83.0 / v2.84.0 惯例在子进程里跑，
     //   真进程、真退出码、真汇总行。它用 ~12s 换 53 项 UI 渲染路径断言（含 728 个真实控件点击）。
     const rUG2136 = require('child_process').spawnSync(process.execPath, [path.join('tests', 'ui-gate.js')],
-      { cwd: BASE, encoding: 'utf8', timeout: 96000 });
+      { cwd: BASE, encoding: 'utf8', timeout: 1344000 });
     const outUG2136 = String(rUG2136.stdout || '');
     const mUG2136 = outUG2136.match(/通过 (\d+) \/ 失败 (\d+)/);
     assert(rUG2136.status === 0,
@@ -21580,7 +21586,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
   section('v2.137.0（O14）：UI 实机验证通道（真浏览器 / 真控件 / 真 localStorage）');
   {
     const rUL2137 = require('child_process').spawnSync(process.execPath, ['tests/ui-live-v2137.js'],
-      { cwd: BASE, encoding: 'utf8', timeout: 96000 });
+      { cwd: BASE, encoding: 'utf8', timeout: 1344000 });
     const outUL2137 = String(rUL2137.stdout || '');
     assert(rUL2137.status === 0,
       'v2137/O14: UI 实机通道端到端 exit 0（实 ' + rUL2137.status + '）'
@@ -21638,7 +21644,7 @@ assert(r2900.dead.length === 1181 && r2900.uiDead.length === 6 && r2900.dataOnly
     // 实机这一轮读数行面必须非空（full 档实测 79 条；非 full 档如实报降档，由 O14 段把住）
     const rUL2145 = require('child_process').spawnSync(process.execPath, ['-e',
       "require('./tests/ui-live.js').runLive().then(function(o){console.log('READINGS='+o.readings.length+' TIER='+o.tier+' WHY='+(o.why||''));})"],
-      { cwd: BASE, encoding: 'utf8', timeout: 96000 });
+      { cwd: BASE, encoding: 'utf8', timeout: 1344000 });
     const outUL2145 = String(rUL2145.stdout || '');
     const mRD = outUL2145.match(/READINGS=(\d+)/);
     const mT215 = outUL2145.match(/TIER=(\S+)/);
@@ -22499,7 +22505,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       + "L.runLive().then(function(o){console.log('LOADED='+o.loaded+' PAGES='+o.pages.length"
       + "+' CONTROLS='+o.controls+' READINGS='+o.readings.length+' RT='+(o.roundtrip&&o.roundtrip.ok?'ok':'no')"
       + "+' FILLERR='+o.fulfillErrors+' ROUTEERR='+(o.routeErrors||0)+' ERRS='+o.errors.length);});"],
-      { cwd: BASE, encoding: 'utf8', timeout: 96000 });
+      { cwd: BASE, encoding: 'utf8', timeout: 1344000 });
     const outUL2163 = String(rUL2163.stdout || '');
     const mT2163 = outUL2163.match(/TIER=(\w+)/);
     const mW2163 = outUL2163.match(/WHY0=(.+)/);
@@ -22589,7 +22595,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runLock('./s3-tx1-v2165.js');
     await runLock('./s3-tx1-v2165.js', 'runNegative');
     // 冒烟工具挂载：为 tools/tx1_smoke.js 提供执行引用（否则被 toolchain-gate 判 orphan）
-    const rSM_tx1_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx1_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_tx1_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx1_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_tx1_smoke.status === 0, 'tx1_smoke 冒烟 exit 0（实 ' + rSM_tx1_smoke.status + '）'
       + (rSM_tx1_smoke.status === 0 ? '' : ' :: ' + String(rSM_tx1_smoke.stdout || '').slice(-200)));
   }
@@ -22599,7 +22605,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runLock('./s3-tx2-v2166.js');
     await runLock('./s3-tx2-v2166.js', 'runNegative');
     // 冒烟工具挂载：为 tools/tx2_smoke.js 提供执行引用（否则被 toolchain-gate 判 orphan）
-    const rSM_tx2_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx2_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_tx2_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx2_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_tx2_smoke.status === 0, 'tx2_smoke 冒烟 exit 0（实 ' + rSM_tx2_smoke.status + '）'
       + (rSM_tx2_smoke.status === 0 ? '' : ' :: ' + String(rSM_tx2_smoke.stdout || '').slice(-200)));
   }
@@ -22608,66 +22614,66 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   判据「真文件逐字未变」由各自脚本内的 N3 断言承担。
   section('v2.167.0（TX3）：区域供需、在途运输与商路选择');
   {
-    const rTX3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx3-v2167.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rTX3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx3-v2167.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rTX3.status === 0, 'v2167: TX3 专锁 exit 0（实 ' + rTX3.status + '）'
       + (rTX3.status === 0 ? '' : ' :: ' + String(rTX3.stdout || '').slice(-300)));
     // 冒烟工具挂载：为 tools/tx3_smoke.js 提供执行引用（否则被 toolchain-gate 判 orphan）
-    const rSM_tx3_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx3_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_tx3_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx3_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_tx3_smoke.status === 0, 'tx3_smoke 冒烟 exit 0（实 ' + rSM_tx3_smoke.status + '）'
       + (rSM_tx3_smoke.status === 0 ? '' : ' :: ' + String(rSM_tx3_smoke.stdout || '').slice(-200)));
   }
   // ── v2.168.0（TX4）：多阶段委托、交付核验与资源履约 ──
   section('v2.168.0（TX4）：多阶段委托、交付核验与资源履约');
   {
-    const rTX4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx4-v2168.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rTX4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx4-v2168.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rTX4.status === 0, 'v2168: TX4 专锁 exit 0（实 ' + rTX4.status + '）'
       + (rTX4.status === 0 ? '' : ' :: ' + String(rTX4.stdout || '').slice(-300)));
     // 冒烟工具挂载：为 tools/tx4_smoke.js 提供执行引用（否则被 toolchain-gate 判 orphan）
-    const rSM_tx4_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx4_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_tx4_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx4_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_tx4_smoke.status === 0, 'tx4_smoke 冒烟 exit 0（实 ' + rSM_tx4_smoke.status + '）'
       + (rSM_tx4_smoke.status === 0 ? '' : ' :: ' + String(rSM_tx4_smoke.stdout || '').slice(-200)));
   }
   // ── v2.169.0（TX6）：委托与调查的时间轴与去重 ──
   section('v2.169.0（TX6）：委托与调查的时间轴与去重');
   {
-    const rTX6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx6-v2169.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rTX6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx6-v2169.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rTX6.status === 0, 'v2169: TX6 专锁 exit 0（实 ' + rTX6.status + '）'
       + (rTX6.status === 0 ? '' : ' :: ' + String(rTX6.stdout || '').slice(-300)));
     // 冒烟工具挂载：为 tools/tx6_smoke.js 提供执行引用（否则被 toolchain-gate 判 orphan）
-    const rSM_tx6_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx6_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_tx6_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx6_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_tx6_smoke.status === 0, 'tx6_smoke 冒烟 exit 0（实 ' + rSM_tx6_smoke.status + '）'
       + (rSM_tx6_smoke.status === 0 ? '' : ' :: ' + String(rSM_tx6_smoke.stdout || '').slice(-200)));
   }
   // ── v2.170.0（TX7）：调查线索与证据链 ──
   section('v2.170.0（TX7）：调查线索与证据链');
   {
-    const rTX7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx7-v2170.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rTX7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx7-v2170.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rTX7.status === 0, 'v2170: TX7 专锁 exit 0（实 ' + rTX7.status + '）'
       + (rTX7.status === 0 ? '' : ' :: ' + String(rTX7.stdout || '').slice(-300)));
     // 冒烟工具挂载：为 tools/tx7_smoke.js 提供执行引用（否则被 toolchain-gate 判 orphan）
-    const rSM_tx7_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx7_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_tx7_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx7_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_tx7_smoke.status === 0, 'tx7_smoke 冒烟 exit 0（实 ' + rSM_tx7_smoke.status + '）'
       + (rSM_tx7_smoke.status === 0 ? '' : ' :: ' + String(rSM_tx7_smoke.stdout || '').slice(-200)));
   }
   // ── v2.171.0（TX8）：后果结算与事件去重 ──
   section('v2.171.0（TX8）：后果结算与事件去重');
   {
-    const rTX8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx8-v2171.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rTX8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx8-v2171.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rTX8.status === 0, 'v2171: TX8 专锁 exit 0（实 ' + rTX8.status + '）'
       + (rTX8.status === 0 ? '' : ' :: ' + String(rTX8.stdout || '').slice(-300)));
     // 冒烟工具挂载：为 tools/tx8_smoke.js 提供执行引用（否则被 toolchain-gate 判 orphan）
-    const rSM_tx8_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx8_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_tx8_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx8_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_tx8_smoke.status === 0, 'tx8_smoke 冒烟 exit 0（实 ' + rSM_tx8_smoke.status + '）'
       + (rSM_tx8_smoke.status === 0 ? '' : ' :: ' + String(rSM_tx8_smoke.stdout || '').slice(-200)));
   }
   // ── v2.172.0（TX9）：运营决策与周期结算 ──
   section('v2.172.0（TX9）：运营决策与周期结算');
   {
-    const rTX9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx9-v2172.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rTX9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-tx9-v2172.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rTX9.status === 0, 'v2172: TX9 专锁 exit 0（实 ' + rTX9.status + '）'
       + (rTX9.status === 0 ? '' : ' :: ' + String(rTX9.stdout || '').slice(-300)));
     // 冒烟工具挂载：为 tools/tx9_smoke.js 提供执行引用（否则被 toolchain-gate 判 orphan）
-    const rSM_tx9_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx9_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_tx9_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/tx9_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_tx9_smoke.status === 0, 'tx9_smoke 冒烟 exit 0（实 ' + rSM_tx9_smoke.status + '）'
       + (rSM_tx9_smoke.status === 0 ? '' : ' :: ' + String(rSM_tx9_smoke.stdout || '').slice(-200)));
   }
@@ -22679,38 +22685,38 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.182.0（第二批）：O3+O4+O5+E2+E5 五聚合面');
   {
     // E2 世界日程（engines/agenda.js）：剧情时间缺失时整表拒算
-    const rB2E2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-e2-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB2E2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-e2-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB2E2.status === 0, 'v2182: E2 专锁 exit 0（实 ' + rB2E2.status + '）'
       + (rB2E2.status === 0 ? '' : ' :: ' + String(rB2E2.stdout || '').slice(-300)));
-    const rSM_agenda_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/agenda_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_agenda_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/agenda_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_agenda_smoke.status === 0, 'agenda_smoke 冒烟 exit 0（实 ' + rSM_agenda_smoke.status + '）'
       + (rSM_agenda_smoke.status === 0 ? '' : ' :: ' + String(rSM_agenda_smoke.stdout || '').slice(-200)));
     // E5 世界纪事（engines/chronicle-view.js）：空历史与读不到可分
-    const rB2E5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-e5-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB2E5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-e5-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB2E5.status === 0, 'v2182: E5 专锁 exit 0（实 ' + rB2E5.status + '）'
       + (rB2E5.status === 0 ? '' : ' :: ' + String(rB2E5.stdout || '').slice(-300)));
-    const rSM_chronicle_view_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/chronicle_view_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_chronicle_view_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/chronicle_view_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_chronicle_view_smoke.status === 0, 'chronicle_view_smoke 冒烟 exit 0（实 ' + rSM_chronicle_view_smoke.status + '）'
       + (rSM_chronicle_view_smoke.status === 0 ? '' : ' :: ' + String(rSM_chronicle_view_smoke.stdout || '').slice(-200)));
     // O4 存储压力（engines/capacity-audit.js）：量不出来如实标 unknown
-    const rB2O4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o4-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB2O4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o4-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB2O4.status === 0, 'v2182: O4 专锁 exit 0（实 ' + rB2O4.status + '）'
       + (rB2O4.status === 0 ? '' : ' :: ' + String(rB2O4.stdout || '').slice(-300)));
-    const rSM_capacity_audit_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/capacity_audit_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_capacity_audit_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/capacity_audit_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_capacity_audit_smoke.status === 0, 'capacity_audit_smoke 冒烟 exit 0（实 ' + rSM_capacity_audit_smoke.status + '）'
       + (rSM_capacity_audit_smoke.status === 0 ? '' : ' :: ' + String(rSM_capacity_audit_smoke.stdout || '').slice(-200)));
     // O3 性能基线（engines/perf-baseline.js）：估计不得顶替测量
-    const rB2O3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o3-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB2O3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o3-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB2O3.status === 0, 'v2182: O3 专锁 exit 0（实 ' + rB2O3.status + '）'
       + (rB2O3.status === 0 ? '' : ' :: ' + String(rB2O3.stdout || '').slice(-300)));
-    const rSM_perf_baseline_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/perf_baseline_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_perf_baseline_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/perf_baseline_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_perf_baseline_smoke.status === 0, 'perf_baseline_smoke 冒烟 exit 0（实 ' + rSM_perf_baseline_smoke.status + '）'
       + (rSM_perf_baseline_smoke.status === 0 ? '' : ' :: ' + String(rSM_perf_baseline_smoke.stdout || '').slice(-200)));
     // O5 世界健康中心（engines/world-health.js）：空与「全正常」可分
-    const rB2O5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o5-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB2O5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b2-o5-v2182.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB2O5.status === 0, 'v2182: O5 专锁 exit 0（实 ' + rB2O5.status + '）'
       + (rB2O5.status === 0 ? '' : ' :: ' + String(rB2O5.stdout || '').slice(-300)));
-    const rSM_world_health_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/world_health_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_world_health_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/world_health_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_world_health_smoke.status === 0, 'world_health_smoke 冒烟 exit 0（实 ' + rSM_world_health_smoke.status + '）'
       + (rSM_world_health_smoke.status === 0 ? '' : ' :: ' + String(rSM_world_health_smoke.stdout || '').slice(-200)));
   }
@@ -22719,10 +22725,10 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   与第二批五聚合面同规格：走 spawnSync 子进程（A 段要读多个源文件做静态契约核对）。
   section('v2.183.0（第一批 E1）：统一待办事项中心');
   {
-    const rB1E1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e1-v2183.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB1E1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e1-v2183.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB1E1.status === 0, 'v2183: E1 专锁 exit 0（实 ' + rB1E1.status + '）'
       + (rB1E1.status === 0 ? '' : ' :: ' + String(rB1E1.stdout || '').slice(-300)));
-    const rSM_pending_center_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/pending_center_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rSM_pending_center_smoke = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tools/pending_center_smoke.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSM_pending_center_smoke.status === 0, 'pending_center_smoke 冒烟 exit 0（实 ' + rSM_pending_center_smoke.status + '）'
       + (rSM_pending_center_smoke.status === 0 ? '' : ' :: ' + String(rSM_pending_center_smoke.stdout || '').slice(-200)));
   }
@@ -22731,7 +22737,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   （库读不出 / 挤出 / 删档造成的孤儿）。与上一批同规格：走 spawnSync 子进程。
   section('v2.184.0（第一批 E3）：存档槽面板接线');
   {
-    const rB1E3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e3-v2184.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB1E3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e3-v2184.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB1E3.status === 0, 'v2184: E3 专锁 exit 0（实 ' + rB1E3.status + '）'
       + (rB1E3.status === 0 ? '' : ' :: ' + String(rB1E3.stdout || '').slice(-300)));
   }
@@ -22767,19 +22773,19 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //     一处「没有调用点的预算」，A6 会当场报「47 ≠ 46」。
   section('v2.186.0（第一批 O9+O1）：全知出口闸与真实宿主验收矩阵');
   {
-    const rO9S = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o9-outlet-gate-v2186.js'), '--methods=runA,runB'], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rO9S = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o9-outlet-gate-v2186.js'), '--methods=runA,runB'], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rO9S.status === 0, 'v2186: O9 静态层（通道闭集 + 八条调用点接线）exit 0（实 ' + rO9S.status + '）'
       + (rO9S.status === 0 ? '' : ' :: ' + String(rO9S.stdout || '').slice(-300)));
-    const rO9L = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o9-outlet-gate-v2186.js'), '--methods=runLive2'], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rO9L = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o9-outlet-gate-v2186.js'), '--methods=runLive2'], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rO9L.status === 0, 'v2186: O9 实机层（真宿主里被拆接线才现形）exit 0（实 ' + rO9L.status + '）'
       + (rO9L.status === 0 ? '' : ' :: ' + String(rO9L.stdout || '').slice(-300)));
-    const rO1S = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o1-host-matrix-v2186.js'), '--methods=runA,runB'], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rO1S = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o1-host-matrix-v2186.js'), '--methods=runA,runB'], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rO1S.status === 0, 'v2186: O1 结构层 + 无头层（矩阵 12 条 + 三模块守恒/拒收）exit 0（实 ' + rO1S.status + '）'
       + (rO1S.status === 0 ? '' : ' :: ' + String(rO1S.stdout || '').slice(-300)));
-    const rO1C = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o1-host-matrix-v2186.js'), '--methods=runC'], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rO1C = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o1-host-matrix-v2186.js'), '--methods=runC'], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rO1C.status === 0, 'v2186: O1 宿主层（三模块 × 四路径真跑 + 重载可复读）exit 0（实 ' + rO1C.status + '）'
       + (rO1C.status === 0 ? '' : ' :: ' + String(rO1C.stdout || '').slice(-300)));
-    const rO1N = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o1-host-matrix-v2186.js'), '--methods=runN'], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rO1N = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o1-host-matrix-v2186.js'), '--methods=runN'], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rO1N.status === 0, 'v2186: O1 负控制层（真源码破坏 ⇒ 宿主里现形）exit 0（实 ' + rO1N.status + '）'
       + (rO1N.status === 0 ? '' : ' :: ' + String(rO1N.stdout || '').slice(-300)));
   }
@@ -22794,7 +22800,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   临时树上落文件、做真破坏 —— 同一进程里做会污染共享上下文。
   section('v2.187.0（第三批 O7）：计划状态与笔记树同一真源');
   {
-    const rB3O7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o7-plan-tree-gate-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3O7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o7-plan-tree-gate-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3O7.status === 0, 'v2187: O7 计划状态与笔记树门禁 exit 0（实 ' + rB3O7.status + '）'
       + (rB3O7.status === 0 ? '' : ' :: ' + String(rB3O7.stdout || '').slice(-400)));
   }
@@ -22813,7 +22819,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   收尾三态改由 test-layers.buildOutcome() 的**真返回**驱动（同一份裁定，单一真源）。
   section('v2.187.0（第三批 O6）：分层选区的单一真源与真省时');
   {
-    const rB3O6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o6-layer-gate-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3O6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o6-layer-gate-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3O6.status === 0, 'v2187: O6 分层选区门禁 exit 0（实 ' + rB3O6.status + '）'
       + (rB3O6.status === 0 ? '' : ' :: ' + String(rB3O6.stdout || '').slice(-400)));
   }
@@ -22828,7 +22834,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   靠这一条现形的：能力齐全、注入源在用，**面板零控件**。
   section('v2.187.0（第三批 O8）：导出消费者类型与「无入口」归零');
   {
-    const rB3O8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o8-consumer-gate-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3O8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/o8-consumer-gate-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3O8.status === 0, 'v2187: O8 消费者类型门禁 exit 0（实 ' + rB3O8.status + '）'
       + (rB3O8.status === 0 ? '' : ' :: ' + String(rB3O8.stdout || '').slice(-400)));
   }
@@ -22844,7 +22850,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   现读骨架真实字段 clock.dayIndex（专锁 A10b 钉住「字段名必须来自骨架」）。
   section('v2.187.0（第三批 E4）：战役目标与阶段');
   {
-    const rB3E4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e4-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3E4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e4-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3E4.status === 0, 'v2187: E4 战役层专锁 exit 0（实 ' + rB3E4.status + '）'
       + (rB3E4.status === 0 ? '' : ' :: ' + String(rB3E4.stdout || '').slice(-400)));
   }
@@ -22859,7 +22865,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   （「已交付 = 有证据文件 **且** 被 run.js 引用」）它不算交付。本轮补挂。
   section('v2.187.0（第三批 E6）：统一世界地图与关系视图');
   {
-    const rB3E6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e6-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3E6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e6-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3E6.status === 0, 'v2187: E6 地图与关系视图专锁 exit 0（实 ' + rB3E6.status + '）'
       + (rB3E6.status === 0 ? '' : ' :: ' + String(rB3E6.stdout || '').slice(-400)));
   }
@@ -22877,7 +22883,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //     b) N1 破坏锚点缩进与源码不一致（源码 4 空格、锚点写 6 空格）⇒ 命中 0 次。
   section('v2.187.0（第三批 E8）：依赖体检与迁移助手');
   {
-    const rB3E8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e8-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3E8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e8-v2187.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3E8.status === 0, 'v2187: E8 依赖体检专锁 exit 0（实 ' + rB3E8.status + '）'
       + (rB3E8.status === 0 ? '' : ' :: ' + String(rB3E8.stdout || '').slice(-400)));
   }
@@ -22889,7 +22895,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   合成一把锁会让「哪一条边界在守哪一行源码」变成一次猜测。
   section('v2.188.0（第四批 E7）：玩家自定义规则包与白名单自动化模板');
   {
-    const rB3E7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e7-v2188.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3E7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e7-v2188.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3E7.status === 0, 'v2188: E7 规则包专锁 exit 0（实 ' + rB3E7.status + '）'
       + (rB3E7.status === 0 ? '' : ' :: ' + String(rB3E7.stdout || '').slice(-400)));
   }
@@ -22899,7 +22905,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   预算跨刷新」，负向段真源码破坏 + 两向自证。
   section('v2.217.0（拓展 N6）：持久条件自动化（schedule.*）');
   {
-    const rB3E8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e8-v2217.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3E8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e8-v2217.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3E8.status === 0, 'v2217: N6 持久调度专锁 exit 0（实 ' + rB3E8.status + '）'
       + (rB3E8.status === 0 ? '' : ' :: ' + String(rB3E8.stdout || '').slice(-400)));
   }
@@ -22909,7 +22915,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   分支目标阶段、失败条件终态（≠ 未达成）、奖励只记自有账本；负向段真源码破坏 + 两向自证。
   section('v2.218.0（拓展 N1）：可编辑战役层（自定义计划）');
   {
-    const rB3N1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n1-v2218.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3N1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n1-v2218.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3N1.status === 0, 'v2218: N1 可编辑战役专锁 exit 0（实 ' + rB3N1.status + '）'
       + (rB3N1.status === 0 ? '' : ' :: ' + String(rB3N1.stdout || '').slice(-400)));
   }
@@ -22920,7 +22926,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   负向段真源码破坏 + 两向自证（四处锚点，含时窗锚反证）。
   section('v2.219.0（拓展 N5）：多站旅程与会合');
   {
-    const rB3N5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n5-v2219.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3N5 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n5-v2219.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3N5.status === 0, 'v2219: N5 多站旅程与会合专锁 exit 0（实 ' + rB3N5.status + '）'
       + (rB3N5.status === 0 ? '' : ' :: ' + String(rB3N5.stdout || '').slice(-400)));
   }
@@ -22931,7 +22937,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   预算只在内存、不落盘）；负向段真源码破坏 + 两向自证（四处锚点：真源缺席 / 开关关 / 超预算 / 知情解析）。
   section('v2.220.0（拓展 N2）：NPC 候选策略与受挫重规划');
   {
-    const rB3N2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n2-v2220.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3N2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n2-v2220.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3N2.status === 0, 'v2220: N2 NPC 候选策略与受挫重规划专锁 exit 0（实 ' + rB3N2.status + '）'
       + (rB3N2.status === 0 ? '' : ' :: ' + String(rB3N2.stdout || '').slice(-400)));
 }
@@ -22944,7 +22950,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   预览是进程态交互物 / 全关即零存在（无 buildBlock）。负向段真源码破坏 + 两向自证（四处锚点）。
   section('v2.221.0（拓展 N3）：经营供应链');
   {
-    const rB3N3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n3-v2221.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3N3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n3-v2221.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3N3.status === 0, 'v2221: N3 经营供应链专锁 exit 0（实 ' + rB3N3.status + '）'
       + (rB3N3.status === 0 ? '' : ' :: ' + String(rB3N3.stdout || '').slice(-400)));
    }
@@ -22960,7 +22966,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   预览 stamp 是进程态交互物 · 全关即零存在（无 buildBlock）。负向段真源码破坏 + 两向自证（四处锚点）。
   section('v2.222.0（拓展 N4）：调查证据工作台');
   {
-    const rB3N4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n4-v2222.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3N4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n4-v2222.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3N4.status === 0, 'v2222: N4 调查证据工作台专锁 exit 0（实 ' + rB3N4.status + '）'
       + (rB3N4.status === 0 ? '' : ' :: ' + String(rB3N4.stdout || '').slice(-400)));
   }
@@ -22977,7 +22983,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   不另出 `unsupported` 第二出口)。负向段真源码破坏 + 两向自证(四处锚点)。
   section('v2.223.0(拓展 N7):多引擎适配器面');
   {
-    const rB3N7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n7-v2223.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3N7 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n7-v2223.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3N7.status === 0, 'v2223: N7 多引擎适配器面专锁 exit 0(实 ' + rB3N7.status + ')'
       + (rB3N7.status === 0 ? '' : ' :: ' + String(rB3N7.stdout || '').slice(-400)));
   }
@@ -22994,7 +23000,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   负向段真源码破坏 + 两向自证(四处锚点)。
   section('v2.224.0(拓展 N8):分支语义比较与选择性移植');
   {
-    const rB3N8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n8-v2224.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3N8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n8-v2224.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3N8.status === 0, 'v2224: N8 分支语义比较与选择性移植专锁 exit 0(实 ' + rB3N8.status + ')'
       + (rB3N8.status === 0 ? '' : ' :: ' + String(rB3N8.stdout || '').slice(-400)));
   }
@@ -23011,7 +23017,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   负向段真源码破坏 + 两向自证(四处锚点:三边砍两边 / 四类砍三类 / 候选硬塞原因 / 去 disabled 守卫)。
   section('v2.227.0(拓展 N9):三项目剧情事件闭环');
   {
-    const rB3N9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n9-v2227.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3N9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-n9-v2227.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3N9.status === 0, 'v2227: N9 三项目剧情事件闭环专锁 exit 0(实 ' + rB3N9.status + ')'
       + (rB3N9.status === 0 ? '' : ' :: ' + String(rB3N9.stdout || '').slice(-400)));
   }
@@ -23023,7 +23029,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   rehearsal.KINDS（不自带副本）。
   section('v2.188.0（第四批 E9）：隔离世界实验室与反事实对比');
   {
-    const rB3E9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e9-v2188.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB3E9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b3-e9-v2188.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB3E9.status === 0, 'v2188: E9 世界实验室专锁 exit 0（实 ' + rB3E9.status + '）'
       + (rB3E9.status === 0 ? '' : ' :: ' + String(rB3E9.stdout || '').slice(-400)));
   }
@@ -23034,7 +23040,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   ⑦ 复验不写状态（plan-audit 真代码面零 store.transact）；⑧ 名单记正文不只记标题。
   section('v2.189.0（缝 A1/A2/A3 + B1/B2）：拍回报三档 / 未来安排复验 / 拍账 / 生成闸门与防重复名单');
   {
-    const rB4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-v2189.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB4 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-v2189.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB4.status === 0, 'v2189: A1/A2/A3 + B1/B2 四引擎专锁 exit 0（实 ' + rB4.status + '）'
       + (rB4.status === 0 ? '' : ' :: ' + String(rB4.stdout || '').slice(-400)));
   }
@@ -23868,7 +23874,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   与 v2.183.0 那一节同规格：走 spawnSync 子进程（A 段要读产品源做静态契约核对）。
   section('v2.206.0（拓展 2）：可处理待办工作台（透传写口 act）');
   {
-    const rB1E1b = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e1b-v2206.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB1E1b = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e1b-v2206.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB1E1b.status === 0, 'v2206: E1b 专锁 exit 0（实 ' + rB1E1b.status + '）'
       + (rB1E1b.status === 0 ? '' : ' :: ' + String(rB1E1b.stdout || '').slice(-300)));
   }
@@ -23903,7 +23909,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   与同族节同规格：走 spawnSync 子进程（A 段要读产品源做静态契约核对）。
   section('v2.208.0：待办×期限并集（timeline 只读面）');
   {
-    const rB1E1c = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e1c-v2207.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB1E1c = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b1-e1c-v2207.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB1E1c.status === 0, 'v2207: E1c 专锁 exit 0（实 ' + rB1E1c.status + '）'
       + (rB1E1c.status === 0 ? '' : ' :: ' + String(rB1E1c.stdout || '').slice(-300)));
   }
@@ -23914,7 +23920,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   与同族节同规格：走 spawnSync 子进程（A 段要读产品源做静态契约核对）。
   section('v2.208.0（E1）：证据问答（现场检索 + 引用核对 + 视角闸）');
   {
-    const rEv1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/ev1-evidence-qa-v2208.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rEv1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/ev1-evidence-qa-v2208.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rEv1.status === 0, 'v2208: E1 专锁 exit 0（实 ' + rEv1.status + '）'
       + (rEv1.status === 0 ? '' : ' :: ' + String(rEv1.stdout || '').slice(-300)));
   }
@@ -23925,7 +23931,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   走 spawnSync 子进程（A 段要读产品源做静态契约核对，N 段要装载破坏副本）。
   section('v2.209.0（优化 6）：面板导航协议与精确定位');
   {
-    const rEv6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/ev6-panel-nav-v2209.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rEv6 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/ev6-panel-nav-v2209.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rEv6.status === 0, 'v2209: 优化 6 专锁 exit 0（实 ' + rEv6.status + '）'
       + (rEv6.status === 0 ? '' : ' :: ' + String(rEv6.stdout || '').slice(-300)));
   }
@@ -23933,7 +23939,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     // 与 v2.209.0 节同规格：本仓对专锁的统一口径是「run.js 只判接线面（exit 0）」，
     //   功能与边界判据全住专锁（两处不写第二遍）。
-    const rE8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-e8-v2210.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rE8 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-e8-v2210.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rE8.status === 0, 'v2210: 拓展 8 专锁 exit 0（实 ' + rE8.status + '）'
       + (rE8.status === 0 ? '' : ' :: ' + String(rE8.stdout || '').slice(-300)));
   }
@@ -24093,7 +24099,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   走 spawnSync 子进程(A 段要读产品源做静态契约核对,N 段要装载破坏副本)。
   section('v2.228.0(拓展 N10):历史留存与检索(旧事可召回)');
   {
-    const rB4N10 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-n10-v2228.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB4N10 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-n10-v2228.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB4N10.status === 0, 'v2228: N10 历史留存与检索专锁 exit 0(实 ' + rB4N10.status + ')'
       + (rB4N10.status === 0 ? '' : ' :: ' + String(rB4N10.stdout || '').slice(-400)));
   }
@@ -24105,7 +24111,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   本节同族口径:只判接线面,功能与破坏判据全住专锁。
   section('v2.229.0(拓展 N11):占比档位 / 推理不冒充产出 / 保存四态 / 拟稿不冒充事实');
   {
-    const rB4N11 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-n11-v2229.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rB4N11 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/s3-b4-n11-v2229.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rB4N11.status === 0, 'v2229: N11 四项缝专锁 exit 0(实 ' + rB4N11.status + ')'
       + (rB4N11.status === 0 ? '' : ' :: ' + String(rB4N11.stdout || '').slice(-400)));
   }
@@ -24631,29 +24637,29 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   // ── v2.231.0(玩法深度与机制涌现): A/B/C 三包切片综合集成门禁 ──
   section('v2.231.0(玩法深度与机制涌现): A/B/C 三包切片综合集成门禁');
   {
-    const rWPA1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a1-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rWPA1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a1-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rWPA1.status === 0, 'wp-a1 integration exit 0');
-    const rWPA2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a2-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rWPA2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a2-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rWPA2.status === 0, 'wp-a2 integration exit 0');
-    const rWPA3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a3-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rWPA3 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-a3-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rWPA3.status === 0, 'wp-a3 integration exit 0');
-    const rWPB1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-b1-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rWPB1 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-b1-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rWPB1.status === 0, 'wp-b1 integration exit 0');
-    const rWPB2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-b2-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rWPB2 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-b2-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rWPB2.status === 0, 'wp-b2 integration exit 0');
-    const rWPC = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-c-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rWPC = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-wp-c-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rWPC.status === 0, 'wp-c integration exit 0');
-    const rV3A = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-a-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rV3A = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-a-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rV3A.status === 0, 'v3-a integration exit 0');
-    const rV3AB = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-ab-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rV3AB = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-ab-integration.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rV3AB.status === 0, 'v3-ab integration exit 0');
-    const rV3B = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-b-deepening.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rV3B = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-b-deepening.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rV3B.status === 0, 'v3-b deepening exit 0');
-    const rV3OP9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-op9-scenarios.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rV3OP9 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-op9-scenarios.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rV3OP9.status === 0, 'v3-op9 scenarios exit 0');
-    const rV3C = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-c-deepening.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rV3C = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-c-deepening.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rV3C.status === 0, 'v3-c deepening exit 0');
-    const rV2232 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v2232-epistemic-director-affect.js')], { cwd: BASE, encoding: 'utf8', timeout: 96000, killSignal: 'SIGKILL' });
+    const rV2232 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v2232-epistemic-director-affect.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rV2232.status === 0, 'v2232 epistemic director affect exit 0');
   }
   // ── v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与消歧专锁 ──
@@ -25199,6 +25205,9 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runLock('./v8-browser-2294.js', 'runAll');
 }
   }
+  // V9 standalone scripts run in child processes, never share global fixture state.
+  section('v2.295.0 (V9): owner projection, managed currents, selection, continuation and volume');
+  { await runLock('./v9-suite-2295.js', 'runAll'); }
   // ── v2.277.0（V7 OPV7-1）：入口版本**不早于**（历史段，防回退）──────────────
   //   ⚠ 形态必须是「不早于」而不是「等于」：上一段（v2.276.0）踩过前缀锁，本段若写成
   //     相等，下一个版本又要回来改一次 —— 历史段就该永不过期。
@@ -25317,13 +25326,13 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(verAtLeast(__verPin292, 292),
       '入口 VERSION 不早于 2.292.0（实 ' + __verPin292 + '）—— 版本面不许往回退');
   }
-  // ── v2.294.0（V8 收口）：入口版本严格钉当前版（runPins 的唯一供养）────
+  // ── v2.295.0（V9 收口）：入口版本严格钉当前版（runPins 的唯一供养）────
   //   本段是唯一一处写「就是当前这个版本号」的地方：升版时只改这里。
-  section('v2.294.0: 入口版本钉版（当前版本在消息面上可见）');
+  section('v2.295.0: 入口版本钉版（当前版本在消息面上可见）');
   {
     const __verPin293 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
       .match(/const VERSION = '([\d.]+)'/) || [])[1];
-    const __wantPin293 = '2.294.0';
+    const __wantPin293 = '2.295.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

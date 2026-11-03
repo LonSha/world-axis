@@ -490,6 +490,7 @@
    *   显式包 = 转移多少读多少，边界在包上（NEXT_PLAN 对 S3 的原话裁决）。
    */
   function transferPack(seedId, max) {
+    const found=get(seedId);if(found.ok&&found.row.continuationRequired)return {ok:false,reason:'continuation-tail-required',hint:'请使用原始末态续接包，不能导出丢失末态的格局载体'};
     const cfg = settings();
     if (!cfg.enabled) { note('disabled'); return { ok: false, reason: 'disabled' }; }
     const got = get(seedId);
@@ -580,7 +581,7 @@
       note('empty-seed'); return { ok: false, reason: 'empty-seed' };
     }
     const res = doWrite(function (b) {
-      b.library.push({ id: id, name: nm, tags: tagsOf(opt && opt.tags !== undefined ? opt.tags : pack.tags), seed: seedIn, at: clockNow() });
+      b.library.push({ id: id, name: nm, tags: tagsOf(opt && opt.tags !== undefined ? opt.tags : pack.tags), seed: seedIn, continuationRequired: !!(opt&&opt.continuationRequired), at: clockNow() });
       b.seq = (b.seq || 0) + 1;
       if (WA.evict && typeof WA.evict.array === 'function') WA.evict.array(b.library, 'worldSeed.library', cfg.libCap);
     });
@@ -621,6 +622,28 @@
    * v2.158.0（S3）·初始化预览：把种子映射到现有状态字段，先建 id 映射、查引用完整性，
    *   返回拟写入结构 + 保留层级说明。变异在此生成**一次**（fixed），确认应用同一份。
    */
+  // V9 tail is a bounded whitelist, never a raw store restore. Used by archive import and preview.
+  function validateContinuation(raw) {
+    if(!raw||raw.version!==1||!Array.isArray(raw.people)||!Array.isArray(raw.currents)||raw.people.length>48||raw.currents.length>40)return {ok:false,reason:'bad-continuation'};
+    const ids=new Set(),names=new Set();
+    const validText=(v,max)=>typeof v==='string'&&v.length>0&&v.length<=max;
+    for(const p of raw.people){
+      if(!p||!validText(p.id,100)||['__proto__','constructor','prototype'].indexOf(p.id)>=0||!validText(p.name,30)||ids.has(p.id)||names.has(p.name)||!Array.isArray(p.relations)||p.relations.length>40)return {ok:false,reason:'bad-continuation-person'};
+      ids.add(p.id);names.add(p.name);
+    }
+    const people=[];
+    for(const p of raw.people){const relations=[];for(const r of p.relations){
+      if(!r||!ids.has(r.target)||r.target===p.id)return {ok:false,reason:'dangling-continuation-relation'};
+      const row={target:r.target};for(const key of ['intimacy','trust','hostility','vigilance','attachment']){
+        if(r[key]!==undefined){if(typeof r[key]!=='number'||!Number.isFinite(r[key])||Math.abs(r[key])>100)return {ok:false,reason:'bad-continuation-relation'};row[key]=r[key];}
+      }
+      row.boundary_status=typeof r.boundary_status==='string'?r.boundary_status.slice(0,80):'';relations.push(row);
+    }people.push({id:p.id,name:p.name,relations:relations});}
+    const cids=new Set(),currents=[];
+    for(const c of raw.currents){if(!c||!validText(c.id,100)||cids.has(c.id)||!validText(c.title,100)||!validText(c.stage,40)||typeof c.summary!=='string'||c.summary.length>2000||['hidden','trace','known','direct','public'].indexOf(c.visibility)<0)return {ok:false,reason:'bad-continuation-current'};
+      cids.add(c.id);currents.push({id:c.id,title:c.title,stage:c.stage,summary:c.summary,visibility:c.visibility,autoAdvance:false});}
+    return {ok:true,tail:{version:1,people:people,currents:currents}};
+  }
   function initPreview(seedId, variance, opt) {
     const cfg = settings();
     if (!cfg.enabled) { note('disabled'); return { ok: false, reason: 'disabled' }; }
@@ -641,6 +664,9 @@
       }
       v = Math.floor(n);
     }
+    if(got.row.continuationRequired&&!(opt&&opt.continuation))return {ok:false,reason:'continuation-tail-required',hint:'重新导入原续接包后再预览；不可静默降级为格局种子'};
+    const continuation=opt&&opt.continuation?validateContinuation(opt.continuation):null;
+    if(continuation&&!continuation.ok)return continuation;
     const sd = got.row.seed || {};
     // 引用完整性：边 [from, to, band] 两端都必须在节点表内（查不到即悬空，不装断网世界）。
     const nodes = (sd.network && sd.network.nodes || []).map(function (n) { return clean(n, 30); }).filter(Boolean);
@@ -666,6 +692,7 @@
       zeroProgress: true,
       _fixed: true
     };
+    if(continuation){plan.continuation=continuation.tail;plan.progress.currents=continuation.tail.currents.length;plan.zeroProgress=false;plan.mode='continuation';}
     if (!plan.powers.length && !plan.network.nodes.length && !plan.geo.places.length && !plan.era.title) {
       note('nothing-to-extract'); return { ok: false, reason: 'nothing-to-extract' };
     }
@@ -692,7 +719,7 @@
       variance: v, chatId: idn.chatId, epoch: idn.epoch, rev: idn.rev,
       seq: _previewSeq, plan: plan, at: clockNow(), ticket: ticket };
     _stat.previews = (_stat.previews || 0) + 1; _stat.lastReason = 'previewed';
-    return { ok: true, plan: plan, retain: true, retainNote: RETAIN_NOTE,
+    return { ok: true, plan: continuation?JSON.parse(JSON.stringify(plan)):plan, retain: true, retainNote: continuation?'末态续接：保留人物关系与暗流，重置轮号；不恢复来源历史与知情。':RETAIN_NOTE,
       previewSeq: _previewSeq, chatId: idn.chatId, ticket: ticket,
       idMap: nodes.map(function (n) { return { display: n }; }) };
   }
@@ -788,12 +815,18 @@
       root.clock.source = root.clock.source === 'unset' ? 'engine' : root.clock.source;
       root.evolution.round = 0;
       root.chronicle = []; root.currents = []; root.echoes = [];
+      if(plan.continuation){
+        const verified=validateContinuation(plan.continuation);if(!verified.ok){innerBlock=verified;return false;}
+        root.people={};
+        verified.tail.people.forEach(function(p){const got=WA.registry.ensurePerson(root,p.id,p.name,'worldSeed:continuation');if(!got||!got.row)throw Error('continuation-person-refused');got.row.profile={relations:JSON.parse(JSON.stringify(p.relations))};got.row.updatedAt=now;});
+        root.currents=verified.tail.currents.map(function(c){return Object.assign({},c,{autoAdvance:false,updatedAt:now});});
+      }
       root.meta = root.meta && typeof root.meta === 'object' ? root.meta : {};
-      root.meta.initFrom = { seedId: t.seedId, sig: t.sig, name: plan.name,
+      root.meta.initFrom = { mode:plan.mode||'structural', seedId: t.seedId, sig: t.sig, name: plan.name,
         variance: plan.variance, at: now, chatId: t.chatId, previewSeq: t.seq,
         installed: { factions: plan.powers.length, places: plan.geo.places.length,
-          nodes: plan.network.nodes.length, edges: plan.network.edges.length, roads: 0 } };
-      out = { ok: true, installed: root.meta.initFrom.installed, installedAt: now,
+          nodes: plan.continuation?plan.continuation.people.length:plan.network.nodes.length, edges: plan.continuation?plan.continuation.people.reduce(function(n,p){return n+p.relations.length;},0):plan.network.edges.length, currents:root.currents.length, roads: 0 } };
+      out = { ok: true, mode:plan.mode||'structural', installed: root.meta.initFrom.installed, installedAt: now,
         sig: t.sig, name: plan.name, variance: plan.variance,
         chatId: t.chatId, previewSeq: t.seq };
     }, 'worldSeed:initConfirm');
@@ -835,6 +868,8 @@
     sow: sow,
     transferPack: transferPack,
     importPack: importPack,
+    requireContinuation: function(id){return doWrite(function(b){const row=b.library.find(x=>x.id===id);if(!row)throw Error('unknown-seed');row.continuationRequired=true;});},
+    validateContinuation: validateContinuation,
     initPreview: initPreview,
     initConfirm: initConfirm,
     stat: statOf

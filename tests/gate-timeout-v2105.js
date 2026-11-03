@@ -63,7 +63,7 @@ function loadBroken(src, dirname) {
 //    `hits(锁源码, 锚点.replace(/\n/g,'\\n')) === 1` —— 用 \n 拼接的多行锚点在锁源码里是
 //    转义形态而非真换行，必然 0 命中 ⇒ 判 impure。本锁首跑就在此处栽过一次（A11 的 armed，
 //    那行还是**改动前**的模块文本，patch D 之后早已不存在）。
-const MEASURED_TXT = "  spawnMs: 96000,";
+const MEASURED_TXT = "  spawnMs: 1344000,";
 const RATIOS_TXT = "const RATIOS = { spawn: 8, inline: 4, heavy: 4 };";
 const ARMED_TXT = "  let armed = 0;";
 const ANCHORS = {
@@ -146,9 +146,9 @@ function runAll(a) {
   const d = gt.discover();
   a(d.armedCount === gt.ARMED_SITES.length && d.armedCount >= 8,
     'A2 武装表 = 现场站点清单（' + d.armedCount + ' vs ' + gt.ARMED_SITES.length + '）');
-  a(d.limits.spawnMs === 96000 && d.limits.shellMs === 240,
-    'A3 统一预算 = 最重门禁实测 12000ms × 8 = 96000ms（实 ' + d.limits.spawnMs + '），shell 保险丝 ' + d.limits.shellMs + 's');
-  a(gt.GATE_TIMEOUTS.spawnMs === 96000,
+  a(d.limits.spawnMs === 1344000 && d.limits.shellMs === 240,
+    'A3 统一预算 = 最重门禁实测 × 8（v2.295.0 起最重门禁为 ui-live-2137 端到端实测 168000ms ⇒ 1344000ms；实 ' + d.limits.spawnMs + '），shell 保险丝 ' + d.limits.shellMs + 's');
+  a(gt.GATE_TIMEOUTS.spawnMs === 1344000,
     'A4 单一真源：现场所有调用点只读一个预算（' + gt.GATE_TIMEOUTS.spawnMs + 'ms）——留第二档就是留一处会漂移的地方');
   a(d.coherence.length === 0, 'A5 自洽：' + d.coherenceSummary);
   // v2.136.0 修：原写死 `10` —— 现场数变 11 就假红。判据要答的是「三数相等且与现场同宽」，
@@ -166,7 +166,7 @@ function runAll(a) {
     + (p.length ? ' :: ' + JSON.stringify(p) : '') + '）');
   const rd = siteReadings(runSrc);
   a(rd.every(function (r) { return r.found && r.ms === gt.GATE_TIMEOUTS.spawnMs; }),
-    'A9 逐站点都能取到整段 options 与统一预算（取不到的：' + JSON.stringify(rd.filter(function (r) { return !r.found || r.ms !== 96000; })) + '）');
+    'A9 逐站点都能取到整段 options 与统一预算（取不到的：' + JSON.stringify(rd.filter(function (r) { return !r.found || r.ms !== 1344000; })) + '）');
   // v2.106.0 修：此处原写死行号区间 `>= 14790 && <= 18792` —— 只要在它**上方**插入任何代码
   //   （本版接线就在 32 行处加了 require、在文末加了 v2.106.0 section），全部站点行号一起下移，
   //   这条判据就红，而它读的东西其实毫无变化。**这正是一份「硬编码读数」的第二副本**：
@@ -188,7 +188,7 @@ function runAll(a) {
     must1(srcOf(MOD_REL), RATIOS_TXT, 'ratios') === 1 &&
     must1(srcOf(MOD_REL), ARMED_TXT, 'armed') === 1,
     'A11 三条统一锚点在目标文件各恰中 1 次（唯一性在开工前就成立）');
-  a(self.split('ANCHORS').length - 1 >= 1 && gt.GATE_TIMEOUTS.spawnMs === 96000,
+  a(self.split('ANCHORS').length - 1 >= 1 && gt.GATE_TIMEOUTS.spawnMs === 1344000,
     'A12 锚点表由本文件声明（ANCHORS 登记 3 条：' + Object.keys(ANCHORS).join('/') + '）');
 
   a(rd.length === gt.ARMED_SITES.length && gt.ARMED_SITES.length === Object.keys(gt.TIMEOUT_ARMED).length,
@@ -223,7 +223,7 @@ function runAll(a) {
   //   那条断言在 79 行输入上恒假（是判据口径错，不是实现错）。
   const manyLines = Array.apply(null, { length: 100 }).map(function (x, i) { return 'line' + i; }).join('\n');
   const block = gt.formatHangBlock({
-    key: 'dead-export-gate', limit: 96000, ms: 96000 + 1234, signal: 'SIGKILL', errorCode: 'ETIMEDOUT',
+    key: 'dead-export-gate', limit: 1344000, ms: 1344000 + 1234, signal: 'SIGKILL', errorCode: 'ETIMEDOUT',
     argv: ['tests/dead-export-gate.js', '--json'], stdout: manyLines, tail: 20
   });
   a(block.indexOf('dead-export-gate') >= 0, 'B5 取证块点名「哪一道门禁」');
@@ -272,7 +272,7 @@ function runNegative(a, runSrc, d) {
   a(/hits != 1 \((?!1\))\d+\)/.test(String(e0b)), 'N0b must1 对不唯一的锚点抛错（实 ' + e0b + '）');
 
   // N1 拆掉一处现场的 timeout ⇒ 逐站点核对器必须现形（**只有那一处**）
-  const n1Src = runSrc.split("timeout: 96000, killSignal: 'SIGKILL' });\n      rc2700")
+  const n1Src = runSrc.split("timeout: 1344000, killSignal: 'SIGKILL' });\n      rc2700")
     .join("});\n      rc2700");
   a(n1Src !== runSrc, 'N1 破坏锚点恰中 1 次（拆掉第一处 timeout —— split/join 全量替换，不吃 str.replace 只替换一次的亏）');
   const n1 = checkArmedSites(n1Src);
@@ -282,15 +282,15 @@ function runNegative(a, runSrc, d) {
 
   // N1b **全局存在性**口径会漏报（这就是初版判据的病）：别处仍有 timeout，但该站点已被拆
   const n1b = n1Src;
-  a(String(n1b).indexOf('timeout: 96000') >= 0 && checkArmedSites(n1b).length === 1,
+  a(String(n1b).indexOf('timeout: 1344000') >= 0 && checkArmedSites(n1b).length === 1,
     'N1b 别处仍有 timeout 时逐站点判据照样现形（全局存在性口径会漏报，故本锁不用它）');
 
   // N2 预算紧贴实测 / 大到等于没有超时 ⇒ 现场逐站点核对器两向现形（每一处都要现形）
-  const n2Src = runSrc.split('timeout: 96000').join('timeout: 10');
+  const n2Src = runSrc.split('timeout: 1344000').join('timeout: 10');
   const n2 = checkArmedSites(n2Src);
   a(n2.length === gt.ARMED_SITES.length && n2.every(function (x) { return x.kind === 'value-mismatch'; }),
     'N2 预算改成 10ms ⇒ ' + gt.ARMED_SITES.length + ' 处逐站点全部现形（实 ' + n2.length + ' 条 value-mismatch）');
-  const n2bSrc = runSrc.split('timeout: 96000').join('timeout: 9999999');
+  const n2bSrc = runSrc.split('timeout: 1344000').join('timeout: 9999999');
   const n2b = checkArmedSites(n2bSrc);
   a(n2b.length === gt.ARMED_SITES.length && n2b.every(function (x) { return x.kind === 'value-mismatch'; }),
     'N2b 预算改成 9999999ms ⇒ 同样 ' + gt.ARMED_SITES.length + ' 处现形（实 ' + n2b.length + ' 条）——两向都不是恒真');
@@ -298,10 +298,10 @@ function runNegative(a, runSrc, d) {
   // N3 破坏副本模块：预算改成 1ms ⇒ 同款自洽判据给出不同答案
   must1(modSrc, MEASURED_TXT, 'n3');
   const b3src = modSrc.replace(MEASURED_TXT, BREAK_HEAD);
-  a(b3src !== modSrc, 'N3 破坏锚点恰中 1 次（预算 96000 → 1）');
+  a(b3src !== modSrc, 'N3 破坏锚点恰中 1 次（预算 1344000 → 1）');
   const b3 = loadBroken(b3src);
   a(b3.GATE_TIMEOUTS.spawnMs === 1 && b3.coherence().some(function (x) { return x.kind === 'two-spawn-budgets'; }),
-    'N3 预算紧贴实测 ⇒ 自洽判据现形（' + JSON.stringify(b3.coherence().slice(0, 1)) + '）——正是本版第一次落盘的真实缺陷（90000/96000）');
+    'N3 预算紧贴实测 ⇒ 自洽判据现形（' + JSON.stringify(b3.coherence().slice(0, 1)) + '）——正是本版第一次落盘的真实缺陷（90000/1344000）');
   a(gt.coherence().length === 0, 'N3 对照——原版自洽');
 
   // N4 抹平管道形态（只改 mode + 去掉 fuse）⇒ 客观的管道规则必须现形
@@ -328,7 +328,7 @@ function runNegative(a, runSrc, d) {
 
   // N6 换 __dirname 的副本仍给出同一预算（判据不靠硬编码路径活着）
   const b6 = loadBroken(modSrc, path.join(BASE, 'tests'));
-  a(typeof b6.discover === 'function' && b6.GATE_TIMEOUTS.spawnMs === 96000,
+  a(typeof b6.discover === 'function' && b6.GATE_TIMEOUTS.spawnMs === 1344000,
     'N6 换 __dirname 的副本仍给出同一预算（判据不靠硬编码路径）');
 
   // N7 现场「武装计数」改错 ⇒ 同款现场读数立刻给出不同答案（破坏真的改到了行为，不是对原文件断言）

@@ -522,7 +522,7 @@
       lastReason: stat.lastReason, faults: Object.assign({}, stat.faults) };
   }
   /**
-   * 注入块：只出**在途**机会。已答与已作废的不进正文——
+   * 注入块：优先展示在途机会，最多附两条明确标记的已错过历史。已答不进正文——
    *   否则模型会把「上周拒掉的那件事」当成此刻还摆着。
    *   四个必答项（由哪项变化产生 / 涉及谁 / 窗口多久 / 忽略会怎样）逐项落地。
    */
@@ -530,12 +530,15 @@
     const cfg = settings();
     if (!cfg.enabled || !WA.store) return '';
     const t = clockNow('opportunity');
-    const rs = rows().filter(isActive);
+    // Live windows take priority; bounded historical reminders must not crowd them out.
+    const all = rows();
+    const rs = all.filter(isActive).concat(all.filter(function (r) { return r.stage === 'lapsed'; }).slice(-2));
     if (!rs.length) return '';
     const lines = rs.slice(0, cfg.maxOpen).map(function (r) {
       const v = rowView(r, t);
       const bits = ['- ' + v.id + '（' + v.sourceLabel + '）由：' + v.from];
       bits.push('涉及：' + ((v.actors || []).length ? v.actors.join('、') : '未记录'));
+      bits.push((t > v.endAt || v.stage === 'lapsed') ? '已错过（不可再参与；历史窗口）' : '可作答窗口（尚未接受）');
       bits.push(v.windowBasis === 'recorded' && v.deadline
         ? ('窗口：至 ' + v.deadline + '（源记录了期限）')
         : ('窗口：本模块默认宽限 ' + Math.round(v.windowMs / 60000) + ' 分钟（源未记期限）'));

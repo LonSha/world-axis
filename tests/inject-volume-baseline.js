@@ -3,8 +3,10 @@ const fs=require('fs'),path=require('path');
 const {scenario}=require('./v8-long-session-2294');
 const {BASE,must1}=require('./v8-harness');
 // Reviewed floor, not overwritten by the running measurement. Growth is allowed.
-const BASELINE={version:'2.294.0',scenario:'seed+declared-facts+real-owner-dispatch',empty:8,seeded:15,
- rounds:[{round:1,yield:20,chars:2403},{round:5,yield:20,chars:2751},{round:25,yield:20,chars:3537},{round:50,yield:20,chars:3545}]};
+// v2.295.0 (V9): collector collapse line simplified to a plain count ("其余折叠：N 条"),
+// shrinking each round by ~13-15 chars vs the V8 floor — re-reviewed, not loosened blindly.
+const BASELINE={version:'2.295.0',scenario:'seed+declared-facts+real-owner-dispatch',empty:8,seeded:15,
+ rounds:[{round:1,yield:20,chars:2390},{round:5,yield:20,chars:2738},{round:25,yield:20,chars:3524},{round:50,yield:20,chars:3532}]};
 function compare(r){return r.seedOK&&r.empty.nonempty>=BASELINE.empty&&r.seeded.nonempty>=BASELINE.seeded&&BASELINE.rounds.every(b=>{
  const x=r.curve[b.round];return x&&x.nonempty>=b.yield&&x.volume&&x.volume.chars>=b.chars&&x.volume.rows.some(v=>v.source==='结构汇流'&&v.chars>0&&v.items>0);
 });}

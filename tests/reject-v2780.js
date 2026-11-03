@@ -8094,63 +8094,12 @@ function runWitness(WA) {
       want('archive-write-failed',
         'EXV8-6 作者私密归档：本机存储写失败（配额/私隐模式）⇒ archive-write-failed 并带回错误'
         + '（不许报 captured 而其实一份都没落下）');
-      trip('archive-write-failed', function () {
-        const keepSet = PA8.getSettings();
-        const w = window, keepLS = w.localStorage;
-        const worksKey = 'worldaxis_player_works_v1_' + encodeURIComponent(String(WA.store.chatId() || 'wa_default'));
-        try {
-          PA8.setSettings({ enabled: true, every: 1, maxWorks: 24 });
-          WA.store.transact(function (d) { d.evolution = d.evolution || {}; d.evolution.round = 2; }, 'witness:round');
-          // 只拦「作品列表」这一个键，其余（含设置面）照真实读写 —— 否则会把
-          //   「设置读不出来 ⇒ disabled」误当成写失败，测的就不是这个码了。
-          w.localStorage = {
-            getItem: function (k) { return k === worksKey ? '[]' : keepLS.getItem(k); },
-            setItem: function (k) { if (k === worksKey) throw new Error('witness:quota'); return keepLS.setItem(k, arguments[1]); },
-            removeItem: function (k) { return keepLS.removeItem(k); }
-          };
-          return PA8.checkpoint().reason;
-        } finally { w.localStorage = keepLS; PA8.setSettings(keepSet); }
-      });
+      trip('archive-write-failed', function () { return require('./v9-reject-witness-2295.js').collect()['archive-write-failed']; });
 
       want('archive-too-big',
-        'EXV8-6 作者私密归档：攒到上限份数后总量越过 524288 字符 ⇒ archive-too-big 并给出真实体量'
+        'EXV8-6 作者私密归档：攒到上限份数后UTF-8 总量越过 524288 字节 ⇒ archive-too-big 并给出真实体量'
         + '（长局不静默丢作品，也不写一份被截断的包）');
-      trip('archive-too-big', function () {
-        const keepSet = PA8.getSettings();
-        const w = window;
-        const worksKey = 'worldaxis_player_works_v1_' + encodeURIComponent(String(WA.store.chatId() || 'wa_default'));
-        const keepChron = WA.store.get() && WA.store.get().chronicle;
-        const keepRound = WA.evolution.roundOf(WA.store.get());
-        try {
-          PA8.setSettings({ enabled: true, every: 1, maxWorks: 24 });
-          // 真实长局形状：chronicle 填到 store 登记的真实上限 200 条，每行取满 chrono 的
-          //   txt 上限 ⇒ 单份投影 ≈ 100KB，第 8 个 cycle 自然越过 524288。
-          //   不是伪造投影：填的是产品自己的容器、走的是产品自己的截断口径。
-          WA.store.transact(function (d) {
-            d.evolution = d.evolution || {};
-            d.chronicle = [];
-            const head = new Array(78).join('事'), body = new Array(118).join('录');
-            for (let i = 0; i < 200; i++) {
-              d.chronicle.push({ at: 1000 + i, kind: 'event', title: '交接' + i + head,
-                summary: body, refs: ['a', 'b', 'c', 'd'], visibility: 'public' });
-            }
-          }, 'witness:long-chronicle');
-          let hit = '';
-          for (let r = 1; r <= 12 && !hit; r++) {
-            WA.store.transact(function (d) { d.evolution.round = r; }, 'witness:round');
-            const res = PA8.checkpoint();
-            if (res && res.reason === 'archive-too-big') hit = res.reason;
-          }
-          return hit;
-        } finally {
-          try { w.localStorage.removeItem(worksKey); } catch (e) {}
-          WA.store.transact(function (d) {
-            if (d.evolution) d.evolution.round = keepRound;
-            d.chronicle = Array.isArray(keepChron) ? keepChron : [];
-          }, 'witness:restore');
-          PA8.setSettings(keepSet);
-        }
-      });
+      trip('archive-too-big', function () { return require('./v9-reject-witness-2295.js').collect()['archive-too-big']; });
     }
 
     if (WA.toolDiag && typeof WA.toolDiag.secControlUsage === 'function') {
@@ -8163,6 +8112,27 @@ function runWitness(WA) {
         finally { WA.ui = keep; }
       });
     }
+  }
+  // V9 rejection paths are exercised in clean independent owner fixtures, not added to base.
+  { const v9 = require('./v9-reject-witness-2295.js').collect();
+    want('archive-tail-unavailable', 'V9 real owner rejection: archive-tail-unavailable'); trip('archive-tail-unavailable', function(){ return v9['archive-tail-unavailable']; });
+    want('bad-continuation', 'V9 real owner rejection: bad-continuation'); trip('bad-continuation', function(){ return v9['bad-continuation']; });
+    want('bad-continuation-current', 'V9 real owner rejection: bad-continuation-current'); trip('bad-continuation-current', function(){ return v9['bad-continuation-current']; });
+    want('bad-continuation-pack', 'V9 real owner rejection: bad-continuation-pack'); trip('bad-continuation-pack', function(){ return v9['bad-continuation-pack']; });
+    want('bad-continuation-person', 'V9 real owner rejection: bad-continuation-person'); trip('bad-continuation-person', function(){ return v9['bad-continuation-person']; });
+    want('bad-continuation-relation', 'V9 real owner rejection: bad-continuation-relation'); trip('bad-continuation-relation', function(){ return v9['bad-continuation-relation']; });
+    want('bad-enabled', 'V9 real owner rejection: bad-enabled'); trip('bad-enabled', function(){ return v9['bad-enabled']; });
+    want('chat-changed', 'V9 real owner rejection: chat-changed'); trip('chat-changed', function(){ return v9['chat-changed']; });
+    want('continuation-seed-mismatch', 'V9 real owner rejection: continuation-seed-mismatch'); trip('continuation-seed-mismatch', function(){ return v9['continuation-seed-mismatch']; });
+    want('continuation-tail-required', 'V9 real owner rejection: continuation-tail-required'); trip('continuation-tail-required', function(){ return v9['continuation-tail-required']; });
+    want('current-missing', 'V9 real owner rejection: current-missing'); trip('current-missing', function(){ return v9['current-missing']; });
+    want('dangling-continuation-relation', 'V9 real owner rejection: dangling-continuation-relation'); trip('dangling-continuation-relation', function(){ return v9['dangling-continuation-relation']; });
+    want('nothing-to-continue', 'V9 real owner rejection: nothing-to-continue'); trip('nothing-to-continue', function(){ return v9['nothing-to-continue']; });
+    want('owner-missing', 'V9 real owner rejection: owner-missing'); trip('owner-missing', function(){ return v9['owner-missing']; });
+    want('round-rewound', 'V9 real owner rejection: round-rewound'); trip('round-rewound', function(){ return v9['round-rewound']; });
+    want('stale-continuation', 'V9 real owner rejection: stale-continuation'); trip('stale-continuation', function(){ return v9['stale-continuation']; });
+    want('transaction-failed', 'V9 real owner rejection: transaction-failed'); trip('transaction-failed', function(){ return v9['transaction-failed']; });
+    want('unsupported-stage', 'V9 real owner rejection: unsupported-stage'); trip('unsupported-stage', function(){ return v9['unsupported-stage']; });
   }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });

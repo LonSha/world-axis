@@ -44,3 +44,7 @@ V8 的断点不在「五台引擎完全没有注入」：既有 render 分支已
 写口台仅把 ok 且非 disabled 的回执算作 written。专属面板写口尚无统一成功回执，所以诊断明确 receiptScope=write-desk-only；不能把静态可达性当作点击已验。控件活动由面板根节点 capture click/change，重绘不重绑业务回调；只统计当前运行期，不写世界、不跨设备持久化。零使用不是不可达，条件和动态输出仍保留层级。
 注入源共用全局 token 池，没有虚构每源独立额度。volumeView 每源记录 poolRemain，显式提供的 source limit 才给 cap；render 传入真正计划预算。共享超额（含 pinned 保底超额）返回 budget-exceeded 和 used/cap/excess 见证，但体积账不另行裁剪、不推翻既有 pinned 策略。
 事件桥恢复队列和新认领共享 maxClaims，失败恢复优先；外部持有排期仍保守阻塞整桥，不抢外部执行器的租约。本版面板补齐 autoFulfill、作品周期与保留份数控制。
+
+V9 直接 owner 注入、私密研究脱敏与显式暗流托管见 [V9 owner projection](2026-11-03-v9-owner-projection-managed-currents.md)，不改变本篇归档与 collector 边界。
+
+- [V9 选材、变化与续接](2026-11-03-v9-selection-changes-continuation.md)：显式新增归档末态模式；原格局模式的历史附件边界不变。

@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('fs'),path=require('path'),{scenario}=require('./v8-long-session-2294');
+const file=path.join(__dirname,'v9-volume-baseline.json');
+function compare(actual,baseline){const warnings=[];for(const round of [25,50]){const a=actual.points.find(x=>x.round===round),b=baseline.points.find(x=>x.round===round);if(!a||!b)throw Error('missing baseline round '+round);const ratio=a.chars/b.chars;if(ratio>1.2||ratio<0.5)warnings.push({round,ratio,chars:a.chars,baseline:b.chars});}return warnings;}
+function run(){let pass=0,fail=0;const a=(v,m)=>{v?pass++:fail++;if(!v)console.error('FAIL '+m);};const raw=scenario(),actual={schema:1,scenario:raw.scenario,fixture:'v8 declared 50-round owner dispatch stream, not autonomous story generation',estimator:'injectBudget.tokensOf',empty:raw.empty.nonempty,seeded:raw.seeded.nonempty,points:[1,5,25,50].map(round=>{const r=raw.curve[round];return {round,nonempty:r.nonempty,chars:r.volume.chars,tokens:r.volume.tokens};})};
+ if(process.argv.includes('--write'))fs.writeFileSync(file,JSON.stringify(actual,null,2)+'\n');
+ const baseline=JSON.parse(fs.readFileSync(file,'utf8')),warnings=compare(actual,baseline);
+ a(raw.seedOK&&raw.curve.length===51,'real 50-round stream completes');a(raw.curve.every(x=>!x.faults.length),'all observed builders remain healthy');a(raw.capacity.complete&&!raw.capacity.unbounded.length&&!raw.capacity.drifted.length,'long-session capacity bounded');a(compare(baseline,baseline).length===0,'baseline self-check');const high=JSON.parse(JSON.stringify(baseline));high.points.forEach(x=>x.chars*=1.3);a(compare(high,baseline).length===2,'120% high-volume negative control warns');const low=JSON.parse(JSON.stringify(baseline));low.points.forEach(x=>x.chars*=0.4);a(compare(low,baseline).length===2,'50% collapse negative control warns');
+ fs.writeFileSync(require('path').join(require('os').tmpdir(),'v9-volume-report.json'),JSON.stringify({actual,baseline,warnings},null,2));console.log('v9 volume baseline: '+pass+' / 失败 '+fail+' / warnings '+warnings.length);console.log(JSON.stringify({points:actual.points,warnings}));process.exitCode=fail?1:0;
+}
+module.exports={compare};if(require.main===module)run();

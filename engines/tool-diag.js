@@ -1187,6 +1187,9 @@
         controlUsage: secControlUsage(),
         injectionVolume: ((WA.store.get() || {}).lastInjection || {}).volume || null,
         collector: WA.injectCollector ? WA.injectCollector.stat() : null,
+        collectorDiagnosis: WA.injectCollector ? WA.injectCollector.diagnose() : null,
+        managedCurrents: WA.storylineAdvance ? WA.storylineAdvance.stat() : null,
+        worldChanges: WA.worldChanges ? WA.worldChanges.view() : null,
         note: (r.fault !== 0 || (r.suspicious || []).length !== 0)
           ? '有引擎交不出内容：抛异常的按 faults 逐个查；suspicious 那一组只能人去判断（本仓判不了）'
           : null
@@ -3376,6 +3379,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   不订阅总线（backstage 直调 snap()），漏登记时「自检看不见的黑盒」
     //   判据正是为这一格设的；与上面八台同一次补齐，避免又落下一格。
     'engines/world-briefing.js': 'worldBriefing',
+    'engines/storyline-advance.js': 'storylineAdvance',
+    'engines/world-changes.js': 'worldChanges',
     // v2.286.0（V7 EXV7-2）：人物意图看板 —— 人物面只读聚合。
     //   不订阅总线、不调写口（plan.expand/advance 一个都不碰），全部现读 plan.chain；
     //   漏登记时「自检看不见的黑盒」判据正是为这一格设的，与上面同一次补齐。
@@ -4661,6 +4666,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-cfg-copy', 'wa-cfg-import', 'wa-cfg-text', 'wa-cfg-check', 'wa-cfg-cancel', 'wa-cfg-go', 'wa-cfg-abort',
       // v2.184.0（E3）：存档槽的读数出口（动态写入，同上面 tools 页两条的口径）。
       'wa-ck-out'] },
+    { page: 'overview', ids: ['wa-setting-search'], dynamic: ['wa-setting-search-count'] },
+    { page: 'world', ids: [], cond: ['wa-current-auto-on','wa-current-auto-turns'] },
+    { page: 'inject', ids: [], cond: ['wa-collector-enabled','wa-collector-tokens','wa-changes-enabled','wa-budget-source-board'] },
+    { page: 'tools', ids: [], cond: ['wa-par-round','wa-par-continue'] },
+    { page: 'events', ids: [], cond: ['wa-sc-capacity','wa-cm-capacity','wa-inv-capacity','wa-af-capacity','wa-ops-capacity'] },
     { page: 'desk', ids: ['wa-wdesk-ns', 'wa-wdesk-load', 'wa-wdesk-stat',
       // v2.294.0（V8 EXV8-2）：写口台页。同 v2.197.0 的理由——新控件必须「渲染 + 绑定 + 守卫登记」
       //   三件齐做，否则「按钮渲染了但绑定的 id 写错」永远不会被守卫表发现。

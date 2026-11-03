@@ -1505,6 +1505,22 @@
       "nextConsumer": "面板模板（构件以局部引用消费）",
       "reviewAfter": "2.298.0",
       "disposition": "keep"
+    },
+    "injectCollector.sceneStat": {
+      "shape": "query-api",
+      "why": "注入选取的分区计数读数：OPV8-4 驱动账本排障时供程序化核对注入选取与落盘一致；无面板入口，由注入链自检与专锁消费",
+      "purpose": "query-api",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.298.0",
+      "disposition": "keep"
+    },
+    "roundDrivers.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置读口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），面板设置面尚未渲染该模块 —— 与同族 settings-registry-only 口同形",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "按需派生的调用方（无面板入口时复核窗口内确认保留）",
+      "reviewAfter": "2.298.0",
+      "disposition": "keep"
     }
   }
 }

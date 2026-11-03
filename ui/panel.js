@@ -140,6 +140,7 @@
     //   SOURCES（键）、注入分支 source 名**四处逐字同名**（inject-sources-v2560 的 D 判据：
     //   SOURCES 每一项在本表里都要有显示名，且本表不得有超出 SOURCES 的键）。
     beatReport: '拍回报', genGate: '要避开的东西',
+    beatLedger: '当前拍账', family: '共同生活', research: '研究进程', opportunity: '机会窗口', storylineAdvance: '暗流阶段推进', worldChanges: '世界变化摘要',
     sediment: '此地沉积',
     // v2.230.0（拓展 N12）：五条新注入源的显示名。与 render/inject.js 的
     //   SOURCES（键）**逐字同批**登记（inject-sources-v2560 的 D 判据：
@@ -1377,7 +1378,8 @@
              }).join('') + '</div>';
        })()}
       <div class="wa-sec">暗流（${s.currents.length}）</div>
-      <div class="wa-list">${s.currents.slice(-10).reverse().map(c => `<div class="wa-item"><span class="wa-badge wa-vis-${c.visibility}">${c.visibility}</span> <b>${esc(c.title)}</b> <span class="wa-dim">${esc(c.stage)}</span><div class="wa-dim">${esc(c.summary || '').slice(0, 120)}</div></div>`).join('') || '<div class="wa-empty">暂无暗流</div>'}</div>
+      ${WA.storylineAdvance ? `<div class="wa-row"><label><input id="wa-current-auto-on" type="checkbox" ${WA.storylineAdvance.getSettings().enabled?'checked':''}/>启用显式托管暗流推进</label><label>每阶段轮数 <input id="wa-current-auto-turns" type="number" min="1" max="30" value="${WA.storylineAdvance.getSettings().turnsPerStage}"/></label></div><div class="wa-dim">仅五段暗流可单独托管；估算日历不作为事实期限，不重写剧情正文。</div>` : ''}
+      <div class="wa-list">${s.currents.slice(-10).reverse().map(c => `<div class="wa-item"><span class="wa-badge wa-vis-${c.visibility}">${c.visibility}</span> <b>${esc(c.title)}</b> <span class="wa-dim">${esc(c.stage)}</span>${['起线','延展','成形','收束','淡出'].includes(c.stage)?` <button class="wa-btn wa-mini" data-current-auto="${esc(c.id)}" aria-label="${esc(c.title)}：${c.autoAdvance?'停止':'启用'}自动阶段推进">${c.autoAdvance?'停止托管':'托管推进'}</button>`:''}<div class="wa-dim">${esc(c.summary || '').slice(0, 120)}</div></div>`).join('') || '<div class="wa-empty">暂无暗流</div>'}</div>
       <div class="wa-sec">纪事（${s.chronicle.length}）</div>
       <div class="wa-list">${s.chronicle.slice(-10).reverse().map(c => `<div class="wa-item wa-dim">${esc(c.title)} — ${esc((c.summary || '').slice(0, 80))}</div>`).join('') || '<div class="wa-empty">暂无纪事</div>'}</div>
       ${(() => {
@@ -2117,7 +2119,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           //   本页的清单是**点出来的**，所以把上一次的读数贴回去（有则贴、无则空）。
           const sr = panelEl.dataset.scOut || '';
           const scOn = (SC.getSettings && SC.getSettings().enabled) ? true : false;
-          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-sc-enabled" type="checkbox" ' + (scOn ? 'checked' : '') + '/> 启用剧情选择</label></div><div class="wa-row">'
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-sc-enabled" type="checkbox" ' + (scOn ? 'checked' : '') + '/> 启用剧情选择</label><label>选择点容量 <input type="number" id="wa-sc-capacity" aria-label="选择点容量" min="2" max="64" value="' + SC.getSettings().maxPending + '"/></label></div><div class="wa-row">'
             + '<input id="wa-sc-round" class="wa-input wa-mini" aria-label="轮次" placeholder="轮次" value="1"/>'
             + '<input id="wa-sc-prompt" class="wa-input" aria-label="分歧点" placeholder="分歧点（你这个回合要玩家选什么）"/>'
             + '<input id="wa-sc-opts" class="wa-input" aria-label="选项" placeholder="选项（逗号分隔，至少两个）"/>'
@@ -2141,7 +2143,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           if (!CM) return '<div class="wa-dim">委托履约未加载</div>';
           const cr = panelEl.dataset.cmOut || '';
           const cmOn = (CM.getSettings && CM.getSettings().enabled) ? true : false;
-          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-cm-enabled" type="checkbox" ' + (cmOn ? 'checked' : '') + '/> 启用委托履约</label></div><div class="wa-row">'
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-cm-enabled" type="checkbox" ' + (cmOn ? 'checked' : '') + '/> 启用委托履约</label><label>委托容量 <input type="number" id="wa-cm-capacity" aria-label="委托容量" min="2" max="64" value="' + CM.getSettings().maxContracts + '"/></label></div><div class="wa-row">'
             + '<input id="wa-cm-title" class="wa-input" aria-label="委托名" placeholder="委托名"/>'
             + '<input id="wa-cm-principal" class="wa-input wa-mini" aria-label="委托方" placeholder="委托方"/>'
             + '<input id="wa-cm-agent" class="wa-input wa-mini" aria-label="受托方" placeholder="受托方"/>'
@@ -2169,7 +2171,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           if (!IV) return '<div class="wa-dim">线索调查未加载</div>';
           const ivr = panelEl.dataset.invOut || '';
           const ivOn = (IV.getSettings && IV.getSettings().enabled) ? true : false;
-          return '<div class="wa-row"><label class="wa-row"><input id="wa-inv-enabled" type="checkbox" ' + (ivOn ? 'checked' : '') + '/> 启用线索调查</label></div><div class="wa-row">'
+          return '<div class="wa-row"><label class="wa-row"><input id="wa-inv-enabled" type="checkbox" ' + (ivOn ? 'checked' : '') + '/> 启用线索调查</label><label>线索容量 <input type="number" id="wa-inv-capacity" aria-label="线索容量" min="4" max="128" value="' + IV.getSettings().maxClues + '"/></label></div><div class="wa-row">'
             + '<input id="wa-inv-title" class="wa-input" aria-label="线索名" placeholder="线索名"/>'
             + '<input id="wa-inv-subject" class="wa-input wa-mini" aria-label="命题" placeholder="针对谁的什么命题"/>'
             + '<input id="wa-inv-witness" class="wa-input wa-mini" aria-label="证人" placeholder="证人（可空）"/>'
@@ -2196,7 +2198,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           if (!AF) return '<div class="wa-dim">灾后余波未加载</div>';
           const afr = panelEl.dataset.afOut || '';
           const afOn = (AF.getSettings && AF.getSettings().enabled) ? true : false;
-          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-af-enabled" type="checkbox" ' + (afOn ? 'checked' : '') + '/> 启用灾后余波</label></div><div class="wa-row">'
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-af-enabled" type="checkbox" ' + (afOn ? 'checked' : '') + '/> 启用灾后余波</label><label>后果容量 <input type="number" id="wa-af-capacity" aria-label="后果容量" min="4" max="128" value="' + AF.getSettings().maxEffects + '"/></label></div><div class="wa-row">'
             + '<input id="wa-af-place" class="wa-input wa-mini" aria-label="地点" placeholder="地点"/>'
             + '<input id="wa-af-event" class="wa-input wa-mini" aria-label="事件号" placeholder="事件号"/>'
             + '<input id="wa-af-type" class="wa-input wa-mini" aria-label="创伤类型" placeholder="创伤类型（damage 等）"/>'
@@ -2223,7 +2225,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           if (!OP) return '<div class="wa-dim">运营项目未加载</div>';
           const opr = panelEl.dataset.opsOut || '';
           const opsOn = (OP.getSettings && OP.getSettings().enabled) ? true : false;
-          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-ops-enabled" type="checkbox" ' + (opsOn ? 'checked' : '') + '/> 启用运营项目</label></div><div class="wa-row">'
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-ops-enabled" type="checkbox" ' + (opsOn ? 'checked' : '') + '/> 启用运营项目</label><label>项目容量 <input type="number" id="wa-ops-capacity" aria-label="项目容量" min="4" max="128" value="' + OP.getSettings().maxProjects + '"/></label></div><div class="wa-row">'
             + '<input id="wa-ops-decision" class="wa-input wa-mini" aria-label="决策号" placeholder="决策号"/>'
             + '<input id="wa-ops-org" class="wa-input wa-mini" aria-label="组织号" placeholder="组织号"/>'
             + '<input id="wa-ops-approver" class="wa-input wa-mini" aria-label="批准人" placeholder="批准人"/>'
@@ -2808,6 +2810,24 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         }
         return h;
       } catch (e) { return '<div class="wa-empty">读取预算快照失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    out += '<div class="wa-sec">结构汇流选材 · 结构选材诊断</div>';
+    if(WA.injectCollector){const cfg=WA.injectCollector.getSettings();out+='<label><input id="wa-collector-enabled" type="checkbox" '+(cfg.enabled?'checked':'')+'/>启用结构汇流选材</label><label>选材 token 上限（估算，0 不限） <input id="wa-collector-tokens" type="number" min="0" max="12000" value="'+cfg.maxTokens+'"/></label>';}
+    if(WA.injectCollector){const cd=WA.injectCollector.diagnose(),cs=WA.injectCollector.stat();out+='<div class="wa-dim">'+esc(cd.status)+' · 候选 '+esc(String(cs.candidateCount||0))+' · 已选 '+esc(String(cs.selected))+' · '+esc(String(cs.tokens||0))+' tokens（估算）'+(cd.faults.length?' · '+esc(JSON.stringify(cd.faults)):'')+'</div>';}
+    out += '<div class="wa-sec">公开世界变化摘要 · 本轮世界变化</div>';
+    if(WA.worldChanges)out+='<label><input id="wa-changes-enabled" type="checkbox" '+(WA.worldChanges.getSettings().enabled?'checked':'')+'/>启用公开世界变化摘要</label>';
+    if(WA.worldChanges)out+='<div class="wa-item">'+esc(WA.worldChanges.view().text)+'</div>';
+    out += '<div class="wa-sec">逐源共享预算看板</div>';
+    out += (function(){
+      const li=WA.store.get().lastInjection,v=li&&li.volume;
+      if(!v)return '<div class="wa-dim">尚无本轮体积账；先发生一次注入。</div>';
+      const budget=li.budget,cap=v.totalCap;
+      const head='<div class="wa-dim">已用 '+esc(String(v.tokens))+' tokens / '+(cap?esc(String(cap))+'（'+Math.round(v.tokens/cap*100)+'%）':'不限额')+'；各源共享同一池，无独立额度。</div>';
+      return '<div id="wa-budget-source-board">'+head+(v.rows||[]).map(row=>{
+        const folded=(budget&&budget.folded||[]).filter(x=>x.source===row.source).length;
+        const dropped=(budget&&budget.dropped||[]).filter(x=>x.source===row.source).length;
+        return '<div class="wa-kv"><span>'+esc(row.source)+'</span><b>'+esc(String(row.tokens))+' tokens · 折叠 '+folded+' · 丢弃 '+dropped+'</b></div>';
+      }).join('')+'</div>';
     })();
     out += '<div class="wa-sec">槽位落地<span class="wa-dim">（剧情约束类注入的独立分槽）</span></div>';
     out += (function () {
@@ -3714,8 +3734,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <label><input id="wa-events-auto" type="checkbox" ${WA.events && WA.events.getSettings().autoFulfill ? 'checked' : ''}/> 自动归档到期排期标题（默认关闭，需同时启用事件模块；不代判条件）</label>
       <label>作品周期<input class="wa-input" type="number" id="wa-par-every" min="1" max="50" value="${WA.playerArchive ? WA.playerArchive.getSettings().every : 5}"/></label>
       <label>保留份数<input class="wa-input" type="number" id="wa-par-max" min="1" max="24" value="${WA.playerArchive ? WA.playerArchive.getSettings().maxWorks : 12}"/></label>
-      <div class="wa-row"><button class="wa-btn" id="wa-par-export">导出当期投影JSON</button><button class="wa-btn" id="wa-par-view">周期作品</button><button class="wa-btn" id="wa-par-seed">保存自传新局包</button></div>
-      <textarea class="wa-input" id="wa-par-input" placeholder="目标空新聊天粘贴自传新局包"></textarea><button class="wa-btn" id="wa-par-import">导入格局附件</button>
+      <div class="wa-row"><button class="wa-btn" id="wa-par-export">导出当期投影JSON</button><button class="wa-btn" id="wa-par-view">周期作品</button><button class="wa-btn" id="wa-par-seed">保存自传新局包</button><label>续接归档轮号<input type="number" min="1" id="wa-par-round" value="5"/></label><button class="wa-btn" id="wa-par-continue">导出该归档末态续接包</button></div>
+      <textarea class="wa-input" id="wa-par-input" placeholder="目标空新聊天粘贴自传新局包或末态续接包"></textarea><button class="wa-btn" id="wa-par-import">导入新局／续接包</button>
       <div id="wa-par-out" class="wa-out"></div>
       `)}
       ${foldSec('tools', 'seedlib', '世界种子库（把这一局的格局存下来，换一局再开）', () => `
@@ -5321,6 +5341,21 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     });
     return html;
   }
+  // Search only existing setting labels; do not reconstruct HTML or touch setting values.
+  function applySettingSearch() {
+    const input=panelEl.querySelector('#wa-setting-search'),root=panelEl.querySelector('.wa-body');
+    if(!input||!root)return;
+    const q=input.value.trim().toLocaleLowerCase();let total=0,hits=0;
+    root.querySelectorAll('label').forEach(label=>{
+      const controls=Array.from(label.querySelectorAll('input,select'));
+      if(!controls.some(el=>el.type==='checkbox'||el.type==='number'))return;
+      total++;
+      const words=(label.textContent+' '+controls.map(el=>(el.id||'')+' '+(el.getAttribute('data-sw-ns')||'')).join(' ')).toLocaleLowerCase();
+      const match=!q||words.includes(q);if(match)hits++;
+      label.hidden=!match;label.style.backgroundColor=q&&match?'rgba(220,190,90,.18)':'';
+    });
+    const out=panelEl.querySelector('#wa-setting-search-count');if(out)out.textContent=q?'匹配 '+hits+' / '+total+'（仅筛选已展开设置；不修改数值）':'';
+  }
   function renderBody() {
     const body = panelEl.querySelector('.wa-body');
     // v2.152.0（RP6）：面板渲染链的耗时与 DOM 规模读数。计时包住「渲染 + 过滤 + 绑定」
@@ -5329,6 +5364,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     const __rpT0 = (WA.renderPerf && typeof clockWall === 'function') ? clockWall() : null;
     stageOut(body, RENDERERS[currentPage]());
     bindBody();
+    applySettingSearch();
     try {
       if (__rpT0 !== null && WA.renderPerf && typeof WA.renderPerf.observe === 'function') {
         WA.renderPerf.observe(currentPage, clockWall() - __rpT0,
@@ -5386,6 +5422,10 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     '#wa-co-out', '#wa-ff-out', '#wa-inj-out', '#wa-rt-out'];
   function bindBody() {
     const $ = sel => panelEl.querySelector(sel);
+    const collectorOn=$('#wa-collector-enabled'),collectorCap=$('#wa-collector-tokens'),changesOn=$('#wa-changes-enabled');
+    if(collectorOn)collectorOn.onchange=()=>{WA.injectCollector.setSettings({enabled:collectorOn.checked});renderBody();};
+    if(collectorCap)collectorCap.onchange=()=>{WA.injectCollector.setSettings({maxTokens:Number(collectorCap.value)});renderBody();};
+    if(changesOn)changesOn.onchange=()=>{WA.worldChanges.setSettings({enabled:changesOn.checked});renderBody();};
     // v2.271.0（V6 EXV6-7）：开局引导「去做」按钮的点击实现。
     //   出口来自引擎 next()（面板不自己编动作）；本处置的是「点了之后该去哪」：
     //     · openSettings / applyTier ⇒ 切到设置页（切档按钮在那一格）；
@@ -5644,6 +5684,21 @@ on('#wa-desk-show', showDesk);
     //   绑定只写一处;写两处就是「同一件事两种写法」,而其中一处迟早漂开。
     //   点一下走 panelFold.toggle + **整页重绘**:收起态不拼接 body,**必须重绘**才生效
     //   (只改类名是假折叠 —— 节点还在 DOM 里)。
+    [['sc','storyChoice','maxPending'],['cm','commission','maxContracts'],['inv','investigation','maxClues'],['af','aftermath','maxEffects'],['ops','operations','maxProjects']].forEach(row=>{
+      const el=panelEl.querySelector('[id="wa-'+row[0]+'-capacity"]');if(el)el.onchange=()=>{
+        const owner=WA[row[1]];if(!owner||!owner.setSettings)return;
+        owner.setSettings({[row[2]]:Number(el.value)});el.value=owner.getSettings()[row[2]];
+      };
+    });
+    const autoOn=$('#wa-current-auto-on'),autoTurns=$('#wa-current-auto-turns');
+    if(autoOn)autoOn.onchange=()=>{WA.storylineAdvance.setSettings({enabled:autoOn.checked});renderBody();};
+    if(autoTurns)autoTurns.onchange=()=>{WA.storylineAdvance.setSettings({turnsPerStage:Number(autoTurns.value)});renderBody();};
+    panelEl.querySelectorAll('[data-current-auto]').forEach(b=>{b.onclick=()=>{
+      const id=b.getAttribute('data-current-auto'),c=(WA.store.get().currents||[]).find(c=>c.id===id);
+      if(!c)return;
+      const r=WA.backstage.setCurrentAdvance(id,c.autoAdvance!==true);
+      if(!r.ok){b.textContent='未生效：'+r.reason;return;}renderBody();
+    };});
     panelEl.querySelectorAll('[data-foldt]').forEach(function (b) {
       b.onclick = function () {
         const k = String(b.getAttribute('data-foldt') || '');
@@ -7926,6 +7981,7 @@ on('#wa-desk-show', showDesk);
     if (parCfg) parCfg.onchange = function () { parOut(WA.playerArchive.setSettings({enabled: !!parCfg.checked})); };
     const parExport = $('#wa-par-export'); if (parExport) parExport.onclick = function () { parOut(WA.playerArchive.exportJSON()); };
     const parView = $('#wa-par-view'); if (parView) parView.onclick = function () { parOut(WA.playerArchive.view()); };
+    const parContinue=$('#wa-par-continue');if(parContinue)parContinue.onclick=()=>parOut(WA.playerArchive.seedPack('归档末态续接',{mode:'continuation',round:Number(($('#wa-par-round')||{}).value)}));
     const parSeed = $('#wa-par-seed'); if (parSeed) parSeed.onclick = function () { parOut(WA.playerArchive.seedPack('自传格局新局')); };
     const parImport = $('#wa-par-import'); if (parImport) parImport.onclick = function () { const r = WA.playerArchive.importSeedPack(($('#wa-par-input') || {}).value || ''); if (r && r.id && $('#wa-ws-id')) $('#wa-ws-id').value = r.id; parOut(r); };
     // v2.158.0（S3 + SP6）：转移包 / 导入包 / 初始化预览 / 初始化确认 四处理器。
@@ -7953,7 +8009,7 @@ on('#wa-desk-show', showDesk);
     on('#wa-ws-init', () => {
       if (!WA.worldSeed || !WA.worldSeed.initPreview) return wsOut('未记录：module-missing', true);
       const v = wsVal('#wa-ws-variance');
-      const r = WA.worldSeed.initPreview(wsVal('#wa-ws-id'), v === '' ? undefined : v);
+      const r = WA.playerArchive.previewSeed(wsVal('#wa-ws-id'), v === '' ? undefined : v);
       if (!r.ok) return wsOut(wsErr(r), true);
       const p = r.plan;
       wsOut('初始化预览（**世界一个字没动**，确认才落笔）：自「' + p.name + '」· 签名 ' + p.sig
@@ -7962,7 +8018,7 @@ on('#wa-desk-show', showDesk);
         + ' · 人物 ' + p.network.nodes.length + ' · 关系边 ' + p.network.edges.length
         + ' · 地名 ' + p.geo.places.length + (p.geo.roads ? '（另记道路数 ' + p.geo.roads + '，不还原端点）' : '')
         + ' · 时代「' + (p.era.label || p.era.title || '无') + '」'
-        + '｜进度归零（轮 0 / 编年史 0 / 暗流 0 / 回声 0）'
+        + (p.mode==='continuation'?'｜末态续接（轮 0 / 编年史 0 / 保留暗流 '+p.progress.currents+' / 托管关闭）':'｜进度归零（轮 0 / 编年史 0 / 暗流 0 / 回声 0）')
         + (r.retainNote ? '\n' + r.retainNote : ''), true);
     });
     on('#wa-ws-confirm', () => {
@@ -7976,7 +8032,7 @@ on('#wa-desk-show', showDesk);
       const i = r.installed;
       wsOut('已初始化新局：势力 ' + i.factions + ' · 人物 ' + i.nodes + ' · 关系边 ' + i.edges
         + ' · 地名 ' + i.places + '（道路如实 0 条：种子只记数量不记端点）'
-        + '｜进度归零，来源已记入 meta.initFrom（签名 ' + r.sig + ' · 变异度 ' + r.variance + '）—— 可以继续游玩了', true);
+        + (r.mode==='continuation'?'｜末态已续接：暗流 '+i.currents+' 条，轮号归零、托管关闭；来源已记入 meta.initFrom（签名 ':'｜进度归零，来源已记入 meta.initFrom（签名 ') + r.sig + ' · 变异度 ' + r.variance + '）—— 可以继续游玩了', true);
       renderBody();
     });
     on('#wa-ws-stat', () => {
@@ -16275,10 +16331,12 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         <button class="wa-cat-btn" data-cat="all">全部</button>
       </div>
       <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}" data-cat="${PAGE_CAT[p.id] || 'core'}">${p.icon} ${p.label}</button>`).join('')}</div>
+      <div class="wa-row"><label for="wa-setting-search">设置检索（当前页）</label><input id="wa-setting-search" type="search" class="wa-input" placeholder="按标签、中文名或设置键筛选"/><span id="wa-setting-search-count" class="wa-dim" aria-live="polite"></span></div>
       <div class="wa-body"></div>
     </div>`);
     mainDoc.body.appendChild(panelEl);
     panelEl.querySelector('.wa-close').onclick = () => toggle(false);
+    panelEl.querySelector('#wa-setting-search').oninput = applySettingSearch;
     // v2.149.0（P3）：观测视角选择器。**绑定在 buildPanel 里而不是 bindBody 里** ——
     //   它在 wa-head 上，而 wa-head 不参与 renderBody 的整块重建（面板头只建一次）。
     //   放进 bindBody 的后果是：每次重绘都重新绑一次，且重绘后选择器节点已不在
