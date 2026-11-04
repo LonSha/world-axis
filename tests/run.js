@@ -904,6 +904,10 @@ const LOAD = [
   'engines/populate.js',
   // v2.294.0（V8 OPV8-4/EXV8-2）：轮次驱动器 + 写口台（与 index.js LOAD_ORDER 同序：
   //   populate 之后、capability-tier 之前）。装载期均只登记自己的设置键。
+  // v2.299.0（V11 OPV11-3）：L3 分级登记表 —— 必须在 round-drivers 之前装载
+  'engines/l3-registry.js',
+  // v2.299.0（V11 OPV11-4）：推进 API 裁决表 —— 同上
+  'engines/push-api-registry.js',
   'engines/round-drivers.js',
   'engines/write-desk.js',
   'engines/capability-tier.js',
@@ -25264,6 +25268,19 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.298.0 (V11 OPV11-2): 主路径与宿主槽位双面同账（lastInjection.hosted）');
   {
     await runScript('./v11-inject-dualface.js');
+  }
+  // ── v2.299.0（V11 OPV11-3）：L3 分级登记表 ───────────────────────────────
+  //   28 台未驱动引擎的四类裁决。判据核心是「表与现场双向一致」+
+  //   「A 类必须真接进 DRIVERS」——只在表里写「可驱动」而没接进去，等于把同形问题换位置。
+  section('v2.299.0 (V11 OPV11-3): L3 分级登记表（zero-arg / needs-input / decision / dead）');
+  {
+    await runScript('./v11-l3-registry.js');
+  }
+  // ── v2.299.0（V11 OPV11-4）：推进类 API 死面裁决表 ────────────────────────
+  //   现场重测口径（真零调用：产品面不存在 `WA.ns.method(` / `ns.method(`）：23 条。
+  section('v2.299.0 (V11 OPV11-4): 推进类 API 死面裁决（drive / entry / ui / dead）');
+  {
+    await runScript('./v11-push-api-registry.js');
   }
   // ── v2.277.0（V7 OPV7-1）：入口版本**不早于**（历史段，防回退）──────────────
   //   ⚠ 形态必须是「不早于」而不是「等于」：上一段（v2.276.0）踩过前缀锁，本段若写成

@@ -1,13 +1,13 @@
 {
- "version": "2.298.0",
- "loadOrderCount": 339,
- "loadedCount": 325,
+ "version": "2.299.0",
+ "loadOrderCount": 341,
+ "loadedCount": 327,
  "uiCount": 14,
- "nsCount": 334,
+ "nsCount": 336,
  "totals": {
-  "loadEdges": 208,
+  "loadEdges": 212,
   "hardEdges": 0,
-  "callRefs": 400,
+  "callRefs": 404,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -111,6 +111,7 @@
     "engines/investigation.js",
     "engines/kaleidoscope.js",
     "engines/knowledge-practice.js",
+    "engines/l3-registry.js",
     "engines/labor-schedule.js",
     "engines/length-policy.js",
     "engines/liaison.js",
@@ -157,6 +158,7 @@
     "engines/production.js",
     "engines/public-agenda.js",
     "engines/purify-scope.js",
+    "engines/push-api-registry.js",
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
     "engines/redact-layer.js",
@@ -441,6 +443,7 @@
     "engines/intent-board.js",
     "engines/investigation.js",
     "engines/knowledge-practice.js",
+    "engines/l3-registry.js",
     "engines/labor-schedule.js",
     "engines/length-policy.js",
     "engines/liaison.js",
@@ -481,6 +484,7 @@
     "engines/production.js",
     "engines/public-agenda.js",
     "engines/purify-scope.js",
+    "engines/push-api-registry.js",
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
     "engines/redact-layer.js",
@@ -6168,14 +6172,60 @@
    ],
    "consumedBy": []
   },
-  "engines/round-drivers.js": {
+  "engines/l3-registry.js": {
    "ns": [
-    "roundDrivers"
+    "l3Registry"
    ],
    "requires": [
     "registerModule"
    ],
    "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "engines/round-drivers.js"
+   ]
+  },
+  "engines/push-api-registry.js": {
+   "ns": [
+    "pushApiRegistry"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "engines/round-drivers.js"
+   ]
+  },
+  "engines/round-drivers.js": {
+   "ns": [
+    "roundDrivers"
+   ],
+   "requires": [
+    "l3Registry",
+    "pushApiRegistry",
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "engines/l3-registry.js",
+    "engines/push-api-registry.js",
     "core/store.js"
    ],
    "providerOrderOk": true,

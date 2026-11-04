@@ -61,15 +61,42 @@
    *   · rhythmLoop.step()   节奏环相位推进 —— 零参（不 rewind）
    *   · eraCycle.tick()     时代轮转推进 —— 零参
    */
-  const DRIVERS = [
-    { engine: 'tolerance', method: 'tick' },
-    { engine: 'motif', method: 'tick' },
-    { engine: 'marginal', method: 'tick' },
-    { engine: 'quota', method: 'tick' },
-    { engine: 'spotlight', method: 'idle' },
-    { engine: 'rhythmLoop', method: 'step' },
-    { engine: 'eraCycle', method: 'tick' }
+  // V11 OPV11-3 口径：本名单不再自己写死 —— **从 l3Registry 派生**，避免两处各写一份。
+  //   现场实测（v11p3e）确认基线七台之外另有三台是零参可驱动的纯状态机，
+  //   故本版把它们接进轮次：genTiming.tick / beatMask.advance / temporalLock.check。
+  //   为什么不直接删掉下面这段字面量：l3Registry 装载早了但在极端降级场景（模块缺失）
+  //   下仍需可用的底座 —— 故保留 BASE_DRIVERS 作为最小名单，再与登记表派生项合并，
+  //   两者都进 DRIVERS。合并后去重（同 engine 只留一条），并把来源记在 from 上，
+  //   使 tests/v11-l3-registry.js 能区分「基线七台」与「登记表派生」两种来源。
+  const BASE_DRIVERS = [
+    { engine: 'tolerance', method: 'tick', from: 'baseline' },
+    { engine: 'motif', method: 'tick', from: 'baseline' },
+    { engine: 'marginal', method: 'tick', from: 'baseline' },
+    { engine: 'quota', method: 'tick', from: 'baseline' },
+    { engine: 'spotlight', method: 'idle', from: 'baseline' },
+    { engine: 'rhythmLoop', method: 'step', from: 'baseline' },
+    { engine: 'eraCycle', method: 'tick', from: 'baseline' }
   ];
+  const DRIVERS = (function () {
+    const out = BASE_DRIVERS.slice();
+    let extra = [];
+    try {
+      if (WA.l3Registry && typeof WA.l3Registry.zeroArgDrivers === 'function') extra = extra.concat(WA.l3Registry.zeroArgDrivers());
+    } catch (e) { /* 缺模块时用基线底座，不抛 */ }
+    try {
+      if (WA.pushApiRegistry && typeof WA.pushApiRegistry.driveDrivers === 'function') extra = extra.concat(WA.pushApiRegistry.driveDrivers());
+    } catch (e) { /* 同上 */ }
+    extra.forEach(function (d) {
+      if (!d || !d.engine) return;
+      // 同一 engine 已在基线里 ⇒ 不重复调（重复调会让 stat 计数与真实轮次不成比例）
+      const dup = out.some(function (x) { return x.engine === d.engine; });
+      // from 必须**照搬来源**（l3Registry / pushApiRegistry），不能统一写死成某一个 ——
+      //   写死的话两道锁的「派生集合 == 实装集合」对账会同时读到错的来源，
+      //   而两条判据各自仍然绿（那是最坏的一种「对账假绿」）。
+      if (!dup) out.push({ engine: d.engine, method: d.method, from: d.from || 'unknown' });
+    });
+    return out;
+  })();
 
   /**
    * 推进一轮。只允许在 store 事务**之外**调用（挂 backstage 的 tx.ok 成功分支后）。

@@ -184,6 +184,56 @@
 - **全量回归**：按要求仍未执行 `node tests/run.js`
 
 ---
+### 第 3 批交付记录（2026-11-05）
+
+#### OPV11-3 L3 分级登记表 —— 已交付
+- **落盘**：`engines/l3-registry.js`（单一真源）+ `tests/v11-l3-registry.js`（L1～L10 + N0～N3，**22 项**）。
+- **现场实测**：28 台未驱动 L3 逐台零参调用后得四类：**3 zero-arg**（genTiming.tick / beatMask.advance / temporalLock.check）、**19 needs-input**、**6 decision**、**0 dead**。
+- **A 类真接进驱动**：`roundDrivers.DRIVERS` 从 7 台扩到 10 台，并改为：**从 `l3Registry` 派生**（保留 BASE_DRIVERS 作降级底座），每条带 `from` 标记来源。
+- **关键口径自纠**：L1 不能用「L3 减去 DRIVERS」—— A 类一接进就从「未驱动」消失，判据永远红。口径改锚在**基线七台**：表键集 == 基线之外的 L3，而 L3 应用另管「A 类真的接进了」—— 两条各管一件事。
+- **D 类为 0**：本仓当前没有真死面 L3；判据 L7 仍保留，一旦有人往里加 D 类，必须先在 dead-export-ledger 登记。
+
+#### OPV11-4 推进类 API 死面裁决 —— 已交付（**立项读数 49 → 现场 23**）
+- **落盘**：`engines/push-api-registry.js`（单一真源）+ `tests/v11-push-api-registry.js`（A1～A10 + N0～N3，**22 项**）。
+- **立项数偏大的原因**：当时把「仅自调」与「被 dispatch 注册表引用」也算进了零调用。本版口径：产品面里不存在 `WA.ns.method(` 或 `ns.method(` 形式的调用点。
+- **四类裁决（21 条：扣除基线七台与 l3Registry 已登记）**：**6 drive**（checkpoints.tick / vitals.tick / farfield.tick / gauge.step / followupGate.due / floorChanges.sweep）、**13 entry**、**2 ui**（cyberUI.progress / vitals.sweep）、**0 dead**。
+- **关键发现（真实缺陷）**：`hazard.tick` 初判为 drive，零参调用实测**会写存档** → 改判 entry。这正是 OPV11-4 要治的病：「看起来可推进」与「安全可推进」是两件事，只有真调才分得清。
+- **两表不重叠（A9 硬判据）**：`beatMask` / `events` / `fondness` 三台归 l3Registry 统一负责，push 表不再登记—— 谁负责必须唯一。
+- **A5 判据口径自纠**：比对要用 **API 全名**（engine.method），不是命名空间—— 否则同一引擎的边路 API（vitals.sweep）会被 vitals.tick 的驱动误伤。
+- **A8 专治「对账假绿」**：强制 DRIVERS 里 `from` 照搬来源，不允许统一写死成某个固定值（写死时两边同时读到错值，两条判据各自绿而对账已失效）。
+
+#### 第 3 批验证
+- 专锁：v11-l3-registry 22/22、v11-push-api-registry 22/22
+- 关联矩阵 10 项全绿；门禁 12 道全绿（module-cycle 基线常量已随新增 2 模块回填：342/342/340 · 212/2668/2880 · 382/336/344 · orderLen 341）
+- 版本面升到 2.299.0
+- **全量回归**：仍未执行
+
+---
+### 第 3 批交付记录（2026-11-05）
+
+#### OPV11-3 L3 分级登记表 —— 已交付
+- **落盘**：`engines/l3-registry.js`（单一真源）+ `tests/v11-l3-registry.js`（L1～L10 + N0～N3，**22 项**）。
+- **现场实测**：28 台未驱动 L3 逐台零参调用后得四类：**3 zero-arg**（genTiming.tick / beatMask.advance / temporalLock.check）、**19 needs-input**、**6 decision**、**0 dead**。
+- **A 类真接进驱动**：`roundDrivers.DRIVERS` 从 7 台扩到 10 台，并改为：**从 `l3Registry` 派生**（保留 BASE_DRIVERS 作降级底座），每条带 `from` 标记来源。
+- **关键口径自纠**：L1 不能用「L3 减去 DRIVERS」—— A 类一接进就从「未驱动」消失，判据永远红。口径改锚在**基线七台**：表键集 == 基线之外的 L3，而 L3 应用另管「A 类真的接进了」—— 两条各管一件事。
+- **D 类为 0**：本仓当前没有真死面 L3；判据 L7 仍保留，一旦有人往里加 D 类，必须先在 dead-export-ledger 登记。
+
+#### OPV11-4 推进类 API 死面裁决 —— 已交付（**立项读数 49 → 现场 23**）
+- **落盘**：`engines/push-api-registry.js`（单一真源）+ `tests/v11-push-api-registry.js`（A1～A10 + N0～N3，**22 项**）。
+- **立项数偏大的原因**：当时把「仅自调」与「被 dispatch 注册表引用」也算进了零调用。本版口径：产品面里不存在 `WA.ns.method(` 或 `ns.method(` 形式的调用点。
+- **四类裁决（21 条：扣除基线七台与 l3Registry 已登记）**：**6 drive**（checkpoints.tick / vitals.tick / farfield.tick / gauge.step / followupGate.due / floorChanges.sweep）、**13 entry**、**2 ui**（cyberUI.progress / vitals.sweep）、**0 dead**。
+- **关键发现（真实缺陷）**：`hazard.tick` 初判为 drive，零参调用实测**会写存档** → 改判 entry。这正是 OPV11-4 要治的病：「看起来可推进」与「安全可推进」是两件事，只有真调才分得清。
+- **两表不重叠（A9 硬判据）**：`beatMask` / `events` / `fondness` 三台归 l3Registry 统一负责，push 表不再登记—— 谁负责必须唯一。
+- **A5 判据口径自纠**：比对要用 **API 全名**（engine.method），不是命名空间—— 否则同一引擎的边路 API（vitals.sweep）会被 vitals.tick 的驱动误伤。
+- **A8 专治「对账假绿」**：强制 DRIVERS 里 `from` 照搬来源，不允许统一写死成某个固定值（写死时两边同时读到错值，两条判据各自绿而对账已失效）。
+
+#### 第 3 批验证
+- 专锁：v11-l3-registry 22/22、v11-push-api-registry 22/22
+- 关联矩阵 10 项全绿；门禁 12 道全绿（module-cycle 基线常量已随新增 2 模块回填：342/342/340 · 212/2668/2880 · 382/336/344 · orderLen 341）
+- 版本面升到 2.299.0
+- **全量回归**：仍未执行
+
+---
 ## 三、排期与依赖
 
 | 阶段 | 项 | 说明 |

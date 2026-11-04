@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.298.0';
+  const VERSION = '2.299.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1219,6 +1219,14 @@
     //   挂进真实轮次循环。装载期只登记自己的设置键（零上游读、零 store 写、
     //   零落盘）；backstage 在结算成功分支**调用期**取 WA.roundDrivers（与
     //   intake 同形态），不构成环。七台目标引擎在本清单里全部更早装载。
+    // v2.299.0（V11 OPV11-3）：L3 分级登记表 —— 28 台未驱动引擎的四类裁决，**单一真源**。
+    //   装载期零上游读、零 store 写、零落盘。刻意排在 round-drivers 之前：
+    //   round-drivers 派生 A 类名单时要读本表（装载期只读静态表，不读 WA 运行态），
+    //   顺序反了就会让派生方读到 undefined 然后各自 fallback 出一份第二真源。
+    'engines/l3-registry.js',
+    // v2.299.0（V11 OPV11-4）：推进类 API 死面裁决表 —— 11 条真零调用的单一真源。
+    //   同样排在 round-drivers 之前（drive 类要派生进 DRIVERS）。
+    'engines/push-api-registry.js',
     'engines/round-drivers.js',
     // v2.294.0（V8 EXV8-2）：写口台 —— 悬空引擎的统一手动写入口。
     //   台面清单从 write-contract 契约现场读（参数形状/拒收码/hint），

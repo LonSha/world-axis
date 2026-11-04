@@ -253,7 +253,11 @@ function runAll(A) {
   //   且 `WA.unifiedPending = ...` 没进 nsOwner（nsFaceDrift 报 ledger-only）。
   //   更严重的是顺序依赖：window.WorldAxis 尚不存在时它落进一份游离空对象，
   //   产品面静默拿不到聚合器。改回统一形态后三处读数同时归零。
-  A(a.files === 340 && a.aliasFiles === 340 && a.refFiles === 338,
+  // v2.299.0（V11 OPV11-3/4）：文件/别名/有引用 340/340/338 → 342/342/340
+  //   （新增 engines/l3-registry.js 与 engines/push-api-registry.js，两文件都被 round-drivers 真引用）。
+  // v2.299.0：装载期 208 → 212（两文件尾调 registerModule）、调用期 2666 → 2668、合计 2874 → 2880。
+  // v2.299.0：命名空间三面 380/334/342 → 382/336/344（两个新 ns 同步入账、入读面）。
+  A(a.files === 342 && a.aliasFiles === 342 && a.refFiles === 340,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -384,7 +388,7 @@ function runAll(A) {
   //   调用期 +8：unifiedPending 修正别名后，它真读的 store / clock / storyChoice / commission /
   //   investigation / aftermath / operations / farfield 等命名空间引用现在都被计入
   //   （此前整个文件对扫描器不可见 ⇒ 这 8 条 (file, ns) 边一条都没算）。
-  A(a.edgesLoad === 208 && a.edgesCall === 2666 && a.edgesAll === 2874 && a.identityOk,
+  A(a.edgesLoad === 212 && a.edgesCall === 2668 && a.edgesAll === 2880 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -463,7 +467,7 @@ function runAll(A) {
   // v2.293.0（EXV7-4~9 收口跟位）：world-autobiography 与 populate 两模块入序 ⇒ LOAD_ORDER 330 → 332。
   // v2.294.0（V8 收口）：LOAD_ORDER 334 → 336（新增两台入序引擎）。
   // v2.297.0（V11 立项轮跟位）：LOAD_ORDER 338 → 339（core/unified-pending.js 入序）。
-  A(a.edgesLoad >= 20 && a.orderLen === 339,
+  A(a.edgesLoad >= 20 && a.orderLen === 341,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -508,7 +512,7 @@ function runAll(A) {
   //   差集 46 不变 ⇒ B6 判据不动。
   // v2.297.0（V11 立项轮跟位）：三面 379/333/342 → 380/334/342。
   //   unifiedPending 从「账本有、静态无」归位为「两面都有」（差集 46 不变）。
-  A(a.nsProvided === 380 && a.nsLedger === 334 && a.nsRead === 342,
+  A(a.nsProvided === 382 && a.nsLedger === 336 && a.nsRead === 344,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
