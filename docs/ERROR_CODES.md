@@ -3,13 +3,13 @@
 > 台账 version：`2.295.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **1347** 个内联拒收码：见证 745 / 死表 52 / 基线 550
+共 **1349** 个内联拒收码：见证 747 / 死表 52 / 基线 550
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
 **基线**=存量未分类（新增未分类码即红灯）。
 
-## 见证（可执行）（745）
+## 见证（可执行）（747）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -79,6 +79,7 @@
 | `bad-bp-ver` | engines/world-blueprint.js | worldBlueprint.previewImport：bpVer 对不上 ⇒ 拒收并给出 got/supported（不按 v1 猜着收 —— 未知版本的蓝图装下去会静默污染目标存档） |
 | `bad-budget` | engines/rule-pack.js | E7：模板调用预算非法 ⇒ bad-budget（与轮次分开点名） |
 | `bad-callback` | engines/defer-token.js | deferToken：回调非函数 ⇒ bad-callback（schedule 与 serial 同判） |
+| `bad-cat` | ui/panel.js | V10 OPV10-9: ui.showCat 传入非法分类名 ⇒ bad-cat 拒收并返回 valid 列表 |
 | `bad-chain` | core/commit.js | commit.commit / flush / retryEffects：链参数缺失或非对象 ⇒ 拒收 bad-chain（三条入口同一口径，不各自造一个码） |
 | `bad-char` | engines/kaleidoscope.js | formula 写不认识的单字符 |
 | `bad-choice` | engines/opportunity.js | opportunity.respond：作答词必须落 take/decline/defer 之一（B6） |
@@ -198,6 +199,7 @@
 | `cleared` | engines/interest-face.js | interestFace：setFocus(null) 撤掉镜头焦点 ⇒ 正常返回并记 cleared（不是静默置空） |
 | `coalesced` | engines/offline-return.js | offlineReturn.recover：宿主对同一次回前台连发多拍 ⇒ 窗内只跑一次，后到的那拍如实拒收 coalesced。「合并了几拍」与「那一拍后来怎么了」必须分开报：合成一个码会让宿主重复通知与通知来了但没得跑在读数上同形，而两者处置不同。 |
 | `commit-absent` | engines/world-lab.js | Y9：选择性采纳必须走 U2 的统一提交 ⇒ 提交面缺席时拒收，不退回自己开事务（回执与世界写入同一 draft） |
+| `compact` | engines/inject-budget.js | V10 OPV10-8: injectBudget 超预算极端降档单行摘要折叠理由 compact |
 | `compliant` | engines/persona-anchor.js | PA：正文没命中任何禁忌 ⇒ compliant（合规要能被说出口，不能只在违规时才出声） |
 | `condition-unmet` | engines/events.js | events.claim 时不传 metConditions（世界条件未足 ⇒ 状态零变化） |
 | `conflict` | engines/rule-pack.js | Y8：包与当前面在同一个设置键上写了不同值 ⇒ 拒收并指出是哪一条（不做「后启用的赢」） |
@@ -400,7 +402,7 @@
 | `no-draft` | engines/farfield.js, engines/offline-tick.js, engines/region.js, engines/world-bridge.js | region.tickOffline：没拿到事务草稿 ⇒ 拒收（不把「我拿不到草稿」说成「你走了零秒」）（X3） |
 | `no-economy` | engines/recipe.js | OPT-8：配方未声明经济面 ⇒ 如实报 no-economy（不回落成银元 —— 回落会让「声明了元」与「没声明」长得一样） |
 | `no-elapsed` | engines/credit-ledger.js, engines/farfield.js, engines/offline-tick.js | offlineTick.tick：离线间隔为零时不伪装为一次结算（v2.151.0 RX2） |
-| `no-entry` | engines/chrono.js | chrono.undo：记录 id 不在图里 ⇒ no-entry（读面同样要如实归因，不返回空计划，v2.112.0） |
+| `no-entry` | core/unified-pending.js, engines/chrono.js | chrono.undo：记录 id 不在图里 ⇒ no-entry（读面同样要如实归因，不返回空计划，v2.112.0） |
 | `no-factions` | engines/faction-graph.js | factionGraph.buildGraph 世界无势力 ⇒ no-factions（v2.139.0 E9 新增） |
 | `no-far` | engines/farfield.js | farfield.tick：没有登记远方地区时不虚构脉搏（v2.151.0 RX3） |
 | `no-goal` | engines/act.js, engines/liaison.js | act.admit：目标被撤销 ⇒ 挂在它下面的行动不得照常开工（B1） |
@@ -820,7 +822,7 @@
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
-| `absent` | core/settings-bus.js, core/store.js, engines/wb-inject.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `absent` | core/settings-bus.js, core/store.js, core/unified-pending.js, engines/wb-inject.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `actFromScene-missing` | ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `after-reply` | engines/bridge.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `all-idle-in-scene` | engines/spotlight.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
