@@ -1,0 +1,45 @@
+{
+  "version": "2.295.0",
+  "baseCommit": "edc4c44",
+  "layer": "L3",
+  "storageStress": {
+    "rounds": 100,
+    "startBytes": 6692,
+    "endBytes": 37290,
+    "growthBytes": 30598,
+    "slopeBytesPerRound": 282,
+    "latency": {
+      "p50Ms": 1,
+      "p95Ms": 1,
+      "maxMs": 2
+    },
+    "forecast": {
+      "quotaMB": 5,
+      "inRounds50Pct": 9165,
+      "inRounds100Pct": 18462
+    },
+    "ok": true
+  },
+  "hostedV9Persist": {
+    "host": "SillyTavern 1.19.0",
+    "write": true,
+    "read": true,
+    "rejectRollback": true,
+    "reloadPreserved": true,
+    "ok": true
+  },
+  "mobileSimulation": {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "touchEnabled": true,
+    "m1Result": "PASS"
+  },
+  "environmentBlocked": {
+    "realPhoneTP6TP8": {
+      "status": "blocked",
+      "reason": "当前会话环境为无头终端容器，无物理手机与真机 USB/无线调试通道连接；按 R3 规约提交环境阻塞记录，不降低门槛，不以 390px 仿真冒充 L4 真机"
+    }
+  }
+}
