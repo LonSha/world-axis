@@ -12,13 +12,25 @@
  *   ② 惰性安全查询：模块未加载或 disabled 时静默归零或标明 disabled，不崩溃；
  *   ③ 结构化输出：统一为 { id, module, kind, title, summary, actionKey, urgency } 格式；
  *   ④ 下钻支持：每条待办提供 module 与 targetPage，供 UI 一键跳转。
+ *
+ * 【v2.297.0（V11 立项轮）修正：别名形态】
+ *   本文件初版把 WA 取成「`window.WorldAxis` 存在就用，否则回退 `global.WA`」——
+ *   与全仓其余 300+ 模块的 `const WA = window.WorldAxis = window.WorldAxis || {};`
+ *   **不是同一形态**。两个真实后果，都在 `tests/module-cycle-gate.js` 当场现形：
+ *     ① 静态别名扫描（ALIAS_RE 只认上面那一种形态）识别不出本文件的 WA 别名 ⇒
+ *        `unreflected` 报 `core/unified-pending.js → core/store.js (registerModule)`
+ *        （静态扫不到这条装载期边，扫描器对它是瞎的）；
+ *     ② `WA.unifiedPending = {...}` 也因此没进 `nsOwner` ⇒ 账本里有、静态提供方没有，
+ *        `nsFaceDrift` 报 `unifiedPending: ledger-only`。
+ *   还有一条静态扫描看不出来、但更严重的**顺序依赖**：旧写法在 `window.WorldAxis`
+ *   尚不存在时回退到 `global.WA`（Node 下通常是 undefined）⇒ 拿到的是一份**游离空对象**，
+ *   于是 `WA.unifiedPending = {...}` 写进了那份空对象，产品面静默拿不到聚合器。
+ *   改成全仓统一形态后，三处读数同时归一。
  */
 (function () {
   'use strict';
 
-  const WA = (typeof window !== 'undefined' && window.WorldAxis)
-    ? window.WorldAxis
-    : ((typeof global !== 'undefined' && global.WA) ? global.WA : {});
+  const WA = window.WorldAxis = window.WorldAxis || {};
 
   /**
    * 待办收集聚合器

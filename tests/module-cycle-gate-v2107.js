@@ -244,7 +244,16 @@ function runAll(A) {
   //   （新增 engines/round-drivers.js 与 engines/write-desk.js，两文件都有真引用）。
   // v2.294.0（V8 收口）：335/335/333 -> 337/337/335（新增 inject-collector 与
   //   player-archive 两文件，两者都被产品面真引用）。
-  A(a.files === 339 && a.aliasFiles === 339 && a.refFiles === 337,
+  // v2.297.0（V11 立项轮跟位）：339/339/337 → 340/340/338。
+  //   +1 文件来自 core/unified-pending.js（V10 OPV10-7 落地时漏进本表）。
+  //   **同一轮还修了它的一处真缺陷**：该文件初版把 WA 取成
+  //   `(window.WorldAxis) ? window.WorldAxis : (global.WA ? global.WA : {})`
+  //   —— 与全仓 `const WA = window.WorldAxis = window.WorldAxis || {};` 不同形态，
+  //   于是静态别名扫描认不出它（unreflected 报 registerModule 那条装载边为「扫不到」），
+  //   且 `WA.unifiedPending = ...` 没进 nsOwner（nsFaceDrift 报 ledger-only）。
+  //   更严重的是顺序依赖：window.WorldAxis 尚不存在时它落进一份游离空对象，
+  //   产品面静默拿不到聚合器。改回统一形态后三处读数同时归零。
+  A(a.files === 340 && a.aliasFiles === 340 && a.refFiles === 338,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -370,7 +379,12 @@ function runAll(A) {
   //   增量来自 V8 新增的三台引擎（inject-collector / player-archive / round-drivers 等）：
   //   尾部各调 WA.registerModule ⇒ 装载期各 +1；它们在调用期读 store / clock /
   //   injectCollector / writeDesk 等既有命名空间。恒等式仍然成立，B4 零次序违规不动。
-  A(a.edgesLoad === 207 && a.edgesCall === 2658 && a.edgesAll === 2865 && a.identityOk,
+  // v2.297.0（V11 立项轮跟位）：装载期 207 → 208、调用期 2658 → 2666、合计 2865 → 2874。
+  //   装载期 +1：core/unified-pending.js 尾部 registerModule 那条边，在别名形态修正后才被静态扫到。
+  //   调用期 +8：unifiedPending 修正别名后，它真读的 store / clock / storyChoice / commission /
+  //   investigation / aftermath / operations / farfield 等命名空间引用现在都被计入
+  //   （此前整个文件对扫描器不可见 ⇒ 这 8 条 (file, ns) 边一条都没算）。
+  A(a.edgesLoad === 208 && a.edgesCall === 2666 && a.edgesAll === 2874 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -448,7 +462,8 @@ function runAll(A) {
   // v2.287.0（EXV7-3）：LOAD_ORDER 现场长度为 330；仍只对运行期定案的装载边判序。
   // v2.293.0（EXV7-4~9 收口跟位）：world-autobiography 与 populate 两模块入序 ⇒ LOAD_ORDER 330 → 332。
   // v2.294.0（V8 收口）：LOAD_ORDER 334 → 336（新增两台入序引擎）。
-  A(a.edgesLoad >= 20 && a.orderLen === 338,
+  // v2.297.0（V11 立项轮跟位）：LOAD_ORDER 338 → 339（core/unified-pending.js 入序）。
+  A(a.edgesLoad >= 20 && a.orderLen === 339,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -491,7 +506,9 @@ function runAll(A) {
   //   （差集 46 不变，B6 判据不动；实测回填）。
   // v2.294.0（V8 收口）：三面 375/329/338 → 377/331/340（新增 ns 同步入账、入读面）。
   //   差集 46 不变 ⇒ B6 判据不动。
-  A(a.nsProvided === 379 && a.nsLedger === 333 && a.nsRead === 342,
+  // v2.297.0（V11 立项轮跟位）：三面 379/333/342 → 380/334/342。
+  //   unifiedPending 从「账本有、静态无」归位为「两面都有」（差集 46 不变）。
+  A(a.nsProvided === 380 && a.nsLedger === 334 && a.nsRead === 342,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
@@ -514,7 +531,12 @@ function runAll(A) {
   // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
   // v2.194.0（U2 批次④）：零读 **仍为 27**（与批次③持平）—— 本轮一度写成 29（那两个
   //   自证槽），但它们实测不可达已撤除，产品源面本就没有这两个记号。
-  A(a.deadNs.length === 37, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  // v2.297.0（V11 立项轮跟位）：零读 ns 37 → 38。
+  //   +1 是 unifiedPending 自己：修正别名形态后它终于进入静态提供方面，
+  //   而它的读者是 ui/panel.js 的待办页与 core/unified-pending.js 自身的 diagnose ——
+  //   静态扫描下 `WA.unifiedPending` 只在面板里出现一次（<A>.<ns> 形态读得出），
+  //   但 B7 数的是「提供方有、读面零」的命名空间，本轮实测为 38。
+  A(a.deadNs.length === 38, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

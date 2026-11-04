@@ -25211,6 +25211,27 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   // V9 standalone scripts run in child processes, never share global fixture state.
   section('v2.295.0 (V9): owner projection, managed currents, selection, continuation and volume');
   { await runLock('./v9-suite-2295.js', 'runAll'); }
+  // ── v2.296.0（V10 全景双九项）：七个纯脚本体套件的挂载 ─────────────────────
+  //   【为什么此前一个都没挂】V10 期间处于「双计划收口前禁跑全量」纪律窗口，这批套件
+  //     只在定向轮里单跑过，从未落进 run.js —— 于是 test-surface-gate 把它们判成
+  //     7 个 unregistered-orphan（判据是对的：从不执行且未登记豁免）。
+  //   【为什么用 runScript 而不是 runLock】它们是**纯脚本体**（顶层直接断言 + process.exit），
+  //     没有 runAll/runNegative 导出。runLock 要求 `[method](assert)` 形态，硬塞会直接 TypeError。
+  //     runScript(spec) 正是为这一类设的统一挂载口（**全仓唯一 spawn 站点**，共享 gate-timeout
+  //     的统一预算），故挂这七个不会新增任何未被 gate-timeout 登记的调用点。
+  //   【耗时】实测单跑：inject-pipeline ~2s、unified-pending ~1s、ui-pills ~1s、
+  //     eighteen-matrix ~3s、master-matrix ~8s、r3-storage-stress ~1s、r3-persist-hosted ~85s。
+  //     最后一项是 V9 持久化生命周期在真宿主上的回归，本来就该在全量里跑。
+  section('v2.296.0 (V10): 双九项验收矩阵 + 注入管线 + 待办中心 + UI 胶囊 + R3 存储/持久化');
+  {
+    await runScript('./v10-inject-pipeline.js');
+    await runScript('./v10-unified-pending.js');
+    await runScript('./v10-ui-pills.js');
+    await runScript('./v10-eighteen-matrix.js');
+    await runScript('./v10-master-matrix.js');
+    await runScript('./v10-r3-storage-stress.js');
+    await runScript('./v10-r3-persist-hosted.js');
+  }
   // ── v2.277.0（V7 OPV7-1）：入口版本**不早于**（历史段，防回退）──────────────
   //   ⚠ 形态必须是「不早于」而不是「等于」：上一段（v2.276.0）踩过前缀锁，本段若写成
   //     相等，下一个版本又要回来改一次 —— 历史段就该永不过期。

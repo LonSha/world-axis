@@ -1,13 +1,13 @@
 {
- "version": "2.295.0",
- "loadOrderCount": 338,
- "loadedCount": 324,
+ "version": "2.296.0",
+ "loadOrderCount": 339,
+ "loadedCount": 325,
  "uiCount": 14,
- "nsCount": 333,
+ "nsCount": 334,
  "totals": {
-  "loadEdges": 207,
+  "loadEdges": 208,
   "hardEdges": 0,
-  "callRefs": 398,
+  "callRefs": 400,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -31,6 +31,7 @@
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
+    "core/unified-pending.js",
     "direction/oracle.js",
     "direction/tags.js",
     "engines/act.js",
@@ -374,6 +375,7 @@
     "core/exec.js",
     "core/plugin.js",
     "core/sandbox.js",
+    "core/unified-pending.js",
     "engines/action-desk.js",
     "engines/action-methods.js",
     "engines/activity.js",
@@ -697,6 +699,25 @@
   "core/commit.js": {
    "ns": [
     "commit"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "core/unified-pending.js": {
+   "ns": [
+    "unifiedPending"
    ],
    "requires": [
     "registerModule"
