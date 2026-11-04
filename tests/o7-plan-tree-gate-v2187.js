@@ -84,8 +84,8 @@ function checkNotes(dir) {
       // 本门禁第一次落盘时这里写了 return，于是负控制 N4「把文件挪回根目录 + 去掉 Status 行」
       // 只报出 root-note，missing-section 被吞掉 —— 那正是「一条判据在另一条之后静默失效」。
     } else {
-      const m = r.match(/^(implemented|proposed)\/(architecture|bug-fix)\//);
-      if (!m) problems.push({ kind: 'bad-dir', rel: r, why: '目录须为 implemented|proposed / architecture|bug-fix' });
+      const m = r.match(/^(implemented|proposed)\/(feature|bug-fix|simplification|architecture|process|testing)\//);
+      if (!m) problems.push({ kind: 'bad-dir', rel: r, why: '目录须为 implemented|proposed / 六类 Agent Note class' });
     }
     const s = read(path.join(root, r));
     const lines = s.split('\n');
