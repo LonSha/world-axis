@@ -35,13 +35,62 @@
   /**
    * 待办收集聚合器
    */
+  // ── v2.298.0（V11 OPV11-7）：三态可分辨的探针 ──────────────────────────
+  //   立项实测缺陷：`collect()` 在空世界返回 `total=0 / highCount=0 / items=0`，
+  //   而三件完全不同的事在读数上完全同形：
+  //     ① 世界确实没事可做（empty：模块都在、都正常、只是没产出）
+  //     ② 聚合器没接上模块（skipped：`WA.<mod>` 不存在或没有 pending 口）
+  //     ③ 接了模块但调用报错（fault：`pending()` 抛异常，被 `catch (e) {}` 吃掉）
+  //   修前七个分支全是 `catch (e) {}` —— 异常**静默消失**，读面永远看到「没事」。
+  //   这正是 V11 要治的病：不是「有没有数据」，而是「读不出来时读面知不知道」。
+  //
+  //   口径（三态边界，写死在判据里）：
+  //     · faults 非空 ⇒ state='fault'（有模块坏了，即使同时有产出也要报）
+  //     · faults 为空且 list 非空 ⇒ state='ok'
+  //     · faults 为空且 list 为空 ⇒ state='empty'
+  //   `hands` / `skipped` / `faults` **无论什么态都全量给出** —— 不允许只在非 ok
+  //   时才给（那样读面又得先判断态才能读细节，等于把同形问题挪了一层）。
+  const PROBES = [
+    { mod: 'storyChoice', need: 'pending' },
+    { mod: 'commission', need: 'pending' },
+    { mod: 'investigation', need: 'pending' },
+    { mod: 'aftermath', need: 'pending' },
+    { mod: 'operations', need: 'pending' },
+    { mod: 'farfield', need: 'pending' },
+    { mod: 'diplomacy', need: 'stat+view' }
+  ];
   function collectPending() {
     const list = [];
     const now = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('unifiedPending') : Date.now();
+    // hands：真的接上并调用了的模块数；skipped：模块缺席/无入口（带原因）；
+    //   faults：接上了但抛异常的模块（带原始错误文本，可定位，不是一句「失败了」）。
+    const hands = [];
+    const skipped = [];
+    const faults = [];
+    const notSkipped = function (mod, need) {
+      // 判定「该模块是否可用」；不可用时**必须**给出原因，不许静默略过
+      const m = WA[mod];
+      if (!m) {
+        skipped.push({ module: mod, reason: 'absent', detail: 'WA.' + mod + ' 不存在' });
+        return false;
+      }
+      const parts = need.split('+');
+      const missing = parts.filter(function (f) { return typeof m[f] !== 'function'; });
+      if (missing.length) {
+        skipped.push({ module: mod, reason: 'no-entry', detail: '缺 ' + missing.map(function (f) { return f + '()'; }).join('/') });
+        return false;
+      }
+      return true;
+    };
+    const markHandled = function (mod) { hands.push(mod); };
+    const markFault = function (mod, e) {
+      faults.push({ module: mod, msg: String((e && (e.message || e)) || 'unknown') });
+    };
 
     // 1. storyChoice (故事分支抉择)
     try {
-      if (WA.storyChoice && typeof WA.storyChoice.pending === 'function') {
+      if (notSkipped('storyChoice', 'pending')) {
+        markHandled('storyChoice');
         const sc = WA.storyChoice.pending();
         if (sc && sc.ok && Array.isArray(sc.points)) {
           sc.points.forEach(function (pt) {
@@ -58,11 +107,12 @@
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { markFault('storyChoice', e); }
 
     // 2. commission (委托任务)
     try {
-      if (WA.commission && typeof WA.commission.pending === 'function') {
+      if (notSkipped('commission', 'pending')) {
+        markHandled('commission');
         const cm = WA.commission.pending();
         if (cm && cm.ok && Array.isArray(cm.items)) {
           cm.items.forEach(function (it) {
@@ -79,11 +129,12 @@
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { markFault('commission', e); }
 
     // 3. investigation (线索调查)
     try {
-      if (WA.investigation && typeof WA.investigation.pending === 'function') {
+      if (notSkipped('investigation', 'pending')) {
+        markHandled('investigation');
         const iv = WA.investigation.pending();
         if (iv && iv.ok && Array.isArray(iv.items)) {
           iv.items.forEach(function (it) {
@@ -100,11 +151,12 @@
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { markFault('investigation', e); }
 
     // 4. aftermath (地点后果与修复)
     try {
-      if (WA.aftermath && typeof WA.aftermath.pending === 'function') {
+      if (notSkipped('aftermath', 'pending')) {
+        markHandled('aftermath');
         const af = WA.aftermath.pending();
         if (af && af.ok && Array.isArray(af.items)) {
           af.items.forEach(function (it) {
@@ -121,11 +173,12 @@
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { markFault('aftermath', e); }
 
     // 5. operations (运营结算)
     try {
-      if (WA.operations && typeof WA.operations.pending === 'function') {
+      if (notSkipped('operations', 'pending')) {
+        markHandled('operations');
         const op = WA.operations.pending();
         if (op && op.ok && Array.isArray(op.items)) {
           op.items.forEach(function (it) {
@@ -142,11 +195,12 @@
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { markFault('operations', e); }
 
     // 6. farfield (远方脉搏在途)
     try {
-      if (WA.farfield && typeof WA.farfield.pending === 'function') {
+      if (notSkipped('farfield', 'pending')) {
+        markHandled('farfield');
         const ff = WA.farfield.pending();
         if (ff && ff.ok && Array.isArray(ff.rows)) {
           ff.rows.forEach(function (it) {
@@ -163,11 +217,12 @@
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { markFault('farfield', e); }
 
     // 7. diplomacy (外交提案待答)
     try {
-      if (WA.diplomacy && typeof WA.diplomacy.stat === 'function') {
+      if (notSkipped('diplomacy', 'stat+view')) {
+        markHandled('diplomacy');
         const dp = WA.diplomacy.stat();
         if (dp && dp.live && dp.live.open > 0 && typeof WA.diplomacy.view === 'function') {
           const v = WA.diplomacy.view();
@@ -187,10 +242,20 @@
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { markFault('diplomacy', e); }
 
+    // 三态：fault 优先（有模块坏了就必须报，哪怕同时有正常产出）> ok > empty。
+    //   为什么 fault 优先：若因为别的模块正好有产出就报 'ok'，那个坏掉的模块
+    //   会永远沉默下去 —— 这正是修前 `catch (e) {}` 的静默在换了一层皮之后重现。
+    const state = faults.length ? 'fault' : (list.length ? 'ok' : 'empty');
     return {
       at: now,
+      // v2.298.0（V11 OPV11-7）：三态 + 三张名单 —— **无论什么态都全量给出**。
+      //   不许只在非 ok 时才给细节：那样读面得先判态才能读，等于把同形问题挪了一层。
+      state: state,
+      hands: hands.slice(),
+      skipped: skipped.slice(),
+      faults: faults.slice(),
       total: list.length,
       highCount: list.filter(function (x) { return x.urgency === 'high'; }).length,
       items: list
@@ -201,12 +266,31 @@
    * 诊断面（只读）
    */
   function diagnose() {
+    // v2.298.0（V11 OPV11-7）：诊断面与 collect 同源（同一个 collectPending 调用链，
+    //   不另起一套计数）。三态与三张名单**逐字透传**，`summary` 按态给出不同的句子 ——
+    //   修前不论什么处境都只说「共登记 0 项」，那句话在 empty / skipped / fault 三种
+    //   情况下都一样，等于告诉读面「没事」而把真相吞掉。
     const report = collectPending();
+    const st = report.state;
+    const sk = report.skipped.map(function (x) { return x.module; });
+    const fl = report.faults.map(function (x) { return x.module; });
+    const summary = st === 'empty'
+      ? ('世界没有待办可做：' + report.hands.length + ' 个模块都在且正常读回，只是都没产出'
+        + (sk.length ? '；另有 ' + sk.length + ' 个模块没接上（' + sk.join('、') + '）' : ''))
+      : (st === 'fault'
+        ? ('待办读取有故障：' + fl.length + ' 个模块报错（' + fl.join('、') + '），其余 ' + report.hands.length
+          + ' 个正常，共登记 ' + report.total + ' 项。这不是「世界没事」，是读面坏了。')
+        : ('待办中心共登记 ' + report.total + ' 项（高优先级 ' + report.highCount + ' 项）'
+          + (sk.length ? '；' + sk.length + ' 个模块没接上（' + sk.join('、') + '）' : '')));
     return {
       ok: true,
+      state: st,
+      hands: report.hands.slice(),
+      skipped: report.skipped.slice(),
+      faults: report.faults.slice(),
       pendingCount: report.total,
       highUrgency: report.highCount,
-      summary: '待办中心共登记 ' + report.total + ' 项（高优先级 ' + report.highCount + ' 项）'
+      summary: summary
     };
   }
 
@@ -215,12 +299,14 @@
     pending: collectPending,
     diagnose: diagnose,
     stat: function () {
+      // 三态一并透出：只报 total/high 会让「没接上」与「真没事」在 stat 面再次同形。
       const r = collectPending();
-      return { total: r.total, high: r.highCount, at: r.at };
+      return { total: r.total, high: r.highCount, at: r.at, state: r.state,
+        hands: r.hands.length, skipped: r.skipped.length, faults: r.faults.length };
     }
   };
 
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('core/unified-pending.js', { kind: 'core', ver: '2.296.0' });
+    WA.registerModule('core/unified-pending.js', { kind: 'core', ver: '2.298.0' });
   }
 })();

@@ -25250,6 +25250,21 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runScript('./v11-snapshot-state.js');
   }
+  // ── v2.298.0（V11 OPV11-7）：unifiedPending 三态可分辨 ───────────────────────
+  //   与 OPV11-1 同一族病（「空」在读数上同形），但发生在待办层：修前七个分支
+
+  //   全是 `catch (e) {}`，异常静默消失，读面永远看到「没事」。
+  section('v2.298.0 (V11 OPV11-7): unifiedPending 三态（empty / ok / fault）可分');
+  {
+    await runScript('./v11-pending-state.js');
+  }
+  // ── v2.298.0（V11 OPV11-2）：主路径与宿主槽位双面同账 ────────────────────
+  //   现场复测推翻了立项读数的一半：入参 injections 是**输入槽位**不是产出面，
+  //   「items=0」是正确行为。本项只做契约显式化（lastInjection.hosted）与两面可对账。
+  section('v2.298.0 (V11 OPV11-2): 主路径与宿主槽位双面同账（lastInjection.hosted）');
+  {
+    await runScript('./v11-inject-dualface.js');
+  }
   // ── v2.277.0（V7 OPV7-1）：入口版本**不早于**（历史段，防回退）──────────────
   //   ⚠ 形态必须是「不早于」而不是「等于」：上一段（v2.276.0）踩过前缀锁，本段若写成
   //     相等，下一个版本又要回来改一次 —— 历史段就该永不过期。

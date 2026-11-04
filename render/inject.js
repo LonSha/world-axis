@@ -1813,9 +1813,27 @@ style: false,
         return out;
       })();
       const decisions = sourceDecisions(vis, landedNames, engineFailuresView(), budgetBySource);
+      // ── v2.298.0（V11 OPV11-2）：主路径与宿主槽位的双面同账 ────────────────
+      //   立项读数说「`applyInjections({injections:[]})` 后入参仍是 0 条，而宿主实收 573 字」——
+      //   现场复测的真相是：**这两者本来就不是同一个面，也无需一致**。
+      //     · `ctx.injections` 是**调用方预置的输入槽位**（宿主把剧情约束等塞进来，
+      //       由本函数取出并入 items），它**不是产出面**，往里回写才是错的设计。
+      //     · 真实产出面是 `combined`（主块）＋ 各路独立槽位，落点记在 `lastInjection`。
+      //   所以本项不做「让入参回写产出」（那会污染输入面），而是做**契约显式化 + 同账**：
+      //     把「本轮到底把多少字送到宿主、送达是否成功」作为独立字段 `hosted` 记录，
+      //     与 `sources`/`len`/`mainCount` 同一份打点 → 读面不必再猜是哪一面的数。
+      //   写法上刻意**在调用前后各取一次**：调用前 null、调用后才有值，读面能区分
+      //   「没送到」与「没记录」（这正是本项要治的同形）。
+      // v2.298.0（V11 OPV11-2）：宿主实收面。**不另起 try** —— 外层已有
+      //   「setExtensionPrompt 失败 ⇒ log error」的既有容器，此处只在**成功返回之后**
+      //   记一行事实（null 语义 = 没走到这一步，与「送到 0 字」区分）。
+      //   刻意不在失败路径写 hosted：失败由外层 catch 落日志，两处各记一遍就是两个真源。
+      let __hostedSnap = null;
       try {
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
+        // 送达成功之后才记这一行事实；失败由外层 catch 落日志（两处各记一遍 = 两个真源）
+        __hostedSnap = { ok: true, key: 'WorldAxis', chars: combined.length, slotCount: slotCount };
         if (WA.injectInspector && WA.injectInspector.markRegistered) WA.injectInspector.markRegistered(combined.length);
         try {
           // v2.50.0（第三十五面）：宿主世界书激活账的**真消费点**。
@@ -1881,6 +1899,10 @@ style: false,
             //   此前这个问题只能靠读快照字符串猜，那正是 V11 要治的「读数不同源」。
             //   三态如实：snapshotState() 返回 null（从未构建）时如实记 null，不填 'live'。
             snapState: (function () { try { const ss = WA.render.snapshotState(); return { state: ss.state, faults: ss.faults }; } catch (e) { return null; } })(),
+            // v2.298.0（V11 OPV11-2）：宿主实收面。与 sources/len/mainCount 同一份打点，
+            //   读面不必再猜 573 字是哪一面的数。三态如实：ok=false 时带原始错误文本；
+            //   null 表示「本轮没走到送达那一步」（不是「送到了 0 字」，两者不许同形）。
+            hosted: __hostedSnap,
             sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, volume: WA.injectBudget && WA.injectBudget.volumeView ? WA.injectBudget.volumeView(items, finalItems, { totalCap: planInfo ? planInfo.budget : null }) : null, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, budgetMode: planInfo.budgetMode || null, headroom: planInfo.headroom ? { remain: planInfo.headroom.remain, usedPct: planInfo.headroom.usedPct, freePct: planInfo.headroom.freePct, saturated: !!planInfo.headroom.saturated, avgKeptTokens: planInfo.headroom.avgKeptTokens, spareSources: planInfo.headroom.spareSources, note: planInfo.headroom.note || '' } : null, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
           // v2.150.0(RP4): 价值观察的唯一生产方。位置刻意——必须在预算裁决(finalItems)
           //   与槽位路由都定完之后：观察面要的是「这一轮真落地了哪些源」，拿注入前的候选集
