@@ -323,6 +323,70 @@
 
   function statusesAvailable() { return statuses() ? statuses().slice() : null; }
 
+  /**
+   * EXV10-8: 多势力博弈动态推演（simulateDynamics）
+   * 基于同盟簇与敌对张力边，推演各阵营暗流博弈与消长走向，产出结构化简讯与态势变动预估。
+   */
+  function simulateDynamics(opts) {
+    const g = graphOf(opts);
+    if (!g.ok) return { ok: false, reason: g.reason };
+    const t = tension(opts);
+    const c = clusters(opts);
+    const h = heat(opts);
+    const R = relations();
+    const reports = [];
+
+    // 1. 识别对抗焦点：找出敌对边（affinity < 0）
+    const rivalries = g.edges.filter(function (e) { return e.affinity < 0; });
+    rivalries.sort(function (a, b) { return a.affinity - b.affinity; }); // 敌对最深排前
+
+    rivalries.slice(0, 5).forEach(function (riv) {
+      const nodeA = g.nodes[riv.ai];
+      const nodeB = g.nodes[riv.bi];
+      const sameLoc = riv.sameScope ? '同属' + (nodeA.scope || '同域') : '跨域';
+      let outcome = '';
+      if (nodeA.status === '鼎盛' && nodeB.status !== '鼎盛') {
+        outcome = nodeA.name + ' 居高临下施压，' + nodeB.name + ' 防线吃紧';
+      } else if (nodeB.status === '鼎盛' && nodeA.status !== '鼎盛') {
+        outcome = nodeB.name + ' 居高临下施压，' + nodeA.name + ' 防线吃紧';
+      } else {
+        outcome = nodeA.name + ' 与 ' + nodeB.name + ' 势均力敌，处于胶着对峙';
+      }
+      reports.push({
+        type: 'rivalry',
+        pair: [nodeA.name, nodeB.name],
+        tier: riv.tier,
+        sameScope: riv.sameScope,
+        narrative: '【' + sameLoc + '争端】' + outcome + '（态势：' + riv.tier + '）。'
+      });
+    });
+
+    // 2. 识别同盟抱团
+    (c.clusters || []).forEach(function (clu, idx) {
+      reports.push({
+        type: 'coalition',
+        factions: clu,
+        narrative: '【阵营缔结】势力 [' + clu.join(', ') + '] 结成同盟互保，形成区域平衡支点。'
+      });
+    });
+
+    // 3. 全局态势简评
+    const tensionLevel = t.value > 0.5 ? '动荡不安' : (t.value > 0.2 ? '暗流涌动' : '大致平稳');
+    const summary = '世界多势力博弈格局：' + tensionLevel + '（全局张力 ' + t.value + '，同盟簇 ' + (c.clusters ? c.clusters.length : 0) + ' 组，孤立 ' + (c.singletons ? c.singletons.length : 0) + ' 家）。';
+
+    stat.builds++;
+    return {
+      ok: true,
+      tensionLevel: tensionLevel,
+      tensionValue: t.value,
+      summary: summary,
+      reports: reports,
+      coalitions: c.clusters || [],
+      isolated: c.singletons || [],
+      hotspots: (h.rows || []).slice(0, 3)
+    };
+  }
+
   WA.factionGraph = {
     // 单一真源的**可核对面**：两套词表各一口，读的是 evolution 的真源（不自带副本）。
     RELATION_KEYS: function () { const R = relations(); return R ? R.slice() : null; },
@@ -337,6 +401,7 @@
     //   要复核算法本身，走 buildGraph() 的 `basis` / `derived` 字段与 tension() 的
     //   `hostile / denominator` 复算 —— 那是**可复算的读数**，不是又一份实现。
     buildGraph: buildGraph, edgeOf: edgeOf, tension: tension, clusters: clusters, heat: heat,
+    simulateDynamics: simulateDynamics,
     stat: function () {
       return Object.assign({}, stat, { faults: Object.assign({}, stat.faults),
         enabled: settings().enabled, allyIdx: settings().allyIdx, maxNodes: settings().maxNodes,

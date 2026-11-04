@@ -8134,6 +8134,29 @@ function runWitness(WA) {
     want('transaction-failed', 'V9 real owner rejection: transaction-failed'); trip('transaction-failed', function(){ return v9['transaction-failed']; });
     want('unsupported-stage', 'V9 real owner rejection: unsupported-stage'); trip('unsupported-stage', function(){ return v9['unsupported-stage']; });
   }
+  // ── v2.296.0（V10 OPV10-9 / EXV10-6）：ui.showCat 校验非法分类 bad-cat 与 compact 降档 ──
+  {
+    want('bad-cat', 'V10 OPV10-9: ui.showCat 传入非法分类名 ⇒ bad-cat 拒收并返回 valid 列表');
+    trip('bad-cat', function () {
+      if (WA.ui && typeof WA.ui.showCat === 'function') {
+        const r = WA.ui.showCat('__invalid_category__');
+        return r && r.reason;
+      }
+      return null;
+    });
+    want('compact', 'V10 OPV10-8: injectBudget 超预算极端降档单行摘要折叠理由 compact');
+    trip('compact', function () {
+      if (WA.injectBudget && typeof WA.injectBudget.plan === 'function') {
+        const text = "【短头】\n第一行稍长内容，但总长度不到四十";
+        const p = WA.injectBudget.plan([
+          { source: "p", content: "内容".repeat(10), pinned: true, fold: false },
+          { source: "opt", content: text.repeat(3), pinned: false, fold: true }
+        ], { budget: 62 });
+        return (p.folded || []).map(function (f) { return f.reason; });
+      }
+      return null;
+    });
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   // ── v2.280.0（V7 OPV7-4）：写口契约的两个「问错了」码 —— 必须带可执行见证 ──

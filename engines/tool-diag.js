@@ -4850,9 +4850,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       dynamic: ['wa-prof-save', 'wa-prof-clear', 'wa-prof-msg', 'wa-prof-personality', 'wa-prof-worldview', 'wa-prof-family', 'wa-prof-memory', 'wa-prof-relationships'],
       cond: ['wa-intel-network-block'] },
     { page: 'events', ids: ['wa-de-prompt', 'wa-de-turns', 'wa-de-create', 'wa-ef-name', 'wa-ef-scope', 'wa-ef-goal', 'wa-ef-core', 'wa-ef-pillars', 'wa-ef-add', 'wa-ee-name', 'wa-ee-type', 'wa-ee-add', 'wa-inspect-run', 'wa-inspect-out', 'wa-ent-type', 'wa-ent-name', 'wa-ent-desc', 'wa-ent-add', 'wa-ent-out', 'wa-ledger-text',
-      // v2.139.0（E9）：势力关系网三枚读数入口（渲染在事件页「势力」区下方）。
-      //   上面那段注释写了三枚，这里必须真有 —— 注释不是登记。
-      'wa-fg-tension', 'wa-fg-clusters', 'wa-fg-edges', 'wa-fg-pa', 'wa-fg-pb', 'wa-fg-pair', 'wa-fg-hot', 'wa-fg-out'],
+      // v2.139.0（E9）：势力关系网读数入口（渲染在事件页「势力」区下方）。
+      'wa-fg-tension', 'wa-fg-clusters', 'wa-fg-edges', 'wa-fg-dyn', 'wa-fg-pa', 'wa-fg-pb', 'wa-fg-pair', 'wa-fg-hot', 'wa-fg-out'],
       // v2.139.0（E9）：势力关系网读数入口共四枚，各答一个问题、**互不替代**：
       //   张力（网有多紧，含分母可复算）/ 同盟簇（图分成几块，单点单列）/
       //   关系网（逐条边，带 basis 可复盘）/ 查两家（就这两家什么关系，edgeOf 的真消费方）。

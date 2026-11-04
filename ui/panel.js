@@ -2028,7 +2028,8 @@ const peopleIds = Object.keys(s.people);
         return `<div class="wa-row">`
           + `<button class="wa-btn wa-mini" id="wa-fg-tension" aria-label="势力关系网张力" title="全局张力 = 敌对边权重和 ÷ 有效边数（分母是边数，可复算；零边时如实标注分母被保护）">张力</button>`
           + `<button class="wa-btn wa-mini" id="wa-fg-clusters" aria-label="势力关系网同盟簇" title="同盟簇 = 倾向达到「盟友」档及以上的连通子图；单点势力单列（不并入簇数，否则「同盟团数」会被读成「图分成几块」）">同盟簇</button>`
-+ `<button class="wa-btn wa-mini" id="wa-fg-edges" aria-label="势力关系网逐条边" title="逐条边 JSON（含 basis：这条边由哪两个势力的对外态度算出）。边是**推导值**，不是观测到的势力间关系">关系网</button>`
+          + `<button class="wa-btn wa-mini" id="wa-fg-edges" aria-label="势力关系网逐条边" title="逐条边 JSON（含 basis：这条边由哪两个势力的对外态度算出）。边是**推导值**，不是观测到的势力间关系">关系网</button>`
+          + `<button class="wa-btn wa-mini" id="wa-fg-dyn" aria-label="势力博弈推演" title="EXV10-8: 多势力博弈推演（暗流博弈与势力消长走向简讯）">博弈推演</button>`
            + `</div><div class="wa-row">`
            + `<input id="wa-fg-pa" class="wa-input" aria-label="势力关系网查边甲" placeholder="势力甲（查两家关系）"/>`
            + `<input id="wa-fg-pb" class="wa-input" aria-label="势力关系网查边乙" placeholder="势力乙"/>`
@@ -10557,6 +10558,14 @@ on('#wa-desk-show', showDesk);
       const g = WA.factionGraph.buildGraph();
       if (!g.ok) return fgOut(fgWhy(g.reason));
       fgOut('边 ' + g.edges.length + ' 条（推导值）：' + g.edges.map(e => e.a + '—' + e.b + '：' + e.tier + '(' + e.affinity + ')').join('；'));
+    });
+    // v2.296.0（EXV10-8）：多势力博弈动态推演入口
+    on('#wa-fg-dyn', () => {
+      if (!WA.factionGraph || !WA.factionGraph.simulateDynamics) return fgOut('多势力博弈模块未就绪');
+      const d = WA.factionGraph.simulateDynamics();
+      if (!d.ok) return fgOut(fgWhy(d.reason));
+      const rep = (d.reports || []).map(r => r.narrative).join(' ') || '当前无突出暗流争端。';
+      fgOut(d.summary + ' ' + rep);
     });
     // v2.165.0（TX1）：势力外交八个入口的绑定。
     //   四种「没做成」的情形一律显式报出（不留空面板）：模块缺席 / 开关未开 / 势力名不在

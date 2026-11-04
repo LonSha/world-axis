@@ -376,7 +376,10 @@ const LOAD = [
   // v2.160.0（TP4）：跨引擎提交契约。必须进 LOAD —— TP4 专锁的破坏副本与正负探针都在同一 vm
   //   上下文里跑；装载面没给它模块，WA.commit 缺席，专锁的幂等/回执判据会各自静默降级成
   //   「什么都没发生」而仍报绿。
-  'core/commit.js', 'core/interceptor.js',
+  'core/commit.js',
+  // v2.296.0（V10 OPV10-7）：全仓统一待办中心。
+  'core/unified-pending.js',
+  'core/interceptor.js',
   // v2.118.0（计划二 B7）：显式执行上下文。必须进 LOAD —— B7 专锁的破坏副本与正负探针都在
   //   同一 vm 上下文里跑，且 act.js / world.js 在调用期经 WA.exec 取值；装载面没给它模块，
   //   两条路径会各自静默降级成「一律按真世界执行」（专锁的隔离判据因而不成立却不报错）。

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.295.0';
+  const VERSION = '2.296.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -361,6 +361,8 @@
     //   它尾调 WA.registerModule（由 store 提供），且写入侧经 WA.evict.array 走挤出台账。
     //   调用期关系：它读 WA.store / WA.clock / WA.evict，全在调用期取，故排在此处不产生环。
     'core/commit.js',
+    // v2.296.0（V10 OPV10-7）：全仓统一待办中心。位置在 store / commit 之后、引擎之前
+    'core/unified-pending.js',
     'core/interceptor.js',
     'engines/backstage.js',
     'engines/evolution.js',

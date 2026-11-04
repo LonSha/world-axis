@@ -612,6 +612,36 @@
     return head + mark;
   }
 
+  /**
+   * v2.296.0（V10 OPV10-8）：自适应降档单行摘要生成器
+   * 当预算严重不足（超预算但余量不够 MIN_KEEP_TOKENS 或被常规折叠判定为 folded_too_small）时，
+   * 将结构化块优雅压缩为单行极简摘要（带闭合标签与核心事实），占用仅 10~25 tokens。
+   */
+  function compactSummary(text, maxTokens) {
+    const s = String(text == null ? '' : text).trim();
+    if (!s) return '';
+    const st = splitStruct(s);
+    let title = '';
+    let firstLine = '';
+    if (st && st.head) {
+      title = st.head.replace(/[\r\n]/g, '').trim();
+      const firstValid = (st.body || []).filter(function (l) { return l && !/^\s*$/.test(l); })[0];
+      if (firstValid) firstLine = firstValid.trim();
+    } else {
+      const lines = s.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      title = lines[0] || '';
+      firstLine = lines[1] || '';
+    }
+    let res = title;
+    if (firstLine && firstLine !== title) {
+      res += ' ' + firstLine;
+    }
+    // 控制在合理长度内并保证单行闭合
+    if (res.length > 55) res = res.slice(0, 52) + '…';
+    if (tokensOf(res) <= maxTokens) return res;
+    return '';
+  }
+
   function plan(items, opts) {
     const o = opts || {};
     const rb = resolveBudget(o.budget);
@@ -673,8 +703,21 @@
         return;
       }
       const t = trim(x.content, remain);
-      const nt = tokensOf(t);
-      if (nt < MIN_KEEP_TOKENS) { dropped.push({ id: x.id, source: x.source, reason: 'folded_too_small', tokens: x.tokens, remainAt: remain, blockedBy: occSnap() }); return; }
+      let nt = tokensOf(t);
+      if (nt < MIN_KEEP_TOKENS) {
+        // v2.296.0（V10 OPV10-8）：自适应紧凑降档
+        const compact = compactSummary(x.content, remain);
+        const ct = tokensOf(compact);
+        if (compact && ct > 0 && ct <= remain) {
+          folded.push({ id: x.id, source: x.source, reason: 'compact', from: x.tokens, to: ct, content: compact, remainAt: remain, blockedBy: occSnap() });
+          kept.push({ id: x.id, source: x.source, tokens: ct });
+          used += ct;
+          occupied.push({ source: x.source, tokens: ct });
+          return;
+        }
+        dropped.push({ id: x.id, source: x.source, reason: 'folded_too_small', tokens: x.tokens, remainAt: remain, blockedBy: occSnap() });
+        return;
+      }
       folded.push({ id: x.id, source: x.source, reason: 'over_budget', from: x.tokens, to: nt, content: t, remainAt: remain, blockedBy: occSnap() });
       kept.push({ id: x.id, source: x.source, tokens: nt });
       used += nt;
