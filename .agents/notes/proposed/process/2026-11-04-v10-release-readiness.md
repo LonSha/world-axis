@@ -14,7 +14,7 @@ V9 已在 `2.295.0` / `2434588` 推送，十八项产品能力和专项锁已完
 
 ## Decision
 
-V10 先作为 **Release Readiness** 计划推进，不立即新增产品功能。执行顺序为 R0 事实基线、R1 全量回归、R2 真实 SillyTavern 桌面宿主、R3 移动/存储/长局现场、R4 发布事实报告与裁决。
+V10 先作为 **Release Readiness** 计划推进，不立即新增产品功能。项目体积较大，实施期只运行定向专项、浏览器专项和宿主/实机路径；最终 `tests/run.js` 全量回归延后到所有计划工作完成后的冻结收口。执行顺序为 R0 事实基线、R1 定向专项、R2 真实 SillyTavern 桌面宿主、R3 移动/存储/长局现场、R4 最终全量与发布事实裁决。
 
 证据分为 L0 至 L4：源码门禁、Node 专项/全量、Chromium 桩宿主、真实 SillyTavern 桌面宿主、真实手机或等价实机。低层级证据不得冒充高层级证据。最低发布候选要求是全量三要素通过、V9 关键路径达到 L3、发布事实报告一致、工作树干净；手机/长局/存储若属于结论范围必须有 L4，否则只能标为阻塞或延期并在发布说明中明示。
 
@@ -61,6 +61,7 @@ V9 计划和历史笔记继续保留其当时事实，不被改写成新决定�
 ## Related decisions
 
 - [V9 收口全量回归判据跟位](../../implemented/architecture/2026-11-03-v9-closeout-followup-supersede.md)
+- [V10 O7 笔记 class 判据跟位](../../implemented/testing/2026-11-04-v10-o7-note-class-followup.md)
 - [O/E 代际计划与证据分层](../architecture/2026-10-08-worldaxis-o-e-plans.md)
 - [O1 真实宿主验收矩阵](../../../plans/O_OPTIMIZATION.md)
 - [U7/U9 历史宿主与事实报告边界](../../../plans/U_OPTIMIZATION.md)
