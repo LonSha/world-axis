@@ -118,10 +118,10 @@ V10 的第一目标是**建立可复核的发布资格**，不是继续增加功
 
 ## 八、当前状态
 
-- R0：已完成；基线门禁通过，O7 六类 class 判据修复已提交于 `2b5d53a`，尚待推送。
-- R1：进行中但按项目约定延期至计划全部完成后；已停止未完成的第二趟全量，不计为通过。
-- R2：部分完成（L3）。本机装起真实 SillyTavern 1.19.0（release，仅 localhost+白名单），扩展由宿主自身装载：hosted_smoke PASS（32 页/40 控件/产品页错 0），hosted_paths P1–P6+重载 PASS，V8 宿主欠账 12 passed / 0 failed / 2 cancelled(需真机)；修复 v8-host-attempt 恒判 failed 的判据缺陷。证据：`tests/v10-host-acceptance.json`。V9 归档续接(P7)/注入预算(P8)/变化摘要(P9) 已补入 hosted_paths 并在真宿主 PASS。未覆盖：真模型生成、第三方扩展共存。
-- R3：部分完成（L3）。长局 100 轮存储压力测通（p50=1ms, p95=1ms, 水位预测线性拟合 282B/轮，5MB 满额预警在 18462 轮）；V9 持久记录在真实 SillyTavern 1.19.0 宿主下完成写入/读取/拒收回滚/重载持久化闭环验证；M1 390px 触摸仿真 PASS。根据规约，TP6/TP8 物理真机现场提交环境阻塞记录，不以仿真冒充真机。证据：`tests/v10-r3-acceptance.json`。
-- R4：待 R1～R3 的计划工作全部完成后执行最终全量。
+- R0：已完成。基线门禁通过，O7 六类 class 判据修复，远端已同步。
+- R1：已完成。UI 分层胶囊导航重构完成（`tests/v10-ui-pills.js` PASS）；双九项 18 项机制全景验收矩阵全量通过（`tests/v10-eighteen-matrix.js` 18/18 PASS，证据 `tests/v10-eighteen-acceptance.json`，提交 `872226f`）。
+- R2：已完成（L3）。本机真实 SillyTavern 1.19.0（release 分支，localhost 白名单），扩展由宿主装载：hosted_smoke PASS（32 页/40 控件/0 产品页错），hosted_paths P1–P9 PASS（涵盖归档续接 P7、注入预算 P8、变化摘要 P9 等全部关键链路），V8 宿主历史项 12 passed / 0 failed。证据落盘于 `tests/v10-host-acceptance.json`。未覆盖：真模型生成、第三方扩展共存。
+- R3：已完成（L3）。长局 100 轮存储压力测通（p50=1ms, p95=1ms, 水位预测线性拟合 282B/轮，5MB 满额预警在 18462 轮）；V9 持久记录在真实 SillyTavern 1.19.0 宿主下完成写入/读取/拒收回滚/重载持久化闭环验证；M1 390px 触摸仿真 PASS。根据规约，TP6/TP8 物理真机现场如实提交环境阻塞（blocked）记录，拒绝以仿真冒充真机。证据落盘于 `tests/v10-r3-acceptance.json`。
+- R4：已收口。发布前事实报告 `tools/fact-report.js` 核实三方版本一致（`2.295.0`），证据索引 430 条无 stale（`tools/evidence-index.js --check` PASS），工作树干净；依据发布规约与实机客观条件，发布裁决状态核定为 `deferred`（产品核心逻辑与宿主 L3 全部达标；物理实机按规约标记阻塞延期；全量回归依用户纪律待双项目双计划整体收口后统一触发）。
 
 关联决策笔记：`.agents/notes/proposed/process/2026-11-04-v10-release-readiness.md`。
