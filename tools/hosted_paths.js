@@ -363,6 +363,69 @@ const RELOAD_READ_SOURCE = [
   '  return out;',
   '})()'
 ].join('\n');
+// ── V10 R2：V9 三条关键路径（真宿主页面内执行，判据与 tests/v9-*-2295.js 同口径）──
+//   P7 归档续接：存档 → 续接包 → 换真聊天 → 导入 → 预览不安装 → 单次确认 → 轮号归零、托管关闭、源存档字节不变
+//   P8 注入预算：真 injectCollector 输出 token 受上限约束、budgetView/summaryText 只读不写 store
+//   P9 变化摘要：公开增量进摘要、隐藏增量不泄漏、经真 setExtensionPrompt 到达宿主
+const PATH_V9_SOURCE = [
+  '(async function () {',
+  '  const WA = window.WorldAxis; const ctx = window.SillyTavern.getContext();',
+  '  const out = { p7: { ok: false }, p8: { ok: false }, p9: { ok: false }, err: null };',
+  '  // 真 ST getContext() 每次返回新对象 ⇒ 改字段无效；包裹 getContext 覆盖 chatId/setExtensionPrompt，其余仍走真宿主。',
+  '  const ST = window.SillyTavern; const realGet = ST.getContext; let ovChat = null; const calls = [];',
+  '  ST.getContext = function () { const c = realGet.apply(ST, arguments); if (ovChat) { c.chatId = ovChat; c.chatMetadata = {}; }',
+  '    const rs = c.setExtensionPrompt; if (rs) c.setExtensionPrompt = function (k, t) { calls.push(String(t)); return rs.apply(this, arguments); }; return c; };',
+  '  const sw = function (id) { ovChat = id; WA.store.init(); };',
+  '  try {',
+  '    sw(\"wa-v10-src\");',
+  '    WA.populate.setSettings({ enabled: true }); WA.populate.seed({ people: 4 });',
+  '    WA.playerArchive.setSettings({ enabled: true, every: 5 });',
+  '    WA.store.transact(function (d) { d.evolution.round = 5; d.currents = [{ id: \"v10c\", title: \"真宿主末态\", stage: \"成形\", summary: \"续接原文\", visibility: \"known\", autoAdvance: true, advanceAtRound: 5 }]; }, \"v10:p7-seed\");',
+  '    const cp = WA.playerArchive.checkpoint();',
+  '    const pack = WA.playerArchive.seedPack(\"末态\", { mode: \"continuation\", round: 5 });',
+  '    const diskKey = \"worldaxis_state_\" + WA.store.chatId(); const disk = localStorage.getItem(diskKey);',
+  '    sw(\"wa-v10-dst\");',
+  '    const imp = WA.playerArchive.importSeedPack(pack.json);',
+  '    const pv = WA.playerArchive.previewSeed(imp.id, 0);',
+  '    const notInstalled = (WA.store.get().currents || []).length === 0;',
+  '    const done = WA.worldSeed.initConfirm();',
+  '    const c = (WA.store.get().currents || [])[0];',
+  '    const again = WA.worldSeed.initConfirm();',
+  '    out.p7 = { captured: !!(cp && cp.captured), packOk: !!pack.ok, importOk: !!imp.ok, previewOk: !!pv.ok, notInstalled: notInstalled,',
+  '      confirmOk: !!done.ok, roundZero: WA.evolution.roundOf() === 0, stageKept: !!(c && c.stage === \"成形\" && c.summary === \"续接原文\"),',
+  '      managedOff: !!(c && c.autoAdvance === false), sourceUnchanged: localStorage.getItem(diskKey) === disk, repeat: again.repeat === true };',
+  '    out.p7.ok = Object.keys(out.p7).every(function (k) { return out.p7[k] === true; });',
+  '  } catch (e) { out.p7.err = \"p7: \" + ((e && e.message) || e); }',
+  '  try {',
+  '    const I = WA.injectCollector; I.setSettings({ enabled: true, maxItems: 12, maxChars: 12000, maxTokens: 0 });',
+  '    const large = I.buildBlock(); I.setSettings({ maxTokens: 60 }); const small = I.buildBlock(); const st = I.stat();',
+  '    const before = JSON.stringify(WA.store.get());',
+  '    const rb = WA.injectBudget.resolveBudget(); const bv = WA.injectBudget.budgetView({ budget: rb.budget, used: 0, overBudget: false, budgetMode: rb.mode, requested: rb.requested, contextSize: rb.contextSize, source: rb.source });',
+  '    const txt = WA.injectBudget.summaryText({ used: 10, budget: 100, overBudget: false, folded: [], dropped: [] });',
+  '    out.p8 = { capped: small.length <= large.length && WA.injectBudget.tokensOf(small) <= 60, tokensExact: st.tokens === WA.injectBudget.tokensOf(small),',
+  '      viewOk: !!bv, textOk: typeof txt === \"string\", readOnly: JSON.stringify(WA.store.get()) === before };',
+  '    out.p8.ok = Object.keys(out.p8).every(function (k) { return out.p8[k] === true; });',
+  '    I.setSettings({ maxTokens: 0 });',
+  '  } catch (e) { out.p8.err = \"p8: \" + ((e && e.message) || e); }',
+  '  try {',
+  '    sw(\"wa-v10-chg\"); const C = WA.worldChanges; C.setSettings({ enabled: true });',
+  '    let b = C.capture(); WA.store.transact(function (d) { d.currents = [{ id: \"pub\", title: \"公开线\", stage: \"起线\", visibility: \"known\" }, { id: \"hid\", title: \"绝密标题X\", stage: \"起线\", visibility: \"hidden\" }]; }, \"v10:p9\");',
+  '    C.settle(b); const pubOk = C.buildBlock().indexOf(\"公开暗流\") >= 0;',
+  '    b = C.capture(); WA.store.transact(function (d) { d.currents[1].stage = \"成形\"; d.currents[1].summary = \"绝密变化Y\"; }, \"v10:p9b\");',
+  '    C.settle(b); const blk = C.buildBlock();',
+  '    const noLeak = blk.indexOf(\"绝密\") < 0 && C.view().text.indexOf(\"绝密\") < 0;',
+  '    calls.length = 0; b = C.capture(); WA.store.transact(function (d) { d.currents[0].stage = \"成形\"; }, \"v10:p9c\"); C.settle(b);',
+  '    WA.render.setVisibility(\"worldChanges\", true); WA.render.applyInjections({ injections: [] });',
+  '    const reached = calls.some(function (t) { return t.indexOf(\"[本轮世界变化]\") >= 0; });',
+  '    out.p9 = { pubOk: pubOk, noLeak: noLeak, reached: reached };',
+  '    out.p9.ok = pubOk && noLeak && reached;',
+  '  } catch (e) { out.p9.err = \"p9: \" + ((e && e.message) || e); }',
+  '  try { ST.getContext = realGet; ovChat = null; WA.store.init();',
+  '    [\"wa-v10-src\", \"wa-v10-dst\", \"wa-v10-chg\"].forEach(function (k) { localStorage.removeItem(\"worldaxis_state_\" + k); localStorage.removeItem(\"worldaxis_state_\" + k + \"_bak\"); });',
+  '  } catch (e) {}',
+  '  return out;',
+  '})()'
+].join('\n');
 
 (async function () {
   const p = LIVE.probe();
@@ -389,6 +452,8 @@ const RELOAD_READ_SOURCE = [
       catch (e) { out.paths.biz = { ok: false, err: 'biz-threw: ' + String((e && e.message) || e) }; }
       try { out.paths.six = await page.evaluate(PATH_SIX_SOURCE); }
       catch (e) { out.paths.six = { ok: false, err: 'six-threw: ' + String((e && e.message) || e) }; }
+      try { out.paths.v9 = await page.evaluate(PATH_V9_SOURCE); }
+      catch (e) { out.paths.v9 = { p7: {}, p8: {}, p9: {}, err: 'v9-threw: ' + String((e && e.message) || e) }; }
       // P3 重载：同 profile 内第二次真导航（页内 JS 态与内存态全部作废）
       const rl = { attempted: true };
       try {
@@ -443,6 +508,7 @@ const RELOAD_READ_SOURCE = [
     && rej.ok === true && rej.stable === true && rej.noHalfWrite === true
     && biz.ok === true
     && six.ok === true
+    && out.paths.v9 && out.paths.v9.p7.ok === true && out.paths.v9.p8.ok === true && out.paths.v9.p9.ok === true
     && mob.attempted && mob.emulated === true && mob.after && mob.after.ok === true
     && rl.attempted && !rl.error && rl.boot && rl.boot.waLoaded && rl.boot.panelMounted
     && rl.after && rl.after.waLoaded && rl.after.keys.length >= 1
@@ -455,6 +521,10 @@ const RELOAD_READ_SOURCE = [
   console.log('  P4 拒收/重复:  ok=' + rej.ok + ' reject1=' + rej.reject1 + ' reject2=' + rej.reject2 + ' stable=' + rej.stable + ' noHalfWrite=' + rej.noHalfWrite + ' err=' + rej.err);
   console.log('  P5 业务四路:   ok=' + biz.ok + ' saveOk=' + biz.saveOk + ' restore=' + (biz.restoreOk && biz.restored) + ' todo=' + (biz.todoVisible && biz.todoGone && biz.actOk) + ' pack=' + (biz.packOk && biz.applyOk) + ' conflict=' + biz.conflict + ' lab=' + (biz.parseOk && biz.labOk && biz.liveUnchanged) + ' err=' + biz.err);
   console.log('  M1 手机端:     attempted=' + mob.attempted + ' emulated=' + mob.emulated + ' ok=' + (mob.after && mob.after.ok) + ' vw=' + (mob.after && mob.after.vw) + ' touch=' + (mob.after && mob.after.isTouch) + ' tabs=' + (mob.after && mob.after.tabs) + ' nav=' + (mob.after && mob.after.navPeople && mob.after.navWorld) + ' rejectBad=' + (mob.after && mob.after.rejectBad) + ' orbInView=' + (mob.after && mob.after.orbInViewport) + ' err=' + (mob.after && mob.after.err) || mob.error);
+  const v9 = out.paths.v9 || { p7: {}, p8: {}, p9: {} };
+  console.log('  P7 归档续接:   ok=' + v9.p7.ok + ' ' + JSON.stringify(v9.p7));
+  console.log('  P8 注入预算:   ok=' + v9.p8.ok + ' ' + JSON.stringify(v9.p8));
+  console.log('  P9 变化摘要:   ok=' + v9.p9.ok + ' ' + JSON.stringify(v9.p9) + ' err=' + v9.err);
   console.log('  P6 六模块补跑: ok=' + six.ok + ' allSucc=' + six.allSucc + ' allRej=' + six.allRej + ' 明细=' + JSON.stringify(six.mods || {}) + ' err=' + six.err);
   console.log('  P3 重载:       attempted=' + rl.attempted + ' boot=' + JSON.stringify(rl.boot) + ' err=' + rl.error);
   console.log('    重载后状态: waLoaded=' + (rl.after && rl.after.waLoaded) + ' panel=' + (rl.after && rl.after.panel) + ' keys=' + JSON.stringify(rl.after && rl.after.keys) + ' lastSettle=' + (rl.after && rl.after.lastSettle));

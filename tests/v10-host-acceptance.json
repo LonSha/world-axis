@@ -35,6 +35,9 @@
     "  P4 拒收/重复:  ok=true reject1=insufficient reject2=insufficient stable=true noHalfWrite=true err=null",
     "  P5 业务四路:   ok=true saveOk=true restore=true todo=true pack=true conflict=conflict lab=true err=null",
     "  M1 手机端:     attempted=true emulated=true ok=true vw=390 touch=true tabs=32 nav=true rejectBad=true orbInView=true err=null",
+    "  P7 归档续接:   ok=true {\"captured\":true,\"packOk\":true,\"importOk\":true,\"previewOk\":true,\"notInstalled\":true,\"confirmOk\":true,\"roundZero\":true,\"stageKept\":true,\"managedOff\":true,\"sourceUnchanged\":true,\"repeat\":true,\"ok\":true}",
+    "  P8 注入预算:   ok=true {\"capped\":true,\"tokensExact\":true,\"viewOk\":true,\"textOk\":true,\"readOnly\":true,\"ok\":true}",
+    "  P9 变化摘要:   ok=true {\"pubOk\":true,\"noLeak\":true,\"reached\":true,\"ok\":true} err=null",
     "  P6 六模块补跑: ok=true allSucc=true allRej=true 明细={\"tx2\":{\"succ\":true,\"rej\":true,\"reason\":\"need-steps\"},\"tx5\":{\"succ\":true,\"rej\":true},\"tx6\":{\"succ\":true,\"rej\":true,\"reason\":\"duplicate-receipt\"},\"tx7\":{\"succ\":true,\"rej\":true,\"reason\":\"duplicate-receipt\"},\"tx8\":{\"succ\":true,\"rej\":true,\"reason\":\"duplicate-event\"},\"tx9\":{\"succ\":true,\"rej\":true,\"reason\":\"duplicate-settle\"},\"td\":{\"planOk\":true,\"unreachable\":true,\"verifySame\":true,\"verifyNone\":true,\"badChannel\":true,\"succ\":true,\"rej\":true}} err=null",
     "  P3 重载:       attempted=true boot={\"host\":\"sillytavern\",\"loadPath\":\"host\",\"waLoaded\":true,\"panelMounted\":true} err=undefined",
     "    重载后状态: waLoaded=true panel=true keys=[\"worldaxis_state_wa_default\",\"worldaxis_state_wa_default_bak\"] lastSettle=[object Object]",
@@ -133,7 +136,12 @@
   "notCovered": [
     "real LLM generation (P1 uses real interceptor + real GENERATION_ENDED with synthetic floor, no model backend)",
     "third-party extension coexistence",
-    "TP6/TP8 real-phone p50/p95 (M1 is emulated 390px touch, L2-equivalent, not L4)",
-    "V9 archive-continue / injection-budget / change-summary paths not yet driven individually in hosted_paths"
-  ]
+    "TP6/TP8 real-phone p50/p95 (M1 is emulated 390px touch, L2-equivalent, not L4)"
+  ],
+  "v9HostedPaths": {
+    "P7": "archive-continue",
+    "P8": "inject-budget",
+    "P9": "world-changes (public in, hidden excluded, reaches real setExtensionPrompt)",
+    "harnessNote": "real ST getContext() returns a fresh object per call; chat override wraps getContext instead of mutating fields"
+  }
 }
