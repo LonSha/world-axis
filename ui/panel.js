@@ -329,12 +329,20 @@
     { id: 'tools', icon: '🧰', label: '工具' },
     { id: 'logs', icon: '📋', label: '日志' }
   ];
+  // v2.295.0（V10 UI）：分类亲和表。4 大核心分类 + all 通用类。
+  const CATS = [
+    { id: 'core', icon: '◈', label: '核心' },
+    { id: 'world', icon: '🌐', label: '世界' },
+    { id: 'workshop', icon: '🧰', label: '工坊' },
+    { id: 'meta', icon: '⚙️', label: '元' },
+    { id: 'all', icon: '≡', label: '全部' }
+  ];
   const PAGE_CAT = {
     overview: 'core', chapter: 'core', beat: 'core', todo: 'core', events: 'core', director: 'core', actiondesk: 'core',
     world: 'world', people: 'world', memory: 'world', enemies: 'world', parallel: 'world', travel: 'world', sediment: 'world', offline: 'world',
     inject: 'workshop', supply: 'workshop', evidence: 'workshop', branchdiff: 'workshop', storyloop: 'workshop', retrieval: 'workshop', port: 'workshop', find: 'workshop', graph: 'workshop', net: 'workshop',
-    settings: 'system', health: 'system', connect: 'system', assistant: 'system', tools: 'system', logs: 'system',
-    desk: 'system'
+    settings: 'meta', health: 'core', connect: 'meta', assistant: 'meta', tools: 'meta', logs: 'meta',
+    desk: 'meta'
   };
   let currentCat = 'core';
 
@@ -16323,12 +16331,12 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
       })()}</span><span class="wa-close">✕</span></div>
       <div class="wa-nav-bar"><span id="wa-nav-out" class="wa-dim"></span>
         <button class="wa-btn wa-mini" id="wa-nav-back" title="回到上一页，并按离开时的样子还原输入与滚动位（ui/panel-nav.js 的回程栈，有界 8 层）">← 返回</button></div>
-      <div class="wa-cat-bar">
-        <button class="wa-cat-btn active" data-cat="core">核心</button>
-        <button class="wa-cat-btn" data-cat="world">世界</button>
-        <button class="wa-cat-btn" data-cat="workshop">工坊</button>
-        <button class="wa-cat-btn" data-cat="system">系统</button>
-        <button class="wa-cat-btn" data-cat="all">全部</button>
+      <div class="wa-cat-bar wa-cat-nav" role="tablist" aria-label="面板分类">
+        <button class="wa-cat-btn wa-cat-pill active" data-cat="core" role="tab" aria-selected="true">◈ 核心</button>
+        <button class="wa-cat-btn wa-cat-pill" data-cat="world" role="tab" aria-selected="false">🌐 世界</button>
+        <button class="wa-cat-btn wa-cat-pill" data-cat="workshop" role="tab" aria-selected="false">🧰 工坊</button>
+        <button class="wa-cat-btn wa-cat-pill" data-cat="meta" role="tab" aria-selected="false">⚙️ 元</button>
+        <button class="wa-cat-btn wa-cat-pill" data-cat="all" role="tab" aria-selected="false">≡ 全部</button>
       </div>
       <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}" data-cat="${PAGE_CAT[p.id] || 'core'}">${p.icon} ${p.label}</button>`).join('')}</div>
       <div class="wa-row"><label for="wa-setting-search">设置检索（当前页）</label><input id="wa-setting-search" type="search" class="wa-input" placeholder="按标签、中文名或设置键筛选"/><span id="wa-setting-search-count" class="wa-dim" aria-live="polite"></span></div>
@@ -16367,11 +16375,7 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
     //   就在那一处）。收成一个口之后，tab 与协议走同一条路。
     panelEl.querySelectorAll('.wa-cat-btn').forEach(btn => {
       btn.onclick = () => {
-        currentCat = btn.dataset.cat;
-        panelEl.querySelectorAll('.wa-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === currentCat));
-        panelEl.querySelectorAll('.wa-tab').forEach(t => {
-          t.style.display = (currentCat === 'all' || t.dataset.cat === currentCat) ? '' : 'none';
-        });
+        WA.ui.showCat(btn.dataset.cat);
       };
     });
     panelEl.querySelectorAll('.wa-tab').forEach(t => t.onclick = () => { WA.ui.goPage(t.dataset.page); });
@@ -16560,6 +16564,25 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
     // v2.255.0 SIMPLIFY-NAV：开发者模式读口/写口。写走 __setDevMode 单一口径（可见性、
     //   分类条、机制页弹回、落盘都在那一个函数里），设置页开关只是它的一个调用方。
     devMode() { return __devMode === true; },
-    setDevMode(on) { return __setDevMode(on); }
+    setDevMode(on) { return __setDevMode(on); },
+    // v2.295.0（V10 UI）：暴露程序化切分类口（供测试/集成/自动化用），与 pill 点击等价。
+    showCat(cat) {
+      const valid = ['core', 'world', 'workshop', 'meta', 'all'];
+      if (valid.indexOf(cat) < 0) return { ok: false, reason: 'bad-cat', valid: valid };
+      currentCat = cat;
+      if (panelEl) {
+        panelEl.querySelectorAll('.wa-cat-btn').forEach(b => {
+          const act = b.dataset.cat === currentCat;
+          b.classList.toggle('active', act);
+          if (b.setAttribute) b.setAttribute('aria-selected', act ? 'true' : 'false');
+        });
+        panelEl.querySelectorAll('.wa-tab').forEach(t => {
+          const catOk = currentCat === 'all' || t.dataset.cat === currentCat;
+          const vis = (__devMode || PLAYER_PAGES.indexOf(t.dataset.page) >= 0) && catOk;
+          t.style.display = vis ? '' : 'none';
+        });
+      }
+      return { ok: true, cat: cat };
+    }
   };
 })();

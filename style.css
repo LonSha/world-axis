@@ -44,6 +44,15 @@
   --wa-font-main: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
   --wa-font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, SFMono-Regular, monospace;
 
+  /* v2.295.0（V10）：响应式与设计 token */
+  --wa-panel-w: clamp(360px, 30vw, 600px);
+  --wa-panel-h: clamp(500px, 72vh, 700px);
+  --wa-text-xs: clamp(10px, 0.75rem, 10.5px);
+  --wa-text-sm: clamp(10.5px, 0.85rem, 12px);
+  --wa-text-base: clamp(12px, 0.95rem, 13px);
+  --wa-r-sm: 8px;
+  --wa-r-pill: 999px;
+
   /* 物理缓动 */
   --wa-ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --wa-duration: 0.16s;
@@ -125,8 +134,8 @@
   position: fixed;
   right: 16px;
   bottom: 140px;
-  width: min(440px, 94vw);
-  height: min(620px, 80vh);
+  width: var(--wa-panel-w);
+  height: var(--wa-panel-h);
   background: linear-gradient(180deg, rgba(14, 18, 24, 0.98) 0%, rgba(9, 12, 16, 0.98) 100%);
   border: 1px solid var(--wa-border-regular);
   border-radius: 11px;
@@ -140,7 +149,7 @@
     0 2px 10px rgba(0, 0, 0, 0.5),
     var(--wa-highlight-top);
   color: var(--wa-text-primary);
-  font: 12.5px/1.5 var(--wa-font-main);
+  font: var(--wa-text-base)/1.5 var(--wa-font-main);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -340,6 +349,44 @@
   font-weight: 600;
 }
 
+/* v2.295.0（V10）：分类 pill 导航 */
+.wa-cat-nav {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(9, 12, 16, 0.5);
+  border-bottom: 1px solid var(--wa-border-subtle);
+  flex-shrink: 0;
+}
+
+.wa-cat-pill {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--wa-border-subtle);
+  color: var(--wa-text-secondary);
+  padding: 4px 12px;
+  border-radius: var(--wa-r-pill);
+  cursor: pointer;
+  font-size: var(--wa-text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all var(--wa-duration) var(--wa-ease-spring);
+  user-select: none;
+  letter-spacing: 0.2px;
+}
+
+.wa-cat-pill:hover {
+  background: var(--wa-surface-hover);
+  color: var(--wa-text-primary);
+  border-color: var(--wa-border-regular);
+}
+
+.wa-cat-pill.active {
+  background: var(--wa-accent-dim);
+  border-color: var(--wa-accent-border);
+  color: var(--wa-accent);
+  font-weight: 600;
+}
+
 .wa-tabs {
   display: flex;
   overflow-x: auto;
@@ -361,7 +408,7 @@
   padding: 5px 9px;
   cursor: pointer;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: var(--wa-text-sm);
   font-weight: 500;
   border-bottom: 2px solid transparent;
   transition: all var(--wa-duration) ease;
