@@ -1025,8 +1025,25 @@ function summarize(r) {
     + ' controls=' + r.controls + ' readings=' + (r.readings ? r.readings.length : 0) + ' thrown=' + r.thrown.length + ' rej=' + r.rejections.length
     + ' pageErr=' + r.pageErrors.length + ' fillErr=' + (r.fulfillErrors || 0) + ' dlg=' + (r.dialogs || 0) + ' roundtrip=' + (r.roundtrip && r.roundtrip.ok ? 'ok' : 'no');
 }
+/**
+ * v2.295.0+（V10 R2）：真宿主验收**单一判据**（hosted_smoke 与 v8-host-attempt 共用）。
+ *   病灶：v8-host-attempt 曾读 `hosted.ok || hosted.status === 'ok'`，而 runLiveHosted 从不
+ *   返回这两个字段 ⇒ 宿主一旦可达就必然全判 failed（V10 现场首次接通真 ST 1.19.0 时抓到）。
+ *   环境类页错（无头 Chromium 拒剪贴板写入）单列，不算产品失败；真机点击即用户手势。
+ */
+const ENV_PAGE_ERR = /NotAllowedError|Clipboard|writeText|permission denied/i;
+function hostedVerdict(o) {
+  const pageErrors = (o && o.pageErrors) || [];
+  const envPageErrs = pageErrors.filter(function (m) { return ENV_PAGE_ERR.test(m); });
+  const realPageErrs = pageErrors.filter(function (m) { return !ENV_PAGE_ERR.test(m); });
+  const ok = !!(o && o.host === 'sillytavern' && o.waLoaded && o.panelMounted
+    && (o.thrown || []).length === 0 && (o.loadErrors || []).length === 0 && realPageErrs.length === 0);
+  return { ok: ok, envPageErrs: envPageErrs, realPageErrs: realPageErrs };
+}
+
 module.exports = {
   BASE: BASE,
+  hostedVerdict: hostedVerdict,
   // v2.211.0（优化 3）：真宿主验收入口 + 驱动类（供真宿主冒烟/专锁复用，**不复制驱动**）
   runLiveHosted: runLiveHosted,
   driveBuiltin: driveBuiltin,

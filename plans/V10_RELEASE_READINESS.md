@@ -120,7 +120,7 @@ V10 的第一目标是**建立可复核的发布资格**，不是继续增加功
 
 - R0：已完成；基线门禁通过，O7 六类 class 判据修复已提交于 `2b5d53a`，尚待推送。
 - R1：进行中但按项目约定延期至计划全部完成后；已停止未完成的第二趟全量，不计为通过。
-- R2：待执行/阻塞，当前会话没有真实 SillyTavern 宿主验收凭据。
+- R2：部分完成（L3）。本机装起真实 SillyTavern 1.19.0（release，仅 localhost+白名单），扩展由宿主自身装载：hosted_smoke PASS（32 页/40 控件/产品页错 0），hosted_paths P1–P6+重载 PASS，V8 宿主欠账 12 passed / 0 failed / 2 cancelled(需真机)；修复 v8-host-attempt 恒判 failed 的判据缺陷。证据：`tests/v10-host-acceptance.json`。未覆盖：真模型生成、第三方扩展共存、V9 归档续接/预算看板/变化摘要逐条真宿主路径。
 - R3：待执行/阻塞，当前会话没有真实手机/存储压力凭据。
 - R4：待 R1～R3 的计划工作全部完成后执行最终全量。
 

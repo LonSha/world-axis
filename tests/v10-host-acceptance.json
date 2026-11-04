@@ -1,0 +1,139 @@
+{
+  "version": "2.295.0",
+  "baseCommit": "b76159c",
+  "layer": "L3",
+  "host": {
+    "product": "SillyTavern",
+    "version": "1.19.0",
+    "branch": "release",
+    "url": "http://127.0.0.1:8000",
+    "config": "listen:false whitelistMode:true (localhost only)",
+    "install": "extension symlinked into public/scripts/extensions/third-party/WorldAxis"
+  },
+  "browser": "chromium_headless_shell-1148 via builtin-cdp@node-websocket",
+  "hostedSmoke": [
+    "=== 真宿主冒烟读数",
+    "  tier=full driver=builtin-cdp@node-websocket",
+    "  host=sillytavern hostVersion=null",
+    "  url=http://127.0.0.1:8000/",
+    "  loadPath=host（host=宿主自己装载 / manual-script=退到真 DOM 装载链）",
+    "  waLoaded=true waVersion=2.295.0 panelMounted=true",
+    "  pages=32 controls=40 waitedMs=11958",
+    "  thrown=0 rej=0 pageErr=3 consoleErr=0",
+    "  loadErrors=[]",
+    "  errors=[]",
+    "  roundtrip=true",
+    "  页错样本=[\"NotAllowedError: Failed to execute 'writeText' on 'Clipboard': Write permission denied.\",\"NotAllowedError: Failed to execute 'writeText' on 'Clipboard': Write permission denied.\",\"NotAllowedError: Failed to execute 'writeText' on 'Clipboard': Write permission denied.\"]",
+    "  环境类页错（非产品缺陷，3）: [\"NotAllowedError: Failed to execute 'writeText' on 'Clipboard': Write permission denied.\",\"NotAllowedError: Failed to execute 'writeText' on 'Clipboard': Write permission denied.\"]",
+    "HOSTED-SMOKE: PASS（真宿主=sillytavern 装载路径=host 面板=true 页数=32 控件=40 产品页错=0 环境页错=3）"
+  ],
+  "hostedPaths": [
+    "=== 真宿主逐条路径读数",
+    "  tier=full driver=builtin-cdp@node-websocket host=sillytavern loadPath=host",
+    "  P1 生成前后链: ok=true steps=[\"before-chain\",\"after-chain\",\"repeat-dedup\"] settled=true round=1 advanced=true dedupNoDouble=true err=null",
+    "  P2 切聊天:     ok=true refChanged=true chatChangedFired=1 repeatOk=true err=null",
+    "  P4 拒收/重复:  ok=true reject1=insufficient reject2=insufficient stable=true noHalfWrite=true err=null",
+    "  P5 业务四路:   ok=true saveOk=true restore=true todo=true pack=true conflict=conflict lab=true err=null",
+    "  M1 手机端:     attempted=true emulated=true ok=true vw=390 touch=true tabs=32 nav=true rejectBad=true orbInView=true err=null",
+    "  P6 六模块补跑: ok=true allSucc=true allRej=true 明细={\"tx2\":{\"succ\":true,\"rej\":true,\"reason\":\"need-steps\"},\"tx5\":{\"succ\":true,\"rej\":true},\"tx6\":{\"succ\":true,\"rej\":true,\"reason\":\"duplicate-receipt\"},\"tx7\":{\"succ\":true,\"rej\":true,\"reason\":\"duplicate-receipt\"},\"tx8\":{\"succ\":true,\"rej\":true,\"reason\":\"duplicate-event\"},\"tx9\":{\"succ\":true,\"rej\":true,\"reason\":\"duplicate-settle\"},\"td\":{\"planOk\":true,\"unreachable\":true,\"verifySame\":true,\"verifyNone\":true,\"badChannel\":true,\"succ\":true,\"rej\":true}} err=null",
+    "  P3 重载:       attempted=true boot={\"host\":\"sillytavern\",\"loadPath\":\"host\",\"waLoaded\":true,\"panelMounted\":true} err=undefined",
+    "    重载后状态: waLoaded=true panel=true keys=[\"worldaxis_state_wa_default\",\"worldaxis_state_wa_default_bak\"] lastSettle=[object Object]",
+    "  产品页错=0 环境页错=0 consoleErr=0",
+    "HOSTED-PATHS: PASS"
+  ],
+  "v8HostAttempt": {
+    "counts": {
+      "passed": 12,
+      "failed": 0,
+      "cancelled": 2,
+      "total": 14
+    },
+    "debts": [
+      {
+        "id": "S1",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "S2",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TX1",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TX2",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TX3",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TX4",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TX5",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TX6",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TX7",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TX8",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TX9",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TP7",
+        "status": "passed",
+        "passed": true
+      },
+      {
+        "id": "TP6",
+        "status": "cancelled-needs-physical-device",
+        "passed": false
+      },
+      {
+        "id": "TP8",
+        "status": "cancelled-needs-physical-device",
+        "passed": false
+      }
+    ]
+  },
+  "locks": {
+    "ui-live-v2137": [
+      "UI-LIVE-V2137: tier=full（实机通道可用（cache-scan:chromium_headless_shell-1148）） —— pass / 54 项全绿"
+    ],
+    "o1-host-matrix-v2186": [
+      "O1-MATRIX-V2186: tier=full（实机通道可用（cache-scan:chromium_headless_shell-1148）） —— pass / 78 项全绿"
+    ]
+  },
+  "verdictFix": "v8-host-attempt read hosted.ok/status which runLiveHosted never returns => any reachable host was always failed; now shares LIVE.hostedVerdict with hosted_smoke (negative controls 7/7).",
+  "notCovered": [
+    "real LLM generation (P1 uses real interceptor + real GENERATION_ENDED with synthetic floor, no model backend)",
+    "third-party extension coexistence",
+    "TP6/TP8 real-phone p50/p95 (M1 is emulated 390px touch, L2-equivalent, not L4)",
+    "V9 archive-continue / injection-budget / change-summary paths not yet driven individually in hosted_paths"
+  ]
+}

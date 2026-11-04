@@ -39,14 +39,13 @@ LIVE.runLiveHosted({ url: url }).then(function (o) {
   //   （无用户手势 + 未授权）⇒ 面板的「复制」按钮会抛 `NotAllowedError`。
   //   真机上用户点击**就是**手势，该错误不会出现。把它算成产品缺陷会掩盖真正的产品页错 ——
   //   故按类分流：`envNotes` 如实登记，`pageErrors` 只留非环境类。
-  const ENV_PAGE_ERR = /NotAllowedError|Clipboard|writeText|permission denied/i;
-  const envPageErrs = o.pageErrors.filter(function (m) { return ENV_PAGE_ERR.test(m); });
-  const realPageErrs = o.pageErrors.filter(function (m) { return !ENV_PAGE_ERR.test(m); });
+  const v = LIVE.hostedVerdict(o);
+  const envPageErrs = v.envPageErrs;
+  const realPageErrs = v.realPageErrs;
   if (envPageErrs.length) console.log('  环境类页错（非产品缺陷，' + envPageErrs.length + '）: '
     + JSON.stringify(envPageErrs.slice(0, 2)));
 
-  const ok = o.host === 'sillytavern' && o.waLoaded && o.panelMounted
-    && o.thrown.length === 0 && (o.loadErrors || []).length === 0 && realPageErrs.length === 0;
+  const ok = v.ok;
   console.log('HOSTED-SMOKE: ' + (ok ? 'PASS' : 'FAIL')
     + '（真宿主=' + o.host + ' 装载路径=' + o.loadPath + ' 面板=' + o.panelMounted
     + ' 页数=' + o.pages + ' 控件=' + o.controls

@@ -77,13 +77,16 @@ function probe(url) {
     });
   } else {
     // 找到宿主：必须真跑，跑不过记 failed（不许注销）
+    // 判据与 tools/hosted_smoke.js 共用 LIVE.hostedVerdict（单一真源）。
+    //   旧判据读 hosted.ok/status，runLiveHosted 从不返回 ⇒ 宿主可达即恒判 failed。
+    const LIVE = require(path.join(BASE, 'tests/ui-live'));
     let hosted = null;
     try {
-      hosted = await require(path.join(BASE, 'tests/ui-live')).runLiveHosted({ url: hit.url });
+      hosted = await LIVE.runLiveHosted({ url: hit.url });
     } catch (e) {
       hosted = { host: 'error', error: String(e && e.message || e) };
     }
-    const ok = !!(hosted && (hosted.ok || hosted.status === 'ok'));
+    const ok = LIVE.hostedVerdict(hosted).ok;
     hostDebts.forEach(function (id) {
       debts.push({
         id: id,
