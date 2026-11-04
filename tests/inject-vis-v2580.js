@@ -38,6 +38,25 @@ const SNAPSHOT_SOURCES = {
 };
 // 独立注入项里方法名不是 buildBlock 的源（其余一律探测 buildBlock）
 const ITEM_METHOD = { memory: 'buildMemoryBlock', opinion: 'buildOpinionBlock', ledger: 'buildLedgerText' };
+// v2.297.0（V11 OPV11-1 同批清偿）：**需要外部前提**才有产出的源 → 该前提的建立方式。
+//   为什么必须有这张表：C 面判的是「开关动一下、产物是否跟着动」。对绝大多数源，前提就是
+//   开关本身；但 retrieval（历史留存）在 render/inject.js 里还有**第二个前提** ——
+//   `if (!chat0.length) return null;` / `if (!last0.is_user) return null;`，即必须存在一帧
+//   **玩家输入**，否则它连 buildBlock 都不会被调用（不是开关失效，是这一轮没有输入可检索）。
+//   此前本条判据对 retrieval 恒红（自 v2.228.0 引入该源起，实测基线即 FAIL 1/10），
+//   而红的原因与「开关失效」正好相反 —— 判据在报一个它没建立前提的场景。
+//   治法**不是**放宽判据（去掉 retrieval 或改成 skip），而是**把前提真的建起来**：
+//   逐源开始前给 mock 上下文塞一帧玩家输入，让 retrieval 走完整分支。
+//   这样判据强度不降反升：若有人把 `vis.retrieval` 守卫删掉，C 面 stillOff 仍会现形。
+const NEEDS_USER_FRAME = { retrieval: true };
+function ensureUserFrame(WA) {
+  try {
+    const ctx = WA.mainWin.SillyTavern.getContext();
+    if (!ctx) return false;
+    ctx.chat = [{ is_user: true, mes: '本轮玩家输入（供历史留存检索）' }];
+    return true;
+  } catch (e) { return false; }
+}
 
 function seedStore(WA) {
   WA.store.transact(function (d) {
@@ -89,6 +108,9 @@ function probeAll(WA) {
     }
     const m = methodOf(WA, k);
     if (!m) { out.push({ source: k, kind: 'no-producer', skipped: true }); return; }
+    // 需要外部前提的源：先把前提真的建起来（不是 skip、不是放宽判据）
+    const frameOk = NEEDS_USER_FRAME[k] ? ensureUserFrame(WA) : true;
+    if (!frameOk) { out.push({ source: k, kind: 'no-frame', skipped: true }); return; }
     const keep = m.mod[m.method];
     m.mod[m.method] = function () { return tag; };
     try {

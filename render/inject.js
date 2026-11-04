@@ -856,6 +856,14 @@ style: false,
    */
   const engineFailures = {};
   /**
+   * v2.297.0（V11 OPV11-1）：快照故障段的**上次观测计数**（段名 -> count）。
+   *   用途只有一个：把 engineFailures 的累计计数差分成「本轮坏没坏」。
+   *   为什么不并进 engineFailures：那是跨轮真源，被诊断面与面板读取；
+   *   往里塞一个「上次读数」会把真源变成状态机，读它的地方都得跟着改。
+   *   本表是本模块私有的观测游标，不导出、不进存档、不影响注入。
+   */
+  const __snapFailSeen = {};
+  /**
    * v2.88.0 O1：引擎源耗时台账（显示名 -> { ms, n }，**只记本轮**，每轮注入链开头清零）。
    *   为什么要 n（调用次数）：墙体时钟只精到 1ms，单次构建常常量到 0；此时 0ms 是
    *   **低于计时精度**，不是「不花时间」。只报 ms 的话，「一次都没量到」与「量到了但很快」
@@ -1180,12 +1188,128 @@ style: false,
           : ((e.refCurrent || '?') + '（余波未明）')).join('；'));
       }
       // v0.1.29: 呈现铁律只在真有状态内容时追加——此前无条件 push 导致
-      // parts.length 恒真、可见性全关仍注入 221 字空壳（开关对世界状态失效）
-      if (parts.length) {
-        parts.push('〔呈现铁律〕以上状态只供你构建舞台。输出时必须全部经过 NPC 视角过滤：信息只可由 NPC 口述/信件/公告/路人议论呈现，绝不使用系统旁白；禁止输出属性面板、好感度数值、经济指标或声望分数。')
-        return '<world_axis_state>\n' + parts.join('\n') + '\n</world_axis_state>';
-      }
-      return '';
+      // parts.length 恒真、可见性全关仍注入 221 字空壳（开关对世界状态失效）。
+      // v2.297.0（V11 OPV11-1）：本分支**不再直接返回** —— 「parts 非空」只能证明
+      //   「有时间戳」，不能证明「有世界内容」。三态判定统一挪到下面那段
+      //   （clockSet / hasContent / faults 三判），此处仅保留 parts 的累积。
+      //   这样 live / no-facts / fault / no-session / off 五个态只有一个判定真源。
+      // ── v2.297.0（V11 OPV11-1）：真空态必须**如实可分**，不得静默返回空串 ──────
+      // 缺口（实测）：空世界 `buildWorldSnapshot()` 返回**长度 0**。后果是两件完全不同的事
+      //   在读数上完全同形：①「世界还没开局」 ②「世界已开局但一个事实都没有」
+      //   ③「构建链路出了故障」。`applyInjections` 里 `if (snap)` 因此整块世界状态不产条目，
+      //   而下游（预算裁决 / 覆盖率统计 / 诊断面）读到的只是一个空 —— 分不清是我没开局
+      //   还是系统坏了。这与 OPV7-7 判定的 no-data/fault 同形问题是同一族，只是发生在快照层。
+      //
+      // 三态定义（`state` 字段是唯一判据，`__lastSnapState` 供读面断言）：
+      //   · 'no-session' —— 未开局：clock 未设（source==='unset' 或 label 为空）。
+      //       产出一句**明确声明**的极简骨架：零事实、零编造，只报「尚未开局」。
+      //   · 'no-facts'   —— 已开局但六个取数段全空（开局了，世界还没有任何可讲的事）。
+      //       同样给骨架，但标记是 no-facts 而不是 no-session —— 两者的下一步动作完全不同
+      //       （前者去开局，后者去录事实），继续同形就是在骗读面。
+      //   · 'off'        —— 六个源**全部**被可见性开关关掉。此时**必须**保持返回空串：
+      //       这是 v0.1.29 已锁死的语义（tests/run.js「全源关闭时世界快照为空串」），
+      //       开关生效优先于状态声明 —— 用户明确关掉了，系统不该拿状态声明去绕过他的开关。
+      //   · 'fault'      —— 六段全抛异常。此时**不得**假装 no-facts（那就是把故障读成真空），
+      //       返回带 fault 标记的骨架，并让 `snapshotState()` 报出是哪几段坏了。
+      const snapVisKeys = ['clock', 'pulse', 'background', 'people', 'currents', 'echoes'];
+      const visOn = snapVisKeys.filter(function (k) { return !!vis[k]; });
+      if (!visOn.length) { this.__lastSnapState = 'off'; this.__lastSnapFaults = []; return ''; }
+      // 本轮故障段 = engineFailures 的**计数差分**（不是读累计台账）。
+      //   为什么不用累计：engineFailures 是跨轮累加的真源，读它会把「三小时前坏过一次」
+      //   报成「本轮坏了」。差分才回答「这一轮坏了哪些段」，而这正是 fault 态要说的那句话。
+      //   ⚠ 键名口径：noteEngineFailure 里写的是 `SRC_NAME[ns] || ns` 作键（显示名优先），
+      //     这里必须**照同一条规则**取键，否则差分永远读到 undefined ⇒ fault 态永不可达
+      //     （正是 V11 要治的「读数假绿」本身）。
+      const failKey = function (ns) { return SRC_NAME[ns] || ns; };
+      const faults = [];
+      snapVisKeys.forEach(function (k) {
+        if (!vis[k]) return;
+        const rec = engineFailures[failKey(k)];
+        if (!rec) return;
+        const prev = __snapFailSeen[k] || 0;
+        if (rec.count > prev) faults.push(k);
+      });
+      snapVisKeys.forEach(function (k) {
+        const rec = engineFailures[failKey(k)];
+        if (rec) __snapFailSeen[k] = rec.count;
+      });
+      const clockSet = (function () {
+        // v2.297.0 自纠：这里**必须**自带守卫。首版把 `s.clock.label` 裸读在六段 try 之外，
+        //   实测（把 clock.label 换成抛错 getter）异常直接冲出 buildWorldSnapshot ——
+        //   正是本文件 v2.86.0 修过的那个病（「任何一段的脏行把整块打成空/抛出」）在新增
+        //   代码里复刻了一遍。脏 clock 不得让状态判定本身抛错：读不出来就按「未开局」处理，
+        //   并把它记进本轮故障段（fault 优先，读面才知道是坏了而不是没开局）。
+        try {
+          if (!s || !s.clock) return false;
+          const src = s.clock.source;
+          const label = String(s.clock.label || '').trim();
+          return !!(src && src !== 'unset' && label);
+        } catch (e) {
+          // ⚠ 此处**不再** noteEngineFailure：上方 clock 段的 try/catch 已经按
+          //   「世界时间」记过一次。重复记会让台账变成噪音（一次故障计两条），
+          //   而 `tests/settle-v2860.js` [C1] 锁死的正是「单次异常 ⇒ 台账恰好 +1」。本处只补本轮故障段名，
+          //   保证 fault 态能报出是 clock 坏了，而不去动计数真源。
+          if (faults.indexOf('clock') < 0) faults.push('clock');
+          return false;
+        }
+      })();
+      // ── 五态判定：**唯一判定真源**（v2.297.0 三稿定稿）──────────────────
+        // 口径（实测自纠两轮 + 既有语义冲突裁决的结论）：
+        //   · 「在场」与「状态」是两件事，必须解耦。parts 里已经产出的行**一律不得**
+        //     因为状态判定的变化而被删除 —— 那正是第二轮把「只有世界时间」判成 no-facts
+        //     时做的事（把世界时间从正文挪进状态注释），结果当场撞碎
+        //     `tests/settle-v2841.js` C 面「只留 clock 一个源开着时它必在场」。
+        //     既有不变量说得很清楚：**只有世界时间也是有效在场**。
+        //   · 故本块只决定 **state 标记与头部声明**，parts 的累积在任何分支都原样保留。
+        //   优先级（高 → 低）：fault > live > no-facts > no-session。
+        //     fault      —— 有段取数失败。绝不降级成 no-facts（那就是把故障读成真空）。
+        //     live       —— 除世界时间外还有真内容（脉搏/背景/人物/暗流/回声）。
+        //     no-facts   —— 已开局但除世界时间外一无所有。**仍保留世界时间行**，
+        //                   只在头部追加「已开局但没有任何世界内容」这句下一步指引。
+        //     no-session —— 连时间都没有（label 空且未开局）。零事实、零编造。
+        //   ⚠ no-facts 与 live 的区别只在**头部声明**，不在正文内容 —— 这样
+        //     「去开局」与「去录事实」这两句不同的指引不会退化成同一句，同时世界时间
+        //     在两种状态下都真实在场（两个既有不变量同时满足，无一是被牺牲掉的）。
+        const clockLine = parts.some(function (p) { return String(p).indexOf('【世界时间】') === 0; });
+        const hasContent = parts.some(function (p) { return String(p).indexOf('【世界时间】') !== 0; });
+        const st = faults.length ? 'fault'
+          : (hasContent ? 'live' : ((clockLine || clockSet) ? 'no-facts' : 'no-session'));
+        this.__lastSnapState = st;
+        this.__lastSnapFaults = faults;
+        // 呈现铁律：只有**真有可呈现内容**的状态之后才追加（live / no-facts）。
+        //   fault 与 no-session 一律不追加：这一轮没有可呈现的世界内容，
+        //   追加铁律会让读面以为有内容（v0.1.29 的教训：空壳 221 字）。
+        const RULE = '〔呈现铁律〕以上状态只供你构建舞台。输出时必须全部经过 NPC 视角过滤：信息只可由 NPC 口述/信件/公告/路人议论呈现，绝不使用系统旁白；禁止输出属性面板、好感度数值、经济指标或声望分数。';
+        if (st === 'live') {
+          parts.push(RULE);
+          return '<world_axis_state>\n' + parts.join('\n') + '\n</world_axis_state>';
+        }
+        const head = st === 'fault'
+          ? '【世界状态·故障】本轮有 ' + faults.length + ' 段取数失败（' + faults.join('、') + '），' + (hasContent ? '其余段有内容但可能不完整' : '其余段为空') + '。这不是「世界没事」，是读面坏了。'
+          : (st === 'no-facts'
+            ? '【世界状态·已开局】世界已经开局，但除世界时间外没有任何世界内容——尚无人物、背景、暗流或回声可讲。'
+            : '【世界状态·尚未开局】这个世界还没有开始。没有时间、没有背景、没有人物在场——不是「本轮无事」，是世界本身还没被创建。');
+        return '<world_axis_state state="' + st + '"' + (faults.length ? ' faults="' + faults.join(',') + '"' : '') + '>\n'
+          + head + '\n'
+          + parts.join('\n')                       // ← 关键：已产出的行在所有状态下都保留
+          + (parts.length ? '\n' : '')
+          + (st === 'no-facts' ? RULE + '\n' : '')
+          + '</world_axis_state>';
+    },
+    /**
+     * v2.297.0（V11 OPV11-1）：快照三态与故障段的只读读数口。
+     *   为什么要单独一个口：`buildWorldSnapshot()` 的返回值是**给模型看的正文**，让读面去
+     *   parse 它自己的字符串就是在制造第二个真源（V11 命题里最忌讳的形态）。本口直接读
+     *   构建期记下的 `__lastSnapState` / `__lastSnapFaults`，与快照同源同刻，纯只读。
+     *   返回：{ state, faults, keys } —— state ∈ 'live'|'no-facts'|'no-session'|'fault'|'off'
+     *   （'off' 之后若从未构建过则为 null，如实报未测而不是猜一个值）。
+     */
+    snapshotState() {
+      return {
+        state: this.__lastSnapState || null,
+        faults: (this.__lastSnapFaults || []).slice(),
+        keys: ['live', 'no-facts', 'no-session', 'fault', 'off']
+      };
     },
 
     /**
@@ -1748,7 +1872,16 @@ style: false,
               return r;
             } catch (e) { return null; }
           })();
-          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length, sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, volume: WA.injectBudget && WA.injectBudget.volumeView ? WA.injectBudget.volumeView(items, finalItems, { totalCap: planInfo ? planInfo.budget : null }) : null, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, budgetMode: planInfo.budgetMode || null, headroom: planInfo.headroom ? { remain: planInfo.headroom.remain, usedPct: planInfo.headroom.usedPct, freePct: planInfo.headroom.freePct, saturated: !!planInfo.headroom.saturated, avgKeptTokens: planInfo.headroom.avgKeptTokens, spareSources: planInfo.headroom.spareSources, note: planInfo.headroom.note || '' } : null, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+          WA.store.transact(d => { d.lastInjection = { at: clockNow('render.inject'), injected: (combined.length > 0 || slotCount > 0), len: combined.length,
+            // v2.297.0（V11 OPV11-1）：把**本轮世界快照的状态**随打点一并落盘。
+            //   为什么必须在这里落：`snapshotState()` 是只读口，但只读口若没人读，
+            //   它就是「记了没人看」的第二个死面（dead-export-gate 会当场抓到这个）。
+            //   真消费点选在注入主路径上：诊断面读 lastInjection.snapState 就能回答
+            //   「这一轮世界状态块为什么是 no-facts / fault 而不是 live」——
+            //   此前这个问题只能靠读快照字符串猜，那正是 V11 要治的「读数不同源」。
+            //   三态如实：snapshotState() 返回 null（从未构建）时如实记 null，不填 'live'。
+            snapState: (function () { try { const ss = WA.render.snapshotState(); return { state: ss.state, faults: ss.faults }; } catch (e) { return null; } })(),
+            sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, volume: WA.injectBudget && WA.injectBudget.volumeView ? WA.injectBudget.volumeView(items, finalItems, { totalCap: planInfo ? planInfo.budget : null }) : null, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, budgetMode: planInfo.budgetMode || null, headroom: planInfo.headroom ? { remain: planInfo.headroom.remain, usedPct: planInfo.headroom.usedPct, freePct: planInfo.headroom.freePct, saturated: !!planInfo.headroom.saturated, avgKeptTokens: planInfo.headroom.avgKeptTokens, spareSources: planInfo.headroom.spareSources, note: planInfo.headroom.note || '' } : null, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice() })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
           // v2.150.0(RP4): 价值观察的唯一生产方。位置刻意——必须在预算裁决(finalItems)
           //   与槽位路由都定完之后：观察面要的是「这一轮真落地了哪些源」，拿注入前的候选集
           //   来观察，会把被折叠/丢弃的项也记成「注入过却没被引用」——那是把没发生的事判成没用。

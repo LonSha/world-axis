@@ -19,8 +19,8 @@
 | **`buildBlock` 有、`SOURCES` 无** | 差集 | **8**：`pmem` `summarizer` `editorFaction` `editorEvents` `memorySampler` `kaleidoscope` `beatFacade` `intentBoard` | 其中 6 个面板已消费、2 个（`pmem`/`summarizer`）无人消费 ⇒ 归属未裁决 |
 | **空世界非空产出** | 逐台 `buildBlock()` 空世界 | **4 / 114**（`livingWorld` `healthPreflight` `antiOmniscience` `outputGuard`） | 110 台在空世界零产出 |
 | **真实开局后非空产出** | `p_yield_baseline.js` | **15 / 114** | 基线门禁底线 14，仅高出 1 |
-| **空世界 `buildWorldSnapshot()`** | 直接调用 | **长度 0** | 世界状态块在空世界是**完全空白**，不是"如实报未开局" |
-| `applyInjections` 主路径条目 | 宿主桩 + 传入 `injections: []` | **items = 0** | 主路径一条都没产出 |
+| **空世界 `buildWorldSnapshot()`** | 直接调用 | ~~长度 0~~ → **OPV11-1 已修**：`state="no-session"` 骨架非空 | 立项时世界状态块在空世界是**完全空白**；现改为如实声明（见第 1 批交付记录） |
+| `applyInjections` 主路径条目 | 宿主桩 + 传入 `injections: []` | **items = 0**；`lastInjection.snapState` 已记录本轮快照态 | 主路径条目数仍为 0（属 OPV11-2，未开工）；但"这一轮世界状态为何不是 live"已可直读打点，不必 parse 快照串 |
 | 同上，宿主槽位真实内容 | 读 `setExtensionPrompt` 实收 | **573 字符 / 4 源**（真实世界运转、系统健康与写作防线、防全知认知视界、别替玩家说话） | **主路径与宿主槽位读数分叉**：items=0 而槽位有 573 字 |
 | `L3_EXCLUDES`（档位排除的悬空引擎） | `capabilityTier.L3_EXCLUDES` | **35** | V7 OPV7-8 定案的"需手动录入数据"名单 |
 | `roundDrivers.DRIVERS`（轮次驱动名单） | 直接读 | **7** | 只覆盖 `tolerance` `motif` `marginal` `quota` `spotlight` `rhythmLoop` `eraCycle` |
@@ -29,7 +29,7 @@
 | `unifiedPending.collect()` 空世界 | 直接调用 | **total=0 / highCount=0 / items=0** | "世界没事可做"与"聚合器没接上模块"在读数上同形 |
 | 同一 store 字段被 ≥3 个引擎写 | 扫 `draft.X =` / `.push(` | **5 个**：`worldFacts`(5) `people`(5) `evolution`(5) `customLax`(3) `economy`(3) | 多写者字段的写权归属未声明 |
 | `ui/panel.js` 页面数 / 分类数 | 正则 | **PAGES 37 / CATS 5** | CATS 注释写"4 大核心分类 + all"，实为 5，且 `PAGE_CAT` 有 `world` 键与 CATS 的 `world` 同名 | 
-| 测试文件面 | `ls tests/*.js \| wc -l` | **434** | — |
+| 测试文件面 | `ls tests/*.js \| wc -l` | **438**（+4：v11-source-contract / v11-snapshot-state 及其挂载） | V11 新增锁全部已挂进 `tests/run.js`，孤儿 0 |
 | `tests/run.js` 引用数 | 正则 | **217** | 434 个文件里 217 个挂在全量里（V11 新增锁须同步挂载） |
 
 **立项判据（V11 命题）**：V10 解决了「机制通不通」；**V11 要解决的是「通了以后，读数说不说实话」**。上表六条分叉——空世界快照 0 长度、主路径 items=0 而槽位 573 字、35 台 L3 只驱动 7 台、49 个推进 API 无人叫、unifiedPending 0/0 三态同形、5 个多写者字段无写权声明——**全部属于「系统在跑，但读数无法自证」的同一类病**。V11 的每一项都必须以「同一件事在不同读面给出同一个答案」为验收口径。
@@ -125,6 +125,36 @@
 
 ---
 
+## 二·五、第 1 批交付记录（2026-11-05）
+
+### OPV11-8 注入源五表契约锁 —— 已交付
+- **落盘**：`tests/v11-source-contract.js`（453 行，判据 T1～T9），挂载于 `tests/run.js` 的 V11 专节（先于 V11 其余脚本）。
+- **判据结构**：五表交叉（`SOURCES` / `buildBlock` 实存 / 分支 / 默认值 / 显示名）+ **双面白名单** + **闭合等式双向断言**。
+- **两条实测闭合等式**（可复跑，已写进判据）：
+  - `114（buildBlock ns）= 106（与 SOURCES 交集）+ 3（子源：memorySampler/pmem/summarizer）+ 5（非源：beatFacade/editorEvents/editorFaction/intentBoard/kaleidoscope）`
+  - `115（SOURCES）= 106（交集）+ 9（内联/自有取数口：clock/pulse/background/people/currents/echoes 为 inline，memory/opinion/ledger 为 ownBuilder）`
+- **白名单每条绑定 `verify`**（subsource/workflow/reasoning/editor/dead/inline/ownBuilder）现场复算证据 + 非空 `reason`；T7 做「差集名单 == 白名单键集」**逐字对账**，多登记一项即红（防白名单变成遮羞布）。
+- **第三注入通道的发现**：`kaleidoscope` 经 `WA.workflow.register({id:'kaleidoscope.inject', chain:'before', order:22})` 自注册并直接 `ctx.injections.push`，**不经 `SOURCES` 也不受 `vis` 开关管辖**（全仓共 13 个 `chain:'before'` 注册点）。故「没进 `SOURCES`」不等于「没进正文」。
+- **判据纯度修复**：`inventory.codeFace` 会把字符串字面量抹成空格（「提及不算引用」的正确口径），但本锁需读 `'before'` 本身，故新增 `stripCommentsKeepStrings()`：只剥注释、保留字符串；N4d 专门验证「把 `'before'` 藏进注释必须仍判假」。
+- **门禁**：pass 30/30；真值破坏自证（临时删 `engines/backstage.js:650` 的 `intentBoard.buildBlock` 消费者 ⇒ 当场精确报「产品侧零调用点」）已复原且逐字节一致。
+
+### OPV11-1 空世界快照五态 —— 已交付
+- **落盘**：`render/inject.js` 的 `buildWorldSnapshot()` 重写判定块 + `snapshotState()` 只读口；`tests/v11-snapshot-state.js`（S1～S8 + N1～N4，**43 项**）；`lastInjection.snapState` 真消费点。
+- **五态**：`live`（除世界时间外有真内容，外壳逐字不变）/ `no-facts`（已开局但除世界时间外无内容，**保留世界时间行**并追加「已开局但没有任何世界内容」指引）/ `no-session`（连时间都没有）/ `fault`（有段取数失败，带 `faults` 名单）/ `off`（六源全关 ⇒ **必须空串**，保住 `tests/run.js:3885` 既有语义）。
+- **核心裁决（本批最重要的设计结论）**：**「在场」与「状态」必须解耦**。
+  - 冲突现场：`tests/settle-v2841.js` C 面锁死「只留 `clock` 一个源开着时它必在场」，而初版把「只有世界时间」判成 `no-facts` 并把时间行挪进状态注释 ⇒ 世界时间从正文消失 ⇒ FAIL 1/19。
+  - 裁决：`state` 标记可以变，**已产出的 `parts` 行在任何状态下都不许删**。`no-facts` 与 `live` 的差别**只在头部声明**，不在正文。两个既有不变量同时满足，无一是被牺牲的。
+  - 附带清理：删掉 `if (clockSet)` 外层包裹（它导致「未开局但有内容」漏 return）与旧注释残留（同一处有两个矛盾口径），**判定真源收敛为一处**。
+- **三次真缺陷自纠**：
+  1. `hasContent` 改名只改了定义、没改 fault 分支的引用 ⇒ `fault` 态裸抛 `ReferenceError`（被专锁 S5c/S5d 抓到）。
+  2. `clockSet` 首版裸读 `s.clock.label` 在六段 try 之外 ⇒ 抛错 getter 让异常冲出快照（正是本文件 v2.86.0 修过的病在新增代码里复刻）。修复为自带 try/catch。
+  3. `clockSet` catch 里重复 `noteEngineFailure` ⇒ 一次故障计两条，撞碎 `settle-v2860` [C1]「单次异常 ⇒ 台账恰好 +1」。修复为只补 `faults` 名单、不重复记数。
+- **只读口必须有真消费点**：`snapshotState()` 首版只被测试引用，`dead-export-gate` 当场判「新增死导出 1 项」。修复为在注入主路径 `lastInjection` 打点里落 `snapState: { state, faults }`，并补 S7d/S7e/S7f 三条判据（含 `live`/`no-facts` 两态随事实变化，防恒真）。
+- **retrieval 既存缺陷清偿**（回归时发现，非本项引入）：`tests/inject-vis-v2580.js` 自 v2.228.0 起 FAIL 1/10，根因是 `render/inject.js:1594` 的检索源有第二前提——`chat` 末条必须是 `is_user` 帧。治法**不是放宽判据**，而是新增 `NEEDS_USER_FRAME` + `ensureUserFrame()` 把前提真建起来；强度自证：删掉 `vis.retrieval` 守卫后 C 面仍报「残留: retrieval」。
+- **验证**：专锁 43/43；关联矩阵 10/10 全绿（v11-snapshot-state / v11-source-contract / inject-vis-v2580 / vis-default-v2260 / settle-v2841 / settle-v2860 / perf-trace-v2102 / v10-inject-pipeline / v10-unified-pending / v10-ui-pills）；门禁 12 道全绿（test-surface / gate-timeout / module-registry / dead-export / export-contract / field-liveness / ui-binding-coverage / version-surface / o7-plan-tree / reject-code / isolated-runner / module-cycle）。
+- **全量回归**：按要求**未执行** `node tests/run.js`（冻结至双项目双计划全部收口）。
+
+---
 ## 三、排期与依赖
 
 | 阶段 | 项 | 说明 |
