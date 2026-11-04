@@ -1,13 +1,13 @@
 {
- "version": "2.299.0",
- "loadOrderCount": 341,
- "loadedCount": 327,
+ "version": "2.300.0",
+ "loadOrderCount": 342,
+ "loadedCount": 328,
  "uiCount": 14,
- "nsCount": 336,
+ "nsCount": 337,
  "totals": {
-  "loadEdges": 212,
+  "loadEdges": 213,
   "hardEdges": 0,
-  "callRefs": 404,
+  "callRefs": 406,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -90,6 +90,7 @@
     "engines/family.js",
     "engines/farfield.js",
     "engines/fate.js",
+    "engines/field-writers.js",
     "engines/first-run.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
@@ -424,6 +425,7 @@
     "engines/family.js",
     "engines/farfield.js",
     "engines/fate.js",
+    "engines/field-writers.js",
     "engines/first-run.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
@@ -6170,6 +6172,25 @@
    "stateKeys": [
     "worldaxis_populate_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/field-writers.js": {
+   "ns": [
+    "fieldWriters"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/l3-registry.js": {

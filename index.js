@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.299.0';
+  const VERSION = '2.300.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1223,6 +1223,8 @@
     //   装载期零上游读、零 store 写、零落盘。刻意排在 round-drivers 之前：
     //   round-drivers 派生 A 类名单时要读本表（装载期只读静态表，不读 WA 运行态），
     //   顺序反了就会让派生方读到 undefined 然后各自 fallback 出一份第二真源。
+    // v2.300.0（V11 OPV11-6）：多写者字段写权声明表 —— 5 个字段的单一真源。
+    'engines/field-writers.js',
     'engines/l3-registry.js',
     // v2.299.0（V11 OPV11-4）：推进类 API 死面裁决表 —— 11 条真零调用的单一真源。
     //   同样排在 round-drivers 之前（drive 类要派生进 DRIVERS）。

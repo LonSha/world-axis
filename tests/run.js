@@ -905,6 +905,7 @@ const LOAD = [
   // v2.294.0（V8 OPV8-4/EXV8-2）：轮次驱动器 + 写口台（与 index.js LOAD_ORDER 同序：
   //   populate 之后、capability-tier 之前）。装载期均只登记自己的设置键。
   // v2.299.0（V11 OPV11-3）：L3 分级登记表 —— 必须在 round-drivers 之前装载
+  'engines/field-writers.js',
   'engines/l3-registry.js',
   // v2.299.0（V11 OPV11-4）：推进 API 裁决表 —— 同上
   'engines/push-api-registry.js',
@@ -25281,6 +25282,13 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.299.0 (V11 OPV11-4): 推进类 API 死面裁决（drive / entry / ui / dead）');
   {
     await runScript('./v11-push-api-registry.js');
+  }
+  // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
+  //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
+  //   核心判据是「声明 vs 现场静态扫描」双向对账 —— 不做对账，声明表只是文档。
+  section('v2.300.0 (V11 OPV11-6): 多写者字段写权声明（append / merge / overwrite + 冲突登记）');
+  {
+    await runScript('./v11-field-writers.js');
   }
   // ── v2.277.0（V7 OPV7-1）：入口版本**不早于**（历史段，防回退）──────────────
   //   ⚠ 形态必须是「不早于」而不是「等于」：上一段（v2.276.0）踩过前缀锁，本段若写成
