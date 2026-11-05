@@ -15,7 +15,7 @@ const WA=ctx.WorldAxis;
 function ok(v,n){if(!v||v.ok!==true)throw new Error(n+': '+JSON.stringify(v));}
 if(!WA.store||!WA.liaison)throw new Error('required modules missing');
 WA.store.init();
-WA.store.transact(d=>{d.people={p_a:{id:'p_a',name:'甲',life:{goals:[{id:'g1',status:'active'}]}},p_b:{id:'p_b',name:'乙',life:{goals:[{id:'g2',status:'active'}]}}}},'v12:seed');
+WA.store.transact(d=>{d.people={p_甲:{id:'p_甲',name:'甲',life:{goals:[{id:'g1',status:'active'}]}},p_乙:{id:'p_乙',name:'乙',life:{goals:[{id:'g2',status:'active'}]}}}},'v12:seed');
 WA.liaison.setSettings({enabled:false});if(WA.liaison.getSettings().enabled!==false)throw new Error('settings disable');
 let r=WA.liaison.sceneOpen({opId:'probe-off',people:['甲'],intent:'不应写入'});if(r.reason!=='disabled')throw new Error('disabled guard');
 WA.liaison.setSettings({enabled:true});
@@ -34,4 +34,19 @@ const transact=WA.store.transact;WA.store.transact=function(fn){const draft=JSON
 if(WA.liaison.sceneOpen({opId:'rejected',people:['甲'],intent:'失败事务'}).ok)throw new Error('transaction rejection ignored');WA.store.transact=transact;
 q=WA.liaison.sceneResolve(id,{ref:'deal:1',source:'other'});if(!q.reused)throw new Error('receipt idempotence');
 const view=WA.liaison.sceneView(id);ok(view,'scene view');if(view.scene.receipts.length!==1||view.scene.status!=='resolved')throw new Error('scene receipt state');
+WA.act.setSettings({enabled:true,maxActs:8});
+WA.phoneBridge.setSettings({enabled:true,linkCausal:true});
+const received=WA.liaison.receive({opId:'real-promise',act:'message',from:'甲',to:'乙',at:1000,dueAt:2000});
+ok(received,'real receive');if(!received.dealId)throw new Error('no real deal');
+const deal=WA.liaison.deals().find(x=>x.id===received.dealId);
+if(!WA.store.get().acts.rows.some(x=>x.id===deal.actId))throw new Error('no real action');
+const settled=WA.liaison.settleDeal(deal.id,3000);ok(settled,'real settlement');
+if(settled.status!=='failed')throw new Error('unperformed action fulfilled');
+const intel=WA.store.get().people.p_甲.knowledge.intel;
+if(intel.filter(x=>x.id==='intel_liaison_'+deal.id).length!==1)throw new Error('alias cognition missing');
+if(!intel.find(x=>x.id==='intel_liaison_'+deal.id).text.includes('原因未知'))throw new Error('failure implies intent');
+ok(WA.liaison.sceneResolve(id,{ref:'deal:'+deal.id}),'real scene receipt');
+ok(WA.liaison.settleDeal(deal.id,4000),'settlement retry');
+if(WA.store.get().people.p_甲.knowledge.intel.filter(x=>x.id==='intel_liaison_'+deal.id).length!==1)throw new Error('duplicate cognition');
+console.log(JSON.stringify({ok:true,scenario:'receive-action-due-failure-cognition-scene',dealId:deal.id,actId:deal.actId}));
 console.log(JSON.stringify({ok:true,loadedThrough:'engines/liaison.js',sceneId:id,receipts:view.scene.receipts.length,people:view.scene.people,status:view.scene.status}));

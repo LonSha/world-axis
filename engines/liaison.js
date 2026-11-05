@@ -140,10 +140,10 @@
    *   为什么不各处自己写：收件校验、目标挑选、关系后果三处都要找人，
    *   三处各写一份 `people[p] || people['p_' + p]` 就是三份会各自漂移的口径。
    */
-  function personOf(person) {
+  function personOf(person, snapshot) {
     const who = str(person, 60);
     if (!who) return null;
-    const ppl = state().people || {};
+    const ppl = (snapshot || state()).people || {};
     const keys = Object.keys(ppl);
     for (let i = 0; i < keys.length; i++) {
       const p = ppl[keys[i]];
@@ -394,7 +394,7 @@
     const a = actRowOf(d0.actId);
     const done = !!(a && a.status === 'done');
     let out = null;
-    mutate(function (draft) {
+    const settlementTx = mutate(function (draft) {
       const n = nodeOf(draft);
       const d = n.deals.filter(function (x) { return x && x.id === id; })[0];
       if (!d) { out = { ok: false, reason: 'missing-deal' }; return false; }
@@ -416,23 +416,25 @@
       }
       // 认知后果：**失约不等于故意失约**（B8 原文：「到期不等于故意失约」）
       draft.people = draft.people && typeof draft.people === 'object' ? draft.people : {};
-      const pid = d.partA;
-      if (draft.people[pid]) {
-        draft.people[pid].knowledge = draft.people[pid].knowledge && typeof draft.people[pid].knowledge === 'object'
-          ? draft.people[pid].knowledge : {};
-        const list = Array.isArray(draft.people[pid].knowledge.intel) ? draft.people[pid].knowledge.intel : [];
+      const participant = personOf(d.partA, draft);
+      if (participant) {
+        participant.knowledge = participant.knowledge && typeof participant.knowledge === 'object'
+          ? participant.knowledge : {};
+        const list = Array.isArray(participant.knowledge.intel) ? participant.knowledge.intel : [];
         const ii = 'intel_liaison_' + id;
         if (!list.some(function (x) { return x && x.id === ii; })) {
           list.push({ id: ii, level: 'witness', text: done ? '约定达成' : '对方到期未到（可能受阻，原因未知）',
             source: 'liaison:' + id, at: t });
           if (WA.evict) WA.evict.array(list, 'people.intel', 24);
-          draft.people[pid].knowledge.intel = list;
+          participant.knowledge.intel = list;
         }
       }
       out = { ok: true, reused: false, dealId: id, status: d.status, fulfilment: d.fulfilment, at: t };
       return true;
     }, 'liaison:settle');
     if (!out || !out.ok) return out || { ok: false, reason: 'store-unavailable' };
+    if (!out.reused && (!settlementTx || settlementTx.ok !== true)) return { ok: false, reason: (settlementTx && settlementTx.reason) || 'transaction-rejected' };
+    out.persisted = settlementTx && settlementTx.persisted != null ? settlementTx.persisted : null;
     if (out.reused) return out;
     S.due++; S.evidence++;
     if (done) S.fulfilled++; else S.failed++;
