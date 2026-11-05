@@ -889,14 +889,12 @@
     const hasEntryFace = (typeof WA.loaderStatus === 'function') || Array.isArray(WA.__loadFailed);
     if (!hasEntryFace) return { present: false, rels: [] };
     if (Array.isArray(WA.__loadFailed)) return { present: true, rels: WA.__loadFailed.slice() };
-    try {
-      if (typeof WA.loaderStatus === 'function') {
-        const st = WA.loaderStatus();
-        if (st && Array.isArray(st.failedModules)) {
-          return { present: true, rels: st.failedModules.map(function (x) { return x && x.rel; }).filter(Boolean) };
-        }
-      }
-    } catch (e) { /* 读不出来 = 不可知,下面按不可知处理 */ }
+    // loaderStatus calls integrity(), which re-enters this reader.
+    // Read the raw failure map when the projection is not yet published.
+    const raw = WA.__loaderState && WA.__loaderState.failed;
+    if (raw && typeof raw.keys === 'function') {
+      try { return { present: true, rels: Array.from(raw.keys()) }; } catch (e) {}
+    }
     return { present: true, rels: null };
   }
   /** 完整性缺口:applicable(闸门是否适用)/ known(失败表是否可读)/ missing(关键模块缺失项)。 */
