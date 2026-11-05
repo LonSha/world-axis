@@ -530,7 +530,7 @@
       if (rows.length >= 40) { out = { ok: false, reason: 'scene-capacity' }; return false; }
       const id = 'sc_' + String(at).toString(36) + '_' + (rows.length + 1);
       const row = { id: id, opId: opId, kind: kind, people: people, place: place,
-        intent: intent, time: clean(s.time, 60), evidence: cleanList(s.evidence, 8, 80),
+        intent: intent, shared: s.shared === true, time: clean(s.time, 60), evidence: cleanList(s.evidence, 8, 80),
         options: cleanList(s.options, 8, 100), status: 'open', receipts: [], at: at, updatedAt: at };
       rows.push(row);
       out = { ok: true, sceneId: id, scene: sceneCopy(row) }; return true;

@@ -16,10 +16,12 @@ Accepting arbitrary receipt references allows future engine adapters without add
 
 ## Consequences
 
-The API rejects fabricated and unfinished references and reports rejected transactions accurately. Store persistence failure remains distinct from memory application under the existing store contract. A matching terminal reference does not yet prove its relevance to scene participants or intent. Automatic settlement consumers, UI integration, reload tests and the complete broken-promise scenario remain outstanding.
+The API rejects fabricated and unfinished references and reports rejected transactions accurately. Store persistence failure remains distinct from memory application under the existing store contract. Receipt sources must resolve to scene participants; intent relevance remains open. Automatic settlement consumers, live UI validation and the complete broken-promise scenario remain outstanding.
 
-The targeted VM probe checks fabricated/pending references, terminal status authority, detached views, disabled resolution, duplicate receipts and simulated transaction rejection. It also invokes receive to create a real act and deal, settles an unperformed due promise through settleDeal, checks evidence-linked cognition and duplicate settlement, then resolves the scene using that deal. This is a VM integration check, not UI or reload evidence.
+The targeted VM probe checks fabricated/pending references, terminal status authority, detached views, disabled resolution, duplicate receipts and simulated transaction rejection. It also invokes receive to create a real act and deal, settles an unperformed due promise through settleDeal, checks evidence-linked cognition and duplicate settlement, then resolves the scene using that deal. A fresh second VM also verifies saved receipts and cognition. This does not establish live UI behavior.
 
 Settlement uses the existing personOf resolver against the transaction draft, so a participant name can reach its stored p_name record without creating a new person. Failed settlement transactions return failure before counters or relation consequences run. The existing act admission still requires p_name storage; this change does not broaden that engine's identity contract.
 
 Existing TX6 commission notes overlap only in the general coordinator principle and remain unchanged. Historical capacity notes concern other bounded containers and are not superseded.
+
+Scene contracts opt into participant visibility through shared:true; existing contracts remain private. actionDesk.sceneFlow projects only shared contracts matching the resolved viewer and requested place. The panel renders escaped intent and coarse outcomes, omitting evidence, options and receipt source payloads.

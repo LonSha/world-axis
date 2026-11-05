@@ -5457,6 +5457,17 @@ ${emptyDrill}
          html += '<div class="wa-row"><span class="wa-dim">[' + esc(c.stage || '变化') + ']</span> <b>' + esc(c.title || c.id) + '</b> <span class="wa-dim">' + esc(c.summary || '') + '</span></div>';
        });
      }
+     if (sf.coordination && sf.coordination.length) {
+       html += '<div class="wa-sec">共同约定与后果</div>';
+       sf.coordination.forEach(function (scene) {
+         html += '<div class="wa-row"><b>' + esc(scene.intent) + '</b> <span class="wa-dim">'
+           + esc(scene.status === 'resolved' ? '已有结算' : '待推进') + '</span>';
+         (scene.receipts || []).forEach(function (receipt) {
+           html += '<span class="wa-dim"> · ' + esc(receipt.status === 'done' ? '已完成' : receipt.status === 'failed' ? '未达成' : '已取消') + '</span>';
+         });
+         html += '</div>';
+       });
+     }
      html += '<div class="wa-sec">场景可行行动（' + (sf.readyActions || []).length + '）</div>';
      if (!(sf.readyActions && sf.readyActions.length)) {
        html += '<div class="wa-dim">' + esc(sf.idleText || '暂无可执行行动') + '</div>';

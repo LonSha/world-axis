@@ -1600,6 +1600,24 @@ return {
       };
     });
 
+    // Only explicitly shared scene contracts containing this viewer are projected.
+    let coordination = [];
+    if (who && WA.liaison && WA.liaison.getSettings().enabled && typeof WA.liaison.sceneView === 'function') {
+      const snapshot = state(), people = snapshot.people || {};
+      const viewer = Object.keys(people).map(function (key) { return { key: key, row: people[key] }; })
+        .filter(function (entry) { return entry.row && (entry.key === who || entry.key === 'p_' + who || entry.row.id === who || entry.row.name === who); })[0];
+      if (viewer) {
+        const aliases = [who, viewer.key, viewer.row.id, viewer.row.name].filter(Boolean);
+        const contracts = WA.liaison.sceneView();
+        coordination = (contracts.scenes || []).filter(function (scene) {
+          return scene.shared === true && scene.people.some(function (person) { return aliases.indexOf(person) >= 0; })
+            && (!place || scene.place === place);
+        }).map(function (scene) {
+          return { id: scene.id, intent: scene.intent, status: scene.status,
+            receipts: scene.receipts.map(function (receipt) { return { ref: receipt.ref, status: receipt.status }; }) };
+        });
+      }
+    }
     const readyActions = enrichedActions.filter(function (a) { return a.state === 'ready'; });
     const blockedActions = enrichedActions.filter(function (a) { return a.state !== 'ready'; });
 
@@ -1611,6 +1629,7 @@ return {
       present: sit.present || [],
       visibleChanges: sit.visibleChanges || [],
       jointProjects: sit.jointProjects || [],
+      coordination: coordination,
       readyActions: readyActions,
       blockedActions: blockedActions,
       idleStatus: sit.idleStatus || 'active',
