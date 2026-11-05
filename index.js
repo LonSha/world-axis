@@ -399,6 +399,10 @@
     //   （节点顺序由 workflow 的 order 决定，不由装载顺序决定）。
     'engines/kaleidoscope.js',
     'engines/calendar.js',
+    // v2.302.0（缝 World Chronicle）：正文内联状态回报标签 <time>/<choice>/<flag>。
+    //   位置**必须在 calendar 之后**：它调 WA.calendar.setClock 写 clock.iso（既有写口），
+    //   且必须在 interceptor 之前（拦截器在 m.load 后订阅事件，解析入口要已就绪）。
+    'engines/inline-tags.js',
     'engines/memory.js',
     'engines/opinion.js',
     // v2.16.0: 对外只读互操作桥（worldaxis_bridge_v1）。须在 store/settingsBus/interceptor/workflow

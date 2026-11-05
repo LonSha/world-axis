@@ -191,6 +191,21 @@
           purifyHooked = true;
           ctx.eventSource.on(et.MESSAGE_RECEIVED, () => {
             try {
+              // v2.302.0（缝 World Chronicle）：内联状态回报标签。
+              //   **必须**用**原文**解析，且排在净化链之前——净化会改写文本，
+              //   用净化后的文本解析等于让标签读数依赖另一条链（口径漂移）。
+              //   只解析与落账，不改显示文本；隐藏显示由 WA.inlineTags.strip 提供。
+              if (WA.inlineTags && typeof WA.inlineTags.apply === 'function') {
+                const c0 = getCtx();
+                const chat0 = (c0 && c0.chat) || [];
+                const last0 = chat0[chat0.length - 1];
+                if (last0 && !last0.is_user && typeof last0.mes === 'string' && WA.inlineTags.hasTag(last0.mes)) {
+                  const r = WA.inlineTags.apply(last0.mes);
+                  if (r && r.ok === false) WA.log('warn', '内联标签落账失败：' + r.reason);
+                }
+              }
+            } catch (e) { WA.log && WA.log('warn', '内联标签解析异常', e); }
+            try {
               if (!WA.purifier || typeof WA.purifier.applySafe !== 'function') return;
               const c = getCtx();
               const chat = (c && c.chat) || [];

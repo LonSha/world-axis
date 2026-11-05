@@ -25302,6 +25302,15 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runScript('./v11-master-matrix.js');
   }
+  // ── v2.302.0（缝 World Chronicle）：正文内联状态回报标签 ──────────────────
+  //   执行 engines/inline-tags.js 真实源码（vm 受控桩：store / calendar 按既有写口形状）。
+  //   四类判据：解析边界 / 落账归属 / 去重纪律 / 不造假，另加三条反向自证。
+  //   ⚠ 本锁不验证「ST 宿主里点一下真的走了这条路」——那属于真机联调（tools/rt-*.js），
+  //     两者不可互相顶替。
+  section('v2.302.0 (World Chronicle 缝): 内联状态回报标签 <time>/<choice>/<flag>');
+  {
+    await runScript('./inline-tags-v2302.js');
+  }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
   //   核心判据是「声明 vs 现场静态扫描」双向对账 —— 不做对账，声明表只是文档。
