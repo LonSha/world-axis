@@ -25281,7 +25281,15 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   现场重测口径（真零调用：产品面不存在 `WA.ns.method(` / `ns.method(`）：23 条。
   section('v2.299.0 (V11 OPV11-4): 推进类 API 死面裁决（drive / entry / ui / dead）');
   {
-    await runScript('./v11-push-api-registry.js');
+        await runScript('./v11-push-api-registry.js');
+  }
+  // ── v2.301.0（V11 EXV11-8）：页/分类双表闭合锁 ────────────────────────────
+  //   PAGES / CATS / PAGE_CAT / RENDERERS 四张表手写各一份，任何一处单边增长
+  //   （加页忘 PAGE_CAT、值越界、缺渲染器）都会变成「点了没反应」死面。
+  //   本锁把三处口径钉成同源，并钉死 world 一名两用的既定裁决。
+  section('v2.301.0 (V11 EXV11-8): 页/分类双表闭合（PAGES × CATS × PAGE_CAT × RENDERERS）');
+  {
+    await runScript('./v11-pages-cats.js');
   }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
