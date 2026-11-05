@@ -554,6 +554,12 @@
       if (!target || ['done', 'failed', 'cancelled'].indexOf(target.status) < 0) {
         out = { ok: false, reason: 'receipt-not-terminal' }; return false;
       }
+      const participants = row.people.map(function (who) { return personOf(who, draft); }).filter(Boolean);
+      const owners = (type === 'deal' ? [target.partA, target.partB] : [target.person])
+        .map(function (who) { return personOf(who, draft); });
+      if (!owners.length || owners.some(function (person) { return !person || participants.indexOf(person) < 0; })) {
+        out = { ok: false, reason: 'receipt-unrelated' }; return false;
+      }
       if (row.receipts.some(function (x) { return x && x.ref === ref; })) {
         out = { ok: true, reused: true, sceneId: id, ref: ref, status: row.status }; return false;
       }

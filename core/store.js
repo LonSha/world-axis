@@ -485,7 +485,7 @@
       //   evidence 每行 = 一条**带来源**的证据（opId + 时间 + 有效范围）。
       //   为什么是新顶层键：它答的是「这件事在世界里成不成立」，与 phone-bridge 的
       //   「手机侧按下过什么」是两件事 —— 合成一个容器，两者在状态里就长得一样了。
-      liaison: { inbox: [], deals: [], evidence: [] },
+      liaison: { inbox: [], deals: [], evidence: [], scenes: [] },
       // v2.118.0（计划二 B9）：多人协作可靠性层。
       //   proposals 每行 = 一份**带基础版本**的待裁提议；archive 每行 = 一份终态提议（不删）。
       //   为什么是独立顶层键：它答的是「别人的提交该不该并进这个世界」，与 collab 的
@@ -1976,6 +1976,7 @@
     // v2.118.0（计划二 B8）：跨插件业务闭环三表。登记键与 evict.SITES 的 path 同名同值
     //   （上面的把门判据逐键对账）。三条 cap 与 engines/liaison.js 的 LIMITS 同源。
     'liaison.inbox':    { cap: 40, site: 'liaison.js WA.evict.array(n.inbox, \'liaison.inbox\')（LIMITS.ROWS=40）' },
+    'liaison.scenes':   { cap: 40, site: 'liaison.sceneOpen explicit capacity refusal' },
     'liaison.deals':    { cap: 24, site: 'liaison.js WA.evict.array(n.deals, \'liaison.deals\')（LIMITS.DEALS=24）' },
     'liaison.evidence': { cap: 40, site: 'liaison.js WA.evict.array(n.evidence, \'liaison.evidence\')（LIMITS.ROWS=40）' },
     // v2.118.0（计划二 B9）：协作提议两表。登记键与 evict.SITES 的 path 同名同值

@@ -465,7 +465,8 @@ function judge(a) {
     'v2118/b8: [A1] evict.SITES 登记 liaison 三表');
   a(/liaison\.inbox[^\n]*cap:\s*40/.test(ev) && /liaison\.deals[^\n]*cap:\s*24/.test(ev) && /liaison\.evidence[^\n]*cap:\s*40/.test(ev),
     'v2118/b8: [A1] 站点 cap 与 LIMITS 同源（40/24/40）');
-  a(st.indexOf('liaison: { inbox: [], deals: [], evidence: [] }') >= 0,
+  const coldLiaison = fresh().store.get().liaison;
+  a(coldLiaison && ['inbox', 'deals', 'evidence', 'scenes'].every(function (key) { return Array.isArray(coldLiaison[key]); }),
     'v2118/b8: [A2] store 骨架物化 liaison（冷启动直写不炸事务）');
   a(st.indexOf("'liaison.inbox'") >= 0 && st.indexOf("'liaison.deals'") >= 0 && st.indexOf("'liaison.evidence'") >= 0,
     'v2118/b8: [A3] __BOUNDED_CAPS 登记同键（挤出侧有账）');
