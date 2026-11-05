@@ -4665,7 +4665,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   wa-cfg-abort / wa-cfg-cancel 在「粘贴 → 校验 → 二次确认」两步流程里逐步出现。
       'wa-cfg-copy', 'wa-cfg-import', 'wa-cfg-text', 'wa-cfg-check', 'wa-cfg-cancel', 'wa-cfg-go', 'wa-cfg-abort',
       // v2.184.0（E3）：存档槽的读数出口（动态写入，同上面 tools 页两条的口径）。
-      'wa-ck-out'] },
+      'wa-ck-out',
+      // v2.301.0（EXV11-1/3）：开局页与驱动页的动态输出/按钮（setOut 动态写入 + 刷新按钮）。
+      'wa-boot-out', 'wa-drive-view', 'wa-drive-out'] },
     { page: 'overview', ids: ['wa-setting-search'], dynamic: ['wa-setting-search-count'] },
     { page: 'world', ids: [], cond: ['wa-current-auto-on','wa-current-auto-turns'] },
     { page: 'inject', ids: [], cond: ['wa-collector-enabled','wa-collector-tokens','wa-changes-enabled','wa-budget-source-board'] },

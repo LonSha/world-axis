@@ -25414,7 +25414,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     const __verPin293 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
       .match(/const VERSION = '([\d.]+)'/) || [])[1];
-    const __wantPin293 = '2.295.0';
+    const __wantPin293 = '2.301.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

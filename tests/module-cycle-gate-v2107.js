@@ -388,7 +388,7 @@ function runAll(A) {
   //   调用期 +8：unifiedPending 修正别名后，它真读的 store / clock / storyChoice / commission /
   //   investigation / aftermath / operations / farfield 等命名空间引用现在都被计入
   //   （此前整个文件对扫描器不可见 ⇒ 这 8 条 (file, ns) 边一条都没算）。
-  A(a.edgesLoad === 213 && a.edgesCall === 2669 && a.edgesAll === 2882 && a.identityOk,
+  A(a.edgesLoad === 213 && a.edgesCall === 2672 && a.edgesAll === 2885 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'

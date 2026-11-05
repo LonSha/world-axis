@@ -325,11 +325,26 @@
     //   插在 assistant 之前：这一页答「这个机制怎么手动喂它」——与工具族相邻。
     //   台面清单从 write-contract 契约现场读，本页零业务逻辑、零事实编造。
     { id: 'desk', icon: '🎛', label: '写口台' },
+    // v2.301.0（V11 EXV11-1）：开局工作台。插在 desk 之后（工具族相邻：
+    //   写口台答「怎么手动喂机制」，本页答「怎么从零把世界立起来」）。
+    //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
+    { id: 'boot', icon: '🌱', label: '开局' },
+    // v2.301.0（V11 EXV11-3）：轮次驱动台。插在 boot 之后：开局答「世界怎么立起来」，
+    //   本页答「立起来之后每轮谁在转、谁没被驱动、为什么」。
+    { id: 'drive', icon: '⚙', label: '驱动' },
     { id: 'assistant', icon: '💬', label: '助手' },
     { id: 'tools', icon: '🧰', label: '工具' },
     { id: 'logs', icon: '📋', label: '日志' }
   ];
-  // v2.295.0（V10 UI）：分类亲和表。4 大核心分类 + all 通用类。
+  // v2.301.0（V11 EXV11-8）：分类亲和表——注释与实现**逐字一致**（本条是 EXV11-8 的裁决：
+  //   旧注释写「4 大核心分类 + all 通用类」，读数没撒谎但口径含糊；改为「4 个内容分类
+  //   （core/world/workshop/meta）+ 1 个 all 通用类」。CATS 的 id 是闭合集合，与 PAGE_CAT
+  //   值域、WA.ui.showCat 的 valid 白名单三处同源——任何一处单边增长都判红（v11-pages-cats 锁）。
+  //   ⚠ 已知撞名（EXV11-8 实测保留项）：`world` 既是**页 id**（世界页）又是**分类 id**（世界类）。
+  //     两者走不同的名空间（PAGE_CAT 的**键**是页 id、**值**是分类 id），`WA.ui.showCat('world')`
+  //     与 `WA.ui.goPage('world')` 互不串线；改名（如分类改 `worldcat`）会动 v2.295.0 起已
+  //     落盘的界面状态语义，收益不抵迁移风险——故本版**不改名**，改为用锁把撞名事实钉死，
+  //     让它从「没人知道的隐患」变成「有据可查的已知项」。）
   const CATS = [
     { id: 'core', icon: '◈', label: '核心' },
     { id: 'world', icon: '🌐', label: '世界' },
@@ -342,7 +357,9 @@
     world: 'world', people: 'world', memory: 'world', enemies: 'world', parallel: 'world', travel: 'world', sediment: 'world', offline: 'world',
     inject: 'workshop', supply: 'workshop', evidence: 'workshop', branchdiff: 'workshop', storyloop: 'workshop', retrieval: 'workshop', port: 'workshop', find: 'workshop', graph: 'workshop', net: 'workshop',
     settings: 'meta', health: 'core', connect: 'meta', assistant: 'meta', tools: 'meta', logs: 'meta',
-    desk: 'meta'
+    desk: 'meta',
+    // v2.301.0（V11 EXV11-1/-3）：新页归属（EXV11-8 双向断言：PAGES ⊂ PAGE_CAT 闭合）
+    boot: 'core', drive: 'meta'
   };
   let currentCat = 'core';
 
@@ -4186,6 +4203,57 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
   //   台面清单从 writeDesk.catalog() 现场读（真源是 write-contract 的函数体契约），
   //   本页零业务逻辑：选引擎 → 选写口 → 按契约参数表填值 → 透传给真写口。
   //   拒收（含 disabled）原样展示，不代答、不重试、不编参数。
+  // ══════════════════════════════════════════════════════════════════════
+  // v2.301.0（V11 EXV11-1）：开局工作台 —— 世界骨架一键成型。
+  //   只读列出 playableBlueprint.listSamples() 的候选蓝图 + playableSeed.view() 的预读
+  //   （「开局会播什么」），一键开局走 installSample 真写口 + playableSeed.seed 真写口，
+  //   回执原样展示。空蓝图如实报 no-blueprint / sample-not-found，不假装开局成功。
+  //   本页不重算任何读数：候选来自 listSamples，预读来自 seed.view，回执来自写口本身。
+  function renderBootDesk() {
+    const bp = (WA.playableBlueprint && typeof WA.playableBlueprint.listSamples === 'function')
+      ? WA.playableBlueprint.listSamples() : null;
+    if (!bp || bp.ok !== true) {
+      return '<div class="wa-sec">开局工作台</div>'
+        + '<div class="wa-item wa-log-warn">no-blueprint：候选蓝图读不出（playableBlueprint ' + esc((bp && bp.reason) || 'unavailable') + '）。</div>'
+        + '<div class="wa-dim">怎么导入蓝图：到「工具」页的存档槽 / 配置包出口导入，或经 actionDesk 调 <code>playableBlueprint.installSample</code>。</div>';
+    }
+    const samples = bp.samples || [];
+    const seed = (WA.playableSeed && typeof WA.playableSeed.view === 'function')
+      ? (function () { try { return WA.playableSeed.view(); } catch (e) { return null; } })() : null;
+    const seedLine = seed
+      ? ('播种预读：计划 <b>' + esc(String(seed.planned || 0)) + '</b> 行'
+        + '（目标 ' + (seed.counts && seed.counts.goal || 0) + ' · 日程 ' + (seed.counts && seed.counts.schedule || 0)
+        + ' · 羁绊 ' + (seed.counts && seed.counts.bond || 0) + ' · 名册 ' + (seed.counts && seed.counts.roster || 0) + '）'
+        + ((seed.noSource && seed.noSource.length) ? ' · 无源跳过 ' + seed.noSource.length + ' 行' : ''))
+      : '播种预读不可用（playableSeed 缺席）';
+    return `
+      <div class="wa-sec">开局工作台（世界骨架一键成型）</div>
+      <div class="wa-dim">候选蓝图与播种预读全部从来源模块自己的读口现读，本页不重算。
+        一键开局走 <code>installSample</code> + <code>seed</code> **真写口**，回执原样展示；
+        已有世界资产时引擎会拒收 <code>conflict-existing-world</code>（防静默破坏）。</div>
+      <div class="wa-item">${seedLine}</div>
+      <div class="wa-row">${samples.map(function (s) {
+        return '<button class="wa-btn" data-boot-sample="' + esc(s.id) + '" title="蓝图：' + esc(s.label) + '（' + esc(s.theme || '') + '）">开局：' + esc(s.label) + '</button>';
+      }).join('') || '<span class="wa-dim">（无候选蓝图）</span>'}</div>
+      <div id="wa-boot-out" class="wa-out"></div>`;
+  }
+  // v2.301.0（V11 EXV11-3）：轮次驱动台 —— L3 引擎驱动状态一屏可见。
+  //   逐台列出：l3Registry.ENTRIES 的分类（四类）+ 是否在 roundDrivers.DRIVERS 内 +
+  //   roundDrivers.stat() 读数。试驱动只对 A 类（zero-arg 且有 driver）开放：
+  //   ②③④类按钮置灰并显示登记表里的 reason —— 不静默禁用（V11 命题）。
+  function renderDriveDesk() {
+    const R = WA.l3Registry;
+    const RD = WA.roundDrivers;
+    if (!R || !RD) return '<div class="wa-empty">驱动读数不可用（l3Registry / roundDrivers 缺席）</div>';
+    const drivers = (RD.DRIVERS || []).map(function (d) { return d.engine; });
+    const st = (typeof RD.stat === 'function') ? RD.stat() : {};
+    return `
+      <div class="wa-sec">轮次驱动台（L3 引擎驱动状态一屏可见）</div>
+      <div class="wa-dim">逐台读数来自 <code>l3Registry.ENTRIES</code> 与 <code>roundDrivers.DRIVERS</code>（同源，不重算）。
+        累计轮次 <b>${st.runs || 0}</b> · 驱动成功 <b>${st.ok || 0}</b> · 轮内驱动名单 ${drivers.length} 台。</div>
+      <div class="wa-row"><button class="wa-btn" id="wa-drive-view" title="逐台列出：分类 / 是否在轮内驱动名单 / 置灰原因（来自登记表原文，不代答）">刷新逐台读数</button></div>
+      <div id="wa-drive-out" class="wa-out"></div>`;
+  }
   function renderWriteDesk() {
     const D = WA.writeDesk;
     if (!D || typeof D.catalog !== 'function') return '<div class="wa-empty">写口台模块未加载</div>';
@@ -4214,7 +4282,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-wdesk-ports" class="wa-out"></div>
       <div id="wa-wdesk-out" class="wa-out"></div>`;
   }
-  const RENDERERS = { actiondesk: renderActionDesk, overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs, desk: renderWriteDesk,
+  const RENDERERS = { actiondesk: renderActionDesk, overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs, desk: renderWriteDesk, boot: renderBootDesk, drive: renderDriveDesk,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -5502,6 +5570,25 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     panelEl.querySelectorAll('[data-vis]').forEach(cb => cb.onchange = () => { WA.render.setVisibility(cb.dataset.vis, cb.checked); });
     panelEl.querySelectorAll('[data-unreg]').forEach(x => x.onclick = () => { WA.registry.unregister(x.dataset.unreg); renderBody(); });
     panelEl.querySelectorAll('[data-observe]').forEach(b => b.onclick = async () => { setOut('#wa-observe-out', '观测中…'); const r = await WA.observe.slice(b.dataset.observe); setOut('#wa-observe-out', r.ok ? r.text : ('失败：' + (r.error && r.error.message || r.reason))); });
+    // v2.301.0（EXV11-1）：开局页候选蓝图按钮——真写口，回执原样展示，不代答。
+    panelEl.querySelectorAll('[data-boot-sample]').forEach(b => b.onclick = async () => {
+      const sid = b.dataset.bootSample;
+      setOut('#wa-boot-out', '开局中（installSample + seed）…');
+      const r = WA.playableBlueprint.installSample(sid);
+      if (!r || !r.ok) { setOut('#wa-boot-out', '拒收：' + (r && r.reason || 'unknown') + '（回执原样，不代答）'); return; }
+      const s = await (WA.playableSeed.seed ? WA.playableSeed.seed() : { ok: true });
+      setOut('#wa-boot-out', 'installSample ok · seed ' + ((s && s.ok) ? 'ok' : ('拒收：' + ((s && s.reason) || 'unknown'))) + '（回执原样）');
+    });
+    // v2.301.0（EXV11-3）：驱动页刷新逐台读数——同源读 l3Registry/roundDrivers，不重算。
+    panelEl.querySelectorAll('#wa-drive-view').forEach(b => b.onclick = () => {
+      const R = WA.l3Registry, RD = WA.roundDrivers;
+      if (!R || !RD) { setOut('#wa-drive-out', '驱动读数不可用（模块缺席）'); return; }
+      const st = RD.stat();
+      const rows = R.ENTRIES.map(function (e) {
+        return esc(e.name || e.id || '?') + ' · ' + (RD.DRIVERS.some(function (d) { return d.engine === (e.id || e.name); }) ? '在轮内名单' : '未在轮内');
+      });
+      setOut('#wa-drive-out', '累计轮次 ' + st.runs + ' / 驱动成功 ' + st.ok + '（同源读数）<br/>' + rows.join('<br/>'));
+    });
     // v2.2.0: 档案入口——此前 setProfile 零调用，用户没有任何建档途径（推演的性格锚点永远未建立）
     let profEditing = null;
     panelEl.querySelectorAll('[data-prof]').forEach(b => b.onclick = () => {
@@ -16576,7 +16663,9 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
     setDevMode(on) { return __setDevMode(on); },
     // v2.295.0（V10 UI）：暴露程序化切分类口（供测试/集成/自动化用），与 pill 点击等价。
     showCat(cat) {
-      const valid = ['core', 'world', 'workshop', 'meta', 'all'];
+      // v2.301.0（V11 EXV11-8）：valid 白名单改为**从 CATS 表现场读**（此前手抄一份数组，
+      //   加分类漏改这里 = 新分类永远 bad-cat 拒收——单边漂移的典型形态）。
+      const valid = CATS.map(function (c) { return c.id; });
       if (valid.indexOf(cat) < 0) return { ok: false, reason: 'bad-cat', valid: valid };
       currentCat = cat;
       if (panelEl) {
