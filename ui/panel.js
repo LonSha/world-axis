@@ -4333,7 +4333,26 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             return '<div class="wa-kv"><span>' + esc(e.api) + '</span><b>' + esc(e.cls) + '</b></div>'
               + '<div class="wa-dim">　' + esc(String(e.reason || '')) + '</div>';
           });
-          return (pst ? '<div class="wa-dim">total ' + esc(String(pst.total)) + ' 台（全部登记项；源码推进 API 全量覆盖仍待验收）</div>' : '')
+          // v2.301.0（EXV11-7 诚实面）：登记表只覆盖已裁决项，运行时扫描到的推进类 API 远多于登记项。
+          //   两个数都印出来，缺口条数如实报；不拿「登记表已全展示」冒充「源码已全覆盖」。
+          const cov = (function () {
+            try {
+              const PRE = /^(tick|advance|sweep|due|settle|step|idle|drive|flush|reap|expire|pulse|turn|cycle|roll|rotate|refresh|progress|run)$/i;
+              const found = [];
+              Object.keys(WA).forEach(function (ns) {
+                const o = WA[ns];
+                if (!o || typeof o !== 'object') return;
+                Object.keys(o).forEach(function (m) { if (PRE.test(m) && typeof o[m] === 'function') found.push(ns + '.' + m); });
+              });
+              const reg = P.ENTRIES.map(function (e) { return e.api; });
+              const miss = found.filter(function (k) { return reg.indexOf(k) < 0; });
+              return { scanned: found.length, registered: reg.length, miss: miss.length, sample: miss.slice(0, 8) };
+            } catch (e) { return null; }
+          })();
+          return (pst ? '<div class="wa-dim">已裁决 ' + esc(String(pst.total)) + ' 条（下表全部）</div>' : '')
+            + (cov
+              ? '<div class="wa-dim wa-log-warn">覆盖缺口：运行时扫到推进类 API ' + esc(String(cov.scanned)) + ' 个，其中 ' + esc(String(cov.miss)) + ' 个尚未裁决（本页只展示已裁决的 ' + esc(String(cov.registered)) + ' 条，不冒充全覆盖）。例：' + esc(cov.sample.join('、')) + '</div>'
+              : '<div class="wa-dim">覆盖扫描不可用（如上报错，不编造读数）</div>')
             + rows.join('');
         } catch (e) { return '<div class="wa-dim">读取失败（' + esc(String(e && e.message || e).slice(0, 60)) + '）</div>'; }
       })()}`;

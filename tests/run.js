@@ -25292,6 +25292,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./v11-pages-cats.js');
     await runScript('./v11-snapshot-viewer.js');
     await runScript('./v11-fold-witness.js');
+    await runScript('./v11-push-api-coverage.js');
   }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
