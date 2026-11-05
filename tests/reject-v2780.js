@@ -379,6 +379,23 @@ function runWitness(WA) {
   const seen = {};
   const expect = {};
   function want(code, desc) { expect[code] = desc; }
+  // 期刊配置拒收：仅替换聊天读口，始终恢复，不写世界存档。
+  if (WA.periodicals && WA.store) {
+    const keepChatId = WA.store.chatId;
+    try {
+      want('no-story-context', '期刊：没有真实聊天上下文时拒绝配置或出刊');
+      trip('no-story-context', function () {
+        WA.store.chatId = function () { return 'wa_default'; };
+        return WA.periodicals.configure({}).reason;
+      });
+      want('invalid-definition', '期刊：刊物标识或排期形状不合法时拒绝配置');
+      trip('invalid-definition', function () {
+        WA.store.chatId = function () { return 'witness-periodical'; };
+        return WA.periodicals.configure({id:'invalid.id',days:[1],name:'见证'}).reason;
+      });
+    } finally { WA.store.chatId = keepChatId; }
+  }
+
   // ── v2.194.0（U2）：跨模块原子提交链的三个码 —— **必须带可执行见证** ──
   //   它们是本版新增的公开失败归因，不是「存量未分类」；不给见证就等于让门禁替我们说
   //   「这些码没人会跑到」。

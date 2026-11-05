@@ -75,10 +75,13 @@ function scanRuntime(WA) {
 }
 function callSites(apis, srcs) {
   const out = {};
+  // 每份源码仅做一次词法剥除；API 数量不应放大整库扫描成本。
+  const stripped = {};
+  Object.keys(srcs).forEach(function (f) { stripped[f] = stripLiterals(srcs[f]); });
   apis.forEach(function (api) {
     const p = api.split('.');
     const re = new RegExp('WA\\.' + p[0] + '\\.' + p[1] + '\\s*\\(|\\b' + p[0] + '\\.' + p[1] + '\\s*\\(');
-    out[api] = Object.keys(srcs).filter(function (f) { return re.test(stripLiterals(srcs[f])); });
+    out[api] = Object.keys(srcs).filter(function (f) { return re.test(stripped[f]); });
   });
   return out;
 }

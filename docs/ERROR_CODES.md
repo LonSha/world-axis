@@ -3,13 +3,13 @@
 > 台账 version：`2.295.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **1349** 个内联拒收码：见证 747 / 死表 52 / 基线 550
+共 **1351** 个内联拒收码：见证 749 / 死表 52 / 基线 550
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
 **基线**=存量未分类（新增未分类码即红灯）。
 
-## 见证（可执行）（747）
+## 见证（可执行）（749）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -294,6 +294,7 @@
 | `intel-missing` | engines/probe.js | probe.confront：情报面（WA.intel）缺席 ⇒ 如实记 intel-missing，不假装记得（拓展⑤） |
 | `intel-threw` | engines/evidence-board.js, engines/probe.js | probe.confront：情报面抛错不吞掉 ⇒ 记为 intel-threw（拓展⑤） |
 | `interior-blocked` | engines/perspective-lock.js | perspective.allows：内心腔只属于视角人物本人 —— 不在视角里的人写内心 / 客观镜头写内心 / 用推断档冒充心声，三者各自拒收并带 via |
+| `invalid-definition` | engines/periodicals.js | 期刊：刊物标识或排期形状不合法时拒绝配置 |
 | `invalid-input` | core/schema.js | schema.validate：字段缺失或类型不符 ⇒ invalid-input + errors 数组（v2.110.0 plan-1 #22） |
 | `invalid-plan` | engines/campaign.js | campaign.planSave：计划机械校验不过（谓词不在既有四类 / 缺参数 / 奖励越界）⇒ 整批拒收 |
 | `investigation-threw` | engines/evidence-board.js | N4：调查动作时线索面抛错 ⇒ 顶层的 investigation-threw（不折成编排层自造码，现场据此去查线索面） |
@@ -396,7 +397,7 @@
 | `no-campaign` | engines/campaign.js | campaign.status：没有进行中的一局（读面如实报「还没开局」） |
 | `no-cause` | engines/story-loop.js | N9:confirm 没给原因 ⇒ no-cause(手机侧按了一下不等于我替它编一个因) |
 | `no-chronicle` | engines/world-bridge.js | worldBridge.exportLegends：编年史为空 ⇒ 拒收（推演几轮后才有大事可传） |
-| `no-clock` | engines/farfield.js, engines/playtime.js, engines/vitals.js, engines/weather.js | farfield.auto：世界钟未设定 ⇒ 拒收 no-clock（不拿真实时间顶替剧情时间） |
+| `no-clock` | engines/farfield.js, engines/inline-tags.js, engines/playtime.js, engines/vitals.js, engines/weather.js | farfield.auto：世界钟未设定 ⇒ 拒收 no-clock（不拿真实时间顶替剧情时间） |
 | `no-conflict` | engines/collab.js | collab.resolve：冲突 id 不在册 ⇒ no-conflict（不假称裁决了一条不存在的分歧，v2.112.0 plan-2 #40） |
 | `no-core-person` | engines/populate.js | EXV7-9：建档口把本批人全拒 ⇒ 势力行记 no-core-person（不许拿一个不在册的人当 core_person） |
 | `no-draft` | engines/farfield.js, engines/offline-tick.js, engines/region.js, engines/world-bridge.js | region.tickOffline：没拿到事务草稿 ⇒ 拒收（不把「我拿不到草稿」说成「你走了零秒」）（X3） |
@@ -447,6 +448,7 @@
 | `no-steps` | engines/rehearsal.js | rehearsal：一步都没给 ⇒ 没有什么可试演的（空步表不是「安全通过」）（B7） |
 | `no-store` | engines/capacity-audit.js, engines/chronicle-view.js, engines/relation-graph.js, engines/world-health.js, engines/world-lab.js | 聚合面读不到 store ⇒ 该栏如实拒算（E5 编年史 / O4 清点 / O5 健康中心共用；与「读到了是空」可分） |
 | `no-story-clock` | engines/agenda.js | agenda.upcoming：剧情钟未设定 ⇒ 整表拒算，不猜日期（E2·边界5） |
+| `no-story-context` | engines/periodicals.js | 期刊：没有真实聊天上下文时拒绝配置或出刊 |
 | `no-subject` | engines/observe-slice.js, engines/world-lab.js | N7:适配器取不到真目标主体(经济无被授者 / 物流无货运单)⇒ 如实不调,不编一个主体出来喂它 |
 | `no-such-activity` | engines/activity.js | EXP-7：这场活动不在台账里（id 对不上）⇒ 如实报 no-such-activity（不新建一场去满足调用）—— 与 activity-closed 分列：一个「没这场」、一个「这场已收口」 |
 | `no-such-case` | engines/ruling.js | EXP-6：这桩案子不在台账里（id 对不上）⇒ 如实报 no-such-case（不新建一案去满足调用）—— 与 case-closed 分列：一个「没这案」、一个「这案已结」 |

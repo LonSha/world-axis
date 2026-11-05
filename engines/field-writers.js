@@ -39,6 +39,7 @@
       writers: [
         { file: 'engines/backstage.js', mode: 'append' },
         { file: 'engines/causal.js', mode: 'append' },
+        { file: 'engines/inline-tags.js', mode: 'merge' },
         { file: 'engines/living-world.js', mode: 'merge' },
         { file: 'engines/world-bridge.js', mode: 'merge' },
         { file: 'engines/world-lab.js', mode: 'overwrite' }

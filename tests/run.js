@@ -384,7 +384,7 @@ const LOAD = [
   //   同一 vm 上下文里跑，且 act.js / world.js 在调用期经 WA.exec 取值；装载面没给它模块，
   //   两条路径会各自静默降级成「一律按真世界执行」（专锁的隔离判据因而不成立却不报错）。
   'core/exec.js',
-  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
+  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/inline-tags.js', 'engines/periodicals.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js', 'engines/kaleidoscope.js',
   // v2.50.0（第三十五面）: 宿主两侧 + 时间轴三账。
