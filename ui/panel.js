@@ -4306,7 +4306,21 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-dim">逐台读数来自 <code>l3Registry.ENTRIES</code> 与 <code>roundDrivers.DRIVERS</code>（同源，不重算）。
         累计轮次 <b>${st.runs || 0}</b> · 驱动成功 <b>${st.ok || 0}</b> · 轮内驱动名单 ${drivers.length} 台。</div>
       <div class="wa-row"><button class="wa-btn" id="wa-drive-view" title="逐台列出：分类 / 是否在轮内驱动名单 / 置灰原因（来自登记表原文，不代答）">刷新逐台读数</button></div>
-      <div id="wa-drive-out" class="wa-out"></div>`;
+      <div id="wa-drive-out" class="wa-out"></div>
+      <div class="wa-sec">死面台账工作台（EXV11-7 · 推进 API 处置面板）</div>
+      ${(function () {
+        try {
+          const P = WA.pushApiRegistry;
+          if (!P || !Array.isArray(P.ENTRIES)) return '<div class="wa-dim">不可用（pushApiRegistry 缺席）</div>';
+          const pst = (typeof P.stat === 'function') ? P.stat() : null;
+          const rows = P.ENTRIES.slice(0, 12).map(function (e) {
+            return '<div class="wa-kv"><span>' + esc(e.api) + '</span><b>' + esc(e.cls) + '</b></div>'
+              + '<div class="wa-dim">　' + esc(String(e.reason || '').slice(0, 80)) + '</div>';
+          });
+          return (pst ? '<div class="wa-dim">total ' + esc(String(pst.total)) + ' 台（前 12 条展示，全量见 engines/push-api-registry.js）</div>' : '')
+            + rows.join('');
+        } catch (e) { return '<div class="wa-dim">读取失败（' + esc(String(e && e.message || e).slice(0, 60)) + '）</div>'; }
+      })()}`;
   }
   function renderWriteDesk() {
     const D = WA.writeDesk;
