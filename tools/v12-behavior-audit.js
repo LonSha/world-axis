@@ -27,6 +27,6 @@ const rows=files.map(f=>{const s=text[f];
   else if(tx||writes.length) disposition='behavior-wired';
   else disposition='read-consumer';
   const hasTests=fs.existsSync(path.join(root,'tests'))&&fs.readdirSync(path.join(root,'tests')).some(t=>t.endsWith('.js')&&fs.readFileSync(path.join(root,'tests',t),'utf8').includes(path.basename(f)));
-  return {file:f,lines:s.split('\\n').length,namespace:ns,api:publicApi,functions:names(s),registerModule:reg,workflowRegistrations:wf,transactions:tx,writes:uniq(writes),crossConsumers:calls,uiConsumers:directUi,uiEventSurface:dynamicUi,moduleLoad,disposition,hasTests};
+  return {file:f,lines:s.split('\n').length,namespace:ns,api:publicApi,functions:names(s),registerModule:reg,workflowRegistrations:wf,transactions:tx,writes:uniq(writes),crossConsumers:calls,uiConsumers:directUi,uiEventSurface:dynamicUi,moduleLoad,disposition,hasTests};
 });
 fs.writeFileSync(process.argv[2]||'/tmp/v12-behavior-audit.json',JSON.stringify(rows,null,1));const tally={};for(const r of rows)tally[r.disposition]=(tally[r.disposition]||0)+1;console.log('files',rows.length,tally);
