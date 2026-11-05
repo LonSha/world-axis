@@ -4774,6 +4774,17 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     const ownerLine = Object.keys(owners).length
       ? Object.keys(owners).map(function (k) { return esc(k) + ' ' + owners[k]; }).join('　')
       : '<span class="wa-dim">（此刻没有条目）</span>';
+    // v2.301.0（EXV11-4）：total=0 时不再渲染一片空白 —— 显示 hands/skipped/unavailable 三行
+    //   + 对每个 skipped 源给出「它为什么没产出」原文（引擎给的 reason，不代答）。
+    const sk = (r && Array.isArray(r.skipped)) ? r.skipped : [];
+    const emptyDrill = (!rows.length && readOk) ? `
+      <div class="wa-item"><b>为什么是 0</b>（EXV11-4 下钻）：
+        产出源 <b>${(r && r.sourceCount) || 0}</b> 台在线 ·
+        skipped <b>${sk.length}</b> 台${sk.length ? '（' + sk.map(function (s) { return esc(s.source) + '：' + esc(s.reason); }).join('；') + '）' : ''} ·
+        ${((r && r.sourceCount) || 0) === 0 ? '<b>全部源缺席/关闭</b>（不是「没有待办」，是「读不到」）' : '在线源全部报空（真没有待办）'}
+      </div>
+      <div class="wa-dim">下一步：开局页（🌱）立世界骨架 → 写口台喂事实 → 待办自会从八源产出。跳转用
+        <code>WA.ui.goPage('boot')</code>（V10 EXV10-6 通道，真跳页不假链）。</div>` : '';
     return `
       <div class="wa-sec">待办中心</div>
       <div class="wa-dim">（把「现在等我做什么」做成一个面：按归属分组 / 每条带来源与到期条件 / 跳到来源模块）
@@ -4786,6 +4797,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div class="wa-row">${todoSourceLine()}</div>
       <div class="wa-item"><b>按归属</b>（世界 / 人物 / … —— 取自引擎 <code>describe().page</code>）：${ownerLine}</div>
       <div class="wa-dim">${TODO_DUE_NOTE}</div>
+${emptyDrill}
       <div class="wa-row">
         <button class="wa-btn" id="wa-td-all" title="全部待办：按归属分组逐条列出（来源模块 / 到期条件 / 是否可处理 / 被谁挡住）—— 真源 pendingCenter.items()">全部待办</button>
         <button class="wa-btn" id="wa-td-soon" title="即将到期：走 soon() 的近期待办口（条数上限来自设置，不是本页自定）">即将到期</button>
