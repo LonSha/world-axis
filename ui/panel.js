@@ -2809,8 +2809,18 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             + '</div>'
           : '';
         if (!li.budget) return dual + '<div class="wa-item wa-dim">上次注入未受预算约束（预算=0 不限，或无可裁项）。</div>';
+        // v2.301.0（EXV11-6）：快照对照 —— buildWorldSnapshot 原样展示 + 折叠/丢弃明细。
+        //   逐字等于引擎产出（不二次加工）；三态标记可见（state 属性在壳上）。
+        const rawSnap = (WA.render && typeof WA.render.buildWorldSnapshot === 'function')
+          ? (function () { try { return WA.render.buildWorldSnapshot(); } catch (e) { return null; } })() : null;
+        const snapView = '<div class="wa-item"><b>世界快照查看器</b>（EXV11-6 · 逐字原样）'
+          + (rawSnap
+            ? '<div class="wa-dim">三态标记：见快照壳 state 属性（snapshotState 同源同刻）</div>'
+              + '<pre style="white-space:pre-wrap;max-height:200px;overflow:auto;font-size:11px">' + esc(String(rawSnap).slice(0, 3000)) + (String(rawSnap).length > 3000 ? '\\n…（截断展示，真源 3000 字符后省略——不二次加工）' : '') + '</pre>'
+            : '<div class="wa-dim">快照读不出（buildWorldSnapshot 缺席或抛错）——如实报，不编造</div>')
+          + '</div>';
         const b = li.budget;
-        let h = '<div class="wa-item"><b>' + esc(b.used + '/' + b.cap + 't') + '</b>'
+        let h = dual + snapView + '<div class="wa-item"><b>' + esc(b.used + '/' + b.cap + 't') + '</b>'
           + '<div class="wa-kv"><span>预算来源</span><b>' + esc(b.source || '?') + (b.contextSize ? '（上下文 ' + esc(String(b.contextSize)) + '）' : '') + '</b></div>'
           + '<div class="wa-kv"><span>保留项</span><b>' + esc(String(b.keptCount == null ? '?' : b.keptCount)) + '</b></div>'
           + (b.overBudget ? '<div class="wa-dim wa-log-warn">超出预算（pinned 保底项不可裁）</div>' : '');
