@@ -16,3 +16,19 @@ console.log(JSON.stringify({ok:true,scenario:'workbench-shared-participant-place
 const inferred=W.actionDesk.sceneFlow({who:'甲'});
 if(!inferred.ok||inferred.coordination.some(x=>x.intent==='shared-away'))throw Error('inferred place leaks distant contract');
 console.log(JSON.stringify({ok:true,scenario:'inferred-place-isolation'}));
+
+
+
+
+// Check actionDesk ROUTES route dispatching for sceneOpen & sceneResolve
+const openRes = W.actionDesk.plan('liaison.sceneOpen', { opId: 'probe-open-routes', place: '东市', intent: '协商商路', people: ['甲', '乙'], shared: true });
+if (!openRes || !openRes.ok || !openRes.scene || !openRes.scene.id) throw new Error('plan(liaison.sceneOpen) failed: ' + JSON.stringify(openRes));
+// Create a real done act to resolve against (act engine uses 'person' for owner)
+W.store.transact(d => {
+  d.acts = d.acts || { rows: [] };
+  d.acts.rows.push({ id: 'act_done_probe', person: '甲', status: 'done', title: '协商完毕' });
+  return true;
+}, 'probe:act');
+const resolveRes = W.actionDesk.plan('liaison.sceneResolve', { sceneId: openRes.scene.id, receipt: { ref: 'act:act_done_probe' } });
+if (!resolveRes || !resolveRes.ok) throw new Error('plan(liaison.sceneResolve) failed: ' + JSON.stringify(resolveRes));
+console.log(JSON.stringify({ ok: true, scenario: 'workbench-routes-scene-contracts', sceneId: openRes.scene.id, receipts: resolveRes.receipts }));

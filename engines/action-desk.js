@@ -170,7 +170,9 @@
     // v2.233.0 (OPV4-1 & OPV4-2): 场景优先入口与跨轮生命周期
     'actionDesk.lifecycle': function (o) { return lifecycle(o); },
     'actionDesk.recoverAction': function (o) { return recoverAction(o.actionId, o); },
-    'actionDesk.sceneFlow': function (o) { return sceneFlow(o); },
+        'liaison.sceneOpen': function (o) { return (WA.liaison && typeof WA.liaison.sceneOpen === 'function') ? WA.liaison.sceneOpen(o) : { ok: false, reason: 'liaison-unavailable' }; },
+    'liaison.sceneResolve': function (o) { return (WA.liaison && typeof WA.liaison.sceneResolve === 'function') ? WA.liaison.sceneResolve(o.sceneId || o.id, o.receipt || o) : { ok: false, reason: 'liaison-unavailable' }; },
+'actionDesk.sceneFlow': function (o) { return sceneFlow(o); },
     'actionDesk.actFromScene': function (o) { return actFromScene(o); },
     // v2.231.0（拓展 IN-3）：共同知晓与默契
     'sharedAwareness.assertMeta': function (o) { return WA.sharedAwareness.assertMeta(o.who, o.target, o.factId, o.basis); },

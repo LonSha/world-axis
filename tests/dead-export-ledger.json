@@ -8,7 +8,7 @@
       "src": "engines/action-desk.js",
       "refs": 0,
       "tref": 0,
-      "own": 5
+      "own": 6
     },
     "actionDesk.sources": {
       "reason": "self-only",
@@ -4392,7 +4392,7 @@
       "src": "engines/liaison.js",
       "refs": 0,
       "tref": 1,
-      "own": 16
+      "own": 17
     },
     "liaison.evidence": {
       "reason": "test-only",
@@ -4400,15 +4400,7 @@
       "src": "engines/liaison.js",
       "refs": 0,
       "tref": 4,
-      "own": 14
-    },
-    "liaison.getSettings": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/liaison.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
+      "own": 16
     },
     "liaison.inbox": {
       "reason": "test-only",
