@@ -488,6 +488,70 @@
     const skipped = live.length - capped.length;
     return { ok: true, at: t, considered: capped.length, skipped: skipped, results: results.slice() };
   }
+  /**
+   * V12 场景协同账：只保存一次场景的协作合同，不代替人物/事件/时间真源。
+   * scene.open 记录玩家意图与可见上下文；scene.resolve 只记录既有写口返回的引用。
+   * 所有可持久世界变化仍必须由 life/act/causal/intel 等原生写口完成。
+   */
+  function sceneNodeOf(draft) {
+    const n = nodeOf(draft);
+    if (!Array.isArray(n.scenes)) n.scenes = [];
+    return n.scenes;
+  }
+  function cleanList(v, max, itemMax) {
+    if (!Array.isArray(v)) return [];
+    return v.map(function (x) { return clean(x, itemMax || 60); }).filter(Boolean).slice(0, max || 12);
+  }
+  function sceneOpen(spec) {
+    const cfg = settings();
+    if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
+    const s = spec || {}, opId = clean(s.opId, 60), kind = clean(s.kind, 40) || 'scene';
+    if (!opId) { noteFault('missing-op'); return { ok: false, reason: 'missing-op' }; }
+    const existing = state().liaison && state().liaison.scenes;
+    const hit = Array.isArray(existing) ? existing.filter(function (x) { return x && x.opId === opId; })[0] : null;
+    if (hit) { S.reused++; return { ok: true, reused: true, sceneId: hit.id, scene: hit }; }
+    const people = cleanList(s.people, 8, 60);
+    const place = clean(s.place, 80), intent = clean(s.intent, 160);
+    if (!people.length) { noteFault('missing-participants'); return { ok: false, reason: 'missing-participants' }; }
+    if (!intent) { noteFault('missing-intent'); return { ok: false, reason: 'missing-intent' }; }
+    const at = isFinite(finite(s.at)) ? Number(s.at) : clockNow('liaison.scene.open');
+    let out = null;
+    mutate(function (draft) {
+      const rows = sceneNodeOf(draft);
+      const id = 'sc_' + String(at).toString(36) + '_' + (rows.length + 1);
+      const row = { id: id, opId: opId, kind: kind, people: people, place: place,
+        intent: intent, time: clean(s.time, 60), evidence: cleanList(s.evidence, 8, 80),
+        options: cleanList(s.options, 8, 100), status: 'open', receipts: [], at: at, updatedAt: at };
+      rows.push(row); if (WA.evict) WA.evict.array(rows, 'liaison.scenes');
+      out = { ok: true, sceneId: id, scene: row }; return true;
+    }, 'liaison:scene-open');
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  function sceneResolve(sceneId, receipt) {
+    const id = clean(sceneId, 60), r = receipt || {};
+    if (!id) { noteFault('missing-scene'); return { ok: false, reason: 'missing-scene' }; }
+    const ref = clean(r.ref || r.id, 80);
+    if (!ref) { noteFault('missing-receipt'); return { ok: false, reason: 'missing-receipt' }; }
+    let out = null;
+    mutate(function (draft) {
+      const rows = sceneNodeOf(draft), row = rows.filter(function (x) { return x && x.id === id; })[0];
+      if (!row) { out = { ok: false, reason: 'missing-scene' }; return false; }
+      if (row.receipts.some(function (x) { return x && x.ref === ref; })) {
+        out = { ok: true, reused: true, sceneId: id, ref: ref, status: row.status }; return false;
+      }
+      row.receipts.push({ ref: ref, type: clean(r.type, 40) || 'consequence', status: clean(r.status, 30) || 'recorded', source: clean(r.source, 80), at: isFinite(finite(r.at)) ? Number(r.at) : clockNow('liaison.scene.resolve') });
+      row.status = clean(r.sceneStatus, 20) || 'resolved'; row.updatedAt = clockNow('liaison.scene.resolve');
+      out = { ok: true, reused: false, sceneId: id, ref: ref, status: row.status, receipts: row.receipts.length }; return true;
+    }, 'liaison:scene-resolve');
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+  function sceneView(sceneId) {
+    const id = clean(sceneId, 60), rows = (state().liaison || {}).scenes;
+    if (!Array.isArray(rows)) return id ? { ok: false, reason: 'missing-scene' } : { ok: true, scenes: [] };
+    if (!id) return { ok: true, scenes: rows.slice(-20).map(function (x) { return Object.assign({}, x, { receipts: (x.receipts || []).slice() }); }) };
+    const row = rows.filter(function (x) { return x && x.id === id; })[0];
+    return row ? { ok: true, scene: Object.assign({}, row, { receipts: (row.receipts || []).slice() }) } : { ok: false, reason: 'missing-scene' };
+  }
   /** 重试：把「待确认」的收件重新推给桥（断网恢复 / 插件重新打开后的显式动作）。 */
   function retry(opId) {
     const cfg = settings();
@@ -556,6 +620,8 @@
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     receive: receive, advance: advance, settleDeal: settleDeal, settleDue: settleDue,
     retry: retry, pendingRows: pendingRows,
+    // V12 场景协同合同：只记上下文与既有写口回执，不代替世界状态真源
+    sceneOpen: sceneOpen, sceneResolve: sceneResolve, sceneView: sceneView,
     // 只读面：台账 / 任务 / 证据（追溯靠真源比对，不靠字符串拼）
     inbox: function (limit) { return rowsOf().slice(-(Math.max(1, Math.floor(finite(limit)) || 20))); },
     deals: function () { return dealsOf().slice(); },
