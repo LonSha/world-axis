@@ -1611,7 +1611,7 @@ return {
         const contracts = WA.liaison.sceneView();
         coordination = (contracts.scenes || []).filter(function (scene) {
           return scene.shared === true && scene.people.some(function (person) { return aliases.indexOf(person) >= 0; })
-            && (!place || scene.place === place);
+            && (!(sit.place || place) || scene.place === (sit.place || place));
         }).map(function (scene) {
           return { id: scene.id, intent: scene.intent, status: scene.status,
             receipts: scene.receipts.map(function (receipt) { return { ref: receipt.ref, status: receipt.status }; }) };

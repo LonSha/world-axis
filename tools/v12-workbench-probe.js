@@ -13,3 +13,6 @@ if(!projection.ok||projection.coordination.length!==1||projection.coordination[0
 if(JSON.stringify(W.store.get())!==before)throw Error('read projection writes');
 projection.coordination[0].intent='changed';if(W.liaison.sceneView(publicId).scene.intent!=='shared-local')throw Error('projection alias');
 console.log(JSON.stringify({ok:true,scenario:'workbench-shared-participant-place-isolation'}));
+const inferred=W.actionDesk.sceneFlow({who:'甲'});
+if(!inferred.ok||inferred.coordination.some(x=>x.intent==='shared-away'))throw Error('inferred place leaks distant contract');
+console.log(JSON.stringify({ok:true,scenario:'inferred-place-isolation'}));
