@@ -5,17 +5,18 @@ const {chromium}=require('/home/user/pwlib/node_modules/playwright-core');
 (async()=>{
  const b=await chromium.launch({executablePath:'/root/.cache/ms-playwright/chromium-1148/chrome-linux/chrome',args:['--no-sandbox']});
  try {
-  const p=await b.newPage();p.setDefaultTimeout(20000);
+  const p=await b.newPage();p.on("dialog",async d=>{console.log("HOST_DIALOG "+d.type()+" "+d.message().slice(0,200));await d.dismiss();});p.setDefaultTimeout(20000);
   await p.goto('http://127.0.0.1:8000');
   await p.waitForFunction(()=>window.WorldAxis && WorldAxis.apiRouter && WorldAxis.periodicals,null,{timeout:60000});
+  p.on('console',m=>{if(m.text().startsWith('PERIODICAL_STAGE')) console.log(m.text());});
   const out=await Promise.race([p.evaluate(async()=>{
    const W=WorldAxis, host=W.mainWin || window, old=host.SillyTavern.getContext, call=W.apiRouter.call;
    const id='wa-periodical-isolated-'+Date.now(),meta={file_name:id};
    const context={...old(),chatId:id,chatMetadata:meta,chat:[{is_user:false,mes:'isolated periodical test'}]};
    try {
     host.SillyTavern.getContext=()=>context;
-    W.store.init();
-    const setup=W.store.transact(d=>{d.clock.iso='2024-03-01';});
+    console.log('PERIODICAL_STAGE init');W.store.init();console.log('PERIODICAL_STAGE initialized');
+    console.log('PERIODICAL_STAGE transact');const setup=W.store.transact(d=>{d.clock.iso='2024-03-01';});
     if (!setup.ok) return {stage:'setup',ok:false,reason:setup.reason};
     const configured=W.periodicals.configure({id:'isolated',name:'隔离联调刊',days:[1],enabled:true});
     W.apiRouter.call=async()=> '真实存储链验收正文';
