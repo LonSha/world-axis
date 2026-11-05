@@ -2842,6 +2842,15 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           if (bh.derived) h += '<div class="wa-dim">余量按快照现算（非裁决当时所记）</div>';
         }
         if ((b.folded || []).length) h += '<div class="wa-dim">折叠 ' + (b.folded || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')'; }).join('、') + '</div>';
+        // 裁决快照只读：历史账没有正文时不能用当前重新构建的内容冒充当时原文。
+        if ((b.folded || []).length) h += '<details class="wa-item"><summary>逐项折叠对照（裁决时记录）</summary>'
+          + b.folded.map(function (f) {
+            return '<div class="wa-kv"><span>' + esc(String(f.source || '未命名')) + '</span><b>'
+              + esc(String(f.from == null ? '未记录' : f.from)) + ' → '
+              + esc(String(f.to == null ? '未记录' : f.to)) + ' token</b></div>'
+              + '<div class="wa-dim">原因：' + esc(String(f.reason || '未记录')) + '</div>'
+              + '<div class="wa-dim">折叠前正文：未记录；折叠后正文：未记录。当前快照不是该次裁决的历史原文。</div>';
+          }).join('') + '</details>';
         if ((b.dropped || []).length) h += '<div class="wa-dim wa-log-warn">丢弃 ' + (b.dropped || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')' + (f.tokens ? ' ' + esc(String(f.tokens)) + 't' : ''); }).join('、') + '</div>';
         h += '</div>';
         // v2.88.0 O1：成本账（`injectBudget.costView` 的真消费方）。
