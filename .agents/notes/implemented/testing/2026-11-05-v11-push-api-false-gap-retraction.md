@@ -1,4 +1,5 @@
-# 自我纠正：push-api「60 条未裁决」是误判
+# Agent Note: Retracting a fabricated push-api coverage gap
+Status: implemented
 
 ## 我上一轮做错了什么
 
@@ -27,3 +28,13 @@
 ## 教训
 
 减法得出的缺口必须先验证被减掉的每一项归属，否则会把「本该排除的」当成「遗漏的」。这次我连续两轮拿错误读数当成果汇报，速度上去了，可信度掉了。
+
+## Problem
+A runtime scan found 81 push-verb APIs against a 21-entry registry. I subtracted and reported a 60-entry unadjudicated gap, put it on the panel as a warning, and shipped a freeze lock around it.
+## Decision
+Retract the claim. The registry's stated scope is true-zero-call APIs only; recomputation showed the 60 entries split into 5 owned by l3Registry, 7 by roundDrivers baseline, and 48 with real product call sites. Zero were true-zero-call and unadjudicated. Coverage is now asserted with ownership-aware criteria plus literal stripping, because two 'stale ruling' hits were an HTML hint string and a clock label.
+
+## Consequences
+The freeze lock and its panel warning were deleted, not kept as a harmless extra signal: a wrong warning trains readers to ignore warnings. v11-push-api-coverage now asserts ownership-aware completeness, so a genuine future gap still fails. Any future gap claim must show the ownership split before it reaches the panel or a lock.
+## Alternatives considered
+Keep the 60-entry baseline as a TODO list and adjudicate entries one by one. Rejected: 48 of them are already called by product code, so adjudicating them as dead faces would have produced 48 wrong rulings with signed evidence. Softening the panel text to 'partial coverage' was also rejected, because the underlying number was wrong, not merely imprecise.
