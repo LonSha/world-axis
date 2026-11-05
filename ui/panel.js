@@ -2842,14 +2842,21 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           if (bh.derived) h += '<div class="wa-dim">余量按快照现算（非裁决当时所记）</div>';
         }
         if ((b.folded || []).length) h += '<div class="wa-dim">折叠 ' + (b.folded || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')'; }).join('、') + '</div>';
-        // 裁决快照只读：历史账没有正文时不能用当前重新构建的内容冒充当时原文。
+        // 裁决快照只读：正文见证由裁决当场落账（wasPreview / nowPreview），读面不重跑 plan()。
         if ((b.folded || []).length) h += '<details class="wa-item"><summary>逐项折叠对照（裁决时记录）</summary>'
           + b.folded.map(function (f) {
+            const was = (f.wasPreview == null) ? null : String(f.wasPreview);
+            const now = (f.nowPreview == null) ? null : String(f.nowPreview);
             return '<div class="wa-kv"><span>' + esc(String(f.source || '未命名')) + '</span><b>'
               + esc(String(f.from == null ? '未记录' : f.from)) + ' → '
               + esc(String(f.to == null ? '未记录' : f.to)) + ' token</b></div>'
               + '<div class="wa-dim">原因：' + esc(String(f.reason || '未记录')) + '</div>'
-              + '<div class="wa-dim">折叠前正文：未记录；折叠后正文：未记录。当前快照不是该次裁决的历史原文。</div>';
+              + (was == null
+                ? '<div class="wa-dim">折叠前正文：未记录（该轮未落账，不拿当前快照冒充）</div>'
+                : '<div class="wa-dim">折叠前（' + esc(String(f.wasChars == null ? '?' : f.wasChars)) + ' 字符，前 240 字）：' + esc(was) + '</div>')
+              + (now == null
+                ? '<div class="wa-dim">折叠后正文：未记录</div>'
+                : '<div class="wa-dim">折叠后（' + esc(String(f.nowChars == null ? '?' : f.nowChars)) + ' 字符，前 240 字）：' + esc(now) + '</div>');
           }).join('') + '</details>';
         if ((b.dropped || []).length) h += '<div class="wa-dim wa-log-warn">丢弃 ' + (b.dropped || []).map(function (f) { return esc(f.source) + '(' + esc(f.reason || '') + ')' + (f.tokens ? ' ' + esc(String(f.tokens)) + 't' : ''); }).join('、') + '</div>';
         h += '</div>';
