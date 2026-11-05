@@ -2764,7 +2764,21 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       try {
         const li = (WA.store.get().lastInjection) || null;
         if (!li) return '<div class="wa-item wa-dim">尚未发生注入；推演一轮后此处显示预算用量与折叠/丢弃明细。</div>';
-        if (!li.budget) return '<div class="wa-item wa-dim">上次注入未受预算约束（预算=0 不限，或无可裁项）。</div>';
+        // v2.301.0（EXV11-5）：注入双面视图 —— 主路径（li.len / li.hosted.ok）与宿主槽位
+        //   （li.hosted.chars / li.hosted.key）并排；差异红标。同源读存档快照，不重算、纯只读。
+        const hd = li.hosted || null;
+        const dual = (li.len != null || hd)
+          ? '<div class="wa-item"><b>双面对照</b>（EXV11-5）'
+            + '<div class="wa-kv"><span>主路径长度</span><b>' + esc(String(li.len == null ? '?' : li.len)) + '</b></div>'
+            + (hd
+              ? '<div class="wa-kv"><span>宿主槽位</span><b>' + esc(hd.key || '?') + ' · ' + esc(String(hd.chars == null ? '?' : hd.chars)) + ' 字符 · ' + (hd.ok ? '送达' : '未送达') + '</b></div>'
+                + ((hd.chars != null && li.len != null && hd.chars !== li.len)
+                  ? '<div class="wa-log-warn">⚠ 差异：主路径 ' + esc(String(li.len)) + ' ≠ 宿主实收 ' + esc(String(hd.chars)) + '（可能原因：宿主二次裁剪 / 通道二次编码——见 inject-inspector）</div>'
+                  : '<div class="wa-dim">两路一致（长度单一真源 li.len === hosted.chars）</div>')
+              : '<div class="wa-dim">宿主槽位无记录（未走 setExtensionPrompt 通道，或宿主不支持）</div>')
+            + '</div>'
+          : '';
+        if (!li.budget) return dual + '<div class="wa-item wa-dim">上次注入未受预算约束（预算=0 不限，或无可裁项）。</div>';
         const b = li.budget;
         let h = '<div class="wa-item"><b>' + esc(b.used + '/' + b.cap + 't') + '</b>'
           + '<div class="wa-kv"><span>预算来源</span><b>' + esc(b.source || '?') + (b.contextSize ? '（上下文 ' + esc(String(b.contextSize)) + '）' : '') + '</b></div>'
