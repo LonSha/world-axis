@@ -25310,6 +25310,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.302.0 (World Chronicle 缝): 内联状态回报标签 <time>/<choice>/<flag>');
   {
     await runScript('./inline-tags-v2302.js');
+    await runScript('./periodicals-v2303.js');
   }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。

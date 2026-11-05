@@ -205,6 +205,7 @@
                 }
               }
             } catch (e) { WA.log && WA.log('warn', '内联标签解析异常', e); }
+            if (WA.periodicals) Promise.resolve().then(() => WA.periodicals.checkAndPublish()).catch(e => WA.log('warn', '期刊调度异常', e));
             try {
               if (!WA.purifier || typeof WA.purifier.applySafe !== 'function') return;
               const c = getCtx();

@@ -4095,6 +4095,14 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     const cpc = (WA.campaign && WA.campaign.getSettings) ? WA.campaign.getSettings() : null;
     const cpOn = !!(cpc && cpc.enabled);
     return `
+      <div class="wa-sec">世界期刊</div>
+      <label class="wa-row">刊物标识 <input id="wa-periodical-id" value="world-paper" maxlength="40"/></label>
+      <label class="wa-row">刊名 <input id="wa-periodical-name" value="世界日报" maxlength="80"/></label>
+      <label class="wa-row">每月出刊日 <input id="wa-periodical-days" value="1,8,15,22" placeholder="1,8,15,22"/></label>
+      <label class="wa-row">刊物设定 <textarea id="wa-periodical-profile" maxlength="2000" placeholder="刊物风格、栏目与公开报道范围"></textarea></label>
+      <label class="wa-row"><input id="wa-periodical-enabled" type="checkbox"/>自动出刊（使用推演通道）</label>
+      <div class="wa-dim">相同标识保存会更新已有刊物；取消自动出刊后保存可停刊。日期跳跃只补最近一期。</div>
+      <button class="wa-btn" id="wa-periodical-config">保存刊物</button><button class="wa-btn" id="wa-periodical-publish">检查出刊</button><button class="wa-btn" id="wa-periodical-read">阅读往期</button><div id="wa-periodical-out" role="status" aria-live="polite"></div>
       <div class="wa-sec">世界健康中心</div><div class="wa-dim">（一屏答三问：还有什么没做完 / 卡在哪 / 快满了没）</div>
       <div class="wa-dim">三栏<b>只做聚合与下钻</b>，不新增第二套状态：待办来自各模块自己的 <code>pending()</code>（「什么算未完成」由它们自己判），
         阻塞来自它们的 <code>stat().faults</code>，水位来自 <code>store.sizeCaps()</code>。
@@ -14176,6 +14184,22 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         };
         return M[reason] || ('拒收：' + String(reason || '?'));
       };
+      on('#wa-periodical-read', () => { const o = $('#wa-periodical-out'); if (o && WA.periodicals) o.innerHTML = WA.periodicals.render(); });
+      on('#wa-periodical-config', () => {
+        const o = $('#wa-periodical-out');
+        try {
+          const r = WA.periodicals.configure({id:$('#wa-periodical-id').value.trim(),name:$('#wa-periodical-name').value,days:$('#wa-periodical-days').value.split(/[,，\s]+/).filter(Boolean),profile:$('#wa-periodical-profile').value,enabled:$('#wa-periodical-enabled').checked});
+          if (o) o.textContent = r && r.ok ? '刊物配置已保存' : '配置未保存：检查标识、出刊日与世界写入权限';
+        } catch(e) { if (o) o.textContent = '配置失败：' + e.message; }
+      });
+      on('#wa-periodical-publish', async () => {
+        const o = $('#wa-periodical-out'), button = $('#wa-periodical-publish');
+        if (button) button.disabled = true;
+        if (o) o.textContent = '正在检查出刊…';
+        try { const r = await WA.periodicals.checkAndPublish(); if (o) o.textContent = r.reason ? '未出刊：' + r.reason : '新出刊 ' + r.published + ' 期，失败 ' + (r.failed || 0) + ' 期，过期丢弃 ' + (r.discarded || 0) + ' 期'; }
+        catch(e) { if (o) o.textContent = '出刊失败：' + e.message; }
+        finally { if (button) button.disabled = false; }
+      });
       const agCfg = $('#wa-wh-ag-enabled');
       if (agCfg) agCfg.onchange = function () {
         if (!WA.agenda || !WA.agenda.setSettings) return agOut('<div class="wa-log wa-log-err">未记录：module-missing</div>');

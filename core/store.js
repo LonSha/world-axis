@@ -68,6 +68,7 @@
       // 回声（已结算结果与正文的接触面）
       echoes: [],               // {id,refCurrent,result,exposure,at}
       // 纪事（归档历史）
+      periodicals: { defs: [], issues: [] },
       chronicle: [],            // {id,kind,title,summary,at,refs}
       // 舆情（新闻/论坛/闲逛，闲逛=NON-CANON）
       opinion: { canon: [], forum: [], sandbox: [], updatedAt: 0 },
@@ -1611,6 +1612,8 @@
     return { state: target, filled: filled, conflicts: conflicts };
   }
   const __BOUNDED_CAPS = {
+    'periodicals.defs': { cap: 8, site: 'periodicals.js configure capacity guard' },
+    'periodicals.issues': { cap: 48, site: 'periodicals.js evict.array' },
     'chronicle': { cap: 200, site: 'backstage.js slice(-200) + horizon.js CHRONICLE_CAP 同源（v1.3.0）' },
     'currents': { cap: 40, site: 'backstage.js slice(-40)' },
     'echoes': { cap: 40, site: 'backstage.js slice(-40)' },
