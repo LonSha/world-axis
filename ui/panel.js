@@ -1370,7 +1370,37 @@
 
   function renderWorld() {
     const s = WA.store.get();
+    // v2.301.0（EXV11-2）：世界真空诊断看板 —— 合成 snapshotState 五态 + yieldAttrib 逐台归因，
+    //   纯只读（不写存档、不跑引擎），每态给出可执行下一步。
+    const vacuum = (function () {
+      try {
+        const R = (WA.render && typeof WA.render.snapshotState === 'function') ? WA.render.snapshotState() : null;
+        const st = (R && R.state) || null;
+        if (!st) return '<div class="wa-item wa-dim">真空诊断不可用（render.snapshotState 缺席——注入引擎未加载）</div>';
+        const nextOf = {
+          'no-session': '没开局：去开局页（🌱）一键立骨架，或写口台手动喂第一批事实',
+          'no-facts': '开了但没事实：写口台（🎛）录目标/日程/羁绊/名册，或注入页看六源开关',
+          'fault': '读面坏了：不是「世界没事」——见下方 faults 段名，去工具页跑健康预检',
+          'off': '六源全关：注入页打开源开关（开关优先于状态声明）',
+          'live': '正常运转（本轮快照 live）'
+        };
+        let h = '<div class="wa-item"><b>真空诊断</b>（EXV11-2 · 纯只读）：state = <b>' + esc(st) + '</b>'
+          + '<div class="wa-dim">下一步：' + esc(nextOf[st] || '未知态（见 snapshotState 原文）') + '</div>';
+        if (R.faults && R.faults.length) h += '<div class="wa-log-warn">取数失败段：' + esc(R.faults.join('、')) + '</div>';
+        try {
+          const ya = (WA.healthPreflight && typeof WA.healthPreflight.yieldAttrib === 'function')
+            ? WA.healthPreflight.yieldAttrib({ limit: 8 }) : null;
+          if (ya && ya.ok && Array.isArray(ya.rows) && ya.rows.length) {
+            h += '<div class="wa-dim">空产引擎（前 ' + ya.rows.length + ' 台）：'
+              + ya.rows.map(function (r) { return esc(r.key || r.engine || '?') + (r.why ? '（' + esc(String(r.why).slice(0, 40)) + '）' : ''); }).join('、')
+              + '</div>';
+          }
+        } catch (e2) {}
+        return h + '</div>';
+      } catch (e) { return '<div class="wa-item wa-dim">真空诊断读取失败（' + esc(String(e && e.message || e).slice(0, 60)) + '）</div>'; }
+    })();
     return `
+      ${vacuum}
       <div class="wa-sec">世界钟 <button class="wa-btn wa-mini" id="wa-set-clock">设定</button> <button class="wa-btn wa-mini" id="wa-next-day" title="推进一天（保留时段由引擎单一实现决定）">下一日</button></div>
       <div class="wa-kv"><span>当前</span><b>${esc(s.clock.label || '未设定')}</b></div>
       ${(() => {
