@@ -502,6 +502,13 @@
     if (!Array.isArray(v)) return [];
     return v.map(function (x) { return clean(x, itemMax || 60); }).filter(Boolean).slice(0, max || 12);
   }
+  function sceneCopy(row) { return JSON.parse(JSON.stringify(row)); }
+  function sceneCommit(tx, out) {
+    if (out && (out.reused || out.ok === false)) return out;
+    if (!tx || tx.ok !== true) return { ok: false, reason: (tx && tx.reason) || 'transaction-rejected' };
+    return Object.assign({}, out || { ok: false, reason: 'store-unavailable' },
+      { persisted: tx.persisted == null ? null : tx.persisted, deferred: !!tx.deferred });
+  }
   function sceneOpen(spec) {
     const cfg = settings();
     if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
@@ -509,48 +516,61 @@
     if (!opId) { noteFault('missing-op'); return { ok: false, reason: 'missing-op' }; }
     const existing = state().liaison && state().liaison.scenes;
     const hit = Array.isArray(existing) ? existing.filter(function (x) { return x && x.opId === opId; })[0] : null;
-    if (hit) { S.reused++; return { ok: true, reused: true, sceneId: hit.id, scene: hit }; }
+    if (hit) { S.reused++; return { ok: true, reused: true, sceneId: hit.id, scene: sceneCopy(hit) }; }
     const people = cleanList(s.people, 8, 60);
     const place = clean(s.place, 80), intent = clean(s.intent, 160);
     if (!people.length) { noteFault('missing-participants'); return { ok: false, reason: 'missing-participants' }; }
     if (!intent) { noteFault('missing-intent'); return { ok: false, reason: 'missing-intent' }; }
     const at = isFinite(finite(s.at)) ? Number(s.at) : clockNow('liaison.scene.open');
     let out = null;
-    mutate(function (draft) {
+    const tx = mutate(function (draft) {
       const rows = sceneNodeOf(draft);
+      if (rows.length >= 40) { out = { ok: false, reason: 'scene-capacity' }; return false; }
       const id = 'sc_' + String(at).toString(36) + '_' + (rows.length + 1);
       const row = { id: id, opId: opId, kind: kind, people: people, place: place,
         intent: intent, time: clean(s.time, 60), evidence: cleanList(s.evidence, 8, 80),
         options: cleanList(s.options, 8, 100), status: 'open', receipts: [], at: at, updatedAt: at };
-      rows.push(row); if (WA.evict) WA.evict.array(rows, 'liaison.scenes');
-      out = { ok: true, sceneId: id, scene: row }; return true;
+      rows.push(row);
+      out = { ok: true, sceneId: id, scene: sceneCopy(row) }; return true;
     }, 'liaison:scene-open');
-    return out || { ok: false, reason: 'store-unavailable' };
+    return sceneCommit(tx, out);
   }
   function sceneResolve(sceneId, receipt) {
+    if (!settings().enabled) return { ok: false, reason: 'disabled' };
     const id = clean(sceneId, 60), r = receipt || {};
-    if (!id) { noteFault('missing-scene'); return { ok: false, reason: 'missing-scene' }; }
+    if (!id) return { ok: false, reason: 'missing-scene' };
     const ref = clean(r.ref || r.id, 80);
-    if (!ref) { noteFault('missing-receipt'); return { ok: false, reason: 'missing-receipt' }; }
+    if (!ref) return { ok: false, reason: 'missing-receipt' };
     let out = null;
-    mutate(function (draft) {
-      const rows = sceneNodeOf(draft), row = rows.filter(function (x) { return x && x.id === id; })[0];
+    const tx = mutate(function (draft) {
+      const row = sceneNodeOf(draft).filter(function (x) { return x && x.id === id; })[0];
       if (!row) { out = { ok: false, reason: 'missing-scene' }; return false; }
+      const split = ref.indexOf(':'), type = ref.slice(0, split), targetId = ref.slice(split + 1);
+      const candidates = type === 'deal' ? nodeOf(draft).deals :
+        (type === 'act' && draft.acts && Array.isArray(draft.acts.rows) ? draft.acts.rows : []);
+      const target = candidates.filter(function (x) { return x && x.id === targetId; })[0];
+      if (!target || ['done', 'failed', 'cancelled'].indexOf(target.status) < 0) {
+        out = { ok: false, reason: 'receipt-not-terminal' }; return false;
+      }
       if (row.receipts.some(function (x) { return x && x.ref === ref; })) {
         out = { ok: true, reused: true, sceneId: id, ref: ref, status: row.status }; return false;
       }
-      row.receipts.push({ ref: ref, type: clean(r.type, 40) || 'consequence', status: clean(r.status, 30) || 'recorded', source: clean(r.source, 80), at: isFinite(finite(r.at)) ? Number(r.at) : clockNow('liaison.scene.resolve') });
-      row.status = clean(r.sceneStatus, 20) || 'resolved'; row.updatedAt = clockNow('liaison.scene.resolve');
-      out = { ok: true, reused: false, sceneId: id, ref: ref, status: row.status, receipts: row.receipts.length }; return true;
+      if (row.receipts.length >= 24) { out = { ok: false, reason: 'receipt-capacity' }; return false; }
+      const at = clockNow('liaison.scene.resolve');
+      row.receipts.push({ ref: ref, type: type, status: target.status,
+        source: type === 'deal' ? 'liaison.settleDeal' : 'act', at: at });
+      row.status = 'resolved'; row.updatedAt = at;
+      out = { ok: true, reused: false, sceneId: id, ref: ref, status: row.status, receipts: row.receipts.length };
+      return true;
     }, 'liaison:scene-resolve');
-    return out || { ok: false, reason: 'store-unavailable' };
+    return sceneCommit(tx, out);
   }
   function sceneView(sceneId) {
     const id = clean(sceneId, 60), rows = (state().liaison || {}).scenes;
     if (!Array.isArray(rows)) return id ? { ok: false, reason: 'missing-scene' } : { ok: true, scenes: [] };
-    if (!id) return { ok: true, scenes: rows.slice(-20).map(function (x) { return Object.assign({}, x, { receipts: (x.receipts || []).slice() }); }) };
+    if (!id) return { ok: true, scenes: rows.slice(-20).map(function (x) { return sceneCopy(x); }) };
     const row = rows.filter(function (x) { return x && x.id === id; })[0];
-    return row ? { ok: true, scene: Object.assign({}, row, { receipts: (row.receipts || []).slice() }) } : { ok: false, reason: 'missing-scene' };
+    return row ? { ok: true, scene: sceneCopy(row) } : { ok: false, reason: 'missing-scene' };
   }
   /** 重试：把「待确认」的收件重新推给桥（断网恢复 / 插件重新打开后的显式动作）。 */
   function retry(opId) {
