@@ -25293,6 +25293,14 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./v11-snapshot-viewer.js');
     await runScript('./v11-fold-witness.js');
     await runScript('./v11-push-api-coverage.js');
+    await runScript('./v11-vacuum-board.js');
+  }
+  // ── v2.301.0（V11 EXV11-9）：端到端验收矩阵 ──────────────────────────────
+  //   口径：能跑的就真跑（require 各专锁并真跑 runAll + runNegative，拿它的计数当判据），
+  //   跑不了的 UI 渲染侧只用源码级见证并标注「源码级」——不冒充浏览器实机验收。
+  section('v2.301.0 (V11 EXV11-9): 端到端验收矩阵（OPV11-1~9 + EXV11-1~9）');
+  {
+    await runScript('./v11-master-matrix.js');
   }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
