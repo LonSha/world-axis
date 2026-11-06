@@ -1009,6 +1009,143 @@
         return WA.rumor.refuteDrift(o.rumorId || o.id, o);
       }
       return { ok: false, reason: 'unsupported' };
+    },
+    // v2.303.0 (OPV13-2): 复杂事件伏笔长周期生命树
+    'foreshadowTree.plant': function (o) {
+      if (WA.foreshadowTree && typeof WA.foreshadowTree.plant === 'function') return WA.foreshadowTree.plant(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'foreshadowTree.ferment': function (o) {
+      if (WA.foreshadowTree && typeof WA.foreshadowTree.ferment === 'function') return WA.foreshadowTree.ferment(o.id || o.treeId, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'foreshadowTree.distort': function (o) {
+      if (WA.foreshadowTree && typeof WA.foreshadowTree.distort === 'function') return WA.foreshadowTree.distort(o.id || o.treeId, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'foreshadowTree.harvest': function (o) {
+      if (WA.foreshadowTree && typeof WA.foreshadowTree.harvest === 'function') return WA.foreshadowTree.harvest(o.id || o.treeId, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'foreshadowTree.decay': function (o) {
+      if (WA.foreshadowTree && typeof WA.foreshadowTree.decay === 'function') return WA.foreshadowTree.decay(o.id || o.treeId, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'foreshadowTree.get': function (o) {
+      if (WA.foreshadowTree && typeof WA.foreshadowTree.get === 'function') return WA.foreshadowTree.get(o.id || o.treeId);
+      return null;
+    },
+    // v2.303.0 (OPV13-6): 叙事潜台词解码与情境张力动态调节
+    'subtextTension.assess': function (o) {
+      if (WA.subtextTension && typeof WA.subtextTension.assessTension === 'function') return WA.subtextTension.assessTension(o.actorA || o.speaker, o.actorB || o.listener, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'subtextTension.encode': function (o) {
+      if (WA.subtextTension && typeof WA.subtextTension.encodeSubtext === 'function') return WA.subtextTension.encodeSubtext(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'subtextTension.decode': function (o) {
+      if (WA.subtextTension && typeof WA.subtextTension.decodeSubtext === 'function') return WA.subtextTension.decodeSubtext(o.pack || o.subtextPack, o.observer || o.who, o.skill || o.insightSkill);
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.303.0 (EXV13-2): 角色自传性回忆重构与心路沙盘
+    'actor.triggerEpiphany': function (o) {
+      if (WA.autobiographyEpiphany && typeof WA.autobiographyEpiphany.triggerEpiphany === 'function') return WA.autobiographyEpiphany.triggerEpiphany(o.actorId || o.who, o.eventId, o.newInterpretation, o.rationale, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'actor.viewAutobiography': function (o) {
+      if (WA.autobiographyEpiphany && typeof WA.autobiographyEpiphany.viewAutobiography === 'function') return WA.autobiographyEpiphany.viewAutobiography(o.actorId || o.who);
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.303.0 (EXV13-3): 历史大事件跨阵营文献对照档案
+    'chronicle.archiveFactionRecord': function (o) {
+      if (WA.factionChronicle && typeof WA.factionChronicle.archiveFactionRecord === 'function') return WA.factionChronicle.archiveFactionRecord(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'chronicle.comparePerspectives': function (o) {
+      if (WA.factionChronicle && typeof WA.factionChronicle.comparePerspectives === 'function') return WA.factionChronicle.comparePerspectives(o.eventId || o.id);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'chronicle.findExemptionClause': function (o) {
+      if (WA.factionChronicle && typeof WA.factionChronicle.findExemptionClause === 'function') return WA.factionChronicle.findExemptionClause(o.eventId || o.id, o.keyword);
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.303.0 (EXV13-4): 世代家族盟约与超长线契约违约连锁
+    'lineage.bindLegacyOath': function (o) {
+      if (WA.legacyOath && typeof WA.legacyOath.bindLegacyOath === 'function') return WA.legacyOath.bindLegacyOath(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'lineage.enforceInheritedDebt': function (o) {
+      if (WA.legacyOath && typeof WA.legacyOath.enforceInheritedDebt === 'function') return WA.legacyOath.enforceInheritedDebt(o.oathId || o.id, o.heirId || o.who, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'lineage.getOath': function (o) {
+      if (WA.legacyOath && typeof WA.legacyOath.getOath === 'function') return WA.legacyOath.getOath(o.oathId || o.id);
+      return null;
+    },
+    // v2.304.0 (EXV13-6): 城市风俗禁忌与集体祭典狂欢日
+    'folklore.proclaimTaboo': function (o) {
+      if (WA.cityFolklore && typeof WA.cityFolklore.proclaimTaboo === 'function') return WA.cityFolklore.proclaimTaboo(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'folklore.checkTabooViolation': function (o) {
+      if (WA.cityFolklore && typeof WA.cityFolklore.checkTabooViolation === 'function') return WA.cityFolklore.checkTabooViolation(o.locationId || o.location, o.actionType || o.action, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'folklore.maskWithFestivity': function (o) {
+      if (WA.cityFolklore && typeof WA.cityFolklore.maskWithFestivity === 'function') return WA.cityFolklore.maskWithFestivity(o.noiseLevel || o.noise, o.festivityLoudness || o.loudness, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'folklore.getTaboo': function (o) {
+      if (WA.cityFolklore && typeof WA.cityFolklore.getTaboo === 'function') return WA.cityFolklore.getTaboo(o.tabooId || o.id);
+      return null;
+    },
+    // v2.304.0 (OPV13-8): 世界内期刊舆论发酵与社会思潮推动
+    'ideology.publishArticle': function (o) {
+      if (WA.periodicalIdeology && typeof WA.periodicalIdeology.publishIdeologyArticle === 'function') return WA.periodicalIdeology.publishIdeologyArticle(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'ideology.assessSocialTide': function (o) {
+      if (WA.periodicalIdeology && typeof WA.periodicalIdeology.assessSocialTide === 'function') return WA.periodicalIdeology.assessSocialTide(o.targetClass || o.class, o.ideologyTopic || o.topic);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'ideology.triggerCollectiveAction': function (o) {
+      if (WA.periodicalIdeology && typeof WA.periodicalIdeology.triggerCollectiveAction === 'function') return WA.periodicalIdeology.triggerCollectiveAction(o.actionSpec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.305.0 (OPV13-9): 中央场景行动桌全生命周期挂钩与自动编排心跳
+    'actionDesk.orchestrate': function (o) {
+      return orchestrate(o);
+    },
+    // v2.305.0 (EXV13-8): 决策反事实沙盘深度推演与回溯对照
+    'counterfactual.forkRehearsal': function (o) {
+      if (WA.counterfactualSandbox && typeof WA.counterfactualSandbox.forkRehearsal === 'function') return WA.counterfactualSandbox.forkRehearsal(o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'counterfactual.simulateBranch': function (o) {
+      if (WA.counterfactualSandbox && typeof WA.counterfactualSandbox.simulateBranch === 'function') return WA.counterfactualSandbox.simulateBranch(o.branchId, o.turnsToSimulate || o.turns, o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'counterfactual.diffOutcomes': function (o) {
+      if (WA.counterfactualSandbox && typeof WA.counterfactualSandbox.diffOutcomes === 'function') return WA.counterfactualSandbox.diffOutcomes(o.branchId);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'counterfactual.getBranch': function (o) {
+      if (WA.counterfactualSandbox && typeof WA.counterfactualSandbox.getBranch === 'function') return WA.counterfactualSandbox.getBranch(o.branchId);
+      return null;
+    },
+    // v2.305.0 (EXV13-9): 文明阶段更迭时的技术遗失与失落遗物谱系
+    'relic.discoverRelic': function (o) {
+      if (WA.civilizationRelic && typeof WA.civilizationRelic.discoverRelic === 'function') return WA.civilizationRelic.discoverRelic(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'relic.reverseEngineer': function (o) {
+      if (WA.civilizationRelic && typeof WA.civilizationRelic.reverseEngineer === 'function') return WA.civilizationRelic.reverseEngineer(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'relic.getRelic': function (o) {
+      if (WA.civilizationRelic && typeof WA.civilizationRelic.getRelic === 'function') return WA.civilizationRelic.getRelic(o.relicId || o.id);
+      return null;
     }
   };
 
@@ -2333,10 +2470,122 @@ let ckpt = null;
         else if (key === 'terrainHazard.forceTraverse') out.nextActions = ['motive.arbitrate', 'terrainHazard.unblockChannel'];
         else if (key === 'rumor.driftRelay') out.nextActions = ['rumor.inspectDrift', 'intel.addIntel', 'terrainHazard.blockChannel'];
         else if (key === 'rumor.inspectDrift') out.nextActions = ['rumor.refute', 'intel.believe'];
+        else if (key === 'foreshadowTree.plant') out.nextActions = ['foreshadowTree.ferment', 'foreshadowTree.distort'];
+        else if (key === 'foreshadowTree.ferment') out.nextActions = ['foreshadowTree.distort', 'foreshadowTree.harvest', 'foreshadowTree.decay'];
+        else if (key === 'foreshadowTree.distort') out.nextActions = ['foreshadowTree.harvest', 'subtextTension.assess'];
+        else if (key === 'subtextTension.assess') out.nextActions = ['subtextTension.encode', 'subtextTension.decode'];
+        else if (key === 'subtextTension.encode') out.nextActions = ['subtextTension.decode'];
+        else if (key === 'lineage.bindLegacyOath') out.nextActions = ['lineage.enforceInheritedDebt'];
+        else if (key === 'chronicle.archiveFactionRecord') out.nextActions = ['chronicle.comparePerspectives', 'chronicle.findExemptionClause'];
+        else if (key === 'actor.triggerEpiphany') out.nextActions = ['actor.viewAutobiography', 'subtextTension.assess'];
+        else if (key === 'folklore.proclaimTaboo') out.nextActions = ['folklore.checkTabooViolation', 'folklore.maskWithFestivity'];
+        else if (key === 'folklore.maskWithFestivity') out.nextActions = ['folklore.checkTabooViolation'];
+        else if (key === 'ideology.publishArticle') out.nextActions = ['ideology.assessSocialTide'];
+        else if (key === 'ideology.assessSocialTide') out.nextActions = ['ideology.triggerCollectiveAction'];
+        else if (key === 'actionDesk.orchestrate') out.nextActions = ['actionDesk.orchestrate', 'actionDesk.workbench'];
+        else if (key === 'counterfactual.forkRehearsal') out.nextActions = ['counterfactual.simulateBranch'];
+        else if (key === 'counterfactual.simulateBranch') out.nextActions = ['counterfactual.diffOutcomes'];
+        else if (key === 'counterfactual.diffOutcomes') out.nextActions = ['counterfactual.forkRehearsal'];
+        else if (key === 'relic.discoverRelic') out.nextActions = ['relic.reverseEngineer'];
+        else if (key === 'relic.reverseEngineer') out.nextActions = ['relic.reverseEngineer', 'techLineage.canProduce'];
       }
     }
     else { stat.refused++; if (out && out.reason) stat.faults[out.reason] = (stat.faults[out.reason] || 0) + 1; }
     return out || { ok: false, reason: 'owner-unavailable', action: key };
+  }
+
+
+  /**
+   * OPV13-9: 中央场景行动桌全生命周期挂钩与自动编排心跳
+   */
+  function orchestrate(opts) {
+    const o = opts || {};
+    const elapsedDays = Math.max(1, Number(o.elapsedDays || o.turns || o.days) || 1);
+    const events = [];
+
+    // 1. 物理环境推演
+    if (WA.weather && typeof WA.weather.advance === 'function') {
+      try {
+        const wRes = WA.weather.advance({ days: elapsedDays });
+        events.push({ type: 'weather_shifted', detail: wRes });
+      } catch (e) {}
+    } else if (WA.world && typeof WA.world.advance === 'function') {
+      try {
+        const wRes = WA.world.advance(elapsedDays * 1440);
+        events.push({ type: 'time_advanced', detail: wRes });
+      } catch (e) {}
+    }
+
+    // 2. 物流在途推进与到货 (freight)
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (draft) {
+        if (draft.freight && draft.freight.shipments) {
+          const list = Array.isArray(draft.freight.shipments)
+            ? draft.freight.shipments
+            : Object.values(draft.freight.shipments);
+          list.forEach(function (sh) {
+            if (sh && sh.status === 'in_transit') {
+              sh.daysRemaining = Math.max(0, (Number(sh.daysRemaining) || 0) - elapsedDays);
+              if (sh.daysRemaining <= 0) {
+                sh.status = 'arrived';
+                sh.arrivedAt = clockNow('actionDesk');
+                events.push({
+                  type: 'freight_arrived',
+                  shipmentId: sh.id || sh.shipmentId,
+                  from: sh.from,
+                  to: sh.to,
+                  cargo: sh.cargo,
+                  summary: '在途货运 ' + (sh.id || sh.shipmentId) + ' 历经 ' + elapsedDays + ' 日跋涉已安全送达地点 ' + sh.to
+                });
+              }
+            }
+          });
+        }
+
+        // 3. 承诺期限核验与违约检查 (customLax)
+        if (draft.customLax && Array.isArray(draft.customLax.promises)) {
+          draft.customLax.promises.forEach(function (p) {
+            if (p && p.status === 'active') {
+              p.remainingDays = (p.remainingDays != null) ? (p.remainingDays - elapsedDays) : -1;
+              if (p.remainingDays <= 0) {
+                p.status = 'defaulted';
+                p.defaultedAt = clockNow('actionDesk');
+                events.push({
+                  type: 'promise_expired',
+                  promiseId: p.id,
+                  promiser: p.promiser,
+                  promisee: p.promisee,
+                  summary: '承诺 ' + p.id + ' 已逾期未偿付，正式触发违约记录！'
+                });
+              }
+            }
+          });
+        }
+
+        // 4. 流言与思潮自然衰减
+        if (draft.rumors && Array.isArray(draft.rumors)) {
+          draft.rumors.forEach(function (rm) {
+            if (rm && rm.intensity > 0) {
+              rm.intensity = Math.max(0, rm.intensity - elapsedDays * 5);
+              if (rm.intensity === 0) {
+                events.push({ type: 'rumor_faded', rumorId: rm.id, summary: '传闻 ' + rm.id + ' 在岁月中自然淡忘消弭。' });
+              }
+            }
+          });
+        }
+
+        return true;
+      }, 'actionDesk:orchestrate');
+    }
+
+    stat.byKind['orchestrate'] = (stat.byKind['orchestrate'] || 0) + 1;
+    return {
+      ok: true,
+      elapsedDays: elapsedDays,
+      totalEvents: events.length,
+      events: events,
+      at: clockNow('actionDesk')
+    };
   }
 
   function diagnose() {
@@ -2360,6 +2609,12 @@ let ckpt = null;
     actFromScene: actFromScene,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults), byKind: Object.assign({}, stat.byKind) }); }
   };
+  Object.defineProperty(WA.actionDesk, 'orchestrate', {
+    value: orchestrate,
+    enumerable: false,
+    writable: true,
+    configurable: true
+  });
   var EXPORT_COUNT = 14;
   var _exported = Object.keys(WA.actionDesk).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('actionDesk: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }

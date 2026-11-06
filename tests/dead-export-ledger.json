@@ -24,7 +24,7 @@
       "src": "engines/action-desk.js",
       "refs": 0,
       "tref": 0,
-      "own": 29
+      "own": 31
     },
     "actionMethods.declareTask": {
       "reason": "self-only",
@@ -592,6 +592,14 @@
       "src": "core/audit-log.js",
       "refs": 0,
       "tref": 3,
+      "own": 3
+    },
+    "autobiographyEpiphany.stat": {
+      "reason": "self-only",
+      "detail": "engines/autobiography-epiphany.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/autobiography-epiphany.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "backstage.budgetHeadroom": {
@@ -1370,6 +1378,22 @@
       "tref": 0,
       "own": 3
     },
+    "cityFolklore.stat": {
+      "reason": "self-only",
+      "detail": "engines/city-folklore.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/city-folklore.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "civilizationRelic.stat": {
+      "reason": "self-only",
+      "detail": "engines/civilization-relic.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/civilization-relic.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "clock.advance": {
       "reason": "test-only",
       "detail": "core/clock.js 内部自用、外部零引用（过度导出）",
@@ -1912,6 +1936,14 @@
       "src": "engines/coop.js",
       "refs": 0,
       "tref": 3,
+      "own": 3
+    },
+    "counterfactualSandbox.stat": {
+      "reason": "self-only",
+      "detail": "engines/counterfactual-sandbox.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/counterfactual-sandbox.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "creditLedger.list": {
@@ -2874,6 +2906,14 @@
       "tref": 0,
       "own": 3
     },
+    "factionChronicle.stat": {
+      "reason": "self-only",
+      "detail": "engines/faction-chronicle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/faction-chronicle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "factionGraph.setSettings": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -3246,6 +3286,14 @@
       "reason": "self-only",
       "detail": "engines/foreshadow.js 内部自用、外部零引用（过度导出）",
       "src": "engines/foreshadow.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "foreshadowTree.stat": {
+      "reason": "self-only",
+      "detail": "engines/foreshadow-tree.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/foreshadow-tree.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -4278,6 +4326,14 @@
       "reason": "self-only",
       "detail": "engines/ledger-timeline.js 内部自用、外部零引用（过度导出）",
       "src": "engines/ledger-timeline.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "legacyOath.stat": {
+      "reason": "self-only",
+      "detail": "engines/legacy-oath.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/legacy-oath.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -5462,6 +5518,14 @@
       "reason": "self-only",
       "detail": "engines/perf-trace.js 内部自用、外部零引用（过度导出）",
       "src": "engines/perf-trace.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "periodicalIdeology.stat": {
+      "reason": "self-only",
+      "detail": "engines/periodical-ideology.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/periodical-ideology.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -7682,6 +7746,14 @@
       "tref": 0,
       "own": 16
     },
+    "subtextTension.stat": {
+      "reason": "self-only",
+      "detail": "engines/subtext-tension.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/subtext-tension.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "successGrade.checkMonotonic": {
       "reason": "self-only",
       "detail": "engines/success-grade.js 内部自用、外部零引用（过度导出）",
@@ -7825,14 +7897,6 @@
       "refs": 0,
       "tref": 0,
       "own": 9
-    },
-    "techLineage.declareTradition": {
-      "reason": "self-only",
-      "detail": "engines/tech-lineage.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/tech-lineage.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "techLineage.departPractitioner": {
       "reason": "self-only",

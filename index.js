@@ -565,6 +565,16 @@
     // v2.302.0 (V13 Batch B): 守恒通胀走私与险道天堑
     'engines/contraband.js',
     'engines/terrain-hazard.js',
+    // v2.303.0 (V13 Batch C): 伏笔生命树、叙事潜台词张力、自传回忆、跨阵营史料与代际盟约
+    'engines/foreshadow-tree.js',
+    'engines/subtext-tension.js',
+    'engines/autobiography-epiphany.js',
+    'engines/faction-chronicle.js',
+    'engines/legacy-oath.js',
+    'engines/city-folklore.js',
+    'engines/periodical-ideology.js',
+    'engines/counterfactual-sandbox.js',
+    'engines/civilization-relic.js',
     // v2.251.0（拓展 WD-1）：阶位权重池 + 未得补偿 + 幸运封顶（cf. aifarm gacha/soft-pity）。
     //   纯判据 + 抽一个：走 rand.pickWeighted 的 `draw` 通道，池子与图鉴留在调用方。
     'engines/weighted-draw.js',
