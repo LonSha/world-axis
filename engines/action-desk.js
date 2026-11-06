@@ -101,6 +101,15 @@
     'schedule.interrupt': function (o) { return WA.laborSchedule.interrupt(o.bookingId, o.solution, o); },
     'schedule.resume': function (o) { return WA.laborSchedule.resume(o.bookingId); },
     'motive.arbitrate': function (o) { return WA.motiveArbitration.decide(o.person, o.candidates, o.facts); },
+    // v2.302.0 (V13 Batch A): 具身空间声学与判定骰
+    'room.whisper': function (o) { return WA.spatialAcoustics.whisper(o); },
+    'room.eavesdrop': function (o) { return WA.spatialAcoustics.eavesdrop(o); },
+    'room.burstIn': function (o) { return WA.spatialAcoustics.burstIn(o); },
+    'room.partition': function (o) { return WA.spatialAcoustics.registerPartition(o.roomId, o.adjacentRoomId, o); },
+    'room.getConversation': function (o) { return WA.spatialAcoustics.getConversation(o.roomId || o.id); },
+    'narrative.roll': function (o) { return WA.narrativeDice.roll(o.groupId || o.group, o); },
+    'successGrade.evaluateSpectrum': function (o) { return WA.successGrade.evaluateSpectrum(o.roll, o.target, o); },
+    'actor.advanceShadow': function (o) { return WA.observe.advanceOffscreenShadow(o.actor || o.who || o.name, o.progress || o); },
     'pathEcho.realize': function (o) { return WA.pathEcho.realizeOutcome(o.personId, o.decisionId, o.actualOutcome, o.knownFacts); },
     'lineage.teach': function (o) { return WA.techLineage.teach(o.traditionId, o.master, o.apprentice); },
     'lineage.confirmVariant': function (o) { return WA.techLineage.confirmVariant(o.traditionId, o.variantId, o.envContext); },
@@ -2243,6 +2252,10 @@ let ckpt = null;
         else if (key === 'rumor.relay') out.nextActions = ['rumor.investigate', 'intel.addIntel'];
         else if (key === 'rumor.investigate') out.nextActions = ['intel.believe', 'relationGraph.upsert'];
         else if (key === 'intel.addIntel') out.nextActions = ['intel.believe'];
+        else if (key === 'room.whisper') out.nextActions = ['room.eavesdrop', 'room.burstIn'];
+        else if (key === 'room.eavesdrop') out.nextActions = ['room.burstIn', 'narrative.roll'];
+        else if (key === 'room.burstIn') out.nextActions = ['motive.arbitrate', 'narrative.roll'];
+        else if (key === 'narrative.roll') out.nextActions = ['successGrade.evaluateSpectrum'];
       }
     }
     else { stat.refused++; if (out && out.reason) stat.faults[out.reason] = (stat.faults[out.reason] || 0) + 1; }

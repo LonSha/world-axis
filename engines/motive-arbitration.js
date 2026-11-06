@@ -86,7 +86,93 @@
     return { weights: effective, base: base, dynamicSources: dynamicSources };
   }
 
+  // v2.302.0 (OPV13-1): 物理生理极限硬熔断检查 (Physiological Hard Lockout)
+  function checkPhysiologicalCircuit(person, facts) {
+    if (!person) return null;
+    const f = facts || {};
+    let stamina = (person.resources && person.resources.stamina != null) ? Number(person.resources.stamina) : null;
+    if (stamina == null && WA.survival && typeof WA.survival.rowOf === 'function' && person.id) {
+      const sRow = WA.survival.rowOf(person.id);
+      if (sRow && sRow.stamina != null) stamina = Number(sRow.stamina);
+    }
+    const stress = (person.stress != null) ? Number(person.stress) : ((f.stress != null) ? Number(f.stress) : 0);
+    const trauma = (person.trauma != null) ? Number(person.trauma) : ((f.trauma != null) ? Number(f.trauma) : 0);
+    const bloodLoss = (f.heavyBloodLoss || f.exsanguination || (person.resources && person.resources.bloodLoss > 50));
+
+    // 1. 体力彻底归零或极端失血 -> 昏厥崩解 (collapse / faint)
+    if ((stamina != null && stamina <= 0) || bloodLoss) {
+      return {
+        lockout: true,
+        type: 'collapse',
+        action: 'faint',
+        reason: bloodLoss ? '重度失血导致休克昏迷' : '体力枯竭导致生理性昏厥',
+        scar: 'physiological_exhaustion_scar'
+      };
+    }
+    // 2. 压力/创伤超载极限 (stress >= 95 或 trauma >= 90) -> 惊恐失语/应激僵直 (mute_panic)
+    if (stress >= 95 || trauma >= 90) {
+      return {
+        lockout: true,
+        type: 'mute_panic',
+        action: 'freeze',
+        reason: '急性应激心理创伤突破耐受极限，陷入失语僵直',
+        scar: 'acute_stress_trauma'
+      };
+    }
+    return null;
+  }
+
   function evaluate(person, candidates, facts) {
+    const circuit = checkPhysiologicalCircuit(person, facts);
+    if (circuit && circuit.lockout) {
+      const lockoutAction = {
+        id: 'lockout_' + circuit.type,
+        title: '生理硬熔断：' + (circuit.action === 'faint' ? '昏厥休克' : '惊恐僵直'),
+        kind: 'involuntary_physiological_reaction',
+        score: 9999,
+        hardLockout: true,
+        circuit: circuit,
+        benefit: 0,
+        penalty: 0,
+        commitmentPenalty: 0,
+        realityPenalty: 0,
+        sycophancyPenalty: 0,
+        factsRef: [],
+        invalidFacts: [],
+        rawCandidate: {
+          id: 'lockout_' + circuit.type,
+          title: '生理硬熔断：' + circuit.reason,
+          kind: 'involuntary_reaction',
+          hardLockout: true
+        }
+      };
+      return {
+        ok: true,
+        hardLockout: true,
+        circuit: circuit,
+        selected: lockoutAction,
+        decision: 'hard_lockout',
+        forsaken: (candidates || []).map(function (c) {
+          return {
+            id: c.id || c.name || 'cand',
+            title: c.title || c.label || 'cand',
+            score: 0,
+            reason: 'intercepted-by-physiological-circuit-breaker',
+            circuit: circuit.type
+          };
+        }),
+        rationale: {
+          primaryMotive: 'physiological_survival',
+          activeFacts: ['hard_lockout:' + circuit.type],
+          verifiedFacts: [],
+          hasFabrication: false,
+          invalidFacts: [],
+          summary: '【生理硬熔断】' + circuit.reason + '，所有主动意图被物理级强制阻断。'
+        },
+        weightsUsed: { livelihood: 0, commitment: 0, ambition: 0, rest: 99, safety: 99 }
+      };
+    }
+
     if (!Array.isArray(candidates) || candidates.length === 0) {
       return { ok: false, reason: 'empty-candidates', selected: null, forsaken: [] };
     }
@@ -251,6 +337,20 @@
         at: WA.clock.now('motive')
       };
 
+      // 生理硬熔断沉淀持久伤痕与虚弱回声 (OPV13-1)
+      if (evalRes.hardLockout && evalRes.circuit && evalRes.circuit.scar) {
+        person.life.physiologicalScars = Array.isArray(person.life.physiologicalScars) ? person.life.physiologicalScars : [];
+        if (person.life.physiologicalScars.indexOf(evalRes.circuit.scar) < 0) {
+          person.life.physiologicalScars.push(evalRes.circuit.scar);
+        }
+        person.life.debilityEcho = {
+          scar: evalRes.circuit.scar,
+          active: true,
+          reason: evalRes.circuit.reason,
+          at: WA.clock.now('motive')
+        };
+      }
+
       // 若有承诺受到影响且承诺列表存在，更新承诺状态
       if (evalRes.selected.commitmentImpact && Array.isArray(person.life.commitments)) {
         const impact = evalRes.selected.commitmentImpact;
@@ -266,7 +366,6 @@
         }
       }
     }
-
     return evalRes;
   }
 

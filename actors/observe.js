@@ -150,6 +150,47 @@
         }, 'observe:enrollCandidate');
       }
       return out || { ok: false, reason: 'store-unavailable' };
+    },
+    /**
+     * v2.302.0 (全视之眼吸收): 镜头外不在场角色的后台暗流演进 (Off-screen Shadow State)
+     * 在不打断主正文的情况下，静默推进不在场角色的位置、心意与行动履历
+     */
+    advanceOffscreenShadow(actorName, progress) {
+      if (!actorName) return { ok: false, reason: 'missing-actor-name' };
+      progress = progress || {};
+      let out = null;
+      if (WA.store && typeof WA.store.transact === 'function') {
+        WA.store.transact(function (draft) {
+          draft.people = draft.people || {};
+          const pKey = 'p_' + actorName;
+          const p = draft.people[pKey] || { id: pKey, name: actorName };
+          p.shadowState = p.shadowState || { logs: [] };
+          if (progress.location) p.location = progress.location;
+          if (progress.intent) p.intent = progress.intent;
+          if (progress.action) p.action = progress.action;
+
+          const logEntry = {
+            round: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('shadow') : Date.now(),
+            location: progress.location || p.location,
+            intent: progress.intent || p.intent,
+            action: progress.action || p.action,
+            note: progress.note || '镜头外暗流自主推进'
+          };
+          p.shadowState.logs.push(logEntry);
+          if (p.shadowState.logs.length > 20) p.shadowState.logs.shift();
+          draft.people[pKey] = p;
+
+          out = {
+            ok: true,
+            actor: actorName,
+            shadowState: p.shadowState,
+            location: p.location,
+            intent: p.intent,
+            action: p.action
+          };
+        }, 'observe:advanceOffscreenShadow');
+      }
+      return out || { ok: false, reason: 'store-unavailable' };
     }
   };
 })();

@@ -559,6 +559,9 @@
     // v2.251.0（拓展 SG-1）：判定成功等级五档（cf. coc-kp-host success_level）。
     //   须早于 engines/fate.js：fate.check 在返回值里追加 grade（只追加，不改 pass/crit/fumble）。
     'engines/success-grade.js',
+    // v2.302.0 (V13 Batch A): 剧情变奏骰与空间具身声学
+    'engines/narrative-dice.js',
+    'engines/spatial-acoustics.js',
     // v2.251.0（拓展 WD-1）：阶位权重池 + 未得补偿 + 幸运封顶（cf. aifarm gacha/soft-pity）。
     //   纯判据 + 抽一个：走 rand.pickWeighted 的 `draw` 通道，池子与图鉴留在调用方。
     'engines/weighted-draw.js',

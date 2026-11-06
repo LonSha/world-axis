@@ -55,6 +55,68 @@
   }
   const stat = { graded: 0, unknown: 0, badInput: 0, lastReason: '', lastBand: '' };
   const RANK = { '大失败': -1, '失败': 0, '普通成功': 1, '困难成功': 2, '极难成功': 3, '大成功': 5 };
+
+  /**
+   * v2.302.0 (OPV13-7): 五档非二元行动检定与代价/启发计算 (Non-binary cost/insight)
+   * 结果光谱：
+   *   - critical_success: 完美突破，无代价大成功
+   *   - costly_success: 成功但付出代价（工具损耗、隐秘暴露、额外耗费）
+   *   - partial_progress: 部分推进（目标未竟但取得阶段性位移）
+   *   - insightful_failure: 失败但获得关键启发（后续同类检定难度降低）
+   *   - catastrophic_failure: 灾难性大失败（局势恶化、物理重伤或触发警报）
+   */
+  function evaluateSpectrum(roll, target, opts) {
+    opts = opts || {};
+    const g = grade(roll, target);
+    if (!g.ok) return g;
+    const basePass = g.pass;
+    const rank = g.rank;
+    let spectrum = 'partial_progress';
+    let cost = null;
+    let insight = null;
+
+    if (rank >= 3) {
+      spectrum = 'critical_success';
+      insight = { bonus: 15, tag: 'mastery_momentum', desc: '势如破竹，下一行动获得+15加成' };
+    } else if (rank === 2) {
+      spectrum = 'costly_success';
+      cost = { type: opts.costType || 'durability_or_resource', severity: 'minor', desc: '成功达成目标，但消耗了额外工具磨损或产生微弱动静' };
+    } else if (rank === 1) {
+      // 普通成功边缘或根据入参判定代价
+      if (roll >= target * 0.8) {
+        spectrum = 'costly_success';
+        cost = { type: opts.costType || 'gear_strain', severity: 'moderate', desc: '勉强成功，装备或耐力承受中度负荷' };
+      } else {
+        spectrum = 'partial_progress';
+      }
+    } else if (rank === 0) {
+      // 失败：若接近目标 (差值 <= 15) 判定为有益失败 (insightful_failure)
+      const diff = roll - target;
+      if (diff <= 15) {
+        spectrum = 'insightful_failure';
+        insight = { bonus: 10, targetDiscount: 10, tag: 'flaw_observed', desc: '行动受挫但洞悉了破绽，下次检定阈值放宽 10 点' };
+      } else {
+        spectrum = 'costly_failure';
+        cost = { type: 'stalled_time', severity: 'minor', desc: '行动失败且白白耗费了宝贵窗口' };
+      }
+    } else if (rank <= -1) {
+      spectrum = 'catastrophic_failure';
+      cost = { type: 'critical_hazard', severity: 'severe', desc: '严重失误，招致致命反扑、装备损毁或惊动全场' };
+    }
+
+    return {
+      ok: true,
+      roll: roll,
+      target: target,
+      grade: g.grade,
+      rank: g.rank,
+      pass: basePass,
+      spectrum: spectrum,
+      cost: cost,
+      insight: insight,
+      at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('successGrade') : Date.now()
+    };
+  }
   function isInt100(v) { return typeof v === 'number' && isFinite(v) && (v | 0) === v && v >= 1 && v <= 100; }
 
   /**
@@ -114,5 +176,6 @@
 
   function statOf() { return Object.assign({}, stat); }
   WA.successGrade = { grade: grade, ladder: ladder, checkMonotonic: checkMonotonic,
+    evaluateSpectrum: evaluateSpectrum,
     stat: statOf, settings: settings, saveSettings: saveSettings, REG: __REG, DEF: DEF, RANK: RANK };
 })();

@@ -505,6 +505,8 @@ const LOAD = [
     'engines/identity-match.js',
     'engines/defer-token.js',
     'engines/success-grade.js',
+    'engines/narrative-dice.js',
+    'engines/spatial-acoustics.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',

@@ -3858,6 +3858,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/capability-audit.js': 'capabilityAudit',
     'engines/success-grade.js': 'successGrade',
     'engines/weighted-draw.js': 'weightedDraw',
+    'engines/narrative-dice.js': 'narrativeDice',
+    'engines/spatial-acoustics.js': 'spatialAcoustics',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
