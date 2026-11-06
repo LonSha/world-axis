@@ -247,6 +247,13 @@
     'creditLedger.accrue': function (o) { return WA.creditLedger.accrue(o.id || o.loanId, o); },
     'creditLedger.repay': function (o) { return WA.creditLedger.repay(o.id || o.loanId, o.spec || o); },
     'creditLedger.view': function (o) { return WA.creditLedger.view(o.id || o.loanId); },
+    'creditLedger.checkCredit': function (o) { return WA.creditLedger.checkCredit(o.borrower || o.who, o.at); },
+    'finance.ruptureCollateral': function (o) {
+      if (WA.collateralRupture && typeof WA.collateralRupture.ruptureCollateral === 'function') {
+        return WA.collateralRupture.ruptureCollateral(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // 关系图谱与声誉边维护
     'relationGraph.upsert': function (o) { return WA.relationGraph.upsert(o.edge || o, o); },
     'relationGraph.view': function (o) { return WA.relationGraph.view(o.edgeId || o.id, o); },
@@ -2471,6 +2478,8 @@ let ckpt = null;
         else if (key === 'customLax.remedyPromise') out.nextActions = ['relationGraph.upsert', 'customLax.commitPromise'];
         else if (key === 'creditLedger.open') out.nextActions = ['creditLedger.accrue', 'creditLedger.repay'];
         else if (key === 'creditLedger.repay') out.nextActions = ['creditLedger.open'];
+        else if (key === 'creditLedger.checkCredit') out.nextActions = ['creditLedger.open', 'finance.ruptureCollateral'];
+        else if (key === 'finance.ruptureCollateral') out.nextActions = ['rumor.startChain', 'relationGraph.upsert', 'subtextTension.assess'];
         else if (key === 'rumor.startChain') out.nextActions = ['rumor.relay', 'rumor.investigate'];
         else if (key === 'rumor.relay') out.nextActions = ['rumor.investigate', 'intel.addIntel'];
         else if (key === 'rumor.investigate') out.nextActions = ['intel.believe', 'relationGraph.upsert'];

@@ -257,9 +257,35 @@
       .sort(function (a, b) { return (b.openedAt || 0) - (a.openedAt || 0); });
     return { ok: true, count: rows.length, rows: rows.map(viewOf) };
   }
-  function statOf() { return Object.assign({}, stat); }
+  /**
+   * 信用核验硬约束：检查借款人是否有逾期借据或借据数超限。
+   * @param {string} borrower 借款人ID
+   * @param {number} at 检查时间戳
+   * @returns {{ ok: boolean, allowed: boolean, reason: string, overdueCount: number, openCount: number, overdueRows: Array }}
+   */
+  function checkCredit(borrower, at) {
+    const cfg = settings();
+    if (!cfg.enabled) return { ok: false, allowed: true, reason: 'disabled' };
+    const bId = intId(borrower);
+    if (!bId) return { ok: false, allowed: false, reason: 'bad-borrower' };
+    const checkAt = Number.isFinite(at) ? at : clockNow('creditLedger.checkCredit');
+    const all = book();
+    const mine = Object.keys(all).map(function (k) { return all[k]; }).filter(function (r) {
+      return r.borrower === bId && (r.status === 'open' || r.status === 'overdue');
+    });
+    const overdueRows = mine.filter(function (r) { return isOverdue(r, checkAt); });
+    if (overdueRows.length > 0) {
+      return { ok: true, allowed: false, reason: 'overdue-present', overdueCount: overdueRows.length, openCount: mine.length, overdueRows: overdueRows.map(viewOf) };
+    }
+    if (mine.length >= cfg.maxOpenPerBorrower) {
+      return { ok: true, allowed: false, reason: 'too-many-open', overdueCount: 0, openCount: mine.length, overdueRows: [] };
+    }
+    return { ok: true, allowed: true, reason: 'good-standing', overdueCount: 0, openCount: mine.length, overdueRows: [] };
+  }
 
+  function statOf() { return Object.assign({}, stat); }
   WA.creditLedger = { open: open, accrue: accrue, repay: repay, writeOff: writeOff,
+    checkCredit: checkCredit,
     view: view, list: list, stat: statOf, settings: settings, saveSettings: saveSettings,
     REG: __REG, DEF: DEF, STATUS: STATUS, RATE_SCALE: RATE_SCALE };
 })();

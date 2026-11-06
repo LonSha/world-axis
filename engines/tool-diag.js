@@ -3873,6 +3873,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/civilization-relic.js': 'civilizationRelic',
     'engines/idiosyncrasy.js': 'idiosyncrasy',
     'engines/whisper-backchannel.js': 'whisperBackchannel',
+    'engines/collateral-rupture.js': 'collateralRupture',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

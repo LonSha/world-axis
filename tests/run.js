@@ -520,6 +520,7 @@ const LOAD = [
     'engines/civilization-relic.js',
     'engines/idiosyncrasy.js',
     'engines/whisper-backchannel.js',
+    'engines/collateral-rupture.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',

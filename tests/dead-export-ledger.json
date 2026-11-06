@@ -1968,7 +1968,7 @@
       "src": "engines/credit-ledger.js",
       "refs": 0,
       "tref": 0,
-      "own": 7
+      "own": 8
     },
     "creditLedger.stat": {
       "reason": "self-only",
