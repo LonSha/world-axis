@@ -375,6 +375,43 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.324.0: 真实人物肉身生理、七情六欲与记恨小账本
+    'realism.setNeeds': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.setNeeds === 'function') {
+        return WA.humanRealism.setNeeds(o.who || o.name, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'realism.consumeRoutine': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.consumeRoutine === 'function') {
+        return WA.humanRealism.consumeRoutine(o.who || o.name, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'realism.recordGrudge': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.recordGrudge === 'function') {
+        return WA.humanRealism.recordGrudge(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'realism.settleGrudge': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.settleGrudge === 'function') {
+        return WA.humanRealism.settleGrudge(o.grudgeId || o.id, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'realism.triggerOutburst': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.triggerOutburst === 'function') {
+        return WA.humanRealism.triggerOutburst(o.who || o.name, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'realism.setExemption': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.setExemption === 'function') {
+        return WA.humanRealism.setExemption(o.who || o.name, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // 关系图谱与声誉边维护
     'relationGraph.upsert': function (o) { return WA.relationGraph.upsert(o.edge || o, o); },
     'relationGraph.view': function (o) { return WA.relationGraph.view(o.edgeId || o.id, o); },

@@ -3890,6 +3890,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.323.0: 退场角色生计与怪诞市井暗线
     'engines/offstage-life.js': 'offstageLife',
     'engines/eccentric-threads.js': 'eccentricThreads',
+    'engines/human-realism.js': 'humanRealism',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',
@@ -5573,8 +5574,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'actiondesk', ids: ['wa-desk-who', 'wa-desk-show', 'wa-desk-on',
       // v2.250.0：跨轮生命周期四枚此前**渲染了但没登记**（守卫表照不到 ⇒ 绑定断了也永远不报），
       //   连同四个输出容器一起补登。输出容器仍是动态容器（由 show* 回调填，非静态成树）。
-      'wa-desk-life', 'wa-desk-flow', 'wa-desk-sched', 'wa-desk-epistemic', 'wa-desk-v14-multi', 'wa-desk-v14-sanctuary', 'wa-desk-v14-crisis', 'wa-desk-v14-pact'],
-      dynamic: ['wa-desk-out', 'wa-desk-life-out', 'wa-desk-flow-out', 'wa-desk-sched-out', 'wa-desk-epistemic-out', 'wa-desk-v14-out'] },
+      'wa-desk-life', 'wa-desk-flow', 'wa-desk-sched', 'wa-desk-epistemic', 'wa-desk-v14-multi', 'wa-desk-v14-sanctuary', 'wa-desk-v14-crisis', 'wa-desk-v14-pact',
+      'wa-desk-v15-offstage', 'wa-desk-v15-eccentric', 'wa-desk-v16-realism', 'wa-desk-v16-grudge'],
+      dynamic: ['wa-desk-out', 'wa-desk-life-out', 'wa-desk-flow-out', 'wa-desk-sched-out', 'wa-desk-epistemic-out', 'wa-desk-v14-out', 'wa-desk-v15-out', 'wa-desk-v16-out'] },
     { page: 'health', ids: ['wa-periodical-id', 'wa-periodical-name', 'wa-periodical-days', 'wa-periodical-profile', 'wa-periodical-enabled',
       'wa-periodical-config', 'wa-periodical-publish', 'wa-periodical-read'],
       dynamic: ['wa-periodical-out'] }

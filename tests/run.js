@@ -536,6 +536,7 @@ const LOAD = [
     'engines/counterfactual-echo.js',
     'engines/offstage-life.js',
     'engines/eccentric-threads.js',
+    'engines/human-realism.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',

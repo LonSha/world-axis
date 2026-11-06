@@ -165,6 +165,18 @@
           });
         }
       }
+      // v2.324.0: 真实人物肉身生理与心底芥蒂注入
+      if (WA.humanRealism && typeof WA.humanRealism.buildBlock === 'function') {
+        const hb = WA.humanRealism.buildBlock();
+        if (hb) {
+          String(hb).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
+            const cleanLine = line.replace(/^· /, '');
+            const m = cleanLine.match(/【(?:肉身实感|心底芥蒂)】([^（(：:\s]+)/);
+            const who = m ? m[1].trim() : '';
+            add('life', 'realism:' + idx, cleanLine, who ? [who] : [], Date.now(), '肉身实感');
+          });
+        }
+      }
     });
     // Rank first, then scene relevance, then owner-local freshness (different clocks
     // are never compared across owners), finally stable owner/id order.

@@ -5426,13 +5426,16 @@ ${emptyDrill}
           <button class="wa-btn" id="wa-desk-v14-pact" title="纯读：城下之盟与多方和解公约名册">看多方和解公约</button>
           <button class="wa-btn" id="wa-desk-v15-offstage" title="纯读：退场角色跨题材日常生计与生活意外切片">看退场生计流转</button>
           <button class="wa-btn" id="wa-desk-v15-eccentric" title="纯读：怪诞市井支线与搞笑暗线进展">看市井怪诞暗线</button>
+          <button class="wa-btn" id="wa-desk-v16-realism" title="纯读：人物肉身生理极限与情绪临界大盘">看肉身生理七情</button>
+          <button class="wa-btn" id="wa-desk-v16-grudge" title="纯读：心底芥蒂与恩怨清算小账本">看心底芥蒂账本</button>
        </div>
        <div id="wa-desk-life-out" class="wa-out"></div>
        <div id="wa-desk-flow-out" class="wa-out"></div>
        <div id="wa-desk-sched-out" class="wa-out"></div>
        <div id="wa-desk-epistemic-out" class="wa-out"></div>
        <div id="wa-desk-v14-out" class="wa-out"></div>
-       <div id="wa-desk-v15-out" class="wa-out"></div>`;
+       <div id="wa-desk-v15-out" class="wa-out"></div>
+       <div id="wa-desk-v16-out" class="wa-out"></div>`;
    }
    /** 把日程与时间协商视图如实渲染（纯读列表 + 改期/取消/拆分操作）。 */
    function renderScheduleNegotiation(sc) {
@@ -5996,6 +5999,43 @@ on('#wa-desk-show', showDesk);
           ths.slice(-4).forEach(function (t) {
             const lastLead = (t.leads && t.leads.length) ? t.leads[t.leads.length - 1].text : t.premise;
             html += '<div class="wa-row"><span class="wa-dim">[' + esc(t.kind) + '·' + esc(t.stage) + ']</span> <b>' + esc(t.title) + '</b>（' + esc(t.genre) + '）：' + esc(lastLead) + '</div>';
+          });
+        }
+        out.innerHTML = html;
+        renderBody();
+      });
+      on('#wa-desk-v16-realism', function () {
+        const out = $('#wa-desk-v16-out'); if (!out) return;
+        const st = (WA.store && WA.store.get) ? WA.store.get() : {};
+        const b = st.humanRealism || {};
+        const actors = b.actors || {};
+        const keys = Object.keys(actors);
+        let html = '<div class="wa-dim"><b>人物肉身实感与七情大盘</b></div>';
+        if (!keys.length) {
+          html += '<div class="wa-dim">暂无人物生理需求记录</div>';
+        } else {
+          keys.slice(-4).forEach(function (k) {
+            const a = (WA.humanRealism && typeof WA.humanRealism.getActor === 'function')
+              ? WA.humanRealism.getActor(k) : actors[k];
+            if (!a) return;
+            const ex = a.exemptions && a.exemptions.preset ? ' [豁免:' + esc(a.exemptions.preset) + ']' : '';
+            html += '<div class="wa-row"><b>' + esc(a.name) + '</b>' + ex + '：温饱 <b>' + a.needs.nourishment + '</b> · 精力 <b>' + a.needs.energy + '</b> · 舒适 <b>' + a.needs.comfort + '</b> · 生机 <b>' + a.needs.vitality + '</b> | 怒 <b>' + a.emotions.anger + '</b> · 怨 <b>' + a.emotions.resentment + '</b>' + (a.lastOutburst ? ' · <span class="wa-dim">[近期激变: ' + esc(a.lastOutburst.action) + ']</span>' : '') + '</div>';
+          });
+        }
+        out.innerHTML = html;
+        renderBody();
+      });
+      on('#wa-desk-v16-grudge', function () {
+        const out = $('#wa-desk-v16-out'); if (!out) return;
+        const grudges = (WA.humanRealism && typeof WA.humanRealism.listGrudges === 'function')
+          ? WA.humanRealism.listGrudges()
+          : ((((WA.store && WA.store.get && WA.store.get().humanRealism) || {}).grudges) || []);
+        let html = '<div class="wa-dim"><b>心底芥蒂恩怨谱</b></div>';
+        if (!grudges.length) {
+          html += '<div class="wa-dim">暂无心底芥蒂与未解记恨</div>';
+        } else {
+          grudges.slice(-4).forEach(function (g) {
+            html += '<div class="wa-row"><span class="wa-dim">[' + (g.settled ? '已化解' : '未平息·烈度' + g.intensity) + ']</span> <b>' + esc(g.who) + '</b> 记恨 <b>' + esc(g.target) + '</b>：' + esc(g.reason) + (g.settled ? '（释怀凭据：' + esc(g.resolution) + '）' : '') + '</div>';
           });
         }
         out.innerHTML = html;

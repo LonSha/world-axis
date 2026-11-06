@@ -237,6 +237,12 @@
         threads: [],
         history: []
       },
+      // v2.324.0: 真实人物肉身生理、七情六欲、记恨小账本与同人豁免矩阵
+      humanRealism: {
+        actors: {},
+        grudges: [],
+        log: []
+      },
       // v2.250.0（拓展：从活跃开源伴侣生态里凿出来的四个真空区）。四个新引擎的顶层容器。
       //   登记了却不在骨架里：registryParity 报「未在骨架物化」，冷启动直写炸事务，
       //   且 sizeAudit / 容量议题 / 健康分一整片读数偏。
@@ -1651,6 +1657,10 @@
     'offstageLife.log': { cap: 32, site: 'offstage-life.js evict.array(log, "offstageLife.log")' },
     'eccentricThreads.threads': { cap: 32, site: 'eccentric-threads.js evict.array(threads, "eccentricThreads.threads")' },
     'eccentricThreads.history': { cap: 20, site: 'eccentric-threads.js evict.array(history, "eccentricThreads.history")' },
+    // v2.324.0: 真实人物肉身生理、七情六欲与记恨小账本容器上限
+    'humanRealism.actors': { cap: 48, kind: 'object', site: 'human-realism.js WA.evict.object(actors, "humanRealism.actors")' },
+    'humanRealism.grudges': { cap: 48, site: 'human-realism.js evict.array(grudges, "humanRealism.grudges")' },
+    'humanRealism.log': { cap: 32, site: 'human-realism.js evict.array(log, "humanRealism.log")' },
     'vitals.rows': { cap: 24, site: "vitals.js evict.array(rows, \"vitals.rows\")" },
     'coordinate.anchors': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.anchors\")" },
     'coordinate.rows': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.rows\")" },

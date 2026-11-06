@@ -96,6 +96,10 @@
     'offstageLife.log': { path: 'offstageLife.log', cap: 32, why: '退场角色市井意外与生活糗事日志环形' },
     'eccentricThreads.threads': { path: 'eccentricThreads.threads', cap: 32, why: '怪诞市井支线与搞笑暗线环形' },
     'eccentricThreads.history': { path: 'eccentricThreads.history', cap: 20, why: '市井化解已结案历史环形' },
+    // v2.324.0: 真实人物肉身生理、七情六欲与记恨小账本容器上限
+    'humanRealism.actors': { path: 'humanRealism.actors', kind: 'object', cap: 48, why: '真实人物生理与情感卡映射（对象型，最久未活跃优先挤出）' },
+    'humanRealism.grudges': { path: 'humanRealism.grudges', cap: 48, why: '心底芥蒂与记恨小账本环形' },
+    'humanRealism.log': { path: 'humanRealism.log', cap: 32, why: '情绪失控与生理极限日志环形' },
     'vitals.rows':         { path: 'vitals.rows',         cap: 24, why: '生理线环形' },
   // v2.231.0（拓展 EXP-1）：逐人逐能力进度行（上限与 training.maxRows 同源，见 training.js）。
   'training.rows':       { path: 'training.rows',       cap: 96, why: '能力成长逐人逐能力行' },
