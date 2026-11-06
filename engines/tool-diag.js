@@ -3871,6 +3871,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/periodical-ideology.js': 'periodicalIdeology',
     'engines/counterfactual-sandbox.js': 'counterfactualSandbox',
     'engines/civilization-relic.js': 'civilizationRelic',
+    'engines/idiosyncrasy.js': 'idiosyncrasy',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

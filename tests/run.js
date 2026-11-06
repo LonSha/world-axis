@@ -518,6 +518,7 @@ const LOAD = [
     'engines/periodical-ideology.js',
     'engines/counterfactual-sandbox.js',
     'engines/civilization-relic.js',
+    'engines/idiosyncrasy.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',

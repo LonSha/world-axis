@@ -1146,6 +1146,15 @@
     'relic.getRelic': function (o) {
       if (WA.civilizationRelic && typeof WA.civilizationRelic.getRelic === 'function') return WA.civilizationRelic.getRelic(o.relicId || o.id);
       return null;
+    },
+    // v2.306.0 (EXV13-7): 潜意识动作与下意识心理微反应
+    'actor.registerIdiosyncrasy': function (o) {
+      if (WA.idiosyncrasy && typeof WA.idiosyncrasy.registerIdiosyncrasy === 'function') return WA.idiosyncrasy.registerIdiosyncrasy(o.actorId || o.who || o.actor, o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'actor.observeSubconscious': function (o) {
+      if (WA.idiosyncrasy && typeof WA.idiosyncrasy.observeSubconscious === 'function') return WA.idiosyncrasy.observeSubconscious(o.observerId || o.observer, o.targetId || o.target, o);
+      return { ok: false, reason: 'unsupported' };
     }
   };
 
@@ -2488,6 +2497,8 @@ let ckpt = null;
         else if (key === 'counterfactual.diffOutcomes') out.nextActions = ['counterfactual.forkRehearsal'];
         else if (key === 'relic.discoverRelic') out.nextActions = ['relic.reverseEngineer'];
         else if (key === 'relic.reverseEngineer') out.nextActions = ['relic.reverseEngineer', 'techLineage.canProduce'];
+        else if (key === 'actor.registerIdiosyncrasy') out.nextActions = ['actor.observeSubconscious', 'motive.arbitrate'];
+        else if (key === 'actor.observeSubconscious') out.nextActions = ['motive.arbitrate', 'subtextTension.assess'];
       }
     }
     else { stat.refused++; if (out && out.reason) stat.faults[out.reason] = (stat.faults[out.reason] || 0) + 1; }

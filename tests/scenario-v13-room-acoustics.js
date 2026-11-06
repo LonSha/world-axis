@@ -19,7 +19,7 @@ function env() {
   if (global.localStorage) global.localStorage.clear();
   const W = uiGate.fresh().WA;
   W.store.init();
-  ['actionDesk', 'motiveArbitration', 'successGrade', 'spatialAcoustics', 'narrativeDice', 'observe'].forEach(function (k) {
+  ['actionDesk', 'motiveArbitration', 'successGrade', 'spatialAcoustics', 'narrativeDice', 'observe', 'idiosyncrasy'].forEach(function (k) {
     if (W[k] && typeof W[k].setSettings === 'function') {
       W[k].setSettings({ enabled: true });
     }
@@ -170,11 +170,44 @@ function runScenario(a) {
   a.ok(shadowRes.ok, '不在场角色暗流推进成功');
   a.equal(shadowRes.location, '城东三号码头', '后台位置更新且未污染正文');
   a.equal(shadowRes.intent, '暗中转移备用账册', '心意自主演化');
-
   // 再次核实人物档案持久化
   const shadowPerson = W.store.get().people['p_神秘随从'];
   a.ok(shadowPerson != null, '神秘随从在册');
   a.equal(shadowPerson.shadowState.logs.length, 1, '后台履历流水沉淀');
+
+  // 10. EXV13-7: 潜意识微反应登记与下意识破绽洞察验证
+  // 登记商人张三在面临走私与军需质询时的下意识微动作（下意识轻抚袖口暗袋火漆印）
+  const idioRegRes = W.actionDesk.plan('actor.registerIdiosyncrasy', {
+    actorId: 'p_merchant',
+    triggerTag: 'military_smuggle',
+    microBehavior: '下意识反复按压左袖暗袋的火漆密信印记',
+    leakedSecretKey: 'north_border_contraband_manifest',
+    stressThreshold: 50,
+    involuntary: true
+  });
+  a.ok(idioRegRes.ok, '潜意识微反应模式登记成功');
+  a.equal(idioRegRes.total, 1, '人物档案下沉淀 1 条潜意识微反应');
+  a.equal(idioRegRes.idiosyncrasy.triggerTag, 'military_smuggle', '触发情境标签绑定精确');
+
+  // 李捕头在现场对处于高压状态下的张三进行敏锐洞察侦测
+  const idioObsRes = W.actionDesk.plan('actor.observeSubconscious', {
+    observerId: 'p_scout',
+    targetId: 'p_merchant',
+    topic: 'military_smuggle',
+    insightScore: 65,
+    stress: 85
+  });
+  a.ok(idioObsRes.ok, '潜意识微动作侦测执行成功');
+  a.equal(idioObsRes.detected, true, '成功捕捉到高压应激下的下意识微动作破绽');
+  a.equal(idioObsRes.microBehavior, '下意识反复按压左袖暗袋的火漆密信印记', '捕捉到具体微动作');
+  a.equal(idioObsRes.secretKey, 'north_border_contraband_manifest', '洞察出与军需走私清单相关的核心密防线索');
+  a.equal(idioObsRes.insightGrade, 'acute_insight', '洞察等级判定为 acute_insight');
+
+  // 核验张三的人物档案中沉淀了近期微动作遥测记录
+  const merchantAfter = W.store.get().people['p_merchant'];
+  a.ok(Array.isArray(merchantAfter.recentMicroBehaviors), '沉淀微动作遥测流');
+  a.equal(merchantAfter.recentMicroBehaviors.length, 1, '遥测流记录数自洽');
+  a.equal(merchantAfter.recentMicroBehaviors[0].leakedSecretKey, 'north_border_contraband_manifest', '遥测泄露密钥一致');
 }
 
 // 统一断言收集器
