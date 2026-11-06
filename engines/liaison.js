@@ -641,12 +641,69 @@
       inbox: rowsOf().length, deals: dealsOf().length, evidence: evidenceOf().length });
   }
 
+
+  /**
+   * OPV14-1: liaison.coordinate(opts)
+   * 协调当前场景中多个在场角色的发言顺序、插话与意图冲突仲裁
+   */
+  function coordinate(opts) {
+    opts = opts || {};
+    const sceneActors = Array.isArray(opts.actors) ? opts.actors : [];
+    const topic = clean(opts.topic || 'general', 60);
+    const urgency = Math.min(100, Math.max(0, finite(opts.urgency) || 30));
+    
+    if (sceneActors.length === 0) {
+      return { ok: false, reason: 'no-actors-in-scene' };
+    }
+    
+    // 多角色排序与发言权重评估
+    const scored = sceneActors.map(function (a) {
+      const aid = typeof a === 'string' ? a : (a.id || '');
+      const stress = finite(a.stress) || 0;
+      const dominance = finite(a.dominance) || 50;
+      const relation = finite(a.affinityWithPlayer) || 0;
+      // 综合加权：主导欲 + 紧急应激 + 亲密意图
+      const priorityScore = dominance * 0.4 + stress * 0.4 + (urgency > 50 ? stress * 0.2 : relation * 0.2);
+      return {
+        id: aid,
+        name: a.name || aid,
+        priorityScore: Math.round(priorityScore * 10) / 10,
+        actionStance: stress > 70 ? 'outburst' : (dominance > 60 ? 'assertive' : 'observant')
+      };
+    });
+    
+    scored.sort(function (x, y) { return y.priorityScore - x.priorityScore; });
+    
+    const primarySpeaker = scored[0];
+    const interrupters = scored.slice(1).filter(function (s) { return s.priorityScore >= 40 || s.actionStance === 'assertive'; });
+    
+    // 沉淀协调事件
+    const coordRecord = {
+      id: 'coord_' + clockNow('liaison') + '_' + Math.floor(Math.random() * 1000),
+      topic: topic,
+      urgency: urgency,
+      speakerOrder: scored.map(function (s) { return s.id; }),
+      primarySpeaker: primarySpeaker.id,
+      interrupters: interrupters.map(function (s) { return s.id; }),
+      at: clockNow('liaison')
+    };
+    
+    return {
+      ok: true,
+      topic: topic,
+      primarySpeaker: primarySpeaker,
+      interrupters: interrupters,
+      roster: scored,
+      coordinationId: coordRecord.id
+    };
+  }
+
   WA.liaison = {
     STAGES: STAGES.slice(), STAGE_CN: Object.assign({}, STAGE_CN),
     SCOPES: SCOPES.slice(), DEAL_STATUS: DEAL_STATUS.slice(),
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
-    receive: receive, advance: advance, settleDeal: settleDeal, settleDue: settleDue,
+    receive: receive, advance: advance, settleDeal: settleDeal, coordinate: coordinate, settleDue: settleDue,
     retry: retry, pendingRows: pendingRows,
     // V12 场景协同合同：只记上下文与既有写口回执，不代替世界状态真源
     sceneOpen: sceneOpen, sceneResolve: sceneResolve, sceneView: sceneView,

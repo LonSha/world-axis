@@ -1155,6 +1155,14 @@
     'actor.observeSubconscious': function (o) {
       if (WA.idiosyncrasy && typeof WA.idiosyncrasy.observeSubconscious === 'function') return WA.idiosyncrasy.observeSubconscious(o.observerId || o.observer, o.targetId || o.target, o);
       return { ok: false, reason: 'unsupported' };
+    },
+    'society.coordinate': function (o) {
+      if (WA.liaison && typeof WA.liaison.coordinate === 'function') return WA.liaison.coordinate(o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'actor.sendWhisper': function (o) {
+      if (WA.whisperBackchannel && typeof WA.whisperBackchannel.sendWhisper === 'function') return WA.whisperBackchannel.sendWhisper(o.senderId || o.sender, o.recipientId || o.recipient, o);
+      return { ok: false, reason: 'unsupported' };
     }
   };
 
@@ -2499,6 +2507,8 @@ let ckpt = null;
         else if (key === 'relic.reverseEngineer') out.nextActions = ['relic.reverseEngineer', 'techLineage.canProduce'];
         else if (key === 'actor.registerIdiosyncrasy') out.nextActions = ['actor.observeSubconscious', 'motive.arbitrate'];
         else if (key === 'actor.observeSubconscious') out.nextActions = ['motive.arbitrate', 'subtextTension.assess'];
+        else if (key === 'society.coordinate') out.nextActions = ['drama.resolveNonBinary', 'subtextTension.assess', 'actor.sendWhisper'];
+        else if (key === 'actor.sendWhisper') out.nextActions = ['society.coordinate', 'subtextTension.assess', 'motive.arbitrate'];
       }
     }
     else { stat.refused++; if (out && out.reason) stat.faults[out.reason] = (stat.faults[out.reason] || 0) + 1; }

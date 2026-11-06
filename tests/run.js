@@ -519,6 +519,7 @@ const LOAD = [
     'engines/counterfactual-sandbox.js',
     'engines/civilization-relic.js',
     'engines/idiosyncrasy.js',
+    'engines/whisper-backchannel.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',
