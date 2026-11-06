@@ -3881,6 +3881,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/rumor-cognition.js': 'rumorCognition',
     'engines/cognitive-poisoning.js': 'cognitivePoisoning',
     'engines/dilemma-bargain.js': 'dilemmaBargain',
+    'engines/faction-schism.js': 'factionSchism',
+    'engines/institutional-schism.js': 'institutionalSchism',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

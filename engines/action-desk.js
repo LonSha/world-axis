@@ -302,6 +302,18 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    'faction.triggerSchism': function (o) {
+      if (WA.factionSchism && typeof WA.factionSchism.triggerSchism === 'function') {
+        return WA.factionSchism.triggerSchism(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'chronicle.enactReform': function (o) {
+      if (WA.institutionalSchism && typeof WA.institutionalSchism.enactReform === 'function') {
+        return WA.institutionalSchism.enactReform(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // 关系图谱与声誉边维护
     'relationGraph.upsert': function (o) { return WA.relationGraph.upsert(o.edge || o, o); },
     'relationGraph.view': function (o) { return WA.relationGraph.view(o.edgeId || o.id, o); },
@@ -2536,6 +2548,8 @@ let ckpt = null;
         else if (key === 'society.projectRumor') out.nextActions = ['intel.believe', 'society.plantForgedIntel'];
         else if (key === 'society.plantForgedIntel') out.nextActions = ['drama.negotiateDilemma', 'motive.arbitrate'];
         else if (key === 'drama.negotiateDilemma') out.nextActions = ['relationGraph.upsert', 'subtextTension.assess'];
+        else if (key === 'faction.triggerSchism') out.nextActions = ['chronicle.enactReform', 'motive.arbitrate'];
+        else if (key === 'chronicle.enactReform') out.nextActions = ['rumor.startChain', 'relationGraph.upsert'];
         else if (key === 'rumor.startChain') out.nextActions = ['rumor.relay', 'rumor.investigate'];
         else if (key === 'rumor.relay') out.nextActions = ['rumor.investigate', 'intel.addIntel'];
         else if (key === 'rumor.investigate') out.nextActions = ['intel.believe', 'relationGraph.upsert'];

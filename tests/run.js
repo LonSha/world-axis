@@ -528,6 +528,8 @@ const LOAD = [
     'engines/rumor-cognition.js',
     'engines/cognitive-poisoning.js',
     'engines/dilemma-bargain.js',
+    'engines/faction-schism.js',
+    'engines/institutional-schism.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',
