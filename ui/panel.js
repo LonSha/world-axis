@@ -5420,11 +5420,14 @@ ${emptyDrill}
          <button class="wa-btn" id="wa-desk-flow" title="纯读：从当前场景情境切入下一步行动（可知变化/可执行/受阻）">看场景行动流</button>
          <button class="wa-btn" id="wa-desk-sched" title="纯读：查看时间成本占用与协商日程（改期/取消/拆分）">看日程与时间协商</button>
          <button class="wa-btn" id="wa-desk-epistemic" title="纯读：查看人物局部信念与证据可信度评估（无全知）">看人物信念与证据</button>
+         <button class="wa-btn" id="wa-desk-v14-multi" title="纯读：多角色博弈态势板与并发行动批调度概览">看多角色博弈态势</button>
+         <button class="wa-btn" id="wa-desk-v14-sanctuary" title="纯读：庇护所争夺与气候阻断滞留日志">看生存避险名册</button>
        </div>
        <div id="wa-desk-life-out" class="wa-out"></div>
        <div id="wa-desk-flow-out" class="wa-out"></div>
        <div id="wa-desk-sched-out" class="wa-out"></div>
-       <div id="wa-desk-epistemic-out" class="wa-out"></div>`;
+       <div id="wa-desk-epistemic-out" class="wa-out"></div>
+       <div id="wa-desk-v14-out" class="wa-out"></div>`;
    }
    /** 把日程与时间协商视图如实渲染（纯读列表 + 改期/取消/拆分操作）。 */
    function renderScheduleNegotiation(sc) {
@@ -5883,6 +5886,42 @@ on('#wa-desk-show', showDesk);
          let html = '<div class="wa-dim"><b>' + esc(who || '当前人物') + '</b> 的局部信念：'
            + '确信度 <b>' + esc(v.certainty) + '</b> · 掌握版本 <b>' + esc(v.version || '无') + '</b></div>'
            + '<div class="wa-row">当前认知摘要：' + esc(v.summary || '（空）') + '</div>';
+         out.innerHTML = html;
+         renderBody();
+       });
+       on('#wa-desk-v14-multi', function () {
+         const out = $('#wa-desk-v14-out'); if (!out) return;
+         if (!WA.actionDesk || typeof WA.actionDesk.boardMulti !== 'function') {
+           out.innerHTML = '<div class="wa-dim">行动桌多角色态势板引擎不可用</div>'; return;
+         }
+         const who = ($('#wa-desk-who') || {}).value || '';
+         const people = String(who).split(/[,，\s]+/).filter(Boolean);
+         const res = WA.actionDesk.boardMulti({ people: people.length ? people : ['protagonist'] });
+         let html = '<div class="wa-dim"><b>多角色博弈态势板</b> · 涉及人数 <b>' + (res.people || []).length + '</b></div>';
+         Object.keys(res.boards || {}).forEach(function (p) {
+           const b = res.boards[p];
+           html += '<div class="wa-row"><b>[' + esc(p) + ']</b> 可执行 ' + (b.counts ? b.counts.ready : 0)
+             + ' · 需准备 ' + (b.counts ? b.counts.prepare : 0) + ' · 受阻 ' + (b.counts ? b.counts.blocked : 0) + '</div>';
+         });
+         out.innerHTML = html;
+         renderBody();
+       });
+       on('#wa-desk-v14-sanctuary', function () {
+         const out = $('#wa-desk-v14-out'); if (!out) return;
+         const st = (WA.store && WA.store.get) ? WA.store.get() : {};
+         const disruptions = Array.isArray(st.routineDisruptions) ? st.routineDisruptions : [];
+         const sanctLogs = Array.isArray(st.sanctuaryLogs) ? st.sanctuaryLogs : [];
+         let html = '<div class="wa-dim"><b>生存避险与极端气候滞留名册</b></div>';
+         if (!disruptions.length && !sanctLogs.length) {
+           html += '<div class="wa-dim">暂无气候阻断与避难争夺记录</div>';
+         } else {
+           disruptions.slice(-3).forEach(function (d) {
+             html += '<div class="wa-row"><span class="wa-dim">[气候滞留]</span> <b>' + esc(d.actorId) + '</b> 因【' + esc(d.weather) + '】滞留于 ' + esc(d.place) + '（状态：' + esc(d.imposedState) + '）</div>';
+           });
+           sanctLogs.slice(-3).forEach(function (s) {
+             html += '<div class="wa-row"><span class="wa-dim">[避险争夺]</span> <b>' + esc(s.sanctuaryId) + '</b> 入驻：' + esc((s.admitted || []).join('、') || '无') + ' · 牺牲让渡：' + esc((s.sacrifices || []).join('、') || '无') + '</div>';
+           });
+         }
          out.innerHTML = html;
          renderBody();
        });

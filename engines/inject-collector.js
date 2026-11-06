@@ -101,6 +101,32 @@
           [r.a, r.b], r.at, '关系登记');
       });
     });
+    // V14 结构注入扩展：恶劣气候日常阻断、空间坍缩庇护所争夺、反事实梦魇回响
+    read('life', function () {
+      const st = (WA.store && WA.store.get) ? WA.store.get() : {};
+      const disruptions = Array.isArray(st.routineDisruptions) ? st.routineDisruptions : [];
+      disruptions.slice(-5).forEach(function (dis, idx) {
+        add('life', 'disrupt:' + dis.actorId + ':' + idx,
+          dis.actorId + '受恶劣气候【' + dis.weather + '】阻断，强制滞留避险（状态：' + dis.imposedState + '）',
+          [dis.actorId], dis.at, '气候滞留');
+      });
+      const sanctLogs = Array.isArray(st.sanctuaryLogs) ? st.sanctuaryLogs : [];
+      sanctLogs.slice(-3).forEach(function (sl, idx) {
+        add('life', 'sanctuary:' + sl.sanctuaryId + ':' + idx,
+          '避难所【' + sl.sanctuaryId + '】席位争夺已结算：入驻[' + sl.admitted.join(',') + ']，牺牲[' + (sl.sacrifices.join(',') || '无') + ']',
+          sl.admitted.concat(sl.sacrifices || []), sl.at, '避险争夺');
+      });
+      const actors = st.actors || {};
+      Object.keys(actors).forEach(function (aid) {
+        const a = actors[aid];
+        if (a && Array.isArray(a.counterfactualEchoes) && a.counterfactualEchoes.length) {
+          const latestEcho = a.counterfactualEchoes[a.counterfactualEchoes.length - 1];
+          add('life', 'echo:' + aid + ':' + latestEcho.id,
+            aid + '心绪受平行世界梦魇回响反噬：「' + latestEcho.pathSummary + '」',
+            [aid], latestEcho.at, '反事实回响');
+        }
+      });
+    });
     // Rank first, then scene relevance, then owner-local freshness (different clocks
     // are never compared across owners), finally stable owner/id order.
     candidates.sort(function (a, b) {

@@ -5567,12 +5567,14 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     ,
     // v2.231.0 (OP-1): actiondesk page -- ids + dynamic out.
     //   同 evidence 页口径：本页不另存状态，写路径转给来源模块。
-    //   wa-desk-out 是动态容器，进 dynamic（进 ids 会被判成静态缺失）。
     { page: 'actiondesk', ids: ['wa-desk-who', 'wa-desk-show', 'wa-desk-on',
       // v2.250.0：跨轮生命周期四枚此前**渲染了但没登记**（守卫表照不到 ⇒ 绑定断了也永远不报），
       //   连同四个输出容器一起补登。输出容器仍是动态容器（由 show* 回调填，非静态成树）。
-      'wa-desk-life', 'wa-desk-flow', 'wa-desk-sched', 'wa-desk-epistemic'],
-      dynamic: ['wa-desk-out', 'wa-desk-life-out', 'wa-desk-flow-out', 'wa-desk-sched-out', 'wa-desk-epistemic-out'] }
+      'wa-desk-life', 'wa-desk-flow', 'wa-desk-sched', 'wa-desk-epistemic', 'wa-desk-v14-multi', 'wa-desk-v14-sanctuary'],
+      dynamic: ['wa-desk-out', 'wa-desk-life-out', 'wa-desk-flow-out', 'wa-desk-sched-out', 'wa-desk-epistemic-out', 'wa-desk-v14-out'] },
+    { page: 'health', ids: ['wa-periodical-id', 'wa-periodical-name', 'wa-periodical-days', 'wa-periodical-profile', 'wa-periodical-enabled',
+      'wa-periodical-config', 'wa-periodical-publish', 'wa-periodical-read'],
+      dynamic: ['wa-periodical-out'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。
