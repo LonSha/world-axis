@@ -254,6 +254,18 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    'actor.applyEvaluationCosts': function (o) {
+      if (WA.actionCostFeedback && typeof WA.actionCostFeedback.applyEvaluationCosts === 'function') {
+        return WA.actionCostFeedback.applyEvaluationCosts(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'drama.germinateForeshadow': function (o) {
+      if (WA.foreshadowGermination && typeof WA.foreshadowGermination.germinate === 'function') {
+        return WA.foreshadowGermination.germinate(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // 关系图谱与声誉边维护
     'relationGraph.upsert': function (o) { return WA.relationGraph.upsert(o.edge || o, o); },
     'relationGraph.view': function (o) { return WA.relationGraph.view(o.edgeId || o.id, o); },
@@ -2480,6 +2492,8 @@ let ckpt = null;
         else if (key === 'creditLedger.repay') out.nextActions = ['creditLedger.open'];
         else if (key === 'creditLedger.checkCredit') out.nextActions = ['creditLedger.open', 'finance.ruptureCollateral'];
         else if (key === 'finance.ruptureCollateral') out.nextActions = ['rumor.startChain', 'relationGraph.upsert', 'subtextTension.assess'];
+        else if (key === 'actor.applyEvaluationCosts') out.nextActions = ['drama.resolveNonBinary', 'subtextTension.assess'];
+        else if (key === 'drama.germinateForeshadow') out.nextActions = ['rumor.startChain', 'subtextTension.assess', 'motive.arbitrate'];
         else if (key === 'rumor.startChain') out.nextActions = ['rumor.relay', 'rumor.investigate'];
         else if (key === 'rumor.relay') out.nextActions = ['rumor.investigate', 'intel.addIntel'];
         else if (key === 'rumor.investigate') out.nextActions = ['intel.believe', 'relationGraph.upsert'];

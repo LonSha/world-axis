@@ -521,6 +521,8 @@ const LOAD = [
     'engines/idiosyncrasy.js',
     'engines/whisper-backchannel.js',
     'engines/collateral-rupture.js',
+    'engines/action-cost-feedback.js',
+    'engines/foreshadow-germination.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',
