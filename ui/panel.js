@@ -5743,12 +5743,17 @@ const flowOut = function () { const r = $('#wa-desk-flow-out'); return r; };
         const who = ($('#wa-desk-who') || {}).value || '';
         try { mainWin.__waDeskWho = who; } catch (e) { }
         const out = deskOut(); if (!out) return;
-        const b = WA.actionDesk.board({ person: String(who).trim() });
+        const b = (who && who.indexOf(',') >= 0 && typeof WA.actionDesk.boardMulti === 'function')
+          ? WA.actionDesk.boardMulti({ people: who.split(',').map(function (x) { return x.trim(); }).filter(Boolean) })
+          : WA.actionDesk.board({ person: String(who).trim() });
         out.innerHTML = renderDeskOut(b);
         // 每个「执行」按钮：把 actionId 交给引擎路由（引擎负责转给 owner 并回报结果）。
         out.querySelectorAll('[data-desk-act]').forEach(function (btn) {
           btn.onclick = function () {
-            const r = WA.actionDesk.plan(btn.getAttribute('data-desk-act'), { who: String(who).trim() });
+            const rawAct = btn.getAttribute('data-desk-act');
+            const r = (rawAct && rawAct.indexOf(';') >= 0 && typeof WA.actionDesk.planMulti === 'function')
+              ? WA.actionDesk.planMulti(rawAct.split(';').map(function (x) { return x.trim(); }).filter(Boolean), { who: String(who).trim() })
+              : WA.actionDesk.plan(rawAct, { who: String(who).trim() });
             const tip = (r && r.ok) ? '已执行' : ('未能执行：' + String((r && r.reason) || 'unknown'));
             showDesk();
             const out2 = deskOut(); if (out2) out2.innerHTML = '<div class="wa-dim">' + esc(tip) + '</div>' + out2.innerHTML;

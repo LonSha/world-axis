@@ -587,6 +587,10 @@
     'engines/dilemma-bargain.js',
     'engines/faction-schism.js',
     'engines/institutional-schism.js',
+    'engines/environment-interference.js',
+    'engines/branch-transplant.js',
+    'engines/sanctuary-scramble.js',
+    'engines/counterfactual-echo.js',
     // v2.251.0（拓展 WD-1）：阶位权重池 + 未得补偿 + 幸运封顶（cf. aifarm gacha/soft-pity）。
     //   纯判据 + 抽一个：走 rand.pickWeighted 的 `draw` 通道，池子与图鉴留在调用方。
     'engines/weighted-draw.js',

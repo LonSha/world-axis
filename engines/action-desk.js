@@ -314,6 +314,30 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    'environment.disruptRoutines': function (o) {
+      if (WA.environmentInterference && typeof WA.environmentInterference.disruptRoutines === 'function') {
+        return WA.environmentInterference.disruptRoutines(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'chronicle.transplantFact': function (o) {
+      if (WA.branchTransplant && typeof WA.branchTransplant.transplantFact === 'function') {
+        return WA.branchTransplant.transplantFact(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'survival.scrambleSanctuary': function (o) {
+      if (WA.sanctuaryScramble && typeof WA.sanctuaryScramble.scramble === 'function') {
+        return WA.sanctuaryScramble.scramble(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'drama.evokeCounterfactualEcho': function (o) {
+      if (WA.counterfactualEcho && typeof WA.counterfactualEcho.evokeEcho === 'function') {
+        return WA.counterfactualEcho.evokeEcho(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // 关系图谱与声誉边维护
     'relationGraph.upsert': function (o) { return WA.relationGraph.upsert(o.edge || o, o); },
     'relationGraph.view': function (o) { return WA.relationGraph.view(o.edgeId || o.id, o); },
@@ -2550,6 +2574,10 @@ let ckpt = null;
         else if (key === 'drama.negotiateDilemma') out.nextActions = ['relationGraph.upsert', 'subtextTension.assess'];
         else if (key === 'faction.triggerSchism') out.nextActions = ['chronicle.enactReform', 'motive.arbitrate'];
         else if (key === 'chronicle.enactReform') out.nextActions = ['rumor.startChain', 'relationGraph.upsert'];
+        else if (key === 'environment.disruptRoutines') out.nextActions = ['survival.scrambleSanctuary', 'subtextTension.assess'];
+        else if (key === 'chronicle.transplantFact') out.nextActions = ['drama.evokeCounterfactualEcho', 'intel.believe'];
+        else if (key === 'survival.scrambleSanctuary') out.nextActions = ['relationGraph.upsert', 'drama.resolveNonBinary'];
+        else if (key === 'drama.evokeCounterfactualEcho') out.nextActions = ['motive.arbitrate', 'subtextTension.assess'];
         else if (key === 'rumor.startChain') out.nextActions = ['rumor.relay', 'rumor.investigate'];
         else if (key === 'rumor.relay') out.nextActions = ['rumor.investigate', 'intel.addIntel'];
         else if (key === 'rumor.investigate') out.nextActions = ['intel.believe', 'relationGraph.upsert'];
@@ -2707,6 +2735,24 @@ let ckpt = null;
     // v2.233.0 (OPV4-1)：场景优先流程收束（纯读情境聚合 + 带场景上下文的行动派发）
     sceneFlow: sceneFlow,
     actFromScene: actFromScene,
+    boardMulti: function (opts) {
+      const o = opts || {};
+      const people = Array.isArray(o.people) ? o.people : [o.person || 'protagonist'];
+      const boards = {};
+      people.forEach(function (p) {
+        boards[p] = board(Object.assign({}, o, { person: p }));
+      });
+      return { ok: true, people: people, boards: boards, at: clockNow('actionDesk') };
+    },
+    planMulti: function (actions, opts) {
+      const list = Array.isArray(actions) ? actions : [];
+      const results = list.map(function (act) {
+        const aid = (typeof act === 'string') ? act : act.actionId;
+        const o = (typeof act === 'object') ? Object.assign({}, opts || {}, act.opts || act) : (opts || {});
+        return { actionId: aid, result: plan(aid, o) };
+      });
+      return { ok: true, total: results.length, results: results, at: clockNow('actionDesk') };
+    },
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults), byKind: Object.assign({}, stat.byKind) }); }
   };
   Object.defineProperty(WA.actionDesk, 'orchestrate', {
@@ -2715,7 +2761,7 @@ let ckpt = null;
     writable: true,
     configurable: true
   });
-  var EXPORT_COUNT = 14;
+  var EXPORT_COUNT = 16;
   var _exported = Object.keys(WA.actionDesk).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('actionDesk: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/action-desk.js', { kind: 'engine', ver: '2.231.0' });
