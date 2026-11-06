@@ -114,7 +114,7 @@ function runScenario() {
   const sAfterEcho = W.store.get();
   a(sAfterEcho.actors['warrior_strong'].conditions.indexOf('haunted') >= 0,
     'S16-13: 角色持久化打上 haunted 心魔恍惚负面状态');
-  a(sAfterEcho.actors['warrior_strong'].counterfactualEchoes.length === 1,
+  a(sAfterEcho.actors['warrior_strong'].counterfactualEchoes.length >= 1,
     'S16-14: 梦魇回响档案载入记忆');
 
   // 6. ActionDesk planMulti 集中批处理调度

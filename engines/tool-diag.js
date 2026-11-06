@@ -5570,7 +5570,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'actiondesk', ids: ['wa-desk-who', 'wa-desk-show', 'wa-desk-on',
       // v2.250.0：跨轮生命周期四枚此前**渲染了但没登记**（守卫表照不到 ⇒ 绑定断了也永远不报），
       //   连同四个输出容器一起补登。输出容器仍是动态容器（由 show* 回调填，非静态成树）。
-      'wa-desk-life', 'wa-desk-flow', 'wa-desk-sched', 'wa-desk-epistemic', 'wa-desk-v14-multi', 'wa-desk-v14-sanctuary'],
+      'wa-desk-life', 'wa-desk-flow', 'wa-desk-sched', 'wa-desk-epistemic', 'wa-desk-v14-multi', 'wa-desk-v14-sanctuary', 'wa-desk-v14-crisis', 'wa-desk-v14-pact'],
       dynamic: ['wa-desk-out', 'wa-desk-life-out', 'wa-desk-flow-out', 'wa-desk-sched-out', 'wa-desk-epistemic-out', 'wa-desk-v14-out'] },
     { page: 'health', ids: ['wa-periodical-id', 'wa-periodical-name', 'wa-periodical-days', 'wa-periodical-profile', 'wa-periodical-enabled',
       'wa-periodical-config', 'wa-periodical-publish', 'wa-periodical-read'],

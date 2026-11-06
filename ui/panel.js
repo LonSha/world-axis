@@ -5420,8 +5420,10 @@ ${emptyDrill}
          <button class="wa-btn" id="wa-desk-flow" title="纯读：从当前场景情境切入下一步行动（可知变化/可执行/受阻）">看场景行动流</button>
          <button class="wa-btn" id="wa-desk-sched" title="纯读：查看时间成本占用与协商日程（改期/取消/拆分）">看日程与时间协商</button>
          <button class="wa-btn" id="wa-desk-epistemic" title="纯读：查看人物局部信念与证据可信度评估（无全知）">看人物信念与证据</button>
-         <button class="wa-btn" id="wa-desk-v14-multi" title="纯读：多角色博弈态势板与并发行动批调度概览">看多角色博弈态势</button>
-         <button class="wa-btn" id="wa-desk-v14-sanctuary" title="纯读：庇护所争夺与气候阻断滞留日志">看生存避险名册</button>
+          <button class="wa-btn" id="wa-desk-v14-multi" title="纯读：多角色博弈态势板与并发行动批调度概览">看多角色博弈态势</button>
+          <button class="wa-btn" id="wa-desk-v14-sanctuary" title="纯读：庇护所争夺与气候阻断滞留日志">看生存避险名册</button>
+          <button class="wa-btn" id="wa-desk-v14-crisis" title="纯读：险道物资断供与公开危机大盘">看全域危机大盘</button>
+          <button class="wa-btn" id="wa-desk-v14-pact" title="纯读：城下之盟与多方和解公约名册">看多方和解公约</button>
        </div>
        <div id="wa-desk-life-out" class="wa-out"></div>
        <div id="wa-desk-flow-out" class="wa-out"></div>
@@ -5907,24 +5909,58 @@ on('#wa-desk-show', showDesk);
          renderBody();
        });
        on('#wa-desk-v14-sanctuary', function () {
-         const out = $('#wa-desk-v14-out'); if (!out) return;
-         const st = (WA.store && WA.store.get) ? WA.store.get() : {};
-         const disruptions = Array.isArray(st.routineDisruptions) ? st.routineDisruptions : [];
-         const sanctLogs = Array.isArray(st.sanctuaryLogs) ? st.sanctuaryLogs : [];
-         let html = '<div class="wa-dim"><b>生存避险与极端气候滞留名册</b></div>';
-         if (!disruptions.length && !sanctLogs.length) {
-           html += '<div class="wa-dim">暂无气候阻断与避难争夺记录</div>';
-         } else {
-           disruptions.slice(-3).forEach(function (d) {
-             html += '<div class="wa-row"><span class="wa-dim">[气候滞留]</span> <b>' + esc(d.actorId) + '</b> 因【' + esc(d.weather) + '】滞留于 ' + esc(d.place) + '（状态：' + esc(d.imposedState) + '）</div>';
-           });
-           sanctLogs.slice(-3).forEach(function (s) {
-             html += '<div class="wa-row"><span class="wa-dim">[避险争夺]</span> <b>' + esc(s.sanctuaryId) + '</b> 入驻：' + esc((s.admitted || []).join('、') || '无') + ' · 牺牲让渡：' + esc((s.sacrifices || []).join('、') || '无') + '</div>';
-           });
-         }
-         out.innerHTML = html;
-         renderBody();
-       });
+        const out = $('#wa-desk-v14-out'); if (!out) return;
+        const st = (WA.store && WA.store.get) ? WA.store.get() : {};
+        const disruptions = Array.isArray(st.routineDisruptions) ? st.routineDisruptions : [];
+        const sanctLogs = Array.isArray(st.sanctuaryLogs) ? st.sanctuaryLogs : [];
+        let html = '<div class="wa-dim"><b>生存避险与极端气候滞留名册</b></div>';
+        if (!disruptions.length && !sanctLogs.length) {
+          html += '<div class="wa-dim">暂无气候阻断与避难争夺记录</div>';
+        } else {
+          disruptions.slice(-3).forEach(function (d) {
+            html += '<div class="wa-row"><span class="wa-dim">[气候滞留]</span> <b>' + esc(d.actorId) + '</b> 因【' + esc(d.weather) + '】滞留于 ' + esc(d.place) + '（状态：' + esc(d.imposedState) + '）</div>';
+          });
+          sanctLogs.slice(-3).forEach(function (s) {
+            html += '<div class="wa-row"><span class="wa-dim">[避险争夺]</span> <b>' + esc(s.sanctuaryId) + '</b> 入驻：' + esc((s.admitted || []).join('、') || '无') + ' · 牺牲让渡：' + esc((s.sacrifices || []).join('、') || '无') + '</div>';
+          });
+        }
+        out.innerHTML = html;
+        renderBody();
+      });
+      on('#wa-desk-v14-crisis', function () {
+        const out = $('#wa-desk-v14-out'); if (!out) return;
+        const st = (WA.store && WA.store.get) ? WA.store.get() : {};
+        const chokes = Array.isArray(st.supplyChokes) ? st.supplyChokes : [];
+        const crises = Array.isArray(st.activeCrises) ? st.activeCrises : [];
+        let html = '<div class="wa-dim"><b>全域危机与物资断供大盘</b></div>';
+        if (!chokes.length && !crises.length) {
+          html += '<div class="wa-dim">暂无活跃的物资断供或公开危机</div>';
+        } else {
+          chokes.slice(-3).forEach(function (ck) {
+            html += '<div class="wa-row"><span class="wa-dim">[物资断供]</span> 路线 <b>' + esc(ck.routeId) + '</b> → 目标城 <b>' + esc(ck.destinationCity) + '</b>（' + esc(ck.resourceKind) + '，物价暴涨 ' + ck.priceMultiplier + 'x）</div>';
+          });
+          crises.slice(-3).forEach(function (cr) {
+            html += '<div class="wa-row"><span class="wa-dim">[伏笔危机]</span> 种子 <b>' + esc(cr.seedId) + '</b> → 针对 <b>' + esc(cr.targetActor) + '</b>（状态: ' + esc(cr.status) + '，严重度 ' + cr.severity + '）</div>';
+          });
+        }
+        out.innerHTML = html;
+        renderBody();
+      });
+      on('#wa-desk-v14-pact', function () {
+        const out = $('#wa-desk-v14-out'); if (!out) return;
+        const st = (WA.store && WA.store.get) ? WA.store.get() : {};
+        const pacts = Array.isArray(st.pacts) ? st.pacts : [];
+        let html = '<div class="wa-dim"><b>多方和解公约名册</b></div>';
+        if (!pacts.length) {
+          html += '<div class="wa-dim">暂无生效的和解公约</div>';
+        } else {
+          pacts.slice(-3).forEach(function (p) {
+            html += '<div class="wa-row"><span class="wa-dim">[和解公约]</span> 编号 <b>' + esc(p.pactId) + '</b> 缔约方 <b>' + esc(p.partyA) + '</b> × <b>' + esc(p.partyB) + '</b>（' + (p.ratified ? '已生效' : '谈判破裂') + ' · 效用 ' + p.utilityA + '/' + p.utilityB + '）</div>';
+          });
+        }
+        out.innerHTML = html;
+        renderBody();
+      });
        const cb = $('#wa-desk-on');
       if (cb) cb.onchange = function () { WA.actionDesk.setSettings({ enabled: cb.checked }); renderBody(); };
     }

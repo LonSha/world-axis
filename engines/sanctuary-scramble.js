@@ -1,17 +1,11 @@
 /**
- * WorldAxis engines/sanctuary-scramble.js (v2.319.0) — EXV14-8 空间坍缩避险与有限庇护所生存竞争
+ * WorldAxis engines/sanctuary-scramble.js (v2.322.0) — EXV14-8 空间坍缩避险与有限庇护所生存竞争与创伤级联
  *
  * ── 它治什么（缺口）──────────────────────────────────────────────────
  *   此前庇护所（shelter/sanctuary）容纳人数永远假定为“无限”。
  *   当灾难发生时，所有 NPC 都能轻松躲入，缺乏名额有限时的人性博弈、
  *   争抢名额、暴力驱逐或自我牺牲让渡名额的戏剧张力。
- *
- * ── 机制（一句说完）──────────────────────────────────────────────────
- *   `sanctuary.scramble`：
- *   1. 庇护所声明有限空位（capacity）；
- *   2. 角色进入求生争夺（scramble），当人数超载时依据力量/求生意志进行排挤；
- *   3. 争夺成功者获得入内避险许可（admitted: true），失败者被关在门外（locked-out）；
- *   4. 持久化记录到 sanctuaryOccupants 档案中。
+ *   本次强化（v2.322.0）：惨烈牺牲与同伴被关门外会自动级联回流至生还者的反事实梦魇（counterfactualEchoes）。
  */
 (function () {
   'use strict';
@@ -20,7 +14,6 @@
   const LS_KEY = 'worldaxis_sanctuary_scramble_settings_v1';
   const DEF = { enabled: true, maxSanctuaries: 16, defaultCapacity: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'sanctuaryScramble' };
-
   function settings() {
     if (!WA.settingsBus) return Object.assign({}, DEF);
     const raw = WA.settingsBus.read(__REG);
@@ -28,15 +21,12 @@
     return WA.settingsBus.normalize(__REG, Object.assign(base, raw || {}));
   }
   if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-
   function transact(fn, why) {
     if (!WA.store || typeof WA.store.transact !== 'function') return false;
     try { WA.store.transact(fn, 'sanctuaryScramble:' + (why || 'update')); return true; }
     catch (e) { return false; }
   }
-
   const stat = { scrambled: 0, admitted: 0, lockedOut: 0, refused: 0, lastReason: '' };
-
   /**
    * 避险争夺
    * @param {object} spec { sanctuaryId, candidateActorId?, actorId?, applicants?: Array, capacity?, at? }
@@ -53,10 +43,8 @@
       stat.refused++; stat.lastReason = 'missing-sanctuary-id';
       return { ok: false, reason: 'missing-sanctuary-id' };
     }
-
     const at = Number.isFinite(s.at) ? s.at : clockNow('sanctuaryScramble');
     const cap = Number.isFinite(s.capacity) ? Number(s.capacity) : cfg.defaultCapacity;
-
     // 多申请者批量仲裁模式
     if (Array.isArray(s.applicants)) {
       if (!s.applicants.length) {
@@ -78,18 +66,36 @@
       });
       const admitted = contenders.slice(0, cap);
       const expelled = contenders.slice(cap).concat(willingSacrifices);
-
       transact(function (d) {
         if (!d) return true;
         d.sanctuaries = d.sanctuaries || {};
         d.sanctuaries[sanctuaryId] = d.sanctuaries[sanctuaryId] || { id: sanctuaryId, occupants: [] };
         d.sanctuaries[sanctuaryId].occupants = admitted.map(function (x) { return x.actorId; });
+        d.sanctuaryLogs = Array.isArray(d.sanctuaryLogs) ? d.sanctuaryLogs : [];
+        d.sanctuaryLogs.push({
+          sanctuaryId: sanctuaryId,
+          admitted: admitted.map(function (x) { return x.actorId; }),
+          sacrifices: willingSacrifices.map(function (x) { return x.actorId; }),
+          at: at
+        });
         d.actors = d.actors || {};
         admitted.forEach(function (adm) {
           d.actors[adm.actorId] = d.actors[adm.actorId] || { id: adm.actorId, conditions: [] };
           const a = d.actors[adm.actorId];
           a.conditions = Array.isArray(a.conditions) ? a.conditions : [];
           if (a.conditions.indexOf('sheltered') < 0) a.conditions.push('sheltered');
+          // 深水区级联：若存在牺牲者，幸存生还者心智烙印幸存者负罪感梦魇
+          if (willingSacrifices.length > 0) {
+            a.counterfactualEchoes = Array.isArray(a.counterfactualEchoes) ? a.counterfactualEchoes : [];
+            a.counterfactualEchoes.push({
+              id: 'echo_survivor_guilt_' + at,
+              forkNodeId: 'sanctuary_' + sanctuaryId,
+              pathSummary: '同伴【' + willingSacrifices.map(function(x){return x.actorId;}).join(',') + '】在避难所门外舍身牺牲换来自己的生还，成为挥之不去的心魔',
+              hauntIntensity: 85,
+              at: at
+            });
+            if (a.conditions.indexOf('haunted') < 0) a.conditions.push('haunted');
+          }
         });
         willingSacrifices.forEach(function (sac) {
           d.actors[sac.actorId] = d.actors[sac.actorId] || { id: sac.actorId, conditions: [] };
@@ -105,7 +111,6 @@
         });
         return true;
       }, 'scramble:batch');
-
       stat.scrambled++;
       stat.admitted += admitted.length;
       return {
@@ -118,7 +123,6 @@
         sacrifices: willingSacrifices.map(function (x) { return x.actorId; })
       };
     }
-
     // 单角色角逐模式
     const candidateActorId = String(s.candidateActorId || s.actorId || '').trim();
     if (!candidateActorId) {
@@ -138,7 +142,6 @@
         currentOccupantsCount = occ.length;
         return true;
       }
-
       if (occ.length < cap) {
         occ.push(candidateActorId);
         admitted = true;
@@ -157,7 +160,6 @@
       }
       return true;
     }, 'scramble');
-
     stat.scrambled++;
     if (admitted) stat.admitted++;
     else stat.lockedOut++;
@@ -171,12 +173,10 @@
       occupantsCount: currentOccupantsCount
     };
   }
-
   WA.sanctuaryScramble = {
     scramble: scramble
   };
-
   if (typeof console !== 'undefined' && console.log) {
-    console.log('[WorldAxis] engines/sanctuary-scramble 已加载（2.319.0）');
+    console.log('[WorldAxis] engines/sanctuary-scramble 已加载（2.322.0）');
   }
 })();

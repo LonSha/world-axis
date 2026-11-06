@@ -126,6 +126,25 @@
             [aid], latestEcho.at, '反事实回响');
         }
       });
+      // V14 深化：险道断裂配给危机、破土公开危机与城下之盟和解公约注入
+      const chokes = Array.isArray(st.supplyChokes) ? st.supplyChokes : [];
+      chokes.filter(function (ck) { return ck.status === 'active'; }).slice(-3).forEach(function (ck, idx) {
+        add('life', 'choke:' + ck.routeId + ':' + idx,
+          '险道【' + ck.routeId + '】被阻断，城池【' + ck.destinationCity + '】物资【' + ck.resourceKind + '】面临断供与' + ck.priceMultiplier + '倍物价暴涨（限购配给中）',
+          [ck.destinationCity], ck.startedAt, '物资断供');
+      });
+      const crises = Array.isArray(st.activeCrises) ? st.activeCrises : [];
+      crises.filter(function (cr) { return cr.status === 'erupted'; }).slice(-3).forEach(function (cr, idx) {
+        add('life', 'crisis:' + cr.seedId + ':' + idx,
+          '历史伏笔全面爆发公开危机：对【' + cr.targetActor + '】形成现实反噬（严重度：' + cr.severity + '）',
+          [cr.targetActor], cr.eruptedAt, '伏笔反噬');
+      });
+      const pacts = Array.isArray(st.pacts) ? st.pacts : [];
+      pacts.filter(function (p) { return p.ratified === true; }).slice(-3).forEach(function (p, idx) {
+        add('life', 'pact:' + p.pactId + ':' + idx,
+          '利益和解公约达成：【' + p.partyA + '】与【' + p.partyB + '】缔结互信协定（双方效用：' + p.utilityA + '/' + p.utilityB + '）',
+          [p.partyA, p.partyB], p.timestamp, '和解公约');
+      });
     });
     // Rank first, then scene relevance, then owner-local freshness (different clocks
     // are never compared across owners), finally stable owner/id order.
