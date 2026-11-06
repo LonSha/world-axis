@@ -570,6 +570,126 @@
     };
   }
 
+  /**
+   * EXV13-5 & OPV13-5: 传闻地理漂移与失真演化网络（Geographic Rumor Drift & Distortion）
+   * 传闻在驿道与市集之间传递时，随距离、中继跳数与地方阵营偏见发生信息熵变。
+   */
+  function driftRelay(spec) {
+    const s = spec || {};
+    const rid = clean(s.rumorId || s.id, 80);
+    const from = clean(s.fromPlace || s.from, 40);
+    const to = clean(s.toPlace || s.to, 40);
+    const transitDays = Math.max(1, Number(s.transitDays) || 1);
+    const localBias = clean(s.localBias || s.bias, 40); // e.g. 'militarist_paranoia', 'hostile_border'
+
+    if (!rid || !from || !to) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+
+    const st = state();
+    const rState = (st.rumor && typeof st.rumor === 'object') ? st.rumor : {};
+    const drifts = Array.isArray(rState.drifts) ? rState.drifts : [];
+    let prevRecord = drifts.filter(function (d) { return d && d.rumorId === rid; }).pop();
+
+    let initialFact = clean(s.initialFact || (prevRecord ? prevRecord.currentText : s.text), 160) || '边境守军小规模调动';
+    let currentText = prevRecord ? prevRecord.currentText : initialFact;
+    let fidelity = prevRecord ? prevRecord.fidelity : 1.0;
+    let hopCount = prevRecord ? (prevRecord.hopCount + 1) : 1;
+    let threatLevel = prevRecord ? prevRecord.threatLevel : 'low';
+
+    // 每一跳根据传播天数与物理距离衰减真实细节
+    const decay = Number((0.15 * transitDays).toFixed(2));
+    fidelity = Math.max(0.05, Number((fidelity - decay).toFixed(2)));
+
+    // 异化与地方偏见注入
+    let distorted = fidelity < 0.65;
+    if (fidelity < 0.3) {
+      threatLevel = 'lethal_alert';
+      currentText = '【极度异化流言】「' + from + '」方向异动已被确凿定性为敌军全面开战越界突袭，边关即将沦陷！';
+    } else if (fidelity < 0.65) {
+      threatLevel = 'imminent_crisis';
+      currentText = '【严重失真】传闻「' + from + '」不仅全军动员，且已封锁所有商道准备突袭！';
+    } else {
+      threatLevel = 'moderate';
+      currentText = '【市集转述】行商传闻「' + from + '」周边有兵马频繁集结之象。';
+    }
+
+    let out = null;
+    WA.store.transact(function (draft) {
+      draft.rumor = draft.rumor && typeof draft.rumor === 'object' && !Array.isArray(draft.rumor) ? draft.rumor : { chains: [] };
+      draft.rumor.drifts = Array.isArray(draft.rumor.drifts) ? draft.rumor.drifts : [];
+      const now = clockNow('rumor');
+      const rec = {
+        id: 'drift_' + now + '_' + draft.rumor.drifts.length,
+        rumorId: rid,
+        fromPlace: from,
+        toPlace: to,
+        transitDays: transitDays,
+        hopCount: hopCount,
+        fidelity: fidelity,
+        threatLevel: threatLevel,
+        distorted: distorted,
+        initialFact: initialFact,
+        currentText: currentText,
+        localBias: localBias,
+        at: now
+      };
+      draft.rumor.drifts.push(rec);
+      WA.evict.array(draft.rumor.drifts, 'rumor.drifts', 32);
+      out = Object.assign({ ok: true }, rec);
+    }, 'rumor:driftRelay');
+
+    if (out && out.ok) { stat.relays++; stat.lastReason = 'drift-relayed'; }
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * 勘验地理漂移的流言档案与演变历史
+   */
+  function inspectDrift(rumorId) {
+    const rid = clean(rumorId, 80);
+    const st = state();
+    const drifts = (st.rumor && Array.isArray(st.rumor.drifts)) ? st.rumor.drifts : [];
+    const chain = drifts.filter(function (d) { return !rid || d.rumorId === rid; });
+    const latest = chain.length ? chain[chain.length - 1] : null;
+    return {
+      ok: true,
+      rumorId: rid,
+      totalHops: chain.length,
+      latestFidelity: latest ? latest.fidelity : 1.0,
+      threatLevel: latest ? latest.threatLevel : 'none',
+      latestText: latest ? latest.currentText : '',
+      chain: chain
+    };
+  }
+
+  /**
+   * 权威辟谣地理漂移的异化谣言
+   */
+  function refuteDrift(rumorId, opts) {
+    const rid = clean(rumorId, 80);
+    if (!rid) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+    const o = opts || {};
+    const by = clean(o.by || o.who, 60);
+    const reason = clean(o.reason || o.evidence, 160) || '出示官防铁证辟谣';
+    let out = null;
+    WA.store.transact(function (draft) {
+      draft.rumor = draft.rumor && typeof draft.rumor === 'object' && !Array.isArray(draft.rumor) ? draft.rumor : {};
+      draft.rumor.drifts = Array.isArray(draft.rumor.drifts) ? draft.rumor.drifts : [];
+      const chain = draft.rumor.drifts.filter(function (d) { return d && d.rumorId === rid; });
+      if (!chain.length) { out = { ok: false, reason: 'missing', rumorId: rid }; return false; }
+      const now = clockNow('rumor');
+      chain.forEach(function (d) {
+        d.refuted = true;
+        d.refutedBy = by;
+        d.refuteReason = reason;
+        d.threatLevel = 'refuted_clear';
+        d.updatedAt = now;
+      });
+      out = { ok: true, rumorId: rid, refuted: true, refutedBy: by, threatLevel: 'refuted_clear', reason: reason };
+    }, 'rumor:refuteDrift');
+    if (out && out.ok) { stat.refuted++; stat.lastReason = 'drift-refuted'; }
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
   WA.rumor = {
     LAYERS: LAYERS, MOTIVES: MOTIVES, PUBLIC_LAYERS: PUBLIC_LAYERS, LAYER_LEVEL: LAYER_LEVEL,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
@@ -578,6 +698,9 @@
     competeForAttention: competeForAttention,
     propagateAcrossRegions: propagateAcrossRegions,
     mutateAndAmplify: mutateAndAmplify,
+    driftRelay: driftRelay,
+    inspectDrift: inspectDrift,
+    refuteDrift: refuteDrift,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

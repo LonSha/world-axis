@@ -8746,14 +8746,6 @@
       "tref": 0,
       "own": 3
     },
-    "weather.season": {
-      "reason": "self-only",
-      "detail": "engines/weather.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/weather.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 11
-    },
     "weather.setSettings": {
       "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -8865,14 +8857,6 @@
       "refs": 0,
       "tref": 17,
       "own": 1
-    },
-    "world.addBlock": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/world.js",
-      "refs": 0,
-      "tref": 9,
-      "own": 3
     },
     "world.blocksOf": {
       "reason": "unwired",
@@ -9230,6 +9214,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 553
+    "dataOnly": 554
   }
 }

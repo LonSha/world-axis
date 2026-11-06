@@ -507,6 +507,8 @@ const LOAD = [
     'engines/success-grade.js',
     'engines/narrative-dice.js',
     'engines/spatial-acoustics.js',
+    'engines/contraband.js',
+    'engines/terrain-hazard.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',

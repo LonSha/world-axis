@@ -3860,6 +3860,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/weighted-draw.js': 'weightedDraw',
     'engines/narrative-dice.js': 'narrativeDice',
     'engines/spatial-acoustics.js': 'spatialAcoustics',
+    'engines/contraband.js': 'contraband',
+    'engines/terrain-hazard.js': 'terrainHazard',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

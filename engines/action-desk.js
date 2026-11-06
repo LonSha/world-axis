@@ -940,7 +940,76 @@
     'plan.settle': function (o) { return WA.plan ? WA.plan.settle(o.person || o.who, o.outcome, o) : { ok: false, reason: 'plan-missing' }; },
     'plan.rechoose': function (o) { return WA.plan ? WA.plan.rechoose(o.person || o.who, o.steps) : { ok: false, reason: 'plan-missing' }; },
     'region.occur': function (o) { return WA.region ? WA.region.occur(o.name || o.place, o.kind, o) : { ok: false, reason: 'region-missing' }; },
-    'region.deliver': function (o) { return WA.region ? WA.region.deliver(o.eventId || o.id, o) : { ok: false, reason: 'region-missing' }; }
+    'region.deliver': function (o) { return WA.region ? WA.region.deliver(o.eventId || o.id, o) : { ok: false, reason: 'region-missing' }; },
+    // v2.302.0 (OPV13-3): 守恒通胀与黑市走私网络
+    'contraband.assessInflation': function (o) {
+      if (WA.contraband && typeof WA.contraband.assessInflation === 'function') {
+        return WA.contraband.assessInflation(o.place, o.resource || o.resourceKey, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'contraband.openRoute': function (o) {
+      if (WA.contraband && typeof WA.contraband.openRoute === 'function') {
+        return WA.contraband.openRoute(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'contraband.smuggle': function (o) {
+      if (WA.contraband && typeof WA.contraband.smuggle === 'function') {
+        return WA.contraband.smuggle(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'contraband.inspectBust': function (o) {
+      if (WA.contraband && typeof WA.contraband.inspectBust === 'function') {
+        return WA.contraband.inspectBust(o.routeId || o.id, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.302.0 (OPV13-4): 险道季节阻断与极端天堑
+    'terrainHazard.assessPassability': function (o) {
+      if (WA.terrainHazard && typeof WA.terrainHazard.assessPassability === 'function') {
+        return WA.terrainHazard.assessPassability(o.from, o.to, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'terrainHazard.blockChannel': function (o) {
+      if (WA.terrainHazard && typeof WA.terrainHazard.blockChannel === 'function') {
+        return WA.terrainHazard.blockChannel(o.from, o.to, o.reason, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'terrainHazard.unblockChannel': function (o) {
+      if (WA.terrainHazard && typeof WA.terrainHazard.unblockChannel === 'function') {
+        return WA.terrainHazard.unblockChannel(o.from, o.to);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'terrainHazard.forceTraverse': function (o) {
+      if (WA.terrainHazard && typeof WA.terrainHazard.forceTraverse === 'function') {
+        return WA.terrainHazard.forceTraverse(o.who || o.person, o.from, o.to, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    // v2.302.0 (EXV13-5 & OPV13-5): 传闻地理漂移失真与情报勘验
+    'rumor.driftRelay': function (o) {
+      if (WA.rumor && typeof WA.rumor.driftRelay === 'function') {
+        return WA.rumor.driftRelay(o.spec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'rumor.inspectDrift': function (o) {
+      if (WA.rumor && typeof WA.rumor.inspectDrift === 'function') {
+        return WA.rumor.inspectDrift(o.rumorId || o.id);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'rumor.refuteDrift': function (o) {
+      if (WA.rumor && typeof WA.rumor.refuteDrift === 'function') {
+        return WA.rumor.refuteDrift(o.rumorId || o.id, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    }
   };
 
   const stat = { boards: 0, planned: 0, refused: 0, lastReason: '', faults: {}, byKind: {} };
@@ -2256,6 +2325,14 @@ let ckpt = null;
         else if (key === 'room.eavesdrop') out.nextActions = ['room.burstIn', 'narrative.roll'];
         else if (key === 'room.burstIn') out.nextActions = ['motive.arbitrate', 'narrative.roll'];
         else if (key === 'narrative.roll') out.nextActions = ['successGrade.evaluateSpectrum'];
+        else if (key === 'contraband.assessInflation') out.nextActions = ['contraband.openRoute', 'contraband.smuggle'];
+        else if (key === 'contraband.openRoute') out.nextActions = ['contraband.smuggle'];
+        else if (key === 'contraband.smuggle') out.nextActions = ['contraband.inspectBust', 'rumor.startChain', 'creditLedger.open'];
+        else if (key === 'terrainHazard.assessPassability') out.nextActions = ['terrainHazard.blockChannel', 'terrainHazard.forceTraverse'];
+        else if (key === 'terrainHazard.blockChannel') out.nextActions = ['terrainHazard.forceTraverse', 'contraband.openRoute'];
+        else if (key === 'terrainHazard.forceTraverse') out.nextActions = ['motive.arbitrate', 'terrainHazard.unblockChannel'];
+        else if (key === 'rumor.driftRelay') out.nextActions = ['rumor.inspectDrift', 'intel.addIntel', 'terrainHazard.blockChannel'];
+        else if (key === 'rumor.inspectDrift') out.nextActions = ['rumor.refute', 'intel.believe'];
       }
     }
     else { stat.refused++; if (out && out.reason) stat.faults[out.reason] = (stat.faults[out.reason] || 0) + 1; }
