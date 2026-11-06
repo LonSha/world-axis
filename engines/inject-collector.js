@@ -145,6 +145,26 @@
           '利益和解公约达成：【' + p.partyA + '】与【' + p.partyB + '】缔结互信协定（双方效用：' + p.utilityA + '/' + p.utilityB + '）',
           [p.partyA, p.partyB], p.timestamp, '和解公约');
       });
+      // v2.323.0: 退场角色生计流转与市井怪诞暗线注入
+      if (WA.offstageLife && typeof WA.offstageLife.buildBlock === 'function') {
+        const ob = WA.offstageLife.buildBlock();
+        if (ob) {
+          String(ob).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
+            const cleanLine = line.replace(/^· /, '');
+            const m = cleanLine.match(/^([^（(：:]+)/);
+            const who = m ? m[1].trim() : '';
+            add('life', 'offstage:' + idx, cleanLine, who ? [who] : [], Date.now(), '退场生计');
+          });
+        }
+      }
+      if (WA.eccentricThreads && typeof WA.eccentricThreads.buildBlock === 'function') {
+        const eb = WA.eccentricThreads.buildBlock();
+        if (eb) {
+          String(eb).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
+            add('life', 'eccentric:' + idx, line.replace(/^· /, ''), [], Date.now(), '市井暗线');
+          });
+        }
+      }
     });
     // Rank first, then scene relevance, then owner-local freshness (different clocks
     // are never compared across owners), finally stable owner/id order.

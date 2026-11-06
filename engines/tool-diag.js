@@ -3887,6 +3887,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/branch-transplant.js': 'branchTransplant',
     'engines/sanctuary-scramble.js': 'sanctuaryScramble',
     'engines/counterfactual-echo.js': 'counterfactualEcho',
+    // v2.323.0: 退场角色生计与怪诞市井暗线
+    'engines/offstage-life.js': 'offstageLife',
+    'engines/eccentric-threads.js': 'eccentricThreads',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

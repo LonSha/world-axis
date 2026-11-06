@@ -228,6 +228,15 @@
         characterLocations: {},
         locationHistory: []
       },
+      // v2.323.0: 通用退场角色跨题材自主生计与烟火生活流转 + 怪诞市井暗线
+      offstageLife: {
+        characters: {},
+        log: []
+      },
+      eccentricThreads: {
+        threads: [],
+        history: []
+      },
       // v2.250.0（拓展：从活跃开源伴侣生态里凿出来的四个真空区）。四个新引擎的顶层容器。
       //   登记了却不在骨架里：registryParity 报「未在骨架物化」，冷启动直写炸事务，
       //   且 sizeAudit / 容量议题 / 健康分一整片读数偏。
@@ -1637,6 +1646,11 @@
     'livingWorld.vignettes': { cap: 32, site: 'living-world.js evict.array(vignettes, "livingWorld.vignettes")' },
     'livingWorld.ripples': { cap: 32, site: 'living-world.js evict.array(ripples, "livingWorld.ripples")' },
     'livingWorld.relationalDebts': { cap: 48, site: 'living-world.js evict.array(relationalDebts, "livingWorld.relationalDebts")' },
+    // v2.323.0: 退场角色生计与怪诞市井暗线容器上限
+    'offstageLife.characters': { cap: 48, kind: 'object', site: 'offstage-life.js WA.evict.object(characters, "offstageLife.characters")' },
+    'offstageLife.log': { cap: 32, site: 'offstage-life.js evict.array(log, "offstageLife.log")' },
+    'eccentricThreads.threads': { cap: 32, site: 'eccentric-threads.js evict.array(threads, "eccentricThreads.threads")' },
+    'eccentricThreads.history': { cap: 20, site: 'eccentric-threads.js evict.array(history, "eccentricThreads.history")' },
     'vitals.rows': { cap: 24, site: "vitals.js evict.array(rows, \"vitals.rows\")" },
     'coordinate.anchors': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.anchors\")" },
     'coordinate.rows': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.rows\")" },

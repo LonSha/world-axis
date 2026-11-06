@@ -338,6 +338,43 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.323.0: 退场角色生计与怪诞市井暗线
+    'life.markOffstage': function (o) {
+      if (WA.offstageLife && typeof WA.offstageLife.markOffstage === 'function') {
+        return WA.offstageLife.markOffstage(o.who || o.name, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'life.progressOffstage': function (o) {
+      if (WA.offstageLife && typeof WA.offstageLife.progressOffstage === 'function') {
+        return WA.offstageLife.progressOffstage(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'life.reunionSnap': function (o) {
+      if (WA.offstageLife && typeof WA.offstageLife.reunionSnap === 'function') {
+        return WA.offstageLife.reunionSnap(o.who || o.name, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'society.openEccentricThread': function (o) {
+      if (WA.eccentricThreads && typeof WA.eccentricThreads.openThread === 'function') {
+        return WA.eccentricThreads.openThread(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'society.advanceEccentricThread': function (o) {
+      if (WA.eccentricThreads && typeof WA.eccentricThreads.advanceThread === 'function') {
+        return WA.eccentricThreads.advanceThread(o.threadId || o.id, o.step || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'society.resolveEccentricThread': function (o) {
+      if (WA.eccentricThreads && typeof WA.eccentricThreads.resolveThread === 'function') {
+        return WA.eccentricThreads.resolveThread(o.threadId || o.id, o.resolutionSpec || o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // 关系图谱与声誉边维护
     'relationGraph.upsert': function (o) { return WA.relationGraph.upsert(o.edge || o, o); },
     'relationGraph.view': function (o) { return WA.relationGraph.view(o.edgeId || o.id, o); },

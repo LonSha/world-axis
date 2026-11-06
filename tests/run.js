@@ -534,6 +534,8 @@ const LOAD = [
     'engines/branch-transplant.js',
     'engines/sanctuary-scramble.js',
     'engines/counterfactual-echo.js',
+    'engines/offstage-life.js',
+    'engines/eccentric-threads.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',

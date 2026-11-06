@@ -5424,12 +5424,15 @@ ${emptyDrill}
           <button class="wa-btn" id="wa-desk-v14-sanctuary" title="纯读：庇护所争夺与气候阻断滞留日志">看生存避险名册</button>
           <button class="wa-btn" id="wa-desk-v14-crisis" title="纯读：险道物资断供与公开危机大盘">看全域危机大盘</button>
           <button class="wa-btn" id="wa-desk-v14-pact" title="纯读：城下之盟与多方和解公约名册">看多方和解公约</button>
+          <button class="wa-btn" id="wa-desk-v15-offstage" title="纯读：退场角色跨题材日常生计与生活意外切片">看退场生计流转</button>
+          <button class="wa-btn" id="wa-desk-v15-eccentric" title="纯读：怪诞市井支线与搞笑暗线进展">看市井怪诞暗线</button>
        </div>
        <div id="wa-desk-life-out" class="wa-out"></div>
        <div id="wa-desk-flow-out" class="wa-out"></div>
        <div id="wa-desk-sched-out" class="wa-out"></div>
        <div id="wa-desk-epistemic-out" class="wa-out"></div>
-       <div id="wa-desk-v14-out" class="wa-out"></div>`;
+       <div id="wa-desk-v14-out" class="wa-out"></div>
+       <div id="wa-desk-v15-out" class="wa-out"></div>`;
    }
    /** 把日程与时间协商视图如实渲染（纯读列表 + 改期/取消/拆分操作）。 */
    function renderScheduleNegotiation(sc) {
@@ -5956,6 +5959,43 @@ on('#wa-desk-show', showDesk);
         } else {
           pacts.slice(-3).forEach(function (p) {
             html += '<div class="wa-row"><span class="wa-dim">[和解公约]</span> 编号 <b>' + esc(p.pactId) + '</b> 缔约方 <b>' + esc(p.partyA) + '</b> × <b>' + esc(p.partyB) + '</b>（' + (p.ratified ? '已生效' : '谈判破裂') + ' · 效用 ' + p.utilityA + '/' + p.utilityB + '）</div>';
+          });
+        }
+        out.innerHTML = html;
+        renderBody();
+      });
+      on('#wa-desk-v15-offstage', function () {
+        const out = $('#wa-desk-v15-out'); if (!out) return;
+        const st = (WA.store && WA.store.get) ? WA.store.get() : {};
+        const b = st.offstageLife || {};
+        const chars = b.characters || {};
+        const keys = Object.keys(chars);
+        let html = '<div class="wa-dim"><b>退场角色生计流转大盘</b></div>';
+        if (!keys.length) {
+          html += '<div class="wa-dim">暂无退场角色生计记录</div>';
+        } else {
+          keys.slice(-4).forEach(function (k) {
+            const c = (WA.offstageLife && typeof WA.offstageLife.getOffstageCard === 'function')
+              ? WA.offstageLife.getOffstageCard(k) : chars[k];
+            if (!c) return;
+            html += '<div class="wa-row"><span class="wa-dim">[离场' + c.roundsAway + '轮]</span> <b>' + esc(c.name) + '</b>（' + esc(c.genre) + '·' + esc(c.role) + '，身处' + esc(c.place) + '）：正在「' + esc(c.doing) + '」；随身「' + esc(c.carriedItem) + '」；小插曲：「' + esc(c.reunionGossip || '平静度日') + '」</div>';
+          });
+        }
+        out.innerHTML = html;
+        renderBody();
+      });
+      on('#wa-desk-v15-eccentric', function () {
+        const out = $('#wa-desk-v15-out'); if (!out) return;
+        const ths = (WA.eccentricThreads && typeof WA.eccentricThreads.listThreads === 'function')
+          ? WA.eccentricThreads.listThreads()
+          : (((WA.store && WA.store.get && WA.store.get().eccentricThreads) || {}).threads || []);
+        let html = '<div class="wa-dim"><b>市井怪诞暗线大盘</b></div>';
+        if (!ths.length) {
+          html += '<div class="wa-dim">暂无市井怪诞与暗线支线</div>';
+        } else {
+          ths.slice(-4).forEach(function (t) {
+            const lastLead = (t.leads && t.leads.length) ? t.leads[t.leads.length - 1].text : t.premise;
+            html += '<div class="wa-row"><span class="wa-dim">[' + esc(t.kind) + '·' + esc(t.stage) + ']</span> <b>' + esc(t.title) + '</b>（' + esc(t.genre) + '）：' + esc(lastLead) + '</div>';
           });
         }
         out.innerHTML = html;

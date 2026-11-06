@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.322.0';
+  const VERSION = '2.323.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -591,6 +591,9 @@
     'engines/branch-transplant.js',
     'engines/sanctuary-scramble.js',
     'engines/counterfactual-echo.js',
+    // v2.323.0: 通用退场角色跨题材自主生计与烟火生活流转 + 怪诞市井暗线
+    'engines/offstage-life.js',
+    'engines/eccentric-threads.js',
     // v2.251.0（拓展 WD-1）：阶位权重池 + 未得补偿 + 幸运封顶（cf. aifarm gacha/soft-pity）。
     //   纯判据 + 抽一个：走 rand.pickWeighted 的 `draw` 通道，池子与图鉴留在调用方。
     'engines/weighted-draw.js',

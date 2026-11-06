@@ -91,6 +91,11 @@
     'livingWorld.vignettes':     { path: 'livingWorld.vignettes',     cap: 'per-call', why: '上限 = maxVignettes 设置；市井微情境与生活窘迫事件环形' },
     'livingWorld.ripples':       { path: 'livingWorld.ripples',       cap: 'per-call', why: '上限 = maxRipples 设置；投石入水局部生态涟漪环形' },
     'livingWorld.relationalDebts': { path: 'livingWorld.relationalDebts', cap: 'per-call', why: '上限 = maxRelationalDebts 设置；人情势能与交往恩义台账环形' },
+    // v2.323.0: 退场角色生计与怪诞市井暗线容器上限
+    'offstageLife.characters': { path: 'offstageLife.characters', kind: 'object', cap: 48, why: '退场角色生计卡映射（对象型，最久未活跃优先挤出）' },
+    'offstageLife.log': { path: 'offstageLife.log', cap: 32, why: '退场角色市井意外与生活糗事日志环形' },
+    'eccentricThreads.threads': { path: 'eccentricThreads.threads', cap: 32, why: '怪诞市井支线与搞笑暗线环形' },
+    'eccentricThreads.history': { path: 'eccentricThreads.history', cap: 20, why: '市井化解已结案历史环形' },
     'vitals.rows':         { path: 'vitals.rows',         cap: 24, why: '生理线环形' },
   // v2.231.0（拓展 EXP-1）：逐人逐能力进度行（上限与 training.maxRows 同源，见 training.js）。
   'training.rows':       { path: 'training.rows',       cap: 96, why: '能力成长逐人逐能力行' },
