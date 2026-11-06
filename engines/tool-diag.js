@@ -3876,6 +3876,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/collateral-rupture.js': 'collateralRupture',
     'engines/action-cost-feedback.js': 'actionCostFeedback',
     'engines/foreshadow-germination.js': 'foreshadowGermination',
+    'engines/courier-dispatch.js': 'courierDispatch',
+    'engines/supply-choke.js': 'supplyChoke',
     'render/inject.js': 'render', 'render/theater.js': 'theater', 'render/purifier.js': 'purifier',
     'actors/registry.js': 'registry', 'actors/monologue.js': 'monologue',
     'actors/observe.js': 'observe', 'actors/profile.js': 'profile',

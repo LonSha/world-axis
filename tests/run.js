@@ -523,6 +523,8 @@ const LOAD = [
     'engines/collateral-rupture.js',
     'engines/action-cost-feedback.js',
     'engines/foreshadow-germination.js',
+    'engines/courier-dispatch.js',
+    'engines/supply-choke.js',
     'engines/weighted-draw.js',
     'engines/credit-ledger.js',
     'engines/interest-face.js',

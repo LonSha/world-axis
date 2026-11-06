@@ -266,6 +266,24 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    'chronicle.deliverRemoteEcho': function (o) {
+      if (WA.courierDispatch && typeof WA.courierDispatch.sendDispatch === 'function') {
+        return WA.courierDispatch.sendDispatch(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'chronicle.dispatchPending': function (o) {
+      if (WA.courierDispatch && typeof WA.courierDispatch.dispatchPending === 'function') {
+        return WA.courierDispatch.dispatchPending(o.at);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'environment.triggerSupplyChoke': function (o) {
+      if (WA.supplyChoke && typeof WA.supplyChoke.triggerChoke === 'function') {
+        return WA.supplyChoke.triggerChoke(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // 关系图谱与声誉边维护
     'relationGraph.upsert': function (o) { return WA.relationGraph.upsert(o.edge || o, o); },
     'relationGraph.view': function (o) { return WA.relationGraph.view(o.edgeId || o.id, o); },
@@ -2494,6 +2512,9 @@ let ckpt = null;
         else if (key === 'finance.ruptureCollateral') out.nextActions = ['rumor.startChain', 'relationGraph.upsert', 'subtextTension.assess'];
         else if (key === 'actor.applyEvaluationCosts') out.nextActions = ['drama.resolveNonBinary', 'subtextTension.assess'];
         else if (key === 'drama.germinateForeshadow') out.nextActions = ['rumor.startChain', 'subtextTension.assess', 'motive.arbitrate'];
+        else if (key === 'chronicle.deliverRemoteEcho') out.nextActions = ['chronicle.dispatchPending'];
+        else if (key === 'chronicle.dispatchPending') out.nextActions = ['intel.addIntel', 'rumor.startChain'];
+        else if (key === 'environment.triggerSupplyChoke') out.nextActions = ['contraband.assessInflation', 'rumor.startChain'];
         else if (key === 'rumor.startChain') out.nextActions = ['rumor.relay', 'rumor.investigate'];
         else if (key === 'rumor.relay') out.nextActions = ['rumor.investigate', 'intel.addIntel'];
         else if (key === 'rumor.investigate') out.nextActions = ['intel.believe', 'relationGraph.upsert'];
