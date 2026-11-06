@@ -284,6 +284,24 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    'society.projectRumor': function (o) {
+      if (WA.rumorCognition && typeof WA.rumorCognition.projectRumorToActor === 'function') {
+        return WA.rumorCognition.projectRumorToActor(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'society.plantForgedIntel': function (o) {
+      if (WA.cognitivePoisoning && typeof WA.cognitivePoisoning.plantForgedIntel === 'function') {
+        return WA.cognitivePoisoning.plantForgedIntel(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'drama.negotiateDilemma': function (o) {
+      if (WA.dilemmaBargain && typeof WA.dilemmaBargain.negotiate === 'function') {
+        return WA.dilemmaBargain.negotiate(o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // 关系图谱与声誉边维护
     'relationGraph.upsert': function (o) { return WA.relationGraph.upsert(o.edge || o, o); },
     'relationGraph.view': function (o) { return WA.relationGraph.view(o.edgeId || o.id, o); },
@@ -2515,6 +2533,9 @@ let ckpt = null;
         else if (key === 'chronicle.deliverRemoteEcho') out.nextActions = ['chronicle.dispatchPending'];
         else if (key === 'chronicle.dispatchPending') out.nextActions = ['intel.addIntel', 'rumor.startChain'];
         else if (key === 'environment.triggerSupplyChoke') out.nextActions = ['contraband.assessInflation', 'rumor.startChain'];
+        else if (key === 'society.projectRumor') out.nextActions = ['intel.believe', 'society.plantForgedIntel'];
+        else if (key === 'society.plantForgedIntel') out.nextActions = ['drama.negotiateDilemma', 'motive.arbitrate'];
+        else if (key === 'drama.negotiateDilemma') out.nextActions = ['relationGraph.upsert', 'subtextTension.assess'];
         else if (key === 'rumor.startChain') out.nextActions = ['rumor.relay', 'rumor.investigate'];
         else if (key === 'rumor.relay') out.nextActions = ['rumor.investigate', 'intel.addIntel'];
         else if (key === 'rumor.investigate') out.nextActions = ['intel.believe', 'relationGraph.upsert'];
