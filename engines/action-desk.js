@@ -63,6 +63,7 @@
   const KINDS = ['research', 'family', 'production', 'training', 'gear', 'travel'];
   /** 具名行动 id 前缀 → 目标 owner 写口。未知前缀一律拒收（边界 3）。 */
   const ROUTES = {
+    'research.open': function (o) { return WA.research.open(o.spec || o); },
     'research.supply': function (o) { return WA.research.supply(o.projectId, o.who, o.material, o.amount); },
     'research.advance': function (o) { return WA.research.advance(o.projectId, { evidence: o.evidence }); },
     'research.disseminate': function (o) { return WA.research.disseminate(o.projectId, o.scope, o.to); },
@@ -72,7 +73,7 @@
     'family.assignCare': function (o) { return WA.family.assignCare(o.unitId, o.who, o.ward, o.notes); },
     'family.transferCare': function (o) { return WA.family.transferCare(o.unitId, o.ward, o.who, o.reason); },
     'family.inherit': function (o) { return WA.family.inherit(o.unitId, o.deceased, o.heirs, o.event); },
-    'production.open': function (o) { return WA.production.open({ recipe: o.recipe, by: o.who, qty: o.qty, days: o.days, facility: o.facility, place: o.place }, { label: o.label }); },
+    'production.open': function (o) { return WA.production.open({ recipe: o.recipe, by: o.by || o.who, qty: o.qty, days: o.days, facility: o.facility, place: o.place }, { label: o.label }); },
     'production.staff': function (o) { return WA.production.staff(o.orderId, o.who, { shift: o.shift }); },
     'production.advance': function (o) { return WA.production.advance(o.orderId, { days: o.days }); },
     'production.resume': function (o) { return WA.production.resume(o.orderId, o); },
@@ -115,11 +116,14 @@
     'familyOps.advanceCycle': function (o) { return WA.familyOps.advanceCycle(o.unitId, o); },
     'aftermath.reroute': function (o) { return WA.aftermathImpact.findDetour(o.from, o.to, o.blockedPlace, o); },
     'aftermath.repairCommission': function (o) { return WA.aftermathImpact.commissionRepair(o.effectId, o); },
-    'epistemic.view': function (o) { return WA.epistemicView.buildView(o.personId, o.topicId); },
-    'epistemic.correct': function (o) { return WA.epistemicView.correctBelief(o.personId, o.topicId, o.evidence, o); },
+    'epistemic.view': function (o) { return WA.epistemicView.buildView(o.personId || o.who, o.topicId); },
+    'epistemic.correct': function (o) { return WA.epistemicView.correctBelief(o.personId || o.who, o.topicId, o.evidence, o); },
+    'epistemic.registerBelief': function (o) { return WA.epistemicView.registerBelief(o.personId || o.who, o.topicId, o.belief || o); },
+    'epistemic.decideAction': function (o) { return WA.epistemicView.decideAction(o.personId || o.who, o.topicId, o.context || o); },
+    'epistemic.deriveAction': function (o) { return WA.epistemicView.deriveAction(o.personId || o.who, o.topicId); },
     // v2.233.0 (OPV4-5): 证据可信度裁决与更替
-    'epistemic.weigh': function (o) { return WA.epistemicView.weighEvidence(o.personId, o.topicId, o.evidenceItems, o); },
-    'epistemic.update': function (o) { return WA.epistemicView.updateBeliefWithEvidence(o.personId, o.topicId, o.evidenceItems, o); },
+    'epistemic.weigh': function (o) { return WA.epistemicView.weighEvidence(o.personId || o.who, o.topicId, o.evidenceItems || o.evidence, o); },
+    'epistemic.update': function (o) { return WA.epistemicView.updateBeliefWithEvidence(o.personId || o.who, o.topicId, o.evidenceItems || o.evidence, o); },
     // v2.233.0 (OPV4-8): 章节、事件与分支的连续游玩
     'chapter.open': function (o) { return chapterOpen(o); },
     'chapter.flow': function (o) { return chapterFlow(o); },
@@ -129,6 +133,36 @@
     'chapter.restore': function (o) { return chapterRestore(o); },
     'chapter.diff': function (o) { return chapterDiff(o); },
     'chapter.inspect': function (o) { return chapterInspect(o); },
+    // EXV12-1: 世界导演台（主题、节奏、阶段、倾向、注意预算）
+    'theme.apply': function (o) { return (WA.theme && typeof WA.theme.apply === 'function') ? WA.theme.apply(o.themes || o.names || o) : { ok: false, reason: 'theme-unavailable' }; },
+    'theme.list': function () { return (WA.theme && typeof WA.theme.list === 'function') ? WA.theme.list() : []; },
+    'tempo.setGear': function (o) { return (WA.tempo && typeof WA.tempo.setGear === 'function') ? WA.tempo.setGear(o.gear || o.id || o) : { ok: false, reason: 'tempo-unavailable' }; },
+    'tempo.current': function () { return (WA.tempo && typeof WA.tempo.current === 'function') ? WA.tempo.current() : null; },
+    'tempo.check': function (o) { return (WA.tempo && typeof WA.tempo.check === 'function') ? WA.tempo.check(o.spanMinutes || o.span || o) : { ok: false, reason: 'tempo-unavailable' }; },
+    'storyTone.set': function (o) { return (WA.storyTone && typeof WA.storyTone.set === 'function') ? WA.storyTone.set(o.person || o.who || '*', o.tone || o.mode) : { ok: false, reason: 'storyTone-unavailable' }; },
+    'storyTone.get': function (o) { return (WA.storyTone && typeof WA.storyTone.get === 'function') ? WA.storyTone.get(o.person || o.who || '*') : null; },
+    'storyTone.clear': function (o) { return (WA.storyTone && typeof WA.storyTone.clear === 'function') ? WA.storyTone.clear(o.person || o.who || '*') : { ok: false, reason: 'storyTone-unavailable' }; },
+    'stage.adopt': function (o) { return (WA.stage && typeof WA.stage.adopt === 'function') ? WA.stage.adopt(o.pack || o.name, o.opts || o) : { ok: false, reason: 'stage-unavailable' }; },
+    'stage.mark': function (o) { return (WA.stage && typeof WA.stage.mark === 'function') ? WA.stage.mark(o.metric, o.delta, o.opts || o) : { ok: false, reason: 'stage-unavailable' }; },
+    'stage.plan': function (o) { return (WA.stage && typeof WA.stage.plan === 'function') ? WA.stage.plan(o.opts || o) : { ok: false, reason: 'stage-unavailable' }; },
+    'stage.transit': function (o) { return (WA.stage && typeof WA.stage.transit === 'function') ? WA.stage.transit(o.transId || o.id, o.opts || o) : { ok: false, reason: 'stage-unavailable' }; },
+    'stage.view': function () { return (WA.stage && typeof WA.stage.view === 'function') ? WA.stage.view() : null; },
+    'sceneBudget.note': function (o) { return (WA.sceneBudget && typeof WA.sceneBudget.note === 'function') ? WA.sceneBudget.note(o.signature || o.fingerprint || o) : { advance: true, factor: 1 }; },
+    'sceneBudget.reset': function () { return (WA.sceneBudget && typeof WA.sceneBudget.reset === 'function') ? WA.sceneBudget.reset() : { ok: false }; },
+    // EXV12-3: 共同体记忆与城市性格（地点沉积层与社区笔记）
+    'sediment.settle': function (o) { return (WA.sediment && typeof WA.sediment.settle === 'function') ? WA.sediment.settle(o.placeId || o.place, o.fact || o.trace, o.opts || o) : { ok: false, reason: 'sediment-unavailable' }; },
+    'sediment.feel': function (o) { return (WA.sediment && typeof WA.sediment.feel === 'function') ? WA.sediment.feel(o.placeId || o.place) : null; },
+    'communityNote.push': function (o) { return (WA.communityNote && typeof WA.communityNote.push === 'function') ? WA.communityNote.push(o.note || o, o.opts || o) : { ok: false, reason: 'communityNote-unavailable' }; },
+    'communityNote.pending': function () { return (WA.communityNote && typeof WA.communityNote.pending === 'function') ? WA.communityNote.pending() : { ok: false, reason: 'communityNote-unavailable' }; },
+    'communityNote.ack': function (o) { return (WA.communityNote && typeof WA.communityNote.ack === 'function') ? WA.communityNote.ack(o.ids || o.id || o) : { ok: false, reason: 'communityNote-unavailable' }; },
+    // EXV12-5 / EXV12-9: 可协商困局与多结局分支树 / 预演选择
+    'branchTree.fork': function (o) { return (WA.branchTree && typeof WA.branchTree.fork === 'function') ? WA.branchTree.fork(o.node || o) : { ok: false, reason: 'branchTree-unavailable' }; },
+    'branchTree.choose': function (o) { return (WA.branchTree && typeof WA.branchTree.choose === 'function') ? WA.branchTree.choose(o.id, o.option || o.choice) : { ok: false, reason: 'branchTree-unavailable' }; },
+    'branchTree.tree': function () { return (WA.branchTree && typeof WA.branchTree.tree === 'function') ? WA.branchTree.tree() : { ok: false, reason: 'branchTree-unavailable' }; },
+    'branchTree.compare': function (o) { return (WA.branchTree && typeof WA.branchTree.compare === 'function') ? WA.branchTree.compare(o.aId || o.idA, o.bId || o.idB) : { ok: false, reason: 'branchTree-unavailable' }; },
+    'storyChoice.present': function (o) { return (WA.storyChoice && typeof WA.storyChoice.present === 'function') ? WA.storyChoice.present(o.node || o) : { ok: false, reason: 'storyChoice-unavailable' }; },
+    'storyChoice.confirm': function (o) { return (WA.storyChoice && typeof WA.storyChoice.confirm === 'function') ? WA.storyChoice.confirm(o.id, o.option || o.choice) : { ok: false, reason: 'storyChoice-unavailable' }; },
+    'storyChoice.pending': function () { return (WA.storyChoice && typeof WA.storyChoice.pending === 'function') ? WA.storyChoice.pending() : []; },
     // v2.232.0 (OPV3-1 & OPV3-2): 情境投影与场景工作台
     // v2.233.0 (OPV4-7): 长局记忆整理与按需回忆
     'retrieval.recall': function (o) {
@@ -193,11 +227,33 @@
     'customLax.provideGuarantee': function (o) { return WA.customLax.provideGuarantee(o); },
     'customLax.claimGuarantee': function (o) { return WA.customLax.claimGuarantee(o.guaranteeId, o.breachAmount); },
     'customLax.settleFavor': function (o) { return WA.customLax.settleFavor(o.favorId, o.outcome); },
+    // 承诺履约、违约与补救和解写口路由（OPV12-7 / 场景 2：一次失约）
+    'customLax.commitPromise': function (o) { return WA.customLax.commitPromise(o.spec || o); },
+    'customLax.fulfillPromise': function (o) { return WA.customLax.fulfillPromise(o.promiseId || o.id, o); },
+    'customLax.defaultPromise': function (o) { return WA.customLax.defaultPromise(o.promiseId || o.id, o.reason, o); },
+    'customLax.remedyPromise': function (o) { return WA.customLax.remedyPromise(o.promiseId || o.id, o.remedySpec || o); },
+    'customLax.listPromises': function (o) { return WA.customLax.listPromises(o); },
+    // 借据与还款写口路由（经济信用层）
+    'creditLedger.open': function (o) { return WA.creditLedger.open(o.spec || o); },
+    'creditLedger.accrue': function (o) { return WA.creditLedger.accrue(o.id || o.loanId, o); },
+    'creditLedger.repay': function (o) { return WA.creditLedger.repay(o.id || o.loanId, o.spec || o); },
+    'creditLedger.view': function (o) { return WA.creditLedger.view(o.id || o.loanId); },
+    // 关系图谱与声誉边维护
+    'relationGraph.upsert': function (o) { return WA.relationGraph.upsert(o.edge || o, o); },
+    'relationGraph.view': function (o) { return WA.relationGraph.view(o.edgeId || o.id, o); },
+    // 传闻发酵与调查
+    'rumor.startChain': function (o) { return WA.rumor.startChain(o.factKey || o.key, o.note); },
+    'rumor.relay': function (o) { return WA.rumor.relay(o.id || o.chainId, o.item || o); },
+    'rumor.investigate': function (o) { return WA.rumor.investigate(o.id || o.chainId); },
+    // 情报与信念更新
+    'intel.addIntel': function (o) { return WA.intel.addIntel(o.person || o.who, o.item || o); },
+    'intel.believe': function (o) { return WA.intel.believe(o.person || o.who, o.item || o); },
     // v2.231.0（优化 OP-8）：场景与历史按因果讲清楚（只读聚合）
     'sceneNarrative.currentScene': function (o) { return WA.sceneNarrative.currentScene(o); },
     'sceneNarrative.resolvedSummary': function (o) { return WA.sceneNarrative.resolvedSummary(o); },
     'sceneNarrative.traceFrom': function (o) { return WA.sceneNarrative.traceFrom(o.seed); },
     'sceneNarrative.perceivedHorizon': function (o) { return WA.sceneNarrative.perceivedHorizon(o.who); },
+    'sceneNarrative.traceCausalEchoes': function (o) { return WA.sceneNarrative.traceCausalEchoes(o.placeId || o.place, o.viewer || o.who, o); },
     // v2.231.0（拓展 IN-6）：公共设施与服务网络
     'serviceNetwork.declareFacility': function (o) { return WA.serviceNetwork.declareFacility(o.spec); },
     'serviceNetwork.activateFacility': function (o) { return WA.serviceNetwork.activateFacility(o.facilityId); },
@@ -236,6 +292,38 @@
         return WA.playableBlueprint.resetInitialConditions(o.sampleId, o);
       }
       return { ok: false, reason: 'unsupported' };
+    },
+    // OPV12-6/8: 世界内期刊出版与渲染路由
+    'periodicals.configure': function (o) { return WA.periodicals.configure(o.input || o); },
+    'periodicals.checkAndPublish': function (o) { return WA.periodicals.checkAndPublish(o); },
+    'periodicals.render': function (o) { return { ok: true, html: WA.periodicals.render() }; },
+    'periodicals.publishDirect': function (o) {
+      if (!o || !o.id || !o.title || !o.text) return { ok: false, reason: 'missing-fields' };
+      return WA.store.transact(function (d) {
+        d.periodicals = d.periodicals || { defs: [], issues: [] };
+        if (!d.periodicals.defs.some(function (x) { return x && x.id === o.id; })) {
+          d.periodicals.defs.push({
+            id: o.id,
+            name: o.name || o.title || o.id,
+            days: [1],
+            profile: o.slant || 'general',
+            enabled: true
+          });
+        }
+        d.periodicals.issues.push({
+          id: o.id,
+          date: o.date || (d.clock && d.clock.iso) || '2026-11-06',
+          title: o.title,
+          text: o.text,
+          slant: o.slant || 'neutral',
+          createdAt: WA.clock.now('periodicals.issue'),
+          canon: false
+        });
+        if (WA.evict && typeof WA.evict.array === 'function') {
+          WA.evict.array(d.periodicals.issues, 'periodicals.issues');
+        }
+        return true;
+      }, 'periodicals:publishDirect');
     },
     // v2.231.0（拓展 IN-7）：有承载力的环境
     'envCapacity.declareResource': function (o) { return WA.envCapacity.declareResource(o.spec); },
@@ -648,7 +736,11 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
-    // v2.239.0 (OPV5-3): 调查系统留痕提取证据
+    // v2.239.0 (OPV5-3): 调查系统留痕提取证据与线索流程
+    'investigation.register': function (o) { return WA.investigation.register(o.spec || o); },
+    'investigation.investigate': function (o) { return WA.investigation.investigate(o.clueId || o.id, o.person || o.who, o.options || o); },
+    'investigation.checkEvidence': function (o) { return WA.investigation.checkEvidence(o.clueId || o.id); },
+    'investigation.reveal': function (o) { return WA.investigation.reveal(o.clueId || o.id, o.person || o.who); },
     'investigation.extractFromTrace': function (o) {
       if (typeof WA.investigation.extractFromTrace === 'function') {
         return WA.investigation.extractFromTrace(o.traceObj || o.trace, o.person || o.who, o.options || o);
@@ -711,7 +803,46 @@
       }
       return { ok: false, reason: 'unsupported' };
     },
+    // v2.285.0 (OPV12-3): 守恒货运发运与改道
+    'freight.dispatch': function (o) {
+      if (WA.freight && typeof WA.freight.dispatch === 'function') {
+        return WA.freight.dispatch(o.routeId || o.id, o.from, o.resource || o.resourceKey, o.qty || o.amount, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'freight.reroute': function (o) {
+      if (WA.freight && typeof WA.freight.reroute === 'function') {
+        return WA.freight.reroute(o.shipmentId || o.id, o.newRouteId || o.routeId, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'freight.cancel': function (o) {
+      if (WA.freight && typeof WA.freight.cancel === 'function') {
+        return WA.freight.cancel(o.shipmentId || o.id, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'freight.arrive': function (o) {
+      if (WA.freight && typeof WA.freight.arrive === 'function') {
+        return WA.freight.arrive(o.shipmentId || o.id, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'economy.buy': function (o) {
+      if (WA.economy && typeof WA.economy.buy === 'function') {
+        return WA.economy.buy(o.place, o.resource || o.resourceKey, o.qty || o.amount, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
+    'economy.craft': function (o) {
+      if (WA.economy && typeof WA.economy.craft === 'function') {
+        return WA.economy.craft(o.place, o.recipe, o);
+      }
+      return { ok: false, reason: 'unsupported' };
+    },
     // v2.243.0 (EXV5-6): 因果溯源与追责纠缠决策树
+    'causal.addChain': function (o) { return WA.causal.addChain(o.spec || o); },
+    'causal.settle': function (o) { return WA.causal.settle(o.chainId || o.id, o.resolution, o); },
     'causal.traceLiabilityTree': function (o) {
       if (WA.causal && typeof WA.causal.traceLiabilityTree === 'function') {
         return WA.causal.traceLiabilityTree(o.incidentKey || o.key, o);
@@ -788,7 +919,19 @@
     'phaseTransition.investPath': function (o) { return WA.phaseTransition.investPath(o.placeId, o); },
     'phaseTransition.evaluatePlacePath': function (o) { return WA.phaseTransition.evaluatePlacePath(o.placeId); },
     'phaseTransition.planTransitionRoute': function (o) { return WA.phaseTransition.planTransitionRoute(o.placeId, o.targetLayout, o); },
-    'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); }
+    'phaseTransition.simulateIncidentStress': function (o) { return WA.phaseTransition.simulateIncidentStress(o.placeId, o.incidentType); },
+    'phaseTransition.executeTransitionRoute': function (o) { return WA.phaseTransition.executeTransitionRoute(o.placeId, o.targetLayout, o); },
+    'travel.move': function (o) { return WA.act.add(o.who, { kind: 'move', goalId: o.goalId, from: o.from, to: o.to, place: o.place, text: o.text }); },
+    // OPV12-4 / 场景3：旅行、日程计划与区域事件路由
+    'world.depart': function (o) { return WA.world ? WA.world.depart(o.person || o.who, o.from, o.to, o.at) : { ok: false, reason: 'world-missing' }; },
+    'world.arrive': function (o) { return WA.world ? WA.world.arrive(o.person || o.who, o.at) : { ok: false, reason: 'world-missing' }; },
+    'world.advance': function (o) { return WA.world ? WA.world.advance(o.minutes || o.step, o) : { ok: false, reason: 'world-missing' }; },
+    'plan.expand': function (o) { return WA.plan ? WA.plan.expand(o.person || o.who, o.goalId, o.steps) : { ok: false, reason: 'plan-missing' }; },
+    'plan.advance': function (o) { return WA.plan ? WA.plan.advance(o.person || o.who) : { ok: false, reason: 'plan-missing' }; },
+    'plan.settle': function (o) { return WA.plan ? WA.plan.settle(o.person || o.who, o.outcome, o) : { ok: false, reason: 'plan-missing' }; },
+    'plan.rechoose': function (o) { return WA.plan ? WA.plan.rechoose(o.person || o.who, o.steps) : { ok: false, reason: 'plan-missing' }; },
+    'region.occur': function (o) { return WA.region ? WA.region.occur(o.name || o.place, o.kind, o) : { ok: false, reason: 'region-missing' }; },
+    'region.deliver': function (o) { return WA.region ? WA.region.deliver(o.eventId || o.id, o) : { ok: false, reason: 'region-missing' }; }
   };
 
   const stat = { boards: 0, planned: 0, refused: 0, lastReason: '', faults: {}, byKind: {} };
@@ -1526,7 +1669,83 @@ return {
         }
       });
     }
+    // OPV12-4: world.journeys 在途真源感知
+    if (st.world && Array.isArray(st.world.journeys)) {
+      st.world.journeys.forEach(function (j) {
+        if (!j || !j.person) return;
+        if (who && j.person !== who) return;
+        if (j.status === 'in-transit') {
+          // 若已有 people 记录则更新或追加
+          const existing = rows.filter(function (r) { return r.kind === 'people' && r.id === j.person; })[0];
+          if (!existing) {
+            rows.push({ stage: 'in-progress', kind: 'people', id: j.person,
+              label: j.person + ' 在途（' + clean(j.from, 20) + '→' + clean(j.to, 20) + '，剩 ' + (j.left || 0) + ' 分钟）',
+              owner: 'travel', why: '在途行程中，到期可确认抵达', recover: (j.left <= 0 ? 'world.arrive:' + j.person : null),
+              next: ['world.advance', 'world.arrive'] });
+          } else if (j.left <= 0 && !existing.recover) {
+            existing.recover = 'world.arrive:' + j.person;
+          }
+        }
+      });
+    }
+    // ── 5. 物流在途（OPV12-3）：货物运输中 → 抵达可确认入库 / 改道 / 取消 ──
+    if (st.freight && Array.isArray(st.freight.shipments)) {
+      st.freight.shipments.forEach(function (s) {
+        if (!s || !s.id) return;
+        if (s.status === 'transit') {
+          rows.push({ stage: 'in-progress', kind: 'freight', id: s.id,
+            label: '货运 ' + clean(s.from, 20) + '→' + clean(s.to, 20) + '（' + clean(s.resource, 20) + ' ' + (s.qty || 0) + '）在途',
+            owner: 'freight', why: '在途运输中，可确认到货或改道/取消',
+            recover: 'freight.arrive:' + s.id, next: ['freight.arrive', 'freight.reroute', 'freight.cancel'] });
+        } else if (s.status === 'arrived' || s.status === 'cancelled') {
+          rows.push({ stage: 'terminal', kind: 'freight', id: s.id,
+            label: '货运 ' + clean(s.id, 24) + ' 已' + s.status,
+            owner: 'freight', why: '货运终态', recover: null, terminal: true });
+        }
+      });
+    }
 
+    // ── 6. 承诺履约监控（OPV12-7 / 场景 2）：未结/到期/违约承诺 → 履约 / 违约声明 / 和解补救 ──
+    if (st.customLax && Array.isArray(st.customLax.promises)) {
+      st.customLax.promises.forEach(function (p) {
+        if (!p || !p.id) return;
+        if (who && p.promiser !== who && p.beneficiary !== who) return;
+        if (p.status === 'active') {
+          rows.push({
+            stage: 'in-progress',
+            kind: 'promise',
+            id: p.id,
+            label: '承诺「' + clean(p.subject, 24) + '」（承诺人: ' + clean(p.promiser, 20) + '，约期日: ' + (p.dueDay != null ? p.dueDay : '无') + '）',
+            owner: 'customLax',
+            why: '承诺进行中，可履行交付或到期违约',
+            recover: 'customLax.fulfillPromise:' + p.id,
+            next: ['customLax.fulfillPromise', 'customLax.defaultPromise']
+          });
+        } else if (p.status === 'defaulted') {
+          rows.push({
+            stage: 'blocked',
+            kind: 'promise',
+            id: p.id,
+            label: '已违约承诺「' + clean(p.subject, 24) + '」（需补救和解）',
+            owner: 'customLax',
+            why: '承诺已失约违约，人际信任受损，需谈判达成和解补偿协议',
+            recover: 'customLax.remedyPromise:' + p.id,
+            next: ['customLax.remedyPromise']
+          });
+        } else if (p.status === 'fulfilled' || p.status === 'remedied') {
+          rows.push({
+            stage: 'terminal',
+            kind: 'promise',
+            id: p.id,
+            label: '承诺「' + clean(p.subject, 24) + '」已' + p.status,
+            owner: 'customLax',
+            why: '承诺已闭环',
+            recover: null,
+            terminal: true
+          });
+        }
+      });
+    }
     const counts = { 'in-progress': 0, 'awaiting-confirm': 0, paused: 0, blocked: 0, partial: 0, terminal: 0, unreadable: 0 };
     rows.forEach(function (r) { if (counts[r.stage] != null) counts[r.stage]++; });
     const active = rows.filter(function (r) { return r.stage !== 'terminal'; });
@@ -2001,6 +2220,29 @@ let ckpt = null;
         } else if (key === 'production.deliver') out.nextActions = ['production.open', 'schedule.claim'];
         else if (key === 'research.supply') out.nextActions = ['research.advance'];
         else if (key === 'research.advance') out.nextActions = (out.status === 'confirmed') ? ['production.open'] : ['research.advance', 'research.supply'];
+        else if (key === 'freight.dispatch') out.nextActions = ['freight.arrive', 'freight.reroute', 'freight.cancel'];
+        else if (key === 'freight.arrive') out.nextActions = ['production.open', 'economy.buy'];
+        else if (key === 'freight.reroute') out.nextActions = ['freight.arrive', 'freight.cancel'];
+        else if (key === 'economy.buy') out.nextActions = ['production.open', 'economy.craft'];
+        else if (key === 'economy.craft') out.nextActions = ['freight.dispatch', 'production.open'];
+        else if (key === 'world.depart') out.nextActions = ['world.advance', 'world.arrive'];
+        else if (key === 'world.advance') out.nextActions = ['world.arrive', 'world.advance'];
+        else if (key === 'world.arrive') out.nextActions = ['plan.advance', 'region.occur'];
+        else if (key === 'plan.expand') out.nextActions = ['plan.advance'];
+        else if (key === 'plan.advance') out.nextActions = ['plan.settle'];
+        else if (key === 'plan.settle') out.nextActions = (out.outcome === 'blocked' ? ['plan.rechoose'] : ['plan.advance']);
+        else if (key === 'plan.rechoose') out.nextActions = ['plan.advance'];
+        else if (key === 'region.occur') out.nextActions = ['region.deliver'];
+        else if (key === 'region.deliver') out.nextActions = ['plan.rechoose', 'plan.settle'];
+        else if (key === 'customLax.commitPromise') out.nextActions = ['customLax.fulfillPromise', 'customLax.defaultPromise'];
+        else if (key === 'customLax.defaultPromise') out.nextActions = ['customLax.remedyPromise', 'rumor.startChain', 'relationGraph.upsert'];
+        else if (key === 'customLax.remedyPromise') out.nextActions = ['relationGraph.upsert', 'customLax.commitPromise'];
+        else if (key === 'creditLedger.open') out.nextActions = ['creditLedger.accrue', 'creditLedger.repay'];
+        else if (key === 'creditLedger.repay') out.nextActions = ['creditLedger.open'];
+        else if (key === 'rumor.startChain') out.nextActions = ['rumor.relay', 'rumor.investigate'];
+        else if (key === 'rumor.relay') out.nextActions = ['rumor.investigate', 'intel.addIntel'];
+        else if (key === 'rumor.investigate') out.nextActions = ['intel.believe', 'relationGraph.upsert'];
+        else if (key === 'intel.addIntel') out.nextActions = ['intel.believe'];
       }
     }
     else { stat.refused++; if (out && out.reason) stat.faults[out.reason] = (stat.faults[out.reason] || 0) + 1; }
