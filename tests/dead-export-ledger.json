@@ -1154,6 +1154,118 @@
       "tref": 9,
       "own": 3
     },
+    "channelProbe.buildProbe": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "channelProbe.channelKey": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "channelProbe.channelStat": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "channelProbe.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "channelProbe.exportText": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "channelProbe.getSettings": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
+    "channelProbe.judgeProbe": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "channelProbe.ledgerRow": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "channelProbe.record": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "channelProbe.reset": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "channelProbe.setSettings": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "channelProbe.spark": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "channelProbe.stat": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "channelProbe.wilson": {
+      "reason": "self-only",
+      "detail": "engines/channel-probe.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/channel-probe.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
     "chatcache.addSnapshot": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -1322,6 +1434,14 @@
       "tref": 0,
       "own": 7
     },
+    "choiceBoard.mount": {
+      "reason": "self-only",
+      "detail": "engines/choice-board.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/choice-board.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
     "choiceBoard.refresh": {
       "reason": "self-only",
       "detail": "engines/choice-board.js 内部自用、外部零引用（过度导出）",
@@ -1339,6 +1459,14 @@
       "own": 3
     },
     "choiceBoard.setSettings": {
+      "reason": "self-only",
+      "detail": "engines/choice-board.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/choice-board.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "choiceBoard.stat": {
       "reason": "self-only",
       "detail": "engines/choice-board.js 内部自用、外部零引用（过度导出）",
       "src": "engines/choice-board.js",
@@ -4914,6 +5042,110 @@
       "tref": 0,
       "own": 10
     },
+    "narrativeLens.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "narrativeLens.getSettings": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "narrativeLens.label": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
+    "narrativeLens.lensApply": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "narrativeLens.lensBody": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "narrativeLens.lensStrip": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "narrativeLens.nextTier": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "narrativeLens.pick": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
+    "narrativeLens.reset": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "narrativeLens.setSettings": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "narrativeLens.stat": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "narrativeLens.tagOf": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "narrativeLens.tokens": {
+      "reason": "self-only",
+      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-lens.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
     "observationProjection.merge": {
       "reason": "self-only",
       "detail": "engines/observation-projection.js 内部自用、外部零引用（过度导出）",
@@ -6480,6 +6712,70 @@
       "src": "render/inject.js",
       "refs": 0,
       "tref": 4,
+      "own": 3
+    },
+    "replyGuard.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/reply-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reply-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "replyGuard.getSettings": {
+      "reason": "self-only",
+      "detail": "engines/reply-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reply-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "replyGuard.judge": {
+      "reason": "self-only",
+      "detail": "engines/reply-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reply-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "replyGuard.noteRetry": {
+      "reason": "self-only",
+      "detail": "engines/reply-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reply-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "replyGuard.reset": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/reply-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "replyGuard.setSettings": {
+      "reason": "self-only",
+      "detail": "engines/reply-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reply-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "replyGuard.stat": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/reply-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "replyGuard.unlock": {
+      "reason": "self-only",
+      "detail": "engines/reply-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reply-guard.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "requestViewer.clear": {
@@ -9049,22 +9345,6 @@
       "refs": 0,
       "tref": 2,
       "own": 1
-    },
-    "choiceBoard.mount": {
-      "reason": "self-only",
-      "detail": "engines/choice-board.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/choice-board.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 5
-    },
-    "choiceBoard.stat": {
-      "reason": "self-only",
-      "detail": "engines/choice-board.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/choice-board.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     }
   },
   "uiDead": {
@@ -9118,6 +9398,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 563
+    "dataOnly": 577
   }
 }

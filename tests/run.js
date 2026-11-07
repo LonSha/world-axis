@@ -797,6 +797,12 @@ const LOAD = [
   //   专锁 tests/choice-board-v2325.js 在同一 vm 上下文里装载它，且 reject-code-gate
   //   的见证面能看见它的拒收码。
   'engines/choice-board.js',
+  // v2.326.0：三个缝合引擎（与 index.js LOAD_ORDER 同序）。进 LOAD 是为了让专锁
+  //   tests/luke-stitch-v2326.js 在同一 vm 上下文里装载它们，且 reject-code-gate
+  //   的见证面能看见它们的拒收码。
+  'engines/narrative-lens.js',
+  'engines/reply-guard.js',
+  'engines/channel-probe.js',
   'engines/commission.js',
   'engines/investigation.js',
   'engines/aftermath.js',

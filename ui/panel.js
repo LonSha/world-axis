@@ -46,6 +46,8 @@
     // v2.56.0: v2.52.0~v2.55.0 新增的四条注入分支此前未登记源表，也**没在这里登记显示名**
     //   —— 面板会裸露英文键名（life/intel/org/longline）。补名与补源表是同一件事的两面。
     injectCollector: '结构汇流',
+    // v2.326.0（缝合 卢克之光）：叙述层镜片。与 SOURCES 同批登记（只加源表不加显示名 ⇒ 面板裸露英文键名）。
+    narrativeLens: '叙述镜片（防全知/去媚）',
     life: '人物生活', intel: '因果与情报', org: '资源与组织', longline: '长线伏笔',
     // v2.62.0: 因果结算。与 SOURCES 同批登记（只加源表不加显示名 ⇒ 面板裸露英文键名）。
     causal: '因果结算',
@@ -3506,6 +3508,46 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
 
   function renderConnect() {
     const chs = WA.apiRouter.listChannels();
+    // v2.326.0（缝合 卢克之光）：三个只读引擎的**产品读数点**。纯展示、零控件、零 id，
+    //   因此不进 UI_BINDINGS 守卫表、不接任何事件。这里只把「开没开、什么档、渠道账本」
+    //   摆给玩家看；判定与探针动作仍由调用方显式发起，渲染路径绝不发请求。
+    const stitch = (function () {
+      const rows = [];
+      try {
+        const nl = WA.narrativeLens;
+        if (nl) {
+          const d = nl.diagnose();
+          const st = nl.stat();
+          rows.push('叙述镜片：' + esc(d.status) + ' / ' + esc(d.label)
+            + '（约 ' + d.tokens + ' tok，已注入 ' + (st.builds || 0) + ' 次）；'
+            + '不读世界状态，知情裁决仍归 anti-omniscience / intel。');
+        }
+        const rg = WA.replyGuard;
+        if (rg) {
+          const d = rg.diagnose();
+          const st = rg.stat();
+          rows.push('回包守卫：' + esc(d.status) + ' / 已判 ' + (st.total || 0) + ' 轮'
+            + '（空回 ' + (st.empty || 0) + '、截断 ' + (st.truncated || 0)
+            + '、拒答 ' + (st.refused || 0) + '、安全 ' + (st.safety || 0) + '）；'
+            + '只判定与建议，不自动发第二次请求。');
+        }
+        const cp = WA.channelProbe;
+        if (cp) {
+          const first = (chs[0] && chs[0].cfg) || {};
+          const base = String(first.baseUrl || '');
+          const s = cp.channelStat(base);
+          const d = cp.diagnose();
+          rows.push('渠道探针：' + esc(d.status) + ' / 有结论 n=' + s.n
+            + '（可疑 ' + s.weak + '、旁证 ' + s.inconclusive + '）'
+            + (s.interval.enough ? '' : '，样本不足不给区间') + ' ' + esc(cp.spark([s.weak, s.inconclusive, s.n]))
+            + '；名字对得上一律不算证据，抄对也不能证明身份。');
+        }
+      } catch (e) { rows.push('缝合读数暂不可用（不影响 API 使用）'); }
+      return rows.length
+        ? '<div class="wa-sec">运行体检（只读）</div><div class="wa-dim">'
+          + rows.map(function (r) { return '· ' + r; }).join('<br/>') + '</div>'
+        : '';
+    })();
     return `
       <div class="wa-sec">API通道（未配置的通道回落default）</div>
       ${chs.map(c => `
@@ -3517,7 +3559,8 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           <button class="wa-btn wa-mini wa-ch-save">保存</button>
         </div>`).join('')}
       <div class="wa-sec">并发上限：<b id="wa-conc-v">${WA.apiRouter.getConcurrency()}</b>（队列 ${WA.apiRouter.queueLength()}）</div>
-      <input type="range" min="1" max="10" value="${WA.apiRouter.getConcurrency()}" id="wa-conc" class="wa-range" title="同时进行的 AI 请求上限（调高会更快，但可能触发供应商限流）"/>`;
+      <input type="range" min="1" max="10" value="${WA.apiRouter.getConcurrency()}" id="wa-conc" class="wa-range" title="同时进行的 AI 请求上限（调高会更快，但可能触发供应商限流）"/>
+      ${stitch}`;
   }
 
   function renderBranchDiff() {

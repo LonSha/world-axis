@@ -196,6 +196,9 @@
     // v2.292.0（V7 EXV7-8）：世界自传。与上面各源同批口径 —— 只加源表不加分支 =
     //   声明了没人消费；只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻）。
     'worldAutobiography',
+    // v2.326.0（缝合 卢克之光）：叙述层镜片。与源表/def/VIS_NAMES/分支同批登记，
+    //   只加分支不加源表 = 开关点了零效果；只加源表不加分支 = 声明了没人消费。
+    'narrativeLens',
     'chrono'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
@@ -295,7 +298,11 @@ style: false,
         //   tool-diag 当场记 error `inject.visibilityUndeclared`（全量回归里
         //   「当前环境判语无阻断项」「恢复模块后判语复原」「可见性声明完整」三条红，
         //   全是这一个缺口）。
-        retrieval: true }, module: 'render' };
+        retrieval: true,
+        // v2.326.0（缝合 卢克之光）：叙述层镜片。取默认 true（同批理由——
+        //   narrativeLens 的 DEF.enabled=false，未开时 buildBlock 返回空串），
+        //   不给老用户凭空多出约束。
+        narrativeLens: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -1611,6 +1618,13 @@ style: false,
           return out;
         });
         if (cb) items.push({ source: '结构汇流', content: cb });
+      }
+      // v2.326.0（缝合 卢克之光）：叙述层镜片。防全知 / 去媚只产一行纯文本硬约束，
+      //   不读世界状态、不判谁该知道（那是 anti-omniscience / intel 的权威链）。
+      //   模块总开关默认关、可见性开关默认开 —— 两级都点头才注入，老档逐字无变化。
+      if (vis.narrativeLens && WA.narrativeLens) {
+        const lb = engineCall('narrativeLens', function () { return WA.narrativeLens.buildBlock(); });
+        if (lb) items.push({ source: '叙述镜片', content: lb });
       }
       if (vis.retrieval && WA.retrieval) {
         const rq = (function () {

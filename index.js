@@ -765,6 +765,13 @@
     // v2.325.0（缝合 -Galgame 呈现半边）：待选按钮。须晚于 engines/story-choice.js
     //   （只经它读 pending/review、只经它 confirm），须晚于 core/settings-bus。
     'engines/choice-board.js',
+    // v2.326.0（缝合 卢克之光 Anti-Route 8.31）：三个只读缝合引擎，与 tests/run.js LOAD 同序。
+    //   narrative-lens 只产叙述镜片文本，reply-guard 只判回包给建议，channel-probe 只产探针报文；
+    //   三者都不 hook fetch、不自动发请求、不写世界。故对 render/inject.js 无次序硬约束，
+    //   统一放在核心设置总线之后、面板之前，由各自的 buildBlock 与 diagnose 显式供读。
+    'engines/narrative-lens.js',
+    'engines/reply-guard.js',
+    'engines/channel-probe.js',
     'engines/commission.js',
     'engines/investigation.js',
     'engines/aftermath.js',

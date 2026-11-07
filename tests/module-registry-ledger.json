@@ -1,13 +1,13 @@
 {
  "version": "2.322.0",
- "loadOrderCount": 378,
- "loadedCount": 364,
+ "loadOrderCount": 381,
+ "loadedCount": 367,
  "uiCount": 14,
- "nsCount": 373,
+ "nsCount": 376,
  "totals": {
-  "loadEdges": 252,
+  "loadEdges": 255,
   "hardEdges": 0,
-  "callRefs": 445,
+  "callRefs": 451,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -61,6 +61,7 @@
     "engines/campaign.js",
     "engines/capacity-audit.js",
     "engines/care-chain.js",
+    "engines/channel-probe.js",
     "engines/chapters.js",
     "engines/choice-board.js",
     "engines/chronicle-view.js",
@@ -138,6 +139,7 @@
     "engines/modelink.js",
     "engines/mood-glide.js",
     "engines/motif.js",
+    "engines/narrative-lens.js",
     "engines/noesis.js",
     "engines/observe-slice.js",
     "engines/offline-return.js",
@@ -185,6 +187,7 @@
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/relation-temp.js",
+    "engines/reply-guard.js",
     "engines/request-viewer.js",
     "engines/research-closure.js",
     "engines/research.js",
@@ -441,6 +444,7 @@
     "engines/campaign.js",
     "engines/capacity-audit.js",
     "engines/care-chain.js",
+    "engines/channel-probe.js",
     "engines/choice-board.js",
     "engines/chronicle-view.js",
     "engines/city-folklore.js",
@@ -508,6 +512,7 @@
     "engines/modelink.js",
     "engines/mood-glide.js",
     "engines/motif.js",
+    "engines/narrative-lens.js",
     "engines/noesis.js",
     "engines/observe-slice.js",
     "engines/offline-return.js",
@@ -550,6 +555,7 @@
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/relation-temp.js",
+    "engines/reply-guard.js",
     "engines/request-viewer.js",
     "engines/research-closure.js",
     "engines/research.js",
@@ -4206,6 +4212,69 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_choice_board_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/narrative-lens.js": {
+   "ns": [
+    "narrativeLens"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_narrative_lens_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/reply-guard.js": {
+   "ns": [
+    "replyGuard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_reply_guard_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/channel-probe.js": {
+   "ns": [
+    "channelProbe"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_channel_probe_settings_v1"
    ],
    "consumedBy": []
   },

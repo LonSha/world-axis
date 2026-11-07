@@ -3755,6 +3755,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.325.0：待选按钮。登记为必载 — 面板剧情段与本模块的 secChoice 都读它，
     //   缺席就是「按钮挂不上」本身，不该被静默兜住。
     'engines/choice-board.js': 'choiceBoard',
+    // v2.326.0：三个缝合引擎。登记为必载 — 面板诊断段与专锁都读它们，
+    //   缺席就是「读数缺席」本身，不该被静默兜住。
+    'engines/narrative-lens.js': 'narrativeLens',
+    'engines/reply-guard.js': 'replyGuard',
+    'engines/channel-probe.js': 'channelProbe',
     'engines/commission.js': 'commission',
     'engines/investigation.js': 'investigation',
     'engines/aftermath.js': 'aftermath',
