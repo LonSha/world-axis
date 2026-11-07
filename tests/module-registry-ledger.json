@@ -1,9 +1,9 @@
 {
  "version": "2.322.0",
- "loadOrderCount": 387,
- "loadedCount": 373,
+ "loadOrderCount": 389,
+ "loadedCount": 375,
  "uiCount": 14,
- "nsCount": 383,
+ "nsCount": 385,
  "totals": {
   "loadEdges": 255,
   "hardEdges": 0,
@@ -7196,6 +7196,32 @@
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []
+  },
+  "engines/personal-inventory.js": {
+   "ns": [
+    "personalInventory"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "hardRequires": [],
+   "hardRequiresFiles": [],
+   "hardMissing": []
+  },
+  "engines/metabolism-clock.js": {
+   "ns": [
+    "metabolismClock"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "hardRequires": [],
+   "hardRequiresFiles": [],
+   "hardMissing": []
   }
  }
 }

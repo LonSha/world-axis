@@ -3496,6 +3496,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/transit-scheduler.js': 'transitScheduler',
     'engines/environmental-occlusion.js': 'environmentalOcclusion',
     'engines/spatial-trace.js': 'spatialTrace',
+    'engines/personal-inventory.js': 'personalInventory',
+    'engines/metabolism-clock.js': 'metabolismClock',
     'engines/health-preflight.js': 'healthPreflight',
     'engines/narrative-deduction.js': 'narrativeDeduction',
     'engines/anti-omniscience.js': 'antiOmniscience',

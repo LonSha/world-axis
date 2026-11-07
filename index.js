@@ -522,6 +522,9 @@
     'engines/transit-scheduler.js',
     'engines/environmental-occlusion.js',
     'engines/spatial-trace.js',
+    // v2.329.0: 随身行囊物理约束与生理代谢疲劳时钟双引擎
+    'engines/personal-inventory.js',
+    'engines/metabolism-clock.js',
     // v2.247.0 (SYS-DEF-1): 全向系统健康与生成质量前置预检器 (SillyTavern-Self-Check 机制缝入)
     'engines/health-preflight.js',
     // v2.247.0 (NARR-1): 双轨因果隔离与线索断裂补偿推演台 (Gloria 叙事三部曲机制缝入)

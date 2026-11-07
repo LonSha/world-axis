@@ -1520,6 +1520,12 @@
            + '<button class="wa-btn" id="wa-geo-diag" title="空间位置追踪引擎状态诊断">空间诊断</button>'
            + '<button class="wa-btn" id="wa-geo-svg" title="MAP-2: 渲染 SVG 画布与同地点角色聚类视图">SVG漫游画布</button>'
            + '</div>'
+           + '<div class="wa-row" style="margin-top:6px;">'
+           + '<button class="wa-btn wa-mini" id="wa-geo-adv-topo" title="查看微观分形拓扑：区-街-店-室四级树与营业/门禁状态">拓扑层级与门禁</button>'
+           + '<button class="wa-btn wa-mini" id="wa-geo-adv-transit" title="测算多模态通勤代价与深夜滞留仲裁">通勤与滞留推演</button>'
+           + '<button class="wa-btn wa-mini" id="wa-geo-adv-occl" title="测算视线物理遮蔽与声学信噪比分贝衰减">视听遮蔽与耳语</button>'
+           + '<button class="wa-btn wa-mini" id="wa-geo-adv-trace" title="查看当前地点物理残留物证与半衰期衰减">物证与感官痕迹</button>'
+           + '</div>'
            + '<div id="wa-geo-out" class="wa-out"></div>';
        })()}`;
 
@@ -12251,6 +12257,77 @@ on('#wa-desk-show', showDesk);
         const flyStr = `插值帧(${Math.round(flyTest.x)}, ${Math.round(flyTest.y)})`;
         geoOut('<div class="wa-log wa-log-ok">MAP-2 SVG 渲染引擎已加载 · ' + flyStr + ' · 聚类数: ' + clusters.length + '</div>'
           + '<div style="width:100%; height:320px; border:1px solid rgba(255,255,255,0.15); border-radius:6px; overflow:hidden; margin-top:6px;">' + svg + '</div>');
+      });
+      // ── 四大空间物理引擎控制交互 ──────────────────────────
+      on('#wa-geo-adv-topo', () => {
+        if (!WA.spatialTopology) return geoOut('<div class="wa-log wa-log-err">spatialTopology 空间分形拓扑引擎未装载</div>');
+        const d = WA.spatialTopology.diagnose();
+        // 自动初始化演示节点（如果为空）
+        if (d.nodeCount === 0) {
+          WA.spatialTopology.registerNode('shinjuku', { name: '新宿区', level: 'region' });
+          WA.spatialTopology.registerNode('kabukicho', { name: '歌舞伎町一番街', level: 'sector', parentId: 'shinjuku' });
+          WA.spatialTopology.registerNode('bar_venue', { name: '风林会馆居酒屋', level: 'venue', parentId: 'kabukicho', schedule: { openHour: 17, closeHour: 4 } });
+          WA.spatialTopology.registerNode('room_vip', { name: '2F 樱之间', level: 'subspace', parentId: 'bar_venue', affordance: { shelter: 8, sleep: 7 } });
+          WA.spatialTopology.connect('kabukicho', 'bar_venue', { status: 'open' });
+          WA.spatialTopology.connect('bar_venue', 'room_vip', { status: 'locked', keyId: 'vip_key_01' });
+        }
+        const tree = WA.spatialTopology.getHierarchy('room_vip');
+        const curHour = new Date().getHours();
+        const canEnterVenue = WA.spatialTopology.canTraverse('kabukicho', 'bar_venue', { currentHour: curHour });
+        const canEnterVip = WA.spatialTopology.canTraverse('bar_venue', 'room_vip', { currentHour: curHour, keys: [] });
+        geoOut('<div class="wa-log wa-log-ok">分形拓扑：节点数 ' + WA.spatialTopology.diagnose().nodeCount + ' · 通道数 ' + WA.spatialTopology.diagnose().edgeCount + '</div>'
+          + '<div class="wa-item"><b>当前层级路径</b>：<code>' + atEsc(tree.join(' 〉 ')) + '</code></div>'
+          + '<div class="wa-item"><b>风林会馆居酒屋 (17:00~04:00)</b>：' + (canEnterVenue.ok ? '<span style="color:#4ade80;">[营业中·准许进入]</span>' : '<span style="color:#f87171;">[打烊闭店·' + atEsc(canEnterVenue.reason) + ']</span>') + '</div>'
+          + '<div class="wa-item"><b>2F 樱之间 (门禁通道)</b>：' + (canEnterVip.ok ? '<span style="color:#4ade80;">[通道开放]</span>' : '<span style="color:#fbbf24;">[门禁锁止·' + atEsc(canEnterVip.reason) + '·需钥匙:vip_key_01]</span>') + '</div>');
+      });
+      on('#wa-geo-adv-transit', () => {
+        if (!WA.transitScheduler) return geoOut('<div class="wa-log wa-log-err">transitScheduler 通勤与滞留仲裁引擎未装载</div>');
+        const planWalk = WA.transitScheduler.computeTrip({ x: 100, y: 150 }, { x: 180, y: 130 }, { mode: 'walk', weather: 'rain' });
+        const planNightTrain = WA.transitScheduler.computeTrip({ x: 100, y: 150 }, { x: 300, y: 300 }, { mode: 'transit', timeStr: '01:30' });
+        const planNightStranded = WA.transitScheduler.computeTrip({ x: 100, y: 150 }, { x: 300, y: 300 }, { mode: 'transit', timeStr: '02:00', money: 200 });
+        geoOut('<div class="wa-log wa-log-ok">多模态通勤与末班车滞留仲裁推演</div>'
+          + '<div class="wa-item"><b>雨天徒步 (新宿→秋叶原)</b>：耗时 ' + Math.round(planWalk.minutes) + '分钟 · 体力消耗 ' + planWalk.costFatigue + ' · 花费 0円</div>'
+          + '<div class="wa-item"><b>深夜电车 (01:30 新宿→初星学园)</b>：' + (planNightTrain.ok ? '可行' : '<span style="color:#f87171;">[停运拦截·' + atEsc(planNightTrain.reason) + ' (末班车已过)]</span>') + '</div>'
+          + '<div class="wa-item"><b>滞留仲裁 (02:00 囊中羞涩200円)</b>：<span style="color:#fbbf24;">[强制滞留 stranded=true]</span><br><span class="wa-dim">仲裁方案：' + atEsc((planNightStranded.strandedOptions || []).map(o => o.label + '(' + o.cost + '円)').join(' / ')) + '</span></div>');
+      });
+      on('#wa-geo-adv-occl', () => {
+        if (!WA.environmentalOcclusion) return geoOut('<div class="wa-log wa-log-err">environmentalOcclusion 视听遮蔽引擎未装载</div>');
+        const sameRoomSight = WA.environmentalOcclusion.checkLineOfSight('room_vip', 'room_vip');
+        const crossRoomSight = WA.environmentalOcclusion.checkLineOfSight('kabukicho', 'room_vip');
+        const whisperAcrossDoor = WA.environmentalOcclusion.computeAcoustics({
+          sourceDb: 30,
+          distanceMeters: 4,
+          barrier: 'wood_door',
+          ambientNoise: 35
+        });
+        const screamSameRoom = WA.environmentalOcclusion.computeAcoustics({
+          sourceDb: 80,
+          distanceMeters: 5,
+          barrier: 'none',
+          ambientNoise: 40
+        });
+        geoOut('<div class="wa-log wa-log-ok">视听遮蔽与声学阻抗测算</div>'
+          + '<div class="wa-item"><b>同房间视线</b>：' + (sameRoomSight.visible ? '<span style="color:#4ade80;">[视线通透·无阻隔]</span>' : '阻断') + '</div>'
+          + '<div class="wa-item"><b>跨建筑视线 (歌舞伎町街道 → 2F包厢)</b>：' + (crossRoomSight.visible ? '通透' : '<span style="color:#f87171;">[视线完全阻断·' + atEsc(crossRoomSight.reason) + ']</span>') + '</div>'
+          + '<div class="wa-item"><b>隔门耳语 (4米木门 30dB@底噪35dB)</b>：' + atEsc(whisperAcrossDoor.clarityLabel) + ' (终点 ' + Math.round(whisperAcrossDoor.receivedDb) + 'dB · 信噪比 SNR: ' + Math.round(whisperAcrossDoor.snr) + 'dB)</div>'
+          + '<div class="wa-item"><b>同室呼救 (5米开阔 80dB@底噪40dB)</b>：' + atEsc(screamSameRoom.clarityLabel) + ' (终点 ' + Math.round(screamSameRoom.receivedDb) + 'dB · 信噪比 SNR: ' + Math.round(screamSameRoom.snr) + 'dB)</div>');
+      });
+      on('#wa-geo-adv-trace', () => {
+        if (!WA.spatialTrace) return geoOut('<div class="wa-log wa-log-err">spatialTrace 空间物理痕迹引擎未装载</div>');
+        // 演示记录两条痕迹
+        const d = WA.spatialTrace.diagnose();
+        if (d.traceCount === 0) {
+          WA.spatialTrace.recordTrace('room_vip', { type: 'tobacco_smoke', source: '神秘访客', initialIntensity: 100 });
+          WA.spatialTrace.recordTrace('room_vip', { type: 'combat_damage', source: '争执打破的清酒杯', initialIntensity: 90 });
+        }
+        const traces = WA.spatialTrace.getTraces('room_vip');
+        const feed = WA.spatialTrace.buildTraceFeed('room_vip');
+        geoOut('<div class="wa-log wa-log-ok">物证痕迹残留与半衰期透镜 (2F 樱之间)</div>'
+          + traces.map(t => {
+            const pct = Math.round(t.currentIntensity);
+            return '<div class="wa-item"><b>' + atEsc(t.type) + '</b>（' + atEsc(t.source) + '）：强度 ' + pct + '% · 半衰期 ' + t.halfLifeHours + 'h</div>';
+          }).join('')
+          + (feed ? '<pre class="wa-pre" style="margin-top:6px;">' + atEsc(feed) + '</pre>' : '<div class="wa-dim">无痕迹反哺文本</div>'));
       });
     }
     on('#wa-ch-start', () => { WA.chapters.start($('#wa-ch-title').value.trim()); renderBody(); });

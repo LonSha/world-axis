@@ -170,7 +170,7 @@
     // v2.230.0（拓展 N12）：六条新注入源。与注入分支**同批**登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
     //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**。
-     'elsewhere', 'livingWorld', 'geoTracker', 'spatialTopology', 'transitScheduler', 'environmentalOcclusion', 'spatialTrace', 'healthPreflight', 'antiOmniscience', 'personaAnchor', 'vitals', 'coordinate', 'dream', 'backstageTone',
+     'elsewhere', 'livingWorld', 'geoTracker', 'spatialTopology', 'transitScheduler', 'environmentalOcclusion', 'spatialTrace', 'personalInventory', 'metabolismClock', 'healthPreflight', 'antiOmniscience', 'personaAnchor', 'vitals', 'coordinate', 'dream', 'backstageTone',
     // v2.250.0（拓展）：四条新注入源。与注入分支**同批**登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
     //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**。
@@ -284,7 +284,7 @@ style: false,
         //   retrieval 的 DEF.enabled=false,未开时 buildBlock 返回空串),不给老用户凭空多出约束。
         // v2.230.0（拓展 N12）：六条新源。取默认 true（同四条理由——其模块总开关
         //   默认为关，未开时 buildBlock 返回空串），不给老用户凭空多出约束。
-        elsewhere: true, livingWorld: true, geoTracker: true, spatialTopology: true, transitScheduler: true, environmentalOcclusion: true, spatialTrace: true, healthPreflight: true, antiOmniscience: true, personaAnchor: true, vitals: true, coordinate: true, dream: true, backstageTone: true,
+        elsewhere: true, livingWorld: true, geoTracker: true, spatialTopology: true, transitScheduler: true, environmentalOcclusion: true, spatialTrace: true, personalInventory: true, metabolismClock: true, healthPreflight: true, antiOmniscience: true, personaAnchor: true, vitals: true, coordinate: true, dream: true, backstageTone: true,
         // v2.250.0（拓展）：四条新源。取默认 true（同四条理由——其模块总开关默认为关：
         //   genTiming / oneShotMod / moodGlide 的 DEF.enabled=false，未开时 buildBlock 返回空串；
         //   outputGuard 虽默认开，但它的块是一句规矩文案、不产生读数，给了也不占额度），
@@ -523,6 +523,8 @@ style: false,
     transitScheduler: '交通与滞留仲裁',
     environmentalOcclusion: '视听遮蔽与环境',
     spatialTrace: '现场痕迹残留',
+    personalInventory: '随身行囊与财物',
+    metabolismClock: '生理代谢与体态',
     healthPreflight: '系统健康与写作防线',
     antiOmniscience: '防全知认知视界',
     personaAnchor: '性格绝对锚定',
@@ -1471,6 +1473,8 @@ style: false,
       if (vis.transitScheduler && WA.transitScheduler) { const tsb = engineCall('transitScheduler', function () { return WA.transitScheduler.buildBlock(); }); if (tsb) items.push({ source: '交通与滞留仲裁', content: tsb }); }
       if (vis.environmentalOcclusion && WA.environmentalOcclusion) { const eob = engineCall('environmentalOcclusion', function () { return WA.environmentalOcclusion.buildBlock(); }); if (eob) items.push({ source: '视听遮蔽与环境', content: eob }); }
       if (vis.spatialTrace && WA.spatialTrace) { const trb = engineCall('spatialTrace', function () { return WA.spatialTrace.buildBlock(); }); if (trb) items.push({ source: '现场痕迹残留', content: trb }); }
+      if (vis.personalInventory && WA.personalInventory) { const pib = engineCall('personalInventory', function () { return WA.personalInventory.buildInventoryFeed('主角'); }); if (pib) items.push({ source: '随身行囊与财物', content: pib }); }
+      if (vis.metabolismClock && WA.metabolismClock) { const mcb = engineCall('metabolismClock', function () { return WA.metabolismClock.buildVitalsFeed('主角'); }); if (mcb) items.push({ source: '生理代谢与体态', content: mcb }); }
       if (vis.healthPreflight && WA.healthPreflight) { const hpb = engineCall('healthPreflight', function () { return WA.healthPreflight.buildBlock(); }); if (hpb) items.push({ source: '系统健康与写作防线', content: hpb }); }
       if (vis.antiOmniscience && WA.antiOmniscience) { const aob = engineCall('antiOmniscience', function () { return WA.antiOmniscience.buildBlock(); }); if (aob) items.push({ source: '防全知认知视界', content: aob }); }
       if (vis.personaAnchor && WA.personaAnchor) { const pab = engineCall('personaAnchor', function () { return WA.personaAnchor.buildBlock(); }); if (pab) items.push({ source: '性格绝对锚定', content: pab }); }
