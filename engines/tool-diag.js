@@ -3492,6 +3492,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/living-world.js': 'livingWorld',
     // v2.245.0 (MAP-1): 通用物理坐标、空间位置追踪与生活圈透镜
     'engines/geo-tracker.js': 'geoTracker',
+    'engines/spatial-topology.js': 'spatialTopology',
+    'engines/transit-scheduler.js': 'transitScheduler',
+    'engines/environmental-occlusion.js': 'environmentalOcclusion',
+    'engines/spatial-trace.js': 'spatialTrace',
     'engines/health-preflight.js': 'healthPreflight',
     'engines/narrative-deduction.js': 'narrativeDeduction',
     'engines/anti-omniscience.js': 'antiOmniscience',

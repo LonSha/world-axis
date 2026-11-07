@@ -1,9 +1,9 @@
 {
  "version": "2.322.0",
- "loadOrderCount": 383,
- "loadedCount": 369,
+ "loadOrderCount": 387,
+ "loadedCount": 373,
  "uiCount": 14,
- "nsCount": 379,
+ "nsCount": 383,
  "totals": {
   "loadEdges": 255,
   "hardEdges": 0,
@@ -7143,6 +7143,58 @@
    "stateKeys": [
     "worldaxis_capability_audit_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/spatial-topology.js": {
+   "ns": [
+    "spatialTopology",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/transit-scheduler.js": {
+   "ns": [
+    "transitScheduler",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/environmental-occlusion.js": {
+   "ns": [
+    "environmentalOcclusion",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/spatial-trace.js": {
+   "ns": [
+    "spatialTrace",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   }
  }

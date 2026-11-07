@@ -517,6 +517,11 @@
     'engines/living-world.js',
     // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
     'engines/geo-tracker.js',
+    // v2.328.0 (MAP-ADVANCED): 分形空间拓扑、通勤滞留仲裁、视听阻抗遮蔽与现场物理痕迹
+    'engines/spatial-topology.js',
+    'engines/transit-scheduler.js',
+    'engines/environmental-occlusion.js',
+    'engines/spatial-trace.js',
     // v2.247.0 (SYS-DEF-1): 全向系统健康与生成质量前置预检器 (SillyTavern-Self-Check 机制缝入)
     'engines/health-preflight.js',
     // v2.247.0 (NARR-1): 双轨因果隔离与线索断裂补偿推演台 (Gloria 叙事三部曲机制缝入)
