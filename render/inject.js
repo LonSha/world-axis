@@ -36,7 +36,7 @@
     'causal', 'world', 'shadow', 'threads',
     // v2.65.0: 'weather' / 'difficulty'。与注入分支同批登记，否则开关点了零效果。
     // v2.66.0: 'affect' / 'bonds' / 'masks'。与注入分支同批登记，否则开关点了零效果。
-    'weather', 'difficulty', 'affect', 'bonds', 'masks', 'temporalLock', 'temperament', 'fondness', 'parallelEvents',
+    'weather', 'difficulty', 'affect', 'bonds', 'masks', 'temporalLock', 'temperament', 'fondness', 'affectionNexus', 'intimateArbiter', 'parallelEvents',
     // v2.68.0: 'eraCycle' / 'survival' / 'warrant' / 'beastBond'。与注入分支同批登记（键名 = 命名空间名）。
     'eraCycle', 'survival', 'warrant', 'beastBond',
     // v2.69.0: 'appearance' / 'ladder'。与注入分支同批登记（键名 = 命名空间名）。
@@ -208,7 +208,7 @@ style: false,
         life: true, intel: true, org: true, longline: true,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
-        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true,
+        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, affectionNexus: true, intimateArbiter: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true,
         // v2.96.0：传播与辟谣。取默认 true（同四条理由——其模块总开关默认为关）。
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
         // v2.117.0：人物行动。同一条理由 —— 其模块总开关默认为关闭。
@@ -431,7 +431,7 @@ style: false,
     style: '叙事工艺', life: '人物生活', intel: '因果与情报', org: '资源与组织',
     longline: '长线伏笔', causal: '因果结算', world: '世界织体', weather: '天气与物候',
     difficulty: '世界难度', affect: '情绪通道', bonds: '关系六型', masks: '假面',
-    temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计',
+    temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', affectionNexus: '情感中枢', intimateArbiter: '亲密生理',
     parallelEvents: '场外事件', eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉',
     beastBond: '驯兽', appearance: '外貌契约', ladder: '原型阶梯', sceneSlice: '情境切片',
     gauge: '阻尼量规', rivalry: '竞争焦点', enigma: '信息暗礁', tempo: '节奏齿轮',
@@ -1395,6 +1395,8 @@ style: false,
       if (vis.temporalLock && WA.temporalLock) { const tb = engineCall('temporalLock', function () { return WA.temporalLock.buildBlock(); }); if (tb) items.push({ source: '时间锁', content: tb }); }
       if (vis.temperament && WA.temperament) { const tm = engineCall('temperament', function () { return WA.temperament.buildBlock(); }); if (tm) items.push({ source: '双层性格', content: tm }); }
       if (vis.fondness && WA.fondness) { const fb = engineCall('fondness', function () { return WA.fondness.buildBlock(); }); if (fb) items.push({ source: '好感审计', content: fb }); }
+      if (vis.affectionNexus && WA.affectionNexus) { const ab = engineCall('affectionNexus', function () { return WA.affectionNexus.buildBlock(); }); if (ab) items.push({ source: '情感中枢', content: ab }); }
+      if (vis.intimateArbiter && WA.intimateArbiter) { const ib = engineCall('intimateArbiter', function () { return WA.intimateArbiter.buildBlock(); }); if (ib) items.push({ source: '亲密生理', content: ib }); }
       if (vis.parallelEvents && WA.parallelEvents) { const pb = engineCall('parallelEvents', function () { return WA.parallelEvents.buildBlock(); }); if (pb) items.push({ source: '场外事件', content: pb }); }
       if (vis.eraCycle && WA.eraCycle) { const ec = engineCall('eraCycle', function () { return WA.eraCycle.buildBlock(); }); if (ec) items.push({ source: '资料片周期', content: ec }); }
       if (vis.survival && WA.survival) { const sv = engineCall('survival', function () { return WA.survival.buildBlock(); }); if (sv) items.push({ source: '生存三轴', content: sv }); }

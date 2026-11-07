@@ -1,9 +1,9 @@
 {
  "version": "2.322.0",
- "loadOrderCount": 381,
- "loadedCount": 367,
+ "loadOrderCount": 383,
+ "loadedCount": 369,
  "uiCount": 14,
- "nsCount": 376,
+ "nsCount": 379,
  "totals": {
   "loadEdges": 255,
   "hardEdges": 0,
@@ -3660,6 +3660,32 @@
    "stateKeys": [
     "worldaxis_fondness_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/affection-nexus.js": {
+   "ns": [
+    "affectionNexus",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/intimate-arbiter.js": {
+   "ns": [
+    "engines",
+    "intimateArbiter"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/parallel-events.js": {

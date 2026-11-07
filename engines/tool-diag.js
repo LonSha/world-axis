@@ -3558,6 +3558,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/temporal-lock.js': 'temporalLock',
     'engines/temperament.js': 'temperament',
     'engines/fondness.js': 'fondness',
+    'engines/affection-nexus.js': 'affectionNexus',
+    'engines/intimate-arbiter.js': 'intimateArbiter',
     'engines/parallel-events.js': 'parallelEvents',
     // v2.68.0：资料片周期 / 生存三轴 / 通缉 / 驯兽（与 index.js LOAD_ORDER 同批登记）
     'engines/era-cycle.js': 'eraCycle',

@@ -1356,18 +1356,26 @@
       ${calBlock}
       ${costBlock}
       ${saveBlock}
-      ${capLine}
-      ${healthLine}
-      ${visLine}
+      <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
+        <summary style="cursor:pointer;opacity:0.75;font-size:12px;">🛠️ 引擎自检与底层读数</summary>
+        <div style="padding-top:6px;">
+          ${capLine}
+          ${healthLine}
+          ${visLine}
+        </div>
+      </details>
       <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}</div>
-      <div class="wa-sec">工作流节点开关</div>
-      <div class="wa-node-list">${nodes.map(n => `
-        <label class="wa-node">
-          <input type="checkbox" data-node="${esc(n.id)}" ${n.enabled ? 'checked' : ''}/>
-          <span class="wa-node-chain ${n.chain}">${n.chain === 'before' ? '前' : '后'}</span>
-          <span class="wa-node-label">${esc(n.label || n.id)}</span>
-        </label>`).join('')}
-      </div>`;
+      <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
+        <summary style="cursor:pointer;opacity:0.75;font-size:12px;">⚡ 工作流节点开关（${nodes.length}）</summary>
+        <div class="wa-sec" style="margin-top:4px;">工作流节点开关</div>
+        <div class="wa-node-list">${nodes.map(n => `
+          <label class="wa-node">
+            <input type="checkbox" data-node="${esc(n.id)}" ${n.enabled ? 'checked' : ''}/>
+            <span class="wa-node-chain ${n.chain}">${n.chain === 'before' ? '前' : '后'}</span>
+            <span class="wa-node-label">${esc(n.label || n.id)}</span>
+          </label>`).join('')}
+        </div>
+      </details>`;
   }
 
   function renderWorld() {
@@ -16768,7 +16776,7 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         <button class="wa-cat-btn wa-cat-pill" data-cat="all" role="tab" aria-selected="false">≡ 全部</button>
       </div>
       <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}" data-cat="${PAGE_CAT[p.id] || 'core'}">${p.icon} ${p.label}</button>`).join('')}</div>
-      <div class="wa-row"><label for="wa-setting-search">设置检索（当前页）</label><input id="wa-setting-search" type="search" class="wa-input" placeholder="按标签、中文名或设置键筛选"/><span id="wa-setting-search-count" class="wa-dim" aria-live="polite"></span></div>
+      <div id="wa-search-bar" class="wa-row" style="display:none;"><label for="wa-setting-search">设置检索（当前页）</label><input id="wa-setting-search" type="search" class="wa-input" placeholder="按标签、中文名或设置键筛选"/><span id="wa-setting-search-count" class="wa-dim" aria-live="polite"></span></div>
       <div class="wa-body"></div>
     </div>`);
     mainDoc.body.appendChild(panelEl);
@@ -16814,6 +16822,11 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
     if (!__devMode) { const cb = panelEl.querySelector('.wa-cat-bar'); if (cb) cb.style.display = 'none'; }
   }
   function syncTabs() {
+    const sb = panelEl.querySelector("#wa-search-bar");
+    if (sb) {
+      const inp = panelEl.querySelector("#wa-setting-search");
+      sb.style.display = (currentPage === "settings" || (inp && inp.value.trim().length > 0)) ? "" : "none";
+    }
     const pageCat = PAGE_CAT[currentPage] || 'core';
     if (currentCat !== 'all' && currentCat !== pageCat) {
       currentCat = pageCat;
