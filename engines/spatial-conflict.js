@@ -264,10 +264,18 @@
     enqueueChokepoint: enqueueChokepoint,
     advanceChokepointQueue: advanceChokepointQueue,
     resolveSpatialConflict: resolveSpatialConflict,
-    resetAll: resetAll
+    resetAll: resetAll,
+    diagnose: function () {
+      return {
+        ok: true,
+        chokepointCount: _chokepoints.size,
+        version: VERSION
+      };
+    }
   };
 
   WA.engines.spatialConflict = engine;
+  WA.spatialConflict = engine;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = engine;
   }

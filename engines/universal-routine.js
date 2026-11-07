@@ -244,10 +244,18 @@
     clearActorDeviation: clearActorDeviation,
     evaluateActorRoutine: evaluateActorRoutine,
     getActorScheduleStatus: getActorScheduleStatus,
-    resetAll: resetAll
+    resetAll: resetAll,
+    diagnose: function () {
+      return {
+        ok: true,
+        actorRoutineCount: _actorRoutines.size,
+        version: VERSION
+      };
+    }
   };
 
   WA.engines.universalRoutine = engine;
+  WA.universalRoutine = engine;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = engine;
   }

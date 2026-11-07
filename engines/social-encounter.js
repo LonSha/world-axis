@@ -159,10 +159,18 @@
     version: VERSION,
     evaluateEncounter: evaluateEncounter,
     getRecentEncounters: getRecentEncounters,
-    resetAll: resetAll
+    resetAll: resetAll,
+    diagnose: function () {
+      return {
+        ok: true,
+        recentEncounterCount: _encounterHistory.length,
+        version: VERSION
+      };
+    }
   };
 
   WA.engines.socialEncounter = engine;
+  WA.socialEncounter = engine;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = engine;
   }

@@ -351,10 +351,19 @@
     evaluateExposure: evaluateExposure,
     getActorExposureStatus: getActorExposureStatus,
     treatActorExposure: treatActorExposure,
-    resetAll: resetAll
+    resetAll: resetAll,
+    diagnose: function () {
+      return {
+        ok: true,
+        hazardProfilesCount: _zoneHazards.size,
+        activeExposuresCount: _actorExposures.size,
+        version: VERSION
+      };
+    }
   };
 
   WA.engines.environmentalHazard = engine;
+  WA.environmentalHazard = engine;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = engine;
   }

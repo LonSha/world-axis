@@ -148,12 +148,21 @@
     dispatchEvent('behavioral', 'behavioral_tick', { actors: actors, hour: hour, tick: _tickCounter });
 
     // ── Layer 4: 社会顶层与跨插件外联层 ──
-    // 跨插件 LonSha 单向真源事实投影同步
-    if (WA.bridge && typeof WA.bridge.dumpFacts === 'function') {
+    // 跨插件 LonSha 单向真源事实投影同步 (调用 bridge.snapshot 刷新外部快照)
+    if (WA.bridge && typeof WA.bridge.snapshot === 'function') {
+      try {
+        WA.bridge.snapshot({ reason: 'cascade_bus_tick' });
+        report.social.externalBridgesSynced++;
+      } catch (e) {}
+    } else if (WA.bridge && typeof WA.bridge.dumpFacts === 'function') {
       report.social.externalBridgesSynced++;
     }
-    // 手机因果入站队列心跳
-    if (WA.phoneBridge && typeof WA.phoneBridge.processQueue === 'function') {
+    // 手机因果入站队列与状态心跳
+    if (WA.phoneBridge && typeof WA.phoneBridge.phaseOf === 'function') {
+      try {
+        WA.phoneBridge.phaseOf();
+      } catch (e) {}
+    } else if (WA.phoneBridge && typeof WA.phoneBridge.processQueue === 'function') {
       WA.phoneBridge.processQueue();
     }
     dispatchEvent('social', 'social_tick', { tick: _tickCounter, report: report });
@@ -203,10 +212,19 @@
     dispatchEvent: dispatchEvent,
     dispatchTick: dispatchTick,
     getCascadeState: getCascadeState,
-    resetAll: resetAll
+    resetAll: resetAll,
+    diagnose: function () {
+      return {
+        ok: true,
+        pulseCount: _tickCounter,
+        lastTick: _lastCascadeSummary.tick,
+        version: VERSION
+      };
+    }
   };
 
   WA.engines.cascadeBus = engine;
+  WA.cascadeBus = engine;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = engine;
   }

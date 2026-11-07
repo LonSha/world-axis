@@ -335,10 +335,20 @@
     clearDisaster: clearDisaster,
     getDisasterStatus: getDisasterStatus,
     getShelterStatus: getShelterStatus,
-    resetAll: resetAll
+    resetAll: resetAll,
+    diagnose: function () {
+      return {
+        ok: true,
+        disasterCount: _disasters.size,
+        shelterCount: _shelters.size,
+        evacuationCount: _evacuations.size,
+        version: VERSION
+      };
+    }
   };
 
   WA.engines.disasterEvacuation = engine;
+  WA.disasterEvacuation = engine;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = engine;
   }

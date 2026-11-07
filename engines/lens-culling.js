@@ -136,10 +136,17 @@
   const engine = {
     version: VERSION,
     cullAcousticEvent: cullAcousticEvent,
-    cullTraceFact: cullTraceFact
+    cullTraceFact: cullTraceFact,
+    diagnose: function () {
+      return {
+        ok: true,
+        version: VERSION
+      };
+    }
   };
 
   WA.engines.lensCulling = engine;
+  WA.lensCulling = engine;
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = engine;
   }

@@ -1002,14 +1002,6 @@
       "tref": 0,
       "own": 1
     },
-    "bridge.snapshot": {
-      "reason": "self-only",
-      "detail": "engines/bridge.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/bridge.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 6
-    },
     "bridge.splitCurrents": {
       "reason": "self-only",
       "detail": "engines/bridge.js 内部自用、外部零引用（过度导出）",
