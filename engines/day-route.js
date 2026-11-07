@@ -208,8 +208,11 @@
     let abs = 0, clk = 0, other = 0;
     list.forEach(function (r) {
       const s = num(r.start), e = num(r.end);
-      if (s === null || e === null || s <= 0 || e <= 0 || e <= s) { other++; return; }
-      if (s >= ABS_MIN && e >= ABS_MIN) abs++;
+      if (s === null || e === null || s < 0 || e <= 0 || e <= s) { other++; return; }
+      if (r.timeDomain === 'absolute') abs++;
+      else if (r.timeDomain === 'clock' && s <= 24 && e <= 24) clk++;
+      else if (r.timeDomain) other++;
+      else if (s >= ABS_MIN && e >= ABS_MIN) abs++;
       else if (s <= 24 && e <= 24) clk++;
       else other++;
     });

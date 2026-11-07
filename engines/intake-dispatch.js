@@ -90,6 +90,12 @@
         //   改成真读设置（截断上限由 goalMaxLen 决定），字面量随之消失。
         const text = clean(p && p.intent, Number(settings().goalMaxLen) || 80);
         if (!text) return null;
+        // Repeated inference intent is an update signal, not a fresh goal each turn.
+        // Read only this owner's exact canonical person key and active goal text.
+        const state = WA.store && WA.store.get ? WA.store.get() : null;
+        const person = state && state.people && state.people['p_' + clean(p.name, 60)];
+        const goals = person && person.life && person.life.goals;
+        if (Array.isArray(goals) && goals.some(function (g) { return g && g.status === 'active' && clean(g.text, 80) === clean(text, 80); })) return null;
         return [p.name, { text: text }];
       }
     },

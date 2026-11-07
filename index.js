@@ -595,6 +595,8 @@
     'engines/offstage-life.js',
     'engines/eccentric-threads.js',
     'engines/human-realism.js',
+    // v2.325.0: 剧情生活动线与身份世界观节律
+    'engines/routine-pacing.js',
     // v2.251.0（拓展 WD-1）：阶位权重池 + 未得补偿 + 幸运封顶（cf. aifarm gacha/soft-pity）。
     //   纯判据 + 抽一个：走 rand.pickWeighted 的 `draw` 通道，池子与图鉴留在调用方。
     'engines/weighted-draw.js',
@@ -760,6 +762,9 @@
     //   须早于 render/inject.js（注入落地时读 freight.buildBlock()）。
     'engines/freight.js',
     'engines/story-choice.js',
+    // v2.325.0（缝合 -Galgame 呈现半边）：待选按钮。须晚于 engines/story-choice.js
+    //   （只经它读 pending/review、只经它 confirm），须晚于 core/settings-bus。
+    'engines/choice-board.js',
     'engines/commission.js',
     'engines/investigation.js',
     'engines/aftermath.js',

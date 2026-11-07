@@ -50,8 +50,8 @@ function runAll(assertFn) {
     const WA = load();
     WA.roundDrivers.setSettings({ enabled: true });
     const r = WA.roundDrivers.tickAll();
-    aa(r.ok === true && r.called === 7,
-      'B2 开启后七台全调（实 called=' + r.called + ' driven=' + r.driven + '）');
+    aa(r.ok === true && r.called === WA.roundDrivers.DRIVERS.length,
+      'B2 开启后登记驱动全调（实 called=' + r.called + ' driven=' + r.driven + '）');
   }
   {
     const WA = load();

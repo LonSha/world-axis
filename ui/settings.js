@@ -316,6 +316,78 @@
     });
     return out;
   }
+  // 普通模式只暴露玩家真正需要理解的三件事。底层引擎设置仍保留，
+  // 但不再把项目内部词汇和实现开关当作默认产品界面。
+  /**
+   * 开局引导设置面（v2.271.0 / V6 EXV6-7；本轮收口：**两种模式共用同一份**）。
+   *
+   * 为什么抽成函数、且在玩家模式也渲染：开局引导的三步（配 API / 选档位 / 说第一句话）
+   *   全是**玩家**的动作。此前这一格只长在开发者模式那段里 —— 普通玩家在设置页既看不到
+   *   自己的装机进度，也点不到「重新显示引导 / 清空进度」（关掉开发者模式就彻底无入口，
+   *   只能重装插件）。tests/first-run-ui-v2271 的 C1–C13 当场抓到这一条。
+   *
+   * 为什么共用而不是各写一份：两份 HTML 必然漂移（文案、id、按钮顺序都是漂移面），
+   *   而负控制咬的就是这些字面量；单一真源让两种模式读到同一个契约。
+   *
+   * 纪律不变：
+   *   ① **只发动作**：写盘走 `WA.firstRun.setSettings` / `mark` / `resume` / `reset`（引擎内唯一写路径）；
+   *   ② **环境优先**：手勾走 `mark()`，它内部判定「环境读得出吗」，读得出时**拒绝写入**并给原因，
+   *      本处只把原因原样转告玩家（不绕过它直写设置族 —— 绕过就等于拆了那条纪律）。
+   */
+  function firstRunBlockHtml() {
+    if (!WA.firstRun || typeof WA.firstRun.getSettings !== 'function') {
+      return '<div class="wa-sec" data-wa-lane="ui" data-wa-sec="开局引导">开局引导</div>'
+        + '<div class="wa-dim">开局引导未加载（engines/first-run.js 缺席）</div>';
+    }
+    const fr = WA.firstRun.getSettings();
+    const snap = (() => { try { return WA.firstRun.build(); } catch (e) { return null; } })();
+    const snapRows = (snap && snap.ok === true)
+      ? snap.steps.map(function (s) {
+          const tag = s.state === 'done' ? '✓ 已完成'
+            : (s.state === 'cannot-tell' ? ('? 测不到' + (s.why2 ? '（' + esc(s.why2) + '）' : '')) : '○ 未完成');
+          return '<div class="wa-item"><b>' + esc(s.order + '. ' + s.title) + '</b> <span class="wa-dim">'
+            + esc(tag) + (s.source === 'manual' ? '（你手勾的）' : '') + '</span></div>';
+        }).join('')
+      : '<div class="wa-dim">状态读数不可用</div>';
+    // ⚠ 手勾回显读 `fr.doneTalk`（getSettings 的真读数）。
+    //   原实现读 `bd('worldaxis_first_run_settings_v1').doneTalk` —— bounds 是「区间声明」，
+    //   里面根本没有布尔读数，读它恒得 undefined ⇒ 勾选框永远不预勾（静默错）。
+    const dt = fr.doneTalk ? 'checked' : '';
+    return `<div class="wa-sec" data-wa-lane="ui" data-wa-sec="开局引导">开局引导<span class="wa-dim">（第一次开局的三个真实步骤）</span></div>
+      <label class="wa-node"><input type="checkbox" id="wa-fr-enable" ${fr.enabled ? 'checked' : ''}/><span class="wa-node-label">启用开局引导</span></label>
+      <label class="wa-node"><input type="checkbox" id="wa-fr-showdone" ${fr.showWhenDone ? 'checked' : ''}/><span class="wa-node-label">三步都做完后仍留在概览页</span></label>
+      <div class="wa-dim">三步当前态（环境读书优先；「测不到」的步可手勾兜底）：</div>
+      ${snapRows}
+      <label class="wa-node"><input type="checkbox" id="wa-fr-talk" ${dt}/><span class="wa-node-label">手动确认「说第一句话」这一步（仅当环境读不到时生效）</span></label>
+      <button class="wa-btn" id="wa-fr-save">保存开局引导设置</button>
+      <button class="wa-btn wa-mini" id="wa-fr-resume">重新显示引导</button>
+      <button class="wa-btn wa-mini" id="wa-fr-reset">清空进度</button>
+      <div id="wa-fr-out" class="wa-out"></div>
+      <div class="wa-dim">三步的真实判据：API 配置字段 / 档位词条 / 注入快照与演化回合。进度只落设置族，不写存档（它是「你」的装机进度，不是世界里发生的事）。</div>`;
+  }
+
+  function playerSettingsHtml() {
+    let b = {};
+    try { b = WA.backstage && typeof WA.backstage.getSettings === 'function' ? WA.backstage.getSettings() : {}; } catch (e) {}
+    const mode = ['light', 'balanced', 'deep'].indexOf(b.simulationMode) >= 0 ? b.simulationMode : 'balanced';
+    return '<div class="wa-player-settings" data-wa-player-settings="true">'
+      + '<div class="wa-sec" data-wa-lane="player" data-wa-sec="世界运行">世界运行</div>'
+      + '<div class="wa-dim">世界会自动推进。选择你喜欢的节奏即可，其他机制会按默认方式工作。</div>'
+      + '<div class="wa-set-row"><label for="wa-set-simple-mode">世界节奏</label><select id="wa-set-simple-mode" class="wa-input" data-wa-simple="simulationMode">'
+      + '<option value="light"' + (mode === 'light' ? ' selected' : '') + '>悠闲</option>'
+      + '<option value="balanced"' + (mode === 'balanced' ? ' selected' : '') + '>自然</option>'
+      + '<option value="deep"' + (mode === 'deep' ? ' selected' : '') + '>活跃</option></select></div>'
+      + '<label class="wa-node"><input type="checkbox" data-wa-simple="autoSimulate" ' + (b.autoSimulate !== false ? 'checked' : '') + '/><span class="wa-node-label">让世界自动运行</span></label>'
+      + '<button class="wa-btn" data-wa-simple-save="true">保存</button><span class="wa-dim" data-wa-simple-out="true"></span>'
+      // 本轮收口：玩家模式也要有「开局引导」这一格 —— 三步是玩家的动作，进度 / 重新显示 /
+      //   清空都不该被开发者开关锁住；与开发者模式共用同一份 HTML（单一真源，不各写一份）。
+      + firstRunBlockHtml()
+      + '<details class="wa-fold wa-developer-entry"><summary>开发者工具</summary>'
+      + '<div class="wa-fold-body"><label class="wa-node"><input type="checkbox" id="wa-set-devmode"/><span class="wa-node-label">显示高级设置与全部工具</span></label>'
+      + '<div class="wa-dim">这里包含调试、机制和内部配置，普通游玩不需要打开。</div></div></details>'
+      + '</div>';
+  }
+
   WA.uiSettings = {
     /**
      * v2.262.0：分组函数的**对外读口**。
@@ -333,6 +405,8 @@
      */
     laneApply(rootEl, lane) { return laneApply(rootEl, lane); },
     render() {
+      const __dev = WA.ui ? ((typeof WA.ui.devMode === 'function') ? WA.ui.devMode() : false) : true;
+      if (!__dev) return playerSettingsHtml();
       const bs = WA.backstage.getSettings();
       const op = WA.opinion.getSettings();
       const modes = [['light', '轻量'], ['balanced', '均衡'], ['deep', '深度'], ['manual', '手动']];
@@ -352,7 +426,7 @@
         ${laneNavHtml()}
         ${tierBlockHtml()}
         <div class="wa-sec" data-wa-lane="ui" data-wa-sec="界面">界面</div>
-        <label class="wa-node"><input type="checkbox" id="wa-set-devmode" ${((WA.ui && typeof WA.ui.devMode === 'function') ? WA.ui.devMode() : false) ? 'checked' : ''}/><span class="wa-node-label">开发者模式（显示全部 32 个页签与分类导航；关闭则只保留概览 / 世界 / 人物 / 事件 / API / 设置 6 个日常页）</span></label>
+        <label class="wa-node"><input type="checkbox" data-wa-devmode="true" ${((WA.ui && typeof WA.ui.devMode === 'function') ? WA.ui.devMode() : false) ? 'checked' : ''}/><span class="wa-node-label">开发者模式（显示全部页签与分类导航；关闭则只保留概览 / 世界 / 人物 / 事件 / API / 设置 6 个日常页）</span></label>
         <div class="wa-dim">日常使用不需要开发者模式。机制页（拍 / 事件闭环 / 分支比较 / 供应链 / 沉积……）是排查与调参用的，藏在开关后面。</div>
         <div class="wa-sec" data-wa-lane="world" data-wa-sec="世界日记">世界日记<span class="wa-dim">（概览页那几句「你看不见的地方」怎么压）</span></div>
         ${(() => {
@@ -637,37 +711,7 @@
             <div class="wa-dim">· 它只跟你自己配的那个接口地址说话，不外发别处。</div>
             <div class="wa-dim">全文随仓库一起：docs/PLAYER_GUIDE.md（含「坏了怎么办」的症状对照表）。</div>`;
         })()}
-        <div class="wa-sec" data-wa-lane="ui" data-wa-sec="开局引导">开局引导<span class="wa-dim">（第一次开局的三个真实步骤）</span></div>
-        ${(() => {
-          // v2.271.0（V6 EXV6-7）：开局引导设置面。
-          //   三步的**当前态**在这里也显示一遍 —— 玩家在概览页点了「知道了」之后，
-          //   想回来看看进度只能到这一格（否则只能靠从头重装插件）。
-          const bdFr = bd('worldaxis_first_run_settings_v1');
-          if (!WA.firstRun || typeof WA.firstRun.getSettings !== 'function') {
-            return '<div class="wa-dim">开局引导未加载（engines/first-run.js 缺席）</div>';
-          }
-          const fr = WA.firstRun.getSettings();
-          const snap = (() => { try { return WA.firstRun.build(); } catch (e) { return null; } })();
-          const snapRows = (snap && snap.ok === true)
-            ? snap.steps.map(function (s) {
-                const tag = s.state === 'done' ? '✓ 已完成'
-                  : (s.state === 'cannot-tell' ? ('? 测不到' + (s.why2 ? '（' + esc(s.why2) + '）' : '')) : '○ 未完成');
-                return '<div class="wa-item"><b>' + esc(s.order + '. ' + s.title) + '</b> <span class="wa-dim">'
-                  + esc(tag) + (s.source === 'manual' ? '（你手勾的）' : '') + '</span></div>';
-              }).join('')
-            : '<div class="wa-dim">状态读数不可用</div>';
-          const dt = (bdFr && bdFr.doneTalk) ? 'checked' : '';
-          return `<label class="wa-node"><input type="checkbox" id="wa-fr-enable" ${fr.enabled ? 'checked' : ''}/><span class="wa-node-label">启用开局引导</span></label>
-            <label class="wa-node"><input type="checkbox" id="wa-fr-showdone" ${fr.showWhenDone ? 'checked' : ''}/><span class="wa-node-label">三步都做完后仍留在概览页</span></label>
-            <div class="wa-dim">三步当前态（环境读书优先；「测不到」的步可手勾兜底）：</div>
-            ${snapRows}
-            <label class="wa-node"><input type="checkbox" id="wa-fr-talk" ${dt}/><span class="wa-node-label">手动确认「说第一句话」这一步（仅当环境读不到时生效）</span></label>
-            <button class="wa-btn" id="wa-fr-save">保存开局引导设置</button>
-            <button class="wa-btn wa-mini" id="wa-fr-resume">重新显示引导</button>
-            <button class="wa-btn wa-mini" id="wa-fr-reset">清空进度</button>
-            <div id="wa-fr-out" class="wa-out"></div>
-            <div class="wa-dim">三步的真实判据：API 配置字段 / 档位词条 / 注入快照与演化回合。进度只落设置族，不写存档（它是「你」的装机进度，不是世界里发生的事）。</div>`;
-        })()}
+        ${firstRunBlockHtml()}
         <div class="wa-sec" data-wa-lane="world" data-wa-sec="世界推演设置">世界推演设置</div>
         <div class="wa-set-row"><span>推演尺度</span><select aria-label="推演尺度" id="wa-set-mode" class="wa-input">${modes.map(m => `<option value="${m[0]}" ${bs.simulationMode === m[0] ? 'selected' : ''}>${m[1]}</option>`).join('')}</select></div>
         <div class="wa-set-row"><span>时间策略</span><select aria-label="时间策略" id="wa-set-time" class="wa-input">${times.map(t => `<option value="${t[0]}" ${bs.timePolicy === t[0] ? 'selected' : ''}>${t[1]}</option>`).join('')}</select></div>
@@ -775,6 +819,23 @@
     },
     bind(panelEl) {
       const $ = sel => panelEl.querySelector(sel);
+      const simpleSave = $('#wa-set-simple-save') || panelEl.querySelector('[data-wa-simple-save]');
+      if (simpleSave) simpleSave.onclick = function () {
+        const read = function (key) { const el = panelEl.querySelector('[data-wa-simple="' + key + '"]'); return el && el.type === 'checkbox' ? !!el.checked : (el ? el.value : ''); };
+        let result = null;
+        try {
+          if (WA.backstage && typeof WA.backstage.setSettings === 'function') {
+            result = WA.backstage.setSettings({ simulationMode: read('simulationMode'), autoSimulate: read('autoSimulate') });
+          } else {
+            throw new Error('世界设置模块未加载');
+          }
+          const out = panelEl.querySelector('[data-wa-simple-out]');
+          if (out) out.textContent = result && result.ok === false ? '保存失败：' + (result.reason || '未知原因') : '已保存，世界会按新的偏好运行。';
+        } catch (e) {
+          const out = panelEl.querySelector('[data-wa-simple-out]');
+          if (out) out.textContent = '保存失败：' + ((e && e.message) || e);
+        }
+      };
       const out = () => $('#wa-set-out');
       // v2.21.0: 设置页结果出口的**判空写**。为什么必须收成单一出口：
       //   `out()` 每次调用都重新查询 —— 而本页有异步出口（舆情生成）在 `await` **之后**才写结果，
@@ -897,7 +958,7 @@
       //   （可见性 / 分类条 / 机制页弹回 / 落盘都在那边），本处只挂事件与留痕。
       //   关闭时若停在机制页，setDevMode 内部会 goPage('overview') → renderBody 重绘，
       //   设置页 DOM 被整块替换，此处的 devCb 节点随旧 DOM 一起失效 —— 这正是期望行为。
-      const devCb = $('#wa-set-devmode');
+      const devCb = $('#wa-set-devmode') || panelEl.querySelector('[data-wa-devmode]');
       if (devCb) devCb.onchange = function () {
         const r = (WA.ui && typeof WA.ui.setDevMode === 'function') ? WA.ui.setDevMode(devCb.checked) : { ok: false, reason: 'ui-missing' };
         if (WA.log) WA.log('info', '开发者模式：' + (devCb.checked ? '开' : '关') + (r && r.ok === false ? '（失败：' + (r.reason || '?') + '）' : (r && r.page ? '（已回到概览页）' : '')));

@@ -130,7 +130,9 @@ function runHumanRealism(a) {
   const resentmentBeforeSettle = W.humanRealism.getActor('药铺小掌柜').emotions.resentment;
   // 恶霸遭报应后带着赔礼真诚下跪谢罪并照价赔偿三倍药资
   const rSettle = W.humanRealism.settleGrudge(rGrudge.grudge.id, {
-    resolution: '恶霸折断佩刀，赔偿白银三十两并当街奉茶向掌柜鞠躬认错'
+    resolution: '恶霸折断佩刀，赔偿白银三十两并当街奉茶向掌柜鞠躬认错',
+    evidence: '场景已确认赔偿交割，掌柜明确表示愿意原谅',
+    response: 'forgive'
   });
   a.ok(rSettle.ok, '恩怨得到实质性化解');
   a.strictEqual(rSettle.grudge.settled, true, '记恨账本标记已平息');

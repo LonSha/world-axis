@@ -62,18 +62,37 @@
     return { ok: false, reason: r };
   }
 
+  let activeDraft = null;
   function getRoot() {
-    if (!WA.store || !WA.store.get) return null;
-    const st = WA.store.get() || {};
-    if (!st.humanRealism) {
-      st.humanRealism = { actors: {}, grudges: [], log: [] };
+    const st = activeDraft || (WA.store && WA.store.get ? WA.store.get() : null);
+    if (!st) return null;
+    if (activeDraft) {
+      st.humanRealism = st.humanRealism || {actors:{}, grudges:[], log:[]};
+      return st.humanRealism;
     }
-    if (!st.humanRealism.actors) st.humanRealism.actors = {};
-    if (!Array.isArray(st.humanRealism.grudges)) st.humanRealism.grudges = [];
-    if (!Array.isArray(st.humanRealism.log)) st.humanRealism.log = [];
-    return st.humanRealism;
+    // 读口不暴露可变存档引用，也不在读取时创建容器。
+    return st.humanRealism ? JSON.parse(JSON.stringify(st.humanRealism)) : null;
   }
-
+  function transactional(fn) {
+    return function () {
+      if (!WA.store || typeof WA.store.transact !== 'function') return {ok:false,reason:'store-unavailable'};
+      const args=arguments, before=JSON.parse(JSON.stringify(stat));
+      let output=null;
+      const tx=WA.store.transact(function(draft) {
+        const parent=activeDraft;
+        activeDraft=draft;
+        try { output=fn.apply(null,args); }
+        finally { activeDraft=parent; }
+        if (!output || output.ok!==true) return false;
+      });
+      if (!tx || tx.ok!==true) {
+        Object.keys(stat).forEach(k=>{delete stat[k];}); Object.assign(stat,before);
+        return output && output.ok===false ? output : {ok:false,reason:'transaction-rejected'};
+      }
+      // store 的 ok 与落盘成功不是同义词，保留其原始语义。
+      return Object.assign({}, JSON.parse(JSON.stringify(output)), {persisted:tx.persisted,deferred:tx.deferred===true});
+    };
+  }
   // 预设豁免类型定义
   const PRESET_EXEMPTIONS = {
     divine: ['nourishment', 'energy', 'comfort', 'vitality'],
@@ -89,6 +108,8 @@
   function isExempt(actorCard, dimension) {
     if (!actorCard || !actorCard.exemptions) return false;
     const ex = actorCard.exemptions;
+    // Explicit per-character capability overrides the species preset, including all.
+    if (ex.overrides && typeof ex.overrides[dimension] === 'boolean') return ex.overrides[dimension];
     if (ex.all === true) return true;
     if (typeof ex.preset === 'string' && PRESET_EXEMPTIONS[ex.preset]) {
       if (PRESET_EXEMPTIONS[ex.preset].indexOf(dimension) >= 0) return true;
@@ -344,23 +365,30 @@
     if (!hit) return noteRefusal('grudge-not-found');
     if (hit.settled) return noteRefusal('already-settled');
 
-    hit.settled = true;
-    hit.resolution = resolution;
-    hit.settledAt = clockNow('humanRealism');
-
-    // 相应平复受害角色的怨气
-    const actor = root.actors[hit.who];
-    if (actor) {
-      actor.emotions.resentment = Math.max(0, actor.emotions.resentment - Math.round(hit.intensity * 0.7));
-      actor.emotions.anger = Math.max(0, actor.emotions.anger - Math.round(hit.intensity * 0.5));
-      actor.emotions.joy = Math.min(100, actor.emotions.joy + 15);
-      actor.updatedAt = clockNow('humanRealism');
+    const evidence=clean(o.evidence,160);
+    if (!evidence) return noteRefusal('missing-resolution-evidence');
+    const response=o.response;
+    if (['reject','acknowledge','accept-repair','forgive'].indexOf(response)<0) return noteRefusal('missing-personal-response');
+    // evidence 是调用方登记的叙事依据，不宣称已独立验证真实性。
+    if (!Array.isArray(hit.resolutionAttempts)) hit.resolutionAttempts=[];
+    hit.resolutionAttempts.push({resolution:resolution,evidence:evidence,response:response,at:clockNow('humanRealism')});
+    hit.resolutionAttempts=hit.resolutionAttempts.slice(-8);
+    hit.resolution=resolution;
+    hit.resolutionEvidence=evidence;
+    hit.response=response;
+    hit.repairAccepted=response==='accept-repair'||response==='forgive';
+    hit.forgiven=response==='forgive';
+    hit.settled=hit.forgiven;
+    if (hit.settled) hit.settledAt=clockNow('humanRealism');
+    const actor=root.actors[hit.who];
+    // 不自动增加喜悦或恢复信任。仅显式原谅时缓和对应怨气。
+    if (actor && hit.forgiven) {
+      actor.emotions.resentment=Math.max(0,actor.emotions.resentment-Math.round(hit.intensity*0.5));
+      actor.updatedAt=clockNow('humanRealism');
+      stat.grudgesSettled++;
     }
-
-    stat.grudgesSettled++;
-    return { ok: true, grudge: Object.assign({}, hit) };
+    return {ok:true,grudge:Object.assign({},hit)};
   }
-
   /**
    * 触发或检测情绪临界爆发（Outburst Breaker）
    */
@@ -443,6 +471,12 @@
     if (Array.isArray(o.custom)) {
       actor.exemptions.custom = o.custom.map(function (c) { return clean(c, 32); }).filter(Boolean);
     }
+    if (o.overrides && typeof o.overrides === 'object') {
+      actor.exemptions.overrides = actor.exemptions.overrides || {};
+      ['nourishment','energy','comfort','vitality','emotion_outburst','grudge'].forEach(function (k) {
+        if (typeof o.overrides[k] === 'boolean') actor.exemptions.overrides[k] = o.overrides[k];
+      });
+    }
     if (o.all !== undefined) {
       actor.exemptions.all = !!o.all;
     }
@@ -492,7 +526,7 @@
     const activeGrudges = (root.grudges || []).filter(function (g) { return g && !g.settled; }).slice(0, 3);
     const grudgeLines = [];
     activeGrudges.forEach(function (g) {
-      grudgeLines.push('· 【心底芥蒂】' + g.who + ' 深刻记恨 ' + g.target + '（缘由：' + g.reason + '，烈度：' + g.intensity + '；互动时必然暗含被动阻抗与冷眼疏离，严禁谄媚讨好）');
+      grudgeLines.push('· 【心底芥蒂】' + g.who + ' 对 ' + g.target + ' 尚有未解芥蒂（缘由：' + g.reason + '，烈度：' + g.intensity + (g.repairAccepted ? '；已接受补偿，不等于原谅或恢复信任' : '') + '；结合性格、经历、现实牵挂与场合表现，可克制、疏远、交涉或暂时合作，不强制报复，也不凭主角意愿抹消恩怨）');
     });
 
     if (!realismLines.length && !grudgeLines.length) return '';
@@ -519,13 +553,14 @@
   }
 
   WA.humanRealism = {
-    setNeeds: setNeeds,
-    consumeRoutine: consumeRoutine,
-    recordGrudge: recordGrudge,
-    settleGrudge: settleGrudge,
-    triggerOutburst: triggerOutburst,
-    setExemption: setExemption,
+    setNeeds: transactional(setNeeds),
+    consumeRoutine: transactional(consumeRoutine),
+    recordGrudge: transactional(recordGrudge),
+    settleGrudge: transactional(settleGrudge),
+    triggerOutburst: transactional(triggerOutburst),
+    setExemption: transactional(setExemption),
     getActor: getActor,
+    isExempt: function (name, dimension) { return isExempt(getActor(name), dimension); },
     listGrudges: listGrudges,
     buildBlock: buildBlock,
     PRESET_EXEMPTIONS: PRESET_EXEMPTIONS

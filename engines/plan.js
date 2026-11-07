@@ -508,6 +508,7 @@
         return { seq: s.seq, kind: s.kind, text: s.text, status: s.status, reason: s.reason || '',
           need: s.need ? Object.assign({}, s.need) : null, fallback: s.fallback || '',
           know: s.know || '', place: s.place || '',
+          costMs: (Number(s.costMs) > 0 ? Math.round(Number(s.costMs)) : 0),
           afterSeq: (s.afterSeq === undefined ? -1 : s.afterSeq) };
       }) };
   }

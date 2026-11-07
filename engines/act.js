@@ -905,22 +905,12 @@
     verdict: verdict,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
-  // ── 工作流节点注册（v2.117.0）─────────────────────────────────────────
-  //   为什么必须有这一段：`advance` 的注释自称「世界心跳调用」，但**全库零调用点** ——
-  //   注释说得好听、真跑起来永远不会被调用，这正是本仓点名的「功能级失效」
-  //   （导出了 API 但零消费方）。挂进 after 链之后，「到点结算」才真的每轮发生。
-  //   位置理由（三条都是硬约束，不是偏好）：
-  //     · 必须在 **after** 链：行动结算读的是世界行程表，而行程是世界侧在推演里写的；
-  //       排在 before 会拿上一轮的行程去算本轮该不该到达。
-  //     · 必须晚于 `backstage.simulate`（order 20）：后台推演会写 life.goals 与 world 行程，
-  //       结算排在它之前 ⇒ 本轮新产生的行程要等下一轮才算，读数整整慢一拍。
-  //     · 必须早于 `parallel.simulate`（order 22）：平行世界是**主线之外**的独立推演，
-  //       不得插在「主线行动」与「世界」之间。故 order 取 21。
-  //   带守卫调用（与 calendar.js / bridge.js / wb-inject.js 同规）：core/workflow.js 缺席时
-  //   不静默半截 —— 结算入口不可用本身就该在 moduleRegistry 里现形，而不是这里抛错。
+  // Automatic cycle consumes the previous committed snapshot before backstage.simulate (20).
+  // Current inference results participate next turn; do not mistake asynchronous launch
+  // order for completion. A still-running previous inference explicitly defers this node.
   if (WA.workflow && typeof WA.workflow.register === 'function') {
     WA.workflow.register({
-      id: 'act.advance', chain: 'after', order: 21, critical: false,
+      id: 'act.advance', chain: 'after', order: 19, critical: false,
       label: '人物行动结算',
       async run() {
         // 时刻取**真实墙钟**：与 events / calendar 的自动推进同口径（推演时刻由那些模块写进状态，
@@ -928,6 +918,8 @@
         //   v2.117.0：本行原先写的是 `WA.clock && typeof WA.clock.now === 'function' ? … : Date.now()`
         //   —— 那是**全库唯一一种不被 K20 判据认下的墙钟写法**（判据只放行 `WA.clock ?` 这一种三元）。
         //   裸调绕过冻结，回放对不上时只能全库通读；此处改回与 core/rand.js 同规的写法。
+        // Background inference is asynchronous; workflow order is not a completion barrier.
+        if (WA.backstage && typeof WA.backstage.isRunning === 'function' && WA.backstage.isRunning()) return {ok:false, reason:'backstage-running', deferred:true};
         const t = (WA.clock ? WA.clock.now('act.advance') : Date.now());
         return WA.act.advance(t, { max: 2 });
       }

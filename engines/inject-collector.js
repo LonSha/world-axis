@@ -14,6 +14,7 @@
   //   「场景换了但选的一样」有两种完全不同的原因 —— ①场景输入根本没到（from='none'）；
   //   ②到了但这几条候选恰好不含在场人（relevance 全是 0）。两者修法相反，
   //   混成一个读数就只能靠猜。故把「这一轮场景从哪来」与「选了哪些」分开记。
+  let routineTrace = {status:'not-collected', candidates:0, selected:0};
   let lastScene = { from: 'none', people: [], place: '' };
   function settings() {
     return WA.settingsBus ? WA.settingsBus.normalize(REG, Object.assign({}, DEF, WA.settingsBus.read(REG) || {})) : Object.assign({}, DEF);
@@ -25,6 +26,7 @@
   }
   function buildBlock(context) {
     const cfg = settings();
+    routineTrace = {status:cfg.enabled ? 'owner-disabled-or-hidden' : 'collector-disabled', candidates:0, selected:0};
     if (!cfg.enabled) { last = { enabled: false, selected: 0, folded: 0, chars: 0, rows: [], faults: [] }; return ''; }
     const c = context || {}, candidates = [], faults = [];
     const max = Math.max(1, Math.min(12, Math.floor(Number(cfg.maxItems) || 4)));
@@ -177,6 +179,20 @@
           });
         }
       }
+      // v2.325.0: 剧情生活动线、身份世界观节律与个性经历偏离注入
+      if (WA.routinePacing && typeof WA.routinePacing.buildBlock === 'function') {
+        routineTrace.status = 'no-material';
+        const rb = WA.routinePacing.buildBlock();
+        if (rb) {
+          String(rb).split('\n').filter(function (l) { return l.indexOf('- ') === 0; }).forEach(function (line, idx) {
+            const cleanLine = line.replace(/^- /, '');
+            const m = cleanLine.match(/^([^（(：:\s]+)/);
+            const who = m ? m[1].trim() : '';
+            routineTrace.candidates++;
+            add('life', 'routine:' + idx, cleanLine, who ? [who] : [], Date.now(), '生活节律');
+          });
+        }
+      }
     });
     // Rank first, then scene relevance, then owner-local freshness (different clocks
     // are never compared across owners), finally stable owner/id order.
@@ -207,6 +223,8 @@
       counts[r.owner] = (counts[r.owner] || 0) + 1;
       picked.push(Object.assign({}, r, { content: text })); used += text.length + 1; tokenUsed += tokenCost(text + "\n");
     });
+    routineTrace.selected = picked.filter(function(r){return r.id.indexOf('routine:') === 0;}).length;
+    if (routineTrace.candidates) routineTrace.status = routineTrace.selected ? 'selected' : 'budget-folded';
     const block = compose(picked, candidates.length - picked.length);
     const inputs = candidates.map(function(r){return {source:'结构汇流',content:'· '+r.label+'：'+r.text};});
     const volume = WA.injectBudget.volumeView(inputs, block ? [{source:'结构汇流',content:block}] : []);
@@ -221,12 +239,12 @@
     buildBlock: buildBlock,
     diagnose: function () {
       const cfg=settings(),s=WA.store.get()||{};
-      if(!cfg.enabled)return {ok:true,status:'disabled',faults:[]};
+      if(!cfg.enabled)return {ok:true,status:'disabled',faults:[],routine:Object.assign({},routineTrace)};
       if(last.chatId!==WA.store.chatId()||last.enabled!==true)return {ok:true,status:'not-collected',faults:[]};
       const populated=Object.keys(s.people||{}).length>0||(s.currents||[]).length>0||(s.events&&s.events.rows||[]).length>0;
       const faults=last.faults.slice();
       if(populated&&last.candidateCount===0)faults.push({fault:'state-but-no-candidate',scope:'collector-five-owners',note:'可能是源关闭/可见性过滤或无适用材料，不代表整个世界注入失败'});
-      return {ok:faults.length===0,status:faults.length?'attention':'ok',candidateCount:last.candidateCount,selected:last.selected,faults:faults};
+      return {ok:faults.length===0,status:faults.length?'attention':'ok',candidateCount:last.candidateCount,selected:last.selected,faults:faults,routine:Object.assign({},routineTrace)};
     },
     noteScene: function (info) {
       const i = info || {};

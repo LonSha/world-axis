@@ -94,8 +94,8 @@ function runLivingThreads(a) {
   const cardZhang = W.offstageLife.getOffstageCard('老张');
   a.ok(cardZhang, '成功读取老张幕后生计卡');
   a.strictEqual(cardZhang.roundsAway, 3, '老张离场轮次累计为 3 轮');
-  a.ok(cardZhang.weariness > 10, '老张生理磨损自然增长');
-  a.ok(cardZhang.misadventures.length > 0, '老张记录了市井生活插曲');
+  a.strictEqual(cardZhang.weariness, 10, '聊天轮数不直接制造疲劳');
+  a.strictEqual(cardZhang.misadventures.length, 0, '批量随机候选不冒充经历');
 
   // ── 环节 3：怪诞市井支线与搞笑暗线发酵 ──
   const openFarce = W.eccentricThreads.openThread({
@@ -139,7 +139,7 @@ function runLivingThreads(a) {
   a.ok(snapRes.ok, '重逢切片生成成功');
   a.strictEqual(snapRes.snap.who, '青玄门小杂役', '切片角色无误');
   a.strictEqual(snapRes.snap.roundsAway, 3, '离线 3 轮如实回流');
-  a.ok(snapRes.snap.reunionTone.indexOf('近别重会') >= 0, '重聚语调自然接地气');
+  a.ok(snapRes.snap.reunionTone.indexOf('不代表剧情时长') >= 0, '重逢情绪不由轮数强制决定');
 
   // ── 环节 5：主生成 Prompt 汇流管线注入 ──
   const deskOff = W.actionDesk.plan('life.markOffstage', {
@@ -152,6 +152,8 @@ function runLivingThreads(a) {
 
   const deskAdv = W.actionDesk.plan('life.progressOffstage', {
     who: '流浪散修',
+    confirmed: true,
+    evidence: '正文已确认仙鹤啄破袖口',
     rounds: 2,
     forceMisadventure: true,
     customMisadventure: '在坊市被一只偷嘴仙鹤啄破了袖口'

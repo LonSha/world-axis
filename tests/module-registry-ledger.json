@@ -1,13 +1,13 @@
 {
- "version": "2.301.0",
- "loadOrderCount": 342,
- "loadedCount": 328,
+ "version": "2.322.0",
+ "loadOrderCount": 378,
+ "loadedCount": 364,
  "uiCount": 14,
- "nsCount": 337,
+ "nsCount": 373,
  "totals": {
-  "loadEdges": 213,
+  "loadEdges": 252,
   "hardEdges": 0,
-  "callRefs": 406,
+  "callRefs": 445,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -44,6 +44,7 @@
     "engines/archive-hide.js",
     "engines/atlas.js",
     "engines/auto-hide.js",
+    "engines/autobiography-epiphany.js",
     "engines/backstage-tone.js",
     "engines/backstage.js",
     "engines/beat-facade.js",
@@ -61,14 +62,19 @@
     "engines/capacity-audit.js",
     "engines/care-chain.js",
     "engines/chapters.js",
+    "engines/choice-board.js",
     "engines/chronicle-view.js",
+    "engines/city-folklore.js",
+    "engines/civilization-relic.js",
     "engines/commission.js",
     "engines/commons-governance.js",
     "engines/community-note.js",
     "engines/compare.js",
     "engines/contest.js",
+    "engines/contraband.js",
     "engines/coop.js",
     "engines/coordinate.js",
+    "engines/counterfactual-sandbox.js",
     "engines/day-route.js",
     "engines/deep-clean.js",
     "engines/demographic-flow.js",
@@ -76,6 +82,7 @@
     "engines/diplomacy.js",
     "engines/direct-event.js",
     "engines/dream.js",
+    "engines/eccentric-threads.js",
     "engines/eco-audit.js",
     "engines/economy.js",
     "engines/elsewhere.js",
@@ -86,6 +93,7 @@
     "engines/events.js",
     "engines/evidence-board.js",
     "engines/evolution.js",
+    "engines/faction-chronicle.js",
     "engines/faction-graph.js",
     "engines/family.js",
     "engines/farfield.js",
@@ -94,6 +102,7 @@
     "engines/first-run.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
+    "engines/foreshadow-tree.js",
     "engines/foreshadow.js",
     "engines/freight.js",
     "engines/gear.js",
@@ -104,8 +113,10 @@
     "engines/handoff-pack.js",
     "engines/hazard.js",
     "engines/history-search.js",
+    "engines/human-realism.js",
     "engines/inject-collector.js",
     "engines/inject-value.js",
+    "engines/inline-tags.js",
     "engines/inst.js",
     "engines/institutional-inertia.js",
     "engines/intent-board.js",
@@ -114,6 +125,7 @@
     "engines/knowledge-practice.js",
     "engines/l3-registry.js",
     "engines/labor-schedule.js",
+    "engines/legacy-oath.js",
     "engines/length-policy.js",
     "engines/liaison.js",
     "engines/life.js",
@@ -130,6 +142,7 @@
     "engines/observe-slice.js",
     "engines/offline-return.js",
     "engines/offline-tick.js",
+    "engines/offstage-life.js",
     "engines/one-shot-mod.js",
     "engines/operations.js",
     "engines/opinion.js",
@@ -138,6 +151,8 @@
     "engines/parallel-world.js",
     "engines/pending-center.js",
     "engines/perf-baseline.js",
+    "engines/periodical-ideology.js",
+    "engines/periodicals.js",
     "engines/perspective-lock.js",
     "engines/phase-transition.js",
     "engines/plan-audit.js",
@@ -180,6 +195,7 @@
     "engines/role-conflict.js",
     "engines/round-cost.js",
     "engines/round-drivers.js",
+    "engines/routine-pacing.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
     "engines/save-health.js",
@@ -199,9 +215,11 @@
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/storyline-advance.js",
+    "engines/subtext-tension.js",
     "engines/summarizer.js",
     "engines/supply-chain.js",
     "engines/survey.js",
+    "engines/terrain-hazard.js",
     "engines/training.js",
     "engines/travel-desk.js",
     "engines/undercurrent-calendar.js",
@@ -209,6 +227,7 @@
     "engines/vitals.js",
     "engines/wb-inject.js",
     "engines/wb-search.js",
+    "engines/whisper-backchannel.js",
     "engines/word-budget.js",
     "engines/world-autobiography.js",
     "engines/world-blueprint.js",
@@ -327,36 +346,56 @@
     "direction/oracle.js",
     "direction/tags.js",
     "engines/act.js",
+    "engines/action-cost-feedback.js",
     "engines/action-desk.js",
     "engines/action-methods.js",
+    "engines/agency.js",
     "engines/backstage.js",
+    "engines/branch-transplant.js",
     "engines/bridge.js",
     "engines/calendar.js",
     "engines/chapters.js",
+    "engines/cognitive-poisoning.js",
+    "engines/collateral-rupture.js",
     "engines/coordinate.js",
+    "engines/counterfactual-echo.js",
+    "engines/courier-dispatch.js",
+    "engines/dilemma-bargain.js",
     "engines/direct-event.js",
+    "engines/eccentric-threads.js",
     "engines/elsewhere.js",
     "engines/enemies.js",
     "engines/entry-router.js",
+    "engines/environment-interference.js",
     "engines/events.js",
     "engines/evolution.js",
+    "engines/faction-schism.js",
     "engines/farfield.js",
+    "engines/foreshadow-germination.js",
     "engines/hazard.js",
+    "engines/human-realism.js",
+    "engines/institutional-schism.js",
     "engines/kaleidoscope.js",
     "engines/labor-schedule.js",
     "engines/life.js",
     "engines/living-world.js",
     "engines/memory.js",
     "engines/offline-return.js",
+    "engines/offstage-life.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
     "engines/pmem.js",
     "engines/proactive.js",
     "engines/regional.js",
     "engines/research-closure.js",
+    "engines/routine-pacing.js",
+    "engines/rumor-cognition.js",
+    "engines/sanctuary-scramble.js",
     "engines/summarizer.js",
+    "engines/supply-choke.js",
     "engines/vitals.js",
     "engines/wb-inject.js",
+    "engines/whisper-backchannel.js",
     "render/purifier.js"
    ]
   },
@@ -388,6 +427,7 @@
     "engines/archive-hide.js",
     "engines/atlas.js",
     "engines/auto-hide.js",
+    "engines/autobiography-epiphany.js",
     "engines/backstage-tone.js",
     "engines/beat-facade.js",
     "engines/beat-ledger.js",
@@ -401,26 +441,33 @@
     "engines/campaign.js",
     "engines/capacity-audit.js",
     "engines/care-chain.js",
+    "engines/choice-board.js",
     "engines/chronicle-view.js",
+    "engines/city-folklore.js",
+    "engines/civilization-relic.js",
     "engines/commission.js",
     "engines/commons-governance.js",
     "engines/community-note.js",
     "engines/compare.js",
     "engines/contest.js",
+    "engines/contraband.js",
     "engines/coop.js",
     "engines/coordinate.js",
+    "engines/counterfactual-sandbox.js",
     "engines/day-route.js",
     "engines/deep-clean.js",
     "engines/demographic-flow.js",
     "engines/dep-check.js",
     "engines/diplomacy.js",
     "engines/dream.js",
+    "engines/eccentric-threads.js",
     "engines/eco-audit.js",
     "engines/economy.js",
     "engines/elsewhere.js",
     "engines/ensemble.js",
     "engines/environmental-capacity.js",
     "engines/evidence-board.js",
+    "engines/faction-chronicle.js",
     "engines/faction-graph.js",
     "engines/family.js",
     "engines/farfield.js",
@@ -429,6 +476,7 @@
     "engines/first-run.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
+    "engines/foreshadow-tree.js",
     "engines/foreshadow.js",
     "engines/freight.js",
     "engines/gear.js",
@@ -438,8 +486,10 @@
     "engines/group-refuse.js",
     "engines/handoff-pack.js",
     "engines/history-search.js",
+    "engines/human-realism.js",
     "engines/inject-collector.js",
     "engines/inject-value.js",
+    "engines/inline-tags.js",
     "engines/inst.js",
     "engines/institutional-inertia.js",
     "engines/intent-board.js",
@@ -447,6 +497,7 @@
     "engines/knowledge-practice.js",
     "engines/l3-registry.js",
     "engines/labor-schedule.js",
+    "engines/legacy-oath.js",
     "engines/length-policy.js",
     "engines/liaison.js",
     "engines/lifeline.js",
@@ -461,12 +512,15 @@
     "engines/observe-slice.js",
     "engines/offline-return.js",
     "engines/offline-tick.js",
+    "engines/offstage-life.js",
     "engines/one-shot-mod.js",
     "engines/operations.js",
     "engines/outline-inject.js",
     "engines/output-guard.js",
     "engines/pending-center.js",
     "engines/perf-baseline.js",
+    "engines/periodical-ideology.js",
+    "engines/periodicals.js",
     "engines/perspective-lock.js",
     "engines/phase-transition.js",
     "engines/plan-audit.js",
@@ -506,6 +560,7 @@
     "engines/role-conflict.js",
     "engines/round-cost.js",
     "engines/round-drivers.js",
+    "engines/routine-pacing.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
     "engines/save-health.js",
@@ -525,14 +580,17 @@
     "engines/story-tone.js",
     "engines/storyclock.js",
     "engines/storyline-advance.js",
+    "engines/subtext-tension.js",
     "engines/supply-chain.js",
     "engines/survey.js",
+    "engines/terrain-hazard.js",
     "engines/training.js",
     "engines/travel-desk.js",
     "engines/undercurrent-calendar.js",
     "engines/userlock.js",
     "engines/vitals.js",
     "engines/wb-search.js",
+    "engines/whisper-backchannel.js",
     "engines/word-budget.js",
     "engines/world-autobiography.js",
     "engines/world-blueprint.js",
@@ -663,6 +721,7 @@
     "direction/oracle.js",
     "direction/tags.js",
     "engines/act.js",
+    "engines/agency.js",
     "engines/backstage.js",
     "engines/bridge.js",
     "engines/calendar.js",
@@ -1342,6 +1401,44 @@
    "stateKeys": [
     "worldaxis_calendar_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/inline-tags.js": {
+   "ns": [
+    "inlineTags"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/periodicals.js": {
+   "ns": [
+    "periodicals"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/memory.js": {
@@ -2450,6 +2547,628 @@
    ],
    "consumedBy": []
   },
+  "engines/narrative-dice.js": {
+   "ns": [
+    "narrativeDice"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_narrative_dice_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/spatial-acoustics.js": {
+   "ns": [
+    "spatialAcoustics"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_spatial_acoustics_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/contraband.js": {
+   "ns": [
+    "contraband"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_contraband_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/terrain-hazard.js": {
+   "ns": [
+    "terrainHazard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_terrain_hazard_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/foreshadow-tree.js": {
+   "ns": [
+    "foreshadowTree"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/subtext-tension.js": {
+   "ns": [
+    "subtextTension"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/autobiography-epiphany.js": {
+   "ns": [
+    "autobiographyEpiphany"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/faction-chronicle.js": {
+   "ns": [
+    "factionChronicle"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/legacy-oath.js": {
+   "ns": [
+    "legacyOath"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/city-folklore.js": {
+   "ns": [
+    "cityFolklore"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/periodical-ideology.js": {
+   "ns": [
+    "periodicalIdeology"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/counterfactual-sandbox.js": {
+   "ns": [
+    "counterfactualSandbox"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/civilization-relic.js": {
+   "ns": [
+    "civilizationRelic"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/idiosyncrasy.js": {
+   "ns": [
+    "idiosyncrasy"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_idiosyncrasy_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/whisper-backchannel.js": {
+   "ns": [
+    "whisperBackchannel"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_whisper_backchannel_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/collateral-rupture.js": {
+   "ns": [
+    "collateralRupture"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_collateral_rupture_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/action-cost-feedback.js": {
+   "ns": [
+    "actionCostFeedback"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_action_cost_feedback_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/foreshadow-germination.js": {
+   "ns": [
+    "foreshadowGermination"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_foreshadow_germination_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/courier-dispatch.js": {
+   "ns": [
+    "courierDispatch"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_courier_dispatch_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/supply-choke.js": {
+   "ns": [
+    "supplyChoke"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_supply_choke_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/rumor-cognition.js": {
+   "ns": [
+    "rumorCognition"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_rumor_cognition_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/cognitive-poisoning.js": {
+   "ns": [
+    "cognitivePoisoning"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_cognitive_poisoning_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/dilemma-bargain.js": {
+   "ns": [
+    "dilemmaBargain"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_dilemma_bargain_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/faction-schism.js": {
+   "ns": [
+    "factionSchism"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_faction_schism_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/institutional-schism.js": {
+   "ns": [
+    "institutionalSchism"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_institutional_schism_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/environment-interference.js": {
+   "ns": [
+    "environmentInterference"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_environment_interference_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/branch-transplant.js": {
+   "ns": [
+    "branchTransplant"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_branch_transplant_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/sanctuary-scramble.js": {
+   "ns": [
+    "sanctuaryScramble"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_sanctuary_scramble_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/counterfactual-echo.js": {
+   "ns": [
+    "counterfactualEcho"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_counterfactual_echo_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/offstage-life.js": {
+   "ns": [
+    "offstageLife"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_offstage_life_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/eccentric-threads.js": {
+   "ns": [
+    "eccentricThreads"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_eccentric_threads_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/human-realism.js": {
+   "ns": [
+    "humanRealism"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_human_realism_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/routine-pacing.js": {
+   "ns": [
+    "routinePacing"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_routine_pacing_settings_v1"
+   ],
+   "consumedBy": []
+  },
   "engines/weighted-draw.js": {
    "ns": [
     "weightedDraw"
@@ -3469,6 +4188,27 @@
    ],
    "consumedBy": []
   },
+  "engines/choice-board.js": {
+   "ns": [
+    "choiceBoard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_choice_board_settings_v1"
+   ],
+   "consumedBy": []
+  },
   "engines/commission.js": {
    "ns": [
     "commission"
@@ -4467,15 +5207,18 @@
     "agency"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "workflow"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/workflow.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
     "clock",
-    "modules"
+    "modules",
+    "settingsBus"
    ],
    "ghostRefs": [],
    "stateKeys": [

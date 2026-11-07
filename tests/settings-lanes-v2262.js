@@ -154,7 +154,10 @@ function runCore() {
   // v2.273.0（EXV6-9）：新增「一键交班」一段 ⇒ 22→23 处源码 / 19→20 段运行时。
   // v2.284~v2.293.0（EXV7-6~9）：新增「世界简报」「人物意图看板」「世界自传」「一键播种」四段 ⇒ 23→27 处源码 / 20→24 段运行时。
   //   段数必须跟着涨：不涨的话，下一次新增漏标那一段时本判据会沉默（它就是那个数）。
-  assert(secDivCount === 27, 'A3 源码字面量 wa-sec 恰 27 处（运行时渲染 24 段，差 3 为分支块备用标注）');
+  // 本轮收口（first-run-ui-v2271 C1–C13）：开局引导那一格抽成 firstRunBlockHtml()，
+  //   两处模式（玩家 / 开发者）共用 ⇒ 源码多出 1 处字面量（另一处是 firstRun 未加载的兜底分支），
+  //   28→29；开发者模式运行时仍是 24 段（共用块只渲染一次，不是叠两份）。
+  assert(secDivCount === 29, 'A3 源码字面量 wa-sec 恰 29 处（运行时 24 段 + 4 分支块备用标注 + 1 处共用块兜底）');
   eq((SET_SRC.match(/const LANES = \[/g) || []).length, 1, 'A4 LANES 表定义恰 1 处（单一真源）');
   eq((SET_SRC.match(/function laneNavHtml\(\)/g) || []).length, 1, 'A5 laneNavHtml 定义恰 1 处');
   eq((SET_SRC.match(/function laneApply\(rootEl, lane\)/g) || []).length, 1, 'A6 laneApply 定义恰 1 处');

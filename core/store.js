@@ -243,6 +243,12 @@
         grudges: [],
         log: []
       },
+      // v2.325.0: 剧情生活动线、身份世界观节律与个性经历偏离推进引擎
+      routinePacing: {
+        actors: {},
+        worldFrame: { preset: 'general_freelance', currentSlot: null, dayType: 'unknown', slotIndex: -1 },
+        history: []
+      },
       // v2.250.0（拓展：从活跃开源伴侣生态里凿出来的四个真空区）。四个新引擎的顶层容器。
       //   登记了却不在骨架里：registryParity 报「未在骨架物化」，冷启动直写炸事务，
       //   且 sizeAudit / 容量议题 / 健康分一整片读数偏。
@@ -1661,6 +1667,9 @@
     'humanRealism.actors': { cap: 48, kind: 'object', site: 'human-realism.js WA.evict.object(actors, "humanRealism.actors")' },
     'humanRealism.grudges': { cap: 48, site: 'human-realism.js evict.array(grudges, "humanRealism.grudges")' },
     'humanRealism.log': { cap: 32, site: 'human-realism.js evict.array(log, "humanRealism.log")' },
+    // v2.325.0: 剧情生活动线、身份世界观节律与个性经历偏离容器上限
+    'routinePacing.actors': { cap: 48, kind: 'object', site: 'routine-pacing.js WA.evict.object(actors, "routinePacing.actors")' },
+    'routinePacing.history': { cap: 32, site: 'routine-pacing.js evict.array(history, "routinePacing.history")' },
     'vitals.rows': { cap: 24, site: "vitals.js evict.array(rows, \"vitals.rows\")" },
     'coordinate.anchors': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.anchors\")" },
     'coordinate.rows': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.rows\")" },

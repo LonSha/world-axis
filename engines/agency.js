@@ -272,7 +272,7 @@
     const actSpec = {
       kind: step.kind || 'work',
       goalId: goal.id,
-      duration: finite(step.duration) || undefined,
+      duration: finite(step.costMs) || finite(step.duration) || undefined,
       need: step.need || undefined,
       place: step.place || undefined,
       to: step.place || undefined
@@ -557,6 +557,47 @@
   }
 
   // ── 导出 ──
+  // Existing plans only: never invent steps or treat routine candidates as receipts.
+  // Use last committed snapshot before launching new inference (20); never await network work.
+  let scheduleCursor = {chatId:null, nextName:null};
+  if (WA.workflow && typeof WA.workflow.register === 'function') {
+    WA.workflow.register({
+      id: 'agency.schedule', chain: 'after', order: 18, critical: false,
+      label: '人物已有计划行动准入',
+      async run() {
+        const cfg = settings();
+        if (!cfg.enabled) return {ok:false, reason:'disabled'};
+        if (WA.backstage && typeof WA.backstage.isRunning === 'function' && WA.backstage.isRunning()) return {ok:false, reason:'backstage-running', deferred:true};
+        const people = state().people || {};
+        const names = Object.keys(people).map(function (id) { return people[id]; })
+          .filter(function (p) { return p && p.name && p.life && Array.isArray(p.life.goals) && p.life.goals.some(function (g) { return g.status === 'active'; }); })
+          .map(function (p) { return p.name; }).filter(function (name, i, all) { return all.indexOf(name) === i; }).sort();
+        const chatId = WA.store && WA.store.chatId ? WA.store.chatId() : null;
+        if (scheduleCursor.chatId !== chatId) scheduleCursor = {chatId:chatId, nextName:null};
+        const index = names.indexOf(scheduleCursor.nextName);
+        const offset = index < 0 ? 0 : index;
+        const ordered = names.slice(offset).concat(names.slice(0, offset));
+        const limit = Math.max(1, Math.min(16, Number(cfg.maxSchedulePerTurn) || 4));
+        const at = clockNow('agency.schedule');
+        const selected = ordered.slice(0, limit);
+        // Cursor is a bounded in-memory scheduling hint, never a world fact.
+        scheduleCursor.nextName = ordered.length ? ordered[selected.length % ordered.length] : null;
+        const results = selected.map(function (name) {
+          try { return WA.agency.schedule(name, at); }
+          catch (e) { return {ok:false, person:name, reason:'schedule-threw', error:String(e && e.message || e).slice(0,120)}; }
+        });
+        return {ok:true, results:results, deferred:Math.max(0, names.length-limit)};
+      }
+    });
+    WA.workflow.register({
+      id: 'agency.receipts', chain: 'after', order: 19.5, critical: false,
+      label: '人物行动回执反馈',
+      async run() {
+        if (WA.backstage && typeof WA.backstage.isRunning === 'function' && WA.backstage.isRunning()) return {ok:false, reason:'backstage-running', deferred:true};
+        return WA.agency.processReceipts(clockNow('agency.receipts'));
+      }
+    });
+  }
   WA.agency = {
     // 设置面
     getSettings: settings,

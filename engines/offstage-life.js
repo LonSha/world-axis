@@ -128,7 +128,7 @@
     const st = WA.store.get() || {};
     const b = st.offstageLife;
     if (!b || !b.characters) return null;
-    return b.characters[w] || null;
+    return b.characters[w] ? JSON.parse(JSON.stringify(b.characters[w])) : null;
   }
 
   /**
@@ -143,7 +143,7 @@
     const o = opts || {};
     const genre = String(o.genre || cfg.defaultGenre || 'generic').toLowerCase();
     const role = clean(o.role || 'dweller', 30);
-    const place = clean(o.place || '幕后街巷居所', 60);
+    const place = clean(o.place || '地点未知', 60);
     const at = Number.isFinite(o.at) ? o.at : clockNow('offstageLife');
 
     let out = null;
@@ -173,8 +173,10 @@
         genre: genre,
         role: role,
         place: place || arch.place,
-        doing: clean(o.doing || arch.doing, 100),
-        carriedItem: clean(o.item || arch.item, 40),
+        doing: clean(o.doing || '', 100),
+        factStatus: 'last-known',
+        candidateDoing: clean(arch.doing, 100),
+        carriedItem: clean(o.item || '', 40),
         weariness: Math.min(100, Math.max(0, Number(o.weariness) || 10)),
         spareCoins: Number.isFinite(o.spareCoins) ? o.spareCoins : 12,
         roundsAway: 0,
@@ -222,34 +224,28 @@
         const rolePool = pool.archetypes || GENRE_PRESETS.generic.archetypes;
         const arch = rolePool[card.role] || GENRE_PRESETS.generic.archetypes.dweller;
 
-        // 推进日常磨损与零星开销
-        card.weariness = Math.min(100, Math.max(0, (card.weariness || 0) + (arch.costWear || 8) * rounds));
-        if (card.spareCoins > 0 && Math.random() < 0.4) {
-          card.spareCoins = Math.max(0, card.spareCoins - 1);
-        }
-
-        // 偶发市井生活意外与窘迫糗事 (misadventure)
-        if (Math.random() < 0.65 || o.forceMisadventure) {
-          const list = (pool.misadventures && pool.misadventures.length) ? pool.misadventures : GENRE_PRESETS.generic.misadventures;
-          const chosen = o.customMisadventure ? clean(o.customMisadventure, 120) : list[Math.floor(Math.random() * list.length)];
-          if (chosen && card.misadventures.indexOf(chosen) < 0) {
-            card.misadventures.push(chosen);
-            if (card.misadventures.length > 5) card.misadventures.shift();
-            card.reunionGossip = chosen;
+        // Chat rounds are bookkeeping, not elapsed story time or observed events.
+        // Explicit narrative reports alone can update factual state.
+        const evidence = clean(o.evidence, 160);
+        const confirmed = o.confirmed === true && !!evidence && !!specificWho;
+        if (confirmed) {
+          if (Number.isFinite(o.weariness)) card.weariness = Math.max(0, Math.min(100, o.weariness));
+          if (Number.isFinite(o.spareCoins)) card.spareCoins = Math.max(0, o.spareCoins);
+          if (o.place) card.place = clean(o.place, 60);
+          if (o.doing) card.doing = clean(o.doing, 100);
+          if (o.item) card.carriedItem = clean(o.item, 40);
+          const event = clean(o.customMisadventure, 120);
+          if (event && card.misadventures.indexOf(event) < 0) {
+            card.misadventures = card.misadventures.concat([event]).slice(-5);
+            card.reunionGossip = event;
+            b.log.push({who:name, event:event, evidence:evidence, at:at});
+            b.log = b.log.slice(-(cfg.maxLogs || 32));
             stat.misadventures++;
-
-            b.log.push({
-              who: name,
-              genre: genre,
-              event: chosen,
-              roundAway: card.roundsAway,
-              at: at
-            });
-            if (b.log.length > (cfg.maxLogs || 32)) b.log.shift();
           }
+          card.factStatus = 'reported';
+          card.evidence = evidence;
         }
-
-        card.doing = arch.doing;
+        card.candidateDoing = clean(arch.doing, 100);
         count++;
       });
 
@@ -281,13 +277,17 @@
       who: name,
       genre: card.genre,
       roundsAway: card.roundsAway,
-      currentPlace: card.place,
-      currentDoing: card.doing,
+      currentPlace: '',
+      lastKnownPlace: card.place,
+      currentDoing: '',
+      lastKnownDoing: card.doing,
       carriedItem: card.carriedItem,
       wearinessLevel: card.weariness >= 50 ? '深感困顿疲乏' : (card.weariness >= 25 ? '微有尘尘倦色' : '尚算精神从容'),
       spareCoins: card.spareCoins,
-      lastMisadventure: card.reunionGossip || (card.misadventures.length ? card.misadventures[card.misadventures.length - 1] : '料理平日杂事，别无特别波澜'),
-      reunionTone: card.roundsAway >= 5 ? '长别久别（满面风尘，恍如隔世）' : (card.roundsAway >= 2 ? '近别重会（自然接续家常）' : '刚打过照面')
+      lastMisadventure: card.factStatus === 'reported' ? card.reunionGossip : '',
+      status: 'last-known',
+      candidateDoing: card.candidateDoing || '',
+      reunionTone: '离场轮数不代表剧情时长；重逢情绪须结合人物关系与已确认经历'
     };
 
     if (o.consume === true) {
@@ -327,21 +327,38 @@
     }
 
     if (!list.length) return '';
-    const lines = ['【退场角色自主生活实况】（角色离开镜头后仍有真实生计流转与市井琐碎，禁止原地冻结）：'];
+    const lines = ['【退场生活参考】（最后登记不等于当前位置；候选不得写成已发生经历，轮数不代表剧情耗时）：'];
     list.forEach(function (c) {
-      const g = c.reunionGossip || (c.misadventures.length ? c.misadventures[c.misadventures.length - 1] : '');
-      let line = '· ' + c.name + '（离场 ' + c.roundsAway + ' 轮，正处于「' + c.place + '」）：正在「' + c.doing + '」，随身带「' + c.carriedItem + '」';
+      const g = c.factStatus === 'reported' ? c.reunionGossip : '';
+      let line = '· ' + c.name + '（离场 ' + c.roundsAway + ' 轮）：最后登记地点「' + c.place + '」、活动「' + (c.doing || '未知') + '」、物品「' + (c.carriedItem || '未知') + '」；生活候选「' + (c.candidateDoing || '结合人物目标另行选择') + '」，非行动回执';
       if (g) line += '；近期生活小插曲：「' + g + '」';
       lines.push(line);
     });
     return lines.join('\n') + '\n';
   }
 
+  function transactional(fn) {
+    return function () {
+      if (!WA.store || typeof WA.store.transact !== 'function') return {ok:false, reason:'store-unavailable'};
+      const args = arguments;
+      let result;
+      const before = Object.assign({}, stat);
+      const tx = WA.store.transact(function () {
+        result = fn.apply(null, args);
+        return result && result.ok !== false ? result : false;
+      });
+      if (!tx || !tx.ok) {
+        Object.assign(stat, before);
+        return result && result.ok === false ? result : {ok:false, reason:'transaction-rejected'};
+      }
+      return Object.assign({}, JSON.parse(JSON.stringify(result)), {persisted:tx.persisted, deferred:tx.deferred === true});
+    };
+  }
   WA.offstageLife = {
     GENRE_PRESETS: GENRE_PRESETS,
-    markOffstage: markOffstage,
-    progressOffstage: progressOffstage,
-    reunionSnap: reunionSnap,
+    markOffstage: transactional(markOffstage),
+    progressOffstage: transactional(progressOffstage),
+    reunionSnap: transactional(reunionSnap),
     getOffstageCard: getOffstageCard,
     buildBlock: buildBlock
   };

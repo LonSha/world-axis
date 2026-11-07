@@ -221,7 +221,7 @@
       let sycophancyPenalty = 0;
       if (c.target === 'user' || c.forUser) {
         const selfLoss = (Number(cost.livelihood) || 0) + (Number(cost.safety) || 0);
-        if (selfLoss > 2.0 && (!person.bonds || !person.bonds.deepAffection)) {
+        if (selfLoss > 2.0 && (!person || !person.bonds || !person.bonds.deepAffection)) {
           // 未建立深层羁绊时强行牺牲自身生存迎合玩家，重度惩罚
           sycophancyPenalty += selfLoss * 2.5;
         }
@@ -323,6 +323,16 @@
     };
   }
 
+  // Integration read path: detached inputs/outputs; never commit promises or scars.
+  function preview(person, candidates, facts) {
+    const clone = function (v) { return v == null ? v : JSON.parse(JSON.stringify(v)); };
+    try {
+      const result = evaluate(clone(person), clone(candidates), clone(facts));
+      return Object.assign({}, clone(result), {status:'candidate', applied:false});
+    } catch (e) {
+      return {ok:false, reason:'invalid-arbitration-input', status:'candidate', applied:false};
+    }
+  }
   function decide(person, candidates, facts) {
     const evalRes = evaluate(person, candidates, facts);
     if (!evalRes.ok) return evalRes;
@@ -374,6 +384,7 @@
     getBaseWeights: getBaseWeights,
     getEffectiveWeights: getEffectiveWeights,
     evaluate: evaluate,
+    preview: preview,
     decide: decide
   };
 

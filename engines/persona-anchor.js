@@ -140,6 +140,9 @@
    *   - majorEvent: Object { title: string, intensity: number, evidence: string } 重大事件标记
    *   - sharedBonds: number 共享羁绊/信任度量值
    */
+  function supportedMajorEvent(ev, cfg) {
+    return !!(ev && typeof ev === 'object' && Number.isFinite(ev.intensity) && ev.intensity >= cfg.minMajorEventIntensity && typeof ev.evidence === 'string' && ev.evidence.trim());
+  }
   function evaluateDrift(person, proposal, context) {
     const cfg = settings();
     if (!cfg.enabled) {
@@ -156,7 +159,7 @@
     const ev = ctx.majorEvent;
 
     // 检查是否有系统裁决的重大事件驱动
-    const hasMajorEvent = ev && typeof ev === 'object' && (ev.intensity >= cfg.minMajorEventIntensity) && ev.evidence;
+    const hasMajorEvent = supportedMajorEvent(ev, cfg);
 
     // 1. 若存在禁忌行为命中且无重大事件驱动：坚决否决
     if (p.deltaTrait && anchor.forbiddenBehaviors && anchor.forbiddenBehaviors.length) {
@@ -232,7 +235,7 @@
     const t = String(text || '');
     const ctx = context || {};
     const ev = ctx.majorEvent;
-    const hasMajorEvent = ev && (ev.intensity >= cfg.minMajorEventIntensity);
+    const hasMajorEvent = supportedMajorEvent(ev, cfg);
 
     // 违规行为/用语匹配
     const flagged = [];

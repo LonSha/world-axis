@@ -100,6 +100,9 @@
     'humanRealism.actors': { path: 'humanRealism.actors', kind: 'object', cap: 48, why: '真实人物生理与情感卡映射（对象型，最久未活跃优先挤出）' },
     'humanRealism.grudges': { path: 'humanRealism.grudges', cap: 48, why: '心底芥蒂与记恨小账本环形' },
     'humanRealism.log': { path: 'humanRealism.log', cap: 32, why: '情绪失控与生理极限日志环形' },
+    // v2.325.0: 剧情生活动线与身份世界观节律
+    'routinePacing.actors': { path: 'routinePacing.actors', kind: 'object', cap: 48, why: '角色生活作息与个性意向映射（对象型，最久未活跃优先挤出）' },
+    'routinePacing.history': { path: 'routinePacing.history', cap: 32, why: '时序与生活切片推进历史环形' },
     'vitals.rows':         { path: 'vitals.rows',         cap: 24, why: '生理线环形' },
   // v2.231.0（拓展 EXP-1）：逐人逐能力进度行（上限与 training.maxRows 同源，见 training.js）。
   'training.rows':       { path: 'training.rows',       cap: 96, why: '能力成长逐人逐能力行' },

@@ -275,15 +275,20 @@
     }, 'life:add-commitment');
     return out || { ok: false, reason: 'store-unavailable' };
   }
+  function scheduleDomainOf(x) {
+    return x.timeDomain || (x.start >= 0 && x.end <= 24 ? 'clock' : 'absolute');
+  }
   function addSchedule(name, item) {
     const activity = clean(item && item.activity, 40), start = Number(item && item.start), end = Number(item && item.end);
     if (!personId(name) || !activity) return { ok: false, reason: 'missing-fields' };
     if (!isFinite(start) || !isFinite(end) || end <= start) return { ok: false, reason: 'bad-time' };
+    const timeDomain = item.timeDomain || (start >= 0 && end <= 24 ? 'clock' : 'absolute');
+    if (['clock', 'absolute'].indexOf(timeDomain) < 0 || (timeDomain === 'clock' && (start < 0 || end > 24))) return { ok: false, reason: 'bad-time-domain' };
     let out = null;
     WA.store.transact(function (draft) {
       const p = person(draft, name), life = ensureLife(p);
-      if (life.schedule.some(function (x) { return x.status === 'active' && start < x.end && end > x.start; })) { out = { ok: false, reason: 'time-conflict' }; return false; }
-      const row = { id: 'sch_' + clockNow('life') + '_' + life.schedule.length, activity: activity, location: clean(item.location, 40), start: start, end: end, status: 'active' };
+      if (life.schedule.some(function (x) { return x.status === 'active' && scheduleDomainOf(x) === timeDomain && start < x.end && end > x.start; })) { out = { ok: false, reason: 'time-conflict' }; return false; }
+      const row = { id: 'sch_' + clockNow('life') + '_' + life.schedule.length, activity: activity, location: clean(item.location, 40), start: start, end: end, timeDomain: timeDomain, status: 'active' };
       // v2.61.0: 同 addCommitment——日程是「人物在做什么」，且日程自带 start/end（未来时刻），
       //   恰是**最该留在场上**的那类人物；缺 updatedAt 会让它最先被挤出。
       life.schedule = life.schedule.concat([row]).slice(-12); p.updatedAt = clockNow('life'); out = { ok: true, id: row.id };
@@ -374,7 +379,19 @@
         const id = row.id;
         const p = draft.people[id]; if (!p || !p.life) return;
         const life = ensureLife(p);
-        const active = life.schedule.filter(function (x) { return x.status === 'active' && f.now >= x.start && f.now < x.end; })[0];
+        const active = life.schedule.filter(function (x) {
+          if (x.status !== 'active') return false;
+          // Legacy 0..24 ranges represent story-local hours, not epoch milliseconds.
+          const hourly = x.timeDomain === 'clock' || (!x.timeDomain && x.start >= 0 && x.end <= 24);
+          let now = f.now;
+          if (hourly) {
+            const iso = draft.clock && draft.clock.iso;
+            const m = typeof iso === 'string' && /T(\d{2}):(\d{2})/.exec(iso);
+            if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return false;
+            now = Number(m[1]) + Number(m[2]) / 60;
+          }
+          return Number.isFinite(now) && now >= x.start && now < x.end;
+        })[0];
         const goal = life.goals.filter(function (x) { return x.status === 'active'; })[0];
         const commitment = life.commitments.filter(function (x) { return x.status === 'active'; })[0];
         const fulfilled = commitment && Array.isArray(f.fulfilledIds) && f.fulfilledIds.indexOf(commitment.id) >= 0;
