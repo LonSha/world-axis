@@ -148,6 +148,9 @@
     //   SOURCES（键）**逐字同批**登记（inject-sources-v2560 的 D 判据：
     //   SOURCES 每一项在本表里都要有显示名，且本表不得有超出 SOURCES 的键）。
     elsewhere: '彼方档案', livingWorld: '真实世界运转', geoTracker: '空间常识与位移',
+    affectionNexus: '情感纽带与依恋羁绊', intimateArbiter: '亲密生理亲昵仲裁',
+    spatialTopology: '分形空间拓扑', transitScheduler: '交通与滞留仲裁', environmentalOcclusion: '视听遮蔽与环境', spatialTrace: '现场痕迹残留',
+    personalInventory: '随身行囊与财物', metabolismClock: '生理代谢与体态',
     healthPreflight: '系统健康与写作防线',
     antiOmniscience: '防全知认知视界', personaAnchor: '性格绝对锚定', vitals: '生理线', coordinate: '坐标台账',
     // v2.250.0（拓展）：四条新源的面板显示名。与 render/inject.js 的 SOURCES（键）与
@@ -1525,6 +1528,7 @@
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-transit" title="测算多模态通勤代价与深夜滞留仲裁">通勤与滞留推演</button>'
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-occl" title="测算视线物理遮蔽与声学信噪比分贝衰减">视听遮蔽与耳语</button>'
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-trace" title="查看当前地点物理残留物证与半衰期衰减">物证与感官痕迹</button>'
+           + '<button class="wa-btn wa-mini" id="wa-geo-adv-hud" title="EXV15: 微观物理环境与生理体征 HUD 胶囊">微观物理HUD</button>'
            + '</div>'
            + '<div id="wa-geo-out" class="wa-out"></div>';
        })()}`;
@@ -12328,6 +12332,17 @@ on('#wa-desk-show', showDesk);
             return '<div class="wa-item"><b>' + atEsc(t.type) + '</b>（' + atEsc(t.source) + '）：强度 ' + pct + '% · 半衰期 ' + t.halfLifeHours + 'h</div>';
           }).join('')
           + (feed ? '<pre class="wa-pre" style="margin-top:6px;">' + atEsc(feed) + '</pre>' : '<div class="wa-dim">无痕迹反哺文本</div>'));
+      });
+      on('#wa-geo-adv-hud', () => {
+        const charId = (WA.activeChar && WA.activeChar.id) || (WA.characters && Object.keys(WA.characters)[0]) || 'hero_test';
+        const hDiag = WA.environmentalHazard ? WA.environmentalHazard.diagnose() : { ok: false };
+        const bDiag = WA.cascadeBus ? WA.cascadeBus.diagnose() : { ok: false };
+        const eDiag = WA.disasterEvacuation ? WA.disasterEvacuation.diagnose() : { ok: false };
+        geoOut('<div class="wa-log wa-log-ok">微观物理环境与生理 HUD (EXV15 状态)</div>'
+          + '<div class="wa-item"><b>四层调度总线:</b> 脉冲数 ' + (bDiag.pulseCount || 0) + ' · 状态: ' + (bDiag.ok ? '正常' : '待初始化') + '</div>'
+          + '<div class="wa-item"><b>极端物理侵蚀:</b> 注册环境 ' + (hDiag.hazardProfilesCount || 0) + ' 处 · 活跃负荷: ' + (hDiag.activeExposuresCount || 0) + '</div>'
+          + '<div class="wa-item"><b>灾难疏散网络:</b> 避难所 ' + (eDiag.shelterCount || 0) + ' 处 · 灾变发生: ' + (eDiag.disasterCount || 0) + ' 次</div>'
+          + '<div class="wa-dim" style="margin-top:4px;">当前受检角色 [' + atEsc(charId) + '] 环境与体征处于微观动力学实时保护中</div>');
       });
     }
     on('#wa-ch-start', () => { WA.chapters.start($('#wa-ch-title').value.trim()); renderBody(); });

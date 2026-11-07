@@ -1,7 +1,7 @@
 {
  "version": "2.322.0",
- "loadOrderCount": 389,
- "loadedCount": 375,
+ "loadOrderCount": 382,
+ "loadedCount": 368,
  "uiCount": 14,
  "nsCount": 385,
  "totals": {
@@ -7222,6 +7222,111 @@
    "hardRequires": [],
    "hardRequiresFiles": [],
    "hardMissing": []
+  },
+  "engines/environmental-hazard.js": {
+   "ns": [
+    "environmentalHazard"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "hardRequires": [],
+   "isEngine": true,
+   "hasSelfGate": true,
+   "declaredKind": "engine",
+   "auditDisposition": "clean"
+  },
+  "engines/disaster-evacuation.js": {
+   "ns": [
+    "disasterEvacuation"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "hardRequires": [],
+   "isEngine": true,
+   "hasSelfGate": true,
+   "declaredKind": "engine",
+   "auditDisposition": "clean"
+  },
+  "engines/spatial-conflict.js": {
+   "ns": [
+    "spatialConflict"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "hardRequires": [],
+   "isEngine": true,
+   "hasSelfGate": true,
+   "declaredKind": "engine",
+   "auditDisposition": "clean"
+  },
+  "engines/universal-routine.js": {
+   "ns": [
+    "universalRoutine"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "hardRequires": [],
+   "isEngine": true,
+   "hasSelfGate": true,
+   "declaredKind": "engine",
+   "auditDisposition": "clean"
+  },
+  "engines/social-encounter.js": {
+   "ns": [
+    "socialEncounter"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "hardRequires": [],
+   "isEngine": true,
+   "hasSelfGate": true,
+   "declaredKind": "engine",
+   "auditDisposition": "clean"
+  },
+  "engines/lens-culling.js": {
+   "ns": [
+    "lensCulling"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "hardRequires": [],
+   "isEngine": true,
+   "hasSelfGate": true,
+   "declaredKind": "engine",
+   "auditDisposition": "clean"
+  },
+  "engines/cascade-bus.js": {
+   "ns": [
+    "cascadeBus"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "hardRequires": [],
+   "isEngine": true,
+   "hasSelfGate": true,
+   "declaredKind": "engine",
+   "auditDisposition": "clean"
   }
  }
 }

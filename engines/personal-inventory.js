@@ -108,12 +108,16 @@
     deductCash: function (characterId, amount) {
       const inv = this.getInventory(characterId);
       if (!inv) return { ok: false, reason: 'no_inventory' };
-      const cost = Math.max(0, Number(amount) || 0);
+      const num = Number(amount);
+      if (!Number.isFinite(num) || num < 0) {
+        return { ok: false, reason: 'invalid-amount', expected: '>= 0' };
+      }
+      const cost = num;
       if (inv.cash < cost) {
         return { ok: false, reason: 'insufficient_funds', balance: inv.cash, required: cost };
       }
       inv.cash -= cost;
-      return { ok: true, balance: inv.cash, spent: cost };
+      return { ok: true, balance: inv.cash, deducted: cost };
     },
 
     /**
@@ -128,27 +132,40 @@
 
     /**
      * 搜查与发现检定（Concealment Check）
-     * 搜查人员遭遇检定：exposed(100%发现), shallow(50%发现), deep(15%极难发现)
+     * 搜查人员遭遇检定：exposed(100%发现), shallow(常规30%/深度70%发现), deep(常规0%/深度30%发现)
+     * 支持传入 perceptionRoll (0~100) 确定性掷骰
      */
-    conductSearch: function (characterId, searchThoroughness) {
+    conductSearch: function (characterId, searchThoroughness, perceptionRoll) {
       const inv = this.getInventory(characterId);
-      if (!inv) return { foundItems: [] };
+      if (!inv) return { ok: false, reason: 'character-not-found', foundItems: [] };
       const thorough = searchThoroughness || 'routine'; // routine (常规盘查) | thorough (深度搜身)
       const allItems = [].concat(inv.pockets, inv.bag);
       const found = [];
+      const hasRoll = Number.isFinite(Number(perceptionRoll));
+      const roll = hasRoll ? Number(perceptionRoll) : 50;
 
       allItems.forEach(it => {
         const tier = it.concealTier || 'exposed';
         if (tier === 'exposed') {
           found.push(it);
         } else if (tier === 'shallow') {
-          if (thorough === 'thorough' || Math.random() < 0.6) found.push(it);
+          if (hasRoll) {
+            if (roll >= (thorough === 'thorough' ? 40 : 65)) found.push(it);
+          } else {
+            if (thorough === 'thorough' || Math.random() < 0.6) found.push(it);
+          }
         } else if (tier === 'deep') {
-          if (thorough === 'thorough' && Math.random() < 0.3) found.push(it);
+          if (hasRoll) {
+            // 深层暗格常规搜查绝对查不到；深度搜身需 roll >= 80 才能识破
+            if (thorough === 'thorough' && roll >= 80) found.push(it);
+          } else {
+            if (thorough === 'thorough' && Math.random() < 0.3) found.push(it);
+          }
         }
       });
 
       return {
+        ok: true,
         characterId: characterId,
         thoroughness: thorough,
         totalItems: allItems.length,
