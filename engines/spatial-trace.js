@@ -147,6 +147,70 @@
     },
 
     /**
+     * OPV16-4: 物证与感官痕迹的环境介质吸附与异化演化 (Trace Medium Adsorption & Environmental Weathering)
+     * 多孔泥土、毛毯吸附延长半衰期；水流冲刷加速消除；焚烧产生异化不可逆残渣
+     */
+    evolveTrace(nodeId, traceId, mediumType, opts) {
+      const state = this.getState();
+      const list = state.tracesByNode[nodeId] || [];
+      const trace = list.find(t => t.id === traceId);
+      if (!trace) return { ok: false, error: 'trace_not_found' };
+
+      const opt = opts || {};
+      const weather = opt.weather || 'clear';
+      const rainAmount = typeof opt.rainAmount === 'number' ? opt.rainAmount : (weather === 'rain' ? 30 : 0);
+      const isFire = Boolean(opt.isFire);
+
+      // 负控制拦截：不可溶的物理微观刻痕（如匕首划痕、岩石裂痕）在水流冲刷下绝不降解
+      if (trace.type === 'scratch' || trace.type === 'carving') {
+        return {
+          ok: true,
+          traceId: traceId,
+          strength: trace.strength || 100,
+          weathered: false,
+          adsorbed: false,
+          message: 'Insoluble physical carving is impervious to water wash.'
+        };
+      }
+
+      let curStrength = typeof trace.strength === 'number' ? trace.strength : 100;
+
+      // 1. 介质吸附修正
+      let halfLifeFactor = 1.0;
+      if (mediumType === 'carpet' || mediumType === 'soil' || mediumType === 'wood_unpainted') {
+        halfLifeFactor = 3.0; // 多孔材质延长 3 倍
+      }
+
+      // 2. 水流降雨冲刷
+      if (rainAmount > 10 && trace.type !== 'carving') {
+        const washDrain = rainAmount * 2.5;
+        curStrength = Math.max(0, curStrength - washDrain);
+      }
+
+      // 3. 烈火焚烧异化
+      let isCarbonized = false;
+      if (isFire) {
+        curStrength = Math.max(5, curStrength * 0.15); // 破坏至不可辨识
+        trace.desc = (trace.desc || '') + ' [已高温碳化变质]';
+        isCarbonized = true;
+      }
+
+      trace.strength = Math.round(curStrength * 10) / 10;
+      trace.halfLifeFactor = halfLifeFactor;
+      trace.isCarbonized = isCarbonized;
+
+      return {
+        ok: true,
+        traceId: traceId,
+        nodeId: nodeId,
+        remainingStrength: trace.strength,
+        isWashedAway: trace.strength <= 0,
+        isCarbonized: isCarbonized,
+        halfLifeFactor: halfLifeFactor
+      };
+    },
+
+    /**
      * 叙事透镜 Prompt 反哺
      */
     buildBlock() {
@@ -166,4 +230,7 @@
 
   WA.engines.spatialTrace = spatialTrace;
   WA.spatialTrace = spatialTrace;
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = spatialTrace;
+  }
 })();

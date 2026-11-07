@@ -1529,6 +1529,7 @@
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-occl" title="测算视线物理遮蔽与声学信噪比分贝衰减">视听遮蔽与耳语</button>'
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-trace" title="查看当前地点物理残留物证与半衰期衰减">物证与感官痕迹</button>'
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-hud" title="EXV15: 微观物理环境与生理体征 HUD 胶囊">微观物理HUD</button>'
+           + '<button class="wa-btn wa-mini" id="wa-phys-v16-dash" title="EXV16-9: 沙盘动态微气候与机能体征全局监控大盘">V16物理大盘</button>'
            + '</div>'
            + '<div id="wa-geo-out" class="wa-out"></div>';
        })()}`;
@@ -12343,6 +12344,26 @@ on('#wa-desk-show', showDesk);
           + '<div class="wa-item"><b>极端物理侵蚀:</b> 注册环境 ' + (hDiag.hazardProfilesCount || 0) + ' 处 · 活跃负荷: ' + (hDiag.activeExposuresCount || 0) + '</div>'
           + '<div class="wa-item"><b>灾难疏散网络:</b> 避难所 ' + (eDiag.shelterCount || 0) + ' 处 · 灾变发生: ' + (eDiag.disasterCount || 0) + ' 次</div>'
           + '<div class="wa-dim" style="margin-top:4px;">当前受检角色 [' + atEsc(charId) + '] 环境与体征处于微观动力学实时保护中</div>');
+      });
+      on('#wa-phys-v16-dash', () => {
+        const mDiag = WA.microclimatePhase ? WA.microclimatePhase.diagnose() : { ok: false };
+        const tDiag = WA.toxicMetabolism ? WA.toxicMetabolism.diagnose() : { ok: false };
+        const pDiag = WA.pyroTelecom ? WA.pyroTelecom.diagnose() : { ok: false };
+        const cDiag = WA.contrabandPipeline ? WA.contrabandPipeline.diagnose() : { ok: false };
+        const cpDiag = WA.crowdPanic ? WA.crowdPanic.diagnose() : { ok: false };
+        const vDiag = WA.veracityArbitration ? WA.veracityArbitration.diagnose() : { ok: false };
+        const gDiag = WA.gearWear ? WA.gearWear.diagnose() : { ok: false };
+        const bDiag = WA.coverBallistics ? WA.coverBallistics.diagnose() : { ok: false };
+        geoOut('<div class="wa-log wa-log-ok">WorldAxis V16 微观物理与社会对抗全景大盘 (EXV16)</div>'
+          + '<div class="wa-item"><b>微气候物相相变:</b> 节点 ' + (mDiag.registeredNodesCount || 0) + ' · 模拟数 ' + (mDiag.simulationCount || 0) + '</div>'
+          + '<div class="wa-item"><b>生物毒素代谢:</b> 涉毒角色 ' + (tDiag.trackedActorsCount || 0) + ' · 代谢频次 ' + (tDiag.metabolismTicks || 0) + '</div>'
+          + '<div class="wa-item"><b>超视距光热烟火:</b> 发射信号 ' + (pDiag.signalsFiredCount || 0) + ' · 节点覆盖 ' + (pDiag.nodeSignalsCount || 0) + '</div>'
+          + '<div class="wa-item"><b>地下黑市违禁链:</b> 管制管区 ' + (cDiag.policiesCount || 0) + ' · 走私事件 ' + (cDiag.smugglingAttempts || 0) + '</div>'
+          + '<div class="wa-item"><b>封闭群体恐慌共振:</b> 激活踩踏区 ' + (cpDiag.activeZonesCount || 0) + ' · 恐慌事件 ' + (cpDiag.totalPanicEvents || 0) + '</div>'
+          + '<div class="wa-item"><b>口供物证比对裁决:</b> 登记案件 ' + (vDiag.activeCasesCount || 0) + ' · 裁决数 ' + (vDiag.arbitrationCount || 0) + '</div>'
+          + '<div class="wa-item"><b>装备应力破损形变:</b> 跟踪装备 ' + (gDiag.registeredGearsCount || 0) + ' · 应力结算 ' + (gDiag.stressEventsCount || 0) + '</div>'
+          + '<div class="wa-item"><b>掩体防护动能弹道:</b> 掩体节点 ' + (bDiag.registeredNodesCount || 0) + ' · 弹道结算 ' + (bDiag.impactEventsCount || 0) + '</div>'
+          + '<div class="wa-dim" style="margin-top:4px;">物理微观动力学与社会非全知对抗引擎集群运转正常</div>');
       });
     }
     on('#wa-ch-start', () => { WA.chapters.start($('#wa-ch-title').value.trim()); renderBody(); });

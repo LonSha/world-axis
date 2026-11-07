@@ -1,11 +1,11 @@
 {
- "version": "2.322.0",
- "loadOrderCount": 382,
- "loadedCount": 368,
+ "version": "2.330.0",
+ "loadOrderCount": 404,
+ "loadedCount": 390,
  "uiCount": 14,
- "nsCount": 385,
+ "nsCount": 400,
  "totals": {
-  "loadEdges": 255,
+  "loadEdges": 257,
   "hardEdges": 0,
   "callRefs": 451,
   "ghostRefs": 0
@@ -383,10 +383,12 @@
     "engines/life.js",
     "engines/living-world.js",
     "engines/memory.js",
+    "engines/metabolism-clock.js",
     "engines/offline-return.js",
     "engines/offstage-life.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
+    "engines/personal-inventory.js",
     "engines/pmem.js",
     "engines/proactive.js",
     "engines/regional.js",
@@ -2285,6 +2287,289 @@
    "stateKeys": [
     "worldaxis_geo_tracker_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/spatial-topology.js": {
+   "ns": [
+    "engines",
+    "spatialTopology"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/transit-scheduler.js": {
+   "ns": [
+    "engines",
+    "transitScheduler"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/environmental-occlusion.js": {
+   "ns": [
+    "engines",
+    "environmentalOcclusion"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/spatial-trace.js": {
+   "ns": [
+    "engines",
+    "spatialTrace"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/personal-inventory.js": {
+   "ns": [
+    "personalInventory"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_personal_inventory_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/metabolism-clock.js": {
+   "ns": [
+    "metabolismClock"
+   ],
+   "requires": [
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_metabolism_clock_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/environmental-hazard.js": {
+   "ns": [
+    "engines",
+    "environmentalHazard"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/disaster-evacuation.js": {
+   "ns": [
+    "disasterEvacuation",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/spatial-conflict.js": {
+   "ns": [
+    "engines",
+    "spatialConflict"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/universal-routine.js": {
+   "ns": [
+    "engines",
+    "universalRoutine"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/social-encounter.js": {
+   "ns": [
+    "engines",
+    "socialEncounter"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/lens-culling.js": {
+   "ns": [
+    "engines",
+    "lensCulling"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/cascade-bus.js": {
+   "ns": [
+    "cascadeBus",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/microclimate-phase.js": {
+   "ns": [
+    "engines",
+    "microclimatePhase"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/toxic-metabolism.js": {
+   "ns": [
+    "engines",
+    "toxicMetabolism"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/pyro-telecom.js": {
+   "ns": [
+    "engines",
+    "pyroTelecom"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/contraband-pipeline.js": {
+   "ns": [
+    "contrabandPipeline",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/crowd-panic.js": {
+   "ns": [
+    "crowdPanic",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/veracity-arbitration.js": {
+   "ns": [
+    "engines",
+    "veracityArbitration"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/gear-wear.js": {
+   "ns": [
+    "engines",
+    "gearWear"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/cover-ballistics.js": {
+   "ns": [
+    "coverBallistics",
+    "engines"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/health-preflight.js": {
@@ -7144,189 +7429,6 @@
     "worldaxis_capability_audit_settings_v1"
    ],
    "consumedBy": []
-  },
-  "engines/spatial-topology.js": {
-   "ns": [
-    "spatialTopology",
-    "engines"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/transit-scheduler.js": {
-   "ns": [
-    "transitScheduler",
-    "engines"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/environmental-occlusion.js": {
-   "ns": [
-    "environmentalOcclusion",
-    "engines"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/spatial-trace.js": {
-   "ns": [
-    "spatialTrace",
-    "engines"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/personal-inventory.js": {
-   "ns": [
-    "personalInventory"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "hardRequires": [],
-   "hardRequiresFiles": [],
-   "hardMissing": []
-  },
-  "engines/metabolism-clock.js": {
-   "ns": [
-    "metabolismClock"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "hardRequires": [],
-   "hardRequiresFiles": [],
-   "hardMissing": []
-  },
-  "engines/environmental-hazard.js": {
-   "ns": [
-    "environmentalHazard"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "hardRequires": [],
-   "isEngine": true,
-   "hasSelfGate": true,
-   "declaredKind": "engine",
-   "auditDisposition": "clean"
-  },
-  "engines/disaster-evacuation.js": {
-   "ns": [
-    "disasterEvacuation"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "hardRequires": [],
-   "isEngine": true,
-   "hasSelfGate": true,
-   "declaredKind": "engine",
-   "auditDisposition": "clean"
-  },
-  "engines/spatial-conflict.js": {
-   "ns": [
-    "spatialConflict"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "hardRequires": [],
-   "isEngine": true,
-   "hasSelfGate": true,
-   "declaredKind": "engine",
-   "auditDisposition": "clean"
-  },
-  "engines/universal-routine.js": {
-   "ns": [
-    "universalRoutine"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "hardRequires": [],
-   "isEngine": true,
-   "hasSelfGate": true,
-   "declaredKind": "engine",
-   "auditDisposition": "clean"
-  },
-  "engines/social-encounter.js": {
-   "ns": [
-    "socialEncounter"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "hardRequires": [],
-   "isEngine": true,
-   "hasSelfGate": true,
-   "declaredKind": "engine",
-   "auditDisposition": "clean"
-  },
-  "engines/lens-culling.js": {
-   "ns": [
-    "lensCulling"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "hardRequires": [],
-   "isEngine": true,
-   "hasSelfGate": true,
-   "declaredKind": "engine",
-   "auditDisposition": "clean"
-  },
-  "engines/cascade-bus.js": {
-   "ns": [
-    "cascadeBus"
-   ],
-   "requires": [],
-   "requiresFiles": [],
-   "providerOrderOk": true,
-   "callRefs": [],
-   "ghostRefs": [],
-   "hardRequires": [],
-   "isEngine": true,
-   "hasSelfGate": true,
-   "declaredKind": "engine",
-   "auditDisposition": "clean"
   }
  }
 }

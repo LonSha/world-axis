@@ -253,6 +253,64 @@
     };
   }
 
+  /**
+   * OPV16-3: 空间动线挤压仲裁的动能损耗与伤损判定 (Kinetic Contusion & Shove Physics)
+   * 结合角色体格（mass）、速率（velocity）与通道容积（capacity）计算碰撞动量与挫伤
+   */
+  function resolveKinetic(nodeKey, participants, opts) {
+    if (!nodeKey) return { ok: false, error: 'missing_node_key' };
+    const actors = Array.isArray(participants) ? participants : [];
+    if (actors.length < 2) {
+      return { ok: false, error: 'need_at_least_two_participants' };
+    }
+    const opt = opts || {};
+    const capacity = typeof opt.capacity === 'number' ? Math.max(1, opt.capacity) : 1;
+
+    // 负控制拦截：若通道容积宽裕（capacity >= actors.length），直接并排通过，断言损耗恒为 0
+    if (capacity >= actors.length) {
+      return {
+        ok: true,
+        nodeKey: nodeKey,
+        passedPeacefully: true,
+        kineticDamageTotal: 0,
+        displacedActor: null,
+        message: 'Capacity sufficient for all participants to pass simultaneously.'
+      };
+    }
+
+    const a1 = actors[0];
+    const a2 = actors[1];
+    const mass1 = typeof a1.mass === 'number' ? Math.max(20, a1.mass) : 70;
+    const mass2 = typeof a2.mass === 'number' ? Math.max(20, a2.mass) : 70;
+    const vel1 = typeof a1.velocity === 'number' ? Math.max(1, a1.velocity) : 5;
+    const vel2 = typeof a2.velocity === 'number' ? Math.max(1, a2.velocity) : 5;
+
+    const momentum1 = mass1 * vel1;
+    const momentum2 = mass2 * vel2;
+    const momDiff = momentum1 - momentum2;
+
+    const winnerId = momDiff >= 0 ? a1.actorId : a2.actorId;
+    const loserId = momDiff >= 0 ? a2.actorId : a1.actorId;
+    const impactMomentum = Math.abs(momDiff);
+
+    // 负控制与真实伤损：计算挫伤与衣物撕裂
+    const contusionDamage = Math.min(40, Math.round(impactMomentum * 0.05));
+    const gearWear = Math.min(25, Math.round(impactMomentum * 0.025));
+
+    return {
+      ok: true,
+      nodeKey: nodeKey,
+      passedPeacefully: false,
+      winnerId: winnerId,
+      loserId: loserId,
+      impactMomentum: impactMomentum,
+      contusionDamage: contusionDamage,
+      gearWear: gearWear,
+      displacedActor: loserId,
+      narrativeOutcome: `${winnerId} pushed through with momentum ${impactMomentum}, displacing ${loserId} with contusion damage ${contusionDamage}.`
+    };
+  }
+
   function resetAll() {
     _chokepoints.clear();
     return { ok: true, reset: true };
@@ -264,6 +322,7 @@
     enqueueChokepoint: enqueueChokepoint,
     advanceChokepointQueue: advanceChokepointQueue,
     resolveSpatialConflict: resolveSpatialConflict,
+    resolveKinetic: resolveKinetic,
     resetAll: resetAll,
     diagnose: function () {
       return {

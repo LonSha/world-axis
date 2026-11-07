@@ -190,6 +190,65 @@
       return parts.join('\n');
     },
 
+    /**
+     * OPV16-5: 暴力强拆破坏搜查暗格对抗 (Destructive Force Inspection)
+     * 搜查者起疑且持有正当嫌疑时，可破坏物品外壳或划开内衬强行起获违禁品，但伴随物品永久破损与关系惩罚
+     */
+    forceInspect: function (characterId, inspectorId, itemKey, opts) {
+      const inv = this.getInventory(characterId);
+      if (!inv) return { ok: false, error: 'inventory_not_found' };
+
+      const opt = opts || {};
+      const suspicionRating = typeof opt.suspicionRating === 'number' ? opt.suspicionRating : 30;
+      const hasWarrant = Boolean(opt.hasWarrant);
+
+      // 负控制拦截：若搜查者无搜查令且起疑度不足（suspicion < 50），强拆搜身被法律与道德守卫硬拦截阻断
+      if (!hasWarrant && suspicionRating < 50) {
+        return {
+          ok: false,
+          error: 'unlawful_search_blocked',
+          inspectorId: inspectorId,
+          characterId: characterId,
+          message: 'Force search rejected: insufficient suspicion or lack of legal warrant.'
+        };
+      }
+
+      // 在 pocket 或 bag 中查找目标物品
+      const allItems = [...inv.pockets, ...inv.bag];
+      const target = allItems.find(it => it.key === itemKey || it.name === itemKey);
+
+      if (!target) {
+        // 强拆搜查落空：承担声誉外交制裁
+        return {
+          ok: true,
+          searched: true,
+          foundTarget: false,
+          inspectorId: inspectorId,
+          characterId: characterId,
+          reputationPenalty: -25,
+          message: 'Destructive search completed but item not found; severe diplomatic grievance incurred.'
+        };
+      }
+
+      // 成功强行起获：物品变为损坏毁坏状态
+      target.destroyed = true;
+      target.revealed = true;
+      target.concealed = false;
+
+      return {
+        ok: true,
+        searched: true,
+        foundTarget: true,
+        inspectorId: inspectorId,
+        characterId: characterId,
+        itemKey: target.key || target.name,
+        destroyed: true,
+        revealed: true,
+        reputationPenalty: -10,
+        message: 'Hidden compartment torn open; contraband revealed in damaged condition.'
+      };
+    },
+
     diagnose: function () {
       return {
         version: this.version,

@@ -378,7 +378,7 @@
       + '<option value="balanced"' + (mode === 'balanced' ? ' selected' : '') + '>自然</option>'
       + '<option value="deep"' + (mode === 'deep' ? ' selected' : '') + '>活跃</option></select></div>'
       + '<label class="wa-node"><input type="checkbox" data-wa-simple="autoSimulate" ' + (b.autoSimulate !== false ? 'checked' : '') + '/><span class="wa-node-label">让世界自动运行</span></label>'
-      + '<button class="wa-btn" data-wa-simple-save="true">保存</button><span class="wa-dim" data-wa-simple-out="true"></span>'
+      + '<button class="wa-btn" id="wa-set-simple-save" data-wa-simple-save="true">保存</button><span class="wa-dim" data-wa-simple-out="true"></span>'
       // 本轮收口：玩家模式也要有「开局引导」这一格 —— 三步是玩家的动作，进度 / 重新显示 /
       //   清空都不该被开发者开关锁住；与开发者模式共用同一份 HTML（单一真源，不各写一份）。
       + firstRunBlockHtml()

@@ -192,6 +192,46 @@
     };
   }
 
+  /**
+   * OPV16-2: 异步突发事件抢占与优先级中断 (Emergency Priority Preemption)
+   * 支持高优先级灾难、袭击立即打断下三层正在进行的常规日程与动作
+   */
+  function interrupt(priority, eventPayload) {
+    const prio = typeof priority === 'number' ? priority : 5;
+    const payload = eventPayload || {};
+
+    // 负控制拦截：低优先级杂音或虚假恶作剧无法突破抢占阈值（priority < 3），不产生中断
+    if (prio < 3) {
+      return {
+        ok: true,
+        interrupted: false,
+        priority: prio,
+        reason: payload.reason || 'low_priority_noise',
+        message: 'Priority too low to interrupt cascading routines.'
+      };
+    }
+
+    const interruptRecord = {
+      interruptedAt: Date.now(),
+      priority: prio,
+      emergencyType: payload.emergencyType || 'catastrophe',
+      reason: payload.reason || 'emergency_preemption',
+      clearedQueues: ['somatic', 'behavioral', 'social'],
+      tick: _tickCounter
+    };
+
+    // 广播中断信号给所有订阅者
+    const notifiedCount = _subscribers.somatic.size + _subscribers.behavioral.size + _subscribers.social.size;
+
+    return {
+      ok: true,
+      interrupted: true,
+      priority: prio,
+      interruptRecord: interruptRecord,
+      notifiedSubscribersCount: notifiedCount
+    };
+  }
+
   function resetAll() {
     _tickCounter = 0;
     _subscribers.physical.clear();
@@ -211,6 +251,7 @@
     unsubscribe: unsubscribe,
     dispatchEvent: dispatchEvent,
     dispatchTick: dispatchTick,
+    interrupt: interrupt,
     getCascadeState: getCascadeState,
     resetAll: resetAll,
     diagnose: function () {

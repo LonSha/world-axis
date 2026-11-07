@@ -174,6 +174,68 @@
       return lines.join('\n');
     },
 
+    /**
+     * OPV16-1: 施加微观极端环境代偿负荷 (Microclimate & Hazard Compensation)
+     * 在极寒、酷暑、毒瘴环境下，生物体维持体征将以 2~4 倍速率加速消耗卡路里与体力储备
+     */
+    applyHazardLoad: function (characterId, hazardType, severity, durationHours, opts) {
+      const v = this.getVitals(characterId);
+      if (!v) return { ok: false, error: 'character_not_found' };
+
+      const sev = typeof severity === 'number' ? Math.max(0, severity) : 1;
+      const dur = typeof durationHours === 'number' ? Math.max(0, durationHours) : 1;
+      const opt = opts || {};
+
+      // 负控制拦截：环境负荷为 0 或角色身处密封恒温恒湿仓时，绝不产生加速代偿消耗
+      if (sev === 0 || opt.insulated === true) {
+        return {
+          ok: true,
+          characterId: characterId,
+          hazardType: hazardType,
+          acceleratedDrain: 0,
+          fatigue: v.fatigue,
+          bodyTemp: v.bodyTemp,
+          message: 'Zero hazard or fully insulated; no metabolic compensation needed.'
+        };
+      }
+
+      // 代偿乘数：根据险阻类型加速体力透支
+      let drainMultiplier = 1.0 + (sev * 0.7); // 1.7x ~ 4.5x
+      // 防具装备御寒/防毒绝缘抵消
+      const insulation = typeof opt.thermalInsulation === 'number' ? Math.max(0, Math.min(1.0, opt.thermalInsulation)) : 0;
+      drainMultiplier = Math.max(1.0, drainMultiplier * (1.0 - insulation));
+
+      const addedFatigue = Math.round(DEF.fatigueRatePerHour * dur * drainMultiplier * 10) / 10;
+      v.fatigue = Math.min(100, Math.round((v.fatigue + addedFatigue) * 10) / 10);
+
+      // 体温与失衡判定
+      if (hazardType === 'cold') {
+        if (sev >= 3 && insulation < 0.5) {
+          v.bodyTemp = v.fatigue >= 80 ? 'frozen' : 'hypothermia';
+        } else if (sev >= 1) {
+          v.bodyTemp = 'chilled';
+        }
+      } else if (hazardType === 'heat') {
+        if (sev >= 3) v.bodyTemp = 'heatstroke';
+        else if (sev >= 1) v.bodyTemp = 'feverish';
+      }
+
+      const st = this.evaluateState(characterId);
+      return {
+        ok: true,
+        characterId: characterId,
+        hazardType: hazardType,
+        severity: sev,
+        durationHours: dur,
+        drainMultiplier: Math.round(drainMultiplier * 100) / 100,
+        addedFatigue: addedFatigue,
+        currentFatigue: v.fatigue,
+        fatigueTier: st.fatigueTier,
+        bodyTemp: v.bodyTemp,
+        isFainted: v.fatigue >= 95
+      };
+    },
+
     diagnose: function () {
       return {
         version: this.version,

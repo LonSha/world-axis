@@ -3505,6 +3505,15 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/social-encounter.js': 'socialEncounter',
     'engines/lens-culling.js': 'lensCulling',
     'engines/cascade-bus.js': 'cascadeBus',
+    // v2.330.0 (V16): 新物理引擎
+    'engines/microclimate-phase.js': 'microclimatePhase',
+    'engines/toxic-metabolism.js': 'toxicMetabolism',
+    'engines/pyro-telecom.js': 'pyroTelecom',
+    'engines/contraband-pipeline.js': 'contrabandPipeline',
+    'engines/crowd-panic.js': 'crowdPanic',
+    'engines/veracity-arbitration.js': 'veracityArbitration',
+    'engines/gear-wear.js': 'gearWear',
+    'engines/cover-ballistics.js': 'coverBallistics',
     'engines/health-preflight.js': 'healthPreflight',
     'engines/narrative-deduction.js': 'narrativeDeduction',
     'engines/anti-omniscience.js': 'antiOmniscience',
@@ -5468,7 +5477,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     { page: 'world', ids: ['wa-at-enabled', 'wa-at-view', 'wa-at-places', 'wa-at-routes', 'wa-at-rel', 'wa-at-unplaced', 'wa-at-diag'],
       dynamic: ['wa-at-out'] },
     // v2.245.0 (MAP-1 & MAP-2): 空间位置感知与视口控制 —— 5 静态控件 + 1 动态读数出口
-    { page: 'world', ids: ['wa-geo-locs', 'wa-geo-feed', 'wa-geo-sample', 'wa-geo-diag', 'wa-geo-svg'],
+    { page: 'world', ids: ['wa-geo-locs', 'wa-geo-feed', 'wa-geo-sample', 'wa-geo-diag', 'wa-geo-svg',
+      // v2.328.0 - v2.330.0 (V15 & V16): 超级物理地图高级控件 (拓扑/通勤/遮蔽/物证/HUD/全景大盘)
+      'wa-geo-adv-topo', 'wa-geo-adv-transit', 'wa-geo-adv-occl', 'wa-geo-adv-trace', 'wa-geo-adv-hud', 'wa-phys-v16-dash'],
       dynamic: ['wa-geo-out'] },
     // v2.187.0（E8）：依赖体检与迁移助手 —— 8 静态控件 + 1 动态读数出口。
     //   渲染在**工具页**（与种子库 / 蓝图同页同族：三者都在「把世界搬走 / 搬来」这条线上），

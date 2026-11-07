@@ -1590,6 +1590,87 @@
     'actor.sendWhisper': function (o) {
       if (WA.whisperBackchannel && typeof WA.whisperBackchannel.sendWhisper === 'function') return WA.whisperBackchannel.sendWhisper(o.senderId || o.sender, o.recipientId || o.recipient, o);
       return { ok: false, reason: 'unsupported' };
+    },
+    // v2.330.0 (OPV16-1~9 & EXV16-1~8): WorldAxis V16 场景行动桌路由接线
+    'bio.applyHazardLoad': function (o) {
+      if (WA.metabolism && typeof WA.metabolism.applyHazardLoad === 'function') return WA.metabolism.applyHazardLoad(o.actorId || o.who, o.hazardSeverity, o.durationMinutes || o.duration, o.opts || o);
+      return { ok: false, reason: 'metabolism-unavailable' };
+    },
+    'bus.interrupt': function (o) {
+      if (WA.cascadeBus && typeof WA.cascadeBus.interrupt === 'function') return WA.cascadeBus.interrupt(o.targetLayer, o.interruptEvent, o.opts || o);
+      return { ok: false, reason: 'cascadeBus-unavailable' };
+    },
+    'geo.resolveKinetic': function (o) {
+      if (WA.spatialConflict && typeof WA.spatialConflict.resolveKinetic === 'function') return WA.spatialConflict.resolveKinetic(o.actorA, o.actorB, o.kineticA || o.speedA, o.kineticB || o.speedB, o.opts || o);
+      return { ok: false, reason: 'spatialConflict-unavailable' };
+    },
+    'geo.evolveTrace': function (o) {
+      if (WA.spatialTrace && typeof WA.spatialTrace.evolveTrace === 'function') return WA.spatialTrace.evolveTrace(o.traceId, o.mediumType || o.medium, o.environmentInterference || o.interference, o.opts || o);
+      return { ok: false, reason: 'spatialTrace-unavailable' };
+    },
+    'item.forceInspect': function (o) {
+      if (WA.personalInventory && typeof WA.personalInventory.forceInspect === 'function') return WA.personalInventory.forceInspect(o.targetActorId || o.target || o.who, o.inspectorSuspicion || o.suspicion, o.opts || o);
+      return { ok: false, reason: 'personalInventory-unavailable' };
+    },
+    'stealth.checkBlindspot': function (o) {
+      if (WA.socialEncounter && typeof WA.socialEncounter.checkBlindspot === 'function') return WA.socialEncounter.checkBlindspot(o.stalkerId || o.who, o.targetId || o.target, o.relativeAngle || o.angle, o.opts || o);
+      return { ok: false, reason: 'socialEncounter-unavailable' };
+    },
+    'routine.deviate': function (o) {
+      if (WA.universalRoutine && typeof WA.universalRoutine.deviate === 'function') return WA.universalRoutine.deviate(o.actorId || o.who, o.stressLevel || o.stress, o.cause, o.opts || o);
+      return { ok: false, reason: 'universalRoutine-unavailable' };
+    },
+    'bridge.atomicTransact': function (o) {
+      if (WA.bridge && typeof WA.bridge.atomicTransact === 'function') return WA.bridge.atomicTransact(o.transactionId || o.txId, o.steps, o.opts || o);
+      return { ok: false, reason: 'bridge-unavailable' };
+    },
+    'sys.breakDeadlock': function (o) {
+      if (WA.healthPreflight && typeof WA.healthPreflight.breakDeadlock === 'function') return WA.healthPreflight.breakDeadlock(o.cycleWaitGraph || o.graph, o.timeoutTicks || o.timeout, o.opts || o);
+      return { ok: false, reason: 'healthPreflight-unavailable' };
+    },
+    'env.simulatePhase': function (o) {
+      if (WA.microclimatePhase && typeof WA.microclimatePhase.simulatePhase === 'function') return WA.microclimatePhase.simulatePhase(o);
+      return { ok: false, reason: 'microclimatePhase-unavailable' };
+    },
+    'bio.metabolizeToxin': function (o) {
+      if (WA.toxicMetabolism && typeof WA.toxicMetabolism.metabolize === 'function') return WA.toxicMetabolism.metabolize(o.actorId || o.who, o.elapsedMinutes || o.duration);
+      return { ok: false, reason: 'toxicMetabolism-unavailable' };
+    },
+    'bio.applyToxin': function (o) {
+      if (WA.toxicMetabolism && typeof WA.toxicMetabolism.applyToxin === 'function') return WA.toxicMetabolism.applyToxin(o.actorId || o.who, o.toxinType, o.dose, o.opts || o);
+      return { ok: false, reason: 'toxicMetabolism-unavailable' };
+    },
+    'bio.administerAntidote': function (o) {
+      if (WA.toxicMetabolism && typeof WA.toxicMetabolism.administerAntidote === 'function') return WA.toxicMetabolism.administerAntidote(o.actorId || o.who, o.antidotePower, o.targetToxinType);
+      return { ok: false, reason: 'toxicMetabolism-unavailable' };
+    },
+    'geo.broadcastSignal': function (o) {
+      if (WA.pyroTelecom && typeof WA.pyroTelecom.broadcastSignal === 'function') return WA.pyroTelecom.broadcastSignal(o);
+      return { ok: false, reason: 'pyroTelecom-unavailable' };
+    },
+    'market.smuggleContraband': function (o) {
+      if (WA.contrabandPipeline && typeof WA.contrabandPipeline.smuggleContraband === 'function') return WA.contrabandPipeline.smuggleContraband(o);
+      return { ok: false, reason: 'contrabandPipeline-unavailable' };
+    },
+    'geo.triggerStampede': function (o) {
+      if (WA.crowdPanic && typeof WA.crowdPanic.triggerStampede === 'function') return WA.crowdPanic.triggerStampede(o);
+      return { ok: false, reason: 'crowdPanic-unavailable' };
+    },
+    'society.crossExamine': function (o) {
+      if (WA.veracityArbitration && typeof WA.veracityArbitration.crossExamine === 'function') return WA.veracityArbitration.crossExamine(o);
+      return { ok: false, reason: 'veracityArbitration-unavailable' };
+    },
+    'item.applyStress': function (o) {
+      if (WA.gearWear && typeof WA.gearWear.applyStress === 'function') return WA.gearWear.applyStress(o.gearId || o.itemId, o.stressLoad || o.load, o.stressType || o.type);
+      return { ok: false, reason: 'gearWear-unavailable' };
+    },
+    'item.repairGear': function (o) {
+      if (WA.gearWear && typeof WA.gearWear.repairGear === 'function') return WA.gearWear.repairGear(o.gearId || o.itemId, o.repairPoints || o.points);
+      return { ok: false, reason: 'gearWear-unavailable' };
+    },
+    'combat.resolveCover': function (o) {
+      if (WA.coverBallistics && typeof WA.coverBallistics.resolveCoverProtection === 'function') return WA.coverBallistics.resolveCoverProtection(o);
+      return { ok: false, reason: 'coverBallistics-unavailable' };
     }
   };
 

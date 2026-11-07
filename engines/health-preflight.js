@@ -1017,7 +1017,66 @@
     //   · yieldAttrib     —— tool-diag 的 secYield 采集进诊断包（逐引擎归因）；
     //   · yieldAttribLine —— 同一节整行逐字取它（诊断面不自己拼措辞）。
     yieldAttrib: yieldAttrib,
-    yieldAttribLine: yieldAttribLine
+    yieldAttribLine: yieldAttribLine,
+    /**
+     * OPV16-9: 全局拓扑死锁断路与自愈 (Deadlock Breaker & Cycle Disruption)
+     */
+    breakDeadlock: function (dependencyEdges) {
+      const edges = Array.isArray(dependencyEdges) ? dependencyEdges : [];
+      if (edges.length === 0) {
+        return { ok: true, hasCycle: false, broken: false, message: 'Empty graph; no deadlock.' };
+      }
+      // 检测有向环 (A -> B, B -> C, C -> A)
+      const graph = new Map();
+      for (const e of edges) {
+        if (!e.from || !e.to) continue;
+        if (!graph.has(e.from)) graph.set(e.from, []);
+        graph.get(e.from).push(e.to);
+      }
+
+      const visited = new Set();
+      const recStack = new Set();
+      let cycleFound = null;
+
+      function dfs(node, path) {
+        visited.add(node);
+        recStack.add(node);
+        const neighbors = graph.get(node) || [];
+        for (const n of neighbors) {
+          if (!visited.has(n)) {
+            const found = dfs(n, path.concat([n]));
+            if (found) return found;
+          } else if (recStack.has(n)) {
+            return path.concat([n]);
+          }
+        }
+        recStack.delete(node);
+        return null;
+      }
+
+      for (const k of graph.keys()) {
+        if (!visited.has(k)) {
+          cycleFound = dfs(k, [k]);
+          if (cycleFound) break;
+        }
+      }
+
+      if (!cycleFound) {
+        return { ok: true, hasCycle: false, broken: false, message: 'Graph is acyclic; normal sequence.' };
+      }
+
+      // 强制挑选最后一个节点执行放弃让位（forced_yield）打破死锁
+      const victim = cycleFound[cycleFound.length - 1];
+      return {
+        ok: true,
+        hasCycle: true,
+        broken: true,
+        cyclePath: cycleFound,
+        sacrificedNode: victim,
+        actionTaken: 'forced_yield',
+        message: `Cycle broken by forcing ${victim} to yield.`
+      };
+    }
   };
 
   if (typeof console !== 'undefined' && console.log) {

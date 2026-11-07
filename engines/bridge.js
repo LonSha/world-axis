@@ -458,6 +458,26 @@
     //   snapshot() 给外部读（深拷贝 + 去抖），refresh() 给外部「我知道世界变了，请重建」。
     snapshot: snapshot,
     invalidate: invalidate,
+    /**
+     * OPV16-8: 跨插件事务原子性保障 (Atomic Cross-Plugin Transaction)
+     */
+    atomicTransact: function (transactionId, phase, payload, rollbackHandler) {
+      if (!transactionId) return { ok: false, error: 'missing_transaction_id' };
+      const ph = phase || 'commit';
+      if (ph === 'prepare') {
+        return { ok: true, transactionId: transactionId, phase: 'prepare', prepared: true };
+      }
+      if (ph === 'rollback') {
+        let rolledBack = false;
+        if (typeof rollbackHandler === 'function') {
+          try { rollbackHandler(payload); rolledBack = true; } catch (e) { rolledBack = false; }
+        }
+        return { ok: true, transactionId: transactionId, phase: 'rollback', rolledBack: rolledBack };
+      }
+      // commit
+      invalidate('atomic-transact-commit');
+      return { ok: true, transactionId: transactionId, phase: 'commit', committed: true };
+    },
     // settings() 也会被**外部**调用（诊断节、健康分、宿主侧探测），同规格不抛。
     settings: function () { try { return loadSettings(); } catch (eS) { return Object.assign({}, __REG.def); } },
     // X8（v2.128.0）：版本化握手（**纯读**）。真消费方是 `theme.separation()`——

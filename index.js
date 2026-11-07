@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.324.0';
+  const VERSION = '2.330.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -533,6 +533,15 @@
     'engines/social-encounter.js',
     'engines/lens-culling.js',
     'engines/cascade-bus.js',
+    // v2.330.0 (V16): 微气候相变、毒素代谢与全息物理空间对抗引擎
+    'engines/microclimate-phase.js',
+    'engines/toxic-metabolism.js',
+    'engines/pyro-telecom.js',
+    'engines/contraband-pipeline.js',
+    'engines/crowd-panic.js',
+    'engines/veracity-arbitration.js',
+    'engines/gear-wear.js',
+    'engines/cover-ballistics.js',
     // v2.247.0 (SYS-DEF-1): 全向系统健康与生成质量前置预检器 (SillyTavern-Self-Check 机制缝入)
     'engines/health-preflight.js',
     // v2.247.0 (NARR-1): 双轨因果隔离与线索断裂补偿推演台 (Gloria 叙事三部曲机制缝入)

@@ -150,6 +150,72 @@
     return _encounterHistory.slice(0, l);
   }
 
+  /**
+   * OPV16-6: 市井动线交汇视线阻断与盲区背刺仲裁 (Blindspot Stalking & Backstab Readiness)
+   * 结合视线遮蔽物、人流掩护与前方 120 度视野锥角，仲裁暗中尾随与盲区接近
+   */
+  function checkBlindspot(stalkerId, targetId, opts) {
+    if (!stalkerId || !targetId) {
+      return { ok: false, error: 'missing_stalker_or_target' };
+    }
+    const opt = opts || {};
+    const envNoise = typeof opt.environmentNoiseDb === 'number' ? opt.environmentNoiseDb : 45;
+    const distanceMeters = typeof opt.distanceMeters === 'number' ? Math.max(0.1, opt.distanceMeters) : 5.0;
+    const isBehind = opt.isBehindTarget !== false; // 默认处于目标后方 120 度盲区内
+    const crowdDensity = typeof opt.crowdDensity === 'number' ? Math.max(0, opt.crowdDensity) : 1.0;
+
+    // 负控制拦截：若目标身处空旷极度安静密室（noise <= 25dB 且 density == 0），背向接近必因足音被察觉，无法盲区潜行
+    if (envNoise <= 25 && crowdDensity === 0 && distanceMeters < 5.0) {
+      return {
+        ok: true,
+        stalkerId: stalkerId,
+        targetId: targetId,
+        stealthSuccess: false,
+        backstabReady: false,
+        spottedReason: 'Acoustic footsteps echoed in dead-silent empty room; stealth impossible.',
+        detectionScore: 95
+      };
+    }
+
+    // 负控制拦截：若非处于目标后方盲区（例如正面对视），直接暴露
+    if (!isBehind) {
+      return {
+        ok: true,
+        stalkerId: stalkerId,
+        targetId: targetId,
+        stealthSuccess: false,
+        backstabReady: false,
+        spottedReason: 'Direct line-of-sight exposure; not in blindspot.',
+        detectionScore: 100
+      };
+    }
+
+    // 潜行成功判定：噪音掩护与人流掩护
+    const stealthRating = typeof opt.stalkerStealth === 'number' ? opt.stalkerStealth : 60;
+    const targetPerception = typeof opt.targetPerception === 'number' ? opt.targetPerception : 50;
+
+    const noiseBonus = Math.max(0, (envNoise - 40) * 0.5);
+    const crowdBonus = crowdDensity * 10;
+    const totalStealthScore = stealthRating + noiseBonus + crowdBonus;
+
+    const stealthSuccess = totalStealthScore > targetPerception;
+    const backstabReady = stealthSuccess && distanceMeters <= 1.5;
+
+    return {
+      ok: true,
+      stalkerId: stalkerId,
+      targetId: targetId,
+      stealthSuccess: stealthSuccess,
+      backstabReady: backstabReady,
+      distanceMeters: distanceMeters,
+      totalStealthScore: Math.round(totalStealthScore * 10) / 10,
+      targetPerception: targetPerception,
+      narrativeStatus: backstabReady
+        ? 'Stalker closed in to 1m unnoticed; lethal backstab strike primed.'
+        : (stealthSuccess ? 'Tailing closely in crowd blindspot.' : 'Target felt uneasy glance and looked back.')
+    };
+  }
+
   function resetAll() {
     _encounterHistory.length = 0;
     return { ok: true, reset: true };
@@ -159,6 +225,7 @@
     version: VERSION,
     evaluateEncounter: evaluateEncounter,
     getRecentEncounters: getRecentEncounters,
+    checkBlindspot: checkBlindspot,
     resetAll: resetAll,
     diagnose: function () {
       return {

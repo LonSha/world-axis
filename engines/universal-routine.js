@@ -232,6 +232,48 @@
     };
   }
 
+  /**
+   * OPV16-7: 全题材作息表反骨偏离与应激滞留重构 (Routine Defiance & Stress Deviation)
+   * 当 NPC 遭遇恐惧、利益诱惑或重伤管制时，自主违抗或中断标准作息
+   */
+  function deviate(actorId, reason, opts) {
+    const aid = _cleanStr(actorId);
+    if (!aid || !_actorRoutines.has(aid)) {
+      return { ok: false, error: 'actor_routine_not_registered' };
+    }
+    const profile = _actorRoutines.get(aid);
+    const opt = opts || {};
+    const stressRating = typeof opt.stressRating === 'number' ? opt.stressRating : 50;
+    const loyalty = typeof opt.loyalty === 'number' ? opt.loyalty : profile.willingness;
+
+    // 负控制拦截：角色忠诚度为满值（loyalty >= 90）且无外部危机刺激（stress < 30），偏离判定坚决拒绝
+    if (loyalty >= 90 && stressRating < 30) {
+      return {
+        ok: false,
+        error: 'deviate_rejected',
+        actorId: aid,
+        message: 'High loyalty and low stress; actor strictly adheres to standard routine.'
+      };
+    }
+
+    const devType = opt.deviationType || 'bunker_down'; // 'bunker_down' | 'abscond' | 'rebellion'
+    profile.deviation = {
+      type: devType,
+      reason: reason || 'stress_induced_defiance',
+      deviatedAt: Date.now(),
+      targetNode: opt.targetNode || 'safe_house_bunker'
+    };
+
+    return {
+      ok: true,
+      actorId: aid,
+      deviated: true,
+      deviationType: devType,
+      reason: profile.deviation.reason,
+      targetNode: profile.deviation.targetNode
+    };
+  }
+
   function resetAll() {
     _actorRoutines.clear();
     return { ok: true, reset: true };
@@ -244,6 +286,7 @@
     clearActorDeviation: clearActorDeviation,
     evaluateActorRoutine: evaluateActorRoutine,
     getActorScheduleStatus: getActorScheduleStatus,
+    deviate: deviate,
     resetAll: resetAll,
     diagnose: function () {
       return {
