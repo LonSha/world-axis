@@ -193,6 +193,26 @@
           });
         }
       }
+      // v2.330.0 (V16): 微观物理物相相变、生物中毒代谢与空间对抗汇流
+      if (WA.toxicMetabolism && typeof WA.toxicMetabolism.getActorToxinStatus === 'function') {
+        const wanted = Array.isArray(c.people) ? c.people : [];
+        wanted.forEach(function (aid, idx) {
+          const tStatus = WA.toxicMetabolism.getActorToxinStatus(aid);
+          if (tStatus && tStatus.ok && tStatus.toxins && tStatus.toxins.length > 0) {
+            const tDesc = tStatus.toxins.map(function (x) { return (x.toxinType || x.type) + '(' + Math.round(x.concentration) + 'mg)'; }).join('、');
+            add('life', 'toxic:' + aid + ':' + idx, aid + '身中毒素【' + tDesc + '】，机能受损与生化代谢中', [aid], Date.now(), '生化中毒');
+          }
+        });
+      }
+      if (c.place && WA.microclimatePhase && typeof WA.microclimatePhase.getNodeMedium === 'function') {
+        const med = WA.microclimatePhase.getNodeMedium(c.place);
+        if (med && (med.phaseState || med.mediaType)) {
+          const pState = med.phaseState || 'normal';
+          if (pState !== 'normal') {
+            add('life', 'phase:' + c.place, '场所【' + c.place + '】环境介质物相演变为【' + pState + '】（温度:' + med.temperature + '°C，阻抗率:' + (med.frictionCoef || 1) + '）', [], Date.now(), '微观相变');
+          }
+        }
+      }
     });
     // Rank first, then scene relevance, then owner-local freshness (different clocks
     // are never compared across owners), finally stable owner/id order.

@@ -188,6 +188,15 @@
         people: Object.keys(obj(st.people)).length, chronicle: arr(st.chronicle).length,
         opinionCanon: arr(obj(st.opinion).canon).length, opinionForum: arr(obj(st.opinion).forum).length
       },
+      // V16 跨插件物理客观事实投影 (单向外供给 LonSha 插件消费)
+      v16LivingWorld: {
+        activeCrisesCount: arr(st.activeCrises).length,
+        microclimateDiag: (WA.microclimatePhase && typeof WA.microclimatePhase.diagnose === 'function') ? WA.microclimatePhase.diagnose() : null,
+        toxicMetabolismDiag: (WA.toxicMetabolism && typeof WA.toxicMetabolism.diagnose === 'function') ? WA.toxicMetabolism.diagnose() : null,
+        contrabandDiag: (WA.contrabandPipeline && typeof WA.contrabandPipeline.diagnose === 'function') ? WA.contrabandPipeline.diagnose() : null,
+        panicDiag: (WA.crowdPanic && typeof WA.crowdPanic.diagnose === 'function') ? WA.crowdPanic.diagnose() : null,
+        coverDiag: (WA.coverBallistics && typeof WA.coverBallistics.diagnose === 'function') ? WA.coverBallistics.diagnose() : null
+      },
       // 过滤归因：外部侧能一眼看出「为什么这条没进来」。
       filter: {
         presumeUnknown: presume, includeHidden: !!cfg.includeHidden,

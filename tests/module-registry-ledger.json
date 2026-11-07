@@ -5,9 +5,9 @@
  "uiCount": 14,
  "nsCount": 400,
  "totals": {
-  "loadEdges": 257,
+  "loadEdges": 258,
   "hardEdges": 0,
-  "callRefs": 451,
+  "callRefs": 453,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -61,6 +61,7 @@
     "engines/campaign.js",
     "engines/capacity-audit.js",
     "engines/care-chain.js",
+    "engines/cascade-bus.js",
     "engines/channel-probe.js",
     "engines/chapters.js",
     "engines/choice-board.js",
@@ -357,6 +358,7 @@
     "engines/branch-transplant.js",
     "engines/bridge.js",
     "engines/calendar.js",
+    "engines/cascade-bus.js",
     "engines/chapters.js",
     "engines/cognitive-poisoning.js",
     "engines/collateral-rupture.js",
@@ -733,6 +735,7 @@
     "engines/backstage.js",
     "engines/bridge.js",
     "engines/calendar.js",
+    "engines/cascade-bus.js",
     "engines/chapters.js",
     "engines/coordinate.js",
     "engines/direct-event.js",
@@ -2460,10 +2463,17 @@
     "cascadeBus",
     "engines"
    ],
-   "requires": [],
-   "requiresFiles": [],
+   "requires": [
+    "workflow"
+   ],
+   "requiresFiles": [
+    "core/workflow.js"
+   ],
    "providerOrderOk": true,
-   "callRefs": [],
+   "callRefs": [
+    "clock",
+    "settingsBus"
+   ],
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []

@@ -116,6 +116,21 @@
           }
         }
       }
+      // V16 EXV16-1: 微气候物相相变自动演化
+      if (WA.microclimatePhase && typeof WA.microclimatePhase.simulatePhase === 'function') {
+        const med = WA.microclimatePhase.getNodeMedium(pid);
+        if (med) {
+          const ambTemp = (worldContext && (worldContext.ambientTemperature != null ? worldContext.ambientTemperature : worldContext.temperature)) != null
+            ? (worldContext.ambientTemperature != null ? worldContext.ambientTemperature : worldContext.temperature)
+            : (med.temperature || 20);
+          const precip = (worldContext && (worldContext.precipitation != null ? worldContext.precipitation : worldContext.rainfall)) || 0;
+          WA.microclimatePhase.simulatePhase({
+            nodeId: pid,
+            ambientTemperature: ambTemp,
+            precipitation: precip
+          });
+        }
+      }
     }
     dispatchEvent('physical', 'physical_tick', { places: places, tick: _tickCounter });
 
@@ -124,6 +139,17 @@
       if (WA.engines && WA.engines.metabolismClock && typeof WA.engines.metabolismClock.accumulateFatigue === 'function') {
         // 自然醒觉代谢
         WA.engines.metabolismClock.accumulateFatigue(aid, 2, 'circadian_tick');
+      }
+      // V16 EXV16-2: 生物毒素半衰期生化代谢
+      if (WA.toxicMetabolism && typeof WA.toxicMetabolism.metabolize === 'function') {
+        WA.toxicMetabolism.metabolize(aid, 30);
+      }
+      // V16 EXV16-7: 随身装备疲劳应力自然微衰变
+      if (WA.gearWear && typeof WA.gearWear.applyStress === 'function') {
+        const gStatus = WA.gearWear.getGearStatus(aid + '_main_gear');
+        if (gStatus) {
+          WA.gearWear.applyStress(aid + '_main_gear', 1, 'abrasion');
+        }
       }
     }
     dispatchEvent('somatic', 'somatic_tick', { actors: actors, tick: _tickCounter });
@@ -142,6 +168,15 @@
       for (let i = 0; i < actors.length - 1; i++) {
         for (let j = i + 1; j < actors.length; j++) {
           WA.engines.socialEncounter.evaluateEncounter(places[0] || 'common_plaza', { actorId: actors[i] }, { actorId: actors[j] }, {});
+        }
+      }
+    }
+    // V16 EXV16-5: 群体恐慌与踩踏疏散状态巡检
+    if (WA.crowdPanic && typeof WA.crowdPanic.getPanicZoneStatus === 'function') {
+      for (const pid of places) {
+        const pz = WA.crowdPanic.getPanicZoneStatus(pid);
+        if (pz && pz.ok && pz.inPanic) {
+          report.behavioral.conflictsResolved++;
         }
       }
     }
@@ -266,6 +301,29 @@
 
   WA.engines.cascadeBus = engine;
   WA.cascadeBus = engine;
+
+  // 挂载主工作流周期触发（每轮生成后自动推动四层总线）
+  if (WA.workflow && typeof WA.workflow.register === 'function') {
+    try {
+      WA.workflow.register({
+        id: 'cascadeBus.advanceTick',
+        chain: 'after',
+        order: 25,
+        critical: false,
+        label: '四层级联调度总线·全域物理与机能演进脉冲',
+        async run() {
+          const st = (WA.store && WA.store.get) ? WA.store.get() : {};
+          const curPlace = (st.region && st.region.currentPlace) || 'common_plaza';
+          const activePeople = (st.people && Object.keys(st.people).slice(0, 5)) || ['player'];
+          dispatchTick({
+            currentZones: [curPlace],
+            activeActors: activePeople
+          });
+        }
+      });
+    } catch (e) {}
+  }
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = engine;
   }
