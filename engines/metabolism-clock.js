@@ -235,7 +235,43 @@
         isFainted: v.fatigue >= 95
       };
     },
+    /**
+     * OPV17-1: 生理极限剧痛与应激惊恐的精神代偿
+     */
+    applyPsychicStress: function (characterId, shockLevel, cause, opts) {
+      const v = this.getVitals(characterId);
+      if (!v) return { ok: false, error: 'character_not_found' };
+      const shock = typeof shockLevel === 'number' ? Math.max(0, shockLevel) : 0;
+      const opt = opts || {};
 
+      // 负控制：无剧痛冲击或角色具备无畏绝缘时，断言绝不产生惊恐精神代偿
+      if (shock <= 0 || opt.fearless === true) {
+        return {
+          ok: false,
+          error: 'zero_shock_or_fearless_immune',
+          characterId: characterId,
+          stressApplied: 0
+        };
+      }
+
+      v.psychicStress = typeof v.psychicStress === 'number' ? v.psychicStress : 0;
+      v.psychicStress = Math.min(100, v.psychicStress + shock);
+
+      // 若有联动 psycheTrauma 引擎，自动向下投递创伤
+      if (WA.psycheTrauma && typeof WA.psycheTrauma.inflictTrauma === 'function') {
+        WA.psycheTrauma.inflictTrauma(characterId, shock, 'mutilation', cause || 'physical_trauma_shock');
+      }
+
+      return {
+        ok: true,
+        characterId: characterId,
+        cause: cause || 'severe_physical_pain',
+        shockLevel: shock,
+        currentStress: v.psychicStress,
+        isPanic: v.psychicStress >= 70,
+        isShocked: v.psychicStress >= 90
+      };
+    },
     diagnose: function () {
       return {
         version: this.version,
@@ -248,4 +284,5 @@
     module.exports = metabolismClock;
   }
   WA.metabolismClock = metabolismClock;
+  WA.metabolism = metabolismClock;
 })();

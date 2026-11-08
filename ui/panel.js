@@ -17140,6 +17140,29 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         });
       }
       return { ok: true, cat: cat };
+    },
+    // v2.340.0 (V17 EXV17-9): 全息宏观因果与心智戏剧沙盘大盘渲染
+    renderV17DramaPsycheBoard(container) {
+      const data = {
+        tension: (WA.dramaticTension && typeof WA.dramaticTension.getSceneTension === 'function') ? WA.dramaticTension.getSceneTension() : 20.0,
+        epoch: (WA.epochTide && typeof WA.epochTide.getCurrentEpoch === 'function') ? WA.epochTide.getCurrentEpoch() : { epochType: 'normal_era' },
+        butterfly: (WA.butterflyCascade && typeof WA.butterflyCascade.diagnose === 'function') ? WA.butterflyCascade.diagnose() : {},
+        psyche: (WA.psycheTrauma && typeof WA.psycheTrauma.diagnose === 'function') ? WA.psycheTrauma.diagnose() : {}
+      };
+      if (!container || typeof container.appendChild !== 'function') {
+        // 安全无 DOM 环境降级
+        return { ok: true, headless: true, data: data };
+      }
+      try {
+        const div = document.createElement('div');
+        div.id = 'wa-drama-v17-dash';
+        div.className = 'wa-v17-board';
+        div.innerHTML = `<div class="board-header">V17 全息戏剧因果大盘</div><div class="board-content">张力: ${data.tension}% | 纪元: ${data.epoch.epochType}</div>`;
+        container.appendChild(div);
+        return { ok: true, rendered: true, data: data };
+      } catch (e) {
+        return { ok: true, headless: true, data: data, error: e.message };
+      }
     }
   };
 })();

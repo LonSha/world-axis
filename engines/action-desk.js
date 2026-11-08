@@ -1671,6 +1671,91 @@
     'combat.resolveCover': function (o) {
       if (WA.coverBallistics && typeof WA.coverBallistics.resolveCoverProtection === 'function') return WA.coverBallistics.resolveCoverProtection(o);
       return { ok: false, reason: 'coverBallistics-unavailable' };
+    },
+    // ── V17 新增动作调度路由 ──
+    'bio.applyPsychicStress': function (o) {
+      if (WA.metabolism && typeof WA.metabolism.applyPsychicStress === 'function') return WA.metabolism.applyPsychicStress(o.actorId || o.who, o.shockLevel || o.shock, o.cause, o.opts || o);
+      return { ok: false, reason: 'metabolism-unavailable' };
+    },
+    'mind.inflictTrauma': function (o) {
+      if (WA.psycheTrauma && typeof WA.psycheTrauma.inflictTrauma === 'function') return WA.psycheTrauma.inflictTrauma(o.actorId || o.who, o.shockLevel || o.shock, o.traumaType || o.type, o.sourceId || o.source, o.opts || o);
+      return { ok: false, reason: 'psycheTrauma-unavailable' };
+    },
+    'mind.triggerBlackening': function (o) {
+      if (WA.psycheTrauma && typeof WA.psycheTrauma.triggerBlackening === 'function') return WA.psycheTrauma.triggerBlackening(o.actorId || o.who, o.obsessionTarget || o.target, o.cause);
+      return { ok: false, reason: 'psycheTrauma-unavailable' };
+    },
+    'mind.soothePsyche': function (o) {
+      if (WA.psycheTrauma && typeof WA.psycheTrauma.soothePsyche === 'function') return WA.psycheTrauma.soothePsyche(o.actorId || o.who, o.soothePower || o.power, o.method);
+      return { ok: false, reason: 'psycheTrauma-unavailable' };
+    },
+    'causal.triggerButterfly': function (o) {
+      if (WA.butterflyCascade && typeof WA.butterflyCascade.triggerFlutter === 'function') return WA.butterflyCascade.triggerFlutter(o.seedEventId || o.seedId, o.initialEnergy || o.energy, o.targetTopologyChain || o.chain, o.opts || o);
+      return { ok: false, reason: 'butterflyCascade-unavailable' };
+    },
+    'causal.advanceButterfly': function (o) {
+      if (WA.butterflyCascade && typeof WA.butterflyCascade.advanceTurn === 'function') return WA.butterflyCascade.advanceTurn(o.stepCount || o.steps || 1);
+      return { ok: false, reason: 'butterflyCascade-unavailable' };
+    },
+    'faction.hatchConspiracy': function (o) {
+      if (WA.conspiracyWeaver && typeof WA.conspiracyWeaver.hatchConspiracy === 'function') return WA.conspiracyWeaver.hatchConspiracy(o.cabalId, o.ringleaderId, o.targetAuthorityId, o.members, o.opts || o);
+      return { ok: false, reason: 'conspiracyWeaver-unavailable' };
+    },
+    'faction.advanceCoupPhase': function (o) {
+      if (WA.conspiracyWeaver && typeof WA.conspiracyWeaver.advancePhase === 'function') return WA.conspiracyWeaver.advancePhase(o.cabalId, o.phaseName, o.evidence);
+      return { ok: false, reason: 'conspiracyWeaver-unavailable' };
+    },
+    'faction.executeCoup': function (o) {
+      if (WA.conspiracyWeaver && typeof WA.conspiracyWeaver.executeCoup === 'function') return WA.conspiracyWeaver.executeCoup(o.cabalId, o.opts || o);
+      return { ok: false, reason: 'conspiracyWeaver-unavailable' };
+    },
+    'faction.unmaskConspiracy': function (o) {
+      if (WA.conspiracyWeaver && typeof WA.conspiracyWeaver.unmaskConspiracy === 'function') return WA.conspiracyWeaver.unmaskConspiracy(o.cabalId, o.exposerId, o.proofTraceId);
+      return { ok: false, reason: 'conspiracyWeaver-unavailable' };
+    },
+    'society.forgeIllusion': function (o) {
+      if (WA.perceptionManipulation && typeof WA.perceptionManipulation.forgeIllusion === 'function') return WA.perceptionManipulation.forgeIllusion(o.forgerId, o.targetVictimId, o.illusionType, o.payload, o.credibilityScore, o.opts || o);
+      return { ok: false, reason: 'perceptionManipulation-unavailable' };
+    },
+    'society.verifyBelief': function (o) {
+      if (WA.perceptionManipulation && typeof WA.perceptionManipulation.verifyBelief === 'function') return WA.perceptionManipulation.verifyBelief(o.victimId, o.illusionId, o.witnessContext);
+      return { ok: false, reason: 'perceptionManipulation-unavailable' };
+    },
+    'world.shiftEpoch': function (o) {
+      if (WA.epochTide && typeof WA.epochTide.shiftEpoch === 'function') return WA.epochTide.shiftEpoch(o.epochType, o.severity, o.durationEpochTurns, o.opts || o);
+      return { ok: false, reason: 'epochTide-unavailable' };
+    },
+    'world.advanceEpoch': function (o) {
+      if (WA.epochTide && typeof WA.epochTide.advanceEpoch === 'function') return WA.epochTide.advanceEpoch(o.turns);
+      return { ok: false, reason: 'epochTide-unavailable' };
+    },
+    'drama.poseDilemma': function (o) {
+      if (WA.moralDilemma && typeof WA.moralDilemma.poseDilemma === 'function') return WA.moralDilemma.poseDilemma(o.dilemmaKey, o.decisionMakerId, o.branchA, o.branchB, o.opts || o);
+      return { ok: false, reason: 'moralDilemma-unavailable' };
+    },
+    'drama.resolveDilemma': function (o) {
+      if (WA.moralDilemma && typeof WA.moralDilemma.resolveDilemma === 'function') return WA.moralDilemma.resolveDilemma(o.dilemmaKey, o.chosenBranch, o.rationale);
+      return { ok: false, reason: 'moralDilemma-unavailable' };
+    },
+    'culture.broadcastMeme': function (o) {
+      if (WA.ideologyMemetics && typeof WA.ideologyMemetics.broadcastMeme === 'function') return WA.ideologyMemetics.broadcastMeme(o);
+      return { ok: false, reason: 'ideologyMemetics-unavailable' };
+    },
+    'bus.penetrateIntent': function (o) {
+      if (WA.cascadeBus && typeof WA.cascadeBus.penetrateIntent === 'function') return WA.cascadeBus.penetrateIntent(o.actorId, o.traumaticTrigger, o.newPrimeDirective, o.weight);
+      return { ok: false, reason: 'cascadeBus-unavailable' };
+    },
+    'drama.primeGun': function (o) {
+      if (WA.dramaticTension && typeof WA.dramaticTension.primeChekhovGun === 'function') return WA.dramaticTension.primeChekhovGun(o.gunId, o.anchorEntityId, o.foreshadowText, o.detonationTension, o.opts || o);
+      return { ok: false, reason: 'dramaticTension-unavailable' };
+    },
+    'drama.updateTension': function (o) {
+      if (WA.dramaticTension && typeof WA.dramaticTension.updateSceneTension === 'function') return WA.dramaticTension.updateSceneTension(o.tensionDelta, o.cause);
+      return { ok: false, reason: 'dramaticTension-unavailable' };
+    },
+    'drama.detonateGun': function (o) {
+      if (WA.dramaticTension && typeof WA.dramaticTension.detonateChekhovGun === 'function') return WA.dramaticTension.detonateChekhovGun(o.gunId, o.opts || o);
+      return { ok: false, reason: 'dramaticTension-unavailable' };
     }
   };
 

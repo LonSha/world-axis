@@ -213,6 +213,30 @@
           }
         }
       }
+      // v2.340.0 (V17): 深层心智创伤、黑化、时代大潮与契诃夫之枪戏剧汇流
+      if (WA.psycheTrauma && typeof WA.psycheTrauma.getProfile === 'function') {
+        const wanted = Array.isArray(c.people) ? c.people : [];
+        wanted.forEach(function (aid, idx) {
+          const prof = WA.psycheTrauma.getProfile(aid);
+          if (prof && prof.isBlackened) {
+            add('life', 'blackening:' + aid + ':' + idx, aid + '已彻底心智黑化，执念「' + (prof.obsessionTarget || '毁灭宿命') + '」，行事狠绝不再顾忌伦理！', [aid], Date.now(), '心智黑化');
+          } else if (prof && prof.phaseState === 'psychic-breakdown') {
+            add('life', 'breakdown:' + aid + ':' + idx, aid + '理智彻底崩溃离魂，认知陷入剧烈谵妄状态！', [aid], Date.now(), '精神崩溃');
+          }
+        });
+      }
+      if (WA.epochTide && typeof WA.epochTide.getCurrentEpoch === 'function') {
+        const ep = WA.epochTide.getCurrentEpoch();
+        if (ep && ep.epochType && ep.epochType !== 'normal_era') {
+          add('life', 'epoch:' + ep.epochType, '宏观文明处于【' + ep.epochType + '】大时代浪潮，全局物理与生存常数受严酷修正（剩余' + ep.remainingTurns + '轮）', [], Date.now(), '时代大潮');
+        }
+      }
+      if (WA.dramaticTension && typeof WA.dramaticTension.getSceneTension === 'function') {
+        const tension = WA.dramaticTension.getSceneTension();
+        if (tension >= 75.0) {
+          add('life', 'tension:climax', '当前场景戏剧宿命张力高达【' + Math.round(tension) + '%】，伏笔契诃夫之枪处于极高引爆阈值！', [], Date.now(), '高潮悬念');
+        }
+      }
     });
     // Rank first, then scene relevance, then owner-local freshness (different clocks
     // are never compared across owners), finally stable owner/id order.

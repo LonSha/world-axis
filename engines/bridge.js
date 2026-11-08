@@ -197,6 +197,17 @@
         panicDiag: (WA.crowdPanic && typeof WA.crowdPanic.diagnose === 'function') ? WA.crowdPanic.diagnose() : null,
         coverDiag: (WA.coverBallistics && typeof WA.coverBallistics.diagnose === 'function') ? WA.coverBallistics.diagnose() : null
       },
+      // V17 跨插件心智震颤与戏剧因果真源 (OPV17-8: 单向投影至 LonSha 与外部消费)
+      v17PsychicCrisis: {
+        psycheTraumaDiag: (WA.psycheTrauma && typeof WA.psycheTrauma.diagnose === 'function') ? WA.psycheTrauma.diagnose() : null,
+        butterflyCascadeDiag: (WA.butterflyCascade && typeof WA.butterflyCascade.diagnose === 'function') ? WA.butterflyCascade.diagnose() : null,
+        conspiracyWeaverDiag: (WA.conspiracyWeaver && typeof WA.conspiracyWeaver.diagnose === 'function') ? WA.conspiracyWeaver.diagnose() : null,
+        perceptionDiag: (WA.perceptionManipulation && typeof WA.perceptionManipulation.diagnose === 'function') ? WA.perceptionManipulation.diagnose() : null,
+        epochTideDiag: (WA.epochTide && typeof WA.epochTide.diagnose === 'function') ? WA.epochTide.diagnose() : null,
+        moralDilemmaDiag: (WA.moralDilemma && typeof WA.moralDilemma.diagnose === 'function') ? WA.moralDilemma.diagnose() : null,
+        dramaticTensionDiag: (WA.dramaticTension && typeof WA.dramaticTension.diagnose === 'function') ? WA.dramaticTension.diagnose() : null,
+        ideologyMemeticsDiag: (WA.ideologyMemetics && typeof WA.ideologyMemetics.diagnose === 'function') ? WA.ideologyMemetics.diagnose() : null
+      },
       // 过滤归因：外部侧能一眼看出「为什么这条没进来」。
       filter: {
         presumeUnknown: presume, includeHidden: !!cfg.includeHidden,

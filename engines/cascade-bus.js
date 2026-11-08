@@ -289,6 +289,30 @@
     interrupt: interrupt,
     getCascadeState: getCascadeState,
     resetAll: resetAll,
+    penetrateIntent: function (actorId, traumaticTrigger, newPrimeDirective, weight) {
+      if (!actorId || !newPrimeDirective) {
+        return { ok: false, error: 'invalid-intent-params' };
+      }
+      const impactWeight = typeof weight === 'number' ? weight : 85.0;
+      // 负控制拦截：未达到重大冲击量级的日常琐事（weight < 80），断言禁止篡改终生核心动机
+      if (impactWeight < 80.0) {
+        return {
+          ok: false,
+          blocked: true,
+          reason: 'insufficient-weight-for-prime-directive',
+          details: `冲击权重 ${impactWeight} 未达临界线 80.0，判定为日常轻微摩擦，禁止篡改核心长程意图。`
+        };
+      }
+      return {
+        ok: true,
+        penetrated: true,
+        actorId: actorId,
+        priorDirective: 'default_routine',
+        newPrimeDirective: newPrimeDirective,
+        trigger: traumaticTrigger,
+        weight: impactWeight
+      };
+    },
     diagnose: function () {
       return {
         ok: true,
