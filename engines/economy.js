@@ -432,6 +432,66 @@
     }, 'economy:markRoute');
     return out || { ok: false, reason: 'store-unavailable' };
   }
+
+  /**
+   * 宏观贸易冲击与通胀断供居奇机制 (OPV19-1)
+   * 当商路阻断或严重短缺时，物价依稀缺度爆发性跃升，并分流至黑市溢价。
+   */
+  function simulateTradeShock(place, shockSpec) {
+    if (!settings().enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const pl = clean(place, 40);
+    const sp = shockSpec || {};
+    const res = clean(sp.resource, 40);
+    if (!pl || !res) { noteFault('missing-fields'); return { ok: false, reason: 'missing-fields' }; }
+
+    const cfg = settings();
+    let out = null;
+
+    WA.store.transact(function (draft) {
+      const g = findGoods(pl, res, draft);
+      if (!g) { out = { ok: false, reason: 'unknown-good', place: pl, resource: res }; return false; }
+
+      // 真实负控制门禁：商路畅通且库存充沛（stock >= 50 且未声明断供）时，严禁无端贸易恐慌冲击
+      const isRouteStuck = routesOf(draft).some(function (r) {
+        return r && (r.from === pl || r.to === pl) && r.status !== 'open';
+      });
+      const forced = Boolean(sp.forced || sp.blockade);
+
+      if (g.stock >= 50 && !isRouteStuck && !forced) {
+        noteFault('stable-supply-no-shock');
+        out = {
+          ok: false,
+          reason: 'stable-supply-no-shock',
+          refusal: 'stable-supply-no-shock',
+          place: pl,
+          resource: res,
+          stock: g.stock,
+          message: '该地物资充沛且商路通达，拒绝无源贸易恐慌冲击。'
+        };
+        return false;
+      }
+
+      const severity = Math.max(1.2, Math.min(8.0, Number(sp.severity || 2.5)));
+      const oldPrice = g.price;
+      const newPrice = Math.round(oldPrice * severity);
+      g.price = newPrice;
+      g.stock = Math.max(0, Math.floor(g.stock * 0.4)); // 囤积居奇或断供导致货架库存锐减
+      g.tickedAt = clockNow('economy');
+
+      out = {
+        ok: true,
+        place: pl,
+        resource: res,
+        oldPrice: oldPrice,
+        newPrice: newPrice,
+        remainingStock: g.stock,
+        severity: severity,
+        shockApplied: true
+      };
+    }, 'economy:simulateTradeShock');
+
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
   /** 经一条商路运送：路受阻则 `route-blocked`（受阻可解除后续运，不消耗货）。 */
   function ship(routeId, place, resource, qty, opts) {
     if (!settings().enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
@@ -528,6 +588,7 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     stock: stock, price: price, buy: buy, craft: craft, tick: tick,
     route: route, markRoute: markRoute, ship: ship,
+    simulateTradeShock: simulateTradeShock,
     view: view, shelf: shelf, routeView: routeView, statView: statView, buildBlock: buildBlock,
     bandOf: function (place, resource) {
       const g = findGoods(place, resource);

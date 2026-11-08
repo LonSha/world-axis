@@ -243,6 +243,39 @@
     _combatants.clear();
   }
 
+  /**
+   * 战术碰撞与随身行囊耗材双向损耗联动 (OPV19-2)
+   */
+  function linkInventoryAttrition(actorId, combatResult, inventoryRef) {
+    if (!actorId) return { ok: false, reason: 'missing-actor' };
+    const res = combatResult || {};
+    const inv = inventoryRef || (WA.personalInventory && typeof WA.personalInventory.view === 'function' ? WA.personalInventory : null);
+
+    // 负控制：未参与真实战斗或结果无损耗判定
+    if (!res.action && !res.hit && !res.parried) {
+      return { ok: false, reason: 'no-combat-clash-data', refusal: 'no-clash-no-attrition' };
+    }
+
+    const durabilityLoss = res.parried ? 15 : (res.hit ? 25 : 5);
+    const traumaType = res.zone === 'head' ? 'concussion' : (res.zone === 'limbs' ? 'fracture' : 'laceration');
+    let gearConsumed = false;
+
+    if (inv && typeof inv.consumeItem === 'function') {
+      // 尝试自动消耗急救耗材
+      const consumeRes = inv.consumeItem(actorId, 'bandage') || inv.consumeItem(actorId, 'medkit');
+      gearConsumed = Boolean(consumeRes && consumeRes.ok);
+    }
+
+    return {
+      ok: true,
+      actorId: actorId,
+      durabilityLoss: durabilityLoss,
+      traumaType: traumaType,
+      autoGearConsumed: gearConsumed,
+      linked: true
+    };
+  }
+
   function diagnose() {
     return {
       ok: true,
@@ -257,6 +290,7 @@
     registerCombatant: registerCombatant,
     getCombatant: getCombatant,
     resolveClash: resolveClash,
+    linkInventoryAttrition: linkInventoryAttrition,
     resetAll: resetAll,
     diagnose: diagnose
   };

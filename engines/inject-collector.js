@@ -189,6 +189,31 @@
           });
         }
       }
+      // v2.350.0: V19 间谍暗网、病理检疫与外科创伤提示词注入
+      if (WA.covertEspionage && typeof WA.covertEspionage.buildBlock === 'function') {
+        const sb = WA.covertEspionage.buildBlock();
+        if (sb) {
+          String(sb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'spy:' + idx, line, [], Date.now(), '谍报暗网');
+          });
+        }
+      }
+      if (WA.epidemicContagion && typeof WA.epidemicContagion.buildBlock === 'function') {
+        const eb = WA.epidemicContagion.buildBlock();
+        if (eb) {
+          String(eb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('world', 'epidemic:' + idx, line, [], Date.now(), '病理检疫');
+          });
+        }
+      }
+      if (WA.surgicalTriage && typeof WA.surgicalTriage.buildBlock === 'function') {
+        const mb = WA.surgicalTriage.buildBlock();
+        if (mb) {
+          String(mb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'surgical:' + idx, line, [], Date.now(), '战地救护');
+          });
+        }
+      }
       if (WA.eccentricThreads && typeof WA.eccentricThreads.buildBlock === 'function') {
         const eb = WA.eccentricThreads.buildBlock();
         if (eb) {

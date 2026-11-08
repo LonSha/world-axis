@@ -62,7 +62,8 @@
 
 ## 三、 贯通新场景专锁矩阵（场景 38 ～ 场景 43）
 
-1. **场景 38：雨夜谍影潜伏伪装与密函刺探专锁 (`tests/scenario-v38-covert-espionage-heist.js`)**
+1. **场景 38：正文聊天驱动退场角色自动幕后生活专锁 (`tests/scenario-v38-stage-presence-offstage-living.js`)** (已实装通过)
+2. **场景 39：雨夜谍影潜伏伪装与密函刺探专锁 (`tests/scenario-v39-covert-espionage-heist.js`)
    - 验证间谍身份伪装（`coverIdentity`）、眼线收买、密函刺探成功率与破绽暴露被捕门禁。
 2. **场景 39：封闭客栈瘟疫爆发隔离与外科缝合急救专锁 (`tests/scenario-v39-epidemic-surgical-triage.js`)**
    - 验证空气/飞沫病原体蔓延（`R0`）、隔离阻断、重创大出血紧急缝合止血与抗感染清创负控制。

@@ -193,6 +193,11 @@
     'stagePresence.sense': function (o) { return (WA.stagePresence && typeof WA.stagePresence.sensePresence === 'function') ? WA.stagePresence.sensePresence(o) : { ok: false, reason: 'stagePresence-unavailable' }; },
     'stagePresence.tick': function (o) { return (WA.stagePresence && typeof WA.stagePresence.tickOffstageAutonomy === 'function') ? WA.stagePresence.tickOffstageAutonomy(o) : { ok: false, reason: 'stagePresence-unavailable' }; },
     'stagePresence.reunion': function (o) { return (WA.stagePresence && typeof WA.stagePresence.awakenReunion === 'function') ? WA.stagePresence.awakenReunion(o.actorId || o.who) : { ok: false, reason: 'stagePresence-unavailable' }; },
+    // ── V19 史诗新机制调度 (EXV19-1 ~ EXV19-3 & OPV19-1) ──
+    'spy.operateSpy': function (o) { return (WA.covertEspionage && typeof WA.covertEspionage.operateSpy === 'function') ? WA.covertEspionage.operateSpy(o) : { ok: false, reason: 'covertEspionage-unavailable' }; },
+    'bio.propagateDisease': function (o) { return (WA.epidemicContagion && typeof WA.epidemicContagion.propagateDisease === 'function') ? WA.epidemicContagion.propagateDisease(o && o.locationId, o) : { ok: false, reason: 'epidemicContagion-unavailable' }; },
+    'medical.performSurgery': function (o) { return (WA.surgicalTriage && typeof WA.surgicalTriage.performSurgery === 'function') ? WA.surgicalTriage.performSurgery(o) : { ok: false, reason: 'surgicalTriage-unavailable' }; },
+    'econ.simulateTradeShock': function (o) { return (WA.economy && typeof WA.economy.simulateTradeShock === 'function') ? WA.economy.simulateTradeShock(o && o.place, o) : { ok: false, reason: 'economy-unavailable' }; },
     'sharedAwareness.openPact': function (o) { return (WA.sharedAwareness && typeof WA.sharedAwareness.openPact === 'function') ? WA.sharedAwareness.openPact(o) : { ok: false, reason: 'sharedAwareness-unavailable' }; },
     'sharedAwareness.confirmPact': function (o) { return (WA.sharedAwareness && typeof WA.sharedAwareness.confirmPact === 'function') ? WA.sharedAwareness.confirmPact(o) : { ok: false, reason: 'sharedAwareness-unavailable' }; },
     'sharedAwareness.amendPact': function (o) { return (WA.sharedAwareness && typeof WA.sharedAwareness.amendPact === 'function') ? WA.sharedAwareness.amendPact(o) : { ok: false, reason: 'sharedAwareness-unavailable' }; },

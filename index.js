@@ -637,6 +637,9 @@
     // v2.323.0: 通用退场角色跨题材自主生计与烟火生活流转 + 怪诞市井暗线
     'engines/offstage-life.js',
     'engines/stage-presence.js',
+    'engines/covert-espionage.js',
+    'engines/epidemic-contagion.js',
+    'engines/surgical-triage.js',
     'engines/eccentric-threads.js',
     'engines/human-realism.js',
     // v2.325.0: 剧情生活动线与身份世界观节律
