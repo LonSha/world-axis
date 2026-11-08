@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.330.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.330.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.340.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.340.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -417,6 +417,30 @@
       "refs": 0,
       "tref": 2,
       "own": 3
+    },
+    "alchemyToxicology.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/alchemy-toxicology.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/alchemy-toxicology.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "alchemyToxicology.settings": {
+      "reason": "self-only",
+      "detail": "engines/alchemy-toxicology.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/alchemy-toxicology.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "alchemyToxicology.stat": {
+      "reason": "self-only",
+      "detail": "engines/alchemy-toxicology.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/alchemy-toxicology.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
     },
     "antiOmniscience.canCharacterKnow": {
       "reason": "self-only",
@@ -930,6 +954,30 @@
       "tref": 0,
       "own": 4
     },
+    "blackmarketUsury.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/blackmarket-usury.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/blackmarket-usury.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "blackmarketUsury.settings": {
+      "reason": "self-only",
+      "detail": "engines/blackmarket-usury.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/blackmarket-usury.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "blackmarketUsury.stat": {
+      "reason": "self-only",
+      "detail": "engines/blackmarket-usury.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/blackmarket-usury.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
+    },
     "bonds.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -985,6 +1033,14 @@
       "refs": 0,
       "tref": 0,
       "own": 8
+    },
+    "bridge.queueDirtyDelta": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/bridge.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 1
     },
     "bridge.refresh": {
       "reason": "self-only",
@@ -2106,6 +2162,70 @@
       "tref": 0,
       "own": 3
     },
+    "covenantSanction.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/covenant-sanction.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/covenant-sanction.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "covenantSanction.settings": {
+      "reason": "self-only",
+      "detail": "engines/covenant-sanction.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/covenant-sanction.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "covenantSanction.stat": {
+      "reason": "self-only",
+      "detail": "engines/covenant-sanction.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/covenant-sanction.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
+    },
+    "covertEspionage.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/covert-espionage.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "covertEspionage.registerSpy": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/covert-espionage.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "covertEspionage.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/covert-espionage.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "covertEspionage.statView": {
+      "reason": "self-only",
+      "detail": "engines/covert-espionage.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/covert-espionage.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "covertEspionage.view": {
+      "reason": "self-only",
+      "detail": "engines/covert-espionage.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/covert-espionage.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "creditLedger.list": {
       "reason": "self-only",
       "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
@@ -2584,7 +2704,7 @@
       "src": "engines/economy.js",
       "refs": 0,
       "tref": 0,
-      "own": 26
+      "own": 27
     },
     "editorEvents.buildBlock": {
       "reason": "test-only",
@@ -2838,6 +2958,54 @@
       "reason": "self-only",
       "detail": "engines/ephemeral-scrub.js 内部自用、外部零引用（过度导出）",
       "src": "engines/ephemeral-scrub.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "epidemicContagion.checkSubjectInfection": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/epidemic-contagion.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "epidemicContagion.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/epidemic-contagion.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "epidemicContagion.isolateSubject": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/epidemic-contagion.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "epidemicContagion.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/epidemic-contagion.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "epidemicContagion.statView": {
+      "reason": "self-only",
+      "detail": "engines/epidemic-contagion.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/epidemic-contagion.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "epidemicContagion.view": {
+      "reason": "self-only",
+      "detail": "engines/epidemic-contagion.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/epidemic-contagion.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -3254,6 +3422,54 @@
       "reason": "self-only",
       "detail": "core/fault-context.js 内部自用、外部零引用（过度导出）",
       "src": "core/fault-context.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "fieldWriters.conflicts": {
+      "reason": "self-only",
+      "detail": "engines/field-writers.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/field-writers.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
+    },
+    "fieldWriters.entryOf": {
+      "reason": "self-only",
+      "detail": "engines/field-writers.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/field-writers.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "fieldWriters.stat": {
+      "reason": "self-only",
+      "detail": "engines/field-writers.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/field-writers.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "fieldWriters.undeclaredConflicts": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/field-writers.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "fieldWriters.view": {
+      "reason": "self-only",
+      "detail": "engines/field-writers.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/field-writers.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "fieldWriters.writersOf": {
+      "reason": "self-only",
+      "detail": "engines/field-writers.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/field-writers.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -3954,6 +4170,30 @@
       "tref": 2,
       "own": 3
     },
+    "inlineTags.normalizeDate": {
+      "reason": "self-only",
+      "detail": "engines/inline-tags.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/inline-tags.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "inlineTags.read": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/inline-tags.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 7
+    },
+    "inlineTags.strip": {
+      "reason": "self-only",
+      "detail": "engines/inline-tags.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/inline-tags.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "inspectorState.checkDirectEvents": {
       "reason": "self-only",
       "detail": "engines/inspector-state.js 内部自用、外部零引用（过度导出）",
@@ -4321,6 +4561,38 @@
       "refs": 0,
       "tref": 0,
       "own": 13
+    },
+    "l3Registry.byClass": {
+      "reason": "self-only",
+      "detail": "engines/l3-registry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/l3-registry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "l3Registry.entryOf": {
+      "reason": "self-only",
+      "detail": "engines/l3-registry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/l3-registry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "l3Registry.stat": {
+      "reason": "self-only",
+      "detail": "engines/l3-registry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/l3-registry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "l3Registry.view": {
+      "reason": "self-only",
+      "detail": "engines/l3-registry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/l3-registry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "laborSchedule.advanceDay": {
       "reason": "self-only",
@@ -4745,6 +5017,38 @@
       "refs": 0,
       "tref": 9,
       "own": 3
+    },
+    "maritimeNavigation.registerVessel": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/maritime-navigation.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "maritimeNavigation.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/maritime-navigation.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/maritime-navigation.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "maritimeNavigation.settings": {
+      "reason": "self-only",
+      "detail": "engines/maritime-navigation.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/maritime-navigation.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "maritimeNavigation.stat": {
+      "reason": "self-only",
+      "detail": "engines/maritime-navigation.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/maritime-navigation.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
     },
     "masks.dropMask": {
       "reason": "test-only",
@@ -6338,6 +6642,38 @@
       "tref": 0,
       "own": 18
     },
+    "pushApiRegistry.byClass": {
+      "reason": "self-only",
+      "detail": "engines/push-api-registry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/push-api-registry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "pushApiRegistry.entryOf": {
+      "reason": "self-only",
+      "detail": "engines/push-api-registry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/push-api-registry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "pushApiRegistry.stat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/push-api-registry.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 5
+    },
+    "pushApiRegistry.view": {
+      "reason": "self-only",
+      "detail": "engines/push-api-registry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/push-api-registry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "quota.add": {
       "reason": "test-only",
       "detail": "engines/quota.js 内部自用、外部零引用（过度导出）",
@@ -7042,6 +7378,54 @@
       "tref": 0,
       "own": 3
     },
+    "routinePacing.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/routine-pacing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/routine-pacing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "routinePacing.evaluate": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/routine-pacing.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 1
+    },
+    "routinePacing.listActors": {
+      "reason": "self-only",
+      "detail": "engines/routine-pacing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/routine-pacing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "routinePacing.saveSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/routine-pacing.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "routinePacing.settings": {
+      "reason": "self-only",
+      "detail": "engines/routine-pacing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/routine-pacing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
+    "routinePacing.stat": {
+      "reason": "self-only",
+      "detail": "engines/routine-pacing.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/routine-pacing.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
     "ruling.caseOf": {
       "reason": "self-only",
       "detail": "engines/ruling.js 内部自用、外部零引用（过度导出）",
@@ -7618,6 +8002,22 @@
       "tref": 0,
       "own": 20
     },
+    "stagePresence.settings": {
+      "reason": "self-only",
+      "detail": "engines/stage-presence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stage-presence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "stagePresence.stat": {
+      "reason": "self-only",
+      "detail": "engines/stage-presence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stage-presence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
     "staleGuard.clear": {
       "reason": "self-only",
       "detail": "engines/stale-guard.js 内部自用、外部零引用（过度导出）",
@@ -7721,6 +8121,38 @@
       "refs": 0,
       "tref": 0,
       "own": 8
+    },
+    "stealthInfiltration.registerGuard": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/stealth-infiltration.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "stealthInfiltration.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/stealth-infiltration.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stealth-infiltration.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "stealthInfiltration.settings": {
+      "reason": "self-only",
+      "detail": "engines/stealth-infiltration.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stealth-infiltration.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "stealthInfiltration.stat": {
+      "reason": "self-only",
+      "detail": "engines/stealth-infiltration.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/stealth-infiltration.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
     },
     "store.batchDepth": {
       "reason": "test-only",
@@ -7953,6 +8385,46 @@
       "refs": 0,
       "tref": 4,
       "own": 1
+    },
+    "surgicalTriage.admitPatient": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/surgical-triage.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "surgicalTriage.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/surgical-triage.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "surgicalTriage.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/surgical-triage.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "surgicalTriage.statView": {
+      "reason": "self-only",
+      "detail": "engines/surgical-triage.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/surgical-triage.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "surgicalTriage.view": {
+      "reason": "self-only",
+      "detail": "engines/surgical-triage.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/surgical-triage.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "survey.reload": {
       "reason": "self-only",
@@ -9372,6 +9844,22 @@
       "tref": 55,
       "own": 24
     },
+    "ui.renderV17DramaPsycheBoard": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "ui/panel.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "ui.renderV19ImmersionFold": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "ui/panel.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
     "ui.rerenderStat": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -9390,6 +9878,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 577
+    "dataOnly": 592
   }
 }

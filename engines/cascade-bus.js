@@ -142,6 +142,22 @@
     if (WA.butterflyCascade && typeof WA.butterflyCascade.advanceEpoch === 'function') {
       WA.butterflyCascade.advanceEpoch(1);
     }
+    // V19 EXV19-4: 远洋水文洋流矢量与暴风颠簸巡检
+    if (WA.maritimeNavigation && typeof WA.maritimeNavigation.navigateVoyage === 'function') {
+      try {
+        const vessels = (typeof WA.maritimeNavigation.getVessel === 'function') ? [] : [];
+        if (worldContext.voyageAction) {
+          WA.maritimeNavigation.navigateVoyage(worldContext.voyageAction);
+        }
+      } catch (eMaritime) {}
+    }
+    // V19 OPV19-1: 气象恶劣度对声学与视锥掩盖的底层环境折算
+    if (WA.spatialAcoustics && typeof WA.spatialAcoustics.calculateWeatherMasking === 'function') {
+      try {
+        const wType = (worldContext && (worldContext.weather || worldContext.weatherType)) || 'clear';
+        WA.spatialAcoustics.calculateWeatherMasking(30, wType);
+      } catch (eAcoustic) {}
+    }
     dispatchEvent('physical', 'physical_tick', { places: places, tick: _tickCounter });
     // ── Layer 2: 机能中层演化 ──
     for (const aid of actors) {
@@ -167,6 +183,20 @@
           // 非黑化态下的微弱自愈倾向
           WA.psycheTrauma.healTrauma(aid, 1.0, 'time_restoration');
         }
+      }
+      // V19 EXV19-7: 药理毒素微观侵蚀代谢衰减巡检
+      if (WA.alchemyToxicology && typeof WA.alchemyToxicology.brewOrTestToxin === 'function') {
+        try {
+          if (worldContext.screenPoison) {
+            WA.alchemyToxicology.brewOrTestToxin(Object.assign({ actorId: aid }, worldContext.screenPoison));
+          }
+        } catch (eAlchemy) {}
+      }
+      // V19 OPV19-3: 生理真实层睡眠剥夺稳态自然累加 (夜间清醒时段)
+      if (WA.humanRealism && typeof WA.humanRealism.applySleepDeprivation === 'function' && hour >= 23) {
+        try {
+          WA.humanRealism.applySleepDeprivation(aid, 1);
+        } catch (eSleep) {}
       }
     }
     dispatchEvent('somatic', 'somatic_tick', { actors: actors, tick: _tickCounter });
@@ -203,10 +233,30 @@
         report.behavioral.conflictsResolved++;
       }
     }
+    // V19 EXV19-6: 视锥潜行警戒态势自然衰减巡检
+    if (WA.stealthInfiltration && typeof WA.stealthInfiltration.executeInfiltration === 'function') {
+      try {
+        if (worldContext.stealthAction) {
+          WA.stealthInfiltration.executeInfiltration(worldContext.stealthAction.infiltratorId || actors[0], worldContext.stealthAction);
+        }
+      } catch (eStealth) {}
+    }
+    // V19 OPV19-5: 通用退场角色跨题材自主生计与舞台聚光灯运转脉冲
+    if (WA.stagePresence && typeof WA.stagePresence.tickOffstageAutonomy === 'function') {
+      try {
+        WA.stagePresence.tickOffstageAutonomy({ hoursPassed: 1, actors: actors });
+      } catch (eStage) {}
+    }
     dispatchEvent('behavioral', 'behavioral_tick', { actors: actors, hour: hour, tick: _tickCounter });
 
     // ── Layer 4: 社会顶层与跨插件外联层 ──
-    // 跨插件 LonSha 单向真源事实投影同步 (调用 bridge.snapshot 刷新外部快照)
+    // 跨插件 LonSha 单向真源事实投影同步与增量脏标记队列沉降 (OPV19-8)
+    if (WA.bridge && typeof WA.bridge.flushDirtySnapshots === 'function') {
+      try {
+        WA.bridge.flushDirtySnapshots('all');
+        report.social.externalBridgesSynced++;
+      } catch (eFlush) {}
+    }
     if (WA.bridge && typeof WA.bridge.snapshot === 'function') {
       try {
         WA.bridge.snapshot({ reason: 'cascade_bus_tick' });
@@ -214,6 +264,30 @@
       } catch (e) {}
     } else if (WA.bridge && typeof WA.bridge.dumpFacts === 'function') {
       report.social.externalBridgesSynced++;
+    }
+    // V19 EXV19-5: 地下钱庄与黑市高利贷逾期巡检
+    if (WA.blackmarketUsury && typeof WA.blackmarketUsury.transactBlackMarket === 'function') {
+      try {
+        if (worldContext.blackmarketAction) {
+          WA.blackmarketUsury.transactBlackMarket(worldContext.blackmarketAction);
+        }
+      } catch (eUsury) {}
+    }
+    // V19 EXV19-8: 铁律盟约与超自然契约惩戒巡检
+    if (WA.covenantSanction && typeof WA.covenantSanction.enforceCovenant === 'function') {
+      try {
+        if (worldContext.covenantEnforcement) {
+          WA.covenantSanction.enforceCovenant(worldContext.covenantEnforcement.covenantId, worldContext.covenantEnforcement);
+        }
+      } catch (eCovenant) {}
+    }
+    // V19 OPV19-2: 历法节庆与暗流共振巡检
+    if (WA.undercurrentCalendar && typeof WA.undercurrentCalendar.alignWithFestival === 'function') {
+      try {
+        if (worldContext.festivalSpec && worldContext.currentId) {
+          WA.undercurrentCalendar.alignWithFestival(worldContext.currentId, worldContext.festivalSpec);
+        }
+      } catch (eFestival) {}
     }
     // 手机因果入站队列与状态心跳
     if (WA.phoneBridge && typeof WA.phoneBridge.phaseOf === 'function') {
