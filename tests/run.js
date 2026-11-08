@@ -535,6 +535,7 @@ const LOAD = [
     'engines/sanctuary-scramble.js',
     'engines/counterfactual-echo.js',
     'engines/offstage-life.js',
+    'engines/stage-presence.js',
     'engines/eccentric-threads.js',
     'engines/human-realism.js',
     // v2.325.0: 剧情生活动线与身份世界观节律

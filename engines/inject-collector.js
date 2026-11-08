@@ -168,7 +168,17 @@
           [p.partyA, p.partyB], p.timestamp, '和解公约');
       });
       // v2.323.0: 退场角色生计流转与市井怪诞暗线注入
-      if (WA.offstageLife && typeof WA.offstageLife.buildBlock === 'function') {
+      if (WA.stagePresence && typeof WA.stagePresence.buildPresenceBlock === 'function') {
+        const pb = WA.stagePresence.buildPresenceBlock();
+        if (pb) {
+          String(pb).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
+            const cleanLine = line.replace(/^· /, '');
+            const m = cleanLine.match(/^([^（(：:]+)/);
+            const who = m ? m[1].trim() : '';
+            add('life', 'presence:' + idx, cleanLine, who ? [who] : [], Date.now(), '退场生计');
+          });
+        }
+      } else if (WA.offstageLife && typeof WA.offstageLife.buildBlock === 'function') {
         const ob = WA.offstageLife.buildBlock();
         if (ob) {
           String(ob).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
