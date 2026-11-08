@@ -1637,7 +1637,9 @@ const peopleIds = Object.keys(s.people);
       }).join('');
     })();
     return `
-      <div class="wa-sec">长线伏笔（承诺回收时刻）</div>
+      <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
+        <summary style="cursor:pointer;opacity:0.75;font-size:12px;">⚙️ 深度因果与底层人物调度机制（展开专家面板）</summary>
+<div class="wa-sec">长线伏笔（承诺回收时刻）</div>
       <label class="wa-row"><input id="wa-ll-enabled" type="checkbox" ${WA.longline && WA.longline.getSettings().enabled ? 'checked' : ''}/> 启用长线伏笔提醒</label>
       <div class="wa-row"><input id="wa-ll-id" class="wa-input" placeholder="伏笔 id"/><input id="wa-ll-due" class="wa-input" placeholder="分钟（多久后应收）"/></div>
       <div class="wa-row"><button class="wa-btn" id="wa-ll-promise">设定承诺</button><button class="wa-btn" id="wa-ll-sweep">扫描欠账</button></div>
@@ -2000,7 +2002,8 @@ const peopleIds = Object.keys(s.people);
       })()}</div>
       <div class="wa-row"><label class="wa-row"><input type="checkbox" id="wa-mo-on"${(() => { try { return WA.monologue.getSettings().enabled ? ' checked' : ''; } catch (e) { return ''; } })()}/><span>启用独白推演</span></label><button class="wa-btn wa-mini" id="wa-mo-stat" title="只读：预筛/独白调用次数、复用条数、被跳过的未提及人数、观望条数、缓存条数。">读数</button><button class="wa-btn wa-mini" id="wa-mo-reset" title="只清读数，不动缓存（缓存是「复用」的依据）。">重置读数</button><button class="wa-btn wa-mini" id="wa-mo-memo" title="清空独白缓存：换聊天/重开档时用，避免复用上一局的人物内心。">清缓存</button></div>
       <div id="wa-mo-out" class="wa-out"></div>
-      <div class="wa-sec">世界人物状态（${people.length}）</div>
+      </details>
+<div class="wa-sec">世界人物状态（${people.length}）</div>
       <div class="wa-list">${people.map(p => {
         const rk = recKeyOf(p && p.name);
         return `
@@ -2106,7 +2109,9 @@ const peopleIds = Object.keys(s.people);
            + `</div><div id="wa-fg-out" class="wa-out wa-dim">${esc(fr)}</div>`;
       })()}
 
-      <div data-omniscient>
+      <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
+        <summary style="cursor:pointer;opacity:0.75;font-size:12px;">⚙️ 外交提案、在途物流与因果调度工单（展开专家面板）</summary>
+<div data-omniscient>
       <div class="wa-sec">势力外交（成对事实）</div>
       <div class="wa-item">
         <div class="wa-dim">与上面的「关系网」<b>不是同一个东西</b>：那一栏是<b>推导值</b>（按双方各自的对外态度算出来的图，<code>derived:true</code>），这一栏是<b>谈成的事实</b>（成对条目 / 双边态度 / 条约 / 有效期 / 履约回执）。推导结果<b>不会</b>自动迁成事实 —— 「算出来的」不许冒充「谈成的」。</div>
@@ -2330,6 +2335,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           //   跳过来时清单已在场，锚点才可能命中。
         })()}
       </div>
+      </details>
       <div class="wa-sec">声誉四维</div>
       <div class="wa-item wa-rep-grid">${['authority','common','shadow','circuit'].map(dim => {
         const labels = {authority:'朝堂',common:'民间',shadow:'江湖',circuit:'商界'};
@@ -4162,7 +4168,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <label class="wa-row">刊名 <input id="wa-periodical-name" value="世界日报" maxlength="80"/></label>
       <label class="wa-row">每月出刊日 <input id="wa-periodical-days" value="1,8,15,22" placeholder="1,8,15,22"/></label>
       <label class="wa-row">刊物设定 <textarea id="wa-periodical-profile" maxlength="2000" placeholder="刊物风格、栏目与公开报道范围"></textarea></label>
-      <label class="wa-row"><input id="wa-periodical-enabled" type="checkbox"/>自动出刊（使用推演通道）</label>
+      <label class="wa-row"><input id="wa-periodical-enabled" type="checkbox"/>启用世界期刊（自动出刊）</label>
       <div class="wa-dim">相同标识保存会更新已有刊物；取消自动出刊后保存可停刊。日期跳跃只补最近一期。</div>
       <button class="wa-btn" id="wa-periodical-config">保存刊物</button><button class="wa-btn" id="wa-periodical-publish">检查出刊</button><button class="wa-btn" id="wa-periodical-read">阅读往期</button><div id="wa-periodical-out" role="status" aria-live="polite"></div>
       <div class="wa-sec">世界健康中心</div><div class="wa-dim">（一屏答三问：还有什么没做完 / 卡在哪 / 快满了没）</div>
