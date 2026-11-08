@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.330.0';
+  const VERSION = '2.340.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -542,6 +542,24 @@
     'engines/veracity-arbitration.js',
     'engines/gear-wear.js',
     'engines/cover-ballistics.js',
+    // v2.340.0 (V17): 混沌蝴蝶、深层心智与文明戏剧大系引擎
+    'engines/butterfly-cascade.js',
+    'engines/psyche-trauma.js',
+    'engines/conspiracy-weaver.js',
+    'engines/ideology-memetics.js',
+    'engines/dramatic-tension.js',
+    'engines/epoch-tide.js',
+    'engines/moral-dilemma.js',
+    'engines/perception-manipulation.js',
+    // v2.340.0 (V18): 具身战术、微表情审讯、荒野生态、围城与遗迹引擎
+    'engines/tactical-combat.js',
+    'engines/interrogation-tell.js',
+    'engines/ecosystem-predation.js',
+    'engines/siege-attrition.js',
+    'engines/anomaly-mutation.js',
+    'engines/bureaucracy-ascension.js',
+    'engines/judicial-inquest.js',
+    'engines/ruin-mechanism.js',
     // v2.247.0 (SYS-DEF-1): 全向系统健康与生成质量前置预检器 (SillyTavern-Self-Check 机制缝入)
     'engines/health-preflight.js',
     // v2.247.0 (NARR-1): 双轨因果隔离与线索断裂补偿推演台 (Gloria 叙事三部曲机制缝入)

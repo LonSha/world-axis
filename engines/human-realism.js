@@ -343,9 +343,8 @@
     stat.grudgesRecorded++;
     return { ok: true, grudge: Object.assign({}, entry) };
   }
-
   /**
-   * 化解或结算一笔恩怨（拒绝无凭据白开脱）
+   * 化解或结算一笔恩怨（拒绝无凭据白开脱，支持赔偿、停火与释怀三层分立）
    */
   function settleGrudge(grudgeId, opts) {
     const cfg = settings();
@@ -365,29 +364,60 @@
     if (!hit) return noteRefusal('grudge-not-found');
     if (hit.settled) return noteRefusal('already-settled');
 
-    const evidence=clean(o.evidence,160);
+    const evidence = clean(o.evidence, 160);
     if (!evidence) return noteRefusal('missing-resolution-evidence');
-    const response=o.response;
-    if (['reject','acknowledge','accept-repair','forgive'].indexOf(response)<0) return noteRefusal('missing-personal-response');
-    // evidence 是调用方登记的叙事依据，不宣称已独立验证真实性。
-    if (!Array.isArray(hit.resolutionAttempts)) hit.resolutionAttempts=[];
-    hit.resolutionAttempts.push({resolution:resolution,evidence:evidence,response:response,at:clockNow('humanRealism')});
-    hit.resolutionAttempts=hit.resolutionAttempts.slice(-8);
-    hit.resolution=resolution;
-    hit.resolutionEvidence=evidence;
-    hit.response=response;
-    hit.repairAccepted=response==='accept-repair'||response==='forgive';
-    hit.forgiven=response==='forgive';
-    hit.settled=hit.forgiven;
-    if (hit.settled) hit.settledAt=clockNow('humanRealism');
-    const actor=root.actors[hit.who];
-    // 不自动增加喜悦或恢复信任。仅显式原谅时缓和对应怨气。
-    if (actor && hit.forgiven) {
-      actor.emotions.resentment=Math.max(0,actor.emotions.resentment-Math.round(hit.intensity*0.5));
-      actor.updatedAt=clockNow('humanRealism');
-      stat.grudgesSettled++;
+    const response = o.response;
+    if (['reject', 'acknowledge', 'accept-repair', 'truce', 'forgive'].indexOf(response) < 0) return noteRefusal('missing-personal-response');
+
+    // OPV18-1: 赔偿价值检定与负控制硬门禁
+    const compensationValue = Number(o.compensationValue !== undefined ? o.compensationValue : (hit.intensity * 2));
+    if (response === 'accept-repair' || response === 'truce' || response === 'forgive') {
+      if (o.compensationValue !== undefined && Number(o.compensationValue) < hit.intensity) {
+        return noteRefusal('insufficient-compensation');
+      }
     }
-    return {ok:true,grudge:Object.assign({},hit)};
+
+    if (!Array.isArray(hit.resolutionAttempts)) hit.resolutionAttempts = [];
+    hit.resolutionAttempts.push({
+      resolution: resolution,
+      evidence: evidence,
+      response: response,
+      compensationValue: compensationValue,
+      at: clockNow('humanRealism')
+    });
+    hit.resolutionAttempts = hit.resolutionAttempts.slice(-8);
+
+    hit.resolution = resolution;
+    hit.resolutionEvidence = evidence;
+    hit.response = response;
+
+    // 三层化解状态分立
+    hit.compensationAccepted = (response === 'accept-repair' || response === 'truce' || response === 'forgive');
+    hit.truceAgreed = (response === 'truce' || response === 'forgive');
+    hit.heartForgiven = (response === 'forgive');
+    hit.repairAccepted = hit.compensationAccepted;
+    hit.forgiven = hit.heartForgiven;
+    hit.settled = hit.heartForgiven; // 仅彻底释怀视为恩怨完全终结
+    if (hit.settled) hit.settledAt = clockNow('humanRealism');
+
+    const actor = root.actors[hit.who];
+    if (actor) {
+      if (hit.heartForgiven) {
+        actor.emotions.resentment = Math.max(0, actor.emotions.resentment - Math.round(hit.intensity * 0.6));
+        actor.emotions.anger = Math.max(0, actor.emotions.anger - Math.round(hit.intensity * 0.5));
+        stat.grudgesSettled++;
+      } else if (hit.truceAgreed) {
+        // 表面停火：暂时压制怒气，但怨恨转为冷性戒备（cold_grudge）
+        actor.emotions.anger = Math.max(0, actor.emotions.anger - Math.round(hit.intensity * 0.3));
+        hit.coldGrudge = true;
+      } else if (hit.compensationAccepted) {
+        // 仅收下赔偿：略微缓和暴怒，保留防备
+        actor.emotions.anger = Math.max(0, actor.emotions.anger - Math.round(hit.intensity * 0.2));
+      }
+      actor.updatedAt = clockNow('humanRealism');
+    }
+
+    return { ok: true, grudge: Object.assign({}, hit) };
   }
   /**
    * 触发或检测情绪临界爆发（Outburst Breaker）

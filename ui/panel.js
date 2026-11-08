@@ -1397,7 +1397,7 @@
           'off': '六源全关：注入页打开源开关（开关优先于状态声明）',
           'live': '正常运转（本轮快照 live）'
         };
-        let h = '<div class="wa-item"><b>真空诊断</b>（EXV11-2 · 纯只读）：state = <b>' + esc(st) + '</b>'
+        let h = '<div class="wa-item"><b>真空诊断</b>（运行状态 · 只读）：state = <b>' + esc(st) + '</b>'
           + '<div class="wa-dim">下一步：' + esc(nextOf[st] || '未知态（见 snapshotState 原文）') + '</div>';
         if (R.faults && R.faults.length) h += '<div class="wa-log-warn">取数失败段：' + esc(R.faults.join('、')) + '</div>';
         try {
@@ -1498,7 +1498,7 @@
          //   / sediment（痕迹）/ farfield（远近分域）摆进同一屏。
          const acfg = (WA.atlas && WA.atlas.getSettings) ? WA.atlas.getSettings() : null;
          const atOn = !!(acfg && acfg.enabled);
-         return '<div class="wa-sec">统一地图与关系视图</div><div class="wa-dim">（E6：地点坐标 / 道路端点与在途货物 / 关系两层）</div>'
+         return '<div class="wa-sec">统一地图与关系视图</div><div class="wa-dim">（地点坐标 / 道路端点与在途货物 / 关系视图）</div>'
            + '<div class="wa-dim">坐标真源是 <code>region.places()</code>，分域真源是 <code>farfield.partition()</code>，关系拆<b>两层永不合并</b>：'
            + '<b>推导边</b>（由两势力态度档位算出，每条带 basis）与<b>已确立事实</b>（成对谈成的结果）。'
            + '只在推导层出现、外交表里没有成对条目的一对报 <b>未知</b>（<b>unknown ≠ 中立</b>）。'
@@ -1514,23 +1514,25 @@
            + '<button class="wa-btn" id="wa-at-diag" title="自证面：七处来源是否齐备、快照可读、两层各有多少、源缺席与源抛错分列">诊断</button>'
            + '</div>'
            + '<div id="wa-at-out" class="wa-out"></div>'
-           + '<div class="wa-sec" style="margin-top:10px">空间位置感知与视口控制（MAP-1 & MAP-2）</div>'
+           + '<div class="wa-sec" style="margin-top:10px">空间位置感知与视口控制</div>'
            + '<div class="wa-dim">基于物理坐标系、多级消歧与 App 级视口漫游。正文末尾写 <code>&lt;位置 人物="角色名"&gt;街区·具体地点&lt;/位置&gt;</code> 即刻自动解析落位，并以 <code>【空间常识与位移透镜】</code> 实时反哺相对距离与生活圈。</div>'
            + '<div class="wa-row">'
            + '<button class="wa-btn" id="wa-geo-locs" title="查看当前在场各角色最新空间坐标与实测落位">角色落位表</button>'
            + '<button class="wa-btn" id="wa-geo-feed" title="构建正文注入块预览（相对物理距离与周边 800m 生活圈）">正文透镜预览</button>'
            + '<button class="wa-btn" id="wa-geo-sample" title="注入东京大舞台基准坐标样例库（新宿/涩谷/秋叶原/初星学园等）">载入基准坐标库</button>'
            + '<button class="wa-btn" id="wa-geo-diag" title="空间位置追踪引擎状态诊断">空间诊断</button>'
-           + '<button class="wa-btn" id="wa-geo-svg" title="MAP-2: 渲染 SVG 画布与同地点角色聚类视图">SVG漫游画布</button>'
+           + '<button class="wa-btn" id="wa-geo-svg" title="渲染 SVG 画布与同地点角色聚类视图">SVG漫游画布</button>'
            + '</div>'
+           + '<details class="wa-details" style="margin-top:6px;">'
+           + '<summary style="cursor:pointer;opacity:0.75;font-size:12px;">🌐 微观物理与高级拓扑感知（展开专家操作）</summary>'
            + '<div class="wa-row" style="margin-top:6px;">'
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-topo" title="查看微观分形拓扑：区-街-店-室四级树与营业/门禁状态">拓扑层级与门禁</button>'
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-transit" title="测算多模态通勤代价与深夜滞留仲裁">通勤与滞留推演</button>'
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-occl" title="测算视线物理遮蔽与声学信噪比分贝衰减">视听遮蔽与耳语</button>'
            + '<button class="wa-btn wa-mini" id="wa-geo-adv-trace" title="查看当前地点物理残留物证与半衰期衰减">物证与感官痕迹</button>'
-           + '<button class="wa-btn wa-mini" id="wa-geo-adv-hud" title="EXV15: 微观物理环境与生理体征 HUD 胶囊">微观物理HUD</button>'
-           + '<button class="wa-btn wa-mini" id="wa-phys-v16-dash" title="EXV16-9: 沙盘动态微气候与机能体征全局监控大盘">V16物理大盘</button>'
-           + '</div>'
+           + '<button class="wa-btn wa-mini" id="wa-geo-adv-hud" title="微观物理环境与生理体征 HUD 胶囊">微观物理HUD</button>'
+           + '<button class="wa-btn wa-mini" id="wa-phys-v16-dash" title="沙盘动态微气候与机能体征全局监控大盘">物理大盘</button>'
+           + '</div></details>'
            + '<div id="wa-geo-out" class="wa-out"></div>';
        })()}`;
 
@@ -1993,7 +1995,7 @@ const peopleIds = Object.keys(s.people);
       <div class="wa-sec">NPC注册（发送前独白推演的候选集）</div>
       <div class="wa-row"><input id="wa-npc-name" class="wa-input" placeholder="角色全名…"/><button class="wa-btn" id="wa-npc-add" title="把角色名加入「发送前独白推演」的候选集（不是创建人物卡）">注册</button></div>
       <div class="wa-tag-row">${reg.map(n => `<span class="wa-tag">${esc(n)}<i data-unreg="${esc(n)}">✕</i></span>`).join('') || '<span class="wa-dim">尚未注册NPC</span>'}</div>
-      <div class="wa-sec">独白推演<span class="wa-dim">（v2.231.0 · OPT-3：按需调用，允许等待/拒绝）</span></div>
+      <div class="wa-sec">独白推演<span class="wa-dim">（按需推演，允许等待/拒绝）</span></div>
       <div id="wa-mo-row" class="wa-dim">${(() => {
         if (!WA.monologue || typeof WA.monologue.getSettings !== 'function') return '独白推演未加载';
         const cfg = WA.monologue.getSettings();
@@ -2022,9 +2024,9 @@ const peopleIds = Object.keys(s.people);
         return ps.registered ? ('已建档 ' + ps.withProfile + '/' + ps.registered + ' 个 NPC（' + ps.entries + ' 条）— 点人名后的「档案」录入') : '尚无注册 NPC';
       })()}</div>
       <div id="wa-prof-out" class="wa-out"></div>
-      <div class="wa-sec">关系六型图<span class="wa-dim">（EXV7-4：登记结构 / 温度 / 最近依据分列；不替代关系图谱）</span></div>
+      <div class="wa-sec">关系六型图<span class="wa-dim">（登记结构 / 温度 / 最近依据分列；不替代关系图谱）</span></div>
       ${relationNetworkBlock}
-      <div class="wa-sec">关系图谱<span class="wa-dim">（v2.231.0 · OPT-6：存档为唯一真源 / 有向立场与边分开记）</span></div>
+      <div class="wa-sec">关系图谱<span class="wa-dim">（存档为真源 / 有向立场与边分开记）</span></div>
       <div id="wa-rel-row" class="wa-dim">${(() => {
         if (!WA.relationGraph || typeof WA.relationGraph.persisted !== 'function') return '关系图谱未加载';
         const p = WA.relationGraph.persisted();
@@ -2100,7 +2102,7 @@ const peopleIds = Object.keys(s.people);
           + `<button class="wa-btn wa-mini" id="wa-fg-tension" aria-label="势力关系网张力" title="全局张力 = 敌对边权重和 ÷ 有效边数（分母是边数，可复算；零边时如实标注分母被保护）">张力</button>`
           + `<button class="wa-btn wa-mini" id="wa-fg-clusters" aria-label="势力关系网同盟簇" title="同盟簇 = 倾向达到「盟友」档及以上的连通子图；单点势力单列（不并入簇数，否则「同盟团数」会被读成「图分成几块」）">同盟簇</button>`
           + `<button class="wa-btn wa-mini" id="wa-fg-edges" aria-label="势力关系网逐条边" title="逐条边 JSON（含 basis：这条边由哪两个势力的对外态度算出）。边是**推导值**，不是观测到的势力间关系">关系网</button>`
-          + `<button class="wa-btn wa-mini" id="wa-fg-dyn" aria-label="势力博弈推演" title="EXV10-8: 多势力博弈推演（暗流博弈与势力消长走向简讯）">博弈推演</button>`
+          + `<button class="wa-btn wa-mini" id="wa-fg-dyn" aria-label="势力博弈推演" title="多势力博弈推演（暗流博弈与势力消长走向简讯）">博弈推演</button>`
            + `</div><div class="wa-row">`
            + `<input id="wa-fg-pa" class="wa-input" aria-label="势力关系网查边甲" placeholder="势力甲（查两家关系）"/>`
            + `<input id="wa-fg-pb" class="wa-input" aria-label="势力关系网查边乙" placeholder="势力乙"/>`
@@ -2825,7 +2827,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         //   （li.hosted.chars / li.hosted.key）并排；差异红标。同源读存档快照，不重算、纯只读。
         const hd = li.hosted || null;
         const dual = (li.len != null || hd)
-          ? '<div class="wa-item"><b>双面对照</b>（EXV11-5）'
+          ? '<div class="wa-item"><b>双面对照</b>'
             + '<div class="wa-kv"><span>主路径长度</span><b>' + esc(String(li.len == null ? '?' : li.len)) + '</b></div>'
             + (hd
               ? '<div class="wa-kv"><span>宿主槽位</span><b>' + esc(hd.key || '?') + ' · ' + esc(String(hd.chars == null ? '?' : hd.chars)) + ' 字符 · ' + (hd.ok ? '送达' : '未送达') + '</b></div>'
@@ -2839,7 +2841,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         //   逐字等于引擎产出（不二次加工）；三态标记可见（state 属性在壳上）。
         const rawSnap = (WA.render && typeof WA.render.buildWorldSnapshot === 'function')
           ? (function () { try { return WA.render.buildWorldSnapshot(); } catch (e) { return null; } })() : null;
-        const snapView = '<div class="wa-item"><b>世界快照查看器</b>（EXV11-6 · 逐字原样）'
+        const snapView = '<div class="wa-item"><b>世界快照查看器</b>（逐字原样）'
           + (rawSnap !== null
             ? '<div class="wa-dim">三态标记：见快照壳 state 属性（snapshotState 同源同刻）</div>'
               + '<pre style="white-space:pre-wrap;max-height:200px;overflow:auto;font-size:11px">' + esc(String(rawSnap)) + '</pre>'
@@ -3954,7 +3956,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-seed-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'depcheck', '依赖体检与迁移助手</div><div class="wa-dim">（E8：这一坨东西在你这台机器上到底能不能用）', () => `
+      ${foldSec('tools', 'depcheck', '依赖体检与迁移助手</div><div class="wa-dim">（运行环境与依赖完整性检查）', () => `
       <div class="wa-dim">蓝图 / 种子 / 转移包 / 存档信封四类可搬物，粘进来逐项体检：<b>缺什么</b>（外部依赖 / 机制开关 / 配方真源）、
         <b>会降级什么</b>（损失面<b>逐字取自各导入侧真源</b>，本面不重写）、<b>能不能迁移</b>（走 checkpoints 的迁移链）。
         三态分列：<code>present</code>（在）/ <code>absent</code>（确实缺）/ <code>unknown</code>（<b>探不出</b>）。
@@ -3981,7 +3983,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-dc-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'rulepack', '规则包与自动化模板</div><div class="wa-dim">（E7：把这一局喜欢的规则存成一套，下次一键切回来）', () => `
+      ${foldSec('tools', 'rulepack', '规则包与自动化模板</div><div class="wa-dim">（保存当前规则设定与自动化动作模板）', () => `
       <div class="wa-dim">把<b>当前规则面</b>（你启用的题材与相关设置）存成一个<b>命名包</b>：换一局、换一个人设时一键切回，
         也能导出给别人。<b>本面只记录设置与启用面，一个字都不改世界状态</b> ——
         写盘唯一走 <code>settingsBus</code>（与题材 / 预设 / 配方同一条路）。<br/>
@@ -4026,7 +4028,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
        </div>
        <div id="wa-rp-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'worldlab', '世界实验室与反事实对比</div><div class="wa-dim">（E9：选 A / 选 B / 什么都不做，先看看分别会怎样）', () => `
+      ${foldSec('tools', 'worldlab', '世界实验室与反事实对比</div><div class="wa-dim">（分支沙盘实验与平行可能性推演）', () => `
       <div class="wa-dim">在<b>隔离副本</b>上把三条路径各跑一遍：<code>hold</code>（什么都不做）、<code>选 A</code>、<code>选 B</code>，
         然后逐项摆差异（准入结论 / 账目 / 因果落地），每一项都标<b>来源</b>。<br/>
         <b>实验绝不写 live 存档</b>：「跑前跑后世界摘要一致」是<b>实测</b>出来的（不是一句声明）。
@@ -4103,7 +4105,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-pbl-out" class="wa-out"></div>
       <div id="wa-diag-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'capability', '能力档位与启用面</div><div class="wa-dim">（OPV6-1/2：默认隐身 —— 想加多少能力，由你自己挑；关着的那些为什么关着，看得见）', () => `
+      ${foldSec('tools', 'capability', '能力档位与启用面</div><div class="wa-dim">（自由选择启用模块与功能启用状态说明）', () => `
         // 读数在**段体内部**求值（OPT-9 的惰性约定）：收起态下这一整段不拼接，也就不读。
         // v2.274.0：段体改为**纯模板字面量**（与其余 13 段同形）。原先这里是语句块
         //   （箭头函数直接花括号 + 两条 const + return），语法正确但收尾是多一个闭合符，
@@ -4188,7 +4190,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-wh-out" class="wa-out"></div>
 
-      <div class="wa-sec">世界日程</div><div class="wa-dim">（E2：按剧情时间排序的未来事件表）</div>
+      <div class="wa-sec">世界日程</div><div class="wa-dim">（按剧情时间排序的未来事件表）</div>
       <div class="wa-dim">只认<b>剧情时间</b>：拿不到剧情钟时<b>整表拒算</b>（no-story-clock），不拿真实时间冒充剧情日 ——
         真实时间与剧情时间混算过一次，代价是离线间隔被抹平。来源：承诺逾期 / 委托阶段期限 / 条约到期 /
         运输到达 / 地点效果到期五处，读的都是它们已经登记的到期项。<b>未知时间保持未知</b>，不用「现在」冒充；
@@ -4200,7 +4202,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-wh-ag-sources" title="五源可用性：缺席的源如实报，不静默当作「这类条目没有」">源可用性</button>
       </div>
       <div class="wa-sec">事件日历</div>
-      <div class="wa-dim">（EXV7-7：事件钟上的未来轴 + 人物承诺台账。与上面「世界日程」<b>不是同一把尺子</b>：
+      <div class="wa-dim">（事件钟上的未来轴 + 人物承诺台账。与上面「世界日程」<b>不是同一把尺子</b>：
         那栏走<b>剧情日</b>，本栏走<b>事件钟</b>（<code>events.scheduledAt</code> 的墙钟口径）——
         两种时刻之间<b>没有换算率</b>，故本栏不折算成剧情日，逐行只报它自己的时刻。
         四种排期语义分开表达：<b>once / delayed</b> 是「到点跑一次」；<b>repeat</b> 报剩余轮次；
@@ -4214,7 +4216,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-wh-ag-out" class="wa-out"></div>
 
       <div class="wa-sec">世界自传</div>
-      <div class="wa-dim">（EXV7-8：把整局归档压成<b>有边界的分章</b> —— 「世界分几个阶段、每个阶段留了什么」。
+      <div class="wa-dim">（把整局归档压成<b>有边界的分章</b> —— 「世界分几个阶段、每个阶段留了什么」。
         与上面「世界纪事」<b>不是同一问</b>：那栏逐条列出发生了什么（长局会滚成几百条），本栏只答阶段与每阶段留下的那几行。
         章正文<b>逐条摘自归档原文</b>，<b>未生成新情节、未替玩家叙事</b>——没有文本的条目如实留空，不补写、不润色。
         断章<b>只用轮差</b>（两个都带轮号的相邻条目之间的减法），<b>不折算时间</b>：
@@ -4232,7 +4234,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-auto-out" class="wa-out"></div>
 
       <div class="wa-sec">一键播种</div>
-      <div class="wa-dim">（EXV7-9：给<b>空世界</b>种一批人 —— 选地区 + 人物数 + 关系密度 + 势力数，
+      <div class="wa-dim">（给<b>空世界</b>种一批人 —— 选地区 + 人物数 + 关系密度 + 势力数，
         按各引擎<b>真写口</b>批量种出人物、地点、道路、势力、名册、关系与目标。
         这是 V7 九项里<b>唯一带写面</b>的一项，因此两件事写死：
         ① <b>先看再播</b>——「会播什么」是纯读的计划，一个写口都不碰；
@@ -4248,7 +4250,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-pop-out" class="wa-out"></div>
 
-      <div class="wa-sec">世界纪事</div><div class="wa-dim">（E5：已经发生过什么、有哪些不给你看）</div>
+      <div class="wa-sec">世界纪事</div><div class="wa-dim">（已发生历史与保密事件纪事）</div>
       <div class="wa-dim">叙事化呈现但<b>每条都能下钻到来源</b>（编年史 / 时间轴 / 沉积 / 因果），事实不经改写。
         <b>空历史与读不到可分</b>：空 ⇒ 如实说「还没有记录」；读不到 ⇒ 报 no-store。
         <code>visibility=hidden</code> 的条目<b>整条不进视图</b>（只计数）——
@@ -4263,7 +4265,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
       <div id="wa-wh-cv-out" class="wa-out"></div>
 
-      <div class="wa-sec">统一待办中心</div><div class="wa-dim">（E1：八源归一 —— 同一件事只有一条记录，条条点得动）</div>
+      <div class="wa-sec">统一待办中心</div><div class="wa-dim">（多渠道待办归一管理）</div>
       <div class="wa-dim">把八个来源的 <code>pending()</code> 归一到<b>同一形状</b>（来源模块 / 类型 / 描述 / 可否动作 / 路由）——
         仓里同名 <code>pending</code> 至少有<b>四种</b>返回形状（items 桶 / points 桶 / 裸数组 / 单对象），
         调用方<b>无法从名字推出形状</b>，猜字段的代价已经付过两次。差异在本中心的<b>归一化层</b>消化。
@@ -4283,7 +4285,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         <button class="wa-btn" id="wa-pc-drill-go" title="下钻：答「去哪看、看哪条、哪个设置键」——只给路由，不执行动作">下钻</button>
       </div>
       <div id="wa-pc-out" class="wa-out"></div>
-      <div class="wa-sec">战役层（目标与阶段）</div><div class="wa-dim">（E4：选一个场景模板 —— 目标与阶段由既有世界事实机械判定）</div>
+      <div class="wa-sec">战役层（目标与阶段）</div><div class="wa-dim">（场景模板与阶段判定）</div>
       <div class="wa-dim">阶段判据引用<b>既有</b>世界事实（外交状态达档 / 货运抵达 / 势力关系达档 / 轮次达标）——
         不由 AI 文本裁定。<b>不可读与未达成是两件事</b>：读不到（模块没装 / 参数没填）时阶段<b>不前进</b>，
         也不会被读成「还没做到」。阶段<b>不得跳级</b>。达成结束条件只给复盘，<b>不动世界</b> ——
@@ -4399,7 +4401,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         累计轮次 <b>${st.runs || 0}</b> · 驱动成功 <b>${st.ok || 0}</b> · 轮内驱动名单 ${drivers.length} 台。</div>
       <div class="wa-row"><button class="wa-btn" id="wa-drive-view" title="逐台列出：分类 / 是否在轮内驱动名单 / 置灰原因（来自登记表原文，不代答）">刷新逐台读数</button></div>
       <div id="wa-drive-out" class="wa-out"></div>
-      <div class="wa-sec">死面台账工作台（EXV11-7 · 推进 API 处置面板）</div>
+      <div class="wa-sec">死面台账工作台（推进 API 处置面板）</div>
       ${(function () {
         try {
           const P = WA.pushApiRegistry;
@@ -4743,7 +4745,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         + ' · 拒收 ' + esc(String(stat.applyRefused)))
       : '<span class="wa-dim">读数不可用</span>';
     return `
-      <div class="wa-sec">大纲注入（OPT-7）—— 编辑 → 预览差异 → 采纳 → 实际注入</div>
+      <div class="wa-sec">大纲注入 —— 编辑 → 预览差异 → 采纳 → 实际注入</div>
       <div class="wa-dim">（大纲是<b>元信息</b>，不进正文：本段把它写成宿主世界书里的一条条目，
         并保证台面上<b>永远只有一条生效</b> —— 旧的那条被置为<b>禁用</b>而不是删除，所以它同时就是
         「上一版本」。此刻：<b>${on ? '开' : '关'}</b>、注入位置 <code>${esc(String((cfg && cfg.position) || '—'))}</code>
@@ -4937,13 +4939,13 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     //   + 对每个 skipped 源给出「它为什么没产出」原文（引擎给的 reason，不代答）。
     const sk = (r && Array.isArray(r.skipped)) ? r.skipped : [];
     const emptyDrill = (!rows.length && readOk) ? `
-      <div class="wa-item"><b>为什么是 0</b>（EXV11-4 下钻）：
+      <div class="wa-item"><b>为什么是 0</b>（深入下钻诊断）：
         产出源 <b>${(r && r.sourceCount) || 0}</b> 台在线 ·
         skipped <b>${sk.length}</b> 台${sk.length ? '（' + sk.map(function (s) { return esc(s.source) + '：' + esc(s.reason); }).join('；') + '）' : ''} ·
         ${((r && r.sourceCount) || 0) === 0 ? '<b>全部源缺席/关闭</b>（不是「没有待办」，是「读不到」）' : '在线源全部报空（真没有待办）'}
       </div>
       <div class="wa-dim">下一步：开局页（🌱）立世界骨架 → 写口台喂事实 → 待办自会从八源产出。跳转用
-        <code>WA.ui.goPage('boot')</code>（V10 EXV10-6 通道，真跳页不假链）。</div>` : '';
+        <code>WA.ui.goPage('boot')</code>（快速导航跳转）。</div>` : '';
     return `
       <div class="wa-sec">待办中心</div>
       <div class="wa-dim">（把「现在等我做什么」做成一个面：按归属分组 / 每条带来源与到期条件 / 跳到来源模块）
@@ -12266,7 +12268,7 @@ on('#wa-desk-show', showDesk);
         }
         const flyTest = WA.mapViewport.computeFlyInterpolation({ x: 0, y: 0, zoom: 1.0 }, { x: 100, y: 100, zoom: 1.5 }, 0.5);
         const flyStr = `插值帧(${Math.round(flyTest.x)}, ${Math.round(flyTest.y)})`;
-        geoOut('<div class="wa-log wa-log-ok">MAP-2 SVG 渲染引擎已加载 · ' + flyStr + ' · 聚类数: ' + clusters.length + '</div>'
+        geoOut('<div class="wa-log wa-log-ok">SVG 地图漫游渲染已就绪 · ' + flyStr + ' · 聚类数: ' + clusters.length + '</div>'
           + '<div style="width:100%; height:320px; border:1px solid rgba(255,255,255,0.15); border-radius:6px; overflow:hidden; margin-top:6px;">' + svg + '</div>');
       });
       // ── 四大空间物理引擎控制交互 ──────────────────────────
@@ -12345,7 +12347,7 @@ on('#wa-desk-show', showDesk);
         const hDiag = WA.environmentalHazard ? WA.environmentalHazard.diagnose() : { ok: false };
         const bDiag = WA.cascadeBus ? WA.cascadeBus.diagnose() : { ok: false };
         const eDiag = WA.disasterEvacuation ? WA.disasterEvacuation.diagnose() : { ok: false };
-        geoOut('<div class="wa-log wa-log-ok">微观物理环境与生理 HUD (EXV15 状态)</div>'
+        geoOut('<div class="wa-log wa-log-ok">微观物理环境与生理体征 HUD 胶囊</div>'
           + '<div class="wa-item"><b>四层调度总线:</b> 脉冲数 ' + (bDiag.pulseCount || 0) + ' · 状态: ' + (bDiag.ok ? '正常' : '待初始化') + '</div>'
           + '<div class="wa-item"><b>极端物理侵蚀:</b> 注册环境 ' + (hDiag.hazardProfilesCount || 0) + ' 处 · 活跃负荷: ' + (hDiag.activeExposuresCount || 0) + '</div>'
           + '<div class="wa-item"><b>灾难疏散网络:</b> 避难所 ' + (eDiag.shelterCount || 0) + ' 处 · 灾变发生: ' + (eDiag.disasterCount || 0) + ' 次</div>'
@@ -12360,7 +12362,7 @@ on('#wa-desk-show', showDesk);
         const vDiag = WA.veracityArbitration ? WA.veracityArbitration.diagnose() : { ok: false };
         const gDiag = WA.gearWear ? WA.gearWear.diagnose() : { ok: false };
         const bDiag = WA.coverBallistics ? WA.coverBallistics.diagnose() : { ok: false };
-        geoOut('<div class="wa-log wa-log-ok">WorldAxis V16 微观物理与社会对抗全景大盘 (EXV16)</div>'
+        geoOut('<div class="wa-log wa-log-ok">微观物理与社会对抗全景大盘</div>'
           + '<div class="wa-item"><b>微气候物相相变:</b> 节点 ' + (mDiag.registeredNodesCount || 0) + ' · 模拟数 ' + (mDiag.simulationCount || 0) + '</div>'
           + '<div class="wa-item"><b>生物毒素代谢:</b> 涉毒角色 ' + (tDiag.trackedActorsCount || 0) + ' · 代谢频次 ' + (tDiag.metabolismTicks || 0) + '</div>'
           + '<div class="wa-item"><b>超视距光热烟火:</b> 发射信号 ' + (pDiag.signalsFiredCount || 0) + ' · 节点覆盖 ' + (pDiag.nodeSignalsCount || 0) + '</div>'

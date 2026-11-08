@@ -1756,6 +1756,39 @@
     'drama.detonateGun': function (o) {
       if (WA.dramaticTension && typeof WA.dramaticTension.detonateChekhovGun === 'function') return WA.dramaticTension.detonateChekhovGun(o.gunId, o.opts || o);
       return { ok: false, reason: 'dramaticTension-unavailable' };
+    },
+    // v2.340.0 (V18): 8 大全新史诗引擎动作路由
+    'combat.resolveTacticalClash': function (o) {
+      if (WA.tacticalCombat && typeof WA.tacticalCombat.resolveClash === 'function') return WA.tacticalCombat.resolveClash(o);
+      return { ok: false, reason: 'tacticalCombat-unavailable' };
+    },
+    'interrogate.pressInquest': function (o) {
+      if (WA.interrogationTell && typeof WA.interrogationTell.pressInquest === 'function') return WA.interrogationTell.pressInquest(o);
+      return { ok: false, reason: 'interrogationTell-unavailable' };
+    },
+    'wild.simulatePredation': function (o) {
+      if (WA.ecosystemPredation && typeof WA.ecosystemPredation.simulatePredation === 'function') return WA.ecosystemPredation.simulatePredation(o);
+      return { ok: false, reason: 'ecosystemPredation-unavailable' };
+    },
+    'siege.advanceSiege': function (o) {
+      if (WA.siegeAttrition && typeof WA.siegeAttrition.advanceSiege === 'function') return WA.siegeAttrition.advanceSiege(o);
+      return { ok: false, reason: 'siegeAttrition-unavailable' };
+    },
+    'anomaly.inflictCorruption': function (o) {
+      if (WA.anomalyMutation && typeof WA.anomalyMutation.inflictCorruption === 'function') return WA.anomalyMutation.inflictCorruption(o);
+      return { ok: false, reason: 'anomalyMutation-unavailable' };
+    },
+    'org.evaluateAscension': function (o) {
+      if (WA.bureaucracyAscension && typeof WA.bureaucracyAscension.evaluateAscension === 'function') return WA.bureaucracyAscension.evaluateAscension(o);
+      return { ok: false, reason: 'bureaucracyAscension-unavailable' };
+    },
+    'judicial.conductInquest': function (o) {
+      if (WA.judicialInquest && typeof WA.judicialInquest.conductInquest === 'function') return WA.judicialInquest.conductInquest(o);
+      return { ok: false, reason: 'judicialInquest-unavailable' };
+    },
+    'ruin.triggerMechanism': function (o) {
+      if (WA.ruinMechanism && typeof WA.ruinMechanism.triggerMechanism === 'function') return WA.ruinMechanism.triggerMechanism(o);
+      return { ok: false, reason: 'ruinMechanism-unavailable' };
     }
   };
 
