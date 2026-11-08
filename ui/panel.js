@@ -176,7 +176,11 @@
         // v2.292.0（V7 EXV7-8）：世界自传。与 render/inject.js 的 SOURCES / SRC_NAME 逐字同批
         //   登记 —— 只加源表不加显示名 ⇒ 注入页/导演页裸露英文键 `worldAutobiography`，
         //   而那是玩家唯一能开关它的地方。
-        worldAutobiography: '世界自传' };
+        worldAutobiography: '世界自传',
+        // v2.360.0 (V20 OPV20-1): V19 活世界深层机制注入源显示名
+        covertEspionage: '谍报暗网', epidemicContagion: '疫病检疫', surgicalTriage: '战地救护',
+        maritimeNavigation: '航海水文', blackmarketUsury: '黑市金融', stealthInfiltration: '潜伏暗杀',
+        alchemyToxicology: '毒理病理', covenantSanction: '铁律盟约', humanRealism: '具身生理' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {
@@ -11944,7 +11948,7 @@ on('#wa-desk-show', showDesk);
           + ' · 组包 ' + st.assemblies + ' · 超容 ' + st.capacity + ' · 查无 ' + st.absents + '</div>'
           // v2.231.0(OPT-1):召回/分列三项常驻读数 —— 「越窗召回了多少」与「分列了多少槽位」
           //   在界面上必须看得见(与「被预算丢掉 ≠ 本来就没有」同一条纪律)。
-          + '<div class="wa-item">v2.231.0(OPT-1):回忆词 ' + (st.recallHints || 0) + ' 条 · 越窗召回 '
+          + '<div class="wa-item">回忆词 ' + (st.recallHints || 0) + ' 条 · 越窗召回 '
           + (st.recalledRows || 0) + ' 行 · 分列包 ' + (st.splitPacks || 0) + '</div>'
           + (st.lastReason ? '<div class="wa-dim">最近一次:' + esc(st.lastReason) + '</div>' : '')
           + (fk ? '<div class="wa-dim">故障分布:' + fk + '</div>' : ''));
@@ -17173,6 +17177,42 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
       }
     },
     // v2.351.0 (V19 EXV19-9 & OPV19-9): 沉浸式微观生理创伤与隐秘暗网原生折叠面板
+        // v2.360.0 (V20 EXV20-9): 史诗全息世界态势仪表大盘 (Holistic World Holomap)
+    renderV20HolomapDashboard(container) {
+      const data = {
+        epoch: (WA.epochalTransition && typeof WA.epochalTransition.buildBlock === 'function') ? WA.epochalTransition.buildBlock() : '',
+        hazard: (WA.cataclysmHazard && typeof WA.cataclysmHazard.buildBlock === 'function') ? WA.cataclysmHazard.buildBlock() : '',
+        finance: (WA.financialContagion && typeof WA.financialContagion.buildBlock === 'function') ? WA.financialContagion.buildBlock() : '',
+        bridgeDirty: (WA.bridge && typeof WA.bridge.stat === 'function') ? WA.bridge.stat() : null
+      };
+      if (!container || typeof container.appendChild !== 'function') {
+        return { ok: true, headless: true, data: data };
+      }
+      try {
+        const wrap = document.createElement('div');
+        wrap.id = 'wa-holomap-v20-wrap';
+        wrap.className = 'wa-holomap-v20-dashboard';
+        wrap.innerHTML = `
+          <div class="wa-holomap-header"><h4>WorldAxis 纪元全息态势仪表大盘</h4></div>
+          <details class="wa-details" id="wa-epoch-holomap" open>
+            <summary class="wa-summary">历史演进与纪元形态</summary>
+            <div class="wa-fold-body">${data.epoch || '文明演进平稳，当前处于承平纪元'}</div>
+          </details>
+          <details class="wa-details" id="wa-cataclysm-holomap" open>
+            <summary class="wa-summary">极端地貌灾变与迁徙流民</summary>
+            <div class="wa-fold-body">${data.hazard || '地壳板块稳固，暂无大尺度灾变'}</div>
+          </details>
+          <details class="wa-details" id="wa-finance-holomap" open>
+            <summary class="wa-summary">地下金融信用与挤兑预警</summary>
+            <div class="wa-fold-body">${data.finance || '流动性充裕，未侦测到钱庄暴雷'}</div>
+          </details>
+        `;
+        container.appendChild(wrap);
+        return { ok: true, rendered: true, data: data };
+      } catch (e) {
+        return { ok: true, headless: true, data: data, error: e.message };
+      }
+    },
     renderV19ImmersionFold(container) {
       const data = {
         maritime: (WA.maritimeNavigation && typeof WA.maritimeNavigation.buildBlock === 'function') ? WA.maritimeNavigation.buildBlock() : '',

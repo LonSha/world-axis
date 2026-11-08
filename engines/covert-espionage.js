@@ -491,7 +491,53 @@
     });
   }
 
+
+  /**
+   * OPV20-4: 吸收入站通讯流量，转化为客观眼线情报或暗网线索 (ingestCommTraffic)
+   */
+  function ingestCommTraffic(commEvent) {
+    if (!settings().enabled) return { ok: false, reason: 'disabled' };
+    commEvent = commEvent || {};
+    const from = cleanStr(commEvent.from || commEvent.sender, 50);
+    const to = cleanStr(commEvent.to || commEvent.receiver, 50);
+    const text = cleanStr(commEvent.text || commEvent.content || commEvent.message, 240);
+    const channel = cleanStr(commEvent.channel || 'phone_sms', 30);
+    
+    // 破坏性负控制：空白无实质内容的噪音通讯严禁作为情报入库
+    if (!text || text.length < 5) {
+      noteFault('comm-traffic-noise');
+      return {
+        ok: false,
+        refusal: 'comm-traffic-noise',
+        reason: '通讯报文长度不足或内容为空，属于无效网络噪音，严禁入库建立谍报线索！'
+      };
+    }
+
+    let result = null;
+    WA.store.transact(function (draft) {
+      const dispatches = getDispatches(draft);
+      const now = clockNow('covertEspionage:ingest');
+      const dispatchId = 'wiretap_' + now + '_' + Math.random().toString(36).slice(2, 6);
+      const entry = {
+        dispatchId: dispatchId,
+        sourceChannel: channel,
+        sender: from || 'unknown_informant',
+        receiver: to || 'intercept_station',
+        interceptedContent: text,
+        riskLevel: text.length > 50 ? 'high' : 'medium',
+        interceptedAt: now,
+        parsedClues: [channel, from].filter(Boolean)
+      };
+      dispatches.push(entry);
+      stat.dispatchesIntercepted++;
+      result = { ok: true, dispatchId: dispatchId, entry: entry, ingested: true };
+    }, 'covertEspionage:ingestCommTraffic');
+
+    return result || { ok: false, reason: 'transact-failed' };
+  }
+
   WA.covertEspionage = {
+    ingestCommTraffic: ingestCommTraffic,
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     registerSpy: registerSpy,

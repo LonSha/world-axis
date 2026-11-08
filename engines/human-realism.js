@@ -633,7 +633,45 @@
     };
   }
 
+
+  /**
+   * OPV20-5: 记忆真源情感心锚与具身意志反哺 (applyMemoryResolve)
+   * 提取深刻羁绊或仇恨，反哺为意志豁免或濒死代偿
+   */
+  function applyMemoryResolve(actorId, memorySpec) {
+    actorId = clean(actorId, 48);
+    memorySpec = memorySpec || {};
+    const bondType = clean(memorySpec.type || memorySpec.bondType || 'grudge', 24);
+    const intensity = Math.max(0, Math.min(100, Number(memorySpec.intensity) || 0));
+    const target = clean(memorySpec.target || memorySpec.who || '', 48);
+    if (!actorId) return { ok: false, refusal: 'missing-actor-id', reason: '未指定角色ID' };
+
+    // 破坏性负控制：若情感记忆强度不足（intensity < 20）强行索求濒死超自然意志代偿必须驳回
+    if (intensity < 20) {
+      return {
+        ok: false,
+        refusal: 'shallow-memory-no-resolve',
+        reason: '该记忆情感羁绊平淡微弱（强度低于20），无法构成心智支柱或激发潜能意志代偿！'
+      };
+    }
+
+    let resolveBonus = Math.round(intensity * 0.5);
+    let compensation = bondType === 'sworn_feud' ? 'damage_resistance' : 'willpower_bonus';
+    
+    return {
+      ok: true,
+      actorId: actorId,
+      bondType: bondType,
+      target: target,
+      intensity: intensity,
+      resolveBonus: resolveBonus,
+      compensation: compensation,
+      narrative: '脑海中浮现与「' + target + '」的深刻记忆（' + bondType + '，强度 ' + intensity + '），迸发出强烈意志，获得 +' + resolveBonus + ' 点意志反哺加成！'
+    };
+  }
+
   WA.humanRealism = {
+    applyMemoryResolve: applyMemoryResolve,
     setNeeds: transactional(setNeeds),
     consumeRoutine: transactional(consumeRoutine),
     recordGrudge: transactional(recordGrudge),

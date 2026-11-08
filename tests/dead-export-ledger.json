@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.340.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.340.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.360.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.360.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -433,14 +433,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "alchemyToxicology.stat": {
-      "reason": "self-only",
-      "detail": "engines/alchemy-toxicology.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/alchemy-toxicology.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 9
     },
     "antiOmniscience.canCharacterKnow": {
       "reason": "self-only",
@@ -970,14 +962,6 @@
       "tref": 0,
       "own": 3
     },
-    "blackmarketUsury.stat": {
-      "reason": "self-only",
-      "detail": "engines/blackmarket-usury.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/blackmarket-usury.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 9
-    },
     "bonds.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -1019,11 +1003,11 @@
       "own": 3
     },
     "bridge.buildSnapshot": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/bridge.js 内部自用、外部零引用（过度导出）",
       "src": "engines/bridge.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 4
     },
     "bridge.invalidate": {
@@ -2178,14 +2162,6 @@
       "tref": 0,
       "own": 3
     },
-    "covenantSanction.stat": {
-      "reason": "self-only",
-      "detail": "engines/covenant-sanction.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/covenant-sanction.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 8
-    },
     "covertEspionage.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -2207,16 +2183,8 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/covert-espionage.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 1
-    },
-    "covertEspionage.statView": {
-      "reason": "self-only",
-      "detail": "engines/covert-espionage.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/covert-espionage.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "covertEspionage.view": {
       "reason": "self-only",
@@ -2993,14 +2961,6 @@
       "refs": 0,
       "tref": 1,
       "own": 1
-    },
-    "epidemicContagion.statView": {
-      "reason": "self-only",
-      "detail": "engines/epidemic-contagion.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/epidemic-contagion.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "epidemicContagion.view": {
       "reason": "self-only",
@@ -5041,14 +5001,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "maritimeNavigation.stat": {
-      "reason": "self-only",
-      "detail": "engines/maritime-navigation.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/maritime-navigation.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 10
     },
     "masks.dropMask": {
       "reason": "test-only",
@@ -8127,7 +8079,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/stealth-infiltration.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 3,
       "own": 3
     },
     "stealthInfiltration.saveSettings": {
@@ -8145,14 +8097,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "stealthInfiltration.stat": {
-      "reason": "self-only",
-      "detail": "engines/stealth-infiltration.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/stealth-infiltration.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 10
     },
     "store.batchDepth": {
       "reason": "test-only",
@@ -8391,7 +8335,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/surgical-triage.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 4,
       "own": 3
     },
     "surgicalTriage.getSettings": {
@@ -8407,16 +8351,8 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/surgical-triage.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 1
-    },
-    "surgicalTriage.statView": {
-      "reason": "self-only",
-      "detail": "engines/surgical-triage.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/surgical-triage.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "surgicalTriage.view": {
       "reason": "self-only",
@@ -9858,6 +9794,14 @@
       "src": "ui/panel.js",
       "refs": 0,
       "tref": 0,
+      "own": 1
+    },
+    "ui.renderV20HolomapDashboard": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "ui/panel.js",
+      "refs": 0,
+      "tref": 1,
       "own": 1
     },
     "ui.rerenderStat": {

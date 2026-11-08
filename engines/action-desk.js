@@ -63,6 +63,18 @@
   const KINDS = ['research', 'family', 'production', 'training', 'gear', 'travel'];
   /** 具名行动 id 前缀 → 目标 owner 写口。未知前缀一律拒收（边界 3）。 */
   const ROUTES = {
+    'finance.triggerRunOnBank': function (o) {
+      if (WA.financialContagion && typeof WA.financialContagion.triggerRunOnBank === 'function') {
+        return WA.financialContagion.triggerRunOnBank(o);
+      }
+      return { ok: false, refusal: 'financial-contagion-unavailable' };
+    },
+    'finance.injectBailout': function (o) {
+      if (WA.financialContagion && typeof WA.financialContagion.injectLiquidityBailout === 'function') {
+        return WA.financialContagion.injectLiquidityBailout(o);
+      }
+      return { ok: false, refusal: financial-contagion-unavailable };
+    },
     'research.open': function (o) { return WA.research.open(o.spec || o); },
     'research.supply': function (o) { return WA.research.supply(o.projectId, o.who, o.material, o.amount); },
     'research.advance': function (o) { return WA.research.advance(o.projectId, { evidence: o.evidence }); },
@@ -193,6 +205,14 @@
     'stagePresence.sense': function (o) { return (WA.stagePresence && typeof WA.stagePresence.sensePresence === 'function') ? WA.stagePresence.sensePresence(o) : { ok: false, reason: 'stagePresence-unavailable' }; },
     'stagePresence.tick': function (o) { return (WA.stagePresence && typeof WA.stagePresence.tickOffstageAutonomy === 'function') ? WA.stagePresence.tickOffstageAutonomy(o) : { ok: false, reason: 'stagePresence-unavailable' }; },
     'stagePresence.reunion': function (o) { return (WA.stagePresence && typeof WA.stagePresence.awakenReunion === 'function') ? WA.stagePresence.awakenReunion(o.actorId || o.who) : { ok: false, reason: 'stagePresence-unavailable' }; },
+    // ── V20 极端自然灾变调度 (EXV20-2) ──
+    'nature.triggerCataclysm': function (o) { return (WA.cataclysmHazard && typeof WA.cataclysmHazard.triggerCataclysm === 'function') ? WA.cataclysmHazard.triggerCataclysm(o && (o.locationId || o.place), o) : { ok: false, reason: 'cataclysmHazard-unavailable' }; },
+    // ── V20 宏观历史突变与纪元跃迁调度 (EXV20-1) ──
+    'history.evaluateEpochShift': function (o) { return (WA.epochalTransition && typeof WA.epochalTransition.evaluateEpochShift === 'function') ? WA.epochalTransition.evaluateEpochShift(o && (o.factors || o), o) : { ok: false, reason: 'epochalTransition-unavailable' }; },
+    // ── V20 全双工生态因果调度 (OPV20-4 & OPV20-5) ──
+    'spy.ingestCommTraffic': function (o) { return (WA.covertEspionage && typeof WA.covertEspionage.ingestCommTraffic === 'function') ? WA.covertEspionage.ingestCommTraffic(o) : { ok: false, reason: 'covertEspionage-unavailable' }; },
+    'current.triggerByMessage': function (o) { return (WA.undercurrentCalendar && typeof WA.undercurrentCalendar.triggerByMessage === 'function') ? WA.undercurrentCalendar.triggerByMessage(o && o.currentId, o) : { ok: false, reason: 'undercurrentCalendar-unavailable' }; },
+    'human.applyMemoryResolve': function (o) { return (WA.humanRealism && typeof WA.humanRealism.applyMemoryResolve === 'function') ? WA.humanRealism.applyMemoryResolve(o && (o.actorId || o.who), o) : { ok: false, reason: 'humanRealism-unavailable' }; },
     // ── V19 史诗新机制调度 (EXV19-1 ~ EXV19-8 & OPV19) ──
     'spy.operateSpy': function (o) { return (WA.covertEspionage && typeof WA.covertEspionage.operateSpy === 'function') ? WA.covertEspionage.operateSpy(o) : { ok: false, reason: 'covertEspionage-unavailable' }; },
     'bio.propagateDisease': function (o) { return (WA.epidemicContagion && typeof WA.epidemicContagion.propagateDisease === 'function') ? WA.epidemicContagion.propagateDisease(o && o.locationId, o) : { ok: false, reason: 'epidemicContagion-unavailable' }; },

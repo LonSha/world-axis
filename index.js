@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.340.0';
+  const VERSION = '2.360.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -647,6 +647,10 @@
     'engines/covenant-sanction.js',
     'engines/eccentric-threads.js',
     'engines/human-realism.js',
+    // v2.360.0 (V20): 纪元突变、地貌灾变与地下金融引擎
+    'engines/epochal-transition.js',
+    'engines/cataclysm-hazard.js',
+    'engines/financial-contagion.js',
     // v2.325.0: 剧情生活动线与身份世界观节律
     'engines/routine-pacing.js',
     // v2.251.0（拓展 WD-1）：阶位权重池 + 未得补偿 + 幸运封顶（cf. aifarm gacha/soft-pity）。

@@ -408,7 +408,45 @@
     };
   }
 
+
+  /**
+   * OPV20-4: 接收外部通信密谋推进暗流阶段 (triggerByMessage)
+   */
+  function triggerByMessage(currentId, messageSpec) {
+    currentId = String(currentId || '').trim();
+    messageSpec = messageSpec || {};
+    const text = String(messageSpec.text || messageSpec.content || '').trim();
+    const sender = String(messageSpec.sender || messageSpec.from || '').trim();
+    if (!currentId) return { ok: false, refusal: 'missing-current-id', reason: '未指定暗流ID' };
+    
+    // 破坏性负控制：若非密谋泄密类通讯（无有效关键词或无发送源），严禁无凭据推动暗流阶段
+    if (!sender || !text || text.indexOf('密') === -1 && text.indexOf('刺杀') === -1 && text.indexOf('谋') === -1 && text.indexOf('反') === -1) {
+      return {
+        ok: false,
+        refusal: 'innocuous-comm-no-conspiracy',
+        reason: '日常闲聊或普通信息未触及任何核心密谋关键词，绝不可催化世界暗流异动！'
+      };
+    }
+
+    let advanced = false;
+    let currentStage = 'unknown';
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (draft) {
+        if (!draft.currents || !Array.isArray(draft.currents)) return;
+        const cur = draft.currents.find(function (c) { return c.id === currentId; });
+        if (cur) {
+          cur.stage = cur.stage === 'latent' ? 'developing' : (cur.stage === 'developing' ? 'active' : cur.stage);
+          cur.lastCommTrigger = { sender: sender, text: text, at: Date.now() };
+          currentStage = cur.stage;
+          advanced = true;
+        }
+      });
+    }
+    return { ok: advanced, currentId: currentId, stage: currentStage, sender: sender, advanced: advanced };
+  }
+
   WA.undercurrentCalendar = {
+    triggerByMessage: triggerByMessage,
     DEF: DEF,
     BOUNDS: BOUNDS,
     STAGE_WINDOWS: STAGE_WINDOWS,

@@ -117,6 +117,7 @@
 
   /** 组装投影。纯读：只调各引擎的只读出口与 store.get()，全程不改一个字段。 */
   function buildSnapshot(cfg, reason) {
+    cfg = cfg || {};
     const st = WA.store.get() || {};
     const f = floor();
     // 口径值域归一：非法 presumeUnknown 一律退回保守档（与「非法阈值回落 2 而不放宽」同规格）。
@@ -207,6 +208,28 @@
         moralDilemmaDiag: (WA.moralDilemma && typeof WA.moralDilemma.diagnose === 'function') ? WA.moralDilemma.diagnose() : null,
         dramaticTensionDiag: (WA.dramaticTension && typeof WA.dramaticTension.diagnose === 'function') ? WA.dramaticTension.diagnose() : null,
         ideologyMemeticsDiag: (WA.ideologyMemetics && typeof WA.ideologyMemetics.diagnose === 'function') ? WA.ideologyMemetics.diagnose() : null
+      },
+      // V18 史诗交锋战况、创伤要害与公审通缉客观事实 (OPV20-3)
+      v18EpicClash: {
+        tacticalCombatDiag: (WA.tacticalCombat && typeof WA.tacticalCombat.diagnose === 'function') ? WA.tacticalCombat.diagnose() : null,
+        interrogationTellDiag: (WA.interrogationTell && typeof WA.interrogationTell.diagnose === 'function') ? WA.interrogationTell.diagnose() : null,
+        ecosystemPredationDiag: (WA.ecosystemPredation && typeof WA.ecosystemPredation.diagnose === 'function') ? WA.ecosystemPredation.diagnose() : null,
+        siegeAttritionDiag: (WA.siegeAttrition && typeof WA.siegeAttrition.diagnose === 'function') ? WA.siegeAttrition.diagnose() : null,
+        anomalyMutationDiag: (WA.anomalyMutation && typeof WA.anomalyMutation.diagnose === 'function') ? WA.anomalyMutation.diagnose() : null,
+        bureaucracyAscensionDiag: (WA.bureaucracyAscension && typeof WA.bureaucracyAscension.diagnose === 'function') ? WA.bureaucracyAscension.diagnose() : null,
+        judicialInquestDiag: (WA.judicialInquest && typeof WA.judicialInquest.diagnose === 'function') ? WA.judicialInquest.diagnose() : null,
+        ruinMechanismDiag: (WA.ruinMechanism && typeof WA.ruinMechanism.diagnose === 'function') ? WA.ruinMechanism.diagnose() : null
+      },
+      // V19 活世界深层物理、病理检疫与暗网谍报真源 (OPV20-3)
+      v19LivingNetwork: {
+        covertEspionageStat: (WA.covertEspionage && typeof WA.covertEspionage.statView === 'function') ? WA.covertEspionage.statView() : null,
+        epidemicContagionStat: (WA.epidemicContagion && typeof WA.epidemicContagion.statView === 'function') ? WA.epidemicContagion.statView() : null,
+        surgicalTriageStat: (WA.surgicalTriage && typeof WA.surgicalTriage.statView === 'function') ? WA.surgicalTriage.statView() : null,
+        maritimeNavigationStat: (WA.maritimeNavigation && typeof WA.maritimeNavigation.stat === 'function') ? WA.maritimeNavigation.stat() : null,
+        blackmarketUsuryStat: (WA.blackmarketUsury && typeof WA.blackmarketUsury.stat === 'function') ? WA.blackmarketUsury.stat() : null,
+        stealthInfiltrationStat: (WA.stealthInfiltration && typeof WA.stealthInfiltration.stat === 'function') ? WA.stealthInfiltration.stat() : null,
+        alchemyToxicologyStat: (WA.alchemyToxicology && typeof WA.alchemyToxicology.stat === 'function') ? WA.alchemyToxicology.stat() : null,
+        covenantSanctionStat: (WA.covenantSanction && typeof WA.covenantSanction.stat === 'function') ? WA.covenantSanction.stat() : null
       },
       // 过滤归因：外部侧能一眼看出「为什么这条没进来」。
       filter: {

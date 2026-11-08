@@ -199,7 +199,9 @@
     // v2.326.0（缝合 卢克之光）：叙述层镜片。与源表/def/VIS_NAMES/分支同批登记，
     //   只加分支不加源表 = 开关点了零效果；只加源表不加分支 = 声明了没人消费。
     'narrativeLens',
-    'chrono'];
+    'chrono',
+    // v2.360.0 (V20 OPV20-1): V19 活世界 9 大深层物理/病理/谍报机制全域接入
+    'covertEspionage', 'epidemicContagion', 'surgicalTriage', 'maritimeNavigation', 'blackmarketUsury', 'stealthInfiltration', 'alchemyToxicology', 'covenantSanction', 'humanRealism'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -302,7 +304,11 @@ style: false,
         // v2.326.0（缝合 卢克之光）：叙述层镜片。取默认 true（同批理由——
         //   narrativeLens 的 DEF.enabled=false，未开时 buildBlock 返回空串），
         //   不给老用户凭空多出约束。
-        narrativeLens: true }, module: 'render' };
+        narrativeLens: true,
+        // v2.360.0: V19 源默认开启（模块总开关把关）
+        covertEspionage: true, epidemicContagion: true, surgicalTriage: true,
+        maritimeNavigation: true, blackmarketUsury: true, stealthInfiltration: true,
+        alchemyToxicology: true, covenantSanction: true, humanRealism: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -563,7 +569,11 @@ style: false,
     //   ——同一源在两张表里对不上同（O1 实测：科目表把「重大事件账本」报成未归类）。
     //   统一到注入项名（用户也在注入日志里看到的就是它）。面板开关的显示名属于 VIS_NAMES，不受此处影响。
     ledger: '账本',
-    digest: '世界推演', nearEvent: '近端事件'
+    digest: '世界推演', nearEvent: '近端事件',
+    // v2.360.0: V19 显示名
+    covertEspionage: '谍报暗网', epidemicContagion: '疫病检疫', surgicalTriage: '战地救护',
+    maritimeNavigation: '航海水文', blackmarketUsury: '黑市金融', stealthInfiltration: '潜伏暗杀',
+    alchemyToxicology: '毒理病理', covenantSanction: '铁律盟约', humanRealism: '具身生理'
   };
   // ── v2.91.0 O4：开关两面对账 ──────────────────────────────────────────
   /**
@@ -727,6 +737,16 @@ style: false,
     //   返回 null，用户勾了模块总开关却在「开关两面一致」上看到「模块没加载」，
     //   排查方向被指错。
     activity: 'worldaxis_activity_settings_v1',
+    // v2.360.0: V19 模块设置映射表
+    covertEspionage: 'worldaxis_covert_espionage_settings_v1',
+    epidemicContagion: 'worldaxis_epidemic_contagion_settings_v1',
+    surgicalTriage: 'worldaxis_surgical_triage_settings_v1',
+    maritimeNavigation: 'worldaxis_maritime_navigation_settings_v1',
+    blackmarketUsury: 'worldaxis_blackmarket_usury_settings_v1',
+    stealthInfiltration: 'worldaxis_stealth_infiltration_settings_v1',
+    alchemyToxicology: 'worldaxis_alchemy_toxicology_settings_v1',
+    covenantSanction: 'worldaxis_covenant_sanction_settings_v1',
+    humanRealism: 'worldaxis_human_realism_settings_v1',
   };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
@@ -1639,6 +1659,43 @@ style: false,
       if (vis.narrativeLens && WA.narrativeLens) {
         const lb = engineCall('narrativeLens', function () { return WA.narrativeLens.buildBlock(); });
         if (lb) items.push({ source: '叙述镜片', content: lb });
+      }
+      // v2.360.0 (V20 OPV20-1): V19 活世界深层机制全域注入分支
+      if (vis.covertEspionage && WA.covertEspionage) {
+        const ceb = engineCall('covertEspionage', function () { return WA.covertEspionage.buildBlock(); });
+        if (ceb) items.push({ source: '谍报暗网', content: ceb });
+      }
+      if (vis.epidemicContagion && WA.epidemicContagion) {
+        const ecb = engineCall('epidemicContagion', function () { return WA.epidemicContagion.buildBlock(); });
+        if (ecb) items.push({ source: '疫病检疫', content: ecb });
+      }
+      if (vis.surgicalTriage && WA.surgicalTriage) {
+        const stb = engineCall('surgicalTriage', function () { return WA.surgicalTriage.buildBlock(); });
+        if (stb) items.push({ source: '战地救护', content: stb });
+      }
+      if (vis.maritimeNavigation && WA.maritimeNavigation) {
+        const mnb = engineCall('maritimeNavigation', function () { return WA.maritimeNavigation.buildBlock(); });
+        if (mnb) items.push({ source: '航海水文', content: mnb });
+      }
+      if (vis.blackmarketUsury && WA.blackmarketUsury) {
+        const bmb = engineCall('blackmarketUsury', function () { return WA.blackmarketUsury.buildBlock(); });
+        if (bmb) items.push({ source: '黑市金融', content: bmb });
+      }
+      if (vis.stealthInfiltration && WA.stealthInfiltration) {
+        const sib = engineCall('stealthInfiltration', function () { return WA.stealthInfiltration.buildBlock(); });
+        if (sib) items.push({ source: '潜伏暗杀', content: sib });
+      }
+      if (vis.alchemyToxicology && WA.alchemyToxicology) {
+        const atb = engineCall('alchemyToxicology', function () { return WA.alchemyToxicology.buildBlock(); });
+        if (atb) items.push({ source: '毒理病理', content: atb });
+      }
+      if (vis.covenantSanction && WA.covenantSanction) {
+        const csb = engineCall('covenantSanction', function () { return WA.covenantSanction.buildBlock(); });
+        if (csb) items.push({ source: '铁律盟约', content: csb });
+      }
+      if (vis.humanRealism && WA.humanRealism) {
+        const hrb = engineCall('humanRealism', function () { return WA.humanRealism.buildBlock(); });
+        if (hrb) items.push({ source: '具身生理', content: hrb });
       }
       if (vis.retrieval && WA.retrieval) {
         const rq = (function () {
