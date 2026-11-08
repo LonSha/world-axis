@@ -132,8 +132,17 @@
         }
       }
     }
+    // V17 EXV17-6: 宏观时代浪潮时钟演进与全局常数约束
+    if (WA.epochTide && typeof WA.epochTide.advanceEpoch === 'function') {
+      WA.epochTide.advanceEpoch(1);
+    } else if (WA.epochTide && typeof WA.epochTide.advanceEpochTurns === 'function') {
+      WA.epochTide.advanceEpochTurns(1);
+    }
+    // V17 EXV17-1: 混沌蝴蝶长程因果多米诺演化
+    if (WA.butterflyCascade && typeof WA.butterflyCascade.advanceEpoch === 'function') {
+      WA.butterflyCascade.advanceEpoch(1);
+    }
     dispatchEvent('physical', 'physical_tick', { places: places, tick: _tickCounter });
-
     // ── Layer 2: 机能中层演化 ──
     for (const aid of actors) {
       if (WA.engines && WA.engines.metabolismClock && typeof WA.engines.metabolismClock.accumulateFatigue === 'function') {
@@ -151,9 +160,16 @@
           WA.gearWear.applyStress(aid + '_main_gear', 1, 'abrasion');
         }
       }
+      // V17 EXV17-2: 深层心智心理防御与情绪应激自然稳态衰减
+      if (WA.psycheTrauma && typeof WA.psycheTrauma.getProfile === 'function') {
+        const prof = WA.psycheTrauma.getProfile(aid);
+        if (prof && prof.traumaLevel > 0 && !prof.isBlackened) {
+          // 非黑化态下的微弱自愈倾向
+          WA.psycheTrauma.healTrauma(aid, 1.0, 'time_restoration');
+        }
+      }
     }
     dispatchEvent('somatic', 'somatic_tick', { actors: actors, tick: _tickCounter });
-
     // ── Layer 3: 行为决策层演化 ──
     for (const aid of actors) {
       if (WA.engines && WA.engines.universalRoutine) {
@@ -178,6 +194,13 @@
         if (pz && pz.ok && pz.inPanic) {
           report.behavioral.conflictsResolved++;
         }
+      }
+    }
+    // V17 EXV17-3: 地下政变与阴谋暗流周期巡检
+    if (WA.conspiracyWeaver && typeof WA.conspiracyWeaver.diagnose === 'function') {
+      const cDiag = WA.conspiracyWeaver.diagnose();
+      if (cDiag && cDiag.activeCabals > 0) {
+        report.behavioral.conflictsResolved++;
       }
     }
     dispatchEvent('behavioral', 'behavioral_tick', { actors: actors, hour: hour, tick: _tickCounter });

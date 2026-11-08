@@ -35,6 +35,10 @@
   const _victimPerceptionMaps = new Map();
 
   function forgeIllusion(forgerId, targetVictimId, illusionType, payload, credibilityScore, opts) {
+    if (typeof forgerId === 'object' && forgerId !== null) {
+      const o = forgerId;
+      return forgeIllusion(o.forgerId, o.targetVictimId, o.illusionType || 'false_intel', o.payload || { falseBeliefFact: o.falseBeliefFact }, o.credibilityScore, o.opts || o);
+    }
     if (!forgerId || !targetVictimId) {
       return { ok: false, error: 'missing_forger_or_victim' };
     }
@@ -86,15 +90,28 @@
       return { ok: false, error: 'no_perception_map_for_victim' };
     }
     const map = _victimPerceptionMaps.get(victimId);
-    if (!map.has(illusionId)) {
+    let rec = map.get(illusionId);
+    if (!rec) {
+      // 容错：按 payload 内容或第一个 illusion 查找
+      for (const item of map.values()) {
+        if (item.illusionId === illusionId || (item.payload && item.payload.falseBeliefFact === illusionId) || (typeof illusionId === 'string' && item.illusionType === illusionId)) {
+          rec = item;
+          break;
+        }
+      }
+      if (!rec && map.size > 0) {
+        rec = map.values().next().value;
+      }
+    }
+    if (!rec) {
       return { ok: false, error: 'illusion_not_found' };
     }
-    const rec = map.get(illusionId);
     if (rec.unmasked) {
       return { ok: true, believed: false, reason: 'already_unmasked' };
     }
-
-    const ctx = currentWitnessContext || {};
+    const ctx = (typeof currentWitnessContext === 'boolean')
+      ? { witnessedReality: currentWitnessContext }
+      : (currentWitnessContext || {});
     // 若受害者获得了实锤铁证物证或亲临现场，认知崩塌
     if (ctx.hasDirectProof === true || ctx.witnessedReality === true) {
       rec.unmasked = true;
@@ -105,7 +122,6 @@
         message: 'Reality witnessed. False belief shattered.'
       };
     }
-
     // 维持受骗相信状态
     return {
       ok: true,

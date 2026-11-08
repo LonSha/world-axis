@@ -95,6 +95,26 @@
           + clean(r.status, 32) + '；来源 ' + clean(r.source, 80) + '；'
           + clean(r.confidence, 32) + '；仅该持有人知情，传闻不等于事实）', [r.person], r.at, '已持有情报');
       });
+      // V17 EXV17-8: 认知战虚假现实投毒与失真信念汇流
+      const getBeliefs = (WA.perceptionManipulation && typeof WA.perceptionManipulation.getVictimPerceptionMap === 'function')
+        ? WA.perceptionManipulation.getVictimPerceptionMap
+        : (WA.perceptionManipulation && typeof WA.perceptionManipulation.getBeliefMap === 'function' ? WA.perceptionManipulation.getBeliefMap : null);
+      if (getBeliefs) {
+        const wanted = Array.isArray(c.people) ? c.people : [];
+        wanted.forEach(function (aid, idx) {
+          const listOrMap = getBeliefs(aid);
+          const items = Array.isArray(listOrMap) ? listOrMap : (listOrMap && typeof listOrMap.values === 'function' ? Array.from(listOrMap.values()) : []);
+          items.forEach(function (item, k) {
+            if (!item.unmasked) {
+              const text = (item.payload && (item.payload.falseBeliefFact || item.payload.text)) || item.falseBeliefFact || item.falseBelief || item.illusionType || '伪造信息';
+              const cred = item.credibilityScore != null ? item.credibilityScore : 80;
+              add('intel', 'poison:' + aid + ':' + idx + ':' + k,
+                aid + '深信受投毒假军情「' + text + '」（可信度：' + cred + '%，受控行动中）',
+                [aid], item.implantedAt || Date.now(), '虚假认知');
+            }
+          });
+        });
+      }
     });
     read('bonds', function () {
       const v = WA.bonds.network({ maxRows: 24 });
@@ -214,13 +234,16 @@
         }
       }
       // v2.340.0 (V17): 深层心智创伤、黑化、时代大潮与契诃夫之枪戏剧汇流
-      if (WA.psycheTrauma && typeof WA.psycheTrauma.getProfile === 'function') {
+      const getP = (WA.psycheTrauma && typeof WA.psycheTrauma.getActorPsyche === 'function')
+        ? WA.psycheTrauma.getActorPsyche
+        : (WA.psycheTrauma && typeof WA.psycheTrauma.getProfile === 'function' ? WA.psycheTrauma.getProfile : null);
+      if (getP) {
         const wanted = Array.isArray(c.people) ? c.people : [];
         wanted.forEach(function (aid, idx) {
-          const prof = WA.psycheTrauma.getProfile(aid);
-          if (prof && prof.isBlackened) {
+          const prof = getP(aid);
+          if (prof && (prof.mentalState === 'blackening' || prof.isBlackened)) {
             add('life', 'blackening:' + aid + ':' + idx, aid + '已彻底心智黑化，执念「' + (prof.obsessionTarget || '毁灭宿命') + '」，行事狠绝不再顾忌伦理！', [aid], Date.now(), '心智黑化');
-          } else if (prof && prof.phaseState === 'psychic-breakdown') {
+          } else if (prof && (prof.mentalState === 'psychic-breakdown' || prof.phaseState === 'psychic-breakdown')) {
             add('life', 'breakdown:' + aid + ':' + idx, aid + '理智彻底崩溃离魂，认知陷入剧烈谵妄状态！', [aid], Date.now(), '精神崩溃');
           }
         });

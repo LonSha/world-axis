@@ -37,6 +37,10 @@
   const _cascadeRegistry = new Map();
 
   function triggerFlutter(seedEventId, initialEnergy, targetTopologyChain, opts) {
+    if (typeof seedEventId === 'object' && seedEventId !== null) {
+      const o = seedEventId;
+      return triggerFlutter(o.seedId || o.seedEventId, o.initialMagnitude || o.initialEnergy || 25, o.targetTopologyChain, o.opts || o);
+    }
     if (!seedEventId || typeof seedEventId !== 'string') {
       return { ok: false, error: 'invalid_seed_event_id' };
     }
@@ -131,7 +135,11 @@
     if (!seedEventId || !_cascadeRegistry.has(seedEventId)) {
       return null;
     }
-    return _cascadeRegistry.get(seedEventId);
+    const rec = _cascadeRegistry.get(seedEventId);
+    return Object.assign({}, rec, {
+      currentMagnitude: rec.currentEnergy,
+      ok: true
+    });
   }
 
   function listActiveCascades() {
@@ -154,6 +162,7 @@
 
   function diagnose() {
     return {
+      ok: true,
       version: VERSION,
       totalCascades: _cascadeRegistry.size,
       cascades: listActiveCascades()
@@ -164,7 +173,9 @@
     VERSION: VERSION,
     triggerFlutter: triggerFlutter,
     advanceTurn: advanceTurn,
+    advanceEpoch: advanceTurn,
     getCascadeState: getCascadeState,
+    getCascadeStatus: getCascadeState,
     listActiveCascades: listActiveCascades,
     resetAll: resetAll,
     diagnose: diagnose

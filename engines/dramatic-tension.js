@@ -106,6 +106,15 @@
       };
     }
 
+    // 负控制拦截：契诃夫之枪引爆后处于 detonated 状态，严禁重复引爆
+    if (gun.status === 'detonated') {
+      return {
+        ok: false,
+        error: 'gun-already-fired',
+        reason: 'gun-already-fired'
+      };
+    }
+
     gun.status = 'detonated';
     gun.detonatedAt = Date.now();
 
