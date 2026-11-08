@@ -188,14 +188,44 @@
     };
   }
 
+  /**
+   * OPV19-3: 流体、暴雨与环境恶劣天候对声学与潜行的动态遮蔽
+   */
+  function calculateWeatherMasking(decibel, weatherType) {
+    const rawDb = Number(decibel) || 0;
+    const wType = String(weatherType || 'clear').toLowerCase();
+    let ambientNoiseDb = 15; // 默认室内微弱底噪 15 dB
+    let maskingEffect = 'none';
+
+    if (wType.indexOf('storm') !== -1 || wType.indexOf('thunder') !== -1 || wType.indexOf('rain') !== -1) {
+      ambientNoiseDb = 85; // 暴雨雷鸣狂风巨浪底噪 85 dB
+      maskingEffect = 'heavy_storm_masking';
+    } else if (wType.indexOf('wind') !== -1 || wType.indexOf('waterfall') !== -1) {
+      ambientNoiseDb = 60; // 狂风或水流飞瀑底噪 60 dB
+      maskingEffect = 'moderate_flow_masking';
+    }
+
+    // 当环境恶劣底噪远远压过自身动作噪音时，脚步声完全被环境掩盖
+    const masked = rawDb <= ambientNoiseDb;
+    return {
+      ok: true,
+      actionDb: rawDb,
+      weatherType: wType,
+      ambientNoiseDb: ambientNoiseDb,
+      masked: masked,
+      maskingEffect: maskingEffect,
+      stealthBonusPct: masked ? 80 : 0
+    };
+  }
+
   function getConversation(roomId) {
     return _activeConversations.get(roomId) || null;
   }
-
   WA.spatialAcoustics = {
     whisper: whisper,
     eavesdrop: eavesdrop,
     burstIn: burstIn,
+    calculateWeatherMasking: calculateWeatherMasking,
     registerPartition: registerPartition,
     getConversation: getConversation
   };

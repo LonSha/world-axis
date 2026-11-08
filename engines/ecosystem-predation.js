@@ -166,6 +166,59 @@
     _ecosystems.clear();
   }
 
+  /**
+   * OPV19-7: 野兽趋利避害与定居点灯火防护哨卫结界威慑判定
+   */
+  function checkPerimeterDeterrent(beastId, settlementId, envSpec) {
+    beastId = String(beastId || 'beast_pack').trim();
+    settlementId = String(settlementId || 'settlement_camp').trim();
+    envSpec = envSpec || {};
+
+    const fireDeterrent = !!envSpec.fireDeterrent; // 是否有营火篝火
+    const barrier = !!envSpec.barrier;             // 是否有木栅栏/城墙
+    const acousticWarning = !!envSpec.acousticWarning; // 是否有号角/钟声
+    const hungerLevel = envSpec.hunger != null ? Number(envSpec.hunger) : 60; // 0~100
+    const isFrenzy = hungerLevel >= 95 || !!envSpec.frenzy;
+
+    // 破坏性负控制：面对毫无灯火防具且无警报的营地，野兽绝对不会无故惊慌逃逸
+    if (!fireDeterrent && !barrier && !acousticWarning && !isFrenzy) {
+      return {
+        ok: false,
+        refusal: 'no-deterrent-present',
+        reason: '该定居点/营地周围无任何篝火、栅栏或声响防御结界，野兽绝不会无故惊慌逃跑！',
+        beastId: beastId,
+        settlementId: settlementId
+      };
+    }
+
+    if (isFrenzy) {
+      // 狂暴突破火线
+      return {
+        ok: true,
+        beastId: beastId,
+        settlementId: settlementId,
+        deterred: false,
+        frenzyBreakthrough: true,
+        narrative: `饥饿突破极限（饥饿度 ${hungerLevel}）！猛兽眼眶猩红丧失痛觉，竟悍然顶着火把浓烟跨越栅栏发起自杀式突袭！`
+      };
+    }
+
+    // 正常被威慑逼退
+    let deterrentFactor = 0;
+    if (fireDeterrent) deterrentFactor += 50;
+    if (barrier) deterrentFactor += 30;
+    if (acousticWarning) deterrentFactor += 20;
+
+    return {
+      ok: true,
+      beastId: beastId,
+      settlementId: settlementId,
+      deterred: true,
+      deterrentScore: deterrentFactor,
+      narrative: `营地周遭熊熊火光照亮荒野，号角声此起彼伏，兽群低吼着被逼退在防御圈 15 米开外，徘徊逡巡不敢贸然进犯。`
+    };
+  }
+
   function diagnose() {
     return {
       ok: true,
@@ -174,11 +227,11 @@
       niches: VALID_NICHES
     };
   }
-
   const exportObj = {
     registerEcosystem: registerEcosystem,
     getEcosystem: getEcosystem,
     simulatePredation: simulatePredation,
+    checkPerimeterDeterrent: checkPerimeterDeterrent,
     resetAll: resetAll,
     diagnose: diagnose
   };

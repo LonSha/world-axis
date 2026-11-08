@@ -213,7 +213,47 @@
       const node = state.nodes[loc.nodeId];
       return node ? node.affordances : [];
     },
+    /**
+     * OPV19-3: 水文洋流、气象与声学视口在空间拓扑的级联感知评估
+     */
+    evaluateSensoryOcclusion(sourceId, targetId, envCondition) {
+      envCondition = envCondition || {};
+      const weather = String(envCondition.weather || 'clear');
+      const lightLevel = envCondition.lightLevel != null ? Number(envCondition.lightLevel) : 100; // 0~100
+      const distance = envCondition.distance != null ? Number(envCondition.distance) : 10; // 米
 
+      let visualOcclusion = 0; // 0~100% 遮蔽
+      let acousticOcclusion = 0;
+
+      // 气象与光照视锥衰减
+      if (lightLevel <= 20 || weather.indexOf('fog') !== -1 || weather.indexOf('night') !== -1) {
+        visualOcclusion = 85; // 浓雾/暗夜视线极度受阻
+      } else if (lightLevel <= 50) {
+        visualOcclusion = 40;
+      }
+
+      // 暴雨与风暴声学掩盖
+      if (weather.indexOf('storm') !== -1 || weather.indexOf('rain') !== -1) {
+        acousticOcclusion = 80;
+      }
+
+      const canSee = distance <= (visualOcclusion >= 80 ? 5 : 40);
+      const canHear = acousticOcclusion < 75;
+
+      return {
+        ok: true,
+        sourceId: sourceId,
+        targetId: targetId,
+        weather: weather,
+        lightLevel: lightLevel,
+        distance: distance,
+        visualOcclusionPct: visualOcclusion,
+        acousticOcclusionPct: acousticOcclusion,
+        canSee: canSee,
+        canHear: canHear,
+        stealthViable: !canSee && !canHear
+      };
+    },
     /**
      * 叙事透镜 Prompt 构建器
      */

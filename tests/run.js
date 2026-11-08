@@ -539,6 +539,11 @@ const LOAD = [
     'engines/covert-espionage.js',
     'engines/epidemic-contagion.js',
     'engines/surgical-triage.js',
+    'engines/maritime-navigation.js',
+    'engines/blackmarket-usury.js',
+    'engines/stealth-infiltration.js',
+    'engines/alchemy-toxicology.js',
+    'engines/covenant-sanction.js',
     'engines/eccentric-threads.js',
     'engines/human-realism.js',
     // v2.325.0: 剧情生活动线与身份世界观节律

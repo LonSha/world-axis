@@ -197,6 +197,51 @@
     _subjects.clear();
   }
 
+  /**
+   * OPV19-6: 酷吏刑讯反噬与人际网络不可逆仇恨决裂
+   */
+  function applyBacklashGrudge(inquestId, interrogatorId, suspectId, opts) {
+    opts = opts || {};
+    const iid = String(interrogatorId || 'torturer').trim();
+    const sid = String(suspectId || 'victim').trim();
+    const tortureSeverity = opts.tortureSeverity != null ? Number(opts.tortureSeverity) : 80;
+
+    // 破坏性负控制：若合法温和谈话问询（tortureSeverity == 0），严禁派生血仇死结标记
+    if (tortureSeverity <= 0) {
+      return {
+        ok: false,
+        refusal: 'mild-inquest-no-blood-grudge',
+        reason: '属于合法礼貌常规问询，无任何肉体摧残与酷刑施暴，严禁派生不可逆血仇！',
+        interrogatorId: iid,
+        suspectId: sid,
+        tortureSeverity: tortureSeverity
+      };
+    }
+
+    // 联动 humanRealism 记下永久血仇
+    if (WA.humanRealism && typeof WA.humanRealism.recordGrudge === 'function') {
+      WA.humanRealism.recordGrudge({
+        who: sid,
+        target: iid,
+        reason: `地牢酷刑残害（受刑烈度 ${tortureSeverity}）引发的骨髓死仇与永久PTSD`,
+        intensity: 100,
+        unforgivable: true
+      });
+    }
+
+    return {
+      ok: true,
+      inquestId: inquestId,
+      interrogatorId: iid,
+      suspectId: sid,
+      tortureSeverity: tortureSeverity,
+      bloodGrudge: true,
+      permanentPTSD: true,
+      factionTrustRuptured: true,
+      narrative: `烙铁与夹棍摧折了肉身！「${sid}」虽然伏法认罪，但双眼死死盯住「${iid}」，心底刻下誓死不休的永世血仇，其背后同盟势力好感度彻底断绝！`
+    };
+  }
+
   function diagnose() {
     return {
       ok: true,
@@ -206,13 +251,13 @@
       statuses: VALID_STATUSES
     };
   }
-
   const exportObj = {
     registerSubject: registerSubject,
     registerSuspect: registerSubject, // 别名兼容
     getSubject: getSubject,
     getSuspect: getSubject,
     pressInquest: pressInquest,
+    applyBacklashGrudge: applyBacklashGrudge,
     resetAll: resetAll,
     diagnose: diagnose
   };

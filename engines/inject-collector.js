@@ -214,6 +214,46 @@
           });
         }
       }
+      if (WA.maritimeNavigation && typeof WA.maritimeNavigation.buildBlock === 'function') {
+        const nb = WA.maritimeNavigation.buildBlock();
+        if (nb) {
+          String(nb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('world', 'naval:' + idx, line, [], Date.now(), '航海动力');
+          });
+        }
+      }
+      if (WA.blackmarketUsury && typeof WA.blackmarketUsury.buildBlock === 'function') {
+        const bb = WA.blackmarketUsury.buildBlock();
+        if (bb) {
+          String(bb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'blackmarket:' + idx, line, [], Date.now(), '黑市借贷');
+          });
+        }
+      }
+      if (WA.stealthInfiltration && typeof WA.stealthInfiltration.buildBlock === 'function') {
+        const st = WA.stealthInfiltration.buildBlock();
+        if (st) {
+          String(st).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'stealth:' + idx, line, [], Date.now(), '潜入视野');
+          });
+        }
+      }
+      if (WA.alchemyToxicology && typeof WA.alchemyToxicology.buildBlock === 'function') {
+        const tox = WA.alchemyToxicology.buildBlock();
+        if (tox) {
+          String(tox).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'alchemy:' + idx, line, [], Date.now(), '毒理验毒');
+          });
+        }
+      }
+      if (WA.covenantSanction && typeof WA.covenantSanction.buildBlock === 'function') {
+        const cov = WA.covenantSanction.buildBlock();
+        if (cov) {
+          String(cov).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('world', 'covenant:' + idx, line, [], Date.now(), '盟约契约');
+          });
+        }
+      }
       if (WA.eccentricThreads && typeof WA.eccentricThreads.buildBlock === 'function') {
         const eb = WA.eccentricThreads.buildBlock();
         if (eb) {

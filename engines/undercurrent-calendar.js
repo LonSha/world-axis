@@ -358,12 +358,63 @@
     stat.hiddenShielded = 0;
   }
 
+  /**
+   * OPV19-4: 剧情暗流与重大历法节庆/天文异象共振
+   */
+  function alignWithFestival(currentId, festivalSpec) {
+    currentId = String(currentId || '').trim();
+    festivalSpec = festivalSpec || {};
+    const festivalName = String(festivalSpec.festivalName || festivalSpec.name || '').trim();
+    if (!currentId) return { ok: false, refusal: 'missing-current-id', reason: '未指定暗流ID' };
+    if (!festivalName) {
+      // 破坏性负控制：非节庆普通工作日无任何集会声明强行调用共振直接拒绝
+      return {
+        ok: false,
+        refusal: 'no-festival-context',
+        reason: '当前日期并非重大节庆狂欢或天文异象日，严禁调用集会人流与戒备松懈掩护！'
+      };
+    }
+
+    const crowdMultiplier = festivalSpec.crowdMultiplier != null ? Number(festivalSpec.crowdMultiplier) : 2.5;
+    const guardSlackPct = festivalSpec.guardSlackPct != null ? Number(festivalSpec.guardSlackPct) : 40;
+
+    let resonated = false;
+    if (WA.store && typeof WA.store.transact === 'function') {
+      WA.store.transact(function (draft) {
+        if (!draft.currents || !Array.isArray(draft.currents)) return;
+        const cur = draft.currents.find(function (c) { return c.id === currentId; });
+        if (cur) {
+          cur.festivalResonance = {
+            festival: festivalName,
+            crowdMultiplier: crowdMultiplier,
+            guardSlackPct: guardSlackPct,
+            at: Date.now()
+          };
+          // 共振直接催化暗流跃迁提速
+          if (cur.stage === 'latent' || cur.stage === '潜伏') cur.stage = 'developing';
+          resonated = true;
+        }
+      });
+    }
+
+    return {
+      ok: true,
+      currentId: currentId,
+      festival: festivalName,
+      resonated: resonated,
+      crowdMultiplier: crowdMultiplier,
+      guardSlackPct: guardSlackPct,
+      narrative: `暗流「${currentId}」与重头节庆「${festivalName}」产生深度共振！街市人头攒动，卫队警戒削弱 ${guardSlackPct}%，暗流爆发窗口大幅提前！`
+    };
+  }
+
   WA.undercurrentCalendar = {
     DEF: DEF,
     BOUNDS: BOUNDS,
     STAGE_WINDOWS: STAGE_WINDOWS,
     getSettings: getSettings,
     setSettings: setSettings,
+    alignWithFestival: alignWithFestival,
     build: build,
     reset: reset,
     stat: function () { return Object.assign({}, stat); }

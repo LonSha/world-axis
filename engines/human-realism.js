@@ -582,6 +582,57 @@
     return root.grudges.filter(function (g) { return g && (g.who === w || g.target === w); });
   }
 
+  /**
+   * OPV19-5: 睡眠剥夺阶梯病理学与深度疲劳强制宕机
+   */
+  function applySleepDeprivation(actorId, hoursAwake) {
+    const aid = clean(actorId, 48);
+    const hours = Number(hoursAwake) || 0;
+    if (!aid) return { ok: false, refusal: 'missing-actor-id', reason: '未指定角色' };
+
+    // 破坏性负控制：刚醒不久睡眠充沛（<4小时），严禁触发任何疲劳昏厥病理
+    if (hours < 4) {
+      return {
+        ok: false,
+        refusal: 'rested-no-deprivation',
+        reason: '该角色精力充沛且刚醒不久（清醒不足4小时），严禁触发睡眠剥夺与虚假昏厥！',
+        actorId: aid,
+        hoursAwake: hours
+      };
+    }
+
+    let pathology = 'alert';
+    let forcedCollapse = false;
+    let narrative = '';
+
+    if (hours >= 72) {
+      // 72 小时极限强制昏睡宕机
+      pathology = 'narcolepsyCrash';
+      forcedCollapse = true;
+      narrative = `【生理强制宕机】连续 ${hours} 小时未眠！神经突触彻底衰竭，大脑自我保护机制强行关闭意识，当场扑倒昏厥长眠！`;
+    } else if (hours >= 48) {
+      // 48 小时出现幻视与手部震颤
+      pathology = 'hallucinations_tremor';
+      narrative = `连续 ${hours} 小时未眠！视野边缘扭曲发黑，眼前浮现不存在的幢幢鬼影，手指剧烈颤抖无法平稳握持兵刃。`;
+    } else if (hours >= 24) {
+      // 24 小时注意力涣散
+      pathology = 'cognitive_fog';
+      narrative = `清醒已达 ${hours} 小时，太阳穴突突胀痛，反应迟钝且注意力严重涣散。`;
+    } else {
+      pathology = 'mild_weariness';
+      narrative = `清醒 ${hours} 小时，略显疲态，需要休整。`;
+    }
+
+    return {
+      ok: true,
+      actorId: aid,
+      hoursAwake: hours,
+      pathology: pathology,
+      forcedCollapse: forcedCollapse,
+      narrative: narrative
+    };
+  }
+
   WA.humanRealism = {
     setNeeds: transactional(setNeeds),
     consumeRoutine: transactional(consumeRoutine),
@@ -592,6 +643,7 @@
     getActor: getActor,
     isExempt: function (name, dimension) { return isExempt(getActor(name), dimension); },
     listGrudges: listGrudges,
+    applySleepDeprivation: applySleepDeprivation,
     buildBlock: buildBlock,
     PRESET_EXEMPTIONS: PRESET_EXEMPTIONS
   };

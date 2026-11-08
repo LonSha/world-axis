@@ -17171,6 +17171,46 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
       } catch (e) {
         return { ok: true, headless: true, data: data, error: e.message };
       }
+    },
+    // v2.351.0 (V19 EXV19-9 & OPV19-9): 沉浸式微观生理创伤与隐秘暗网原生折叠面板
+    renderV19ImmersionFold(container) {
+      const data = {
+        maritime: (WA.maritimeNavigation && typeof WA.maritimeNavigation.buildBlock === 'function') ? WA.maritimeNavigation.buildBlock() : '',
+        blackmarket: (WA.blackmarketUsury && typeof WA.blackmarketUsury.buildBlock === 'function') ? WA.blackmarketUsury.buildBlock() : '',
+        stealth: (WA.stealthInfiltration && typeof WA.stealthInfiltration.buildBlock === 'function') ? WA.stealthInfiltration.buildBlock() : '',
+        toxicology: (WA.alchemyToxicology && typeof WA.alchemyToxicology.buildBlock === 'function') ? WA.alchemyToxicology.buildBlock() : '',
+        covenant: (WA.covenantSanction && typeof WA.covenantSanction.buildBlock === 'function') ? WA.covenantSanction.buildBlock() : ''
+      };
+      if (!container || typeof container.appendChild !== 'function') {
+        return { ok: true, headless: true, data: data };
+      }
+      try {
+        const wrap = document.createElement('div');
+        wrap.id = 'wa-immersion-v19-wrap';
+        wrap.className = 'wa-immersion-fold-wrap';
+        wrap.innerHTML = `
+          <details class="wa-details" id="wa-trauma-fold">
+            <summary class="wa-summary">身体创伤与病理诊查</summary>
+            <div class="wa-fold-body">${data.toxicology || '经络血气平稳，未探得致命毒质'}</div>
+          </details>
+          <details class="wa-details" id="wa-blackmarket-fold">
+            <summary class="wa-summary">隐秘市集与商誉信用</summary>
+            <div class="wa-fold-body">${data.blackmarket || '当前无逾期借贷，市井流水如常'}</div>
+          </details>
+          <details class="wa-details" id="wa-shadow-network-fold">
+            <summary class="wa-summary">暗中潜伏与眼线网络</summary>
+            <div class="wa-fold-body">${data.stealth || '未处于严密盯梢视锥盲区'}</div>
+          </details>
+          <details class="wa-details" id="wa-naval-fold">
+            <summary class="wa-summary">远洋水文与操舵航程</summary>
+            <div class="wa-fold-body">${data.maritime || '泊锚于安全港湾'}</div>
+          </details>
+        `;
+        container.appendChild(wrap);
+        return { ok: true, rendered: true, data: data };
+      } catch (e) {
+        return { ok: true, headless: true, data: data, error: e.message };
+      }
     }
   };
 })();

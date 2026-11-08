@@ -498,6 +498,40 @@
       invalidate('atomic-transact-commit');
       return { ok: true, transactionId: transactionId, phase: 'commit', committed: true };
     },
+    /**
+     * OPV19-8: 跨插件真源快照增量脏标记同步队列
+     */
+    queueDirtyDelta: function (targetPlugin, eventCategory, deltaPayload) {
+      targetPlugin = String(targetPlugin || 'all').toLowerCase();
+      eventCategory = String(eventCategory || 'world_fact');
+      if (!deltaPayload || typeof deltaPayload !== 'object') {
+        return { ok: false, refusal: 'invalid-delta-payload', reason: '脏标记负载必须为有效对象' };
+      }
+      this.__dirtyQueue = this.__dirtyQueue || [];
+      const item = {
+        id: 'delta_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        target: targetPlugin,
+        category: eventCategory,
+        payload: JSON.parse(JSON.stringify(deltaPayload)),
+        at: clockNow('queueDirtyDelta')
+      };
+      this.__dirtyQueue.push(item);
+      if (this.__dirtyQueue.length > 50) this.__dirtyQueue.shift();
+      return { ok: true, queuedId: item.id, queueLength: this.__dirtyQueue.length };
+    },
+    flushDirtySnapshots: function (targetPlugin) {
+      this.__dirtyQueue = this.__dirtyQueue || [];
+      const target = String(targetPlugin || 'all').toLowerCase();
+      let matched = [];
+      if (target === 'all') {
+        matched = this.__dirtyQueue.slice();
+        this.__dirtyQueue = [];
+      } else {
+        matched = this.__dirtyQueue.filter(function (it) { return it.target === target || it.target === 'all'; });
+        this.__dirtyQueue = this.__dirtyQueue.filter(function (it) { return it.target !== target && it.target !== 'all'; });
+      }
+      return { ok: true, target: target, flushedCount: matched.length, deltas: matched };
+    },
     // settings() 也会被**外部**调用（诊断节、健康分、宿主侧探测），同规格不抛。
     settings: function () { try { return loadSettings(); } catch (eS) { return Object.assign({}, __REG.def); } },
     // X8（v2.128.0）：版本化握手（**纯读**）。真消费方是 `theme.separation()`——
