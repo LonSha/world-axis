@@ -1,22 +1,41 @@
 /**
- * WorldAxis engines/financial-contagion.js (v2.360.0)
+ * WorldAxis engines/financial-contagion.js (v2.380.0)
  * EXV20-7: 黑市金融危机、钱庄挤兑与假币通缩洗牌引擎
  */
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this);
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   WA.engines = WA.engines || {};
 
-  const VERSION = '2.360.0';
+  const VERSION = '2.380.0';
   const LS_KEY = 'worldaxis_financial_contagion_settings_v1';
   const DEF = {
     enabled: true,
     insolvencyThreshold: 0.35,
     maxHistory: 30
   };
-
+  const __REG = {
+    key: LS_KEY,
+    def: DEF,
+    module: 'financialContagion'
+  };
+  // v2.381.0: 补齐设置键登记 —— 与 engines/court-intrigue.js 同一处漏项（那一处已在
+  //   同版修掉，且注释里写着「全仓 274 个引擎里唯一的登记漏项」；实测这句在本版已不成立，
+  //   因为本引擎也漏着）。症状不是「少一行」：
+  //     · render/inject.js 的 SRC_MOD_SETTING 里本源的键是**对的**
+  //       （financialContagion → worldaxis_financial_contagion_settings_v1），
+  //       但 moduleEnabled 的三态读以 __settingsRegs 为唯一真源 ⇒ 查不到 ⇒ 返回 null，
+  //       于是对账面把本源判成 unavailable（「没有模块级总开关」——而它明明有）；
+  //     · 更坏的是它同时**计数错位**：判据 A1 说「表内 108 + 表外 36 = 源面 144」，
+  //       而本源既在表内（有映射）又被算进表外（不可判定），两件事各自为真、
+  //       合起来就成了「表内 + 表外 ≠ 源面」——一个源被算了两次。
+  //     · settingsBus 的 ghostScan / applyDefaults / verifyDefaults 也以本表为唯一真源：
+  //       未登记则该键被判成幽灵键（进清理候选），子键级默认值永不回填。
+  //   教训同 court-intrigue 那处：**映射表里有键 ≠ 登记表里有项**，两张表的两跳
+  //   （源键 → settings 键 → 模块名）必须两跳都通，只通第一跳时读数看起来「有归属」，
+  //   而开关实际读不到。
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   let stat = {
     runsTriggered: 0,
     defaultsOccurred: 0,
@@ -33,7 +52,7 @@
 
   function clockNow() {
     try { if (WA.clock && typeof WA.clock.now === 'function') return WA.clock.now('financial.contagion'); } catch (e) {}
-    return Date.now();
+    return clockNow('financial-contagion');
   }
 
   function getFinancialStore(draft) {
@@ -130,8 +149,31 @@
       });
     }
 
-    if (WA.events && typeof WA.events.emit === 'function') {
-      WA.events.emit('financial:contagion', record);
+    // v2.381.0: events 是事件钟排期表，不提供 emit 即时广播原语（导出面只有
+    //   schedule/due/claim/complete/cancel/replace/fulfillDue/active/fails/...）。
+    //   原代码探测 emit 恒 false，于是「金融机构暴雷」这件大事从未进入统一事件钟，
+    //   timelineView / fulfillDue 都看不见它。改为排一条立即可认领的 once 事件，
+    //   事实与数字原样进 payload，不额外编造。
+    if (WA.events && typeof WA.events.schedule === 'function') {
+      try {
+        WA.events.schedule({
+          id: 'financial.contagion:' + record.bankId + ':' + record.timestamp,
+          title: record.bankId + (record.status === 'insolvent' ? ' 金融暴雷' : ' 挤兑承压'),
+          kind: 'once',
+          priority: record.status === 'insolvent' ? 8 : 5,
+          payload: {
+            source: 'financialContagion',
+            bankId: record.bankId,
+            place: record.place,
+            status: record.status,
+            isDefault: record.isDefault,
+            contagionIndex: record.contagionIndex,
+            panicIndex: record.panicIndex,
+            coverageRatio: record.coverageRatio,
+            summary: record.summary
+          }
+        });
+      } catch (eSchedule) {}
     }
 
     return { ok: true, data: record };

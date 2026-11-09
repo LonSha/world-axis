@@ -99,10 +99,29 @@
     // v2.324.0: 真实人物肉身生理、七情六欲与记恨小账本容器上限
     'humanRealism.actors': { path: 'humanRealism.actors', kind: 'object', cap: 48, why: '真实人物生理与情感卡映射（对象型，最久未活跃优先挤出）' },
     'humanRealism.grudges': { path: 'humanRealism.grudges', cap: 48, why: '心底芥蒂与记恨小账本环形' },
-    'humanRealism.log': { path: 'humanRealism.log', cap: 32, why: '情绪失控与生理极限日志环形' },
+    // ⚠ v2.382.0：`humanRealism.log` 本站点已**撤除**（此处曾登记 cap:32「情绪失控与生理极限日志环形」）。
+    //   理由：全仓 grep 证实该容器**从来没有过写入方**——`engines/human-realism.js` 只在
+    //   `store()` 的兜底里把它初始化成 `[]`（第 70 行 `{actors:{}, grudges:[], log:[]}`），
+    //   `git log -S 'realism.log.push'` 全历史零命中，`buildBlock()` 也从不读它。
+    //   这正是本仓库反复踩过的那类「登记了却没有写入方的容器」：站点表声明了一个
+    //   `evict.array(log, "humanRealism.log")` 的裁剪点，产品源码里根本不存在这个调用 ⇒
+    //   回归把它报成「声明悬空站点」，而那正是**判据在说真话**。
+    //   处置沿用 core/store.js:118-120 的既定口径（presetWorld / requestViewer / wbSearch 三条
+    //   同款）：**不**给它编一个假的写入方来让判据变绿，而是**撤下登记**——骨架里那行
+    //   `log: []` 保留（老存档兼容：已落盘的键照旧读得到，只是没人写、也不再有容量承诺）。
+    //   registryParity 只查「登记的键是否在骨架物化」，不反向查「骨架键是否都登记」，
+    //   故撤登记不会引发新红灯（已实跑核对）。
     // v2.325.0: 剧情生活动线与身份世界观节律
     'routinePacing.actors': { path: 'routinePacing.actors', kind: 'object', cap: 48, why: '角色生活作息与个性意向映射（对象型，最久未活跃优先挤出）' },
-    'routinePacing.history': { path: 'routinePacing.history', cap: 32, why: '时序与生活切片推进历史环形' },
+    // ⚠ v2.382.0：`routinePacing.history` 本站点已**撤除**（此处曾登记 cap:32「时序与生活切片推进历史环形」）。
+    //   与上方 `humanRealism.log` 完全同因同处置：全仓只在 `engines/routine-pacing.js` 的
+    //   四处 `draft.routinePacing = draft.routinePacing || { actors:{}, worldFrame:{}, history:[] }`
+    //   兜底初始化里出现（250/290/335/364/388 行），**没有任何 push**；
+    //   `git log -S 'pacing.history.push'` 全历史零命中；`buildBlock()` 只读
+    //   `rp.worldFrame` 与 `rp.actors`，从不读 history。
+    //   即：一个从建库起就恒为空的数组，却被登记了容量上限、还声明了一个不存在的裁剪点。
+    //   处置同 `humanRealism.log` 与 core/store.js:118-120 三条先例：撤登记、保留骨架键
+    //   （老存档里若真有历史数据照旧读得到，只是不再承诺容量与挤出）。
     'vitals.rows':         { path: 'vitals.rows',         cap: 24, why: '生理线环形' },
   // v2.231.0（拓展 EXP-1）：逐人逐能力进度行（上限与 training.maxRows 同源，见 training.js）。
   'training.rows':       { path: 'training.rows',       cap: 96, why: '能力成长逐人逐能力行' },
@@ -542,7 +561,23 @@
     'investigation.clues': '写入侧硬上界（满则 clues-full 拒写，不走 evict）',
     'investigation.evidence': '写入侧硬上界（满则 evidence-full 拒写，不走 evict）',
     'aftermath.effects': '写入侧硬上界（满则 effects-full 拒写，不走 evict）',
-    'operations.projects': '写入侧硬上界（满则 projects-full 拒写，不走 evict）'
+    'operations.projects': '写入侧硬上界（满则 projects-full 拒写，不走 evict）',
+    // v2.382.0（本轮回归红项收口）：两处「登记了容量、却既没站点也没解释方」的容器。
+    //   病是同一个：`__BOUNDED_CAPS` 里登记了 cap，但 `SITE_DECLS` 里没有对应裁剪点、
+    //   `NON_EVICT` 里也没有声明 ⇒ 双集合门禁两层同时报「未解释」与「零调用」。
+    //   定性：两者都不是环形挤出，而是**写入侧硬上界**——与 region.places / stage.metrics
+    //   完全同族（v2.119.0 起同一口径）。只是当初登记时漏了在 NON_EVICT 这边声明。
+    //   ① periodicals.defs：`engines/periodicals.js:36` 的 `configure()` 在
+    //      `if (i<0 && rows.length>=8) return false;` —— 满 8 条**整笔事务放弃**，
+    //      既有刊物定义一条不动。注意它**不是**返回 `{ok:false,reason}` 而是 `return false`
+    //      （transact 回滚），但对「既有项不动」这个性质的语义是一样的。
+    //   ② liaison.scenes：`engines/liaison.js:527` 的 sceneOpen 在
+    //      `if (rows.length >= 40) { out = { ok:false, reason:'scene-capacity' }; return false; }`
+    //      —— 显式拒绝并带归因码，比 ① 更标准。
+    //   两者都**不**适合造一个 evict 站点：它们的设计是「满了就不让进」，而不是
+    //   「进来了再把旧的挤出去」——后者会把用户配好的刊物/场景静默丢掉。
+    'periodicals.defs': '写入侧硬上界（满 8 条则 configure 整笔回滚，既有定义不动，不走 evict）',
+    'liaison.scenes': '写入侧硬上界（满 40 则 scene-capacity 拒写，既有场景不动，不走 evict）'
   };
 
   // ── 记账 ──────────────────────────────────────────────────

@@ -201,7 +201,17 @@
     'narrativeLens',
     'chrono',
     // v2.360.0 (V20 OPV20-1): V19 活世界 9 大深层物理/病理/谍报机制全域接入
-    'covertEspionage', 'epidemicContagion', 'surgicalTriage', 'maritimeNavigation', 'blackmarketUsury', 'stealthInfiltration', 'alchemyToxicology', 'covenantSanction', 'humanRealism'];
+    'covertEspionage', 'epidemicContagion', 'surgicalTriage', 'maritimeNavigation', 'blackmarketUsury', 'stealthInfiltration', 'alchemyToxicology', 'covenantSanction', 'humanRealism',
+    // v2.380.0 (V21 OPV21-2): V20 三源 + V21 八源全域接入注入链。
+    //   三处同批（SOURCES / 默认值 / VIS_NAMES）+ 注入分支，任一处单边增长都是静默缺口：
+    //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
+    //   （v2.38.0 的 echoes 原样复刻）。键名 = 命名空间名。
+    //   V20 三源此前漏登记（同批缺陷）：buildBlock 早已实在、panel 的 V20 大盘
+    //   也在消费，但注入链从未读过它们 —— 正文里「纪元为何变了、地貌为何塌了、
+    //   钱庄为何暴雷」三件事从没到过模型手里。
+    'epochalTransition', 'cataclysmHazard', 'financialContagion',
+    'theologyCult', 'regimentTactics', 'incarcerationJailbreak', 'bloodlineHeritage',
+    'engineeringBlueprint', 'dungeonHazardMesh', 'ecosystemCascade', 'courtIntrigue'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -308,7 +318,12 @@ style: false,
         // v2.360.0: V19 源默认开启（模块总开关把关）
         covertEspionage: true, epidemicContagion: true, surgicalTriage: true,
         maritimeNavigation: true, blackmarketUsury: true, stealthInfiltration: true,
-        alchemyToxicology: true, covenantSanction: true, humanRealism: true }, module: 'render' };
+        alchemyToxicology: true, covenantSanction: true, humanRealism: true,
+        // v2.380.0 (V21 OPV21-2): V20 三源 + V21 八源。同一条理由——模块总开关默认为关，
+        //   故注入面取默认 true，不给老用户凭空多出约束（必开时关掉的是模块本身）。
+        epochalTransition: true, cataclysmHazard: true, financialContagion: true,
+        theologyCult: true, regimentTactics: true, incarcerationJailbreak: true, bloodlineHeritage: true,
+        engineeringBlueprint: true, dungeonHazardMesh: true, ecosystemCascade: true, courtIntrigue: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -573,7 +588,22 @@ style: false,
     // v2.360.0: V19 显示名
     covertEspionage: '谍报暗网', epidemicContagion: '疫病检疫', surgicalTriage: '战地救护',
     maritimeNavigation: '航海水文', blackmarketUsury: '黑市金融', stealthInfiltration: '潜伏暗杀',
-    alchemyToxicology: '毒理病理', covenantSanction: '铁律盟约', humanRealism: '具身生理'
+    alchemyToxicology: '毒理病理', covenantSanction: '铁律盟约', humanRealism: '具身生理',
+    // v2.380.0: V20/V21 显示名（用户看得懂的名字，与注入项 source 名同批）
+    epochalTransition: '纪元跃迁', cataclysmHazard: '天灾地貌', financialContagion: '金融连环',
+    theologyCult: '神权教派', regimentTactics: '军团阵战',
+    incarcerationJailbreak: '刑狱越狱', bloodlineHeritage: '血脉宗法',
+    engineeringBlueprint: '工程器械', dungeonHazardMesh: '地牢机关',
+    ecosystemCascade: '生态级联', courtIntrigue: '宫廷内斗',
+    // v2.381.0：叙述镜片的显示名。v2.326.0 落地时它是**只加了一半**的一处：
+    //   SOURCES 里登记了键（narrativeLens）、注入分支里写了中文 source 名（'叙述镜片'）、
+    //   VIS_NAMES 也给了名，唯独 SRC_NAME 漏了 —— 于是三处读数里都正确、
+    //   只有「失败台账 / 开关两面对账面」这一路把英文键名 `narrativeLens` 直接印给用户
+    //   （实测 faceAudit 里 144 行只有这 1 行 name === key）。
+    //   这正是本表每一段注释都在念的同一条：显示名与 SOURCES 必须**同批登记**，
+    //   否则用户唯一能看见它的地方裸露英文键名。取「叙述镜片」与注入分支的 source 字面量
+    //   逐字同名（explain-v2900 的 A4 咬「不裸露英文键」、C1 咬「源表每项都有名」）。
+    narrativeLens: '叙述镜片'
   };
   // ── v2.91.0 O4：开关两面对账 ──────────────────────────────────────────
   /**
@@ -746,7 +776,22 @@ style: false,
     stealthInfiltration: 'worldaxis_stealth_infiltration_settings_v1',
     alchemyToxicology: 'worldaxis_alchemy_toxicology_settings_v1',
     covenantSanction: 'worldaxis_covenant_sanction_settings_v1',
-    humanRealism: 'worldaxis_human_realism_settings_v1',
+        // v2.380.0 (V21 OPV21-2): V20 三源 + V21 八源的模块设置键。
+    //   与 SOURCES / 默认值 / VIS_NAMES / 注入分支**同批**登记（第五处）。
+    //   缺在本表里的后果不是「少一行字」：注入页的模块总开关读成「不可判定」，
+    //   玩家关不掉这个源 —— 与 v2.38.0 的 echoes「开关点了零效果」同一类缺陷。
+    epochalTransition: 'worldaxis_epochal_transition_settings_v1',
+    cataclysmHazard: 'worldaxis_cataclysm_hazard_settings_v1',
+    financialContagion: 'worldaxis_financial_contagion_settings_v1',
+    theologyCult: 'worldaxis_theology_cult_settings_v1',
+    regimentTactics: 'worldaxis_regiment_tactics_settings_v1',
+    incarcerationJailbreak: 'worldaxis_incarceration_jailbreak_settings_v1',
+    bloodlineHeritage: 'worldaxis_bloodline_heritage_settings_v1',
+    engineeringBlueprint: 'worldaxis_engineering_blueprint_settings_v1',
+    dungeonHazardMesh: 'worldaxis_dungeon_hazard_mesh_settings_v1',
+    ecosystemCascade: 'worldaxis_ecosystem_cascade_settings_v1',
+    courtIntrigue: 'worldaxis_court_intrigue_settings_v1',
+humanRealism: 'worldaxis_human_realism_settings_v1',
   };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
@@ -1696,6 +1741,72 @@ style: false,
       if (vis.humanRealism && WA.humanRealism) {
         const hrb = engineCall('humanRealism', function () { return WA.humanRealism.buildBlock(); });
         if (hrb) items.push({ source: '具身生理', content: hrb });
+      }
+
+      // ── v2.380.0 (V21 OPV21-2): V20 纪元突变大系 + V21 文明盛衰/生态政变大系注入分支 ──
+      //   口径与既有各源完全一致：模块缺席 / 可见性关 / 无内容 ⇒ buildBlock 返回空串，
+      //   静默不出块、零 token 占用。三个官方读口全部走 engineCall 单出口（计时 + 失败台账）。
+      //
+      //   V20 三源（此前漏登记，正文里从来看不到）：
+      //     epochalTransition 答「纪元为什么变了」—— 只报当前纪元形态与跃迁压力，不剧透下一纪元；
+      //     cataclysmHazard   答「地貌为什么塌了」—— 只报已发生/进行中的灾变与流民，不报未触发断层；
+      //     financialContagion 答「钱庄为什么暴雷」—— 只报已传导的信用链，不报尚在潜伏的杠杆。
+      //   三者与 panel 的 V20 大盘读同一个 buildBlock，故「玩家看得到的」与「模型知道的」同源。
+      if (vis.epochalTransition && WA.epochalTransition) {
+        const etb = engineCall('epochalTransition', function () { return WA.epochalTransition.buildBlock(); });
+        if (etb) items.push({ source: '纪元跃迁', content: etb });
+      }
+      if (vis.cataclysmHazard && WA.cataclysmHazard) {
+        const chb = engineCall('cataclysmHazard', function () { return WA.cataclysmHazard.buildBlock(); });
+        if (chb) items.push({ source: '天灾地貌', content: chb });
+      }
+      if (vis.financialContagion && WA.financialContagion) {
+        const fcb = engineCall('financialContagion', function () { return WA.financialContagion.buildBlock(); });
+        if (fcb) items.push({ source: '金融连环', content: fcb });
+      }
+      //
+      //   V21 八源：文明盛衰、神权军团、刑狱血脉、工程拓扑与生态政变。
+      //   每源只报**本引擎自己台账里已经成立的事实**，不越权代言别的源
+      //   （与 shadow「秘密只对持有者公开」、threads「只报未结案」同一条纪律）：
+      //     theologyCult        教派狂热与神权天平（不含审判结果预判）；
+      //     regimentTactics     阵线与士气实况（不含胜负预判）；
+      //     incarcerationJailbreak 在押名册与禁闭等级（不含越狱计划是否成功）；
+      //     bloodlineHeritage   宗族谱系与信托状态（不含继承结果预判）；
+      //     engineeringBlueprint 工坊图纸与器械完好度（不含自爆概率预判）；
+      //     dungeonHazardMesh   地牢拓扑与机关就绪态（不含陷阱触发结果）；
+      //     ecosystemCascade    营养级与异化灾警（不含种群崩溃预判）；
+      //     courtIntrigue       派系态势与禁军倾向（不含政变成败预判）。
+      if (vis.theologyCult && WA.theologyCult) {
+        const tcb = engineCall('theologyCult', function () { return WA.theologyCult.buildBlock(); });
+        if (tcb) items.push({ source: '神权教派', content: tcb });
+      }
+      if (vis.regimentTactics && WA.regimentTactics) {
+        const rtb = engineCall('regimentTactics', function () { return WA.regimentTactics.buildBlock(); });
+        if (rtb) items.push({ source: '军团阵战', content: rtb });
+      }
+      if (vis.incarcerationJailbreak && WA.incarcerationJailbreak) {
+        const ijb = engineCall('incarcerationJailbreak', function () { return WA.incarcerationJailbreak.buildBlock(); });
+        if (ijb) items.push({ source: '刑狱越狱', content: ijb });
+      }
+      if (vis.bloodlineHeritage && WA.bloodlineHeritage) {
+        const bhb = engineCall('bloodlineHeritage', function () { return WA.bloodlineHeritage.buildBlock(); });
+        if (bhb) items.push({ source: '血脉宗法', content: bhb });
+      }
+      if (vis.engineeringBlueprint && WA.engineeringBlueprint) {
+        const ebb = engineCall('engineeringBlueprint', function () { return WA.engineeringBlueprint.buildBlock(); });
+        if (ebb) items.push({ source: '工程器械', content: ebb });
+      }
+      if (vis.dungeonHazardMesh && WA.dungeonHazardMesh) {
+        const dhb = engineCall('dungeonHazardMesh', function () { return WA.dungeonHazardMesh.buildBlock(); });
+        if (dhb) items.push({ source: '地牢机关', content: dhb });
+      }
+      if (vis.ecosystemCascade && WA.ecosystemCascade) {
+        const ecb = engineCall('ecosystemCascade', function () { return WA.ecosystemCascade.buildBlock(); });
+        if (ecb) items.push({ source: '生态级联', content: ecb });
+      }
+      if (vis.courtIntrigue && WA.courtIntrigue) {
+        const cib = engineCall('courtIntrigue', function () { return WA.courtIntrigue.buildBlock(); });
+        if (cib) items.push({ source: '宫廷内斗', content: cib });
       }
       if (vis.retrieval && WA.retrieval) {
         const rq = (function () {

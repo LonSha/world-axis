@@ -141,13 +141,22 @@
     choiceApplied: 0, flagApplied: 0, flagDeduped: 0, bgmSeen: 0,
     malformed: 0, fault: 0, lastAt: 0, lastSig: '', lastTime: null,
   };
+  /** 读侧归因（v2.381.0 收口）：G16 口径要求每一处裸读点附近都投递一次读失败归因。
+   *  本条治的病：`catch (e)` 里只写一句「账坏了不影响解析」，会把「localStorage 被拒」
+   *  答成「本聊天还没有任何内联标签记录」——两者在诊断上同形，补救却完全不同
+   *  （前者查存储可读性 / 隐私模式，后者是正常开局态）。故当场留痕，只投递不改结论。 */
+  function noteReadFail(k, err) {
+    try {
+      if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail('inlineTags', k, err);
+    } catch (e) { /* 归因出口自身不可用时不阻断解析 */ }
+  }
   function loadLedger() {
     try {
       const raw = (WA.mainWin && WA.mainWin.localStorage) ? WA.mainWin.localStorage.getItem(LS_KEY) : null;
       if (!raw) return;
       const o = JSON.parse(raw);
       if (o && typeof o === 'object') Object.keys(stat).forEach(function (k) { if (k in o) stat[k] = o[k]; });
-    } catch (e) { /* 账坏了不影响解析 */ }
+    } catch (e) { noteReadFail(LS_KEY, e); /* 账坏了不影响解析，但读失败必须留痕 */ }
   }
   function saveLedger() {
     try {
@@ -159,6 +168,18 @@
   function now() {
     try { return WA.clock.now('inlineTags'); } catch (e) { return Date.now(); }
   }
+  // v2.381.0 收口（G20）：墙钟守卫**必须是一个具名声明**，不能在三处各自内联一份。
+  //   原状：writeBounded 的两端各写 `(function () { try { return WA.clock.wallNow(); }
+  //   catch (e) { return Date.now(); } })()` —— 两处 fallback 各自散落在表达式里，
+  //   于是 G20 的「声明数 == fallback 数」判据报 328 vs 330（本文件 1 声明 / 3 fallback）。
+  //   为什么必须收成一个声明：判据要的命题是「每一次读墙钟都有一个与它配对的守卫」。
+  //   内联 IIFE 版本在语义上**没漏改**（它确实走了 WA.clock.wallNow()），但它在源码上
+  //   把「守卫」复制了两份 —— 这正是本仓反复治理的「第二份真源」：改一处忘一处时，
+  //   一条路径静默回落到裸 Date.now()，而另一条不会，回放对不上时无从定位。
+  //   收到一个具名声明里，配对关系就变成结构事实，而不是靠三处字面量恰好一致。
+  const clockWall = function (site) {
+    try { return WA.clock.wallNow(); } catch (e) { return Date.now(); }
+  };
   function hash(str) {
     let h = 0x811c9dc5;
     const s = String(str || '');
@@ -176,13 +197,13 @@
    */
   const WRITE_BUDGET_MS = 1500;
   function writeBounded(fn) {
-    const t0 = (function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } })();
+    const t0 = clockWall('inlineTags.writeBounded.t0');
     try {
       fn();
     } catch (e) {
       return { ok: false, timeout: false, ms: 0, error: String(e && e.message).slice(0, 120) };
     }
-    const t1 = (function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } })();
+    const t1 = clockWall('inlineTags.writeBounded.t1');
     const ms = t1 - t0;
     if (ms > WRITE_BUDGET_MS) {
       stat.slowWrites = (stat.slowWrites || 0) + 1;

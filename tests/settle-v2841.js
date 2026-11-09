@@ -28,7 +28,15 @@ const gate = require('./ui-gate-sync.js');
 // 快照类源（产物在 <world_axis_state> 里，由 buildWorldSnapshot 组装）
 const SNAPSHOT_SOURCES = { clock: 'TOKCLOCK', pulse: 'TOKPULSE', background: 'TOKBG',
   people: 'TOKPEOPLE', currents: 'TOKCURRENT', echoes: 'TOKECHO' };
-const ITEM_METHOD = { memory: 'buildMemoryBlock', opinion: 'buildOpinionBlock', ledger: 'buildLedgerText' };
+// 非 buildBlock 形态的源 → 真实注入方法名（其余全是 buildBlock）。
+// v2.381.0 收口补两条：personalInventory / metabolismClock 在 render/inject.js:1541-1542
+//   走的是 buildInventoryFeed / buildVitalsFeed，不是 buildBlock。表里没有它们 ⇒ armAll 里
+//   `typeof mod[method] !== 'function'` 直接 return，但 k 早已写进 tags ⇒ 这两个源的哨兵
+//   **永远装不上**，[前题]/[B]/[C] 三面必然报「缺/误伤/漏」。这是判据的输入面缺口，
+//   不是引擎缺陷（两模块的 profile 方法确实存在）。补表即修，且下面加了自检：
+//   任何「非快照源在表里找不到可用方法」都不许静默 return，直接判红并点名。
+const ITEM_METHOD = { memory: 'buildMemoryBlock', opinion: 'buildOpinionBlock', ledger: 'buildLedgerText',
+  personalInventory: 'buildInventoryFeed', metabolismClock: 'buildVitalsFeed' };
 /** 稳定种子的配对抽样：同一份源码任何时候都抽样到同一批配对（结果可复现） */
 function pairsOf(list, max) {
   const out = [];
@@ -52,6 +60,7 @@ function seedStore(WA) {
 function armAll(WA) {
   const tags = {};
   const restores = [];
+  const unarmed = [];
   (WA.render.SOURCES || []).forEach(function (k) {
     const tag = '<<SENT-' + k + '>>';
     tags[k] = tag;
@@ -68,14 +77,16 @@ function armAll(WA) {
       return;
     }
     const mod = WA[k];
-    if (!mod) return;
     const method = ITEM_METHOD[k] || 'buildBlock';
-    if (typeof mod[method] !== 'function') return;
+    // 装不上哨兵不许静默跳过：一旦跳过，tags 里已有 k ⇒ [前题]/[B]/[C] 会以
+    // 「缺/误伤/漏」的形式误报到那个源头上，看起来像引擎缺陷，其实是判据表漏登记。
+    // 这里把「装不上」单独收集起来，runAll 里作为独立判据判红并点名（可自证、可定位）。
+    if (!mod || typeof mod[method] !== 'function') { unarmed.push(k + '→' + method); return; }
     const keep = mod[method];
     mod[method] = function () { return tag; };
     restores.push(function () { mod[method] = keep; });
   });
-  return { tags: tags, restore: function () { restores.forEach(function (f) { f(); }); } };
+  return { tags: tags, unarmed: unarmed, restore: function () { restores.forEach(function (f) { f(); }); } };
 }
 /** 产物文本 = 快照 + 独立注入项（两处合起来才是「这一轮到底注入了什么」） */
 function productText(WA) {
@@ -116,6 +127,12 @@ function runAll(a) {
   const armed = armAll(WA);
   const tags = armed.tags;
   const all = (WA.render.SOURCES || []).slice();
+  // ── 0 面：哨兵必须全部装上（判据自身的前提前提） ──
+  // 这一条比 [前题] 更靠前：如果某个源的产出方法名不在表里，它的哨兵从没装上过，
+  // 那么 [前题]/[B]/[C] 报出来的「缺/误伤/漏」全是假红。先判这一条，把判据坏和源码坏分开。
+  a(armed.unarmed.length === 0, 'v2840/a3: [0] ' + Object.keys(tags).length + ' 个源的哨兵全部装上'
+    + '（装不上: ' + (armed.unarmed.join(',') || '无') + '）—— 装不上说明本判据的源→方法表漏登了真形态，'
+    + '后面三面的「缺/误伤/漏」会误报到那个源头上去');
   try {
     // ── 前题：全开时全部哨兵都在场（否则后面的「缺席」不可能是开关造成的） ──
     const base = measure(en, tags, []);

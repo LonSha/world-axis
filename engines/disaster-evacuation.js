@@ -14,8 +14,8 @@
 
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -87,7 +87,7 @@
       blockedPlaces: new Set([epic, ...blockedPlaces]),
       blockedEdges: new Set(blockedEdges),
       desc: _cleanStr(opts.desc || '', 120),
-      createdAt: Date.now(),
+      createdAt: clockNow('disaster-evacuation'),
       active: true
     };
 
@@ -196,7 +196,7 @@
         disasterId: did,
         status: 'shelter_exhausted',
         targetShelterId: null,
-        timestamp: Date.now()
+        timestamp: clockNow('disaster-evacuation')
       };
       _evacuations.set(aid, evacRecord);
       return {
@@ -223,7 +223,7 @@
       disasterId: did,
       status: 'evacuated',
       escapedHazard: isTrappedAtStart,
-      timestamp: Date.now()
+      timestamp: clockNow('disaster-evacuation')
     };
     _evacuations.set(aid, evacRecord);
 

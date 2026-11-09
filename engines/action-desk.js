@@ -73,7 +73,7 @@
       if (WA.financialContagion && typeof WA.financialContagion.injectLiquidityBailout === 'function') {
         return WA.financialContagion.injectLiquidityBailout(o);
       }
-      return { ok: false, refusal: financial-contagion-unavailable };
+      return { ok: false, refusal: 'financial-contagion-unavailable' };
     },
     'research.open': function (o) { return WA.research.open(o.spec || o); },
     'research.supply': function (o) { return WA.research.supply(o.projectId, o.who, o.material, o.amount); },
@@ -205,6 +205,55 @@
     'stagePresence.sense': function (o) { return (WA.stagePresence && typeof WA.stagePresence.sensePresence === 'function') ? WA.stagePresence.sensePresence(o) : { ok: false, reason: 'stagePresence-unavailable' }; },
     'stagePresence.tick': function (o) { return (WA.stagePresence && typeof WA.stagePresence.tickOffstageAutonomy === 'function') ? WA.stagePresence.tickOffstageAutonomy(o) : { ok: false, reason: 'stagePresence-unavailable' }; },
     'stagePresence.reunion': function (o) { return (WA.stagePresence && typeof WA.stagePresence.awakenReunion === 'function') ? WA.stagePresence.awakenReunion(o.actorId || o.who) : { ok: false, reason: 'stagePresence-unavailable' }; },
+    // ── V21 史诗扩展引擎全局调度路由 (EXV21-1 ~ EXV21-8) ──
+    'theology.conductTheologyOp': function (o) {
+      if (WA.theologyCult && typeof WA.theologyCult.conductTheologyOp === 'function') {
+        return WA.theologyCult.conductTheologyOp(o && (o.sectId || o.id), o && o.opKind, o);
+      }
+      return { ok: false, refusal: 'theologyCult-unavailable' };
+    },
+    'regiment.clashRegiments': function (o) {
+      if (WA.regimentTactics && typeof WA.regimentTactics.clashRegiments === 'function') {
+        return WA.regimentTactics.clashRegiments(o && (o.regimentAId || o.attackerId), o && (o.regimentBId || o.defenderId), o);
+      }
+      return { ok: false, refusal: 'regimentTactics-unavailable' };
+    },
+    'prison.executeJailOp': function (o) {
+      if (WA.incarcerationJailbreak && typeof WA.incarcerationJailbreak.executeJailOp === 'function') {
+        return WA.incarcerationJailbreak.executeJailOp(o && o.opKind, o, o);
+      }
+      return { ok: false, refusal: 'incarcerationJailbreak-unavailable' };
+    },
+    'bloodline.transactLineage': function (o) {
+      if (WA.bloodlineHeritage && typeof WA.bloodlineHeritage.transactLineage === 'function') {
+        return WA.bloodlineHeritage.transactLineage(o && o.opKind, o, o);
+      }
+      return { ok: false, refusal: 'bloodlineHeritage-unavailable' };
+    },
+    'engineering.engineerDevice': function (o) {
+      if (WA.engineeringBlueprint && typeof WA.engineeringBlueprint.engineerDevice === 'function') {
+        return WA.engineeringBlueprint.engineerDevice(o && o.opKind, o, o);
+      }
+      return { ok: false, refusal: 'engineeringBlueprint-unavailable' };
+    },
+    'dungeon.navigateOrTrigger': function (o) {
+      if (WA.dungeonHazardMesh && typeof WA.dungeonHazardMesh.navigateOrTrigger === 'function') {
+        return WA.dungeonHazardMesh.navigateOrTrigger(o && (o.dungeonId || o.id), o && o.opKind, o);
+      }
+      return { ok: false, refusal: 'dungeonHazardMesh-unavailable' };
+    },
+    'eco.simulateBioShock': function (o) {
+      if (WA.ecosystemCascade && typeof WA.ecosystemCascade.simulateBioShock === 'function') {
+        return WA.ecosystemCascade.simulateBioShock(o && (o.regionId || o.biomeId || o.id), o);
+      }
+      return { ok: false, refusal: 'ecosystemCascade-unavailable' };
+    },
+    'court.executeIntrigue': function (o) {
+      if (WA.courtIntrigue && typeof WA.courtIntrigue.executeIntrigue === 'function') {
+        return WA.courtIntrigue.executeIntrigue(o && (o.courtId || o.id), o && o.opKind, o);
+      }
+      return { ok: false, refusal: 'courtIntrigue-unavailable' };
+    },
     // ── V20 极端自然灾变调度 (EXV20-2) ──
     'nature.triggerCataclysm': function (o) { return (WA.cataclysmHazard && typeof WA.cataclysmHazard.triggerCataclysm === 'function') ? WA.cataclysmHazard.triggerCataclysm(o && (o.locationId || o.place), o) : { ok: false, reason: 'cataclysmHazard-unavailable' }; },
     // ── V20 宏观历史突变与纪元跃迁调度 (EXV20-1) ──
@@ -3202,13 +3251,12 @@ let ckpt = null;
     const elapsedDays = Math.max(1, Number(o.elapsedDays || o.turns || o.days) || 1);
     const events = [];
 
-    // 1. 物理环境推演
-    if (WA.weather && typeof WA.weather.advance === 'function') {
-      try {
-        const wRes = WA.weather.advance({ days: elapsedDays });
-        events.push({ type: 'weather_shifted', detail: wRes });
-      } catch (e) {}
-    } else if (WA.world && typeof WA.world.advance === 'function') {
+    // 1. 物理环境推演（时间推进）
+    // v2.381.0: 原代码先探 weather.advance —— 但 weather 面只有
+    //   setWeather/weatherOf/effect/travelMinutes/getMicroclimate，
+    //   从来没有 advance（它不推进时间，只登记某地此刻天气）。
+    //   真正的推进口是 world.advance(ms)。这里直接走真源，不再保留探测死枝。
+    if (WA.world && typeof WA.world.advance === 'function') {
       try {
         const wRes = WA.world.advance(elapsedDays * 1440);
         events.push({ type: 'time_advanced', detail: wRes });

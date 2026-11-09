@@ -14,7 +14,14 @@ function runAll(assertFn){
  a(d.yield+d.off+d.fault+d.noData===d.total,'four-state partition exactly equals inventory');
  a(d.fault===0,'empty world is not missing builder failure or truncated inventory');
  a(d.rows.some(r=>r.key==='karma'),'computed writeDesk call is recognized by real driver ledger');
- a(d.rows.some(r=>r.key==='geoTracker'&&r.state!=='fault'),'non-switch builders are sampled instead of false faults');
+ // v2.382.0：原判据写死 `geoTracker` 作为「无开关键但应被采样」的样本。
+//   v2.360.0 起 L2p 是动态盘点面，geoTracker 已落到 L2r（新引擎把分类面重排了），
+//   于是 `d.rows.some(r=>r.key==='geoTracker'&&…)` 恒假 —— 不是采样坏了，是**样本过期**。
+//   修法：动态从 L2p 现场取「无 setSettings 的 builder」集合，要求其中至少一台非 fault。
+//   这条仍是同一个语义（「没有开关的引擎不许被误判成构建失败」），且不再依赖任何单一引擎名；
+//   反向自证（把 secPanelYield 的 fallback 分支打坏 ⇒ 全变 fault ⇒ 判据失败）实测成立。
+const noSwitch = ledger.layerNames.L2p.filter(k => !(W[k] && typeof W[k].setSettings === 'function'));
+a(noSwitch.length > 0 && d.rows.some(r => noSwitch.indexOf(r.key) >= 0 && r.state !== 'fault'),'non-switch builders are sampled instead of false faults');
  W.karma.setSettings({enabled:true});const r=W.writeDesk.call('karma','record',['甲','debt',2,'借出粮食']);
  const receipt=W.writeDesk.stat().activity.karma;
  a(receipt.calls===1&&receipt.written===(r&&r.ok?1:0)&&receipt.rejected===(r&&r.ok?0:1),'receipt counts only true write results');

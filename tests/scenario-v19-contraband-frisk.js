@@ -25,6 +25,8 @@
 
 const assert = require('assert');
 const path = require('path');
+// v2.380.0（历史欠账消红）：纯引擎直跑老形态，需先搭宿主台子（宿主 = mock.js）。
+require('./host-boot.js').boot();
 
 // 引入被测生产引擎
 const inventory = require('../engines/personal-inventory.js');

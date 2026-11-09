@@ -27,8 +27,7 @@
 (function () {
   'use strict';
   const root = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this);
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_covenant_sanction_settings_v1';
   const DEF = {
@@ -111,7 +110,7 @@
         if (action === 'signCovenant') {
           // 签订契约盟书
           const covRecord = {
-            covenantId: covenantId || ('cov_' + Date.now()),
+            covenantId: covenantId || ('cov_' + clockNow('covenant-sanction')),
             name: cleanStr(eventSpec.name || '互不侵犯与通商铁约', 48),
             tier: cleanStr(eventSpec.tier || 'secular', 24), // secular | supernatural
             signatories: Array.isArray(eventSpec.signatories) ? eventSpec.signatories.slice() : ['party_a', 'party_b'],
@@ -121,7 +120,7 @@
             createdAt: now
           };
           store.covenants.unshift(covRecord);
-          if (store.covenants.length > 50) store.covenants.length = 50;
+          store.covenants.length = Math.min(store.covenants.length, Math.max(1, Math.floor(settings().maxCovenants)));
           stat.covenantsSigned++;
 
           result = {
@@ -175,16 +174,17 @@
           }
 
           const sanctionRecord = {
-            sanctionId: 'sanc_' + Date.now(),
+            sanctionId: 'sanc_' + clockNow('covenant-sanction'),
             covenantId: covenantId,
             violatorId: violatorId,
             act: actCommitted,
             sanctionType: sanctionType,
+            until: now + Math.max(0, Number(settings().defaultBankruptcyDuration) || 0) * 86400000,
             consequence: consequence,
             at: now
           };
           store.sanctions.unshift(sanctionRecord);
-          if (store.sanctions.length > 50) store.sanctions.length = 50;
+          store.sanctions.length = Math.min(store.sanctions.length, Math.max(1, Math.floor(settings().maxSanctions)));
 
           result = {
             ok: true,
@@ -208,7 +208,10 @@
     const store = getCovenantStore();
     if (!store) return '';
     const activeCovs = (store.covenants || []).filter(function (c) { return c.status === 'active'; }).slice(0, 3);
-    const recentBreaches = (store.sanctions || []).slice(0, 2);
+    const sanctionAt = clockNow('covenant-sanction');
+    const recentBreaches = (store.sanctions || []).filter(function (s) {
+      return s.until == null || s.until > sanctionAt;
+    }).slice(0, 2);
     if (activeCovs.length === 0 && recentBreaches.length === 0) return '';
 
     const lines = ['【盟约铁律与契约因果】'];

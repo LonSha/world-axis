@@ -180,7 +180,14 @@
         // v2.360.0 (V20 OPV20-1): V19 活世界深层机制注入源显示名
         covertEspionage: '谍报暗网', epidemicContagion: '疫病检疫', surgicalTriage: '战地救护',
         maritimeNavigation: '航海水文', blackmarketUsury: '黑市金融', stealthInfiltration: '潜伏暗杀',
-        alchemyToxicology: '毒理病理', covenantSanction: '铁律盟约', humanRealism: '具身生理' };
+        alchemyToxicology: '毒理病理', covenantSanction: '铁律盟约', humanRealism: '具身生理',
+        // v2.380.0 (V21 OPV21-2): V20 三源 + V21 八源显示名。与 render/inject.js 的
+        //   SOURCES / SRC_NAME 逐字同批登记 —— 只加源表不加显示名 ⇒ 注入页/导演页
+        //   裸露英文键，而那是玩家唯一能开关它的地方。
+        epochalTransition: '纪元跃迁', cataclysmHazard: '天灾地貌', financialContagion: '金融连环',
+        theologyCult: '神权教派', regimentTactics: '军团阵战', incarcerationJailbreak: '刑狱越狱',
+        bloodlineHeritage: '血脉宗法', engineeringBlueprint: '工程器械', dungeonHazardMesh: '地牢机关',
+        ecosystemCascade: '生态级联', courtIntrigue: '宫廷内斗' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {
@@ -1343,6 +1350,54 @@
         return '<div class="wa-dim" id="wa-intent-block">人物意图看板读数异常：' + esc((e && e.message) || e) + '</div>';
       }
     })();
+    // v2.380.0 (V21 OPV21-3): V19/V20/V21 三个跨版本态势大盘**真正挂进概览页**。
+    //   缺陷（实测立据）：renderV19ImmersionFold / renderV20HolomapDashboard /
+    //   renderV21CivEcoHub 三个函数此前**全仓零调用点** —— 只有 tests/ 里手动调用，
+    //   产品渲染路径从未拼过它们。于是「V21 文明盛衰与生态全景控制大盘」在
+    //   dead-export 台账里被登记成 reason:test-only（把缺陷写进台账合法化），
+    //   而玩家永远看不到这个大盘。这里用宿主同一套渲染函数 + 取 innerHTML 的方式挂载，
+    //   不另写一份大盘 HTML（另写一份就是第二个措辞真源）。
+    //   三态如实：渲染函数缺席 ⇒ 不注入（不假装注入了空大盘）；
+    //             渲染抛错 ⇒ 吞掉并出一行可归因的读数，不影响整页渲染
+    //             （一个附加大盘挂掉不该让概览页白屏）。
+    //   层级：全部默认收起（<details> 不带 open）—— 它们是**按需查阅**的态势面，
+    //         不是首屏要看的东西。这正是「面板再次简化」的同一条口径。
+    const __dashboardBlock = (function (fnName, label, fn) {
+      try {
+        if (typeof fn !== 'function') {
+          return '<div class="wa-dim" id="wa-dash-missing-' + esc(fnName) + '">' + esc(label) + '读数不可用（渲染口缺席）</div>';
+        }
+        // 真 DOM 下走文档宿主建节点再取 innerHTML；无 DOM（测试壳）下退回 headless 返回值
+        let html = '';
+        if (typeof document !== 'undefined' && document && typeof document.createElement === 'function') {
+          const holder = document.createElement('div');
+          const r = fn.call(WA.ui, holder);
+          if (r && r.headless === true) {
+            // 宿主建节点失败（无真 DOM）：不出假大盘，如实说明
+            return '<div class="wa-dim" id="wa-dash-headless-' + esc(fnName) + '">' + esc(label) + '在无界面环境下不渲染</div>';
+          }
+          html = holder.innerHTML || '';
+        } else {
+          return '<div class="wa-dim" id="wa-dash-nodom-' + esc(fnName) + '">' + esc(label) + '在无界面环境下不渲染</div>';
+        }
+        if (!html) return '';
+        return '<details class="wa-details wa-dash-mount" id="wa-dash-fold-' + esc(fnName) + '" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">'
+          + '<summary class="wa-summary">' + esc(label) + '</summary>'
+          + '<div style="padding-top:6px;">' + html + '</div></details>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-dash-err-' + esc(fnName) + '">' + esc(label) + '读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    });
+    //   **押手为什么不用 WA.ui[fnName] 取**：本仓的引用面扫描（inventory / dead-export-gate）
+    //   只认 `WA.ui.renderXxx` 这种字面形态，动态下标一律读成零引用 ——
+    //   用下标取会让刚接好的线又被判成「死导出」，等于把修复改回缺陷。
+    //   故三处引用写成字面量，fn 只为约束「宿主确实是个函数」。
+    const v19FoldBlock = __dashboardBlock('renderV19ImmersionFold',
+      '🌊 沉浸式深水机制与暗网总览（V19）', WA.ui && WA.ui.renderV19ImmersionFold);
+    const v20HolomapBlock = __dashboardBlock('renderV20HolomapDashboard',
+      '🌐 纪元全息态势仪表大盘（V20）', WA.ui && WA.ui.renderV20HolomapDashboard);
+    const v21CivEcoBlock = __dashboardBlock('renderV21CivEcoHub',
+      '🏛️ 文明盛衰与生态全景控制大盘（V21）', WA.ui && WA.ui.renderV21CivEcoHub);
     return `
       <div class="wa-stat-grid">
         <div class="wa-stat"><div class="wa-stat-v">${esc(s.clock.label || '未设定')}</div><div class="wa-stat-k">世界时间</div></div>
@@ -1363,6 +1418,9 @@
       ${calBlock}
       ${costBlock}
       ${saveBlock}
+      ${v19FoldBlock}
+      ${v20HolomapBlock}
+      ${v21CivEcoBlock}
       <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
         <summary style="cursor:pointer;opacity:0.75;font-size:12px;">🛠️ 引擎自检与底层读数</summary>
         <div style="padding-top:6px;">
@@ -5494,15 +5552,33 @@ ${emptyDrill}
          <button class="wa-btn" id="wa-desk-flow" title="纯读：从当前场景情境切入下一步行动（可知变化/可执行/受阻）">看场景行动流</button>
          <button class="wa-btn" id="wa-desk-sched" title="纯读：查看时间成本占用与协商日程（改期/取消/拆分）">看日程与时间协商</button>
          <button class="wa-btn" id="wa-desk-epistemic" title="纯读：查看人物局部信念与证据可信度评估（无全知）">看人物信念与证据</button>
+       </div>
+       <!-- v2.380.0 (V21 SM-2): 面板再次简化 —— 8 个跨版本宏观态势按钮收进两个原生折叠抽屉。
+            理由：这 8 个按钮自 V14 起逐版平铺进同一个 wa-row，到 V16 时已把「看场景行动流」
+            这类**主操作**挤到第三屏之后 —— 玩家每次打开行动桌都要先穿过 8 个纯读诊断入口。
+            它们全是纯读投影（零写入），不是当前这一拍要做的事，故默认收起、按需展开。
+            **DOM 契约不变**：8 个按钮的 id / title / class 逐字保持原样，只是换了父节点容器，
+            故既有 on('#wa-desk-v14-*') 事件绑定与 tests/overview-fold-v2254.js /
+            v11-vacuum-board.js 的文本锚点全部不受影响（display:none 不影响程序化 click）。
+            用原生 <details> 而非自定义折叠：零 JS、零监听、键盘可达、刷新后状态由浏览器管。 -->
+       <details class="wa-details" id="wa-desk-tactical-fold" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
+         <summary class="wa-summary">🛡️ 战术推演与全域危机大盘</summary>
+         <div class="wa-row" style="flex-wrap:wrap;gap:6px;margin-top:6px;">
           <button class="wa-btn" id="wa-desk-v14-multi" title="纯读：多角色博弈态势板与并发行动批调度概览">看多角色博弈态势</button>
           <button class="wa-btn" id="wa-desk-v14-sanctuary" title="纯读：庇护所争夺与气候阻断滞留日志">看生存避险名册</button>
           <button class="wa-btn" id="wa-desk-v14-crisis" title="纯读：险道物资断供与公开危机大盘">看全域危机大盘</button>
           <button class="wa-btn" id="wa-desk-v14-pact" title="纯读：城下之盟与多方和解公约名册">看多方和解公约</button>
+         </div>
+       </details>
+       <details class="wa-details" id="wa-desk-somatic-fold" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
+         <summary class="wa-summary">🧬 生理机能与退场人物暗线</summary>
+         <div class="wa-row" style="flex-wrap:wrap;gap:6px;margin-top:6px;">
           <button class="wa-btn" id="wa-desk-v15-offstage" title="纯读：退场角色跨题材日常生计与生活意外切片">看退场生计流转</button>
           <button class="wa-btn" id="wa-desk-v15-eccentric" title="纯读：怪诞市井支线与搞笑暗线进展">看市井怪诞暗线</button>
           <button class="wa-btn" id="wa-desk-v16-realism" title="纯读：人物肉身生理极限与情绪临界大盘">看肉身生理七情</button>
           <button class="wa-btn" id="wa-desk-v16-grudge" title="纯读：心底芥蒂与恩怨清算小账本">看心底芥蒂账本</button>
-       </div>
+         </div>
+       </details>
        <div id="wa-desk-life-out" class="wa-out"></div>
        <div id="wa-desk-flow-out" class="wa-out"></div>
        <div id="wa-desk-sched-out" class="wa-out"></div>
@@ -12278,72 +12354,97 @@ on('#wa-desk-show', showDesk);
       // ── 四大空间物理引擎控制交互 ──────────────────────────
       on('#wa-geo-adv-topo', () => {
         if (!WA.spatialTopology) return geoOut('<div class="wa-log wa-log-err">spatialTopology 空间分形拓扑引擎未装载</div>');
-        const d = WA.spatialTopology.diagnose();
+        const countTopo = (st) => ({
+          nodeCount: (st && st.nodes) ? Object.keys(st.nodes).length : 0,
+          edgeCount: (st && Array.isArray(st.portals)) ? st.portals.length : 0
+        });
         // 自动初始化演示节点（如果为空）
-        if (d.nodeCount === 0) {
+        let topoState = WA.spatialTopology.getState();
+        let topoCount = countTopo(topoState);
+        if (topoCount.nodeCount === 0) {
           WA.spatialTopology.registerNode('shinjuku', { name: '新宿区', level: 'region' });
           WA.spatialTopology.registerNode('kabukicho', { name: '歌舞伎町一番街', level: 'sector', parentId: 'shinjuku' });
-          WA.spatialTopology.registerNode('bar_venue', { name: '风林会馆居酒屋', level: 'venue', parentId: 'kabukicho', schedule: { openHour: 17, closeHour: 4 } });
-          WA.spatialTopology.registerNode('room_vip', { name: '2F 樱之间', level: 'subspace', parentId: 'bar_venue', affordance: { shelter: 8, sleep: 7 } });
+          WA.spatialTopology.registerNode('bar_venue', { name: '风林会馆居酒屋', level: 'venue', parentId: 'kabukicho', type: 'shop', schedule: { openHour: 17, closeHour: 4, allDay: false } });
+          WA.spatialTopology.registerNode('room_vip', { name: '2F 樱之间', level: 'subspace', parentId: 'bar_venue', type: 'room' });
           WA.spatialTopology.connect('kabukicho', 'bar_venue', { status: 'open' });
           WA.spatialTopology.connect('bar_venue', 'room_vip', { status: 'locked', keyId: 'vip_key_01' });
+          topoState = WA.spatialTopology.getState();
+          topoCount = countTopo(topoState);
         }
-        const tree = WA.spatialTopology.getHierarchy('room_vip');
+        const treeNodes = WA.spatialTopology.getHierarchy('room_vip');
+        const treePath = treeNodes.length ? treeNodes.map(n => n.name || n.id).join(' 〉 ') : '（该地点尚未登记）';
         const curHour = new Date().getHours();
+        const venueNode = topoState.nodes ? topoState.nodes['bar_venue'] : null;
+        const venueHours = (venueNode && venueNode.schedule)
+          ? (String(venueNode.schedule.openHour).padStart(2, '0') + ':00~' + String(venueNode.schedule.closeHour).padStart(2, '0') + ':00')
+          : '未知';
         const canEnterVenue = WA.spatialTopology.canTraverse('kabukicho', 'bar_venue', { currentHour: curHour });
         const canEnterVip = WA.spatialTopology.canTraverse('bar_venue', 'room_vip', { currentHour: curHour, keys: [] });
-        geoOut('<div class="wa-log wa-log-ok">分形拓扑：节点数 ' + WA.spatialTopology.diagnose().nodeCount + ' · 通道数 ' + WA.spatialTopology.diagnose().edgeCount + '</div>'
-          + '<div class="wa-item"><b>当前层级路径</b>：<code>' + atEsc(tree.join(' 〉 ')) + '</code></div>'
-          + '<div class="wa-item"><b>风林会馆居酒屋 (17:00~04:00)</b>：' + (canEnterVenue.ok ? '<span style="color:#4ade80;">[营业中·准许进入]</span>' : '<span style="color:#f87171;">[打烊闭店·' + atEsc(canEnterVenue.reason) + ']</span>') + '</div>'
-          + '<div class="wa-item"><b>2F 樱之间 (门禁通道)</b>：' + (canEnterVip.ok ? '<span style="color:#4ade80;">[通道开放]</span>' : '<span style="color:#fbbf24;">[门禁锁止·' + atEsc(canEnterVip.reason) + '·需钥匙:vip_key_01]</span>') + '</div>');
+        geoOut('<div class="wa-log wa-log-ok">分形拓扑：节点数 ' + topoCount.nodeCount + ' · 通道数 ' + topoCount.edgeCount + '</div>'
+          + '<div class="wa-item"><b>当前层级路径</b>：<code>' + atEsc(treePath) + '</code></div>'
+          + '<div class="wa-item"><b>风林会馆居酒屋 (' + atEsc(venueHours) + ' · 当前 ' + curHour + ':00)</b>：' + (canEnterVenue.ok ? '<span style="color:#4ade80;">[营业中·准许进入]</span>' : '<span style="color:#f87171;">[打烊闭店·' + atEsc(canEnterVenue.reason) + ']</span>') + '</div>'
+          + '<div class="wa-item"><b>2F 樱之间 (门禁通道)</b>：' + (canEnterVip.ok ? '<span style="color:#4ade80;">[通道开放]</span>' : '<span style="color:#fbbf24;">[门禁锁止·' + atEsc(canEnterVip.reason) + '·需钥匙:' + atEsc(canEnterVip.keyId || 'vip_key_01') + ']</span>') + '</div>');
       });
       on('#wa-geo-adv-transit', () => {
         if (!WA.transitScheduler) return geoOut('<div class="wa-log wa-log-err">transitScheduler 通勤与滞留仲裁引擎未装载</div>');
-        const planWalk = WA.transitScheduler.computeTrip({ x: 100, y: 150 }, { x: 180, y: 130 }, { mode: 'walk', weather: 'rain' });
-        const planNightTrain = WA.transitScheduler.computeTrip({ x: 100, y: 150 }, { x: 300, y: 300 }, { mode: 'transit', timeStr: '01:30' });
-        const planNightStranded = WA.transitScheduler.computeTrip({ x: 100, y: 150 }, { x: 300, y: 300 }, { mode: 'transit', timeStr: '02:00', money: 200 });
-        geoOut('<div class="wa-log wa-log-ok">多模态通勤与末班车滞留仲裁推演</div>'
-          + '<div class="wa-item"><b>雨天徒步 (新宿→秋叶原)</b>：耗时 ' + Math.round(planWalk.minutes) + '分钟 · 体力消耗 ' + planWalk.costFatigue + ' · 花费 0円</div>'
-          + '<div class="wa-item"><b>深夜电车 (01:30 新宿→初星学园)</b>：' + (planNightTrain.ok ? '可行' : '<span style="color:#f87171;">[停运拦截·' + atEsc(planNightTrain.reason) + ' (末班车已过)]</span>') + '</div>'
-          + '<div class="wa-item"><b>滞留仲裁 (02:00 囊中羞涩200円)</b>：<span style="color:#fbbf24;">[强制滞留 stranded=true]</span><br><span class="wa-dim">仲裁方案：' + atEsc((planNightStranded.strandedOptions || []).map(o => o.label + '(' + o.cost + '円)').join(' / ')) + '</span></div>');
+        const rainWalk = WA.transitScheduler.planCommute(2.4, 14.0, { weather: 'rain' });
+        const lateTrain = WA.transitScheduler.planCommute(12.0, 1.5, {});
+        const stranded = WA.transitScheduler.arbitrateStranded('hero_test', {
+          currentHour: 2.0,
+          distanceToHomeKm: 12.0,
+          walletFunds: 200,
+          hasHomeKey: true,
+          nearbyAffordances: ['convenience_store']
+        });
+        const footOpt = (rainWalk.options && rainWalk.options.foot) || {};
+        const transitOpt = (lateTrain.options && lateTrain.options.transit) || {};
+        const directOpt = (lateTrain.options && lateTrain.options.direct) || {};
+        const strandedNote = (stranded && stranded.record)
+          ? (stranded.record.emergencyOption + ' —— ' + stranded.record.optionDesc)
+          : ((stranded && stranded.note) ? stranded.note : '无数据');
+        geoOut('<div class="wa-log wa-log-ok">多模态通勤与末班车滞留仲裁推演 (' + (rainWalk.distanceKm || 2.4) + 'km / ' + (lateTrain.distanceKm || 12) + 'km)</div>'
+          + '<div class="wa-item"><b>雨天徒步 2.4km @14:00</b>：耗时 ' + (footOpt.durationMin != null ? footOpt.durationMin : '—') + '分钟 · 体力消耗 ' + (footOpt.staminaBurn != null ? footOpt.staminaBurn : '—') + ' · 花费 ' + (footOpt.cost || 0) + '円</div>'
+          + '<div class="wa-item"><b>深夜电车 12km @01:30</b>：' + (transitOpt.available ? '<span style="color:#4ade80;">[运行中·' + atEsc(transitOpt.desc) + ']</span>' : '<span style="color:#f87171;">[停运拦截·' + atEsc(transitOpt.reason || 'out_of_service') + ' (末班车已过)]</span>') + '</div>'
+          + '<div class="wa-item"><b>深夜直达载具 12km @01:30</b>：' + atEsc(directOpt.desc || '—') + '</div>'
+          + '<div class="wa-item"><b>滞留仲裁 @02:00 · 囊中 200円</b>：' + (stranded && stranded.stranded ? '<span style="color:#fbbf24;">[强制滞留 stranded=true]</span>' : '<span style="color:#4ade80;">[未滞留]</span>') + '<br><span class="wa-dim">仲裁方案：' + atEsc(strandedNote) + '</span></div>');
       });
       on('#wa-geo-adv-occl', () => {
         if (!WA.environmentalOcclusion) return geoOut('<div class="wa-log wa-log-err">environmentalOcclusion 视听遮蔽引擎未装载</div>');
-        const sameRoomSight = WA.environmentalOcclusion.checkLineOfSight('room_vip', 'room_vip');
-        const crossRoomSight = WA.environmentalOcclusion.checkLineOfSight('kabukicho', 'room_vip');
-        const whisperAcrossDoor = WA.environmentalOcclusion.computeAcoustics({
-          sourceDb: 30,
-          distanceMeters: 4,
-          barrier: 'wood_door',
-          ambientNoise: 35
-        });
-        const screamSameRoom = WA.environmentalOcclusion.computeAcoustics({
-          sourceDb: 80,
-          distanceMeters: 5,
-          barrier: 'none',
-          ambientNoise: 40
-        });
+        const sameRoomSight = WA.environmentalOcclusion.canSee({ nodeId: 'room_vip', room: 'main' }, { nodeId: 'room_vip', room: 'main' });
+        const crossRoomSight = WA.environmentalOcclusion.canSee({ nodeId: 'room_vip', room: 'main' }, { nodeId: 'room_vip', room: 'restroom' });
+        const crossVenueSight = WA.environmentalOcclusion.canSee({ nodeId: 'kabukicho', room: 'street' }, { nodeId: 'room_vip', room: 'main' });
+        const whisperAcrossDoor = WA.environmentalOcclusion.auditAcoustic('whisper',
+          { nodeId: 'bar_venue', room: 'hall' }, { nodeId: 'bar_venue', room: 'vip' },
+          { barriers: ['wooden_door'], distanceMeters: 4, backgroundNoiseDb: 35 });
+        const screamSameRoom = WA.environmentalOcclusion.auditAcoustic('scream',
+          { nodeId: 'room_vip', room: 'main' }, { nodeId: 'room_vip', room: 'main' },
+          { barriers: ['none'], distanceMeters: 5, backgroundNoiseDb: 40 });
         geoOut('<div class="wa-log wa-log-ok">视听遮蔽与声学阻抗测算</div>'
-          + '<div class="wa-item"><b>同房间视线</b>：' + (sameRoomSight.visible ? '<span style="color:#4ade80;">[视线通透·无阻隔]</span>' : '阻断') + '</div>'
-          + '<div class="wa-item"><b>跨建筑视线 (歌舞伎町街道 → 2F包厢)</b>：' + (crossRoomSight.visible ? '通透' : '<span style="color:#f87171;">[视线完全阻断·' + atEsc(crossRoomSight.reason) + ']</span>') + '</div>'
-          + '<div class="wa-item"><b>隔门耳语 (4米木门 30dB@底噪35dB)</b>：' + atEsc(whisperAcrossDoor.clarityLabel) + ' (终点 ' + Math.round(whisperAcrossDoor.receivedDb) + 'dB · 信噪比 SNR: ' + Math.round(whisperAcrossDoor.snr) + 'dB)</div>'
-          + '<div class="wa-item"><b>同室呼救 (5米开阔 80dB@底噪40dB)</b>：' + atEsc(screamSameRoom.clarityLabel) + ' (终点 ' + Math.round(screamSameRoom.receivedDb) + 'dB · 信噪比 SNR: ' + Math.round(screamSameRoom.snr) + 'dB)</div>');
+          + '<div class="wa-item"><b>同房间视线</b>：' + (sameRoomSight.visible ? '<span style="color:#4ade80;">[视线通透·' + atEsc(sameRoomSight.note || '无阻隔') + ']</span>' : '阻断') + '</div>'
+          + '<div class="wa-item"><b>同层隔间视线 (樱之间 → 洗手间)</b>：' + (crossRoomSight.visible ? '通透' : '<span style="color:#fbbf24;">[视线阻断·' + atEsc(crossRoomSight.reason) + '·' + atEsc(crossRoomSight.note || '') + ']</span>') + '</div>'
+          + '<div class="wa-item"><b>跨建筑视线 (歌舞伎町街道 → 2F包厢)</b>：' + (crossVenueSight.visible ? '通透' : '<span style="color:#f87171;">[视线完全阻断·' + atEsc(crossVenueSight.reason) + ']</span>') + '</div>'
+          + '<div class="wa-item"><b>隔门耳语 (25dB 源 · 4米木门 · 底噪35dB)</b>：' + atEsc(whisperAcrossDoor.desc) + ' (终点 ' + Math.round(whisperAcrossDoor.receivedDb) + 'dB · 信噪比 SNR: ' + Math.round(whisperAcrossDoor.snr) + 'dB)</div>'
+          + '<div class="wa-item"><b>同室呼救 (90dB 源 · 5米开阔 · 底噪40dB)</b>：' + atEsc(screamSameRoom.desc) + ' (终点 ' + Math.round(screamSameRoom.receivedDb) + 'dB · 信噪比 SNR: ' + Math.round(screamSameRoom.snr) + 'dB)</div>');
       });
       on('#wa-geo-adv-trace', () => {
         if (!WA.spatialTrace) return geoOut('<div class="wa-log wa-log-err">spatialTrace 空间物理痕迹引擎未装载</div>');
-        // 演示记录两条痕迹
-        const d = WA.spatialTrace.diagnose();
-        if (d.traceCount === 0) {
-          WA.spatialTrace.recordTrace('room_vip', { type: 'tobacco_smoke', source: '神秘访客', initialIntensity: 100 });
-          WA.spatialTrace.recordTrace('room_vip', { type: 'combat_damage', source: '争执打破的清酒杯', initialIntensity: 90 });
+        // 演示记录两条真实痕迹（类型必须是 TRACE_SPECS 中真实存在的 key）
+        const traceState = WA.spatialTrace.getState();
+        const existing = (traceState.tracesByNode && traceState.tracesByNode['room_vip']) || [];
+        if (existing.length === 0) {
+          WA.spatialTrace.leaveTrace('room_vip', 'cigarette', { sourceChar: '神秘访客', initialStrength: 1.0, createdHour: 11.5 });
+          WA.spatialTrace.leaveTrace('room_vip', 'struggle', { sourceChar: '争执双方', customDesc: '争执中磕碰翻倒的清酒杯与散落的骰子', initialStrength: 0.9, createdHour: 11.8 });
         }
-        const traces = WA.spatialTrace.getTraces('room_vip');
-        const feed = WA.spatialTrace.buildTraceFeed('room_vip');
-        geoOut('<div class="wa-log wa-log-ok">物证痕迹残留与半衰期透镜 (2F 樱之间)</div>'
-          + traces.map(t => {
-            const pct = Math.round(t.currentIntensity);
-            return '<div class="wa-item"><b>' + atEsc(t.type) + '</b>（' + atEsc(t.source) + '）：强度 ' + pct + '% · 半衰期 ' + t.halfLifeHours + 'h</div>';
-          }).join('')
+        const nowHour = 12.5;
+        const traces = WA.spatialTrace.inspectTraces('room_vip', nowHour);
+        const feed = WA.spatialTrace.buildBlock();
+        geoOut('<div class="wa-log wa-log-ok">物证痕迹残留与半衰期透镜 (2F 樱之间 · 当前 ' + nowHour.toFixed(1) + ' 时)</div>'
+          + (traces.length === 0
+            ? '<div class="wa-dim">该场所已无有效残留（全部低于可辨阈值 8%）</div>'
+            : traces.map(t => {
+              const pct = Math.round(t.currentStrength * 100);
+              return '<div class="wa-item"><b>' + atEsc(t.name) + '</b>（' + atEsc(t.sensory) + ' · 来源 ' + atEsc(t.sourceChar || '不明') + '）：强度 ' + pct + '% · 半衰期 ' + t.halfLifeHours + 'h · 已过 ' + t.elapsedHours + 'h · ' + atEsc(t.freshness) + '<br><span class="wa-dim">' + atEsc(t.desc) + '</span></div>';
+            }).join(''))
           + (feed ? '<pre class="wa-pre" style="margin-top:6px;">' + atEsc(feed) + '</pre>' : '<div class="wa-dim">无痕迹反哺文本</div>'));
       });
       on('#wa-geo-adv-hud', () => {
@@ -13454,7 +13555,10 @@ on('#wa-desk-show', showDesk);
             tapeStore: '磁带仓库读回',
             // v2.274.0（V6 收口）：与 store.LAB / toolDiag.SRC_LABEL 同源同键集。
             //   缺这一份，面板上「读不出玩家表过的态」与「玩家没表过态」同形。
-            capabilityAudit: '能力档位表态读回' };
+            capabilityAudit: '能力档位表态读回',
+             // v2.381.0 收口：与 store.LAB / toolDiag.SRC_LABEL 同源同键集（三份真源一同登记）。
+             channelProbe: '渠道探针账本读回',
+             inlineTags: '内联标签解析账读回' };
           const byP = rdStore2.bySource || {};
           const srcTxtP = Object.keys(byP).filter(function (k) { return byP[k] > 0; })
             .map(function (k) { return (LAB_P[k] || k) + ' ' + byP[k]; }).join(' / ');
@@ -17205,6 +17309,66 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
           <details class="wa-details" id="wa-finance-holomap" open>
             <summary class="wa-summary">地下金融信用与挤兑预警</summary>
             <div class="wa-fold-body">${data.finance || '流动性充裕，未侦测到钱庄暴雷'}</div>
+          </details>
+        `;
+        container.appendChild(wrap);
+        return { ok: true, rendered: true, data: data };
+      } catch (e) {
+        return { ok: true, headless: true, data: data, error: e.message };
+      }
+    },
+    // v2.380.0 (V21 EXV21-9): 史诗级活世界文明与生态全景控制中心 (Holistic Civ-Eco Hub)
+    renderV21CivEcoHub(container) {
+      const data = {
+        theology: (WA.theologyCult && typeof WA.theologyCult.buildBlock === 'function') ? WA.theologyCult.buildBlock() : '',
+        regiment: (WA.regimentTactics && typeof WA.regimentTactics.buildBlock === 'function') ? WA.regimentTactics.buildBlock() : '',
+        prison: (WA.incarcerationJailbreak && typeof WA.incarcerationJailbreak.buildBlock === 'function') ? WA.incarcerationJailbreak.buildBlock() : '',
+        bloodline: (WA.bloodlineHeritage && typeof WA.bloodlineHeritage.buildBlock === 'function') ? WA.bloodlineHeritage.buildBlock() : '',
+        engineering: (WA.engineeringBlueprint && typeof WA.engineeringBlueprint.buildBlock === 'function') ? WA.engineeringBlueprint.buildBlock() : '',
+        dungeon: (WA.dungeonHazardMesh && typeof WA.dungeonHazardMesh.buildBlock === 'function') ? WA.dungeonHazardMesh.buildBlock() : '',
+        eco: (WA.ecosystemCascade && typeof WA.ecosystemCascade.buildBlock === 'function') ? WA.ecosystemCascade.buildBlock() : '',
+        court: (WA.courtIntrigue && typeof WA.courtIntrigue.buildBlock === 'function') ? WA.courtIntrigue.buildBlock() : ''
+      };
+      if (!container || typeof container.appendChild !== 'function') {
+        return { ok: true, headless: true, data: data };
+      }
+      try {
+        const wrap = document.createElement('div');
+        wrap.id = 'wa-civ-eco-hub-v21';
+        wrap.className = 'wa-civ-eco-hub-dashboard';
+        wrap.innerHTML = `
+          <div class="wa-hub-header"><h4>WorldAxis V21 文明盛衰与生态全景控制大盘</h4></div>
+          <details class="wa-details" id="wa-theology-hub">
+            <summary class="wa-summary">神权信仰天平与教派狂热</summary>
+            <div class="wa-fold-body">${data.theology || '四海向化，神权信仰平和自守'}</div>
+          </details>
+          <details class="wa-details" id="wa-regiment-hub">
+            <summary class="wa-summary">战役军团排阵与阵线士气</summary>
+            <div class="wa-fold-body">${data.regiment || '营垒坚实，军容肃整'}</div>
+          </details>
+          <details class="wa-details" id="wa-prison-hub">
+            <summary class="wa-summary">刑狱地道与水牢禁闭档案</summary>
+            <div class="wa-fold-body">${data.prison || '囹圄安稳，门禁森严'}</div>
+          </details>
+          <details class="wa-details" id="wa-bloodline-hub">
+            <summary class="wa-summary">宗族血脉信托与先祖诅咒</summary>
+            <div class="wa-fold-body">${data.bloodline || '昭穆序定，谱系传续无虞'}</div>
+          </details>
+          <details class="wa-details" id="wa-engineering-hub">
+            <summary class="wa-summary">文明工程图纸与器械工坊</summary>
+            <div class="wa-fold-body">${data.engineering || '百工严谨，工坊按部就班'}</div>
+          </details>
+          <details class="wa-details" id="wa-dungeon-hub">
+            <summary class="wa-summary">地牢秘境迷宫与机关陷阱拓扑</summary>
+            <div class="wa-fold-body">${data.dungeon || '地宫虚静，陷阱静默待发'}</div>
+          </details>
+          <details class="wa-details" id="wa-eco-hub">
+            <summary class="wa-summary">深层生态食物链与异化灾警</summary>
+            <div class="wa-fold-body">${data.eco || '林野自适，物种营养级稳态平衡'}</div>
+          </details>
+          <details class="wa-details" id="wa-court-hub">
+            <summary class="wa-summary">深宫内斗派系与禁军兵权</summary>
+            <div class="wa-fold-body">${data.court || '君臣相得，宫廷法度清明'}</div>
           </details>
         `;
         container.appendChild(wrap);

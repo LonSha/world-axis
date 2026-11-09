@@ -71,7 +71,7 @@
 
     const at = Number.isFinite(s.at) ? s.at : clockNow('counterfactualEcho');
     const echoRecord = {
-      id: 'echo_' + at + '_' + Math.random().toString(36).slice(2, 6),
+      id: 'echo_' + at + '_' + WA.rand.next('counterfactual-echo').toString(36).slice(2, 6),
       forkNodeId: forkNodeId,
       pathSummary: summary,
       hauntIntensity: Math.min(100, Math.floor(stress * 1.2)),

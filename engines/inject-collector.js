@@ -5,6 +5,7 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const DEF = { enabled: false, maxItems: 4, maxChars: 2400, maxTokens: 0 };
   const REG = { key: 'worldaxis_inject_collector_settings_v1', def: DEF,
     module: 'injectCollector', bounds: { maxItems: [1, 12], maxChars: [400, 12000], maxTokens: [0, 12000] } };
@@ -96,9 +97,11 @@
           + clean(r.confidence, 32) + '；仅该持有人知情，传闻不等于事实）', [r.person], r.at, '已持有情报');
       });
       // V17 EXV17-8: 认知战虚假现实投毒与失真信念汇流
+      // v2.381.0: 收掉恒不可达的回退枝。真源只有 getVictimPerceptionMap，
+      //   getBeliefMap 从来不存在；留着这个三元回退会让审计把它当成「另一套接口」。
       const getBeliefs = (WA.perceptionManipulation && typeof WA.perceptionManipulation.getVictimPerceptionMap === 'function')
         ? WA.perceptionManipulation.getVictimPerceptionMap
-        : (WA.perceptionManipulation && typeof WA.perceptionManipulation.getBeliefMap === 'function' ? WA.perceptionManipulation.getBeliefMap : null);
+        : null;
       if (getBeliefs) {
         const wanted = Array.isArray(c.people) ? c.people : [];
         wanted.forEach(function (aid, idx) {
@@ -110,7 +113,7 @@
               const cred = item.credibilityScore != null ? item.credibilityScore : 80;
               add('intel', 'poison:' + aid + ':' + idx + ':' + k,
                 aid + '深信受投毒假军情「' + text + '」（可信度：' + cred + '%，受控行动中）',
-                [aid], item.implantedAt || Date.now(), '虚假认知');
+                [aid], item.implantedAt || clockNow('inject-collector'), '虚假认知');
             }
           });
         });
@@ -175,7 +178,7 @@
             const cleanLine = line.replace(/^· /, '');
             const m = cleanLine.match(/^([^（(：:]+)/);
             const who = m ? m[1].trim() : '';
-            add('life', 'presence:' + idx, cleanLine, who ? [who] : [], Date.now(), '退场生计');
+            add('life', 'presence:' + idx, cleanLine, who ? [who] : [], clockNow('inject-collector'), '退场生计');
           });
         }
       } else if (WA.offstageLife && typeof WA.offstageLife.buildBlock === 'function') {
@@ -185,7 +188,7 @@
             const cleanLine = line.replace(/^· /, '');
             const m = cleanLine.match(/^([^（(：:]+)/);
             const who = m ? m[1].trim() : '';
-            add('life', 'offstage:' + idx, cleanLine, who ? [who] : [], Date.now(), '退场生计');
+            add('life', 'offstage:' + idx, cleanLine, who ? [who] : [], clockNow('inject-collector'), '退场生计');
           });
         }
       }
@@ -194,7 +197,7 @@
         const sb = WA.covertEspionage.buildBlock();
         if (sb) {
           String(sb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
-            add('conflict', 'spy:' + idx, line, [], Date.now(), '谍报暗网');
+            add('conflict', 'spy:' + idx, line, [], clockNow('inject-collector'), '谍报暗网');
           });
         }
       }
@@ -202,7 +205,7 @@
         const eb = WA.epidemicContagion.buildBlock();
         if (eb) {
           String(eb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
-            add('world', 'epidemic:' + idx, line, [], Date.now(), '病理检疫');
+            add('world', 'epidemic:' + idx, line, [], clockNow('inject-collector'), '病理检疫');
           });
         }
       }
@@ -210,7 +213,7 @@
         const mb = WA.surgicalTriage.buildBlock();
         if (mb) {
           String(mb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
-            add('life', 'surgical:' + idx, line, [], Date.now(), '战地救护');
+            add('life', 'surgical:' + idx, line, [], clockNow('inject-collector'), '战地救护');
           });
         }
       }
@@ -218,7 +221,7 @@
         const nb = WA.maritimeNavigation.buildBlock();
         if (nb) {
           String(nb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
-            add('world', 'naval:' + idx, line, [], Date.now(), '航海动力');
+            add('world', 'naval:' + idx, line, [], clockNow('inject-collector'), '航海动力');
           });
         }
       }
@@ -226,7 +229,7 @@
         const bb = WA.blackmarketUsury.buildBlock();
         if (bb) {
           String(bb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
-            add('conflict', 'blackmarket:' + idx, line, [], Date.now(), '黑市借贷');
+            add('conflict', 'blackmarket:' + idx, line, [], clockNow('inject-collector'), '黑市借贷');
           });
         }
       }
@@ -234,7 +237,7 @@
         const st = WA.stealthInfiltration.buildBlock();
         if (st) {
           String(st).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
-            add('conflict', 'stealth:' + idx, line, [], Date.now(), '潜入视野');
+            add('conflict', 'stealth:' + idx, line, [], clockNow('inject-collector'), '潜入视野');
           });
         }
       }
@@ -242,7 +245,7 @@
         const tox = WA.alchemyToxicology.buildBlock();
         if (tox) {
           String(tox).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
-            add('life', 'alchemy:' + idx, line, [], Date.now(), '毒理验毒');
+            add('life', 'alchemy:' + idx, line, [], clockNow('inject-collector'), '毒理验毒');
           });
         }
       }
@@ -250,7 +253,7 @@
         const cov = WA.covenantSanction.buildBlock();
         if (cov) {
           String(cov).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
-            add('world', 'covenant:' + idx, line, [], Date.now(), '盟约契约');
+            add('world', 'covenant:' + idx, line, [], clockNow('inject-collector'), '盟约契约');
           });
         }
       }
@@ -258,7 +261,7 @@
         const eb = WA.eccentricThreads.buildBlock();
         if (eb) {
           String(eb).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
-            add('life', 'eccentric:' + idx, line.replace(/^· /, ''), [], Date.now(), '市井暗线');
+            add('life', 'eccentric:' + idx, line.replace(/^· /, ''), [], clockNow('inject-collector'), '市井暗线');
           });
         }
       }
@@ -270,7 +273,7 @@
             const cleanLine = line.replace(/^· /, '');
             const m = cleanLine.match(/【(?:肉身实感|心底芥蒂)】([^（(：:\s]+)/);
             const who = m ? m[1].trim() : '';
-            add('life', 'realism:' + idx, cleanLine, who ? [who] : [], Date.now(), '肉身实感');
+            add('life', 'realism:' + idx, cleanLine, who ? [who] : [], clockNow('inject-collector'), '肉身实感');
           });
         }
       }
@@ -284,7 +287,7 @@
             const m = cleanLine.match(/^([^（(：:\s]+)/);
             const who = m ? m[1].trim() : '';
             routineTrace.candidates++;
-            add('life', 'routine:' + idx, cleanLine, who ? [who] : [], Date.now(), '生活节律');
+            add('life', 'routine:' + idx, cleanLine, who ? [who] : [], clockNow('inject-collector'), '生活节律');
           });
         }
       }
@@ -295,7 +298,7 @@
           const tStatus = WA.toxicMetabolism.getActorToxinStatus(aid);
           if (tStatus && tStatus.ok && tStatus.toxins && tStatus.toxins.length > 0) {
             const tDesc = tStatus.toxins.map(function (x) { return (x.toxinType || x.type) + '(' + Math.round(x.concentration) + 'mg)'; }).join('、');
-            add('life', 'toxic:' + aid + ':' + idx, aid + '身中毒素【' + tDesc + '】，机能受损与生化代谢中', [aid], Date.now(), '生化中毒');
+            add('life', 'toxic:' + aid + ':' + idx, aid + '身中毒素【' + tDesc + '】，机能受损与生化代谢中', [aid], clockNow('inject-collector'), '生化中毒');
           }
         });
       }
@@ -304,35 +307,36 @@
         if (med && (med.phaseState || med.mediaType)) {
           const pState = med.phaseState || 'normal';
           if (pState !== 'normal') {
-            add('life', 'phase:' + c.place, '场所【' + c.place + '】环境介质物相演变为【' + pState + '】（温度:' + med.temperature + '°C，阻抗率:' + (med.frictionCoef || 1) + '）', [], Date.now(), '微观相变');
+            add('life', 'phase:' + c.place, '场所【' + c.place + '】环境介质物相演变为【' + pState + '】（温度:' + med.temperature + '°C，阻抗率:' + (med.frictionCoef || 1) + '）', [], clockNow('inject-collector'), '微观相变');
           }
         }
       }
       // v2.340.0 (V17): 深层心智创伤、黑化、时代大潮与契诃夫之枪戏剧汇流
+      // v2.381.0: 收掉恒不可达的回退枝（psycheTrauma 的真读口只有 getActorPsyche）。
       const getP = (WA.psycheTrauma && typeof WA.psycheTrauma.getActorPsyche === 'function')
         ? WA.psycheTrauma.getActorPsyche
-        : (WA.psycheTrauma && typeof WA.psycheTrauma.getProfile === 'function' ? WA.psycheTrauma.getProfile : null);
+        : null;
       if (getP) {
         const wanted = Array.isArray(c.people) ? c.people : [];
         wanted.forEach(function (aid, idx) {
           const prof = getP(aid);
           if (prof && (prof.mentalState === 'blackening' || prof.isBlackened)) {
-            add('life', 'blackening:' + aid + ':' + idx, aid + '已彻底心智黑化，执念「' + (prof.obsessionTarget || '毁灭宿命') + '」，行事狠绝不再顾忌伦理！', [aid], Date.now(), '心智黑化');
+            add('life', 'blackening:' + aid + ':' + idx, aid + '已彻底心智黑化，执念「' + (prof.obsessionTarget || '毁灭宿命') + '」，行事狠绝不再顾忌伦理！', [aid], clockNow('inject-collector'), '心智黑化');
           } else if (prof && (prof.mentalState === 'psychic-breakdown' || prof.phaseState === 'psychic-breakdown')) {
-            add('life', 'breakdown:' + aid + ':' + idx, aid + '理智彻底崩溃离魂，认知陷入剧烈谵妄状态！', [aid], Date.now(), '精神崩溃');
+            add('life', 'breakdown:' + aid + ':' + idx, aid + '理智彻底崩溃离魂，认知陷入剧烈谵妄状态！', [aid], clockNow('inject-collector'), '精神崩溃');
           }
         });
       }
       if (WA.epochTide && typeof WA.epochTide.getCurrentEpoch === 'function') {
         const ep = WA.epochTide.getCurrentEpoch();
         if (ep && ep.epochType && ep.epochType !== 'normal_era') {
-          add('life', 'epoch:' + ep.epochType, '宏观文明处于【' + ep.epochType + '】大时代浪潮，全局物理与生存常数受严酷修正（剩余' + ep.remainingTurns + '轮）', [], Date.now(), '时代大潮');
+          add('life', 'epoch:' + ep.epochType, '宏观文明处于【' + ep.epochType + '】大时代浪潮，全局物理与生存常数受严酷修正（剩余' + ep.remainingTurns + '轮）', [], clockNow('inject-collector'), '时代大潮');
         }
       }
       if (WA.dramaticTension && typeof WA.dramaticTension.getSceneTension === 'function') {
         const tension = WA.dramaticTension.getSceneTension();
         if (tension >= 75.0) {
-          add('life', 'tension:climax', '当前场景戏剧宿命张力高达【' + Math.round(tension) + '%】，伏笔契诃夫之枪处于极高引爆阈值！', [], Date.now(), '高潮悬念');
+          add('life', 'tension:climax', '当前场景戏剧宿命张力高达【' + Math.round(tension) + '%】，伏笔契诃夫之枪处于极高引爆阈值！', [], clockNow('inject-collector'), '高潮悬念');
         }
       }
     });

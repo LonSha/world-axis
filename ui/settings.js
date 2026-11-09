@@ -181,6 +181,33 @@
    *   ③ **不重复造控件逻辑**：按钮只发动作，写盘与复核全在引擎侧；
    *      本块的出口显示引擎原话（`notEffective` 逐条列名，不折成「部分成功」）。
    */
+  /**
+   * v2.381.0 回归修复：人物今日动线设置块**抽成模块级函数**，玩家与开发者两个分支共用一份 HTML。
+   *   缺陷现场（day-route-ui-v2266 的 B 面 13 条同时红）：v2.325.0 引入玩家模式分支后，
+   *   这块原先只内联在开发者分支的大模板里 => 默认玩家模式下 #wa-dr-enable /
+   *   #wa-dr-maxp / #wa-dr-save 等七枚控件一个都不渲染，bind() 里
+   *   $('#wa-dr-enable') 取到 null 就静默跳过 => 点了没反应也不报错。
+   *   为什么它属于玩家面而不是开发者面：那块控件管的都是**内容偏好**
+   *   （要不要看动线 / 最多报几人 / 要不要透露「接下来要去哪」），
+   *   不是调试参数；EXV6-2 原文写的就是「三条取舍必须能被玩家改到」。
+   */
+  function dayRouteBlockHtml() {
+    const bd = k => (WA.settingsBus && WA.settingsBus.boundsOf) ? WA.settingsBus.boundsOf(k) : {};
+    const rng = (arr, fb) => Array.isArray(arr) ? arr : fb;
+    if (!WA.dayRoute || typeof WA.dayRoute.getSettings !== 'function') {
+      return '<div class="wa-dim">人物动线模块未加载（engines/day-route.js 缺席）</div>';
+    }
+    const dr = WA.dayRoute.getSettings();
+    const bdDr = bd('worldaxis_day_route_settings_v1');
+    const mp = rng(bdDr.maxPeople, [1, 8]);
+    return `<label class="wa-node"><input type="checkbox" id="wa-dr-enable" ${dr.enabled ? 'checked' : ''}/><span class="wa-node-label">在概览页显示人物今日动线</span></label>
+      <div class="wa-set-row"><span>最多报几人 <b id="wa-dr-maxpv">${dr.maxPeople}</b></span><input type="range" min="${mp[0]}" max="${mp[1]}" value="${dr.maxPeople}" aria-label="最多报几人" id="wa-dr-maxp" class="wa-range"/></div>
+      <label class="wa-node"><input type="checkbox" id="wa-dr-next" ${dr.showNext ? 'checked' : ''}/><span class="wa-node-label">带上「接下来要去哪」（关掉则只报已经发生的）</span></label>
+      <label class="wa-node"><input type="checkbox" id="wa-dr-hideplace" ${dr.hidePlace ? 'checked' : ''}/><span class="wa-node-label">不显示地名（只报做了什么，不报在哪）</span></label>
+      <button class="wa-btn" id="wa-dr-save">保存人物动线设置</button>
+      <div id="wa-dr-out" class="wa-out"></div>
+      <div class="wa-dim">只读既有事实（幕后生活安排 / 档期预约 / 此刻位置），不新记一份、不调模型。日程时间域的说明：只有当档期存的是绝对时间戳时才会被读成「此刻正在做什么」；存的是「第几点的钟点」那种，不硬猜成现在。</div>`;
+  }
   function tierBlockHtml() {
     if (!WA.capabilityTier || typeof WA.capabilityTier.view !== 'function') {
       return '<div class="wa-sec" data-wa-lane="power" data-wa-sec="世界规模">世界规模</div><div class="wa-dim">档位引擎未加载（engines/capability-tier.js 缺席）——世界会按各机制的出厂默认跑，无法一键调整。</div>';
@@ -366,69 +393,23 @@
       <div class="wa-dim">三步的真实判据：API 配置字段 / 档位词条 / 注入快照与演化回合。进度只落设置族，不写存档（它是「你」的装机进度，不是世界里发生的事）。</div>`;
   }
 
-  function playerSettingsHtml() {
-    let b = {};
-    try { b = WA.backstage && typeof WA.backstage.getSettings === 'function' ? WA.backstage.getSettings() : {}; } catch (e) {}
-    const mode = ['light', 'balanced', 'deep'].indexOf(b.simulationMode) >= 0 ? b.simulationMode : 'balanced';
-    return '<div class="wa-player-settings" data-wa-player-settings="true">'
-      + '<div class="wa-sec" data-wa-lane="player" data-wa-sec="世界运行">世界运行</div>'
-      + '<div class="wa-dim">世界会自动推进。选择你喜欢的节奏即可，其他机制会按默认方式工作。</div>'
-      + '<div class="wa-set-row"><label for="wa-set-simple-mode">世界节奏</label><select id="wa-set-simple-mode" class="wa-input" data-wa-simple="simulationMode">'
-      + '<option value="light"' + (mode === 'light' ? ' selected' : '') + '>悠闲</option>'
-      + '<option value="balanced"' + (mode === 'balanced' ? ' selected' : '') + '>自然</option>'
-      + '<option value="deep"' + (mode === 'deep' ? ' selected' : '') + '>活跃</option></select></div>'
-      + '<label class="wa-node"><input type="checkbox" data-wa-simple="autoSimulate" ' + (b.autoSimulate !== false ? 'checked' : '') + '/><span class="wa-node-label">让世界自动运行</span></label>'
-      + '<button class="wa-btn" id="wa-set-simple-save" data-wa-simple-save="true">保存</button><span class="wa-dim" data-wa-simple-out="true"></span>'
-      // 本轮收口：玩家模式也要有「开局引导」这一格 —— 三步是玩家的动作，进度 / 重新显示 /
-      //   清空都不该被开发者开关锁住；与开发者模式共用同一份 HTML（单一真源，不各写一份）。
-      + firstRunBlockHtml()
-      + '<details class="wa-fold wa-developer-entry"><summary>开发者工具</summary>'
-      + '<div class="wa-fold-body"><label class="wa-node"><input type="checkbox" id="wa-set-devmode"/><span class="wa-node-label">显示高级设置与全部工具</span></label>'
-      + '<div class="wa-dim">这里包含调试、机制和内部配置，普通游玩不需要打开。</div></div></details>'
-      + '</div>';
-  }
-
-  WA.uiSettings = {
-    /**
-     * v2.262.0：分组函数的**对外读口**。
-     *
-     * 为什么要导出：分组逻辑若要被探针/专锁验证，只有两条路——
-     *   ① 从源码里挖出 `laneApply` 的文本再 `vm.runInContext` 求值：闭包里的 `LANES`
-     *      随之丢失（实测 ReferenceError: LANES is not defined），要验的东西还没验就先崩；
-     *   ② 从这里调真函数：走到的是产品自己的闭包与产品自己的表。
-     * 弯路会让「测到的」与「跑起来的」成为两份东西 —— 本仓反复付过价，故取 ②。
-     *
-     * ⚠ 这里**只导出 laneApply**，不导出 `lanes()`：本版一度加过 `lanes()` 让测试读
-     *   动线表，dead-export-gate 当场报「仅测试引用（产品代码零引用）」。
-     *   判据改读运行时真值（按钮的 data-wa-lane-go + laneApply 读数）——
-     *   产品不为「让测试看得见」多长一个镜像面。
-     */
-    laneApply(rootEl, lane) { return laneApply(rootEl, lane); },
-    render() {
-      const __dev = WA.ui ? ((typeof WA.ui.devMode === 'function') ? WA.ui.devMode() : false) : true;
-      if (!__dev) return playerSettingsHtml();
-      const bs = WA.backstage.getSettings();
-      const op = WA.opinion.getSettings();
-      const modes = [['light', '轻量'], ['balanced', '均衡'], ['deep', '深度'], ['manual', '手动']];
-      const times = [['explicit', '严格'], ['cautious', '谨慎'], ['open', '开放'], ['world', '世界钟']];
-      const pulses = [['quiet', '安静'], ['normal', '正常'], ['turbulent', '激荡']];
-      // v2.7.0（收口）: 控件区间一律取自登记表声明（`boundsOf`）——此前每个 `<input min max>`
-      //   都是一份**独立**的字面量：它既是「界面能拖到的范围」，又事实上是「引擎接受的契约」，
-      //   而引擎自己的夹取常量住在别处（memory-sampler.js 跨文件、evolution._num 干脆不夹）。
-      //   三处只要有一处改动不一致，就会出现「滑块能拖到的值被引擎夹掉」或「引擎接受但界面拖不到」
-      //   的静默不一致。现在声明只有一份，界面与写路径读取同一份。
-      const bd = k => (WA.settingsBus && WA.settingsBus.boundsOf) ? WA.settingsBus.boundsOf(k) : {};
-      const bB = bd('worldaxis_backstage_settings_v1');
-      const bO = bd('worldaxis_opinion_settings_v1');
-      const bE = bd('worldaxis_evolution_settings_v1');
-      const rng = (arr, fb) => Array.isArray(arr) ? arr : fb;
-      return `
-        ${laneNavHtml()}
-        ${tierBlockHtml()}
-        <div class="wa-sec" data-wa-lane="ui" data-wa-sec="界面">界面</div>
-        <label class="wa-node"><input type="checkbox" data-wa-devmode="true" ${((WA.ui && typeof WA.ui.devMode === 'function') ? WA.ui.devMode() : false) ? 'checked' : ''}/><span class="wa-node-label">开发者模式（显示全部页签与分类导航；关闭则只保留概览 / 世界 / 人物 / 事件 / API / 设置 6 个日常页）</span></label>
-        <div class="wa-dim">日常使用不需要开发者模式。机制页（拍 / 事件闭环 / 分支比较 / 供应链 / 沉积……）是排查与调参用的，藏在开关后面。</div>
-        <div class="wa-sec" data-wa-lane="world" data-wa-sec="世界日记">世界日记<span class="wa-dim">（概览页那几句「你看不见的地方」怎么压）</span></div>
+  /**
+   * v2.381.0 回归修复：把「内容偏好」设置块抽成模块级函数，玩家与开发者两个分支共用一份。
+   *   缺陷现场（v2.325.0 提交 9fa7be3「界面简化动线」）：设置页默认走 playerSettingsHtml()，
+   *   而下面这一整段（世界日记 / 今日世界简报 / 世界自传 / 一键播种 / 人物意图看板 /
+   *   人物今日动线 / 暗流日历 / 单轮成本卡 / 存档体检 / 一键交班 / 玩家说明书）只被拼进
+   *   开发者分支 —— 于是对**真正的玩家**整块消失：bind() 里 $(#wa-wd-enable) 取到 null 就
+   *   静默跳过，点了没反应也不报错，六个 EXV6 接线锁的 B 面同时变红。
+   *   为什么它们属于玩家面：这一整段管的都是**内容取舍**（看不看世界日记、报几个人、
+   *   要不要离线那段、交班包收哪几块），不是调试参数；v2.325.0 之前它们本来就在设置页上。
+   *   为什么抽函数而不是复制：两份 HTML 必然漂移（文案、id、按钮顺序都是漂移面），
+   *   而负控制咬的正是这些字面量 —— 单一真源让两种模式读到同一个契约。
+   */
+  function contentPrefsBlocksHtml() {
+    const bd = k => (WA.settingsBus && WA.settingsBus.boundsOf) ? WA.settingsBus.boundsOf(k) : {};
+    const rng = (arr, fb) => Array.isArray(arr) ? arr : fb;
+    return `
+<div class="wa-sec" data-wa-lane="world" data-wa-sec="世界日记">世界日记<span class="wa-dim">（概览页那几句「你看不见的地方」怎么压）</span></div>
         ${(() => {
           // v2.265.0（V6 EXV6-1）：世界日记的设置面。
           //   为什么它必须有界面入口：引擎出厂 `enabled:true`，而它的三个开关里
@@ -563,29 +544,7 @@
             <div class="wa-dim">看板只读既有计划链（第几步 / 缺什么前置 / 卡在哪），不推断卡点、不补空行、不调模型。还没结算的步骤标「打算」而不是「已结算」；链上报不出卡点的人不占一行。</div>`;
         })()}
         <div class="wa-sec" data-wa-lane="people" data-wa-sec="人物今日动线">人物今日动线<span class="wa-dim">（概览页那几行「今天在哪、做了什么、接下来」怎么压）</span></div>
-        ${(() => {
-          // v2.266.0（V6 EXV6-2）：人物今日动线的设置面。
-          //   同世界日记一样，出厂即有可用默认值，但三条取舍必须能被玩家改到：
-          //   ① `showNext` —— 「接下来要去哪」是**预告**，本体上是泄露；有人就只想看已经发生的；
-          //   ② `hidePlace` —— 地名说不说，与「看不看得见」是两件事（引擎里分成 suppressed / hidden 两支）；
-          //   ③ `maxPeople` —— 概览页篇幅有限，报几个人得玩家自己定。
-          //   两条纪律照抄世界日记段（同类问题不再二次踩）：
-          //   ① **只发动作**：写盘走 `dayRoute.setSettings`（引擎内唯一写路径，内含 bounds 归一）；
-          //   ② **回显按真实结果**：`setSettings` 返回 ok:false 就报失败。
-          if (!WA.dayRoute || typeof WA.dayRoute.getSettings !== 'function') {
-            return '<div class="wa-dim">人物动线模块未加载（engines/day-route.js 缺席）</div>';
-          }
-          const dr = WA.dayRoute.getSettings();
-          const bdDr = bd('worldaxis_day_route_settings_v1');
-          const mp = rng(bdDr.maxPeople, [1, 8]);
-          return `<label class="wa-node"><input type="checkbox" id="wa-dr-enable" ${dr.enabled ? 'checked' : ''}/><span class="wa-node-label">在概览页显示人物今日动线</span></label>
-            <div class="wa-set-row"><span>最多报几人 <b id="wa-dr-maxpv">${dr.maxPeople}</b></span><input type="range" min="${mp[0]}" max="${mp[1]}" value="${dr.maxPeople}" aria-label="最多报几人" id="wa-dr-maxp" class="wa-range"/></div>
-            <label class="wa-node"><input type="checkbox" id="wa-dr-next" ${dr.showNext ? 'checked' : ''}/><span class="wa-node-label">带上「接下来要去哪」（关掉则只报已经发生的）</span></label>
-            <label class="wa-node"><input type="checkbox" id="wa-dr-hideplace" ${dr.hidePlace ? 'checked' : ''}/><span class="wa-node-label">不显示地名（只报做了什么，不报在哪）</span></label>
-            <button class="wa-btn" id="wa-dr-save">保存人物动线设置</button>
-            <div id="wa-dr-out" class="wa-out"></div>
-            <div class="wa-dim">只读既有事实（幕后生活安排 / 档期预约 / 此刻位置），不新记一份、不调模型。日程时间域的说明：只有当档期存的是绝对时间戳时才会被读成「此刻正在做什么」；存的是「第几点的钟点」那种，不硬猜成现在。</div>`;
-        })()}
+        ${dayRouteBlockHtml()}
         ${(() => {
           const bdRt = bd('worldaxis_relation_temp_settings_v1');
           if (!WA.relationTemp || typeof WA.relationTemp.getSettings !== 'function') {
@@ -710,7 +669,106 @@
             <div class="wa-dim">· 你的装机进度存在你自己的浏览器本地，不进存档（导给别人不会带过去）。</div>
             <div class="wa-dim">· 它只跟你自己配的那个接口地址说话，不外发别处。</div>
             <div class="wa-dim">全文随仓库一起：docs/PLAYER_GUIDE.md（含「坏了怎么办」的症状对照表）。</div>`;
-        })()}
+})()}
+`;
+  }
+  function playerSettingsHtml() {
+    let b = {};
+    try { b = WA.backstage && typeof WA.backstage.getSettings === 'function' ? WA.backstage.getSettings() : {}; } catch (e) {}
+    const mode = ['light', 'balanced', 'deep'].indexOf(b.simulationMode) >= 0 ? b.simulationMode : 'balanced';
+    return '<div class="wa-player-settings" data-wa-player-settings="true">'
+      + '<div class="wa-sec" data-wa-lane="player" data-wa-sec="世界运行">世界运行</div>'
+      + '<div class="wa-dim">世界会自动推进。选择你喜欢的节奏即可，其他机制会按默认方式工作。</div>'
+      // ── v2.381.0 回归修复：档位块在玩家模式下**必须仍在** ─────────────────────
+      //   缺陷现场（capability-ui-v2257 的 D 面 8 条同时红）：v2.325.0 引入
+      //   `playerSettingsHtml()`（界面简化动线）后，设置页默认走**玩家分支**，而
+      //   `tierBlockHtml()` 只被拼进开发者分支 —— 于是 OPV6-1 立的口径
+      //   「设置页_top 呈现当前档位」对**真正的玩家**整块消失：`#wa-set-tier-*`
+      //   三个按钮、`#wa-set-tier-now`、`#wa-set-tier-gap`、`#wa-set-tier-out`
+      //   一个都不在产物里，`[data-tier]` 的点击绑定自然空转（bind 里 querySelectorAll
+      //   找不到节点就静默跳过，所以点了也没反应且不报错）。
+      //   为什么这是产品缺陷而不是「玩家不该看见档位」：`bind()` 里档位按钮的绑定
+      //   本来就是**无条件**的（不判 devMode），且档位正是「我有多少控制权」这一玩家
+      //   动作（`LANES` 的 power 车道）。开发者分支里它与其余开发项平级只是历史遗留。
+      //   故此处按同一渲染函数补上 —— 单一真源，不另写第二份 HTML。
+      + tierBlockHtml()
+      // v2.381.0 回归修复：内容偏好整段（世界日记 / 简报 / 自传 / 播种 / 意图看板 /
+      //   人物今日动线 / 暗流日历 / 成本卡 / 存档体检 / 交班 / 说明书）必须在玩家面 ——
+      //   它们管的是内容取舍而非调试参数，v2.325.0 的玩家分支把它们整段漏掉了。
+      //   动线块（dayRouteBlockHtml）已包含在这一段里，故此处不再单列，避免同 id 两份。
+      + contentPrefsBlocksHtml()
+      + '<div class="wa-set-row"><label for="wa-set-simple-mode">世界节奏</label><select id="wa-set-simple-mode" class="wa-input" data-wa-simple="simulationMode">'
+      + '<option value="light"' + (mode === 'light' ? ' selected' : '') + '>悠闲</option>'
+      + '<option value="balanced"' + (mode === 'balanced' ? ' selected' : '') + '>自然</option>'
+      + '<option value="deep"' + (mode === 'deep' ? ' selected' : '') + '>活跃</option></select></div>'
+      + '<label class="wa-node"><input type="checkbox" data-wa-simple="autoSimulate" ' + (b.autoSimulate !== false ? 'checked' : '') + '/><span class="wa-node-label">让世界自动运行</span></label>'
+      + '<button class="wa-btn" id="wa-set-simple-save" data-wa-simple-save="true">保存</button><span class="wa-dim" data-wa-simple-out="true"></span>'
+      // 本轮收口：玩家模式也要有「开局引导」这一格 —— 三步是玩家的动作，进度 / 重新显示 /
+      //   清空都不该被开发者开关锁住；与开发者模式共用同一份 HTML（单一真源，不各写一份）。
+      + firstRunBlockHtml()
+      // v2.381.0 回归修复（第二处，与 tierBlockHtml / contentPrefsBlocksHtml 同族）：
+      //   `switchBlockHtml()` 只被拼进开发者分支，而 `bind()` 里的 `switchBind(panelEl)` 与
+      //   E7 的 `[data-hzwx]` 绑定是**无条件**执行的 —— 于是玩家模式下渲染方没给控件、
+      //   绑定方在等控件：`querySelector` 返回 null，`if (hzwx) {...}` 静默跳过，
+      //   点了没反应也不报错（正是 v2.325.0 玩家分支漏块那一族的第三处）。
+      //   缺陷现场（tests/hazard-trigger-v2138.js 第 11 段「真 DOM 点击驱动」）：
+      //     ✓ 设置页 tab 在场
+      //     ✗ 面板渲染出天气造灾害开关（真 DOM 在场）      ← #wa-sw-hazardwx 不在产物里
+      //     ✗ [锁 runAll 抛出] Cannot read properties of null (reading 'onchange')
+      //     ✗ [锁 runNegative 抛出] Cannot set properties of null (setting 'checked')
+      //   为什么这是产品缺陷而不是「玩家不该看见这些开关」：这一段是**缝合引擎总开关**
+      //   （十项 + 天气造灾害 + 势力关系网 + 地图可视化 + 伏笔 + 输入润色…），
+      //   它们管的是「这台机器上开哪些机制」，与 tierBlockHtml 的「我有多少控制权」
+      //   同属玩家动作；`dis()` 已经保证模块未装载时置灰（缺席本身才是断裂）。
+      //   故按同一渲染函数补上 —— 单一真源，不另写第二份 HTML。
+      + switchBlockHtml()
+      + '<details class="wa-fold wa-developer-entry"><summary>开发者工具</summary>'
+      + '<div class="wa-fold-body"><label class="wa-node"><input type="checkbox" id="wa-set-devmode"/><span class="wa-node-label">显示高级设置与全部工具</span></label>'
+      + '<div class="wa-dim">这里包含调试、机制和内部配置，普通游玩不需要打开。</div></div></details>'
+      + '</div>';
+  }
+
+  WA.uiSettings = {
+    /**
+     * v2.262.0：分组函数的**对外读口**。
+     *
+     * 为什么要导出：分组逻辑若要被探针/专锁验证，只有两条路——
+     *   ① 从源码里挖出 `laneApply` 的文本再 `vm.runInContext` 求值：闭包里的 `LANES`
+     *      随之丢失（实测 ReferenceError: LANES is not defined），要验的东西还没验就先崩；
+     *   ② 从这里调真函数：走到的是产品自己的闭包与产品自己的表。
+     * 弯路会让「测到的」与「跑起来的」成为两份东西 —— 本仓反复付过价，故取 ②。
+     *
+     * ⚠ 这里**只导出 laneApply**，不导出 `lanes()`：本版一度加过 `lanes()` 让测试读
+     *   动线表，dead-export-gate 当场报「仅测试引用（产品代码零引用）」。
+     *   判据改读运行时真值（按钮的 data-wa-lane-go + laneApply 读数）——
+     *   产品不为「让测试看得见」多长一个镜像面。
+     */
+    laneApply(rootEl, lane) { return laneApply(rootEl, lane); },
+    render() {
+      const __dev = WA.ui ? ((typeof WA.ui.devMode === 'function') ? WA.ui.devMode() : false) : true;
+      if (!__dev) return playerSettingsHtml();
+      const bs = WA.backstage.getSettings();
+      const op = WA.opinion.getSettings();
+      const modes = [['light', '轻量'], ['balanced', '均衡'], ['deep', '深度'], ['manual', '手动']];
+      const times = [['explicit', '严格'], ['cautious', '谨慎'], ['open', '开放'], ['world', '世界钟']];
+      const pulses = [['quiet', '安静'], ['normal', '正常'], ['turbulent', '激荡']];
+      // v2.7.0（收口）: 控件区间一律取自登记表声明（`boundsOf`）——此前每个 `<input min max>`
+      //   都是一份**独立**的字面量：它既是「界面能拖到的范围」，又事实上是「引擎接受的契约」，
+      //   而引擎自己的夹取常量住在别处（memory-sampler.js 跨文件、evolution._num 干脆不夹）。
+      //   三处只要有一处改动不一致，就会出现「滑块能拖到的值被引擎夹掉」或「引擎接受但界面拖不到」
+      //   的静默不一致。现在声明只有一份，界面与写路径读取同一份。
+      const bd = k => (WA.settingsBus && WA.settingsBus.boundsOf) ? WA.settingsBus.boundsOf(k) : {};
+      const bB = bd('worldaxis_backstage_settings_v1');
+      const bO = bd('worldaxis_opinion_settings_v1');
+      const bE = bd('worldaxis_evolution_settings_v1');
+      const rng = (arr, fb) => Array.isArray(arr) ? arr : fb;
+      return `
+        ${laneNavHtml()}
+        ${tierBlockHtml()}
+        <div class="wa-sec" data-wa-lane="ui" data-wa-sec="界面">界面</div>
+        <label class="wa-node"><input type="checkbox" data-wa-devmode="true" ${((WA.ui && typeof WA.ui.devMode === 'function') ? WA.ui.devMode() : false) ? 'checked' : ''}/><span class="wa-node-label">开发者模式（显示全部页签与分类导航；关闭则只保留概览 / 世界 / 人物 / 事件 / API / 设置 6 个日常页）</span></label>
+        <div class="wa-dim">日常使用不需要开发者模式。机制页（拍 / 事件闭环 / 分支比较 / 供应链 / 沉积……）是排查与调参用的，藏在开关后面。</div>
+        ${contentPrefsBlocksHtml()}
         ${firstRunBlockHtml()}
         <div class="wa-sec" data-wa-lane="world" data-wa-sec="世界推演设置">世界推演设置</div>
         <div class="wa-set-row"><span>推演尺度</span><select aria-label="推演尺度" id="wa-set-mode" class="wa-input">${modes.map(m => `<option value="${m[0]}" ${bs.simulationMode === m[0] ? 'selected' : ''}>${m[1]}</option>`).join('')}</select></div>

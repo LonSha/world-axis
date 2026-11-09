@@ -532,7 +532,7 @@
       }
       this.__dirtyQueue = this.__dirtyQueue || [];
       const item = {
-        id: 'delta_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        id: 'delta_' + clockNow('bridge') + '_' + Math.floor(WA.rand.next('bridge') * 1000),
         target: targetPlugin,
         category: eventCategory,
         payload: JSON.parse(JSON.stringify(deltaPayload)),

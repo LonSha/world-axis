@@ -24,6 +24,10 @@
 const assert = require('assert');
 const path = require('path');
 require('./mock.js');
+// v2.380.0（历史欠账消红）：本文件已装宿主 mock，但 spatial-trace 读 `WA.rand.next(...)`
+//   而未装随机源（纯引擎直跑形态不装 LOAD），故 3 条断言炸 undefined。
+//   随机源用**真产品模块** core/rand.js，不造假桩 —— 测试与产品同一份随机实现。
+require('./host-boot.js').boot();
 
 const toxicMetabolism = require('../engines/toxic-metabolism.js');
 const spatialTrace = require('../engines/spatial-trace.js');

@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/cataclysm-hazard.js (v2.360.0)
+ * WorldAxis engines/cataclysm-hazard.js (v2.380.0)
  * EXV20-2: 极端自然灾异突发与大尺度地貌灾变引擎 (Cataclysmic Hazard & Large-Scale Geological Rupture)
  *
  * ── 核心架构哲学（Genre-Neutral Architecture）─────────────────────────
@@ -20,10 +20,9 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   WA.engines = WA.engines || {};
-  const VERSION = '2.360.0';
+  const VERSION = '2.380.0';
   const LS_KEY = 'worldaxis_cataclysm_hazard_settings_v1';
 
   const DEF = {
@@ -109,10 +108,10 @@
         const store = getHazardStore(draft);
         if (!store) {
           result = { ok: false, reason: 'no-hazard-store' };
-          return;
+          return false;
         }
         const now = clockNow('cataclysmHazard');
-        const disasterId = 'disaster_' + now + '_' + Math.random().toString(36).slice(2, 6);
+        const disasterId = 'disaster_' + now + '_' + WA.rand.next('cataclysm-hazard').toString(36).slice(2, 6);
         
         // 破坏能量计算与难民产出
         const damageScore = Math.round(magnitude * 10);

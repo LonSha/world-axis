@@ -150,20 +150,27 @@ function runA(a) {
 }
 
 // ═══ B 面：运行时（真写 + 真复核）═══════════════════════════════════
+// 出厂「真在跑」的机制数（带开关 **且** 有注入面）。
+//   ⚠ 这是**跨文件共用**的现场读数，出处是 tests/capability-tier-v2257.js:113
+//   的 `const RUNNING0 = 10;`（注释写明 「RUNNING0 7 → 10：出厂开 且 有注入面的（+3）」，
+//   V7 的 intentBoard / worldAutobiography 等出厂即开）。
+//   本文件此前写死 7（v2.257.0 的读数），在 V7 交付后既没跟上、也没人发现 ——
+//   正是本仓点过名的「陈旧常量：写死一种形态 = 给其它形态发通行证」。
+const FACTORY_RUNNING = 10;
 function runB(a) {
   const env = fresh();
   const WA = env.WA;
   const T = WA.capabilityTier;
   const Th = WA.theme;
-  // B1 出厂：题材为空、机制只开 5 个（与 OPV6-1 的 B1d 同数）
+  // B1 出厂：题材为空、机制只开出厂那几台（与 OPV6-1 的 B1d 同源，见 FACTORY_RUNNING）
   a(WA.theme.statView().themes.length === 0, 'B1: 出厂无题材');
   const r0 = T.view().running;
-  a(r0 === 7, 'B1b: 出厂真在跑的机制 7 个（实 ' + r0 + '）');
+  a(r0 === FACTORY_RUNNING, 'B1b: 出厂真在跑的机制 ' + FACTORY_RUNNING + ' 个（实 ' + r0 + '）');
   // B2 预览答得出「会开几个机制」，且**不落设置**（预览不覆盖）
   const pv = Th.preview(['urban']);
   a(pv.previewOnly === true && pv.engineCount > 0 && pv.engineWillOn === pv.engineCount,
     'B2: 预览答出机制面（将开 ' + pv.engineWillOn + '/' + pv.engineCount + '）');
-  a(T.view().running === 7, 'B2b: 预览不改任何引擎（running 仍 ' + T.view().running + '）—— 预览不覆盖');
+  a(T.view().running === FACTORY_RUNNING, 'B2b: 预览不改任何引擎（running 仍 ' + T.view().running + '）—— 预览不覆盖');
   a(WA.theme.statView().themes.length === 0, 'B2c: 预览不落设置');
   // B3 选都市真开机制（本版最要紧的一条：不再是「只改顺序」）
   const r1 = Th.apply(['urban']);
@@ -225,7 +232,7 @@ function runB(a) {
   a(clear.enginesGranted.length === 0 && leak.length === 0,
     'B8b: 清空后 granted 名单为空且无残留（实 ' + JSON.stringify(clear.enginesGranted) + '）');
   const back = W4.capabilityTier.view().running;
-  a(back === 7, 'B8c: 清空后 running 回到出厂 7 个（实 ' + back + '）—— 收回是真收回');
+  a(back === FACTORY_RUNNING, 'B8c: 清空后 running 回到出厂 ' + FACTORY_RUNNING + ' 个（实 ' + back + '）—— 收回是真收回');
   // B9 engineFace 读数与现场一致
   const env5 = fresh();
   const W5 = env5.WA;

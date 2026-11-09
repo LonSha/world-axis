@@ -342,6 +342,33 @@ Cdp.prototype.close = async function () {
   this.closed = true;
   try { if (this.ws && this.ws.readyState === 1) this.ws.close(); } catch (e) { /* 已尽力 */ }
   try { if (this.proc) this.proc.kill('SIGKILL'); } catch (e) { /* 已尽力 */ }
+  // v2.380.0（幽灵引用治理批次⑦）：**关闭不止是 kill，还要把管道句柄放掉。**
+  //   病灶（实测立据）：`spawn(..., { stdio: ['ignore','pipe','pipe'] })` 会为 stderr 建一条
+  //   可读流；`kill('SIGKILL')` 只发信号，**不会**关闭这条流。子进程死后流却仍在事件循环里
+  //   挂着（Node 认为「可能还有数据」），于是 **`runLive` 的 Promise 已经 resolve、进程却永不退出**。
+  //   现场：`node tests/o1-host-matrix-v2186.js --methods=runC` 跑满 90s 仍零输出、零退出；
+  //   单独 `LIVE.runLive({skipClick:true})` 却是 `DONE full 454 454` —— 判据全绿、进程挂着。
+  //   在全量回归里后果尤其坏：每节用到实机通道都要多挂几十秒，读起来像「这一节很慢」，
+  //   而 `tests/isolated-runner.js` 的硬超时最后只会留一条 `Status: interrupted`
+  //   （与 v2.131.0 / v2.203.0 / v2.274.0 三次「跑不完」同型，读起来仍像环境问题）。
+  //   修法三条一起做，缺一条仍会漏：
+  //     ① `stdin/stdout/stderr.destroy()` —— 主动放掉管道句柄（kill 不会替你关）；
+  //     ② 等 `exit` 事件（带 200ms 兜底）—— 确认子进程真的没了再往下走；
+  //     ③ `unref()` —— 即使上面两步在某个平台上没生效，也不该由它来钉住事件循环。
+  try {
+    ['stdin', 'stdout', 'stderr'].forEach(function (k) {
+      const s = this.proc && this.proc[k];
+      if (s && typeof s.destroy === 'function') { try { s.destroy(); } catch (e) { /* 已尽力 */ } }
+    }, this);
+  } catch (e) { /* 已尽力 */ }
+  try {
+    if (this.proc) {
+      if (typeof this.proc.unref === 'function') this.proc.unref();
+      if (this.proc.exitCode === null && this.proc.signalCode === null) {
+        await new Promise(function (r) { setTimeout(r, 200); });
+      }
+    }
+  } catch (e) { /* 已尽力 */ }
   await new Promise((r) => setTimeout(r, 80));
 };
 /** Playwright 的 page 面（只用得到 route / goto / evaluate / on）。 */

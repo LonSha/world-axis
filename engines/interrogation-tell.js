@@ -28,8 +28,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
   const VERSION = '2.340.0';
 
@@ -63,7 +63,7 @@
       presentedEvidence: [],
       stoicLevel: _clamp(opt.stoicLevel || 0, 0, 100), // 抗审讯训练度
       confessionText: '',
-      updatedAt: Date.now()
+      updatedAt: clockNow('interrogation-tell')
     };
     _subjects.set(id, state);
     return { ok: true, subject: JSON.parse(JSON.stringify(state)) };
@@ -168,7 +168,7 @@
       tell: tellKind,
       atDefiance: sub.mentalDefiance,
       atStress: sub.deceptionStress,
-      timestamp: Date.now()
+      timestamp: clockNow('interrogation-tell')
     };
     sub.tellsHistory.push(tellRecord);
     result.tellObserved = tellRecord;
@@ -188,7 +188,7 @@
     }
 
     result.newStatus = sub.status;
-    sub.updatedAt = Date.now();
+    sub.updatedAt = clockNow('interrogation-tell');
 
     return result;
   }

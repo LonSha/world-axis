@@ -18,6 +18,7 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
 
   const LS_KEY = 'worldaxis_undercurrent_calendar_settings_v1';
   const DEF = {
@@ -388,7 +389,7 @@
             festival: festivalName,
             crowdMultiplier: crowdMultiplier,
             guardSlackPct: guardSlackPct,
-            at: Date.now()
+            at: clockNow('undercurrent-calendar')
           };
           // 共振直接催化暗流跃迁提速
           if (cur.stage === 'latent' || cur.stage === '潜伏') cur.stage = 'developing';
@@ -436,7 +437,7 @@
         const cur = draft.currents.find(function (c) { return c.id === currentId; });
         if (cur) {
           cur.stage = cur.stage === 'latent' ? 'developing' : (cur.stage === 'developing' ? 'active' : cur.stage);
-          cur.lastCommTrigger = { sender: sender, text: text, at: Date.now() };
+          cur.lastCommTrigger = { sender: sender, text: text, at: clockNow('undercurrent-calendar') };
           currentStage = cur.stage;
           advanced = true;
         }

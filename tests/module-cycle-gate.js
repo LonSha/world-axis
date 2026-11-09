@@ -185,6 +185,8 @@ const UI_NS = {
  * 反复赋值 —— 这是**累加**，不是「后跑的顶掉先跑的」。逐条必须给理由。
  */
 const SELF_REF_NS = {
+  engines: '各引擎文件头部的幂等兜底 `WA.engines = WA.engines || {}`（50 处同型）：先到先建、'
+    + '后到复用同一对象，重复赋值是自举占位而非第二个提供方',
   __settingsRegs: '各模块用 (WA.__settingsRegs || []).concat([__REG]) 自注册，累加语义',
   modules: '入口兜底 WA.modules = WA.modules || {}（重复赋值是幂等置位）',
   registerModule: '入口兜底 typeof 守卫下赋值，非重复提供',
@@ -196,6 +198,20 @@ const SELF_REF_NS = {
 const CONTRACT_NS = {
   digest: 'engines/contract-audit.js 在 try 里 Object.assign 屏蔽 digest.generate、'
     + 'finally 原位还原（138-142 / 211 成对），是探测期的临时替换，不是第二个提供方'
+};
+
+/**
+ * 可选依赖 ns：全仓无提供方、读者**全部带存在性守卫**的软探针形态。ns -> 理由。
+ * 与 ENTRY_NS / UI_NS 的区别：这两张表里的 ns 有真实提供方（入口 / ui 层），
+ * 这里登记的 ns 是「读者单方面假设宿主壳可能挂载」的可选汇点——判据是读者形态
+ * `if (WA.x && ...)` 防御守卫 + 全仓无赋值提供点 + 缺省分支有兜底。
+ * （HEAD 基线树 gate 实测「未提供 53」，本表是当时欠登记的显式化收敛的一步。）
+ */
+const OPTIONAL_NS = {
+  activeChar: 'ui/panel.js:12451 `if (WA.activeChar && WA.activeChar.id)` 软探针：宿主壳可选挂的当前角色锚点，缺省走 `WA.characters[0]` / 字面量兜底',
+  characters: 'ui/panel.js:12451 同一行软探针：宿主壳可选挂的角色表，缺省走字面量兜底',
+  actors: 'engines/stage-presence.js:127 `if (WA.actors && typeof WA.actors.list === ...)` 软探针：actors/registry.js 挂的是 WA.registry，本 ns 留给宿主壳按需挂载，缺席时名单为空',
+  health: 'engines/financial-contagion.js:48 `if (WA.health && typeof WA.health.noteFault === ...)` 软探针：故障上报的可选汇点，无汇点时静默降级'
 };
 
 /** 明确放行的外名前缀（本轮为空，见文件头边界） */
@@ -450,15 +466,16 @@ function audit(opt) {
   };
   const isEntry = function (ns) { return Object.prototype.hasOwnProperty.call(ENTRY_NS, ns); };
   const isUi = function (ns) { return Object.prototype.hasOwnProperty.call(UI_NS, ns); };
+  const isOptional = function (ns) { return Object.prototype.hasOwnProperty.call(OPTIONAL_NS, ns); };
 
   const readAll = {};
   Object.keys(g.refs).forEach(function (rel) {
     g.refs[rel].forEach(function (ns) { (readAll[ns] = readAll[ns] || []).push(rel); });
   });
 
-  // ① 读了无人提供的 ns（入口 / UI / 外名须显式登记）
+  // ① 读了无人提供的 ns（入口 / UI / 外名 / 可选依赖须显式登记）
   const unprovided = Object.keys(readAll).sort().filter(function (ns) {
-    return !g.nsOwner[ns] && !isEntry(ns) && !isUi(ns) && !isExternal(ns);
+    return !g.nsOwner[ns] && !isEntry(ns) && !isUi(ns) && !isExternal(ns) && !isOptional(ns);
   }).map(function (ns) { return { ns: ns, files: readAll[ns].slice(0, 4) }; });
 
   // ⑤ 过期登记（登记了但全仓无人读 = 静默掩盖面）
@@ -605,6 +622,7 @@ module.exports = {
   productFiles: productFiles, acyclic: acyclic, readLedger: readLedger,
   EXTERNAL: EXTERNAL, ENTRY_NS: ENTRY_NS, UI_NS: UI_NS, CONTRACT_NS: CONTRACT_NS,
   SELF_REF_NS: SELF_REF_NS, NS_FACE_EXPECT: NS_FACE_EXPECT, ALIAS_HOST_NS: ALIAS_HOST_NS,
+  OPTIONAL_NS: OPTIONAL_NS,
   EXTERNAL_PREFIX: EXTERNAL_PREFIX, NS_FIELD_MAP: NS_FIELD_MAP, ALIAS_RE: ALIAS_RE, LEDGER: LEDGER
 };
 

@@ -25,8 +25,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
   const VERSION = '2.340.0';
 
@@ -58,7 +58,7 @@
       carryingCapacity: _clamp(opt.carryingCapacity || 1000, 100, 10000),
       scentIntensity: _clamp(opt.scentIntensity || 0, 0, 100), // 区域血腥/气味残留
       hasActiveCampfire: !!opt.hasActiveCampfire,
-      updatedAt: Date.now()
+      updatedAt: clockNow('ecosystem-predation')
     };
     _ecosystems.set(id, state);
     return { ok: true, ecosystem: JSON.parse(JSON.stringify(state)) };
@@ -157,7 +157,7 @@
     }
 
     eco.hasActiveCampfire = campfire;
-    eco.updatedAt = Date.now();
+    eco.updatedAt = clockNow('ecosystem-predation');
 
     return result;
   }

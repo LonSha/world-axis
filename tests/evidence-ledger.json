@@ -1,28 +1,28 @@
 {
   "_note": "WorldAxis 证据索引(Q9,v2.226.0)。每行 = 一个证据文件,六栏全部**现场复算**(文件 / sha / version / commit / wired / env、runnable),本表不存第二真源。**version 只认文件自述**(标题行提到本文件名的那行 > 头部前六行首个版本词),并回带 versionSource(title / head / null)自证来源;取不到如实标 null,**不猜**。fileAnchor = 文件名 `-v2NNN` 后缀**原样**,仅备查 —— 该后缀有损且二义(2.117.0 写作 2117、2.97.0 写作 2970;`2100` 既可读成 2.10.0 也可读成 2.100.0),**不作判据、不填进 version**。acceptance 四档:verified(被 run.js 引用 **且** 另有真跑面:导出 runAll 一族**且**带真源码破坏锚点)/ wired(存在 + 被 run.js 引用)/ consumed(未被 run.js 直接引用,但被其它测试 require 当公共基建)/ unwired。计划 Q9 原文「现有计划顶部存在+引用不等于功能验收」落在 verified 与 wired 的分界上 —— wired 一律不许写成 verified。stale 只认三档可复算的硬事实:sha-changed / file-missing / wired-lost;**不**把「version 落后于当前版本」算 stale(历史证据本就停在它交付的那一版)。边界:输出摘要不进记录;只登记 tests/ 下的 .js(不含 run.js 与账本 json)。",
-  "version": "2.295.0",
+  "version": "2.380.0",
   "counts": {
-    "total": 430,
+    "total": 530,
     "verified": 29,
-    "wired": 382,
+    "wired": 411,
     "consumed": 5,
-    "unwired": 14,
+    "unwired": 85,
     "browser": 0,
-    "headlessGate": 22,
-    "headlessLock": 351,
-    "headlessScript": 57
+    "headlessGate": 26,
+    "headlessLock": 368,
+    "headlessScript": 136
   },
   "rows": [
     {
       "file": "tests/act-b1-v2117.js",
-      "sha": "2a8aea4c7250",
+      "sha": "547007cbe474",
       "version": "2.117.0",
       "versionSource": "title",
       "fileAnchor": "2117",
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21058
+        "line": 21336
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -34,6 +34,48 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/action-desk-v14-routing-regression.js",
+      "sha": "7da4eb85baa5",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/agency-real-cycle-regression.js",
+      "sha": "d0405579f395",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/agency-workflow-integration.js",
+      "sha": "a5856e12d4d0",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/alias-trace-v2970.js",
       "sha": "dbd762c888ff",
       "version": "2.97.0",
@@ -42,7 +84,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20028
+        "line": 20306
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -62,7 +104,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21291
+        "line": 21569
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -83,7 +125,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21526
+        "line": 21804
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -103,7 +145,7 @@
       "commit": "5b4ad74",
       "wired": {
         "form": "runLock",
-        "line": 24692
+        "line": 24971
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -123,7 +165,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20889
+        "line": 21167
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -142,7 +184,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20920
+        "line": 21198
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -161,7 +203,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21170
+        "line": 21448
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -182,7 +224,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21060
+        "line": 21338
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -202,7 +244,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21062
+        "line": 21340
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -222,7 +264,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21064
+        "line": 21342
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -242,7 +284,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21066
+        "line": 21344
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -262,7 +304,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19815
+        "line": 20093
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -282,7 +324,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21082
+        "line": 21360
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -302,7 +344,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21096
+        "line": 21374
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -315,14 +357,14 @@
     },
     {
       "file": "tests/b8-liaison-v2118.js",
-      "sha": "0b4302a5508d",
+      "sha": "a4f8bb8c9b79",
       "version": "2.118.0",
       "versionSource": "title",
       "fileAnchor": "2118",
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21112
+        "line": 21390
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -342,7 +384,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21130
+        "line": 21408
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -362,7 +404,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21442
+        "line": 21720
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -381,7 +423,7 @@
       "commit": "c4fbdcd",
       "wired": {
         "form": "runLock",
-        "line": 23282
+        "line": 23561
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -403,7 +445,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22095
+        "line": 22373
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -423,7 +465,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24838
+        "line": 25117
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -442,7 +484,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20062
+        "line": 20340
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -462,7 +504,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19952
+        "line": 20230
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -482,7 +524,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20050
+        "line": 20328
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -495,14 +537,14 @@
     },
     {
       "file": "tests/capability-tier-v2257.js",
-      "sha": "aee0c7aab45f",
+      "sha": "a2153af58426",
       "version": "2.257.0",
       "versionSource": "title",
       "fileAnchor": "2257",
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24763
+        "line": 25042
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -523,7 +565,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24772
+        "line": 25051
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -544,7 +586,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21682
+        "line": 21960
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -564,7 +606,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21704
+        "line": 21982
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -584,7 +626,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19626
+        "line": 19904
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -604,7 +646,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19808
+        "line": 20086
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -616,6 +658,20 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/choice-board-v2325.js",
+      "sha": "b3b983cd14c6",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2325",
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/collab-tasks-v2139.js",
       "sha": "6c68157e569b",
       "version": "2.139.0",
@@ -624,7 +680,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19943
+        "line": 20221
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -644,7 +700,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 957
+        "line": 1115
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -656,14 +712,14 @@
     },
     {
       "file": "tests/contract-scan-v2150.js",
-      "sha": "338dcd9bfa35",
+      "sha": "8d7a091115fd",
       "version": "2.150.0",
       "versionSource": "title",
       "fileAnchor": "2150",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21958
+        "line": 22236
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -684,7 +740,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20030
+        "line": 20308
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -704,7 +760,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19822
+        "line": 20100
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -724,7 +780,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24922
+        "line": 25201
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -743,7 +799,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24918
+        "line": 25197
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -762,7 +818,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 15781
+        "line": 16050
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -779,7 +835,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21239
+        "line": 21517
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -799,7 +855,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22242
+        "line": 22520
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -821,7 +877,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20446
+        "line": 20724
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -840,7 +896,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20428
+        "line": 20706
       },
       "consumedBy": [
         "tests/dependency-guard-v2103.js",
@@ -878,7 +934,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19679
+        "line": 19957
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -899,7 +955,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19995
+        "line": 20273
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -919,7 +975,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22174
+        "line": 22452
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -940,7 +996,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21146
+        "line": 21424
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -960,7 +1016,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19650
+        "line": 19928
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -972,6 +1028,22 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/engines-ns-gate.js",
+      "sha": "e0a787349678",
+      "version": "2.381.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": null,
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/ensemble-v2138.js",
       "sha": "07b193c06284",
       "version": null,
@@ -980,7 +1052,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20319
+        "line": 20597
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -999,7 +1071,7 @@
       "commit": "129ae75",
       "wired": {
         "form": "path-literal",
-        "line": 23923
+        "line": 24202
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1018,7 +1090,7 @@
       "commit": "129ae75",
       "wired": {
         "form": "path-literal",
-        "line": 23934
+        "line": 24213
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1037,7 +1109,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21035
+        "line": 21313
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1057,7 +1129,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21015
+        "line": 21293
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1070,14 +1142,14 @@
     },
     {
       "file": "tests/evict-meta-v2610.js",
-      "sha": "6415d66fbec9",
+      "sha": "8049ea0c3046",
       "version": "2.61.0",
       "versionSource": "title",
       "fileAnchor": "2610",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19623
+        "line": 19901
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1097,7 +1169,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24264
+        "line": 24543
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1110,14 +1182,14 @@
     },
     {
       "file": "tests/exp10-action-desk-v2232.js",
-      "sha": "6d7fe2dd15d2",
+      "sha": "cb5dcd402e0f",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2232",
       "commit": "bae7ed7",
       "wired": {
         "form": "runLock",
-        "line": 24409
+        "line": 24688
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1137,7 +1209,7 @@
       "commit": "05a096e",
       "wired": {
         "form": "runLock",
-        "line": 24415
+        "line": 24694
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1157,7 +1229,7 @@
       "commit": "df85370",
       "wired": {
         "form": "runLock",
-        "line": 24421
+        "line": 24700
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1177,7 +1249,7 @@
       "commit": "a9e71cb",
       "wired": {
         "form": "runLock",
-        "line": 24427
+        "line": 24706
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1197,7 +1269,7 @@
       "commit": "7062a9f",
       "wired": {
         "form": "runLock",
-        "line": 24433
+        "line": 24712
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1217,7 +1289,7 @@
       "commit": "21e5de4",
       "wired": {
         "form": "runLock",
-        "line": 24439
+        "line": 24718
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1237,7 +1309,7 @@
       "commit": "0874d52",
       "wired": {
         "form": "runLock",
-        "line": 24445
+        "line": 24724
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1257,7 +1329,7 @@
       "commit": "753d76e",
       "wired": {
         "form": "runLock",
-        "line": 24451
+        "line": 24730
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1277,7 +1349,7 @@
       "commit": "5093325",
       "wired": {
         "form": "runLock",
-        "line": 24457
+        "line": 24736
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1297,7 +1369,7 @@
       "commit": "500c9fc",
       "wired": {
         "form": "runLock",
-        "line": 24463
+        "line": 24742
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1317,7 +1389,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24281
+        "line": 24560
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1337,7 +1409,7 @@
       "commit": "2ea1b5b",
       "wired": {
         "form": "runLock",
-        "line": 24469
+        "line": 24748
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1357,7 +1429,7 @@
       "commit": "a7bfbd2",
       "wired": {
         "form": "runLock",
-        "line": 24475
+        "line": 24754
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1377,7 +1449,7 @@
       "commit": "e13c619",
       "wired": {
         "form": "runLock",
-        "line": 24481
+        "line": 24760
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1397,7 +1469,7 @@
       "commit": "20eb2da",
       "wired": {
         "form": "runLock",
-        "line": 24487
+        "line": 24766
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1417,7 +1489,7 @@
       "commit": "96dcabe",
       "wired": {
         "form": "runLock",
-        "line": 24493
+        "line": 24772
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1437,7 +1509,7 @@
       "commit": "05daa5a",
       "wired": {
         "form": "runLock",
-        "line": 24499
+        "line": 24778
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1457,7 +1529,7 @@
       "commit": "8ded3eb",
       "wired": {
         "form": "runLock",
-        "line": 24505
+        "line": 24784
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1477,7 +1549,7 @@
       "commit": "cf49db4",
       "wired": {
         "form": "runLock",
-        "line": 24511
+        "line": 24790
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1497,7 +1569,7 @@
       "commit": "cd58819",
       "wired": {
         "form": "runLock",
-        "line": 24517
+        "line": 24796
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1517,7 +1589,7 @@
       "commit": "b5eb5da",
       "wired": {
         "form": "runLock",
-        "line": 24523
+        "line": 24802
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1537,7 +1609,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24301
+        "line": 24580
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1557,7 +1629,7 @@
       "commit": "8f2832f",
       "wired": {
         "form": "runLock",
-        "line": 24529
+        "line": 24808
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1577,7 +1649,7 @@
       "commit": "b4faa7a",
       "wired": {
         "form": "runLock",
-        "line": 24535
+        "line": 24814
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1597,7 +1669,7 @@
       "commit": "94b2fdf",
       "wired": {
         "form": "runLock",
-        "line": 24541
+        "line": 24820
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1617,7 +1689,7 @@
       "commit": "82b9b11",
       "wired": {
         "form": "runLock",
-        "line": 24547
+        "line": 24826
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1637,7 +1709,7 @@
       "commit": "316de77",
       "wired": {
         "form": "runLock",
-        "line": 24553
+        "line": 24832
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1649,14 +1721,14 @@
     },
     {
       "file": "tests/exp35-chapter-branch-play-v2233.js",
-      "sha": "270701996dab",
+      "sha": "4968cf89bda4",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2233",
       "commit": "fd3c2f2",
       "wired": {
         "form": "runLock",
-        "line": 24558
+        "line": 24837
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1676,7 +1748,7 @@
       "commit": "f52aa6e",
       "wired": {
         "form": "runLock",
-        "line": 24563
+        "line": 24842
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1696,7 +1768,7 @@
       "commit": "2f156af",
       "wired": {
         "form": "runLock",
-        "line": 24568
+        "line": 24847
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1716,7 +1788,7 @@
       "commit": "9a2f577",
       "wired": {
         "form": "runLock",
-        "line": 24573
+        "line": 24852
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1736,7 +1808,7 @@
       "commit": "fb1f56d",
       "wired": {
         "form": "runLock",
-        "line": 24578
+        "line": 24857
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1756,7 +1828,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24320
+        "line": 24599
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1776,7 +1848,7 @@
       "commit": "58208ac",
       "wired": {
         "form": "runLock",
-        "line": 24583
+        "line": 24862
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1796,7 +1868,7 @@
       "commit": "11101ea",
       "wired": {
         "form": "runLock",
-        "line": 24588
+        "line": 24867
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1816,7 +1888,7 @@
       "commit": "bb0f001",
       "wired": {
         "form": "runLock",
-        "line": 24593
+        "line": 24872
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1836,7 +1908,7 @@
       "commit": "05b8a9b",
       "wired": {
         "form": "runLock",
-        "line": 24598
+        "line": 24877
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1856,7 +1928,7 @@
       "commit": "46f4256",
       "wired": {
         "form": "runLock",
-        "line": 24603
+        "line": 24882
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1876,7 +1948,7 @@
       "commit": "e3b461e",
       "wired": {
         "form": "runLock",
-        "line": 24608
+        "line": 24887
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1896,7 +1968,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24345
+        "line": 24624
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1916,7 +1988,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24365
+        "line": 24644
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1936,7 +2008,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24387
+        "line": 24666
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1956,7 +2028,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24392
+        "line": 24671
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1976,7 +2048,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24397
+        "line": 24676
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -1996,7 +2068,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21195
+        "line": 21473
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2016,7 +2088,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19836
+        "line": 20114
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2036,7 +2108,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 12368
+        "line": 12637
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2053,7 +2125,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19930
+        "line": 20208
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2073,7 +2145,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21992
+        "line": 22270
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2093,7 +2165,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19729
+        "line": 20007
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2113,7 +2185,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20835
+        "line": 21113
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2132,7 +2204,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19722
+        "line": 20000
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2152,7 +2224,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20008
+        "line": 20286
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2172,7 +2244,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 17604
+        "line": 17882
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -2189,7 +2261,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24962
+        "line": 25241
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2208,7 +2280,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24875
+        "line": 25154
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2228,7 +2300,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24958
+        "line": 25237
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2247,7 +2319,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20317
+        "line": 20595
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2266,7 +2338,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20579
+        "line": 20857
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -2286,7 +2358,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20491
+        "line": 20769
       },
       "consumedBy": [
         "tests/gate-timeout-v2105.js"
@@ -2299,6 +2371,20 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/gates.js",
+      "sha": "17555533703c",
+      "version": "2.381.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": null,
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/gauge-wire-v2274.js",
       "sha": "bfbacc9bccd7",
       "version": "2.274.0",
@@ -2307,7 +2393,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24978
+        "line": 25257
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2326,7 +2412,7 @@
       "commit": "e3b18f1",
       "wired": {
         "form": "runLock",
-        "line": 24668
+        "line": 24947
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2346,7 +2432,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24974
+        "line": 25253
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2365,7 +2451,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24970
+        "line": 25249
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2384,7 +2470,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19908
+        "line": 20186
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2404,7 +2490,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19897
+        "line": 20175
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2424,7 +2510,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19644
+        "line": 19922
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2436,6 +2522,20 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/human-realism-transaction-regression.js",
+      "sha": "d262127b37fe",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/identity-v2860.js",
       "sha": "a0badc3e80e0",
       "version": "2.86.0",
@@ -2444,7 +2544,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19802
+        "line": 20080
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2464,9 +2564,11 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19608
+        "line": 19886
       },
-      "consumedBy": [],
+      "consumedBy": [
+        "tests/v11-source-contract.js"
+      ],
       "env": "headless-lock",
       "runnable": false,
       "runnableExports": [
@@ -2484,7 +2586,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21837
+        "line": 22115
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2497,14 +2599,14 @@
     },
     {
       "file": "tests/inject-vis-v2580.js",
-      "sha": "8f017632ccbe",
+      "sha": "c3bf3154c301",
       "version": "2.58.0",
       "versionSource": "title",
       "fileAnchor": "2580",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19614
+        "line": 19892
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2524,7 +2626,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25195
+        "line": 25474
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2536,14 +2638,14 @@
     },
     {
       "file": "tests/injection-restore-lock-v2800.js",
-      "sha": "b1f48f35791f",
+      "sha": "9c4b247d29af",
       "version": "2.80.0",
       "versionSource": "title",
       "fileAnchor": "2800",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19742
+        "line": 20020
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2556,6 +2658,23 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/inline-tags-v2302.js",
+      "sha": "3b5130825919",
+      "version": "2.302.0",
+      "versionSource": "title",
+      "fileAnchor": "2302",
+      "commit": "f6fe90e",
+      "wired": {
+        "form": "runScript",
+        "line": 25607
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
       "file": "tests/input-boundary-v2790.js",
       "sha": "b12f66621f87",
       "version": "2.79.0",
@@ -2564,7 +2683,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19709
+        "line": 19987
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2585,7 +2704,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19714
+        "line": 19992
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2606,7 +2725,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21147
+        "line": 21425
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2618,6 +2737,20 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/intake-goal-idempotency.js",
+      "sha": "46d626b3c5da",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/integration-social-ecosystem-e2e-v2233.js",
       "sha": "1ddaca17fb72",
       "version": null,
@@ -2626,7 +2759,7 @@
       "commit": "6a1ea22",
       "wired": {
         "form": "runLock",
-        "line": 24635
+        "line": 24914
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2646,7 +2779,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20310
+        "line": 20588
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2665,7 +2798,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20079
+        "line": 20357
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2685,7 +2818,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 12354
+        "line": 12623
       },
       "consumedBy": [
         "tests/dead-export-gate.js",
@@ -2698,7 +2831,8 @@
         "tests/orphan-lock-v2750.js",
         "tests/readings-v2106.js",
         "tests/readings.js",
-        "tests/s3-b4-v2189.js"
+        "tests/s3-b4-v2189.js",
+        "tests/v11-source-contract.js"
       ],
       "env": "headless-script",
       "runnable": false,
@@ -2714,7 +2848,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 20329
+        "line": 20607
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2756,7 +2890,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19876
+        "line": 20154
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2768,6 +2902,20 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/life-boundary-batch-regression.js",
+      "sha": "cc6143f220e6",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/life-e4-v2115.js",
       "sha": "7c77cd2ff3ac",
       "version": "2.115.0",
@@ -2776,7 +2924,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21019
+        "line": 21297
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2796,7 +2944,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19919
+        "line": 20197
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2816,7 +2964,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21463
+        "line": 21741
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2836,7 +2984,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20311
+        "line": 20589
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2855,7 +3003,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19971
+        "line": 20249
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2867,6 +3015,20 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/linkage-verify.js",
+      "sha": "7ec197f1cc5a",
+      "version": "2.381.0",
+      "versionSource": "head",
+      "fileAnchor": null,
+      "commit": null,
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/living-world-v2234.js",
       "sha": "046a7bb83406",
       "version": null,
@@ -2875,7 +3037,7 @@
       "commit": "b973e51",
       "wired": {
         "form": "runScript",
-        "line": 24613
+        "line": 24892
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -2894,7 +3056,7 @@
       "commit": "a41c825",
       "wired": {
         "form": "runScript",
-        "line": 24618
+        "line": 24897
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -2911,7 +3073,7 @@
       "commit": "b5bca00",
       "wired": {
         "form": "runScript",
-        "line": 24623
+        "line": 24902
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -2928,7 +3090,24 @@
       "commit": "50a2104",
       "wired": {
         "form": "runScript",
-        "line": 24628
+        "line": 24907
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/loader-recursion-runtime.js",
+      "sha": "fb4ed7ea1de6",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "2b102ea",
+      "wired": {
+        "form": "runScript",
+        "line": 25609
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -2993,6 +3172,11 @@
         "tests/u3-loose-readings-v2191.js",
         "tests/u4-export-lifecycle-v2191.js",
         "tests/u9-fact-report-v2190.js",
+        "tests/v11-field-writers.js",
+        "tests/v11-inject-dualface.js",
+        "tests/v11-l3-registry.js",
+        "tests/v11-pending-state.js",
+        "tests/v11-push-api-registry.js",
         "tests/v7-intel-network-2287.js",
         "tests/version-surface-gate-v2185.js",
         "tests/x1-chain-v2127.js",
@@ -3020,7 +3204,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20312
+        "line": 20590
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3031,6 +3215,20 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/luke-stitch-v2326.js",
+      "sha": "03da79270258",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2326",
+      "commit": "d1dbfc7",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/map-viewport-v2246.js",
       "sha": "1454571f28d3",
       "version": "2.246.0",
@@ -3039,7 +3237,7 @@
       "commit": "e3b18f1",
       "wired": {
         "form": "runLock",
-        "line": 24674
+        "line": 24953
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3051,6 +3249,22 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/member-surface-gate.js",
+      "sha": "1834d22394bc",
+      "version": "2.381.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": null,
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/mend-v2119.js",
       "sha": "cb1436169fc8",
       "version": "2.119.0",
@@ -3059,7 +3273,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21145
+        "line": 21423
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3083,6 +3297,9 @@
       },
       "consumedBy": [
         "tests/act-b1-v2117.js",
+        "tests/action-desk-v14-routing-regression.js",
+        "tests/agency-real-cycle-regression.js",
+        "tests/agency-workflow-integration.js",
         "tests/b2-travel-v2117.js",
         "tests/b3-intel-v2117.js",
         "tests/b4-relation-v2117.js",
@@ -3128,20 +3345,25 @@
         "tests/fault-ledger-lock-v2800.js",
         "tests/field-liveness-gate.js",
         "tests/horizon-v2640.js",
+        "tests/human-realism-transaction-regression.js",
         "tests/inject-value-v2150.js",
         "tests/injection-restore-lock-v2800.js",
         "tests/input-boundary-v2790.js",
         "tests/input-guard-v2840.js",
         "tests/inst-v2119.js",
+        "tests/intake-goal-idempotency.js",
         "tests/inventory.js",
+        "tests/life-boundary-batch-regression.js",
         "tests/life-e4-v2115.js",
         "tests/mend-v2119.js",
+        "tests/motive-preview-regression.js",
         "tests/o7-plan-tree-gate-v2187.js",
         "tests/p3-x1-v2149.js",
         "tests/p5-stage-v2214.js",
         "tests/parallel-world-v2640.js",
         "tests/perf-regression-gate.js",
         "tests/perf-tape-v2148.js",
+        "tests/persona-schedule-evidence-regression.js",
         "tests/plan-v2119.js",
         "tests/probe-v2119.js",
         "tests/q6-atomic-budget-v2215.js",
@@ -3154,8 +3376,61 @@
         "tests/reject-lock-v2780.js",
         "tests/reject-recovery-lock-v2192.js",
         "tests/render-pre-v2108.js",
+        "tests/routine-agency-regression.js",
         "tests/rumor-e3-v2115.js",
         "tests/s3-b1-o2-v2185.js",
+        "tests/scenario-v12-era-transition.js",
+        "tests/scenario-v12-multiple-perspectives.js",
+        "tests/scenario-v12-town-shortage.js",
+        "tests/scenario-v13-border-drift.js",
+        "tests/scenario-v13-room-acoustics.js",
+        "tests/scenario-v13-ruin-relic-sandbox.js",
+        "tests/scenario-v14-choke-courier.js",
+        "tests/scenario-v14-cost-foreshadow.js",
+        "tests/scenario-v14-credit-rupture.js",
+        "tests/scenario-v14-grand-cascade.js",
+        "tests/scenario-v14-multi-whisper.js",
+        "tests/scenario-v14-poison-dilemma.js",
+        "tests/scenario-v14-sanctuary-echo.js",
+        "tests/scenario-v14-schism-reform.js",
+        "tests/scenario-v15-living-threads.js",
+        "tests/scenario-v16-human-realism.js",
+        "tests/scenario-v20-routine-pacing.js",
+        "tests/scenario-v21-quagmire-crossing.js",
+        "tests/scenario-v22-toxic-pursuit.js",
+        "tests/scenario-v23-contraband-pipeline.js",
+        "tests/scenario-v24-panic-cover-ballistics.js",
+        "tests/scenario-v25-v16-living-world-integration.js",
+        "tests/scenario-v26-psyche-trauma-blackening.js",
+        "tests/scenario-v27-conspiracy-coup-domino.js",
+        "tests/scenario-v28-moral-dilemma-tide.js",
+        "tests/scenario-v29-butterfly-chekhov-gun.js",
+        "tests/scenario-v30-ideology-memetics-cascade.js",
+        "tests/scenario-v31-v17-causal-psyche-integration.js",
+        "tests/scenario-v32-tactical-combat-trauma.js",
+        "tests/scenario-v33-interrogation-psychic-tell.js",
+        "tests/scenario-v34-ecosystem-predation-wild.js",
+        "tests/scenario-v35-siege-attrition-starvation.js",
+        "tests/scenario-v36-ruin-mechanism-trap.js",
+        "tests/scenario-v37-v18-epic-world-grand-pulse.js",
+        "tests/scenario-v38-stage-presence-offstage-living.js",
+        "tests/scenario-v39-covert-espionage-heist.js",
+        "tests/scenario-v40-epidemic-surgical-triage.js",
+        "tests/scenario-v41-maritime-navigation-storm.js",
+        "tests/scenario-v42-stealth-infiltration-kill.js",
+        "tests/scenario-v43-v19-epic-living-network-pulse.js",
+        "tests/scenario-v44-embodied-prompt-perception.js",
+        "tests/scenario-v45-cross-plugin-full-duplex-resonance.js",
+        "tests/scenario-v46-epochal-collapse-transition.js",
+        "tests/scenario-v47-cataclysm-topological-rupture.js",
+        "tests/scenario-v48-financial-contagion-collapse.js",
+        "tests/scenario-v49-v20-epic-holistic-convergence.js",
+        "tests/scenario-v50-theology-cult-crusade.js",
+        "tests/scenario-v51-regiment-tactics-clash.js",
+        "tests/scenario-v52-incarceration-jailbreak-hounds.js",
+        "tests/scenario-v53-bloodline-heritage-trust.js",
+        "tests/scenario-v54-engineering-siege-explosion.js",
+        "tests/scenario-v55-dungeon-eco-court-mesh.js",
         "tests/session-v2119.js",
         "tests/settle-v2650.js",
         "tests/settle-v2660.js",
@@ -3201,14 +3476,14 @@
     },
     {
       "file": "tests/module-cycle-gate-v2107.js",
-      "sha": "80fecc010665",
+      "sha": "51aae0f8c873",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2107",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20823
+        "line": 21101
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -3223,7 +3498,7 @@
     },
     {
       "file": "tests/module-cycle-gate.js",
-      "sha": "417c30cf5246",
+      "sha": "107ab3ca8c1a",
       "version": "2.107.0",
       "versionSource": "head",
       "fileAnchor": null,
@@ -3252,13 +3527,27 @@
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 20173
+        "line": 20451
       },
       "consumedBy": [],
       "env": "headless-gate",
       "runnable": false,
       "runnableExports": [],
       "acceptance": "wired"
+    },
+    {
+      "file": "tests/motive-preview-regression.js",
+      "sha": "739a65d8c828",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
     },
     {
       "file": "tests/negative-control-audit-v2104.js",
@@ -3269,7 +3558,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20478
+        "line": 20756
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3290,7 +3579,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20462
+        "line": 20740
       },
       "consumedBy": [
         "tests/anchor-scan-v2126.js",
@@ -3313,7 +3602,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19966
+        "line": 20244
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3335,7 +3624,7 @@
       "commit": "e3b18f1",
       "wired": {
         "form": "runLock",
-        "line": 24686
+        "line": 24965
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3355,7 +3644,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 22782
+        "line": 23060
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -3372,7 +3661,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 22822
+        "line": 23100
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -3391,7 +3680,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 22803
+        "line": 23081
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -3412,7 +3701,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 22837
+        "line": 23115
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -3429,7 +3718,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 22776
+        "line": 23054
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -3449,7 +3738,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22326
+        "line": 22604
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3469,7 +3758,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22325
+        "line": 22603
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3489,7 +3778,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21991
+        "line": 22269
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3509,7 +3798,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24133
+        "line": 24412
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3529,7 +3818,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24157
+        "line": 24436
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3549,7 +3838,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24146
+        "line": 24425
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3569,7 +3858,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24170
+        "line": 24449
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3589,7 +3878,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24207
+        "line": 24486
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3609,7 +3898,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24227
+        "line": 24506
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3629,7 +3918,7 @@
       "commit": "c6ff687",
       "wired": {
         "form": "runLock",
-        "line": 24247
+        "line": 24526
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3650,7 +3939,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19888
+        "line": 20166
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3670,7 +3959,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20320
+        "line": 20598
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3689,7 +3978,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20321
+        "line": 20599
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3710,7 +3999,7 @@
       "commit": "6142af8",
       "wired": {
         "form": "runLock",
-        "line": 24733
+        "line": 25012
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3730,7 +4019,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21788
+        "line": 22066
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3750,7 +4039,7 @@
       "commit": "dac2f73",
       "wired": {
         "form": "runLock",
-        "line": 24024
+        "line": 24303
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3770,7 +4059,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19647
+        "line": 19925
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3790,7 +4079,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20203
+        "line": 20481
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3810,7 +4099,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21217
+        "line": 21495
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3830,7 +4119,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20208
+        "line": 20486
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -3847,7 +4136,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21725
+        "line": 22003
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3867,7 +4156,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20091
+        "line": 20369
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3879,6 +4168,23 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/periodicals-v2303.js",
+      "sha": "66d4e88efb24",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": "2303",
+      "commit": "7d6d4c1",
+      "wired": {
+        "form": "runScript",
+        "line": 25608
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
       "file": "tests/permissions-v2110.js",
       "sha": "33fdc828f104",
       "version": "2.110.0",
@@ -3887,7 +4193,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20841
+        "line": 21119
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3906,7 +4212,7 @@
       "commit": "7ea350e",
       "wired": {
         "form": "runScript",
-        "line": 24711
+        "line": 24990
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3918,6 +4224,20 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/persona-schedule-evidence-regression.js",
+      "sha": "49fef042dd29",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/perspective-lock-v2142.js",
       "sha": "c7553678f2ab",
       "version": "2.142.0",
@@ -3926,7 +4246,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19984
+        "line": 20262
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3947,7 +4267,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20026
+        "line": 20304
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3967,7 +4287,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21144
+        "line": 21422
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -3987,7 +4307,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24966
+        "line": 25245
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4006,7 +4326,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22324
+        "line": 22602
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4027,7 +4347,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22094
+        "line": 22372
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4047,7 +4367,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20965
+        "line": 21243
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -4064,7 +4384,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21148
+        "line": 21426
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4084,7 +4404,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 9433
+        "line": 9600
       },
       "consumedBy": [
         "tests/context-guard.js",
@@ -4101,6 +4421,9 @@
         "tests/ui-live-v2137.js",
         "tests/ui-live.js",
         "tests/ui-wire-audit.js",
+        "tests/v11-field-writers.js",
+        "tests/v11-push-api-coverage.js",
+        "tests/v11-push-api-registry.js",
         "tests/v8-panel-activity-2294.js"
       ],
       "env": "headless-lock",
@@ -4119,7 +4442,7 @@
       "commit": "b402ad4",
       "wired": {
         "form": "runLock",
-        "line": 23987
+        "line": 24266
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4139,7 +4462,7 @@
       "commit": "b402ad4",
       "wired": {
         "form": "runLock",
-        "line": 23998
+        "line": 24277
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4159,7 +4482,7 @@
       "commit": "b402ad4",
       "wired": {
         "form": "runLock",
-        "line": 24009
+        "line": 24288
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4179,7 +4502,7 @@
       "commit": "30a4c73",
       "wired": {
         "form": "runLock",
-        "line": 24038
+        "line": 24317
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4199,7 +4522,7 @@
       "commit": "07d3c2c",
       "wired": {
         "form": "runLock",
-        "line": 24056
+        "line": 24335
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4220,7 +4543,7 @@
       "commit": "551030a",
       "wired": {
         "form": "runLock",
-        "line": 24071
+        "line": 24350
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4240,7 +4563,7 @@
       "commit": "cd4765f",
       "wired": {
         "form": "runLock",
-        "line": 24090
+        "line": 24369
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4260,7 +4583,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20627
+        "line": 20905
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4302,7 +4625,7 @@
       "commit": "75ab77c",
       "wired": {
         "form": "runLock",
-        "line": 24754
+        "line": 25033
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4323,7 +4646,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19703
+        "line": 19981
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4344,7 +4667,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21149
+        "line": 21427
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4364,7 +4687,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19632
+        "line": 19910
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4384,7 +4707,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20673
+        "line": 20951
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4426,13 +4749,14 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20657
+        "line": 20935
       },
       "consumedBy": [
         "tests/contract-scan-v2150.js",
         "tests/reject-code-coverage-v2107.js",
         "tests/reject-code-coverage.js",
-        "tests/reject-lock-v2780.js"
+        "tests/reject-lock-v2780.js",
+        "tests/v10-master-matrix.js"
       ],
       "env": "headless-gate",
       "runnable": false,
@@ -4444,14 +4768,14 @@
     },
     {
       "file": "tests/reject-lock-v2780.js",
-      "sha": "d7ec871a36f3",
+      "sha": "895884154c58",
       "version": "2.78.0",
       "versionSource": "title",
       "fileAnchor": "2780",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19690
+        "line": 19968
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4473,7 +4797,7 @@
       "commit": "c58a6ba",
       "wired": {
         "form": "runLock",
-        "line": 23213
+        "line": 23492
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4487,21 +4811,22 @@
     },
     {
       "file": "tests/reject-v2780.js",
-      "sha": "d092dc5bba3e",
+      "sha": "f0e4cde22c3c",
       "version": "2.78.0",
       "versionSource": "title",
       "fileAnchor": "2780",
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20152
+        "line": 20430
       },
       "consumedBy": [
         "tests/reject-code-coverage-v2107.js",
         "tests/reject-code-coverage.js",
         "tests/reject-code-gate.js",
         "tests/reject-lock-v2780.js",
-        "tests/render-pre-v2108.js"
+        "tests/render-pre-v2108.js",
+        "tests/v10-master-matrix.js"
       ],
       "env": "headless-lock",
       "runnable": false,
@@ -4519,7 +4844,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19617
+        "line": 19895
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4539,7 +4864,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19620
+        "line": 19898
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4560,7 +4885,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24930
+        "line": 25209
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4579,7 +4904,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24926
+        "line": 25205
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4598,7 +4923,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22032
+        "line": 22310
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4618,7 +4943,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 19764
+        "line": 20042
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4638,7 +4963,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19829
+        "line": 20107
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4658,7 +4983,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19856
+        "line": 20134
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4678,7 +5003,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24946
+        "line": 25225
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4697,7 +5022,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24942
+        "line": 25221
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4708,6 +5033,20 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/routine-agency-regression.js",
+      "sha": "2350c96ccf99",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/rulepack-idem-v2264.js",
       "sha": "7263acbfaece",
       "version": "2.264.0",
@@ -4716,7 +5055,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24888
+        "line": 25167
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4735,7 +5074,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 21017
+        "line": 21295
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4755,7 +5094,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20015
+        "line": 20293
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4775,7 +5114,7 @@
       "commit": "b61fd83",
       "wired": {
         "form": "path-literal",
-        "line": 22728
+        "line": 23006
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -4792,7 +5131,7 @@
       "commit": "129ae75",
       "wired": {
         "form": "path-literal",
-        "line": 23877
+        "line": 24156
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -4809,7 +5148,7 @@
       "commit": "129ae75",
       "wired": {
         "form": "path-literal",
-        "line": 23912
+        "line": 24191
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4821,14 +5160,14 @@
     },
     {
       "file": "tests/s3-b1-e3-v2184.js",
-      "sha": "113a1d8a00ec",
+      "sha": "9df381795b54",
       "version": "2.184.0",
       "versionSource": "title",
       "fileAnchor": "2184",
       "commit": "e0d6ef1",
       "wired": {
         "form": "path-literal",
-        "line": 22740
+        "line": 23018
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -4845,7 +5184,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "runLock",
-        "line": 22751
+        "line": 23029
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4859,14 +5198,14 @@
     },
     {
       "file": "tests/s3-b2-e2-v2182.js",
-      "sha": "4a88a2715c21",
+      "sha": "7f3cddec79c5",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
       "commit": "b61fd83",
       "wired": {
         "form": "path-literal",
-        "line": 22688
+        "line": 22966
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -4876,14 +5215,14 @@
     },
     {
       "file": "tests/s3-b2-e5-v2182.js",
-      "sha": "0d4c087b35bd",
+      "sha": "00d9f6f8d6c2",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
       "commit": "b61fd83",
       "wired": {
         "form": "path-literal",
-        "line": 22695
+        "line": 22973
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4893,14 +5232,14 @@
     },
     {
       "file": "tests/s3-b2-o3-v2182.js",
-      "sha": "7dacdfd5f75e",
+      "sha": "d00d06adc602",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
       "commit": "b61fd83",
       "wired": {
         "form": "path-literal",
-        "line": 22709
+        "line": 22987
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -4910,14 +5249,14 @@
     },
     {
       "file": "tests/s3-b2-o4-v2182.js",
-      "sha": "fb0b710e1c3d",
+      "sha": "5ef0c2700fb3",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
       "commit": "b61fd83",
       "wired": {
         "form": "path-literal",
-        "line": 22702
+        "line": 22980
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4929,14 +5268,14 @@
     },
     {
       "file": "tests/s3-b2-o5-v2182.js",
-      "sha": "6dd2ea120dd2",
+      "sha": "03f1aea00102",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
       "commit": "b61fd83",
       "wired": {
         "form": "path-literal",
-        "line": 22716
+        "line": 22994
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -4953,7 +5292,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 22853
+        "line": 23131
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -4970,7 +5309,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 22868
+        "line": 23146
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -4987,7 +5326,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 22898
+        "line": 23176
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5004,7 +5343,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 22886
+        "line": 23164
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5021,7 +5360,7 @@
       "commit": "9a219ac",
       "wired": {
         "form": "path-literal",
-        "line": 22908
+        "line": 23186
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5038,7 +5377,7 @@
       "commit": "2ab9b0e",
       "wired": {
         "form": "path-literal",
-        "line": 23032
+        "line": 23310
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5055,7 +5394,7 @@
       "commit": "481ed61",
       "wired": {
         "form": "path-literal",
-        "line": 22918
+        "line": 23196
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5072,7 +5411,7 @@
       "commit": "0c726f3",
       "wired": {
         "form": "path-literal",
-        "line": 22940
+        "line": 23218
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5089,7 +5428,7 @@
       "commit": "568adff",
       "wired": {
         "form": "path-literal",
-        "line": 22953
+        "line": 23231
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5106,7 +5445,7 @@
       "commit": "568adff",
       "wired": {
         "form": "path-literal",
-        "line": 22969
+        "line": 23247
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5123,7 +5462,7 @@
       "commit": "d117ba7",
       "wired": {
         "form": "path-literal",
-        "line": 22929
+        "line": 23207
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5140,7 +5479,7 @@
       "commit": "e82ab63",
       "wired": {
         "form": "path-literal",
-        "line": 22986
+        "line": 23264
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5159,7 +5498,7 @@
       "commit": "728a2a8",
       "wired": {
         "form": "path-literal",
-        "line": 23003
+        "line": 23281
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5178,7 +5517,7 @@
       "commit": "e2fde03",
       "wired": {
         "form": "path-literal",
-        "line": 23020
+        "line": 23298
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5198,7 +5537,7 @@
       "commit": "8fbe8a7",
       "wired": {
         "form": "path-literal",
-        "line": 24102
+        "line": 24381
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5211,14 +5550,14 @@
     },
     {
       "file": "tests/s3-b4-n11-v2229.js",
-      "sha": "1d24e629c465",
+      "sha": "a2d72c25f319",
       "version": "2.229.0",
       "versionSource": "title",
       "fileAnchor": "2229",
       "commit": "8fbe8a7",
       "wired": {
         "form": "path-literal",
-        "line": 24114
+        "line": 24393
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5237,7 +5576,7 @@
       "commit": "84f1270",
       "wired": {
         "form": "path-literal",
-        "line": 23043
+        "line": 23321
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5256,7 +5595,7 @@
       "commit": "b15894b",
       "wired": {
         "form": "path-literal",
-        "line": 23942
+        "line": 24221
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5273,7 +5612,7 @@
       "commit": "339f4b2",
       "wired": {
         "form": "runLock",
-        "line": 23973
+        "line": 24252
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5293,7 +5632,7 @@
       "commit": "129ae75",
       "wired": {
         "form": "runLock",
-        "line": 23904
+        "line": 24183
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5313,7 +5652,7 @@
       "commit": "8e48d04",
       "wired": {
         "form": "runLock",
-        "line": 23868
+        "line": 24147
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5333,7 +5672,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22376
+        "line": 22654
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5353,7 +5692,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22379
+        "line": 22657
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5373,7 +5712,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22380
+        "line": 22658
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5393,7 +5732,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22411
+        "line": 22689
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5413,7 +5752,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22385
+        "line": 22663
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5433,7 +5772,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 22421
+        "line": 22699
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5453,7 +5792,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22595
+        "line": 22873
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5466,14 +5805,14 @@
     },
     {
       "file": "tests/s3-tx2-v2166.js",
-      "sha": "5a553fea741a",
+      "sha": "0e28dce7f5ea",
       "version": "2.166.0",
       "versionSource": "head",
       "fileAnchor": "2166",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22605
+        "line": 22883
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5486,14 +5825,14 @@
     },
     {
       "file": "tests/s3-tx3-v2167.js",
-      "sha": "7724a90f1132",
+      "sha": "a7061074dae2",
       "version": "2.167.0",
       "versionSource": "head",
       "fileAnchor": "2167",
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 22617
+        "line": 22895
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5503,14 +5842,14 @@
     },
     {
       "file": "tests/s3-tx4-v2168.js",
-      "sha": "c6a2d42b2aa7",
+      "sha": "f2bc0a78d43c",
       "version": "2.168.0",
       "versionSource": "head",
       "fileAnchor": "2168",
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 22628
+        "line": 22906
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5527,7 +5866,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 22554
+        "line": 22832
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5540,14 +5879,14 @@
     },
     {
       "file": "tests/s3-tx6-v2169.js",
-      "sha": "bfaf0868a8d3",
+      "sha": "342becc05f78",
       "version": "2.169.0",
       "versionSource": "head",
       "fileAnchor": "2169",
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 22639
+        "line": 22917
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5557,14 +5896,14 @@
     },
     {
       "file": "tests/s3-tx7-v2170.js",
-      "sha": "988ffa84f7a5",
+      "sha": "dcc9529ec453",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2170",
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 22650
+        "line": 22928
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5574,14 +5913,14 @@
     },
     {
       "file": "tests/s3-tx8-v2171.js",
-      "sha": "e7553345a52b",
+      "sha": "9d9bb4d18a7e",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2171",
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 22661
+        "line": 22939
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5591,14 +5930,14 @@
     },
     {
       "file": "tests/s3-tx9-v2172.js",
-      "sha": "bf0f2813fb9c",
+      "sha": "38ecb2deeedd",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2172",
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 22672
+        "line": 22950
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5615,7 +5954,7 @@
       "commit": "b8daf8f",
       "wired": {
         "form": "runLock",
-        "line": 23349
+        "line": 23628
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5634,7 +5973,7 @@
       "commit": "239069e",
       "wired": {
         "form": "runLock",
-        "line": 23360
+        "line": 23639
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5653,7 +5992,7 @@
       "commit": "8479480",
       "wired": {
         "form": "runLock",
-        "line": 23361
+        "line": 23640
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5672,7 +6011,7 @@
       "commit": "8479480",
       "wired": {
         "form": "runLock",
-        "line": 23362
+        "line": 23641
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5691,7 +6030,7 @@
       "commit": "8479480",
       "wired": {
         "form": "runLock",
-        "line": 23363
+        "line": 23642
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5710,7 +6049,7 @@
       "commit": "9a38cbe",
       "wired": {
         "form": "runLock",
-        "line": 23450
+        "line": 23729
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5730,7 +6069,7 @@
       "commit": "9a38cbe",
       "wired": {
         "form": "runLock",
-        "line": 23478
+        "line": 23757
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5750,7 +6089,7 @@
       "commit": "c3da921",
       "wired": {
         "form": "runLock",
-        "line": 23401
+        "line": 23680
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5769,7 +6108,7 @@
       "commit": "9a38cbe",
       "wired": {
         "form": "runLock",
-        "line": 23543
+        "line": 23822
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5788,7 +6127,7 @@
       "commit": "9a38cbe",
       "wired": {
         "form": "runLock",
-        "line": 23607
+        "line": 23886
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5807,7 +6146,7 @@
       "commit": "9a38cbe",
       "wired": {
         "form": "runLock",
-        "line": 23675
+        "line": 23954
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5826,7 +6165,7 @@
       "commit": "9a38cbe",
       "wired": {
         "form": "runLock",
-        "line": 23747
+        "line": 24026
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5845,7 +6184,7 @@
       "commit": "9a38cbe",
       "wired": {
         "form": "runLock",
-        "line": 23795
+        "line": 24074
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5864,7 +6203,7 @@
       "commit": "9a38cbe",
       "wired": {
         "form": "runLock",
-        "line": 23847
+        "line": 24126
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5883,7 +6222,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21268
+        "line": 21546
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5903,7 +6242,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20891
+        "line": 21169
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -5920,7 +6259,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24954
+        "line": 25233
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5939,7 +6278,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24950
+        "line": 25229
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5951,6 +6290,878 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/scenario-v12-broken-promise.js",
+      "sha": "691f2c1761fc",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "296c258",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v12-era-transition.js",
+      "sha": "fef76fa1f85f",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "296c258",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v12-exv-cross-experience.js",
+      "sha": "7e2cf783e13a",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "296c258",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v12-multiple-perspectives.js",
+      "sha": "ca6d271df2ff",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "296c258",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v12-town-shortage.js",
+      "sha": "f2cc1bb771f6",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "296c258",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v12-travel-return.js",
+      "sha": "8e959ad53ba1",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "296c258",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v13-border-drift.js",
+      "sha": "21b3580bc8ea",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "4974985",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v13-family-legacy.js",
+      "sha": "e98203e85878",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "a162c3b",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v13-room-acoustics.js",
+      "sha": "95b69905ef5d",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "bac17d5",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v13-ruin-relic-sandbox.js",
+      "sha": "bc2ba7d475c7",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "a162c3b",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v13-taboo-festival.js",
+      "sha": "75f54a7702d5",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "a162c3b",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v14-choke-courier.js",
+      "sha": "d71236197653",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "0c44ea6",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v14-cost-foreshadow.js",
+      "sha": "586b6db39dcd",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "b128c50",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v14-credit-rupture.js",
+      "sha": "e91195f49c9d",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "897fd39",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v14-grand-cascade.js",
+      "sha": "b3c397cf2171",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "ecb1b5b",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v14-multi-whisper.js",
+      "sha": "668108d74b16",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "8dffb42",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v14-poison-dilemma.js",
+      "sha": "744c34db7a34",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "21fef9f",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v14-sanctuary-echo.js",
+      "sha": "b2c8a4e74874",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "4050cbe",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v14-schism-reform.js",
+      "sha": "30374e0cc45c",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "f26ff6d",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v15-living-threads.js",
+      "sha": "fd9cf7aae45a",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "6a8755a",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v16-human-realism.js",
+      "sha": "2a05cbdd2513",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "92017af",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v17-storm-evacuation.js",
+      "sha": "ec92b4506075",
+      "version": "2.330.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "69800ec",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v18-acoustic-whisper.js",
+      "sha": "7b33574dfe0e",
+      "version": "2.330.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "69800ec",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v19-contraband-frisk.js",
+      "sha": "d2a62e55d0ff",
+      "version": "2.330.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "69800ec",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v20-routine-pacing.js",
+      "sha": "7bb5ef99e3d9",
+      "version": "2.325.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "9fa7be3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v20-universal-evacuation.js",
+      "sha": "3f3ab5ae9e09",
+      "version": "2.330.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "69800ec",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v21-quagmire-crossing.js",
+      "sha": "d4c18a4eec45",
+      "version": "2.330.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "686150c",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v22-toxic-pursuit.js",
+      "sha": "3bf44abb3aae",
+      "version": "2.330.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "686150c",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v23-contraband-pipeline.js",
+      "sha": "acc6aecc2827",
+      "version": "2.330.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "686150c",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v24-panic-cover-ballistics.js",
+      "sha": "1346c7a18030",
+      "version": "2.330.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "686150c",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v25-v16-living-world-integration.js",
+      "sha": "14ec0cb8194d",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "bf2c1f2",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v26-psyche-trauma-blackening.js",
+      "sha": "7603da30e9d3",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "58a9120",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v27-conspiracy-coup-domino.js",
+      "sha": "57891672e4af",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "58a9120",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v28-moral-dilemma-tide.js",
+      "sha": "3faf68ca6bba",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "58a9120",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v29-butterfly-chekhov-gun.js",
+      "sha": "f5c639f0db8b",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "58a9120",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v30-ideology-memetics-cascade.js",
+      "sha": "5d5c14ab755e",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "58a9120",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v31-v17-causal-psyche-integration.js",
+      "sha": "534162afe18f",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "b6c038a",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v32-tactical-combat-trauma.js",
+      "sha": "34a5e6f65dbd",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "c03969e",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v33-interrogation-psychic-tell.js",
+      "sha": "4265b71f1f9e",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "c03969e",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v34-ecosystem-predation-wild.js",
+      "sha": "f6eb9f574d70",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "c03969e",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v35-siege-attrition-starvation.js",
+      "sha": "b8eba84604bc",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "c03969e",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v36-ruin-mechanism-trap.js",
+      "sha": "ef8c921ec6ca",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "c03969e",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v37-v18-epic-world-grand-pulse.js",
+      "sha": "00a6475b6c78",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "c03969e",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v38-stage-presence-offstage-living.js",
+      "sha": "eb12497b2859",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "b3524f0",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v39-covert-espionage-heist.js",
+      "sha": "6c15f42f053a",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "cf9ed92",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v40-epidemic-surgical-triage.js",
+      "sha": "04af2412bf8b",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "cf9ed92",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v41-maritime-navigation-storm.js",
+      "sha": "f63da8f835c6",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "3db20fb",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v42-stealth-infiltration-kill.js",
+      "sha": "0baaeabea0bd",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "3db20fb",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v43-v19-epic-living-network-pulse.js",
+      "sha": "00545a53b626",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "3db20fb",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v44-embodied-prompt-perception.js",
+      "sha": "ad35783caeed",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "30a1141",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v45-cross-plugin-full-duplex-resonance.js",
+      "sha": "7d728fad17b6",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "30a1141",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v46-epochal-collapse-transition.js",
+      "sha": "921bcef4ea64",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "30a1141",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v47-cataclysm-topological-rupture.js",
+      "sha": "44726fc074bf",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "30a1141",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v48-financial-contagion-collapse.js",
+      "sha": "2b5a15cf2989",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "30a1141",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v49-v20-epic-holistic-convergence.js",
+      "sha": "ce7c857cf523",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "30a1141",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/scenario-v50-theology-cult-crusade.js",
+      "sha": "d8294ed7099e",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": null,
+      "wired": {
+        "form": "runScript",
+        "line": 25593
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/scenario-v51-regiment-tactics-clash.js",
+      "sha": "65f8a609f84c",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": null,
+      "wired": {
+        "form": "runScript",
+        "line": 25594
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/scenario-v52-incarceration-jailbreak-hounds.js",
+      "sha": "154be880d97f",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": null,
+      "wired": {
+        "form": "runScript",
+        "line": 25595
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/scenario-v53-bloodline-heritage-trust.js",
+      "sha": "5dae172a2067",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": null,
+      "wired": {
+        "form": "runScript",
+        "line": 25596
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/scenario-v54-engineering-siege-explosion.js",
+      "sha": "843c9b54c555",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": null,
+      "wired": {
+        "form": "runScript",
+        "line": 25597
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/scenario-v55-dungeon-eco-court-mesh.js",
+      "sha": "eaa2272e4ade",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": null,
+      "wired": {
+        "form": "runScript",
+        "line": 25598
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
       "file": "tests/schema-v2110.js",
       "sha": "c015a365e25c",
       "version": "2.110.0",
@@ -5959,7 +7170,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20838
+        "line": 21116
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5978,7 +7189,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21151
+        "line": 21429
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -5990,15 +7201,31 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/settings-bus-api-gate.js",
+      "sha": "cf07a7b49210",
+      "version": "2.381.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": null,
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-gate",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/settings-lanes-v2262.js",
-      "sha": "154702e736d2",
+      "sha": "c7f7abc5a953",
       "version": "2.262.0",
       "versionSource": "head",
       "fileAnchor": "2262",
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24856
+        "line": 25135
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6017,7 +7244,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19653
+        "line": 19931
       },
       "consumedBy": [
         "tests/product-files.js"
@@ -6039,7 +7266,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19656
+        "line": 19934
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6059,7 +7286,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19659
+        "line": 19937
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6079,7 +7306,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19662
+        "line": 19940
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6099,7 +7326,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19665
+        "line": 19943
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6119,7 +7346,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19669
+        "line": 19947
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6139,7 +7366,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19672
+        "line": 19950
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6159,7 +7386,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19675
+        "line": 19953
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6179,7 +7406,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19684
+        "line": 19962
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6199,7 +7426,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19749
+        "line": 20027
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6219,7 +7446,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19757
+        "line": 20035
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6232,14 +7459,14 @@
     },
     {
       "file": "tests/settle-v2830.js",
-      "sha": "db0e52228100",
+      "sha": "806f7453e62f",
       "version": "2.83.0",
       "versionSource": "title",
       "fileAnchor": "2830",
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 19766
+        "line": 20044
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6253,14 +7480,14 @@
     },
     {
       "file": "tests/settle-v2841.js",
-      "sha": "e41ea114306c",
+      "sha": "045eb5b3c6ab",
       "version": "2.84.0",
       "versionSource": "title",
       "fileAnchor": "2841",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19775
+        "line": 20053
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6280,7 +7507,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19790
+        "line": 20068
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6300,7 +7527,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19796
+        "line": 20074
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6320,7 +7547,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19638
+        "line": 19916
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6333,14 +7560,14 @@
     },
     {
       "file": "tests/side-effect-lock-v2790.js",
-      "sha": "0b79a9e213b6",
+      "sha": "649b99359dc5",
       "version": "2.79.0",
       "versionSource": "title",
       "fileAnchor": "2790",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19697
+        "line": 19975
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6348,20 +7575,21 @@
       "runnableExports": [
         "runAll",
         "runNegative",
-        "scan"
+        "scan",
+        "audit"
       ],
       "acceptance": "wired"
     },
     {
       "file": "tests/simplify-nav-v2255.js",
-      "sha": "169c37eb9599",
+      "sha": "937144e8318f",
       "version": "2.255.0",
       "versionSource": "title",
       "fileAnchor": "2255",
       "commit": "5c5611c",
       "wired": {
         "form": "runLock",
-        "line": 24743
+        "line": 25022
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6381,7 +7609,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22331
+        "line": 22609
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6401,7 +7629,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22332
+        "line": 22610
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6421,7 +7649,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22353
+        "line": 22631
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6441,7 +7669,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21150
+        "line": 21428
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6461,7 +7689,7 @@
       "commit": "2a8bf94",
       "wired": {
         "form": "runLock",
-        "line": 24725
+        "line": 25004
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6481,7 +7709,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20194
+        "line": 20472
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6501,7 +7729,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22033
+        "line": 22311
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6521,7 +7749,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20944
+        "line": 21222
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6541,7 +7769,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19629
+        "line": 19907
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6561,7 +7789,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19847
+        "line": 20125
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6625,7 +7853,7 @@
       "commit": "e3b18f1",
       "wired": {
         "form": "runLock",
-        "line": 24680
+        "line": 24959
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6645,7 +7873,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 20038
+        "line": 20316
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6658,6 +7886,34 @@
       "acceptance": "wired"
     },
     {
+      "file": "tests/test-advanced-maps.js",
+      "sha": "cd40b1c011e5",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "b0f48e9",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/test-affection-nexus.js",
+      "sha": "3dc4ae5a21cb",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "75ac9bc",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
       "file": "tests/test-audit-v2155.js",
       "sha": "dfa43836f787",
       "version": "2.155.0",
@@ -6666,7 +7922,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22238
+        "line": 22516
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6678,6 +7934,34 @@
         "audit"
       ],
       "acceptance": "wired"
+    },
+    {
+      "file": "tests/test-intimate-arbiter.js",
+      "sha": "24187fba7066",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "75ac9bc",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
+    },
+    {
+      "file": "tests/test-inventory-metabolism.js",
+      "sha": "e20684244a79",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "2750ba3",
+      "wired": null,
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "unwired"
     },
     {
       "file": "tests/test-surface-gate.js",
@@ -6721,7 +8005,7 @@
       "commit": "e675e0f",
       "wired": {
         "form": "path-literal",
-        "line": 24662
+        "line": 24941
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6738,7 +8022,7 @@
       "commit": "9b0842b",
       "wired": {
         "form": "path-literal",
-        "line": 24652
+        "line": 24931
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6755,7 +8039,7 @@
       "commit": "79b2132",
       "wired": {
         "form": "path-literal",
-        "line": 24654
+        "line": 24933
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6772,7 +8056,7 @@
       "commit": "e7a41d7",
       "wired": {
         "form": "path-literal",
-        "line": 24656
+        "line": 24935
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6789,7 +8073,7 @@
       "commit": "bd09669",
       "wired": {
         "form": "path-literal",
-        "line": 24660
+        "line": 24939
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6806,7 +8090,7 @@
       "commit": "6abaa30",
       "wired": {
         "form": "path-literal",
-        "line": 24658
+        "line": 24937
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6823,7 +8107,7 @@
       "commit": "a455511",
       "wired": {
         "form": "path-literal",
-        "line": 24640
+        "line": 24919
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6840,7 +8124,7 @@
       "commit": "8798d57",
       "wired": {
         "form": "path-literal",
-        "line": 24642
+        "line": 24921
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6857,7 +8141,7 @@
       "commit": "1ea7df5",
       "wired": {
         "form": "path-literal",
-        "line": 24644
+        "line": 24923
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6874,7 +8158,7 @@
       "commit": "e2d1c3b",
       "wired": {
         "form": "path-literal",
-        "line": 24646
+        "line": 24925
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6891,7 +8175,7 @@
       "commit": "d441fd6",
       "wired": {
         "form": "path-literal",
-        "line": 24648
+        "line": 24927
       },
       "consumedBy": [],
       "env": "headless-script",
@@ -6908,7 +8192,7 @@
       "commit": "a1432e3",
       "wired": {
         "form": "path-literal",
-        "line": 24650
+        "line": 24929
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6918,14 +8202,14 @@
     },
     {
       "file": "tests/theme-engines-v2258.js",
-      "sha": "d7fc5cefe188",
+      "sha": "418268faf424",
       "version": "2.258.0",
       "versionSource": "title",
       "fileAnchor": "2258",
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24789
+        "line": 25068
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6945,7 +8229,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19641
+        "line": 19919
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -6965,7 +8249,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24803
+        "line": 25082
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -6985,7 +8269,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20846
+        "line": 21124
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7005,7 +8289,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20993
+        "line": 21271
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7024,7 +8308,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19866
+        "line": 20144
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7044,7 +8328,7 @@
       "commit": "6665f32",
       "wired": {
         "form": "runLock",
-        "line": 23096
+        "line": 23374
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7064,7 +8348,7 @@
       "commit": "6665f32",
       "wired": {
         "form": "runLock",
-        "line": 23097
+        "line": 23375
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7083,7 +8367,7 @@
       "commit": "c576fe5",
       "wired": {
         "form": "runLock",
-        "line": 23065
+        "line": 23343
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7103,7 +8387,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20230
+        "line": 20508
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -7115,14 +8399,14 @@
     },
     {
       "file": "tests/ui-binding-coverage.js",
-      "sha": "7e8f7e711a2f",
-      "version": null,
-      "versionSource": null,
+      "sha": "f49e2edced80",
+      "version": "2.382.0",
+      "versionSource": "head",
       "fileAnchor": null,
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25204
+        "line": 25483
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7141,7 +8425,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 20306
+        "line": 20584
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7162,7 +8446,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "require",
-        "line": 8850
+        "line": 9017
       },
       "consumedBy": [
         "tests/dependency-guard-v2103.js",
@@ -7186,6 +8470,9 @@
       },
       "consumedBy": [
         "tests/act-b1-v2117.js",
+        "tests/action-desk-v14-routing-regression.js",
+        "tests/agency-real-cycle-regression.js",
+        "tests/agency-workflow-integration.js",
         "tests/alias-trace-v2970.js",
         "tests/audit-vol-v2121.js",
         "tests/b2-travel-v2117.js",
@@ -7256,20 +8543,24 @@
         "tests/hazard-trigger-v2138.js",
         "tests/hazard-weather-v2960.js",
         "tests/horizon-v2640.js",
+        "tests/human-realism-transaction-regression.js",
         "tests/identity-v2860.js",
         "tests/inject-value-v2150.js",
         "tests/inject-vis-v2580.js",
         "tests/input-boundary-v2790.js",
         "tests/input-guard-v2840.js",
         "tests/inst-v2119.js",
+        "tests/intake-goal-idempotency.js",
         "tests/interop-v2101.js",
         "tests/journal-v2940.js",
+        "tests/life-boundary-batch-regression.js",
         "tests/life-e4-v2115.js",
         "tests/life-e8-v2139.js",
         "tests/life-turn-v2132.js",
         "tests/lifeline-v2141.js",
         "tests/map-viewport-v2246.js",
         "tests/mend-v2119.js",
+        "tests/motive-preview-regression.js",
         "tests/noesis-v2140.js",
         "tests/o1-host-matrix-v2186.js",
         "tests/o7-plan-tree-gate-v2187.js",
@@ -7285,6 +8576,7 @@
         "tests/perf-recalc-v2123.js",
         "tests/perf-tape-v2148.js",
         "tests/perf-trace-v2102.js",
+        "tests/persona-schedule-evidence-regression.js",
         "tests/perspective-lock-v2142.js",
         "tests/phone-bridge-v2970.js",
         "tests/plan-v2119.js",
@@ -7305,6 +8597,7 @@
         "tests/render-pre-v2108.js",
         "tests/replay-v2890.js",
         "tests/resource-ledger-v2920.js",
+        "tests/routine-agency-regression.js",
         "tests/rumor-e3-v2115.js",
         "tests/rumor-v2960.js",
         "tests/s3-b1-e1-v2183.js",
@@ -7340,6 +8633,57 @@
         "tests/s3-tx6-v2169.js",
         "tests/s3-tx7-v2170.js",
         "tests/sandbox-isolation-v2125.js",
+        "tests/scenario-v12-broken-promise.js",
+        "tests/scenario-v12-era-transition.js",
+        "tests/scenario-v12-exv-cross-experience.js",
+        "tests/scenario-v12-multiple-perspectives.js",
+        "tests/scenario-v12-town-shortage.js",
+        "tests/scenario-v12-travel-return.js",
+        "tests/scenario-v13-border-drift.js",
+        "tests/scenario-v13-room-acoustics.js",
+        "tests/scenario-v13-ruin-relic-sandbox.js",
+        "tests/scenario-v14-choke-courier.js",
+        "tests/scenario-v14-cost-foreshadow.js",
+        "tests/scenario-v14-credit-rupture.js",
+        "tests/scenario-v14-grand-cascade.js",
+        "tests/scenario-v14-multi-whisper.js",
+        "tests/scenario-v14-poison-dilemma.js",
+        "tests/scenario-v14-sanctuary-echo.js",
+        "tests/scenario-v14-schism-reform.js",
+        "tests/scenario-v15-living-threads.js",
+        "tests/scenario-v16-human-realism.js",
+        "tests/scenario-v20-routine-pacing.js",
+        "tests/scenario-v25-v16-living-world-integration.js",
+        "tests/scenario-v26-psyche-trauma-blackening.js",
+        "tests/scenario-v27-conspiracy-coup-domino.js",
+        "tests/scenario-v28-moral-dilemma-tide.js",
+        "tests/scenario-v29-butterfly-chekhov-gun.js",
+        "tests/scenario-v30-ideology-memetics-cascade.js",
+        "tests/scenario-v31-v17-causal-psyche-integration.js",
+        "tests/scenario-v32-tactical-combat-trauma.js",
+        "tests/scenario-v33-interrogation-psychic-tell.js",
+        "tests/scenario-v34-ecosystem-predation-wild.js",
+        "tests/scenario-v35-siege-attrition-starvation.js",
+        "tests/scenario-v36-ruin-mechanism-trap.js",
+        "tests/scenario-v37-v18-epic-world-grand-pulse.js",
+        "tests/scenario-v38-stage-presence-offstage-living.js",
+        "tests/scenario-v39-covert-espionage-heist.js",
+        "tests/scenario-v40-epidemic-surgical-triage.js",
+        "tests/scenario-v41-maritime-navigation-storm.js",
+        "tests/scenario-v42-stealth-infiltration-kill.js",
+        "tests/scenario-v43-v19-epic-living-network-pulse.js",
+        "tests/scenario-v44-embodied-prompt-perception.js",
+        "tests/scenario-v45-cross-plugin-full-duplex-resonance.js",
+        "tests/scenario-v46-epochal-collapse-transition.js",
+        "tests/scenario-v47-cataclysm-topological-rupture.js",
+        "tests/scenario-v48-financial-contagion-collapse.js",
+        "tests/scenario-v49-v20-epic-holistic-convergence.js",
+        "tests/scenario-v50-theology-cult-crusade.js",
+        "tests/scenario-v51-regiment-tactics-clash.js",
+        "tests/scenario-v52-incarceration-jailbreak-hounds.js",
+        "tests/scenario-v53-bloodline-heritage-trust.js",
+        "tests/scenario-v54-engineering-siege-explosion.js",
+        "tests/scenario-v55-dungeon-eco-court-mesh.js",
         "tests/session-v2119.js",
         "tests/settle-v2650.js",
         "tests/settle-v2660.js",
@@ -7384,7 +8728,20 @@
         "tests/ui-module-section-v2570.js",
         "tests/ui-wire-audit.js",
         "tests/v10-eighteen-matrix.js",
+        "tests/v10-inject-pipeline.js",
+        "tests/v10-master-matrix.js",
         "tests/v10-r3-storage-stress.js",
+        "tests/v10-unified-pending.js",
+        "tests/v11-field-writers.js",
+        "tests/v11-fold-witness.js",
+        "tests/v11-inject-dualface.js",
+        "tests/v11-l3-registry.js",
+        "tests/v11-pending-state.js",
+        "tests/v11-push-api-coverage.js",
+        "tests/v11-push-api-registry.js",
+        "tests/v11-snapshot-state.js",
+        "tests/v11-source-contract.js",
+        "tests/v11-vacuum-board.js",
         "tests/world-bridge-v2154.js",
         "tests/world-seed-v2155.js",
         "tests/world-v2630.js",
@@ -7413,7 +8770,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "spawn-argv",
-        "line": 21563
+        "line": 21841
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -7430,7 +8787,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 21588
+        "line": 21866
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7444,14 +8801,14 @@
     },
     {
       "file": "tests/ui-live.js",
-      "sha": "ab579c119905",
+      "sha": "b1472c0c81a8",
       "version": "2.137.0",
       "versionSource": "title",
       "fileAnchor": null,
       "commit": "792d9ac",
       "wired": {
         "form": "path-literal",
-        "line": 21627
+        "line": 21905
       },
       "consumedBy": [
         "tests/o1-host-matrix-v2186.js",
@@ -7474,7 +8831,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19611
+        "line": 19889
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7515,7 +8872,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24938
+        "line": 25217
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7534,7 +8891,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24934
+        "line": 25213
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7550,13 +8907,52 @@
       "version": "2.295.0",
       "versionSource": "head",
       "fileAnchor": null,
-      "commit": null,
-      "wired": null,
+      "commit": "872226f",
+      "wired": {
+        "form": "runScript",
+        "line": 25515
+      },
       "consumedBy": [],
       "env": "headless-script",
       "runnable": false,
       "runnableExports": [],
-      "acceptance": "unwired"
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v10-inject-pipeline.js",
+      "sha": "0aa24d750b88",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "5b7f991",
+      "wired": {
+        "form": "runScript",
+        "line": 25503
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v10-master-matrix.js",
+      "sha": "4d4cba512e16",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "5b7f991",
+      "wired": {
+        "form": "runScript",
+        "line": 25516
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "audit"
+      ],
+      "acceptance": "wired"
     },
     {
       "file": "tests/v10-r3-persist-hosted.js",
@@ -7565,12 +8961,15 @@
       "versionSource": "head",
       "fileAnchor": null,
       "commit": "1115b36",
-      "wired": null,
+      "wired": {
+        "form": "runScript",
+        "line": 25510
+      },
       "consumedBy": [],
       "env": "headless-script",
       "runnable": false,
       "runnableExports": [],
-      "acceptance": "unwired"
+      "acceptance": "wired"
     },
     {
       "file": "tests/v10-r3-storage-stress.js",
@@ -7579,12 +8978,15 @@
       "versionSource": "head",
       "fileAnchor": null,
       "commit": "1115b36",
-      "wired": null,
+      "wired": {
+        "form": "runScript",
+        "line": 25517
+      },
       "consumedBy": [],
       "env": "headless-script",
       "runnable": false,
       "runnableExports": [],
-      "acceptance": "unwired"
+      "acceptance": "wired"
     },
     {
       "file": "tests/v10-ui-pills.js",
@@ -7593,12 +8995,292 @@
       "versionSource": "head",
       "fileAnchor": null,
       "commit": "edc4c44",
-      "wired": null,
+      "wired": {
+        "form": "runScript",
+        "line": 25509
+      },
       "consumedBy": [],
       "env": "headless-script",
       "runnable": false,
       "runnableExports": [],
-      "acceptance": "unwired"
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v10-unified-pending.js",
+      "sha": "9c18c09252a3",
+      "version": "2.296.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "5b7f991",
+      "wired": {
+        "form": "runScript",
+        "line": 25504
+      },
+      "consumedBy": [],
+      "env": "headless-script",
+      "runnable": false,
+      "runnableExports": [],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-field-writers.js",
+      "sha": "d6e8bcb73e49",
+      "version": "2.300.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "92ea1f1",
+      "wired": {
+        "form": "runScript",
+        "line": 25616
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-fold-witness.js",
+      "sha": "69b978915cfb",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "382caf9",
+      "wired": {
+        "form": "runScript",
+        "line": 25573
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-inject-dualface.js",
+      "sha": "a849a0490457",
+      "version": "2.298.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "a3ca680",
+      "wired": {
+        "form": "runScript",
+        "line": 25550
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-l3-registry.js",
+      "sha": "6247f3e21857",
+      "version": "2.299.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "2eba92d",
+      "wired": {
+        "form": "runScript",
+        "line": 25557
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-master-matrix.js",
+      "sha": "ef12ce99aa4e",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "2e559c0",
+      "wired": {
+        "form": "runScript",
+        "line": 25582
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-pages-cats.js",
+      "sha": "123e1e49d1be",
+      "version": "2.301.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "a171b76",
+      "wired": {
+        "form": "runScript",
+        "line": 25571
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-pending-state.js",
+      "sha": "428c3925abf3",
+      "version": "2.298.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "a3ca680",
+      "wired": {
+        "form": "runScript",
+        "line": 25543
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-push-api-coverage.js",
+      "sha": "d96e96dc2360",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "e37bc64",
+      "wired": {
+        "form": "runScript",
+        "line": 25574
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-push-api-registry.js",
+      "sha": "4e0fadf90150",
+      "version": "2.299.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "2eba92d",
+      "wired": {
+        "form": "runScript",
+        "line": 25563
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-snapshot-state.js",
+      "sha": "2d373534b655",
+      "version": "2.297.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "46be976",
+      "wired": {
+        "form": "runScript",
+        "line": 25535
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-snapshot-viewer.js",
+      "sha": "77ca52eabdd4",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "37077b7",
+      "wired": {
+        "form": "runScript",
+        "line": 25572
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-source-contract.js",
+      "sha": "14fe4f276541",
+      "version": "2.297.0",
+      "versionSource": "title",
+      "fileAnchor": null,
+      "commit": "46be976",
+      "wired": {
+        "form": "runScript",
+        "line": 25527
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
+    },
+    {
+      "file": "tests/v11-vacuum-board.js",
+      "sha": "8d1c09978ac2",
+      "version": null,
+      "versionSource": null,
+      "fileAnchor": null,
+      "commit": "2e559c0",
+      "wired": {
+        "form": "runScript",
+        "line": 25575
+      },
+      "consumedBy": [],
+      "env": "headless-lock",
+      "runnable": false,
+      "runnableExports": [
+        "runAll",
+        "runNegative"
+      ],
+      "acceptance": "wired"
     },
     {
       "file": "tests/v2250-locks.js",
@@ -7609,7 +9291,7 @@
       "commit": "1cdf5c6",
       "wired": {
         "form": "runLock",
-        "line": 24716
+        "line": 24995
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7630,7 +9312,7 @@
       "commit": "0ad2519",
       "wired": {
         "form": "runScript",
-        "line": 24701
+        "line": 24980
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7650,7 +9332,7 @@
       "commit": "af1b36f",
       "wired": {
         "form": "runScript",
-        "line": 24702
+        "line": 24981
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7670,7 +9352,7 @@
       "commit": "853c368",
       "wired": {
         "form": "runScript",
-        "line": 24703
+        "line": 24982
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7690,7 +9372,7 @@
       "commit": "f6d93a9",
       "wired": {
         "form": "runScript",
-        "line": 24704
+        "line": 24983
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7710,7 +9392,7 @@
       "commit": "ac3220a",
       "wired": {
         "form": "runScript",
-        "line": 24705
+        "line": 24984
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7730,7 +9412,7 @@
       "commit": "1856919",
       "wired": {
         "form": "runScript",
-        "line": 24706
+        "line": 24985
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7750,7 +9432,7 @@
       "commit": "193f500",
       "wired": {
         "form": "runLock",
-        "line": 25113
+        "line": 25392
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7762,14 +9444,14 @@
     },
     {
       "file": "tests/v7-cap-tier-2283.js",
-      "sha": "93b9530ad638",
+      "sha": "7389896e6308",
       "version": "2.283.0",
       "versionSource": "head",
       "fileAnchor": null,
       "commit": "44b117f",
       "wired": {
         "form": "runLock",
-        "line": 25099
+        "line": 25378
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7789,7 +9471,7 @@
       "commit": "f20db62",
       "wired": {
         "form": "runLock",
-        "line": 25062
+        "line": 25341
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -7810,7 +9492,7 @@
       "commit": "f20db62",
       "wired": {
         "form": "runLock",
-        "line": 25015
+        "line": 25294
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7831,7 +9513,7 @@
       "commit": "8401413",
       "wired": {
         "form": "runLock",
-        "line": 25152
+        "line": 25431
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7851,7 +9533,7 @@
       "commit": "af44f9f",
       "wired": {
         "form": "runLock",
-        "line": 25135
+        "line": 25414
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7871,7 +9553,7 @@
       "commit": "5a7911b",
       "wired": {
         "form": "runLock",
-        "line": 25123
+        "line": 25402
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7891,7 +9573,7 @@
       "commit": "19e3033",
       "wired": {
         "form": "runLock",
-        "line": 25118
+        "line": 25397
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7911,7 +9593,7 @@
       "commit": "2314f23",
       "wired": {
         "form": "runLock",
-        "line": 25143
+        "line": 25422
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7931,7 +9613,7 @@
       "commit": "f20db62",
       "wired": {
         "form": "runLock",
-        "line": 25090
+        "line": 25369
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7951,7 +9633,7 @@
       "commit": "da4756d",
       "wired": {
         "form": "runLock",
-        "line": 25175
+        "line": 25454
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7971,7 +9653,7 @@
       "commit": "9f7224d",
       "wired": {
         "form": "runLock",
-        "line": 25129
+        "line": 25408
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -7991,7 +9673,7 @@
       "commit": "e3537b4",
       "wired": {
         "form": "runLock",
-        "line": 25163
+        "line": 25442
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8011,7 +9693,7 @@
       "commit": "f20db62",
       "wired": {
         "form": "runLock",
-        "line": 25080
+        "line": 25359
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8032,7 +9714,7 @@
       "commit": "44b117f",
       "wired": {
         "form": "runLock",
-        "line": 25108
+        "line": 25387
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8052,7 +9734,7 @@
       "commit": "f20db62",
       "wired": {
         "form": "runLock",
-        "line": 25071
+        "line": 25350
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8072,7 +9754,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25205
+        "line": 25484
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8091,7 +9773,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25192
+        "line": 25471
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8111,7 +9793,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25187
+        "line": 25466
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8123,14 +9805,14 @@
     },
     {
       "file": "tests/v8-desk-ui-2294.js",
-      "sha": "be2031226af8",
+      "sha": "ec54a66dc968",
       "version": null,
       "versionSource": null,
       "fileAnchor": null,
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25193
+        "line": 25472
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8150,7 +9832,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25198
+        "line": 25477
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8171,7 +9853,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25189
+        "line": 25468
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8216,7 +9898,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25194
+        "line": 25473
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8228,14 +9910,14 @@
     },
     {
       "file": "tests/v8-panel-activity-2294.js",
-      "sha": "0b9da9adcf94",
+      "sha": "2a3c252bd5b6",
       "version": null,
       "versionSource": null,
       "fileAnchor": null,
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25191
+        "line": 25470
       },
       "consumedBy": [
         "tests/v8-long-session-2294.js"
@@ -8257,7 +9939,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25190
+        "line": 25469
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8269,14 +9951,14 @@
     },
     {
       "file": "tests/v8-round-drivers-2294.js",
-      "sha": "f9890f94cd2f",
+      "sha": "19238d9457c9",
       "version": "2.294.0",
       "versionSource": "head",
       "fileAnchor": null,
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25183
+        "line": 25462
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8296,7 +9978,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25196
+        "line": 25475
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8315,7 +9997,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25188
+        "line": 25467
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8334,7 +10016,7 @@
       "commit": "99b1e44",
       "wired": {
         "form": "runLock",
-        "line": 25185
+        "line": 25464
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8500,7 +10182,7 @@
       "commit": "2434588",
       "wired": {
         "form": "runLock",
-        "line": 25210
+        "line": 25489
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8526,14 +10208,14 @@
     },
     {
       "file": "tests/version-surface-gate-v2185.js",
-      "sha": "34b1ea6eeea2",
+      "sha": "4cfee1e0df57",
       "version": "2.185.0",
       "versionSource": "title",
       "fileAnchor": "2185",
       "commit": "2ab9b0e",
       "wired": {
         "form": "runLock",
-        "line": 22756
+        "line": 23034
       },
       "consumedBy": [],
       "env": "headless-gate",
@@ -8554,7 +10236,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24820
+        "line": 25099
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8574,7 +10256,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22173
+        "line": 22451
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8594,7 +10276,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24911
+        "line": 25190
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8613,7 +10295,7 @@
       "commit": "9a5f47b",
       "wired": {
         "form": "runLock",
-        "line": 24907
+        "line": 25186
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8633,7 +10315,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 22200
+        "line": 22478
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8653,7 +10335,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 19635
+        "line": 19913
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8673,7 +10355,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21323
+        "line": 21601
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8686,14 +10368,14 @@
     },
     {
       "file": "tests/x2-chronicle-v2127.js",
-      "sha": "4676b018f019",
+      "sha": "aa825be74ffa",
       "version": "2.127.0",
       "versionSource": "title",
       "fileAnchor": "2127",
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21325
+        "line": 21603
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8701,7 +10383,8 @@
       "runnableExports": [
         "runAll",
         "runNegative",
-        "scan"
+        "scan",
+        "audit"
       ],
       "acceptance": "verified"
     },
@@ -8714,7 +10397,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21385
+        "line": 21663
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8734,7 +10417,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21387
+        "line": 21665
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8754,7 +10437,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21389
+        "line": 21667
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8774,7 +10457,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21391
+        "line": 21669
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8794,7 +10477,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21393
+        "line": 21671
       },
       "consumedBy": [],
       "env": "headless-lock",
@@ -8814,7 +10497,7 @@
       "commit": "792d9ac",
       "wired": {
         "form": "runLock",
-        "line": 21395
+        "line": 21673
       },
       "consumedBy": [],
       "env": "headless-lock",

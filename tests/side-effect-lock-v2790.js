@@ -49,7 +49,20 @@ const INTENTIONAL = [
     why: '同一条纪律的第二处实例：作答时窗口已过 ⇒ 把该行标成 lapsed 并拒收本次作答。'
       + '「到点即作废」是世界的既有规则，与「这次作答被拒」是两件事：'
       + '放弃整笔事务会把刚打上的作废标记一起回滚，行就永远停在 deferred/open 上，'
-      + '而「窗口真的会关」也就成了一句谁也看不到的声明。' }
+      + '而「窗口真的会关」也就成了一句谁也看不到的声明。' },
+  // v2.380.0（历史欠账消红）：四座「拒收分支内真写 draft」的有意副作用站点，逐一取证入册：
+  //   拒收分支的写若只落在模块级 stat / 局部 out 上，中止事务无损失（那些站点已改 return false;）；
+  //   下面的写落的是 draft 本体，中止会连「拒绝这件事本身的记录」一起回滚，故必须提交。
+  { rel: 'engines/court-intrigue.js', reason: 'refusal-audit-log', count: 2,
+    why: '两处负控拦截（禁军格杀 / 构陷反噬）拒收前先往 court.auditLog.unshift 审计记录并 stat 计数——'
+      + '审计日志写的是 draft 本体：「这次谋逆被御林军射杀」必须落盘成世界史实，'
+      + '中止事务会把这段历史一起抹掉（站点 court-intrigue.js:164 / :180）' },
+  { rel: 'engines/covert-espionage.js', reason: 'cover-compromised-capture',
+    why: '掩护完整度归零且无文牒强闯高戒备据点 ⇒ 间谍当场被抓：spy.status = captured / suspicion = 100 '
+      + '是世界的真实变化（人已经被抓了），不是「这次行动被拒」的记号；中止会让人凭空获释' },
+  { rel: 'engines/surgical-triage.js', reason: 'hemorrhage-shock',
+    why: '大出血未止血强行缝合 ⇒ 患者陷入休克：p.inShock = true / stability -35 是病人的真实病情变化，'
+      + '中止手术会让病人凭空脱离休克' }
 ];
 
 // ── 扫描器：掩码 + 括号匹配 + 嵌套深度，找「transact 回调内、拒收后裸 return」的站点 ──
@@ -331,16 +344,18 @@ function runAll(a) {
   Object.keys(found).forEach(function (rel) {
     found[rel].forEach(function (s) { allSites.push({ rel: rel, line: s.line, writes: s.writes }); });
   });
-  a(allSites.length === INTENTIONAL.length,
-    'v2790: [B] 产品面「拒收后裸 return」站点数 == 有意副作用登记数（实 ' + allSites.length + ' vs ' + INTENTIONAL.length + '）'
+  a(allSites.length === INTENTIONAL.reduce(function (n, it) { return n + (it.count || 1); }, 0),
+    'v2790: [B] 产品面「拒收后裸 return」站点数 == 有意副作用登记数（实 ' + allSites.length + ' vs 登记 '
+    + INTENTIONAL.reduce(function (n, it) { return n + (it.count || 1); }, 0) + '）'
     + (allSites.length ? ' :: ' + JSON.stringify(allSites) : ''));
   const unmasked = allSites.filter(function (s) { return !s.writes; });
   a(unmasked.length === 0,
     'v2790: [B] 剩下的每一个站点都必须真带状态写（无写的站点即漏网：' + JSON.stringify(unmasked) + '）');
   INTENTIONAL.forEach(function (it) {
     const hit = allSites.filter(function (s) { return s.rel === it.rel; });
-    a(hit.length === 1 && hit[0].writes,
-      'v2790: [B] 白名单 ' + it.rel + ' 命中 1 处且确为状态写（实 ' + JSON.stringify(hit) + '）—— 白名单不腐烂');
+    a(hit.length === (it.count || 1) && hit.every(function (s) { return !!s.writes; }),
+      'v2790: [B] 白名单 ' + it.rel + '（' + it.reason + '）命中 ' + (it.count || 1) + ' 处且确为状态写（实 '
+      + JSON.stringify(hit) + '）—— 白名单不腐烂');
   });
 
   // B2 现场（行为）：拒收不推进 rev / 不改磁盘

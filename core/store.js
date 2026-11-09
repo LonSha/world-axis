@@ -63,6 +63,51 @@
       // v2.253.0 物化：摊位账（stall）。摊是**留在世界上**的东西，摊主走了它还在卖，
       //   故与人的在场状态分开存（与 interestFace 相反：那是人在哪，这是货在哪）。
       stalls: { rows: [] },   // rows: [{id,owner,place,sign,away,listings:[{resource,qty,price}],ledger:[]}]
+      // v2.382.0：生产引擎已持久写入的容器必须在冷启动骨架物化。
+      // 结构沿用各引擎 ensure/openStore 的既有默认值；旧存档由 ensureShape 补齐。
+      actors: {},
+      actionCostLogs: [],
+      toxicologyLedger: { cases: {}, recipes: [] },
+      autobiography: { actors: {} },
+      blackmarketAccounts: { laundered: [], loans: [], auctions: [] },
+      cityFolklore: { taboos: [], violations: [] },
+      civilizationRelic: { relics: {}, breakthroughs: [] },
+      forgedIntelLogs: [],
+      collateralRecords: [],
+      socialBlacklist: {},
+      guarantorDebts: {},
+      contraband: { routes: [], shipments: [], busts: [], confiscated: [] },
+      counterfactualSandbox: { branches: {}, nextId: 1 },
+      courierQueue: [],
+      inboxes: {},
+      courtIntrigue: { courts: {} },
+      covenantLedger: { covenants: [], sanctions: [] },
+      covertSpies: [],
+      covertDispatches: [],
+      pacts: [],
+      routineDisruptions: [],
+      epidemicOutbreaks: {},
+      factionChronicle: { archives: {} },
+      factions: {},
+      schismLogs: [],
+      activeCrises: [],
+      foreshadowTree: { trees: [] },
+      regionalInstitutions: {},
+      institutionalReforms: [],
+      legacyOaths: { oaths: [], enforcements: [] },
+      maritimeVessels: [],
+      socialIdeology: { articles: [], classIndices: {}, collectiveActions: [] },
+      sanctuaries: {},
+      sanctuaryLogs: [],
+      sanctuaryOccupants: {},
+      stagePresence: { lastSeenActors: {}, activeCast: [], offstageCast: [], currentRound: 0 },
+      stealthTactics: { guards: [], infiltrators: {}, logs: [] },
+      supplyChokes: [],
+      cityMarkets: {},
+      cityPanics: {},
+      rumors: [],
+      surgicalPatients: {},
+      terrainHazard: { hazards: [], logs: [] },
       // 暗流（未结算事件链）
       currents: [],             // {id,title,summary,visibility:hidden|trace|public,public_trace,causes:[],participants:[],stage,createdAt,updatedAt,branchId}
       // 回声（已结算结果与正文的接触面）
@@ -1439,7 +1484,24 @@
     //   与 lifeTurn 同一裁决（见上）：它既**不是设置**、也**不是存档本体**——
     //   单列是为了不让它污染既有计数面（`families.settingsUnregistered` 是面板与断言
     //   都读的读数，不得被新键悄悄加一）。
-    playtime: /^worldaxis_playtime_v1$/
+    playtime: /^worldaxis_playtime_v1$/,
+    // v2.381.0（收口）：engines/channel-probe.js 的渠道探针**账本**键。
+    //   注意它**不是**该模块的设置键 —— 设置键是 `worldaxis_channel_probe_settings_v1`
+    //   （已随 __REG 登记，走 settings 家族）。LEDGER_KEY 记的是「历次探针抽到的题干/判分」，
+    //   属进程侧观测记忆：不进世界存档、不是用户配置。
+    //   为什么要单列而不是让它落进兜底的 settingsUnregistered：
+    //     ① 那个桶的面板语义是「**设置**家族里没人认领的幽灵键」（体检视图逐字显示
+    //        「未登记设置 N」）。把一份探针账本报成「用户配置有问题」是错的归因。
+    //     ② sweepStaleKeys 对 settingsUnregistered 的口径是「默认保留，ghostSettings:true
+    //        才纳入候选清理」；本键真正该守的不变量是「账本可以丢（探针会重建），
+    //        但绝不该被当成幽灵设置列在用户面前」。
+    //   与 lifeTurn / playtime 同一裁决逻辑：单列是为了**不让它污染既有计数面**。
+    channelProbe: /^worldaxis_channel_probe_ledger_v1$/,
+    // v2.381.0（收口）：engines/inline-tags.js 的解析统计键（命中/畸形计数）。
+    //   该模块**没有**设置键（不可配置，纯解析器），故本键 `worldaxis_inline_tags_v1`
+    //   是它唯一的落盘点 —— 一份可丢可重建的运行时统计。
+    //   同 lifeTurn / playtime / channelProbe 裁决：单列，不污染 settingsUnregistered。
+    inlineTags: /^worldaxis_inline_tags_v1$/
   };
     // v2.5.0: 删除 `settingsSettings` 硬编码白名单。原因（实测口径）：
     //   ① 它是「12 个设置键」的第二份真源，必然漂移——实查已漏掉 calendar_settings_v1 与
@@ -1476,6 +1538,10 @@
     // v2.156.0（SP1）：同上——必须在 settings 兜底**之前**判定，否则活动基准键
     //   会落进 settingsUnregistered，把一件进程侧记忆报成用户配置。
     if (KEY_FAMILIES.playtime.test(key)) return { family: 'playtime', chat: null };
+    // v2.381.0（收口）：同上——必须在 settings 兜底**之前**判定，否则探针账本/
+    //   内联标签统计会被报成「未登记设置」（面板体检视图里变成两条假告警）。
+    if (KEY_FAMILIES.channelProbe.test(key)) return { family: 'channelProbe', chat: null };
+    if (KEY_FAMILIES.inlineTags.test(key)) return { family: 'inlineTags', chat: null };
     if ((m = key.match(KEY_FAMILIES.state))) return { family: 'state', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.recovery))) return { family: 'recovery', chat: m[1] };
     if ((m = key.match(KEY_FAMILIES.diag_eventLog))) return { family: 'diagnostic', kind: 'event_log', chat: m[1] };
@@ -1666,10 +1732,21 @@
     // v2.324.0: 真实人物肉身生理、七情六欲与记恨小账本容器上限
     'humanRealism.actors': { cap: 48, kind: 'object', site: 'human-realism.js WA.evict.object(actors, "humanRealism.actors")' },
     'humanRealism.grudges': { cap: 48, site: 'human-realism.js evict.array(grudges, "humanRealism.grudges")' },
-    'humanRealism.log': { cap: 32, site: 'human-realism.js evict.array(log, "humanRealism.log")' },
+    // ⚠ v2.382.0：`humanRealism.log` 本条已**撤除**（此处曾登记 cap:32 + site 声明）。
+    //   与 core/evict.js 的 SITE_DECLS 同名撤除**必须成对**——只改一边会让
+    //   registryParity 继续按旧登记查骨架，而站点表里已经没有这条裁剪点，
+    //   「登记 ↔ 站点」两侧就此错位（正是本仓库 v2.13.0 双集合门禁要防的形态）。
+    //   根因：该容器全仓**零写入方**（只在 human-realism.js:70 兜底初始化为 `[]`），
+    //   声明的裁剪点从来不执行 ⇒ 回归报「声明悬空站点」是在说真话。
+    //   处置按 core/store.js:118-120 的既定口径：撤登记、不造假写入方。
     // v2.325.0: 剧情生活动线、身份世界观节律与个性经历偏离容器上限
     'routinePacing.actors': { cap: 48, kind: 'object', site: 'routine-pacing.js WA.evict.object(actors, "routinePacing.actors")' },
-    'routinePacing.history': { cap: 32, site: 'routine-pacing.js evict.array(history, "routinePacing.history")' },
+    // ⚠ v2.382.0：`routinePacing.history` 本条已**撤除**（曾登记 cap:32 + site 声明）。
+    //   与 core/evict.js 的 SITE_DECLS 同名撤除成对（理由同上一条 humanRealism.log：
+    //   单边改会让「登记 ↔ 站点」错位）。
+    //   根因：全仓只在 routine-pacing.js 的兜底初始化里出现（250/290/335/364/388 行的
+    //   `{ actors:{}, worldFrame:{}, history:[] }`），**零 push、零读**，
+    //   `git log -S 'pacing.history.push'` 全历史无命中。
     'vitals.rows': { cap: 24, site: "vitals.js evict.array(rows, \"vitals.rows\")" },
     'coordinate.anchors': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.anchors\")" },
     'coordinate.rows': { cap: 64, site: "coordinate.js evict.array(rows, \"coordinate.rows\")" },
@@ -3012,7 +3089,14 @@
           // v2.274.0（V6 收口）：能力档位报读面的键读回（engines/capability-audit.js 的 wroteFalse）。
           //   三份真源（本表 / ui/panel.js 的 LAB_P / engines/tool-diag.js 的 SRC_LABEL）同键集——
           //   缺这一份，『读不出玩家表过的态』与『玩家从没表过态』在诊断上同形。
-          capabilityAudit: '能力档位表态读回（读失败 ⇒ 与「玩家没表过态」同形）' };
+          capabilityAudit: '能力档位表态读回（读失败 ⇒ 与「玩家没表过态」同形）',
+          // v2.381.0 收口：v2.326.0 / v2.329.0 两个新引擎的裸读点补投归因（G16 排查）。
+          //   与上面十条同键集（本表 / ui/panel.js 的 LAB_P / engines/tool-diag.js 的 SRC_LABEL 三份真源一同登记）。
+          //   缺这一份，消费端退回裸桶名——「渠道账本读不出来」与「本渠道还没有任何结论」、
+          //   「内联标签账读不出来」与「本聊天还没有任何内联标签」在诊断上同形，
+          //   而前者要查存储可读性/隐私模式，后者是正常开局态。
+          channelProbe: '渠道探针账本读回（读失败 ⇒ 与「本渠道还没有任何结论」同形）',
+          inlineTags: '内联标签解析账读回（读失败 ⇒ 与「本聊天还没有任何内联标签」同形）' };
         const rTxt = Object.keys(rdSrc).filter(function (k) { return rdSrc[k] > 0; })
           .map(function (k) { return (LAB[k] || k) + ' ' + rdSrc[k]; }).join(' / ');
         issues.push({ level: 'warn', key: 'storage.readFailed',
@@ -4582,8 +4666,10 @@
       // v2.108.0: the recover family (backup/mark) MUST be registered alongside
       //   KEY_FAMILIES -- skipping it turns `families[cls.family]++` into NaN
       //   (an occupancy table that reports "NaN keys").
-      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, playtime: 0, other: 0 };
-      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, playtime: 0, other: 0 };
+      // v2.381.0：channelProbe / inlineTags 两个进程记忆家族同批入表 —— 漏登记会让
+      //   `families[cls.family]++` 变 NaN（正是 v2.108.0 给 recover 家族留注释的那一类）。
+      const families = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, playtime: 0, channelProbe: 0, inlineTags: 0, other: 0 };
+      const perFamilyBytes = { state: 0, stateDerived: 0, recovery: 0, diagnostic: 0, corrupt: 0, conflict: 0, writerId: 0, settings: 0, settingsUnregistered: 0, wb: 0, recover: 0, lifeTurn: 0, playtime: 0, channelProbe: 0, inlineTags: 0, other: 0 };
       let totalBytes = 0, stateKeys = 0, stateDerivedKeys = 0, diagKeys = 0, corruptKeys = 0, curBytes = 0, curQuarantines = 0;
       let conflictKeys = 0, conflictBytes = 0;
       let keysReadFailed = 0;           // v2.10.0: 本次盘点中读失败的键数（体积表可信度判据）

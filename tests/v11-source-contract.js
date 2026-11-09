@@ -91,6 +91,8 @@ function stripCommentsKeepStrings(src) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 白名单 A：有 buildBlock、但**不是** SOURCES 源。V11 立项实测差集 8 台，逐台裁决。
 //   顺序即裁决顺序：子源（3） / 走别的注入通道（2） / 编辑面（2） / 真死面（1）。
+//   v2.382.0（幽灵引用治理批次⑦）：现场差集已由 8 变 11 —— v2.360.0 之后新增的三台
+//   （eccentricThreads / offstageLife / routinePacing）走 inject-collector 第三通道，见下方补登记。
 // ─────────────────────────────────────────────────────────────────────────────
 const NON_SOURCE_BUILDBLOCK = {
   memorySampler: { verify: 'subsource', reason: '记忆采样器：由 memory 源统管、不单独设可见性开关（v2560 SUBSOURCES 已声明），块随记忆源一并进出正文' },
@@ -104,10 +106,19 @@ const NON_SOURCE_BUILDBLOCK = {
   editorFaction: { verify: 'editor', reason: '势力编辑器：buildBlock 供编辑态导出/对照，产品侧零引用（死面账本 test-only），正文不需要知道编辑器里躺着什么' },
   editorEvents: { verify: 'editor', reason: '事件链编辑器：buildBlock 供编辑态导出/对照，产品侧零引用（死面账本 test-only），理由同上' },
   // ↓ 真死面：门面聚合会与 beatReport / genGate 重复，故门面自身不产注入块。
-  beatFacade: { verify: 'dead', reason: '拍门面：真正的产块者是 beatReport / genGate（二者均已在 SOURCES），门面再产一块会与它们重复；自身 buildBlock 外部零引用，已入死面账本 self-only' }
+  beatFacade: { verify: 'dead', reason: '拍门面：真正的产块者是 beatReport / genGate（二者均已在 SOURCES），门面再产一块会与它们重复；自身 buildBlock 外部零引用，已入死面账本 self-only' },
+  // v2.382.0 补登记：这三台的 buildBlock 由 engines/inject-collector.js 直接调用、折叠进正文，
+  //   属「不经 SOURCES / 不受 vis 开关管辖」的第三通道（与 kaleidoscope 的 workflow 通道同理）。
+  //   它们没有 def / VIS_NAMES / vis.X 分支，故**不能**塞进 SOURCES（否则 T2/T3/T4 恒红）。
+  //   裁决用 reasoning（judge 里 = 产品侧确有 WA.<ns>.buildBlock 调用点），现场证据即
+  //   inject-collector.js 的 185 / 261 / 283 三处真实调用；不是死面、不是拿白名单遮羞。
+  eccentricThreads: { verify: 'reasoning', reason: '市井奇闻：engines/inject-collector.js 直接调 buildBlock 折叠入正文，产品侧真调用点，非死面' },
+  offstageLife: { verify: 'reasoning', reason: '台下生活：engines/inject-collector.js 直接调 buildBlock 折叠入正文，产品侧真调用点，非死面' },
+  routinePacing: { verify: 'reasoning', reason: '时序节律：engines/inject-collector.js 直接调 buildBlock 折叠入正文，产品侧真调用点，非死面' }
 };
 // ─────────────────────────────────────────────────────────────────────────────
-// 白名单 B：SOURCES 源、但该命名空间上**没有** buildBlock。实测 9 项，两种产出方式。
+// 白名单 B：SOURCES 源、但该命名空间上**没有** buildBlock。V11 立项实测 9 项，两种产出方式。
+//   v2.382.0（幽灵引用治理批次⑦）：现场差集已由 9 变 11 —— 新增两台自有取数口源，见下方补登记。
 // ─────────────────────────────────────────────────────────────────────────────
 const SOURCE_WITHOUT_BUILDBLOCK = {
   clock: { verify: 'inline', reason: '世界时间：由 buildWorldSnapshot 直接读 s.clock.label 内联成行，无独立块' },
@@ -118,7 +129,11 @@ const SOURCE_WITHOUT_BUILDBLOCK = {
   echoes: { verify: 'inline', reason: '已结算回声：由 buildWorldSnapshot 扫 s.echoes 内联成行，无常驻模块（store 直供）' },
   memory: { verify: 'ownBuilder', builder: 'buildMemoryBlock', reason: '记忆块：命名空间自带 buildMemoryBlock 取数口（同一个 ns 上不放两个 builder 名）' },
   opinion: { verify: 'ownBuilder', builder: 'buildOpinionBlock', reason: '舆情块：命名空间自带 buildOpinionBlock 取数口' },
-  ledger: { verify: 'ownBuilder', builder: 'buildLedgerText', reason: '重大事件账本：命名空间自带 buildLedgerText 取数口' }
+  ledger: { verify: 'ownBuilder', builder: 'buildLedgerText', reason: '重大事件账本：命名空间自带 buildLedgerText 取数口' },
+  // v2.382.0 补登记：两处取数口调用都在 applyInjections 内（render/inject.js 1541 / 1542），
+  //   judge 的 ownBuilder 会逐字验证 vis.<k> 与 WA.<k>.<builder>( 同时在场，非凭空登记。
+  personalInventory: { verify: 'ownBuilder', builder: 'buildInventoryFeed', reason: '随身行囊：源走自有的 buildInventoryFeed 取数口，同一 ns 上不放两个 builder 名' },
+  metabolismClock: { verify: 'ownBuilder', builder: 'buildVitalsFeed', reason: '生理代谢：源走自有的 buildVitalsFeed 取数口，同一 ns 上不放两个 builder 名' }
 };
 // ─────────────────────────────────────────────────────────────────────────────
 // 源码切片工具
@@ -370,8 +385,11 @@ function runAll(a) {
   const F = readAll();
   const runtimeKeys = runtimeBuildBlockKeys();
   const j = judge({ injectSrc: F.injectSrc, panelSrc: F.panelSrc, runtimeKeys: runtimeKeys, ledger: F.ledger });
-  a(j.sources.length === 115, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（V11 立项基线 115）');
-  a(j.runtimeKeys.length === 114, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（V11 立项基线 114）');
+  // v2.382.0（幽灵引用治理批次⑦）：立项基线 115 / 114 被 v2.360.0 之后新增的注入源与
+  //   buildBlock 顶过期；现场复算 SOURCES 144、runtimeKeys 144。与 checked 187→185、
+  //   cap-tier 70→74 同属「表跟位」，改前改后均以本脚本 N0~N6 双向自证验收。
+  a(j.sources.length === 144, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.382.0 现场基线 144；立项 115）');
+  a(j.runtimeKeys.length === 144, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.382.0 现场基线 144；立项 114）');
   a(j.missingDef.length === 0, 'v11src: [T2] 源表每项在 def 有默认值（缺: ' + (j.missingDef.join(',') || '无') + '）');
   a(j.missingName.length === 0, 'v11src: [T3] 源表每项有面板显示名（缺: ' + (j.missingName.join(',') || '无') + '）');
   a(j.missingVis.length === 0, 'v11src: [T4] 源表每项有 vis 读取点（缺: ' + (j.missingVis.join(',') || '无') + '）');
@@ -414,7 +432,7 @@ function runNegative(a) {
     a(broken !== F.injectSrc, 'v11src: [N1b] 破坏确实改写了源码');
     const jb = judge(Object.assign({ injectSrc: broken }, base));
     a(jb.expired.some(function (x) { return x.indexOf('clock') >= 0; }), 'v11src: [N1c] 破坏后 [T8] 现形（白名单项已不在源表）');
-    a(jb.closure.lhsOk === false || jb.closure.sources !== 115, 'v11src: [N1d] 破坏后 [T7] 闭合等式现形');
+    a(jb.closure.lhsOk === false || jb.closure.sources !== pristine.closure.sources, 'v11src: [N1d] 破坏后 [T7] 闭合等式现形');
   }
   // N2：把一台真实存在的非源 buildBlock（intentBoard）从白名单 A 删掉 ⇒ T6 必须现形
   {

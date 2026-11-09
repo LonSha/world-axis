@@ -315,7 +315,17 @@ async function judge(a) {
   // v2.294.0（V8 收口）：账本实测 loadEdges 200 -> 205 / callRefs 384 -> 394
 //   （V8 新增三台引擎各 +1 装载期边，调用期读既有 ns 共 +10）。
 //   期望值以 tests/module-registry-ledger.json 的现场复算为准，不靠推算。
-a(led.totals.loadEdges === 207 && led.totals.callRefs === 398,
+// v2.380.0（历史欠账消红跟位）：callRefs 494 -> **495**。真源 = module-registry-gate 现场复算
+//   （node tests/module-registry-gate.js --json，与账本逐文件逐字段 diff 为 0，gate 自身 pass）。
+//   增量归因**逐条闭合**：账本逐文件 callRefs 求和 = 495，去掉 engines/epoch-tide.js 的
+//   ['clock'] 后恰为 494 —— 即这 +1 全部来自 epoch-tide.js 新增的 clockNow 守卫形态
+//   （engines/epoch-tide.js:27 `const clockNow = function (site) { try { return WA.clock.now(site); }
+//   catch (e) { return Date.now(); } };`，48/93/140 三处在真路径上调用）。
+//   口径说明：callRefs 是 (file, ns) 对去重计数，同一文件读 clock 四站点只记 1；try/catch 不豁免
+//   —— 本门禁是**运行期实测**（Proxy 拦 WA.访问），真读到了就是引用，与「有没有兜底」无关。
+//   归因实证脚本：/tmp/clock_attr.js（扫 HEAD 与工作树的 WA.clock 出现面做差，epoch-tide.js
+//   在 HEAD 版 WA.clock 出现次数为 0，工作树为 4）+ /tmp/sum494.js（账本求和闭合）。
+a(led.totals.loadEdges === 280 && led.totals.callRefs === 495,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 装载期边 +1(尾部调 registerModule)、调用期引用 +2(读 store 的 registerModule 与 settingsBus)、命名空间 +1、装载文件 +1 —— 本处四个数字由 U3 散装读数核对器(node tools/loose-readings.js)一次报出,不必等全量回归;\n    v2830/mr: 装载期边 108 / 调用期引用 212（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（引用多 ≠ 必须先装载；v2.187.0（第三批 E4/E6/E8）：新增 engines/campaign.js / engines/atlas.js / engines/dep-check.js ⇒ 装载期边 +3（尾部各调 registerModule）、调用期 +4；v2.135.0（E6）：新增 engines/foreshadow.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎尾部各调 registerModule ⇒ 装载期边 +12；其调用期读 store/clock/evict/settingsBus/apiRouter ⇒ 调用期 +24；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
@@ -345,7 +355,7 @@ a(led.totals.loadEdges === 207 && led.totals.callRefs === 398,
 //   欠债来源同上一条：v2.224.0 加 branch-diff 引擎时改了账本却漏同步这两处散装读数。
   // v2.294.0（V8 收口）：账本实测 nsCount 327 -> 331 / loadedCount 318 -> 322
   //   （V8 新增 injectCollector / playerArchive / roundDrivers / writeDesk 四个命名空间）。
-  a(led.nsCount === 333 && led.loadedCount === 324,
+  a(led.nsCount === 437 && led.loadedCount === 426,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 两边各 +1(装载期边与调用期引用另计,见上一条);本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出,不必等全量回归;\n    v2830/mr: 命名空间 213 / 装载文件 205（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（v2.187.0（第三批 E4/E6/E8）：campaign / atlas / depCheck 三命名空间 ⇒ 两边各 +1，叠加 ui/* 三件后装载文件面 194 → 197；v2.135.0（E6）新增 engines/foreshadow.js ⇒ 两边各 +1；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）十二个新引擎 ⇒ 两边各 +12；v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '
@@ -371,8 +381,16 @@ a(led.totals.loadEdges === 207 && led.totals.callRefs === 398,
     led.modules[rel].requires.forEach(function (ns) { acc[ns] = true; });
     return acc;
   }, {});
-  a(Object.keys(providers).sort().join(',') === 'perfTrace,registerModule,settingsBus,workflow',
-    'v2830/mr: 全库装载期只依赖四个 ns（perfTrace / registerModule / settingsBus / workflow）——'
+  // v2.381.0 收口：第四条 → 六条。V11（OPV11-3）把 round-drivers 的 A 类驱动名单从「自己写死」
+  //   改成「从登记表派生」，于是 engines/round-drivers.js 在**模块顶层 IIFE** 里读
+  //   WA.l3Registry.zeroArgDrivers() 与 WA.pushApiRegistry.driveDrivers()（现读现派，不延迟到调用期）
+  //   ⇒ 装载期依赖面必然多出 l3Registry / pushApiRegistry 两个 ns。
+  //   这两条是**有意为之的装载期读**，不是次序违规：index.js 的 LOAD_ORDER 把
+  //   engines/l3-registry.js（1348）与 engines/push-api-registry.js（1351）显式排在
+  //   engines/round-drivers.js（1352）**之前**，注释原文「round-drivers 派生 A 类名单时要读本表」。
+  //   判据就此同批同步（`orderViolation` 仍为 0，证明「先装后读」这条更硬的判据没有让步）。
+  a(Object.keys(providers).sort().join(',') === 'l3Registry,perfTrace,pushApiRegistry,registerModule,settingsBus,workflow',
+    'v2830/mr: 全库装载期只依赖六个 ns（l3Registry / perfTrace / pushApiRegistry / registerModule / settingsBus / workflow）——'
     + 'v2.182.0（第二批 · O3）：engines/perf-baseline.js 在装载期就对 perfTrace.CLASS_DEF 做深拷贝'
     + '（冻结预算副本），故 perfTrace 成了第四条装载期依赖 —— 也是唯一一条数据面硬边（前三条都是接口面）。'
     + '实测：摘掉 store/clock 零消费方失败（引用最多 ≠ 必须先装载）。v2.114.0 起 registerModule 也进了装载期依赖面：'

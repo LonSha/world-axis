@@ -223,7 +223,7 @@
     const currentStamina = person && person.resources ? (num(person.resources.stamina) || 20) : 20;
 
     // 检定计算：可显式传入 roll，或根据体能加成计算
-    const roll = num(o.roll) !== null ? num(o.roll) : Math.floor(Math.random() * 100) + 1;
+    const roll = num(o.roll) !== null ? num(o.roll) : Math.floor(WA.rand.next('terrain-hazard') * 100) + 1;
     const isSuccess = roll >= difficulty;
 
     let out = null;

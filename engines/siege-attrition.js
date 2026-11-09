@@ -23,8 +23,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
   const VERSION = '2.340.0';
 
@@ -59,7 +59,7 @@
       stage: opt.stage || 'plentiful',
       isFallen: false,
       fallReason: '',
-      updatedAt: Date.now()
+      updatedAt: clockNow('siege-attrition')
     };
     _fortresses.set(id, state);
     return { ok: true, fortress: JSON.parse(JSON.stringify(state)) };
@@ -172,7 +172,7 @@
     result.epidemicIndex = fort.epidemicIndex;
     result.stage = fort.stage;
     result.isFallen = fort.isFallen;
-    fort.updatedAt = Date.now();
+    fort.updatedAt = clockNow('siege-attrition');
 
     return result;
   }

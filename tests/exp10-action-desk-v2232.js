@@ -97,7 +97,25 @@ function careTransfer(W) {
 
 async function runAll(a, ov) {
   let W = env(ov);
-  a(Object.keys(W.actionDesk).length === 14, 'API loaded');
+  // v2.381.0：**改掉硬编码的成员数断言**。
+  //   原断言是 `Object.keys(W.actionDesk).length === 14`。V21 一批扩展给 actionDesk
+  //   加了 lifecycle / recoverAction / sceneFlow / actFromScene / boardMulti / planMulti
+  //   六个成员，真源（engines/action-desk.js:3383）自带 `EXPORT_COUNT = 16` 的自校验，
+  //   于是这条测试从此**恒假**——它红的原因不是"API 没装载"，而是"数字过期"。
+  //   硬编码计数是错的判据：它把「接口面扩大」误报成「接口坏了」，而真正想守的是
+  //   「本测试要用到的成员都在、且是可调用/可读的类型」。故改为逐项点名。
+  //   注意 orchestrate 是 **non-enumerable**（defineProperty 挂的，见引擎 3380 行），
+  //   它本就不在 Object.keys 里，这里一并按成员存在性判，不靠可枚举性。
+  const needFns = ['getSettings', 'setSettings', 'board', 'plan', 'sources', 'diagnose',
+    'lifecycle', 'recoverAction', 'sceneFlow', 'actFromScene', 'boardMulti', 'planMulti',
+    'orchestrate', 'stat'];
+  const needArr = ['STATES', 'KINDS', 'ROUTES'];
+  const missFns = needFns.filter((k) => typeof W.actionDesk[k] !== 'function');
+  const missArr = needArr.filter((k) => !Array.isArray(W.actionDesk[k]) || !W.actionDesk[k].length);
+  a(missFns.length === 0 && missArr.length === 0,
+    'API loaded' + (missFns.concat(missArr).length ? '（缺/类型错：' + missFns.concat(missArr).join(',') + '）' : ''));
+  // 枚举面必须与引擎自校验口径一致，防止「加了成员忘了改 EXPORT_COUNT」或反之。
+  a(Object.keys(W.actionDesk).length === 16, 'enumerable export count matches engine EXPORT_COUNT=16');
   a(W.actionDesk.getSettings().enabled === true, 'settings roundtrip');
   a(!W.actionDesk.board({}).ok, 'missing person refused');
   a(W.actionDesk.board({ person: '不存在' }).reason === 'unknown-person', 'unknown person refused (no person created)');

@@ -76,8 +76,16 @@ const A_LABEL = "    { id: 'connect', icon: '🔌', label: 'API' },";
 const A_SETID = 'id="wa-set-devmode"';
 // ⑫ 设置页绑定（onchange 挂事件）
 const A_SETBIND = '      if (devCb) devCb.onchange = function () {';
-// ⑬ 守卫登记（tool-diag 的 settings 页 ids）
-const A_GUARD = "      'wa-set-devmode',";
+// ⑬ 守卫登记（tool-diag 的 settings 页守卫表）
+//   v2.382.0：原锚点是带 6 空格缩进的 `"      'wa-set-devmode',"` —— 那是它当时躺在
+//   `ids` 数组里的**排版形态**，不是语义。v2.381.0 把这三枚只在玩家分支渲染的控件
+//   移进单列的 `player` 层（内联数组，同一行三枚），缩进/换行全变了 ⇒ 锚点命中 0 次，
+//   runAll 与 runNegative 双双在 A1/N0 抛出（实测 cOjwon 全量回归两条红）。
+//   修法：钉**登记行本体**（`'wa-set-devmode',`），不钉缩进。这样无论它以后被重排到
+//   哪一层，只要还在守卫表里就绿；真撤销登记（把 player 行整行拿掉）则命中 0 ⇒ 仍咬得住。
+//   双向自证（临时探针，已删）：真源码 1 次 / 撤掉 player 行 0 次 / 去注释后仍 1 次 /
+//   真文件逐字未变 / 旧锚点 0 次。D4 那条判据本来就用不带缩进的字面，可见口径本就一致。
+const A_GUARD = "'wa-set-devmode',";
 // ── PAGES 冻结清单（业务页签；分类条不属于页签）──
 // boot / drive 是真实开局与运行工具页，保留在 DOM 并仅由开发者模式显示。
 const PAGES_FROZEN = ["overview","world","people","memory","enemies","parallel","inject","sediment","offline","net","health","beat","chapter","todo","port","find","graph","travel","supply","evidence","branchdiff","storyloop","retrieval","actiondesk","events","director","settings","connect","desk","boot","drive","assistant","tools","logs"];

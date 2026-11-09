@@ -23,8 +23,7 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   WA.engines = WA.engines || {};
 
   const VERSION = '2.328.0';

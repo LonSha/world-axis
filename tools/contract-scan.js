@@ -66,7 +66,19 @@ function witnessDeclared(root) {
   if (!fs.existsSync(p)) return [];
   const src = stripComments(fs.readFileSync(p, 'utf8'));
   const out = [];
-  const re = /\bwant\(\s*'([a-zA-Z][a-zA-Z0-9_-]*)'/g;
+  // v2.381.0 口径修正：首字符类由 [a-zA-Z] 放宽到 [A-Za-z_]，与**拒收码扫描面**
+  //   （reject-code-gate.js 的 CODE_RE 要求首字符 a-zA-Z）**刻意不同** —— 两处面的语义本就不同：
+  //     · 扫描面问的是「产品源码里有没有这个内联拒收码」，拒收码首字符必是字母；
+  //     · 本函数问的是「见证表声明了哪些码」，见证表里除拒收码外还有一类**正向见证标记**
+  //       （EXP-7 的 __exp7-absent-check / __exp7-rain-check / __exp7-settle-check：
+  //       「缺席者不能获奖」这类**验收通过**的判据，不是拒收）。
+  //   旧正则用 [a-zA-Z] 把这类标记**静默漏掉**，于是同一个集合有了两份口径：
+  //   runWitness 运行时 expect = 779，本函数静态 = 776，差 3；
+  //   reject-lock-v2780 手写补登了那 3 个，contract-scan-v2150 的清单却没补 ——
+  //   两处冻结清单因此分叉，B7b 与 [B] 各红一次。
+  //   正确的修法是**让静态口径覆盖全表**，而不是在两处清单里各补一遍数字：
+  //   判据强度不降 —— 反向仍由面外清单逐字比对咬住（多一个就红）。
+  const re = /\bwant\(\s*'([A-Za-z_][A-Za-z0-9_-]*)'/g;
   let m;
   while ((m = re.exec(src)) !== null) out.push(m[1]);
   return out.filter(function (v, i, a) { return a.indexOf(v) === i; });
@@ -215,6 +227,25 @@ const EXEMPT = {
   //       一个是「医疗流程的阶段」，一个是「上手引导的步骤」—— 步数、元素形状、判据全不同，
   //       **不许互相校验**：若强行统一，就会出现「开局三步要跟照护七步同词」这种语义错配。
   STEPS: '同名不同义的「步骤表」：lifeline=照护流程七步（triage/exam/diagnosis/treatment/monitoring/rehab/access，判据是照护链走到哪、careGap 报哪几步未落账）、first-run=开局引导三步（api/tier/talk，每步带 order/title/why/probe/exit，判据是配 API/选档位/说第一句话）',
+  // v2.381.0（全量排红 · 契约台账漂移）：下列两条是**真·同名不同义**，此前一直没在表里，
+  //   于是 B9（分歧名必须全在 EXEMPT）与 B11（已豁免名仍分歧）双向都红。逐条说清：
+  //     · CATS：eco-audit=**世界一致性审计的四类**（timeline/space/cognition/causal，
+  //       判据是这条指控属于「时间线打架 / 地点对不上 / 他不可能知道 / 因果断了」哪一类，
+  //       是**字符串数组**，逐个喂给 LEVEL_OF 定严重度）；
+  //       ui/panel=**设置页的分类页签**（core/world/workshop/meta/all，每项是
+  //       {id,icon,label} **对象**，判据是这一页归哪个页签、按哪个图标出）。
+  //       一个是「指控的性质」，一个是「页面的分组」—— 元素形状与语义都不通约，
+  //       **不许互相校验**：若强行统一，就会出现「审计类别必须等于设置页页签名」这种语义错配。
+  //     · CLS：l3-registry=**引擎入口的调用分类**（zero-arg/needs-input/decision/dead，
+  //       判据是「这个引擎函数能不能零参直接调 / 得先喂输入 / 得先做决定 / 根本没人调」，
+  //       是给 44 个引擎做可调用性盘点用的）；
+  //       push-api-registry=**推送 API 的分类**（drive/entry/ui/dead，判据是「这条 API 是
+  //       驱动轮转的 / 只是入口 / 只给界面用 / 没人用」）。两者都带一个 'dead'，
+  //       但 'dead' 在上者是「引擎没人调」、在后者是「API 没人用」，分母不同，
+  //       其余三项毫无交集 —— **不许互相校验**。
+  CATS: '同名不同义的「分类表」：eco-audit=世界一致性审计四类（timeline/space/cognition/causal，字符串数组，判据是这条指控属时间线/地点/越知/因果哪一类）、ui/panel=设置页分类页签（core/world/workshop/meta/all，每项 {id,icon,label} 对象，判据是这一页按哪个页签图标出）',
+  CLS: '同名不同义的「分类表」：l3-registry=引擎入口调用分类（zero-arg/needs-input/decision/dead，判据是能否零参直调/需喂输入/需先决策/无人调用）、push-api-registry=推送 API 分类（drive/entry/ui/dead，判据是驱动轮转/仅入口/仅界面/无人使用）；两者共享的 dead 分母不同（引擎无调者 vs API 无用户），其余三项无交集',
+
 };
 
 /** 具名常量数组（只认一行内形态）。 */

@@ -14,7 +14,8 @@
   'use strict';
 
   const VERSION = '2.340.0';
-  const WA = (typeof global !== 'undefined' && global.WorldAxis) ? global.WorldAxis : {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   // 模因库 memeKey -> MemeDef
@@ -49,7 +50,7 @@
       baseInfectivity: typeof dogmaDef.baseInfectivity === 'number' ? dogmaDef.baseInfectivity : 0.6,
       fanaticismPotency: typeof dogmaDef.fanaticismPotency === 'number' ? dogmaDef.fanaticismPotency : 50.0,
       radicalism: dogmaDef.radicalism || 'moderate', // 'peaceful' | 'moderate' | 'extremist'
-      createdAtTick: Date.now()
+      createdAtTick: clockNow('ideology-memetics')
     };
     _memeCatalog.set(memeKey, def);
     return { ok: true, meme: def };

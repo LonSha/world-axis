@@ -66,9 +66,16 @@
       });
       const admitted = contenders.slice(0, cap);
       const expelled = contenders.slice(cap).concat(willingSacrifices);
+      let capReached = false;
       transact(function (d) {
         if (!d) return true;
         d.sanctuaries = d.sanctuaries || {};
+        // v2.382.0（死键族）：设施数量上限改由登记的 maxSanctuaries 生效 —— 此前该设置声明了
+        //   却零消费，庇护所建立点没有任何上限检查，避难点可以无限增殖。
+        if (!d.sanctuaries[sanctuaryId] && Object.keys(d.sanctuaries).length >= cfg.maxSanctuaries) {
+          capReached = true;
+          return true;
+        }
         d.sanctuaries[sanctuaryId] = d.sanctuaries[sanctuaryId] || { id: sanctuaryId, occupants: [] };
         d.sanctuaries[sanctuaryId].occupants = admitted.map(function (x) { return x.actorId; });
         d.sanctuaryLogs = Array.isArray(d.sanctuaryLogs) ? d.sanctuaryLogs : [];
@@ -111,6 +118,10 @@
         });
         return true;
       }, 'scramble:batch');
+      if (capReached) {
+        stat.refused++; stat.lastReason = 'sanctuary-capacity';
+        return { ok: false, reason: 'sanctuary-capacity', sanctuaryId: sanctuaryId };
+      }
       stat.scrambled++;
       stat.admitted += admitted.length;
       return {
@@ -120,7 +131,8 @@
         capacity: cap,
         admitted: admitted.map(function (x) { return x.actorId; }),
         expelled: expelled.map(function (x) { return x.actorId; }),
-        sacrifices: willingSacrifices.map(function (x) { return x.actorId; })
+        sacrifices: willingSacrifices.map(function (x) { return x.actorId; }),
+        sanctuaryCapReached: capReached
       };
     }
     // 单角色角逐模式
@@ -131,9 +143,14 @@
     }
     let admitted = false;
     let currentOccupantsCount = 0;
+    let capReached = false;
     transact(function (d) {
       if (!d) return true;
       d.sanctuaryOccupants = d.sanctuaryOccupants || {};
+      if (!d.sanctuaryOccupants[sanctuaryId] && Object.keys(d.sanctuaryOccupants).length >= Math.max(1, Math.floor(cfg.maxSanctuaries))) {
+        capReached = true;
+        return true;
+      }
       d.sanctuaryOccupants[sanctuaryId] = Array.isArray(d.sanctuaryOccupants[sanctuaryId])
         ? d.sanctuaryOccupants[sanctuaryId] : [];
       const occ = d.sanctuaryOccupants[sanctuaryId];
@@ -160,6 +177,10 @@
       }
       return true;
     }, 'scramble');
+    if (capReached) {
+      stat.refused++; stat.lastReason = 'sanctuary-capacity';
+      return { ok: false, reason: 'sanctuary-capacity', sanctuaryId: sanctuaryId };
+    }
     stat.scrambled++;
     if (admitted) stat.admitted++;
     else stat.lockedOut++;

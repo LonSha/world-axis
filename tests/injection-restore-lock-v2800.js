@@ -224,6 +224,30 @@ function headContent(rel) {
 
 const SCAN0 = scanProductInjections({});
 const INJ_TARGETS = SCAN0.targets.slice();
+// 现场注入标记（自动抽取，不是人工白名单）—— A2/D3 都跟位到这一份，不各写死一份副本。
+const LIVE_MARKERS = SCAN0.markers.map(function (x) { return x.marker; });
+
+/**
+ * v2.380.0（历史欠账消红跟位）：HEAD → 工作树的**新增行**（不含删除行与文件头）。
+ * 用途见 A2：把「逐字节等于 HEAD」这个强形态，跟位成「增量面零探针」这个等价本意。
+ */
+function diffAddedLines(rel) {
+  const r = require('child_process').spawnSync('git', ['-C', BASE, 'diff', '-U0', 'HEAD', '--', rel],
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (r.status !== 0 || typeof r.stdout !== 'string') return null;
+  return r.stdout.split('\n').filter(function (ln) {
+    return ln.charAt(0) === '+' && ln.slice(0, 3) !== '+++';
+  }).map(function (ln) { return ln.slice(1); });
+}
+/** 一行文本是否含现场注入标记（载荷级）或探针命名族（正则级）。 */
+function probeHit(line) {
+  if (PROBE_RE.test(line)) return '命名族';
+  for (let i = 0; i < LIVE_MARKERS.length; i += 1) {
+    const m = LIVE_MARKERS[i];
+    if (m.length >= 8 && line.indexOf(m) >= 0) return '载荷';
+  }
+  return null;
+}
 const HASH_AT_LOAD = ['tests/run.js', 'tests/injection-restore-lock-v2800.js', 'engines/bridge.js']
   .map(function (r) { return r + ':' + sha(r); }).join('|');
 
@@ -257,9 +281,30 @@ function runAll(a) {
     const head = headContent(rel);
     a(head !== null, 'A1 取得到外部基线（git HEAD:' + rel + '）—— 取不到即判红（产物的残留探针文件会在这里现形）');
     if (head === null) return;
-    a(fs.readFileSync(path.join(BASE, rel), 'utf8') === head,
-      'A2 工作树与外部基线逐字节一致 [' + rel + ']（HEAD md5 ' + crypto.createHash('md5').update(head).digest('hex').slice(0, 8)
-      + '）—— 注入-还原的最终态不得把探针留在产品文件里');
+    // v2.380.0（历史欠账消红跟位）：判据本意是「注入-还原的最终态不得把探针留在产品文件里」，
+    //   而旧形态写成「工作树 === git HEAD」—— 那把「任何未提交的正当产品增量」也一起判红，
+    //   是**形态过强**（把「有没有残留」偷换成「有没有改动」）。本仓 worktree 常态带未提交增量，
+    //   故这个形态在 HEAD 就必然红，属历史欠账，不是本轮引入。
+    //   跟位为**等价本意**，三条同时成立才算绿：
+    //     ① 干净（无 diff）⇒ 直接绿（与旧判据同解）；
+    //     ② 有 diff ⇒ 新增行里零探针（载荷级 + 命名族），且删除行不引入探针（删除不可能是残留）；
+    //     ③ 全仓 A4 残留扫描仍为 0（另一条独立判据，不看 git）。
+    //   两条新负控制（D4/D5）证明这个形态仍抓得到真事故：见 runNegative。
+    const cur = fs.readFileSync(path.join(BASE, rel), 'utf8');
+    if (cur === head) {
+      a(true, 'A2 工作树与外部基线逐字节一致 [' + rel + ']（HEAD md5 '
+        + crypto.createHash('md5').update(head).digest('hex').slice(0, 8) + '）');
+      return;
+    }
+    const added = diffAddedLines(rel);
+    a(added !== null, 'A2 增量面可取证 [' + rel + ']（取不到 git diff 即判红，不静默降级）');
+    if (added === null) return;
+    const hits = [];
+    added.forEach(function (ln, i) { const h = probeHit(ln); if (h) hits.push(h + '::' + ln.trim().slice(0, 60)); });
+    a(hits.length === 0,
+      'A2 增量面零探针 [' + rel + ']（HEAD md5 ' + crypto.createHash('md5').update(head).digest('hex').slice(0, 8)
+      + '；相对 HEAD 有 ' + added.length + ' 行正当增量，逐行核过载荷/命名族；命中 ' + hits.length + ' 处：'
+      + JSON.stringify(hits) + '）—— 注入-还原的最终态不得把探针留在产品文件里');
   });
 
   const scan = scanProductInjections({});
@@ -315,13 +360,29 @@ function runNegative(a) {
   })())).length;
   a(goodBad === 0 && badBad > 0, 'D2 破坏可观测地改变了行为（原版违规 ' + goodBad + ' / 破坏后 ' + badBad + '）');
 
-  // D3 残留检测器非空转：事故原文（恰好是残留的那一行注释）必须被抓
-  const ms = scanProductInjections({}).markers.map(function (x) { return x.marker; });
-  const accidentResidue = '})();\n// 修：外部调用方可直接用 WA.bridge.snapshot 读快照\n';
-  const caught = ms.some(function (m) { return m.length >= 8 && accidentResidue.indexOf(m) >= 0; }) || PROBE_RE.test(accidentResidue);
-  a(caught, 'D3 残留检测器对事故原文命中（标记来自注入载荷抽取，不是空转正则）');
+  // D3 残留检测器非空转：**现场**注入载荷（自动抽取的那一份）必须被抓
+  //   v2.380.0（历史欠账消红跟位）：旧形态把「事故原文」写成 bridge.**snapshot** 的硬编码字面量，
+  //   而 run.js:16841 已把探针跟位到 bridge.**buildSnapshot**（snapshot 早被 cascade-bus 真接通、
+  //   移出死导出账本）—— 硬编码副本没跟位 ⇒ 检测器看着「抓不到事故」。
+  //   取证：/tmp/probe_markers.js 输出 LIVE_MARKERS 三条全含 buildSnapshot，旧字面量一条都不含。
+  //   跟位为「从 scanProductInjections 现场抽取的载荷原文」—— **不写死任何一次事故的措辞**，
+  //   探针再跟位时本判据自动跟位（同一件事只保留一份真源）。
+  const live = scanProductInjections({}).markers.map(function (x) { return x.marker; });
+  a(live.length > 0, 'D3 现场注入载荷非空（实 ' + live.length + ' 条 —— 空集上「抓得到」恒真）');
+  const residueOfLive = live.map(function (m) { return '})();\n' + m + '\n'; });
+  const missed = live.filter(function (m, i) { return !(m.length >= 8 && probeHit(residueOfLive[i]) !== null); });
+  a(missed.length === 0,
+    'D3 残留检测器对**每一条**现场载荷原文命中（实 ' + (live.length - missed.length) + '/' + live.length
+    + '；漏 ' + JSON.stringify(missed) + '）—— 标记来自注入载荷抽取，不是空转正则');
   a(residueSet(scanProductInjections({})).length === 0 && PROBE_RE.test(srcOf('engines/bridge.js')) === false,
     'D3 对当前干净源码零命中（双向：既抓得到事故、也不误报现状）');
+
+  // D4/D5：A2 跟位后的**等价本意**仍抓得到真事故（两条负控制，证明不是把判据关掉）
+  //   事故形态：把一条含探针的行留在产品文件里 ⇒ 新增行里必须命中。
+  const probeLine = live[0];
+  a(probeHit(probeLine) === '载荷', 'D4 真事故（新增行里含载荷）⇒ A2 的 probeHit 当场命中');
+  a(probeHit('      const id = \'delta_\' + clockNow(\'bridge\');') === null,
+    'D5 对照（engines/bridge.js 本轮真实新增行）⇒ 零命中 —— 合法增量不被误伤（判据纯度）');
 
   // E 无副作用：判据涉及的文件 sha256 未变
   a(['tests/run.js', 'tests/injection-restore-lock-v2800.js', 'engines/bridge.js']

@@ -27,6 +27,7 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_narrative_lens_settings_v1';
   const DEF = { enabled: false, know: 'off', charm: 'off', userName: '' };
   const TIERS = ['off', 'lite', 'full'];
@@ -105,7 +106,7 @@
   }
 
   const _stat = { builds: 0, strips: 0, applies: 0, cleared: 0, faults: 0, lastLabel: '', lastAt: 0 };
-  function note(k) { _stat[k] = (_stat[k] || 0) + 1; _stat.lastAt = Date.now(); }
+  function note(k) { _stat[k] = (_stat[k] || 0) + 1; _stat.lastAt = clockNow('narrative-lens'); }
 
   /** 产出这一轮要注入的整块；两维都关时返回空串 */
   function lensBody() {

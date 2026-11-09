@@ -26,8 +26,7 @@
 (function () {
   'use strict';
   const root = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this);
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_blackmarket_usury_settings_v1';
   const DEF = {
@@ -129,11 +128,11 @@
             return;
           }
 
-          const discountRate = clamp(spec.discountRate != null ? spec.discountRate : 0.40, 0.1, 0.8);
+          const discountRate = clamp(spec.discountRate != null ? spec.discountRate : settings().defaultLaunderDiscount, 0.1, 0.8);
           const launderedCash = Math.round(nominalValue * discountRate);
 
           const record = {
-            id: 'lnd_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            id: 'lnd_' + clockNow('blackmarket-usury') + '_' + Math.floor(WA.rand.next('blackmarket-usury') * 1000),
             actorId: actorId,
             itemName: itemName,
             nominalValue: nominalValue,
@@ -160,11 +159,11 @@
           // 借高利贷
           const principal = clamp(spec.principal != null ? spec.principal : 500, 10, 100000);
           const collateral = cleanStr(spec.collateral || '随身祖传玉佩', 48);
-          const interestRate = clamp(spec.interestRate != null ? spec.interestRate : 0.15, 0.05, 0.50);
+          const interestRate = clamp(spec.interestRate != null ? spec.interestRate : settings().dailyInterestRate, 0.05, 0.50);
           const dueRounds = clamp(spec.dueRounds != null ? spec.dueRounds : 3, 1, 20);
 
           const loanRecord = {
-            loanId: 'loan_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+            loanId: 'loan_' + clockNow('blackmarket-usury') + '_' + Math.floor(WA.rand.next('blackmarket-usury') * 1000),
             borrowerId: actorId,
             principal: principal,
             currentDebt: principal,

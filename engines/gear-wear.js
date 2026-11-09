@@ -19,8 +19,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -76,7 +76,7 @@
       durability: curDur,
       stage: _calcStage(curDur, maxDur),
       stressAccumulated: 0,
-      lastUpdated: Date.now()
+      lastUpdated: clockNow('gear-wear')
     };
     _gearLedger.set(gearId, gear);
 
@@ -125,7 +125,7 @@
     gear.durability = Math.max(0, gear.durability - damage);
     gear.stressAccumulated += damage;
     gear.stage = _calcStage(gear.durability, gear.maxDurability);
-    gear.lastUpdated = Date.now();
+    gear.lastUpdated = clockNow('gear-wear');
 
     const isBroken = gear.stage === 'shattered';
 
@@ -153,7 +153,7 @@
 
     gear.durability = Math.min(gear.maxDurability, gear.durability + pts);
     gear.stage = _calcStage(gear.durability, gear.maxDurability);
-    gear.lastUpdated = Date.now();
+    gear.lastUpdated = clockNow('gear-wear');
 
     return {
       ok: true,

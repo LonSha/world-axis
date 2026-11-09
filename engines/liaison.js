@@ -679,7 +679,7 @@
     
     // 沉淀协调事件
     const coordRecord = {
-      id: 'coord_' + clockNow('liaison') + '_' + Math.floor(Math.random() * 1000),
+      id: 'coord_' + clockNow('liaison') + '_' + Math.floor(WA.rand.next('liaison') * 1000),
       topic: topic,
       urgency: urgency,
       speakerOrder: scored.map(function (s) { return s.id; }),

@@ -134,12 +134,21 @@
   }
 
   /* ── 渠道账本（只记有结论的轮次，不吃 key）── */
+  /** 读侧归因（v2.381.0 收口）：G16 口径要求每一处裸读点附近都投递一次读失败归因。
+   *  本条治的病与 engines/* 同族：`catch (e) { return {} }` 会把「localStorage 被拒」
+   *  （配额满 / 隐私模式 / 宿主禁止）答成「本渠道还没有任何结论」——两者在诊断上同形，
+   *  而补救完全不同（前者查存储可读性、后者是正常开局态）。故当场留痕，只投递不改结论。 */
+  function noteRead(k, err) {
+    try {
+      if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail('channelProbe', k, err);
+    } catch (e) { /* 归因出口自身不可用时不阻断业务 */ }
+  }
   function readLed() {
     try {
       const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(LEDGER_KEY) : null;
       const o = raw ? JSON.parse(raw) : {};
       return (o && typeof o === 'object') ? o : {};
-    } catch (e) { return {}; }
+    } catch (e) { noteRead(LEDGER_KEY, e); return {}; }
   }
   function writeLed(o) {
     try { if (typeof localStorage !== 'undefined') localStorage.setItem(LEDGER_KEY, JSON.stringify(o)); } catch (e) { /* 配额满不算失败 */ }
@@ -186,17 +195,28 @@
       weakRate: r.n ? r.weak / r.n : 0, interval: w,
       note: r.n < 8 ? '样本不足（n<8），只报原始计数，不给置信区间结论' : '被换倾向的 95% 区间' };
   }
-  /** 机读码：Node 走 Buffer，浏览器走 TextEncoder+btoa；不依赖任何宿主全局之外的新包 */
+  /** 机读码：只用 Web 平台标准（TextEncoder + btoa），不碰任何宿主专属全局。
+   *  v2.382.0 收口：这里原有一条 `Buffer.from(...).toString('base64')` 近路，注释写的是
+   *  「Node 走 Buffer，浏览器走 TextEncoder+btoa」。它有两个问题：
+   *    ① 违反 v2.30.0「Browser 运行时守恒」——产品代码里 `Buffer` 是 Node 内建，
+   *       带 `typeof Buffer !== 'undefined'` 守卫也照样是产品面对 Node 的隐式依赖，
+   *       守卫只保它不抛错，不保它不存在（这正是那条扫描判据要抓的形态）；
+   *    ② 那条近路是**纯冗余**：实测六个用例（`{}` / 中文 / 含 URL 的 JSON / emoji+制表符+换行
+   *       / 300 字符 / 真实探针载荷）两条路径输出逐字相等，且 Node 16+ 与全部现代浏览器
+   *       都提供 `btoa`，`btoa` 遇非 Latin1 字符抛 `Invalid character` 也正是必须先
+   *       `TextEncoder` 过一遍的原因——即两条路径的实际算法本来就是同一个。
+   *  删掉近路后机读码逐字不变（本文件 exportText 的消费方只认 `WA-PROBE:` 前缀），
+   *  而产品面回到「零 Node 内建」。
+   */
   function b64(s) {
     try {
-      if (typeof Buffer !== 'undefined' && Buffer.from) return Buffer.from(String(s), 'utf8').toString('base64');
       if (typeof TextEncoder !== 'undefined' && typeof btoa === 'function') {
         const bytes = new TextEncoder().encode(String(s));
         let bin = '';
         for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
         return btoa(bin);
       }
-      return '';   // 两条都不可用就留空机读码，文本读数照常可读（不静默编造）
+      return '';   // Web 编码面整体缺失（极旧宿主）就留空机读码，文本读数照常可读（不静默编造、不拿假码充数）
     } catch (e) { return ''; }
   }
   /** ≤1800 字可粘贴文本：含一行机读码，默认不含任何 key */

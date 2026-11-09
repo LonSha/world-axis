@@ -25,8 +25,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.340.0';
@@ -52,7 +52,7 @@
       detonationTension: threshold,
       status: 'primed',
       isDestroyed: false,
-      primedAt: Date.now(),
+      primedAt: clockNow('dramatic-tension'),
       detonatedAt: null
     };
 
@@ -116,7 +116,7 @@
     }
 
     gun.status = 'detonated';
-    gun.detonatedAt = Date.now();
+    gun.detonatedAt = clockNow('dramatic-tension');
 
     return {
       ok: true,

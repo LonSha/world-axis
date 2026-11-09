@@ -63,11 +63,14 @@
     const at = Number.isFinite(s.at) ? s.at : clockNow('actionCostFeedback');
 
     // 调取 difficulty 模块阻力系数（若存在）
+    // v2.381.0: difficulty 从未导出 costMultiplier() —— 真源是 effective().cost
+    //   （COST[resistance]，关闭时 cost=1）。此前探测恒 false，世界难度的
+    //   「行动阻力」对体力消耗的加权从未生效。
     let multiplier = 1.0;
-    if (WA.difficulty && typeof WA.difficulty.costMultiplier === 'function') {
+    if (WA.difficulty && typeof WA.difficulty.effective === 'function') {
       try {
-        const m = WA.difficulty.costMultiplier();
-        if (typeof m === 'number' && m > 0) multiplier = m;
+        const eff = WA.difficulty.effective();
+        if (eff && eff.ok && typeof eff.cost === 'number' && eff.cost > 0) multiplier = eff.cost;
       } catch (e) {}
     }
 

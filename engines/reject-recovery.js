@@ -2,14 +2,15 @@
  * WorldAxis engines/reject-recovery.js (v2.192.0) — 拒收码 → 恢复动作的统一映射（计划 U5）
  *
  * ── 它治什么（计划 U5 现状原文）──────────────────────────────────
- *   拒收码已 800+（v2.189.0 收口轮实测 804），三面已治理（分类 / 见证 / 覆盖率），
+ *   拒收码已 800+（v2.189.0 收口轮实测 804；v2.380.0 现场 1721 条字面量 / 拒收面 1531），
+ *   三面已治理（分类 / 见证 / 覆盖率），
  *   但「**拒收之后该干什么**」不是统一契约。新拍引擎尤其明显：
  *   `adjust` / `setup` / `reject` / `bad-round` / `hard-cut` / `landed-immutable`
  *   都可拒收，但处置方向**相反** —— 前两个补因，后四个才要回滚或重写。
  *   没有这份映射时，每个消费方（诊断面 / 面板面 / 日志面）只能各自猜一句人话，
  *   于是同一件事在三个面上有三种说法，其中至少两种是错的。
  *
- * ── 先纠一件事：那 804 个不是「拒收码」，是「`reason:` 字面量面」──────────
+ * ── 先纠一件事：那 804 个（今日 1721）不是「拒收码」，是「`reason:` 字面量面」──────────
  *   源码扫描面的词法是 `reason: 'x'` 的**内联字面量**，它不管这个 reason 写在
  *   成功返回里还是失败返回里。按「每次命中所属的对象字面量是否带 `ok:false`」分面，
  *   实测（v2.192.0，tools/reject-recovery.js `faces()` 复算）：
@@ -240,6 +241,52 @@
     'toll-required': { kind: 'request-setup', why: '该服务点要先付费/凭通行权：先把通行费或凭证补上（service-network:571）' },
     'unauthorized-trustee': { kind: 'request-setup', why: '委托人不在受托名册上：先把受托关系登记上（social-legacy:574）' },
     'unqualified-master': { kind: 'request-setup', why: '这位师父不够资格带这一门技艺：先提升资质或换人（tech-lineage:123）' },
+
+    // ── v2.380.0（幽灵引用治理批次⑦）：拒收面残余 31 条逐条显式登记。
+    //   判据来源：`tools/reject-recovery.js` 的 audit() 把它们报成 via:undecided（B6 当场报无档）。
+    //   为什么规则表收不住这批 —— 两类原因，都不是「表太窄」而是「这类码本来就不该按形态归」：
+    //     ① **下划线命名**（24 条）：`ruleKind` 按 `-` 分词（契约如此，换成 `[-_]` 需先过 A2 与
+    //        六档语义复核）。实测把分词换成 `[-_]` 会把 `closed_hours` 归成 rollback ——
+    //        正确处置是「等开门再试」，不是「回头改写」。形态归类在 snake_case 上会**判错档**，
+    //        所以这批必须逐条给理由，不能扩分词了事。
+    //     ② **连字符命名但词表语义相反**（7 条）：如 `backstage-running` 的 running 不在任何
+    //        词表里、`ample-supplies-cannot-collapse` 的 supplies 也不在 —— 它们的拒收理由
+    //        恰恰是「条件太充足」而不是「条件不足」，按 missing/short 一类的词族归会归反。
+    //   归法沿用既有口径（**按语义，不按像谁**）：在途/被占/时段未到 ⇒ retry-same-input；
+    //   前置缺/授权缺 ⇒ request-setup；输入形态或数值不被接受 ⇒ adjust-input；
+    //   状态已变只能按新态改写 ⇒ rollback；底层没给出更具体原因 ⇒ manual-review；
+    //   这件事本身不被允许/对象根本不成立 ⇒ permanent-reject。
+    'actor_possesses_stoic_sage_or_psychic_immunity': { kind: 'permanent-reject', why: '该角色对精神创伤享有苦修/贤者/灵能免疫：这类创伤对他本就不成立，重试同输入不会产生效果（psyche-trauma:98）' },
+    'character_not_found': { kind: 'request-setup', why: '代谢时钟里查不到该角色：先把角色建上（metabolism-clock:118/223 两处同因）' },
+    'closed_hours': { kind: 'retry-same-input', why: '该地点当前已打烊：等开门时段同输入再来（spatial-topology:148，回执带 openHour/closeHour）' },
+    'container_full': { kind: 'adjust-input', why: '容器已装满：先腾出空间或换容器再放（personal-inventory:76，回执带 currentSize/capacity）' },
+    'direct_observation_rejects_illusion': { kind: 'permanent-reject', why: '被直接目视观察时幻象不成立：这个把戏在此刻这件事上不成立，换手段（perception-manipulation:55）' },
+    'insufficient_cosmic_or_geological_disturbance': { kind: 'request-setup', why: '纪元潮汐要求的天象/地质扰动不够：先把扰动做出来（epoch-tide:64）' },
+    'insufficient_funds': { kind: 'adjust-input', why: '现金不够这笔：改金额或先筹钱（personal-inventory:117，回执带 balance/required）' },
+    'invalid_target': { kind: 'adjust-input', why: '库存记录或物品对不上：按回执指出的那一项改（personal-inventory:69）' },
+    'no_inventory': { kind: 'request-setup', why: '该角色还没有库存面：先建档（personal-inventory:110）' },
+    'nodeList-must-be-array': { kind: 'adjust-input', why: '传进来的节点清单不是数组：改成数组形态再提交（spatial-topology:91）' },
+    'physical_anchor_permanently_lost': { kind: 'permanent-reject', why: '悬念的物理依托已永久失去：这条张力在这件依托上立不起来了，换依托重开（dramatic-tension:95）' },
+    'platitude_blocked': { kind: 'adjust-input', why: '这句是套话、被文气闸挡下：按 retryHint 改写具体内容（subtext-tension:140/143）' },
+    'portal_locked': { kind: 'request-setup', why: '门被反锁、缺对应钥匙或凭证：先取钥匙/凭证（spatial-topology:165，回执带 keyId）' },
+    'portal_sealed': { kind: 'permanent-reject', why: '通道已被物理封死：这条路走不通了，改走别的路（spatial-topology:160）' },
+    'preset-unconfigured': { kind: 'request-setup', why: '排程预设还没配：先把 preset 配上（routine-pacing:179）' },
+    'rational-immunity-contentment': { kind: 'permanent-reject', why: '该对象安于现状、理性免疫这套宣传：这条叙事对他不成立，换对象或换角度（ideology-memetics:95）' },
+    'rational-immunity-enlightened': { kind: 'permanent-reject', why: '该对象已通达、理性免疫这套宣传：同上，对他不成立（ideology-memetics:87）' },
+    'receipt-unrelated': { kind: 'adjust-input', why: '回执与这笔交易不相关：换成对应的那张回执（liaison:561）' },
+    'sated-beasts-repelled-by-fire': { kind: 'permanent-reject', why: '兽群已饱食、又被火逼退：这一次捕猎不成立，换个时机或猎物（ecosystem-predation:109）' },
+    'sufficient_resources_or_alternative_path_exists': { kind: 'permanent-reject', why: '资源充足或另有出路 ⇒ 这场道德困境不成立：不该在这里做两难抉择，走正当途径（moral-dilemma:49）' },
+    'taboo_violated': { kind: 'permanent-reject', why: '触犯城中禁忌：这件事本身不被允许，换做法（city-folklore:137/141）' },
+    'transaction-rejected': { kind: 'manual-review', why: '结对交易的底层结算没成，且底层没给出更具体的原因：要人看这笔结算（liaison:436/510，另有人类写实/台下生活/排程三处同码）' },
+    'unaware-blindspot-cannot-parry': { kind: 'request-setup', why: '当事人没察觉这个盲区、格挡不了：先让他察觉（tactical-combat:118）' },
+    'uncontrolled-hemorrhage-stabilization-required': { kind: 'request-setup', why: '大出血没控制住、必须先做止血稳定：先止血再做后面的处置（surgical-triage:207/210）' },
+    'ample-supplies-cannot-collapse': { kind: 'permanent-reject', why: '补给充足 ⇒ 围城崩溃不成立：不靠饿城这条路（siege-attrition:97）' },
+    'backstage-running': { kind: 'retry-same-input', why: '后台正跑着别的回合：等它结束同输入再来（act:922 / agency:570 两处同因，回执带 deferred:true）' },
+    'cannot-distort-in-current-status': { kind: 'rollback', why: '该悬念处于的状态不允许再扭曲：只能按新状态改写，不能原地重来（foreshadow-tree:183，回执带 currentStatus）' },
+    'compromised-cover-detected': { kind: 'permanent-reject', why: '掩护已被识破：这个身份在这条线上作废了，换身份或撤离（covert-espionage:254/257）' },
+    'disarmed-or-keyed-cannot-detonate': { kind: 'request-setup', why: '机关已被卸除或被钥匙卡住：先恢复机关或取走钥匙（ruin-mechanism:100）' },
+    'exempted-from-grudge': { kind: 'permanent-reject', why: '该角色享有超然/构造体豁免、不滋生凡俗记恨：这条记恨对他不成立（human-realism:313）' },
+    'exempted-from-outburst': { kind: 'permanent-reject', why: '该角色豁免情绪失控与爆发：这条爆发对他不成立（human-realism:436）' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -359,7 +406,21 @@
       //   **不带 ok**，故现场面是判不出。给档而不是 out:true 的理由：这条读数决定玩家
       //   下一步动作（重新立委托再走），与 `plan-unavailable` / `registry-missing` 同规；
       //   说「契约外」等于把「该怎么办」丢掉。
-    'contract-cancelled': { kind: 'request-setup', why: '委托已被取消：这一步没有可结的账，先重新立委托再走' }
+    'contract-cancelled': { kind: 'request-setup', why: '委托已被取消：这一步没有可结的账，先重新立委托再走' },
+
+    // ── v2.380.0（同上批次）：判不出面新增 10 条（键集与 NEUTRAL_FACE 逐字相同，见 A7）。
+    //   全部是**记录 / 读数理由**：写在账本条目、通缉名录、记恨列表、嫌疑列表、可用性读数里，
+    //   所在对象不带 `ok` —— 给它们配恢复动作就是造数据（与 after-reply / commitment 同一条边界）。
+    'cascade_bus_tick': { out: true, why: '级联总线的拍点标签（engine/cascade-bus:269 写进 bridge 快照的 reason），不是调用被拒' },
+    'collateral-default': { out: true, why: '违约登记里记的失信理由（collateral-rupture:93 写进 socialBlacklist），不是调用被拒' },
+    'compact': { out: true, why: '注入预算的折叠理由（inject-budget:712 的 folded 行），不是调用被拒' },
+    'contraband_smuggling_caught': { out: true, why: '通缉名录里记的查获理由（contraband-pipeline:105 的 wantedLedger），不是调用被拒' },
+    'debt-breach': { out: true, why: '记恨条目里记的违约理由（collateral-rupture:109 的 grudges），不是调用被拒' },
+    'different_venues': { out: true, why: '视线隔离读数（environmental-occlusion:83 的 visible:false 对象不带 ok），不是调用被拒' },
+    'forgery-detected': { out: true, why: '目标心里记下的识破理由（cognitive-poisoning:116 的 suspicions），不是调用被拒' },
+    'intercepted-by-physiological-circuit-breaker': { out: true, why: '动机裁决里被剔掉选项的理由（motive-arbitration:165 的 forsaken 行），不是调用被拒' },
+    'out_of_service': { out: true, why: '出行方式的可用性读数（transit-scheduler:108 的 available:false 对象不带 ok），不是调用被拒' },
+    'room_partition': { out: true, why: '遮挡读数（environmental-occlusion:80，与 different_venues 同形），不是调用被拒' },
   };
 /* 拒收面冻结快照（v2.203.0 现场实测 740 条）：至少在 `ok:false` 对象里出现过 ——
    *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。
@@ -732,6 +793,71 @@
     'current-missing', 'dangling-continuation-relation', 'nothing-to-continue',
     'owner-missing', 'round-rewound', 'stale-continuation', 'transaction-failed',
     'unsupported-stage',
+    // ── v2.380.0（幽灵引用治理批次⑦）：按 tools/reject-recovery.js 的现场复算一次性补齐快照。
+    //   此前本数组 1224 条、现场拒收面 1531 条 —— 差 341 条（这是本仓同一形态的第七次，
+    //   前六次记在 v2.203.0 / v2.209.0 / v2.221.0 / v2.222.0 / v2.231.0 / 全量回归体检批次）。
+    //   口径与前六次完全一致：**逐条照抄现场分面结果** —— 面的判据是「有没有一处落在 ok:false
+    //   对象里」（tools 侧括号配对算出来的），不是人读出来的；这里不改档、不猜语义。
+    //   这批码的来源是 v2.263.0 ~ v2.380.0 之间落地的引擎（personal-inventory / spatial-topology /
+    //   human-realism / covert-espionage / subconscious 等 60+ 个新模块的 ok:false 站点），
+    //   以及一批 snake_case 命名的 reason（引擎确实在输出下划线形态，见 OVERRIDES 段说明）。
+    'actionCostFeedback-unavailable', 'actor-already-enqueued', 'actor-has-no-exposure-records', 'actor-not-in-shelter', 'actor-routine-not-registered', 'actor-unconfigured',
+    'actor_possesses_stoic_sage_or_psychic_immunity', 'alchemyToxicology-unavailable', 'already-exists', 'already-fully-confessed', 'ample-supplies-cannot-collapse', 'anomalyMutation-unavailable',
+    'autoHide-unavailable', 'autobiographyEpiphany-unavailable', 'backstage-running', 'backstageTone-unavailable', 'bad-borrower', 'bad-cat',
+    'bad-places', 'bad-spec', 'bad-time-domain', 'beatFacade-unavailable', 'blackmarketUsury-unavailable', 'board-threw',
+    'branch-not-found', 'branch-not-simulated', 'branchTransplant-unavailable', 'branchTree-unavailable', 'bridge-unavailable', 'bureaucracyAscension-unavailable',
+    'butterflyCascade-unavailable', 'cannot-clash-self', 'cannot-conflict-with-self', 'cannot-distort-in-current-status', 'cannot-encounter-self', 'careChain-unavailable',
+    'cascadeBus-unavailable', 'cataclysmHazard-unavailable', 'character-not-found', 'character_not_found', 'chokepoint-not-found', 'cityFolklore-unavailable',
+    'civilizationRelic-unavailable', 'closed_hours', 'cognitivePoisoning-unavailable', 'collateralRupture-unavailable', 'commonsGovernance-unavailable', 'communityNote-unavailable',
+    'compromised-cover-detected', 'confirm-threw', 'conspiracyWeaver-unavailable', 'container_full', 'contraband-unavailable', 'contrabandPipeline-unavailable',
+    'counterfactualEcho-unavailable', 'counterfactualSandbox-unavailable', 'courierDispatch-unavailable', 'covenantSanction-unavailable', 'coverBallistics-unavailable', 'covertEspionage-unavailable',
+    'crowdPanic-unavailable', 'demand-below-threshold', 'demographicFlow-unavailable', 'dilemmaBargain-unavailable', 'direct_observation_rejects_illusion', 'disarmed-or-keyed-cannot-detonate',
+    'disaster-not-found', 'disaster-not-found-or-inactive', 'dispatch-not-found', 'dramaticTension-unavailable', 'eccentricThreads-unavailable', 'economy-unavailable',
+    'ecosystemPredation-unavailable', 'empty-applicants', 'empty-content', 'empty-fake-claim', 'empty-reply', 'empty-rumor-text',
+    'entryRouter-unavailable', 'environmentInterference-unavailable', 'epidemicContagion-unavailable', 'epochTide-unavailable', 'epochalTransition-unavailable', 'evidenceBoard-unavailable',
+    'exempted-from-grudge', 'exempted-from-outburst', 'factionChronicle-unavailable', 'factionSchism-unavailable', 'floorChanges-unavailable', 'foreshadowGermination-unavailable',
+    'gearWear-unavailable', 'geoTracker-unavailable', 'group-disabled', 'groupGuard-unavailable', 'gun-already-fired', 'hazard-below-threshold',
+    'hazard-not-active-in-place', 'hazard-record-not-found', 'healthPreflight-unavailable', 'humanRealism-unavailable', 'identityMatch-unavailable', 'ideologyMemetics-unavailable',
+    'inlineTags-unavailable', 'institutionalSchism-unavailable', 'insufficient-centrifugal-force', 'insufficient-evidence-cannot-execute', 'insufficient-merit-rejected', 'insufficient-weight-for-prime-directive',
+    'insufficient_cosmic_or_geological_disturbance', 'insufficient_funds', 'interestFace-unavailable', 'interrogationTell-unavailable', 'invalid-arbitration-input', 'invalid-bribe-amount',
+    'invalid-capacity', 'invalid-conflict-intent', 'invalid-default-amount', 'invalid-definition', 'invalid-disaster-kind', 'invalid-duration',
+    'invalid-hazard-type', 'invalid-kind', 'invalid-layer', 'invalid-participants', 'invalid-recovery-points', 'invalid-status-transition',
+    'invalid-subtext-pack', 'invalid-throughput', 'invalid_target', 'judicialInquest-unavailable', 'knowledgePractice-unavailable', 'lens-apply-threw',
+    'liaison-unavailable', 'livingWorld-unavailable', 'maritimeNavigation-unavailable', 'metabolism-unavailable', 'microclimatePhase-unavailable', 'missing-action-key',
+    'missing-action-or-spyId', 'missing-actor-a', 'missing-actor-b', 'missing-actor-id', 'missing-actor-name', 'missing-actors',
+    'missing-article-fields', 'missing-borrower', 'missing-candidate-actor', 'missing-charName', 'missing-characterId', 'missing-chokepoint-id',
+    'missing-combatants', 'missing-destination', 'missing-deviation-kind', 'missing-disaster-id', 'missing-disinformation-params', 'missing-divergent-action',
+    'missing-epicenter', 'missing-epiphany-fields', 'missing-event-id', 'missing-fact', 'missing-fork-node', 'missing-fortress-id',
+    'missing-from-place', 'missing-from-region', 'missing-id-or-title', 'missing-intent', 'missing-lead-text', 'missing-location',
+    'missing-node-id', 'missing-nodeId', 'missing-nodeId-or-type', 'missing-org-id', 'missing-parameters', 'missing-params',
+    'missing-parent-faction', 'missing-participants', 'missing-party-a', 'missing-party-b', 'missing-path-summary', 'missing-patient-id',
+    'missing-patient-or-procedure', 'missing-place-id', 'missing-planter', 'missing-rebel-leader', 'missing-receipt', 'missing-recipient',
+    'missing-reform-type', 'missing-region-id', 'missing-relic-id', 'missing-resolution', 'missing-resource-kind', 'missing-route-id',
+    'missing-rumor-key', 'missing-sanctuary-id', 'missing-scene', 'missing-seed-id', 'missing-shelter-id', 'missing-sound-event',
+    'missing-source-branch', 'missing-spy-identity', 'missing-subtext-fields', 'missing-suspect-id', 'missing-taboo-fields', 'missing-target-actor',
+    'missing-target-asset', 'missing-target-room', 'missing-trace-item', 'missing-warrant-id', 'modelink-unavailable', 'moodGlide-unavailable',
+    'moralDilemma-unavailable', 'mundane-environment-no-corruption', 'name-required', 'no-active-conversation', 'no-actors-in-scene', 'no-archive-found',
+    'no-available-shelters-with-capacity', 'no-combat-clash-data', 'no-conclusion', 'no-doc', 'no-epoch-store', 'no-hazard-store',
+    'no-infection-source', 'no-items', 'no-message', 'no-offstage-record', 'no-outbreak', 'no-send-el',
+    'no-story-context', 'no_inventory', 'nodeList-must-be-array', 'not-blocked', 'not-offstage', 'oath-not-found',
+    'observeSlice-unavailable', 'offstageLife-unavailable', 'parallelEvents-unavailable', 'pending-threw', 'pendingCenter-unavailable', 'perceptionManipulation-unavailable',
+    'periodicalIdeology-unavailable', 'personalInventory-unavailable', 'phaseTransition-unavailable', 'physical_anchor_permanently_lost', 'place-not-registered', 'plan-missing',
+    'platitude_blocked', 'portal_locked', 'portal_sealed', 'powerAnchor-unavailable', 'preset-unconfigured', 'probe-build-threw',
+    'probe-disabled', 'probe-judge-threw', 'psycheTrauma-unavailable', 'pyroTelecom-unavailable', 'rational-immunity-contentment', 'rational-immunity-enlightened',
+    'receipt-capacity', 'receipt-not-terminal', 'receipt-unrelated', 'region-missing', 'relationGraph-unavailable', 'relic-not-found',
+    'researchClosure-unavailable', 'riskPooling-unavailable', 'ruin-already-collapsed', 'ruinMechanism-unavailable', 'rumorCognition-unavailable', 'same-borrower-guarantor',
+    'same-party', 'same-planter-target', 'sanctuaryScramble-unavailable', 'sated-beasts-repelled-by-fire', 'scene-capacity', 'sceneNarrative-unavailable',
+    'sceneSlice-unavailable', 'schedule-threw', 'sediment-unavailable', 'seed-not-matured', 'send-threw', 'serviceNetwork-unavailable',
+    'severity-out-of-range', 'sharedAwareness-unavailable', 'shelter-not-found', 'siegeAttrition-unavailable', 'socialEncounter-unavailable', 'socialLegacy-unavailable',
+    'spatialAcoustics-unavailable', 'spatialConflict-unavailable', 'spatialTrace-unavailable', 'spy-captured-cannot-act', 'spy-not-found', 'stable-supply-no-shock',
+    'stage-unavailable', 'stagePresence-unavailable', 'stealthInfiltration-unavailable', 'story-choice-unavailable', 'storyChoice-unavailable', 'storyLoop-unavailable',
+    'storyTone-unavailable', 'storylineAdvance-unavailable', 'stress-below-threshold', 'subtextTension-unavailable', 'sufficient_resources_or_alternative_path_exists', 'supplyChain-unavailable',
+    'supplyChoke-unavailable', 'surgicalTriage-unavailable', 'taboo_violated', 'tacticalCombat-unavailable', 'tempo-unavailable', 'temporalLock-unavailable',
+    'terrainHazard-unavailable', 'theme-unavailable', 'thread-not-found', 'tide-not-fever', 'time-unconfigured', 'toxicMetabolism-unavailable',
+    'transact-failed', 'transaction-rejected', 'travelDesk-unavailable', 'tree-not-found', 'unaware-blindspot-cannot-parry', 'uncontrolled-hemorrhage-stabilization-required',
+    'undercurrentCalendar-unavailable', 'universalRoutine-unavailable', 'unknown-group', 'unsubstantiated-bluff-refused', 'unsupported-procedure', 'unsupported-spy-action',
+    'veracityArbitration-unavailable', 'warrant-not-active', 'warrant-not-found', 'whisperBackchannel-unavailable', 'worldChanges-unavailable', 'worldClock-unavailable',
+    'worldGraph-unavailable', 'worldHealth-unavailable', 'worldLab-unavailable', 'worldSnapshot-unavailable', 'writeDesk-unavailable',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -770,6 +896,14 @@
     //     · no-records（engines/relation-temp.js）：关系变化暂未结算 —— 同上，带 quiet:true。
     //     · quiet（engines/farfield.js）：这一段时长里没有该推的窗口（正常态）。
     'built', 'no-people', 'no-records', 'quiet',
+    // ── v2.380.0（同上批次）：成功面补齐 23 条。全部实测**只**落在 ok:true 对象里：
+    //   credit-ledger 的三态（good-standing / overdue-present / too-many-open）尤其要看清 ——
+    //   它们返回 `ok:true, allowed:false`：调用没被拒，只是**信用不够**，那是查询的结论，
+    //   给它配恢复动作就是教玩家去「修」一件本就没坏的事（与 built / quiet 同一条边界）。
+    'already_unmasked', 'choke-triggered', 'cost-applied', 'counterfactual-echo-evoked', 'dispatched', 'faction-split-enacted',
+    'foreshadow-erupted', 'good-standing', 'memory-transplanted', 'no-characters', 'no-idiosyncrasies', 'occluded-in-secret-pocket-or-hidden-layer',
+    'out-of-earshot', 'overdue-present', 'pending-dispatched', 'projected', 'reform-enacted', 'room-empty-or-quiet',
+    'routine-disrupted-sheltered', 'rupture-enacted', 'scramble-completed', 'threshold-not-met', 'too-many-open',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
@@ -797,6 +931,10 @@
     //   （`trend: { available:false, reason:'forecaster-absent' }`），既不是调用被拒、
     //   也不是成功返回，故归判不出面，并在 NEUTRAL_REVIEW 逐条给档（键集必须逐字相同）。
     'audit-absent', 'forecaster-absent',
+    // ── v2.380.0（同上批次）：判不出面补齐 10 条（对象不带 ok 的记录/读数理由）。
+    //   键集与 NEUTRAL_REVIEW 必须逐字相同（A7），故下方登记表同批补入同样 10 条。
+    'cascade_bus_tick', 'collateral-default', 'compact', 'contraband_smuggling_caught', 'debt-breach', 'different_venues',
+    'forgery-detected', 'intercepted-by-physiological-circuit-breaker', 'out_of_service', 'room_partition',
   ];
   /** 三快照查表 → 面。未命中即 `unknown`（**判不出就是判不出**，不拿规则表兜）。 */
   function frozenFace(c) {

@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/epochal-transition.js (v2.360.0)
+ * WorldAxis engines/epochal-transition.js (v2.380.0)
  * EXV20-1: 宏观历史突变与文明纪元跃迁引擎 (Macro-Historical Rupture & Civilized Epoch Transition)
  *
  * ── 核心架构哲学（Genre-Neutral Architecture）─────────────────────────
@@ -20,10 +20,9 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   WA.engines = WA.engines || {};
-  const VERSION = '2.360.0';
+  const VERSION = '2.380.0';
   const LS_KEY = 'worldaxis_epochal_transition_settings_v1';
 
   const DEF = {
@@ -115,7 +114,7 @@
         const epStore = getEpochStore(draft);
         if (!epStore) {
           result = { ok: false, reason: 'no-epoch-store' };
-          return;
+          return false;
         }
         const prevEpoch = epStore.currentEpoch;
         const now = clockNow('epochalTransition');

@@ -9,6 +9,7 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_narrative_dice_settings_v1';
   const DEF = { enabled: true, auditLog: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'narrativeDice', bounds: {} };
@@ -97,7 +98,7 @@
     } else if (WA.rand && typeof WA.rand.int === 'function') {
       result = WA.rand.int(1, sides, 'narrative-dice');
     } else {
-      result = Math.floor(Math.random() * sides) + 1;
+      result = Math.floor(WA.rand.next('narrative-dice') * sides) + 1;
     }
 
     // 命中匹配的 slot
@@ -115,12 +116,17 @@
       sides: sides,
       roll: result,
       slot: matchedSlot,
-      at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('dice') : Date.now()
+      at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('dice') : clockNow('narrative-dice')
     };
 
-    if (cfg.auditLog && WA.auditLog && typeof WA.auditLog.append === 'function') {
+    // v2.381.0: 修 **调用了不存在的成员** —— WA.auditLog 的真实入口是
+    //   record(action, params, opts)（见 core/audit-log.js），从来没有 `append`。
+    //   原判定 `typeof WA.auditLog.append === 'function'` 恒为 false ⇒ 掷骰的审计
+    //   分支**永远不执行**：开关打开也一条不落，属于「声明面空转」的静默失效
+    //   （不是崩溃，所以任何语法/单测都测不出来）。
+    if (cfg.auditLog && WA.auditLog && typeof WA.auditLog.record === 'function') {
       try {
-        WA.auditLog.append('narrativeDice', 'roll', out);
+        WA.auditLog.record('narrativeDice.roll', out, { surface: 'engines/narrative-dice.js' });
       } catch (e) {}
     }
     return out;

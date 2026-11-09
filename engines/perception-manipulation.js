@@ -25,8 +25,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.340.0';
@@ -61,7 +61,7 @@
     }
     const victimMap = _victimPerceptionMaps.get(targetVictimId);
 
-    const illusionId = opt.illusionId || ('ill_' + Date.now() + '_' + Math.floor(Math.random() * 1000));
+    const illusionId = opt.illusionId || ('ill_' + clockNow('perception-manipulation') + '_' + Math.floor(WA.rand.next('perception-manipulation') * 1000));
     const record = {
       illusionId: illusionId,
       forgerId: forgerId,
@@ -70,7 +70,7 @@
       payload: payload || {},
       credibilityScore: cred,
       unmasked: false,
-      plantedAt: Date.now()
+      plantedAt: clockNow('perception-manipulation')
     };
 
     victimMap.set(illusionId, record);

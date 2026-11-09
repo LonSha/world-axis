@@ -27,8 +27,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.340.0';
@@ -75,7 +75,7 @@
       targetTopologyChain: chain,
       macroOutcome: null,
       settled: false,
-      createdAt: Date.now()
+      createdAt: clockNow('butterfly-cascade')
     };
 
     _cascadeRegistry.set(seedEventId, record);

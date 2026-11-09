@@ -76,6 +76,53 @@ const mcg = require('./module-cycle-gate.js');
 const BASE = path.join(__dirname, '..');
 let pass = 0, fail = 0;
 const failures = [];
+// v2.380.0（V10 hosted 档位）：**实机验证的显式跳过通道**（与分层选区同一条 O6 纪律：
+//   「跳过必须显式声明并计进读数」，不许把「算不出来」伪装成「算过了」）。
+//   治的病：`v10-ui-pills.js` / `v10-r3-persist-hosted.js` 走的是 `runLiveHosted` 语义 ——
+//   它们 `page.goto('http://127.0.0.1:8000/')` 打**真 SillyTavern 宿主**，断言的是真宿主上的
+//   DOM/存储链路。而全量入口 `node tests/run.js` 既不起静态服务、也不传 HOST，于是无宿主时
+//   子进程以 `ERR_CONNECTION_REFUSED` 收 rc=1；那是「环境缺席」，不是「产品判据红」。
+//   tests/v8-host-acceptance.json 已白纸黑字记过：该类验收「需要真实宿主，终端内不可完成」。
+//   处置：挂载前先探测宿主可达性；可达 ⇒ 原 runScript 逐字照跑（断言一条不少）；
+//   不可达 ⇒ 逐条登记跳过、计入 `__hostSkips`，并在摘要行里报出 —— 「没跑」绝不等于「通过」。
+const __nodeNet = require('net');
+const __nodeUrl = require('url');
+const __hostSkips = [];
+/** 探测真宿主是否可达（TCP 连接即可，不发起 HTTP 请求、不读任何源码）。
+ *  为什么用 TCP 而不是 fetch：只要端口能连上就说明有真宿主在听，这正是这两个套件的前提；
+ *  连不上（ECONNREFUSED/ETIMEDOUT）才是「环境缺席」。任何异常都归为不可达（宁缺勿编）。 */
+function __hostReachable(url, ms) {
+  return new Promise(function (resolve) {
+    let host, port;
+    try {
+      const u = new __nodeUrl.URL(url);
+      host = u.hostname;
+      port = Number(u.port) || (u.protocol === 'https:' ? 443 : 80);
+    } catch (e) { resolve(false); return; }
+    const sock = __nodeNet.connect({ host: host, port: port });
+    let done = false;
+    const finish = function (ok) {
+      if (done) return; done = true;
+      try { sock.destroy(); } catch (e) {}
+      resolve(ok);
+    };
+    sock.setTimeout(ms || 1500, function () { finish(false); });
+    sock.once('connect', function () { finish(true); });
+    sock.once('error', function () { finish(false); });
+  });
+}
+/** 真宿主不可达时登记一条显式跳过（可达时由挂载点直接 runScript，断言一条不少）。
+ *  为什么把「跳过」与「跑」分开而不封装成 runHostedScript：`tools/evidence-index.js` 的
+ *  引用面正则只认 `runLock|runScript|require|spawnSync` 四种形态；若把挂载改写成
+ *  `runHostedScript('./x.js')`，这两个文件会被判成「run.js 里没有引用」的孤儿锁。
+ *  故保留 `runScript('./x.js')` 字面调用（引用面不漂），只把「可达性守卫 + 跳过登记」放在外面。 */
+function __skipHosted(spec, why) {
+  const HOST = process.env.WA_HOSTED_URL || 'http://127.0.0.1:8000';
+  __hostSkips.push({ spec: spec, host: HOST, why: why });
+  console.log('  \u2263 ' + path.basename(spec) + ' 显式跳过：真宿主不可达（' + HOST + '）—— ' + why
+    + '；这不是通过，是真宿主验收本次未执行');
+}
+
 // v2.131.0（O15 ①）：**中断摘要**。治的病（现场实测）：整趟回归 **439.0s**（196 节，
 //   只有 2 节超 60s），而 `isolated-runner` 硬超时默认 **600000ms（10 分钟）**！
 //   —— 超时那一刻子进程被杀，摘要（在最后一行）根本没机会打印：
@@ -482,6 +529,43 @@ const LOAD = [
     'engines/living-world.js',
     // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
     'engines/geo-tracker.js',
+  'engines/ruin-mechanism.js',
+  'engines/judicial-inquest.js',
+  'engines/bureaucracy-ascension.js',
+  'engines/anomaly-mutation.js',
+  'engines/siege-attrition.js',
+  'engines/ecosystem-predation.js',
+  'engines/interrogation-tell.js',
+  'engines/tactical-combat.js',
+  'engines/perception-manipulation.js',
+  'engines/moral-dilemma.js',
+  'engines/epoch-tide.js',
+  'engines/dramatic-tension.js',
+  'engines/ideology-memetics.js',
+  'engines/conspiracy-weaver.js',
+  'engines/psyche-trauma.js',
+  'engines/butterfly-cascade.js',
+  'engines/cover-ballistics.js',
+  'engines/gear-wear.js',
+  'engines/veracity-arbitration.js',
+  'engines/crowd-panic.js',
+  'engines/contraband-pipeline.js',
+  'engines/pyro-telecom.js',
+  'engines/toxic-metabolism.js',
+  'engines/microclimate-phase.js',
+  'engines/cascade-bus.js',
+  'engines/lens-culling.js',
+  'engines/social-encounter.js',
+  'engines/universal-routine.js',
+  'engines/spatial-conflict.js',
+  'engines/disaster-evacuation.js',
+  'engines/environmental-hazard.js',
+  'engines/metabolism-clock.js',
+  'engines/personal-inventory.js',
+  'engines/spatial-trace.js',
+  'engines/environmental-occlusion.js',
+  'engines/transit-scheduler.js',
+  'engines/spatial-topology.js',
     'engines/health-preflight.js',
     'engines/narrative-deduction.js',
     'engines/anti-omniscience.js',
@@ -546,6 +630,17 @@ const LOAD = [
     'engines/covenant-sanction.js',
     'engines/eccentric-threads.js',
     'engines/human-realism.js',
+  'engines/court-intrigue.js',
+  'engines/ecosystem-cascade.js',
+  'engines/dungeon-hazard-mesh.js',
+  'engines/engineering-blueprint.js',
+  'engines/bloodline-heritage.js',
+  'engines/incarceration-jailbreak.js',
+  'engines/regiment-tactics.js',
+  'engines/theology-cult.js',
+  'engines/financial-contagion.js',
+  'engines/cataclysm-hazard.js',
+  'engines/epochal-transition.js',
     // v2.325.0: 剧情生活动线与身份世界观节律
     'engines/routine-pacing.js',
     'engines/weighted-draw.js',
@@ -584,6 +679,8 @@ const LOAD = [
   // v2.66.0：情绪通道 / 关系六型 / 假面。位置与 index.js LOAD_ORDER 同序（都早于 render/inject.js 消费点）。
   'engines/affect.js', 'engines/bonds.js', 'engines/masks.js',
   // v2.67.0：时间锁 / 双层性格 / 好感审计 / 场外事件。位置与 index.js LOAD_ORDER 同序（都早于 render/inject.js 消费点）。
+  'engines/affection-nexus.js',
+  'engines/intimate-arbiter.js',
   'engines/temporal-lock.js', 'engines/temperament.js', 'engines/fondness.js', 'engines/parallel-events.js',
   // v2.68.0：资料片周期 / 生存三轴 / 通缉 / 驯兽。位置与 index.js LOAD_ORDER 同序（都早于 render/inject.js 消费点）。
   'engines/era-cycle.js', 'engines/survival.js', 'engines/warrant.js', 'engines/beast-bond.js',
@@ -7682,7 +7779,16 @@ const __ctxGuard = require('./context-guard.js').boundary();
   //   故本版不再续写逐版算式 —— 算式本身就是要维护的第二真源（写几行、几行都得对），
   //   它的可复核性由下一行 `checkedKeys` 与登记表**双向核对**承担（那是集合相等判定，不是算术）。
   //   判据仍钉**精确等值**：容器被误删或漏登都会红，值由现场实测回填。
-  assert(rpA1700.checked === 175, 'checked 精确值 175（现场实测：__BOUNDED_CAPS 精确非通配键；v2.250.0（VAC-4）新增 genTiming.ledger / oneShotMod.pending / moodGlide.moods / narrativeDeduction.timeline 四环，并把 livingWorld 八环与 geoTracker 两环改 per-call；实际集合由下一条 checkedKeys 与登记表双向核对）');
+  //   v2.381.0 第三次回填（175 → 187）：v2.230.0 十枚引擎容器、v2.323/324/325 三批引擎容器
+  //   陆续进 __BOUNDED_CAPS 而本判据没人跟 —— 与 v2.162.0（→137）、v2.250.0（→175）
+  //   完全同型。三次都是「表长了、常量没跟」，故把这一句留在现场：**这个数字注定
+  //   随登记表增长而失效**，它的可复核性只来自 checkedKeys 的集合相等判定。
+  //   v2.382.0 第四次回填（187 → 185）：本版把 `humanRealism.log` / `routinePacing.history`
+  //   两条**撤下**了 __BOUNDED_CAPS（全仓零写点死容器，声明的裁剪点从不执行 —— 见
+  //   core/store.js 该处注释与 core/evict.js 的 SITE_DECLS 成对撤除）。这次是**表短了**，
+  //   与前三次方向相反但同源：常量必须跟着登记表走，无论多还是少。实测 185（185 条带
+  //   cap 的活键，撤下项 0 条残留），故回填为 185。
+  assert(rpA1700.checked === 185, 'checked 精确值 185（现场实测：__BOUNDED_CAPS 精确非通配键；v2.382.0 撤除 humanRealism.log / routinePacing.history 两条零写点死容器登记 ⇒ 187→185；v2.250.0（VAC-4）新增 genTiming.ledger / oneShotMod.pending / moodGlide.moods / narrativeDeduction.timeline 四环，并把 livingWorld 八环与 geoTracker 两环改 per-call；实际集合由下一条 checkedKeys 与登记表双向核对）');
   // ── B. object 键漏物化检出（v1.6.0 盲区修复）──
   fresh1700();
   WA.store.transact(d => { delete d.people; });
@@ -9472,8 +9578,8 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // H1. 分层结构
     const grpH = WA.toolDiag.UI_BINDINGS;
     assert(Array.isArray(grpH) && grpH.length >= 6, 'UI_BINDINGS 覆盖多页（实 ' + grpH.length + ' 组）');
-    const gIds = new Set(), gCond = new Set(), gDyn = new Set();
-    grpH.forEach(g => { (g.ids || []).forEach(x => gIds.add(x)); (g.cond || []).forEach(x => gCond.add(x)); (g.dynamic || []).forEach(x => gDyn.add(x)); });
+    const gIds = new Set(), gCond = new Set(), gDyn = new Set(), gPlayer = new Set();
+    grpH.forEach(g => { (g.ids || []).forEach(x => gIds.add(x)); (g.cond || []).forEach(x => gCond.add(x)); (g.dynamic || []).forEach(x => gDyn.add(x)); (g.player || []).forEach(x => gPlayer.add(x)); });
     assert(gIds.size >= 60, '无条件渲染控件纳入守卫数不少于 60（实 ' + gIds.size + '，此前仅 24）');
     assert(gCond.size >= 5, '条件渲染控件单独分层（实 ' + gCond.size + '）');
     assert(gDyn.size >= 5, '动态生成节点按锚点分层（实 ' + gDyn.size + '）');
@@ -9497,8 +9603,22 @@ const __ctxGuard = require('./context-guard.js').boundary();
     }).join('\n');
     let mH;
     while ((mH = reH.exec(uiSrcJoinH))) { if (renderedH.indexOf(mH[1]) < 0) renderedH.push(mH[1]); }
-    const EXEMPT_H = ['wa-panel', 'wa-orb'];
-    const uncoveredH = renderedH.filter(id => !gIds.has(id) && !gCond.has(id) && !gDyn.has(id) && EXEMPT_H.indexOf(id) < 0);
+    const EXEMPT_H = ['wa-panel', 'wa-orb',
+      // v2.380.0（幽灵引用治理批次⑦）：`wa-search-bar` 是**面板骨架**，不是某一页的控件。
+      //   它由 ui/panel.js 的 mount 模板拼出（与 wa-panel / wa-orb 同层），页切换后仍在原地，
+      //   故不属于任何 `page` 组 —— 塞进某页的 ids 档就会在**别的页**被判缺失（判据方向反了）。
+      //   这条豁免不是「放行一个漏登记的控件」：它连绑定都在 mount 里（`#wa-setting-search`
+      //   的 oninput 紧跟 appendChild），guard 表按页校验的模型对它没有意义。
+      'wa-search-bar'];
+    const uncoveredH = renderedH.filter(id => !gIds.has(id) && !gCond.has(id) && !gDyn.has(id) && !gPlayer.has(id) && EXEMPT_H.indexOf(id) < 0);
+    // v2.382.0 口径补正：`player` 层必须计入「已在守卫表内」。
+    //   本条的语义是「渲染出来的控件不许落在守卫表之外」，不是「必须落在 ids 那一层」。
+    //   settings 页有两个互斥渲染面（开发者面 devSettingsHtml / 玩家面 playerSettingsHtml），
+    //   三枚只在玩家面出现的控件（wa-set-devmode / wa-set-simple-mode / wa-set-simple-save）
+    //   已被移入 settings 组的 `player` 层 —— 它们在「开发者模式下不在场上」是**正确形态**，
+    //   不是漏登记。若本条仍只认 ids/cond/dynamic，这三枚就会被报成「未覆盖」，
+    //   迫使它们搬回 ids，从而在 secUi 那一侧重新变成「开发者模式恒缺 3 枚」的假红。
+    //   即：两处判据必须同时认 player 层，否则无论怎么摆都有一侧恒红（这正是本轮的原始病）。
     assert(uncoveredH.length === 0, 'panel 渲染的每个控件都在守卫表内（未覆盖：' + JSON.stringify(uncoveredH) + '）');
     assert(renderedH.length >= 80, '面板渲染控件总量不少于 80（实 ' + renderedH.length + '）');
     // v2.294.0（V8 收口）：僵尸检查的定义面与渲染面必须同源，故分两档判。
@@ -9577,6 +9697,17 @@ const __ctxGuard = require('./context-guard.js').boundary();
       const tabsH = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab'));
       const byPageH = {};
       tabsH.forEach(t => { byPageH[t.dataset.page] = t; });
+      // v2.380.0（幽灵引用治理批次⑦）：**这条判据的前提必须先写明，否则它在玩家模式下恒红。**
+      //   病灶：守卫表的 settings 组登记的是**设置页全量控件集**（205 个 id，含「世界推演设置」
+      //   / 随机事件 / 区域突发 / 机制开关 …… 那些只在开发者模式渲染的东西）。而 v2.325.0 起
+      //   出厂 `devMode:false`，设置页默认走 `playerSettingsHtml()` 玩家分支 —— 那里只渲染
+      //   玩家该看的那几格。于是「拿开发者控件全集去比玩家渲染产物」必然报 96 条缺失，
+      //   而缺的每一条**都是正确行为**（玩家模式下就不该出现这些调试参数）。
+      //   正确口径：这条判据验的是「**控件全集**在它该在的模式里逐页都在场」，故它必须在
+      //   **开发者模式**下跑（`setDevMode(true)` 会同时把分类切到 all，见 PLAYER_PAGES 注释）。
+      //   玩家模式另有自己的判据（本块后面的 `玩家模式下设置页只出玩家面`），两者分开咬：
+      //   一条钉「开发者面一个都不少」，一条钉「玩家面不泄漏调试参数」。混着咬就只剩一团红。
+      WA.ui.setDevMode(true);
       const badH = [];
       pageListH.forEach(function (pg) {
         const tab = byPageH[pg];
@@ -9587,6 +9718,27 @@ const __ctxGuard = require('./context-guard.js').boundary();
         if (!g || !g.ok) badH.push(pg + ':' + JSON.stringify(g ? g.missing : null));
       });
       assert(badH.length === 0, '逐页无缺失（未通过：' + JSON.stringify(badH) + '）');
+      // v2.380.0（幽灵引用治理批次⑦）：**反向判据** —— 玩家模式下设置页只出玩家面。
+      //   为什么必须补这条：上面那条改成在开发者模式下跑之后，「玩家分支漏拼」这一类回归
+      //   就再也不会被它抓到（v2.325.0 那次漏掉整段内容偏好块，正是这样静默了一个版本）。
+      //   两条判据各咬一个方向，缺一条就有一个方向成盲区 —— 这正是本仓反复付过价的那类病。
+      //   判据形态：回玩家模式 → 重开设置页 → 玩家该看的那几格必须在场（逐个点名，
+      //   不用「数量足够」兜：数量判据在整块被删时会跟着变小数，照样绿）。
+      WA.ui.setDevMode(false);
+      byPageH['settings'].onclick();
+      const playerMustH = ['wa-set-tier-now', 'wa-wd-enable', 'wa-rt-enable', 'wa-hp-enable',
+        'wa-set-simple-mode', 'wa-set-simple-save'];
+      const playerLackH = playerMustH.filter(function (id) { return !global.document.getElementById(id); });
+      assert(playerLackH.length === 0,
+        '玩家模式下设置页仍在玩家面（缺：' + JSON.stringify(playerLackH) + '）');
+      // 反面：开发者专属调试控件**不得**泄进玩家面（抽样点名，不穷举 —— 穷举会把这条
+      //   变成「设置页布局锁」，而布局本来就会随版本调）。
+      const devOnlyH = ['wa-set-mode', 'wa-set-time', 'wa-hz-d-en', 'wa-rg-enable', 'wa-prm-find'];
+      const leakedH = devOnlyH.filter(function (id) { return !!global.document.getElementById(id); });
+      assert(leakedH.length === 0,
+        '玩家模式下不泄漏开发者调试控件（泄漏：' + JSON.stringify(leakedH) + '）');
+      WA.ui.setDevMode(true);
+      byPageH['settings'].onclick();
       byPageH['tools'].onclick();
       const toolsH = WA.toolDiag.secUi().groups.filter(g => g.page === 'tools')[0];
       assert(!!toolsH && toolsH.ok === true && toolsH.expected >= 20, '工具页控件全在场且规模充足（' + (toolsH && toolsH.expected) + '）');
@@ -9964,12 +10116,25 @@ const __ctxGuard = require('./context-guard.js').boundary();
       vm.runInContext(fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8'), ctx, { filename: 'ui/settings.js' });
       WA.store.init();
       WA.ui.mount(); WA.ui.open();
+      // v2.380.0 修：本段验的是**开发者模式**设置页的随机事件控件，而面板自 v2.255.0
+      //   SIMPLIFY-NAV 起默认是玩家模式 —— render() 在玩家模式下直接返回
+      //   playerSettingsHtml()，wa-hz-* 一整套控件根本不会被渲染。
+      //   缺这一步前置时 qB2300('wa-hz-d-en') 恒为 null，下一行 `.onchange` 抛
+      //   TypeError，整个 runner 以 runner-failed 收场（一份结论都拿不到）。
+      //   故先切开发者模式（产品公开写口 WA.ui.setDevMode），再验绑定。
+      assert(typeof WA.ui.setDevMode === 'function', '面板提供开发者模式写口（本段前置）');
+      WA.ui.setDevMode(true);
       const tabsB2300 = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab'));
       const setTabB2300 = tabsB2300.filter(function (t) { return t.dataset.page === 'settings'; })[0];
       if (setTabB2300) {
         setTabB2300.onclick();
         const qB2300 = function (id) { return global.document.querySelector('#' + id); };
         // 1) 处理器必须真挂上（选择器写错时这里必然为 null）
+        //   v2.380.0：先断言控件在场，再断言绑定 —— 缺控件时给「控件缺席」的可归因报错，
+        //   而不是让下一行 `.onchange` 抛 TypeError 把整个 runner 拖崩
+        //   （崩栈会让后面所有节都不执行，读数从「一个失败」退化成「零结论」）。
+        const hasB2300 = id => !!qB2300(id);
+        assert(hasB2300('wa-hz-d-en'), '（真 DOM）开发者模式设置页渲染出 wa-hz-d-en');
         assert(typeof qB2300('wa-hz-d-en').onchange === 'function', '（真 DOM）远方通道复选框绑定生效');
         assert(typeof qB2300('wa-hz-n-en').onchange === 'function', '（真 DOM）近端通道复选框绑定生效');
         assert(typeof qB2300('wa-hz-d-chance').oninput === 'function', '（真 DOM）触发率滑块绑定生效');
@@ -10006,9 +10171,23 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // C11. UI 守卫覆盖全部页面（v2.2.0 块8 只守了 8/9 页——设置页整页在守卫之外）
     const pagesSrc2300 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
     const pageIds2300 = [];
+    // v2.382.0 判据输入面修正：原正则 `/\{ id: '([a-z]+)', icon:/g` 会**同时命中两个数组**——
+    //   `const PAGES = [...]`（页面清单，223–354 行）与 `const CATS = [...]`（分类清单，358–370 行），
+    //   两者的条目形状逐字同形（`{ id: 'xxx', icon: '…', label: '…' }`）。
+    //   后果：`core` / `world` / `workshop` / `meta` / `all` 五个**分类 id**被当成页 id，
+    //   于是本条按「页」核对守卫表时，永远报这五个「未覆盖」，而它们根本不是页。
+    //   （其中 `world` 还是已知撞名项：既是页 id 又是分类 id —— 正是它让这条判据的缺陷
+    //    一直没被看出来，因为它恰好在两边的名字里都有。）
+    //   修法：先切出 `const PAGES = [...]` 这一段再抽取，分类清单不参与页判定。
+    //   这不是「放行」，而是让判据看它本来该看的面：页 id 只能来自 PAGES。
+    const pagesSegStart = pagesSrc2300.indexOf('const PAGES = [');
+    const pagesSegEnd = pagesSegStart < 0 ? -1 : pagesSrc2300.indexOf('\n  ];', pagesSegStart);
+    const pagesSeg = (pagesSegStart >= 0 && pagesSegEnd > pagesSegStart)
+      ? pagesSrc2300.slice(pagesSegStart, pagesSegEnd)
+      : pagesSrc2300;
     const pageRe2300 = /\{ id: '([a-z]+)', icon:/g;
     let pm2300;
-    while ((pm2300 = pageRe2300.exec(pagesSrc2300))) pageIds2300.push(pm2300[1]);
+    while ((pm2300 = pageRe2300.exec(pagesSeg))) pageIds2300.push(pm2300[1]);
     assert(pageIds2300.length >= 10, '解析到面板页清单（实 ' + pageIds2300.length + '）');
     const boundPages2300 = {};
     WA.toolDiag.UI_BINDINGS.forEach(function (g) { boundPages2300[g.page] = true; });
@@ -11436,7 +11615,20 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
         //   恢复它不等于恢复世界 —— project() 的注释明写「投影不导入为事实」）。
         //   登记在此是「走一次家族判断」的结果，不是漏网：下面的语义断言会当场核
         //   它的家族确实不是 settings 家族。
-        'engines/player-archive.js': 1 };
+         'engines/player-archive.js': 1,
+         // v2.381.0 收口：engines/channel-probe.js 的渠道探针账本键
+         //   （worldaxis_channel_probe_ledger_v1）与 engines/inline-tags.js 的解析统计键
+         //   （worldaxis_inline_tags_v1）。两者都是**进程侧观测记忆**：不进世界存档、
+         //   不是用户配置（inline-tags 根本没有设置键，纯解析器）。
+         //   登记在此是「走一次家族判断」的结果，不是漏网：为此同批在 core/store.js 的
+         //   KEY_FAMILIES 里单列了 channelProbe / inlineTags 两个家族（与 lifeTurn /
+         //   playtime 同一裁决）—— 若让它们落进兜底的 settingsUnregistered，
+         //   面板体检视图会把一份探针账本报成「未登记设置 N」（假的用户配置告警）。
+         //   下面的语义断言会当场核这两族确实不是 settings 家族。
+         //   注：这两个 setItem 点在 v2.326.0 / v2.329.0 就存在，此前只是从未登记；
+         //   同批给两处读回点补了 store.reportReadFail 归因（G16），故两处一并处理。
+         'engines/channel-probe.js': 1,
+         'engines/inline-tags.js': 1 };
       const countByFile = {};
       BOUNDARY_G.forEach(function (st) { countByFile[st.rel] = (countByFile[st.rel] || 0) + 1; });
       Object.keys(INVENTORY_G).forEach(function (rel) {
@@ -11509,6 +11701,16 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
         vm.runInContext(src2600('ui/settings.js'), ctx, { filename: 'ui/settings.js' });
         WA.store.init();
         WA.ui.mount(); WA.ui.open();
+        // v2.381.0 收口：本段验的是**开发者模式**设置页的两个远方/近端控件
+        //   （`#wa-hz-save` / `#wa-hz-out` 由 devSettingsHtml 内联的 horizon 段产出）。
+        //   面板自 v2.255.0 SIMPLIFY-NAV 起出厂 `devMode:false`，`render()` 在玩家模式下
+        //   直接返回 `playerSettingsHtml()` —— 那一整段根本不会被拼接，于是这两条断言
+        //   恒红（不是「控件丢了」，是「压根没进玩家面，也不该进」）。
+        //   这正是 v2.380.0 给 B2300 段补同款前置时写下的那条纪律（本次收口前它已存在：
+        //   「缺这一步前置时 qB2300('wa-hz-d-en') 恒为 null」）——本段当时漏改，属同族第二处。
+        //   故先走产品公开写口切到开发者模式。
+        assert(typeof WA.ui.setDevMode === 'function', '面板提供开发者模式写口（H2 前置）');
+        WA.ui.setDevMode(true);
         const setTabH = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab')).filter(function (t) { return t.dataset.page === 'settings'; })[0];
         assert(!!setTabH, '（真 DOM）存在「设置」页签（H2）');
         if (setTabH) setTabH.onclick();
@@ -12211,7 +12413,13 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
         // v2.294.0（V8 收口）：engines/player-archive.js +1 —— 玩家归档的 local works 读回点。
         //   同形：`catch (e) { return [] }` 会把「存储读失败」（配额满 / 隐私模式）
         //   答成「还没归档过」，两者补救完全不同，故补投 store.reportReadFail('playerArchive')。
-        'engines/player-archive.js': 1 };
+        'engines/player-archive.js': 1,
+        // v2.381.0 收口：两个 v2.326.0 / v2.329.0 新引擎的账本读回点（每文件恰 1 处）。
+        //   与上面十一个文件同形：`catch (e)` 把「存储被拒」答成「账本里什么都没有」，
+        //   两者在诊断上不可分辨而补救不同，故已同批补投 store.reportReadFail。
+        //   本条清单的用途正是「新增裸读点必须显式落进清单」——此处登记是门禁**要求**的动作。
+        'engines/channel-probe.js': 1,
+        'engines/inline-tags.js': 1 };
       const ATTRIB_G16 = /noteReadFail\(|noteStoreReadFail\(|reportReadFail\(|reportHostReadFail\(|noteWbRead\(|noteRead\(/;
       const scanG16 = function (extraFiles) {
         const dirs = ['core', 'engines', 'render', 'ui', 'actors', 'direction', 'compat'];
@@ -12257,7 +12465,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
         'G16 每处裸读点附近都有读侧归因（实无归因 ' + SCAN16.miss.length + ' 处'
         + (SCAN16.miss.length ? '：' + SCAN16.miss.slice(0, 5).join('、') : '') + '）');
       const total16 = Object.keys(countByFile16).reduce(function (a, k) { return a + countByFile16[k]; }, 0);
-      assert(total16 === 51, 'G16 裸读点总数为 51（v2.294.0（V8 收口）：engines/player-archive.js +1（玩家归档读回点，补投 store.reportReadFail）；v2.274.0（V6 收口）：engines/capability-audit.js +1（wroteFalse 的键读回点，补投 store.reportReadFail）；v2.203.0（第四批）Y6 history-search / Y5 world-snapshot 各 +1（补投 noteRead）；v2.156.0（SP1）：engines/playtime.js +1（活动基准读回点，补投 store.reportReadFail）；v2.148.0（RP2）：engines/tape-store.js +1（仓库读回点，补投 noteRead）；v2.132.0 O19：engines/life.js +1（跨会话游标读回点，补投 noteRead）；v2.113.0 A1 收口：core/audit-log.js +2（落盘/读回两处裸读，补投 store.reportReadFail）；此前 42 = v2.108.0 L2 自愈取回点 +1 + v2.82.0 快照与分支 +1；实 ' + total16 + '）');
+      assert(total16 === 53, 'G16 裸读点总数为 53（v2.381.0：engines/channel-probe.js +1（渠道探针账本读回点，补投 store.reportReadFail channelProbe）、engines/inline-tags.js +1（内联标签解析账读回点，补投 store.reportReadFail inlineTags）——两处裸读点本来就存在，只是既无归因也不在清单里；v2.294.0（V8 收口）：engines/player-archive.js +1（玩家归档读回点，补投 store.reportReadFail）；v2.274.0（V6 收口）：engines/capability-audit.js +1（wroteFalse 的键读回点，补投 store.reportReadFail）；v2.203.0（第四批）Y6 history-search / Y5 world-snapshot 各 +1（补投 noteRead）；v2.156.0（SP1）：engines/playtime.js +1（活动基准读回点，补投 store.reportReadFail）；v2.148.0（RP2）：engines/tape-store.js +1（仓库读回点，补投 noteRead）；v2.132.0 O19：engines/life.js +1（跨会话游标读回点，补投 noteRead）；v2.113.0 A1 收口：core/audit-log.js +2（落盘/读回两处裸读，补投 store.reportReadFail）；此前 42 = v2.108.0 L2 自愈取回点 +1 + v2.82.0 快照与分支 +1；实 ' + total16 + '）');
       // 负向探针：临时落一个含裸读点的文件，必须被检出（否则上面的计数只是「碰巧成立」）
       const probeRel16 = 'core/__g16_probe__.js';
       const probeAbs16 = path.join(BASE, probeRel16);
@@ -12332,7 +12540,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     const memberCount2800 = Object.keys(depMap2800).reduce(function (a, ns) { return a + depMap2800[ns].size; }, 0);
 
     // 冻结串（改动依赖面就要同步更新；下方失败信息会给精确 diff）
-    const FROZEN2800 = 'act:KINDS abort add admit advance buildBlock getSettings replan setSettings stat verdict view|actionCostFeedback:applyEvaluationCosts|actionDesk:ROUTES actFromScene board boardMulti diagnose lifecycle plan planMulti recoverAction sceneFlow setSettings|actionMethods:evaluate execute|activity:buildBlock declareSeries getSeries handleDisruption listSeries nextCycle nextCycleInvitations prepareForActivity|affect:buildBlock checkTraumaTrigger|aftermath:active buildBlock cancel inspect pending register repair setSettings view|aftermathImpact:commissionRepair findDetour listCascadingChains|agency:buildBlock diagnose getSettings processReceipts schedule setSettings stat|agenda:getSettings overdueList setSettings sources stat upcoming|antiOmniscience:auditGeneratedContent buildBlock|apiRouter:CHANNELS call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|appearance:buildBlock|atlas:diagnose getSettings places relations routes setSettings stat view|auditLog:append exportVol flush record stat verifyVolWith|autoHide:clear getSettings isHidden list mark plan resetStat revoke setSettings stat view|autobiographyEpiphany:triggerEpiphany viewAutobiography|backstage:abort advanceManagedCurrents applyResult applyStat archiveScheduled buildPrompt channelStat forceSimulate getSettings isRunning pending setCurrentAdvance setSettings|backstageTone:buildBlock era getSettings noteAdd noteClear noteList numToZh parseShichen reset setSettings shichen socialHint stat view voiceCheck zhNum|beastBond:buildBlock|beat:bandOf categoryOf extract getSettings hue parseOrExtract repair reset setSettings stat validateId validateList view|beatFacade:blocked diagnose status|beatLedger:buildBlock current getSettings view|beatMask:buildBlock|beatReport:buildBlock getSettings view|bonds:buildBlock evaluateDeepTalk network read setBond|branchDiff:catalog getSettings semanticDiff setSettings stat transplant triDiff|branchTransplant:transplantFact|branchTree:choose compare fork getSettings replay setSettings stat tree|bridge:FLOOR_GAP handshake id setSettings settings stat version|calendar:advanceDay getSettings setClock setSettings stat|campaign:advance current diagnose evaluate getSettings planDelete planList planOf reset review setSettings start stat status templates|canon:actText actsBrief adopt alignView buildBlock buildOutline clearOutline coordOf deviation deviationTrend gap getSettings locate outlineView position setSettings signal stat|capabilityAudit:audit dormantMechanisms getSettings setSettings stat summary|capabilityTier:applyTier flipSwitch getSettings list rollback shapeOf stat view|capacityAudit:diagnose getSettings migrationCheck obligations reclaimable setSettings stat waterline|careChain:ESCALATION_LEVELS assessCaregiverAbsence careChainProjection queueForPublicCare referCare registerCareCommitment reportCareAbsence|causal:STAGES TERMINAL addChain buildBlock cancel classify conflicts defer due endingsTree evidence getSettings knownCause previewIntervention record rehearse rippleWeb setSettings settle settleBlockReason stat stateView tick traceGraph traceLiabilityTree|chapters:current end start|chatcache:init installStat listSnapshots mirrorOwner|checkpoints:FORMAT branch branchPlan buildBlock compare exportOne getSettings importOne list migrate migrations read remove restore save setSettings stat topKeys|choices:generate|chronicleView:coverage diagnose entries entry getSettings hiddenSummary setSettings stat|chrono:applyUndo buildBlock chronicle getSettings record setSettings stale stat undo|cityFolklore:checkTabooViolation getTaboo maskWithFestivity proclaimTaboo|civilizationRelic:discoverRelic getRelic reverseEngineer|clock:clockStat freeze now wallNow|cognitivePoisoning:plantForgedIntel|collab:claim conflicts contribute createTask enqueue getSettings holderOf open penalize pending setSettings settle stat taskStat|collateralRupture:ruptureCollateral|commission:advance buildBlock cancel create pending setSettings settle view|commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay resumeIdentity resumeStat retryEffects scanInterrupted settle stat step|commonsGovernance:ASSET_STATUS GOVERNANCE_MODELS auditAssetDecay changeGovernanceModel commonsProjection contributeMaintenance declareCommonAsset reserveCommonAsset resolveAssetDispute|communityNote:ack clear getSettings isSeen list markSeen pending push resetStat setSettings stat view|compare:diff getSettings hasResidue merge reset setSettings stat strip tableOf toLines variants view|compat:context detect snapshot|compatMvu:init status|compatTH:init status|contest:buildBlock|contraband:assessInflation inspectBust openRoute smuggle|contractAudit:audit|coop:concludeProject handleAbsence pending pledgeProject proposeProject|coordinate:anchorAdd anchorOf bridgeDump bridgeLoad buildBlock capture decode encode gateClaim gateClear gateRelease gateSuppressed getSettings index lines list parseLine reset setSettings stat view|counterfactualEcho:evokeEcho|counterfactualSandbox:diffOutcomes forkRehearsal getBranch simulateBranch|courierDispatch:dispatchPending sendDispatch|creditLedger:accrue checkCredit open repay view|customLax:activeRules adoptRuleFromPrecedent checkRuleEnforcement claimGuarantee commitPromise defaultPromise enactRule establishPrecedent evaluatePrecedent fulfillPromise listPrecedents listPromises provideGuarantee reciprocityLedger recordFavor registerDissatisfaction remedyPromise requestAid reviewRule settleFavor spawnCandidate submitToApproval|dayRoute:boundary build getSettings reset scheduleDomain setSettings stat storyDay|deepClean:apply digest freeze getSettings prepare reset resetStat review scan setSettings stat status view|deferToken:schedule|demographicFlow:arriveMigration commitMigration demographicProjection planMigration recordSeasonalDeparture recordSeasonalReturn setPlaceCapacity|depCheck:catalog check diagnose getSettings prepare setSettings stat|difficulty:buildBlock costMultiplier effective|digest:buildBlock generate|dilemmaBargain:negotiate|diplomacy:STATES TERMS applies breach buildBlock diagnose expire fulfil getSettings pairId pairView propose reply setSettings sign stat view|directEvent:abort create|dream:archive buildBlock deviationList getSettings onset reset setSettings stat threadList threadOf view volumeGet volumeList weave|driverLedger:getSettings setSettings stat summaryText view why|eccentricThreads:advanceThread buildBlock listThreads openThread resolveThread|ecoAudit:CATS getSettings lastSweep setSettings stat sweep|economy:RECIPES buildBlock buy craft declaredBase economySpec getSettings markRoute money price recipeKeys recipeOf route routeView setSettings shelf ship statView stock tick view|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|elsewhere:bandOf buildBlock card getSettings list open reconcile remove reset romance romanceOf setSettings stat sweep update view|enemies:ASSET_STATUS ENEMY_STATUS ENEMY_TYPE apply applyBlackbox applyWorldTrends dropStat|enigma:buildBlock mark read|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|envCapacity:declareRecyclableMaterial declareResource evaluateImpact generateScrap materialLifecycle recycleScrap regenerate regionStatus withdraw|environmentInterference:disruptRoutines|epistemicView:buildView correctBelief decideAction deriveAction registerBelief updateBeliefWithEvidence weighEvidence|eraCycle:buildBlock|events:buildBlock getSettings setSettings timelineView|evict:array evictStat idempotentDecls nonEvictDecls note object siteDecls|evidenceBoard:assertClaim board diagnose gather getSettings playerView retract setSettings stat|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation decayWindsDraft getSettings rollEventsDraft roundOf setSettings tick triggerSingularityEruption|exec:cloneState mutate statBag storeOf withContext|factionChronicle:archiveFactionRecord comparePerspectives findExemptionClause|factionGraph:RELATION_KEYS STATUS_KEYS buildGraph clusters edgeOf getSettings heat simulateDynamics stat tension|factionSchism:triggerSchism|family:assignCare buildBlock contribute inherit list spend transferCare view|familyOps:advanceCycle handleGap inheritRatio|farfield:auto buildBlock getSettings partition pending setSettings stat transferPack|fate:bigrams check deck dedupe evalArith evalFormula getSettings isArithmeticSyntax jaccard judgeView oversample parse reset resolveCount resolveDC roll setSettings stat stripHeader titleGate view|firstRun:build dismiss getSettings mark next reset resetAll resume setSettings stat|floorChanges:markSubscribed onFloorEvent plan reset stat stateText|floorSettle:beginRound endRound getSettings list onFloorEvent reset resetStat rollback rollbackFrom scopeOf setSettings stat view|floorSnapshot:at bind bindings buildBlock byMessage clear getSettings list markCleared push resetStat rollback setSettings stat unbind view|fondness:BANDS apply buildBlock getSettings read|foreshadow:ACTIVE STATUS TERMINAL buildBlock check getSettings stat|foreshadowGermination:germinate|foreshadowTree:decay distort ferment get harvest plant|freight:arrive buildBlock cancel diagnose dispatch getSettings issueShadowRation reroute setSettings stat view|gauge:bandOf buildBlock getSettings|gear:canUse declareSlot equip getSettings lend list make repair setSettings unequip use view|genGate:KINDS buildBlock getSettings view|genTiming:buildBlock tick|geoTracker:buildBlock diagnose readLocationMarks registerPlace resolveLocation saveSettings settings updateCharacterLocation|groupGuard:detect isGroup|handoffPack:getSettings pack reset restore setSettings stat suggest verify|hazard:TRIGGER_KINDS buildBlock getSettings stat|healthPreflight:buildBlock firstRunLine firstRunView inspectAndSanitize threeGates threeGatesLine yieldAttrib yieldAttribLine|historySearch:FACE_LABELS catalog clearRecent count diagnose filters recent remember search stat|horizon:BASE_CHANCE COOLDOWN_ROUNDS LEDGER_THRESHOLD acceptResult bounds buildPromptBlock getSettings setSettings stat|hostWbTrace:crossCheck markSubscribed onActivated stat stateText|humanRealism:buildBlock consumeRoutine getActor isExempt listGrudges recordGrudge setExemption setNeeds settleGrudge triggerOutburst|idiosyncrasy:observeSubconscious registerIdiosyncrasy|injectBudget:PRIORITY apply budgetView costOf costView incrementalCost plan rankOf resolveBudget summaryText tokensOf volumeView|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectCollector:buildBlock diagnose getSettings noteScene setSettings stat|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|injectValue:getSettings observe report setSettings settle stat|inputGuard:check count list num oneOf text|inspectorState:flatten inspect summaryText|inst:PERMS REASONS approve assign authority breach buildBlock charter decide getSettings post propose setSettings settle statView succession vacate view|institutionalInertia:CHARTER_STATUS SUCCESSION_PATHS auditInstitutionalDecay establishCharter institutionalInertiaProjection resolveSuccessionPath submitBureaucraticReport triggerSuccessionHandover|institutionalSchism:enactReform|intake:run|intel:CONFIDENCE LEVELS addIntel addLink believe buildBlock correct explain getSettings knownCause network networkStat project rowsOf setSettings stat truthOf visibleTo|intentBoard:board buildBlock getSettings reset setSettings stat view|interceptor:install|interestFace:publish put|interop:compatGaps freeze probeAll stat summaryText|investigation:buildBlock checkEvidence extractFromTrace investigate pending register reveal setSettings view|kaleidoscope:MAX_DERIVES MAX_RULES OPS buildBlock clearDerives clearRules evaluate lastEval lastFailure listDerives listRules removeDerive removeRule setDerive setRule snapshot|karma:buildBlock|knowledgePractice:PRACTICE_STATUS executePractice grantPracticeLicense knowledgePracticeProjection refineKnowledgeFromEvidence registerKnowledgeSpec|laborSchedule:book cancel claim earliestSlot getSettings interrupt isBooked previewSchedule reschedule resume split transfer view|ladder:buildBlock|ledger:buildLedgerText recordChanges saveCheckpoint|ledgerTimeline:note probeDefault reset stat summaryText|legacyOath:bindLegacyOath enforceInheritedDebt getOath|lengthPolicy:getSettings parse parseNumber resetStat setSettings stat targetOf tierOf view|liaison:coordinate getSettings sceneOpen sceneResolve sceneView|life:ACTIONS COMMITMENTS addCommitment addGoal addSchedule buildBlock commitBag commitmentsView decide getSettings makeBag setSettings stat tick tickDraft|lifeline:advance boundary buildBlock capacityOf careGap getSettings register setSettings stat view|limits:applyStableUpdate clampBackstageResult locateStable|lingqi:buildBlock getSettings listSkills normalizeSkill register resetStat route seed setSettings stat view|livingWorld:DAY_PERIODS OCCUPATIONAL_ROUTINES autonomousTick buildBlock cleanTrace consolidateLivingMemory deflectTrajectory detectEncounters getTierPrice integrateLongRest leaveTrace propagateRipple recordRelationalDebt recordSilentEcho redeemDebt registerRoutine|longline:TERMINAL buildBlock getSettings overdue pressure promise setSettings stat sweep|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID LONSHA_BRIDGE_VERSION describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|mapViewport:clusterCharacters computeFlyInterpolation declutterLabels diagnose renderSvgScene saveSettings settings|marginal:buildBlock|masks:buildBlock|memory:buildMemoryBlock claimStat pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|memoryTiers:buildBlock clearTier getSettings knot list resetStat setSettings sink stat tierOf view|mend:buildBlock close getSettings mark setSettings statView step view|modelink:draftAdd draftApply draftClear draftList getSettings isMvuComment matchEntry parseFlow reset residue setSettings stat stripArtifacts updateBlocks view|monologue:getSettings plan resetMemo resetStat setSettings stat|moodGlide:buildBlock glide|motif:buildBlock|motiveArbitration:decide preview|narrativeDice:roll|noesis:boundary buildBlock duty fidelity gateScene getSettings knows leakScan perceive setSettings stat|observe:advanceOffscreenShadow slice|observeSlice:actionProvesPerception extractAnchor getSettings isMicroScene isObservationPrompt resetStat setSettings slice stat view|offlineReturn:getSettings recover setSettings stat|offlineTick:KINDS KIND_LABEL anchor anchorPaths buildBlock getSettings markConsumed release setSettings stat summary tick|offstageLife:buildBlock getOffstageCard markOffstage progressOffstage reunionSnap|oneShotMod:advance buildBlock|operations:active buildBlock cancel disburse enact handover pending setSettings settle trackSafehouseExposure view|opinion:buildOpinionBlock claimStat generate getSettings setSettings|opportunity:SOURCES buildBlock collect getSettings list statView sweep|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|org:KINDS assignRole buildBlock canAfford closeProject creditWork debtsView deliverToProject exportJournal getSettings grant ledgerView openProject oweTo payroll penalize projectView promote reconcile reconcileWith rosterView setSettings settleDebt settleOwed stat stockOf transfer|outlineInject:apply extractFromEnd getSettings parseEntries plan preview resetStat setSettings stat undo updateCapability view|outputGuard:buildBlock checkAndRemember|parallelEvents:buildBlock|parallelWorld:CAP_MODULES CAP_NPCS CAP_RELATIONS IMPACTS IMPACT_LABEL INJECT_MIN_IMPACT addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings getSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings shouldAuto stat|pathEcho:realizeOutcome record recordExpectation|pendingCenter:act bySource describe diagnose getSettings items setSettings soon stat timeline|perfBaseline:bands budget diagnose gap getSettings readings setSettings stat|perfLedger:getSettings ingest stat trend|perfTrace:CLASSES CLASS_DEF HISTORY_CAP LAYERS LAYER_LABEL alerts bandCompare baseline cacheStat coldStart curve curveAll dirtyAll flamegraph heatHistogram importSnapshot partial slots snapshot spikeOf split stat summaryText thresholds warmStart|periodicalIdeology:assessSocialTide publishIdeologyArticle triggerCollectiveAction|permissions:adopt currentUser gate gateStat|personaAnchor:auditGeneratedContent buildBlock|perspective:allows applyView assign boundary buildBlock current getSettings getView leakScan outletAllowed setSettings setView stat|phaseTransition:declarePlaceLayout evaluatePhase evaluatePlacePath executeTransitionRoute history investPath planTransitionRoute simulateIncidentStress transition|phoneBridge:ACT_LABEL PHASES PHONE_ACTS getSettings id linkChain noteAction opTrace opsView phaseOf setSettings stat traceOf version|plan:abandon adopt advance buildBlock candidates chain chainBlock current expand getSettings rechoose review setSettings settle statView view|planAudit:diagnose evidence|playableBlueprint:checkDependencies exportPlayDefs getSample installSample listSamples migrateBlueprint previewDiff resetInitialConditions tuneConfig|playableSeed:getSettings preview seed setSettings stat view|playerArchive:checkpoint exportJSON getSettings importSeedPack previewSeed seedPack setSettings view|playtime:DATA_KEY SOURCE_NAMES getSettings lastActive setSettings sources stat story touch|plotGauge:advice getSettings setSettings stat tension trend|plugin:fire list register stat unregister|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText stat|populate:getSettings plan reset seed setSettings stat view|portal:claim digest getSettings release reset resetStat setSettings signature stat status view|powerAnchor:buildBlock|prefilterGate:alias clearRoster getSettings parseReply register resetStat resolveName roster screen setSettings stat view|preset:getAllPresets getSegmentOverrides|presetWorld:getSettings preview seed stat|proactive:isEnabled stat|probe:LEVELS addEvidence auditRecord buildBlock confront decide getSettings open resolve setSettings statView tally view wrong|production:advance cancel declareFacility deliver deliverPartial extend getSettings list open pause resume resupply setSettings staff view|profile:stat|publicAgenda:TOPIC_STATUS enactAgendaTopic publicAgendaProjection scheduleAgenda setAgendaCapacity submitProposal viewAgenda|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|quota:buildBlock|rand:beginTape chance coordOf dice endTape getSeed id int markCoord next pick pickWeighted randStat replay seed seeded stopReplay tape tapeVol verifyTape verifyTapeWith|reasoning:buildBlock officialOnly|reasoningStrip:getSettings hasIncomplete resetStat setSettings stat strip trailingPartialTagLength view|recipe:catalogView economySpec extendedThemes getSettings judgeSpec list policyClashes preview satisfied seed staleness statView themeCatalog themeClashes|redactLayer:getSettings isSecretPath probe redact resetStat setSettings stat view|region:buildBlock deliver fine getSettings heard markLane occur places register setSettings stat statView tickOffline|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:aliasOf aliasStat bindAlias clearProfile danglingRefs ensurePerson getPersona getProfile getRelation idClear idStat identityOf list personOriginStat profileStat register relationBands relationStat setPersonaDice setProfileSafe setRelations slotStat traceOf unregister|rehearsal:checkPreview preview run|rejectRecovery:explain|relationGraph:clear directedOf edgeIdOf edgesOf get getSettings list persisted reload remove resetStat setSettings stat upsert view|relationTemp:build getSettings network networkStat reset setSettings stat|render:SOURCES applyInjections buildWorldSnapshot explain getVisibility injectionLedger loadUninjectLedger setVisibility snapshotState themeContrast uninject uninjectAudit visibilityDefault visibilityStat|requestViewer:CHANNELS capture getSettings size stat|research:abandon advance buildBlock canUse disseminate list open supply view|retrieval:RECALL_HINTS assemble audit buildBlock candidates contracts getSettings historyOf recallWanted reset setSettings stat|rewriter:CHANNEL getSettings stat|rhythmLoop:buildBlock|riskPooling:POOL_STATUS claimMutualRelief declareRiskPool disputeReliefClaim pledgeMutualFund riskPoolingProjection|rivalry:buildBlock|roleConflict:CONFLICT_SEVERITY RESOLUTION_STANCES detectRoleConflict registerAffiliationObligation resolveConflictStance roleConflictProjection viewConflictPerception|roundCost:build getSettings reset setSettings stat|roundDrivers:tickAll|rulePack:admit apply catalog compose current detect diagnose drop exportPack get getSettings history importPack list rollback save setSettings stat template|rules:ORDER coreSummary getAll getModule getRuleCount isNewModule listModules|ruling:buildBlock|rumor:LAYERS MOTIVES PUBLIC_LAYERS buildBlock competeForAttention conceal driftRelay fullView getSettings inspectDrift investigate mutateAndAmplify refute refuteDrift relay setSettings startChain stat visibleTo|rumorCognition:projectRumorToActor|samplerCheck:runChecks|sanctuaryScramble:scramble|sandbox:isolationReport run stat|sanitize:html text|saveHealth:build getSettings reset setSettings stat|sceneBudget:note reset|sceneNarrative:currentScene perceivedHorizon resolvedSummary situation traceCausalEchoes traceFrom|sceneSlice:buildBlock read|scopeTag:getSettings parse rangesOf resetStat setSettings stat view|sediment:LABEL TRACES buildBlock feel getSettings placesView setSettings settle stat|serviceNetwork:activateFacility cancelQueue checkPassage checkServiceImpact decayFacility declareFacility queueService releaseService requestService restoreFacility servicesAt|session:HOST_PERMS SEAT_PERMS auth buildBlock getSettings host identify identity join leave post resync setSettings since statView view|settingsBus:boundsOf cfgStat cfgSurface clampNum deregisterOrphan dormantGhosts exportConfig ghostScan importConfig migrationStat normalize pendingOrphan read readEx readStat registry registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults write writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|shadow:SHADOW_KINDS STAKES addExperience addShadow brighten buildBlock deepen experiencesOf getSettings getShadow setSettings shadowStat stat visibleTo|sharedAwareness:amendPact assertMeta confirmPact openPact viewPact|socialLegacy:acceptLegacy clarifyClaim entrustDeathbedPact formLegacy fulfillDeathbedPact groupMemoryStance initiateHandover proposeSuccession registerClaim reorganizeUnclaimed resolveHandover spreadClaim viewLegacy witnessAccount|soloVoice:brief check countQuestions getSettings labelWeight resetStat setSettings stat view|spatialAcoustics:burstIn eavesdrop getConversation registerPartition whisper|spotlight:buildBlock|stage:PACKS adopt buildBlock getSettings mark plan setSettings statView transit view|staleGuard:begin verdict|stall:away back board buildBlock buy delist getSettings lay list pack setSettings sign statView view|storageForecast:forecast getSettings reset sample setSettings stat|store:SCHEMA_VERSION batch batchStat capsFor chatId claimAsync claimStat classifyKey committedRev conflictStat createRecoveryPoint currentBranchId defaultWorldState diagBudget dropAsync dropConflict dropQuarantine dropRecoveryPoint epoch exportAuditReport exportConflict exportRecoveryPoints externalWriteStat floorSig fnv1a get init integrity integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport migrations mirrorStat orphanSettingsKeys patch peopleSig quarantineAudit quarantineStat read readStat recentSig recoveryStat registryParity removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat settleAsync sizeAudit sizeAuditFull sizeCaps sizeProfile storageStat sweepStaleKeys transact transientSnapshotKeys txStat writeGate|storyChoice:buildBlock confirm pending present review setSettings|storyLoop:audit candidates confirm contracts getSettings reset setSettings stat trace|storyTone:buildBlock clear get set|storyclock:discipline readLatest|storylineAdvance:buildBlock getSettings setSettings stat tick|style:CHOICES CHOICE_LABELS buildBlock effectiveSettings getSettings setSettings styleStat summaryText textCoverage|subtextTension:assessTension decodeSubtext encodeSubtext|successGrade:evaluateSpectrum grade|summarizer:buildBlock cursorOf stat|supplyChain:bottleneck commit diagnose plan stat verify|supplyChoke:triggerChoke|survey:advance buildBlock confirm declareSpot fog getSettings halt knowsOf list pause report resume resupply routesOf setSettings survey view|survival:buildBlock rowOf statusOf|tapeStore:drop list load save stat|techLineage:advanceRetrofit canProduce cancelRetrofit checkCompatibility confirmVariant declareStandard declareTradition getStandard listStandards outsourceWork planRetrofit produceAdapter teach|temperament:buildBlock read|tempo:buildBlock check current setGear|temporalLock:buildBlock|terrainHazard:assessPassability blockChannel forceTraverse unblockChannel|theater:generate send stat wrap|theme:THEMES THEME_EXT activeModules apply contrast engineFace list preview separation statView|threads:RELIABILITY TERMINAL abandon addLead buildBlock converge explain getSettings open resolve setSettings stall stat threadStat|timeline:SOURCE_ID_KEY auditRefs captureRange hashText unionRefs|tolerance:buildBlock|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview previewPlan|toolSnapshot:buildSubsetPayload download restore|training:abilitiesView can declare getSettings practice progress setSettings view|travelDesk:commit diagnose ledger meet plan route stat verify|undercurrentCalendar:build getSettings reset setSettings stat|undo:capture clear peek pushValue stat undo|userlock:buildBlock|vitals:buildBlock conceive endPregnancy getSettings know knows knowsOthers list phaseOf register reset setSettings stat sweep tell tick view|warrant:buildBlock|wbInject:activeOrders findCompanionName getConfig isEnabled|wbSearch:count search|weather:advance buildBlock getMicroclimate season weatherOf|whisperBackchannel:sendWhisper|wordBudget:count|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|world:CHANNELS EVENT_KINDS PLACE_KINDS addBlock addEvent addPlace addRoad addUse advance arrive attendees buildBlock canBeAt depart eventsBetween getSettings move reach setSettings stat stop tick tickDraft transit useWindowOf usesOf where whereStat|worldAutobiography:autobiography buildBlock exportText getSettings reset setSettings stat|worldBlueprint:BP_VER SCENES checkIntegrity drop exportBlueprint get getSettings importBlueprint list previewImport save setSettings stat targetEmpty|worldBridge:buildBlock exportLegends getSettings importLegends seed setSettings stat toRumor view worldKey|worldBriefing:getSettings reset setSettings snap stat view|worldChanges:buildBlock capture getSettings setSettings settle view|worldClock:getSettings inspectEnd judge parseEnd resetStat setSettings stat view|worldDiary:boundary build getSettings reset setSettings stat|worldGraph:KINDS diagnose geo getSettings graph locate stat suggest timeline|worldHealth:diagnose drill getSettings setSettings sources stat summary|worldLab:adapterTable adopt advance arms beats catalog diagnose diff discard exportAs getSettings kinds parseSteps report run setSettings simulate staleness stat|worldSeed:SEED_VER drop extract get getSettings importPack initConfirm initPreview list requireContinuation save setSettings sow stat transferPack validateContinuation|worldSnapshot:IDENTITY_REFS checkCompat diagnose exportSnapshot importSnapshot libDrop libTake library previewImport roundTrip toBlueprint toJSON|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries matchKey peekEntries previewActivation saveSelection triggerEnabled|writeContract:contractOf scan stat summaryText|writeDesk:call catalog stat';
+    const FROZEN2800 = 'act:KINDS abort add admit advance buildBlock getSettings replan setSettings stat verdict view|actionCostFeedback:applyEvaluationCosts|actionDesk:ROUTES actFromScene board boardMulti diagnose lifecycle plan planMulti recoverAction sceneFlow setSettings|actionMethods:evaluate execute|activity:buildBlock declareSeries getSeries handleDisruption listSeries nextCycle nextCycleInvitations prepareForActivity|affect:buildBlock checkTraumaTrigger|affectionNexus:buildBlock|aftermath:active buildBlock cancel inspect pending register repair setSettings view|aftermathImpact:commissionRepair findDetour listCascadingChains|agency:buildBlock diagnose getSettings processReceipts schedule setSettings stat|agenda:getSettings overdueList setSettings sources stat upcoming|alchemyToxicology:brewOrTestToxin buildBlock stat|anomalyMutation:diagnose inflictCorruption|antiOmniscience:auditGeneratedContent buildBlock|apiRouter:CHANNELS call callStats cfgStat extractJson getChannel getConcurrency listChannels queueLength resetCallStats setChannel setConcurrency|appearance:buildBlock|atlas:diagnose getSettings places relations routes setSettings stat view|auditLog:exportVol flush record stat verifyVolWith|autoHide:clear getSettings isHidden list mark plan resetStat revoke setSettings stat view|autobiographyEpiphany:triggerEpiphany viewAutobiography|backstage:abort advanceManagedCurrents applyResult applyStat archiveScheduled buildPrompt channelStat forceSimulate getSettings isRunning pending setCurrentAdvance setSettings|backstageTone:buildBlock era getSettings noteAdd noteClear noteList numToZh parseShichen reset setSettings shichen socialHint stat view voiceCheck zhNum|beastBond:buildBlock|beat:bandOf categoryOf extract getSettings hue parseOrExtract repair reset setSettings stat validateId validateList view|beatFacade:blocked diagnose run status view|beatLedger:buildBlock current getSettings view|beatMask:buildBlock|beatReport:buildBlock getSettings view|blackmarketUsury:buildBlock stat transactBlackMarket|bloodlineHeritage:buildBlock transactLineage|bonds:buildBlock evaluateDeepTalk network read setBond|branchDiff:catalog getSettings semanticDiff setSettings stat transplant triDiff|branchTransplant:transplantFact|branchTree:choose compare fork getSettings replay setSettings stat tree|bridge:FLOOR_GAP atomicTransact flushDirtySnapshots handshake id setSettings settings snapshot stat version|bureaucracyAscension:diagnose evaluateAscension|butterflyCascade:advanceEpoch advanceTurn diagnose triggerFlutter|calendar:advanceDay getSettings setClock setSettings stat|campaign:advance current diagnose evaluate getSettings planDelete planList planOf reset review setSettings start stat status templates|canon:actText actsBrief adopt alignView buildBlock buildOutline clearOutline coordOf deviation deviationTrend gap getSettings locate outlineView position setSettings signal stat|capabilityAudit:audit dormantMechanisms getSettings setSettings stat summary|capabilityTier:applyTier flipSwitch getSettings list rollback shapeOf stat view|capacityAudit:diagnose getSettings migrationCheck obligations reclaimable setSettings stat waterline|careChain:ESCALATION_LEVELS assessCaregiverAbsence careChainProjection queueForPublicCare referCare registerCareCommitment reportCareAbsence|cascadeBus:diagnose interrupt penetrateIntent|cataclysmHazard:buildBlock triggerCataclysm|causal:STAGES TERMINAL addChain buildBlock cancel classify conflicts defer due endingsTree evidence getSettings knownCause previewIntervention record rehearse rippleWeb setSettings settle settleBlockReason stat stateView tick traceGraph traceLiabilityTree|chapters:current end start|chatcache:init installStat listSnapshots mirrorOwner|checkpoints:FORMAT branch branchPlan buildBlock compare exportOne getSettings importOne list migrate migrations read remove restore save setSettings stat topKeys|choices:generate|chronicleView:coverage diagnose entries entry getSettings hiddenSummary setSettings stat|chrono:applyUndo buildBlock chronicle getSettings record setSettings stale stat undo|cityFolklore:checkTabooViolation getTaboo maskWithFestivity proclaimTaboo|civilizationRelic:discoverRelic getRelic reverseEngineer|clock:clockStat freeze now wallNow|cognitivePoisoning:plantForgedIntel|collab:claim conflicts contribute createTask enqueue getSettings holderOf open penalize pending setSettings settle stat taskStat|collateralRupture:ruptureCollateral|commission:advance buildBlock cancel create pending setSettings settle view|commit:active begin chain chainSelfCheck chainStat commit defer effect flush inflight opKey pending replay resumeIdentity resumeStat retryEffects scanInterrupted settle stat step|commonsGovernance:ASSET_STATUS GOVERNANCE_MODELS auditAssetDecay changeGovernanceModel commonsProjection contributeMaintenance declareCommonAsset reserveCommonAsset resolveAssetDispute|communityNote:ack clear getSettings isSeen list markSeen pending push resetStat setSettings stat view|compare:diff getSettings hasResidue merge reset setSettings stat strip tableOf toLines variants view|compat:context detect snapshot|compatMvu:init status|compatTH:init status|conspiracyWeaver:advancePhase diagnose executeCoup hatchConspiracy unmaskConspiracy|contest:buildBlock|contraband:assessInflation inspectBust openRoute smuggle|contrabandPipeline:diagnose smuggleContraband|contractAudit:audit|coop:concludeProject handleAbsence pending pledgeProject proposeProject|coordinate:anchorAdd anchorOf bridgeDump bridgeLoad buildBlock capture decode encode gateClaim gateClear gateRelease gateSuppressed getSettings index lines list parseLine reset setSettings stat view|counterfactualEcho:evokeEcho|counterfactualSandbox:diffOutcomes forkRehearsal getBranch simulateBranch|courierDispatch:dispatchPending sendDispatch|courtIntrigue:buildBlock executeIntrigue|covenantSanction:buildBlock enforceCovenant stat|coverBallistics:diagnose resolveCoverProtection|covertEspionage:buildBlock ingestCommTraffic operateSpy statView|creditLedger:accrue checkCredit open repay view|crowdPanic:diagnose getPanicZoneStatus triggerStampede|customLax:activeRules adoptRuleFromPrecedent checkRuleEnforcement claimGuarantee commitPromise defaultPromise enactRule establishPrecedent evaluatePrecedent fulfillPromise listPrecedents listPromises provideGuarantee reciprocityLedger recordFavor registerDissatisfaction remedyPromise requestAid reviewRule settleFavor spawnCandidate submitToApproval|dayRoute:boundary build getSettings reset scheduleDomain setSettings stat storyDay|deepClean:apply digest freeze getSettings prepare reset resetStat review scan setSettings stat status view|deferToken:schedule|demographicFlow:arriveMigration commitMigration demographicProjection planMigration recordSeasonalDeparture recordSeasonalReturn setPlaceCapacity|depCheck:catalog check diagnose getSettings prepare setSettings stat|difficulty:buildBlock effective|digest:buildBlock generate|dilemmaBargain:negotiate|diplomacy:STATES TERMS applies breach buildBlock diagnose expire fulfil getSettings pairId pairView propose reply setSettings sign stat view|directEvent:abort create|disasterEvacuation:diagnose|dramaticTension:detonateChekhovGun diagnose getSceneTension primeChekhovGun updateSceneTension|dream:archive buildBlock deviationList getSettings onset reset setSettings stat threadList threadOf view volumeGet volumeList weave|driverLedger:getSettings setSettings stat summaryText view why|dungeonHazardMesh:buildBlock navigateOrTrigger|eccentricThreads:advanceThread buildBlock listThreads openThread resolveThread|ecoAudit:CATS getSettings lastSweep setSettings stat sweep|economy:RECIPES buildBlock buy craft declaredBase economySpec getSettings markRoute money price recipeKeys recipeOf route routeView setSettings shelf ship simulateTradeShock statView stock tick view|ecosystemCascade:buildBlock simulateBioShock|ecosystemPredation:checkPerimeterDeterrent diagnose simulatePredation|editorEvents:MAX_EVENTS TERMINAL add getEditingId list remove setEditingId shiftStage stagesOf|editorFaction:MAX_FACTIONS RELATIONS STATUSES add copy getEditingId list remove reputationPressure setEditingId update|elsewhere:bandOf buildBlock card getSettings list open reconcile remove reset romance romanceOf setSettings stat sweep update view|enemies:ASSET_STATUS ENEMY_STATUS ENEMY_TYPE apply applyBlackbox applyWorldTrends dropStat|engineeringBlueprint:buildBlock engineerDevice|enigma:buildBlock mark read|entities:ENTITY_TYPES TYPE_LABELS applyEntities applyEntityUpdates buildEntitiesBlock upsert|entryRouter:applyPlan clearCache clearCandidates isPassive lastFailure lastRoute listCandidates plan recentMessages removeCandidate setCandidate|envCapacity:declareRecyclableMaterial declareResource evaluateImpact generateScrap materialLifecycle recycleScrap regenerate regionStatus withdraw|environmentInterference:disruptRoutines|environmentalHazard:diagnose|environmentalOcclusion:auditAcoustic buildBlock canSee|epidemicContagion:buildBlock propagateDisease statView|epistemicView:buildView correctBelief decideAction deriveAction registerBelief updateBeliefWithEvidence weighEvidence|epochTide:advanceEpoch diagnose getCurrentEpoch shiftEpoch|epochalTransition:buildBlock evaluateEpochShift|eraCycle:buildBlock|events:buildBlock getSettings schedule setSettings timelineView|evict:array evictStat idempotentDecls nonEvictDecls note object siteDecls|evidenceBoard:assertClaim board diagnose gather getSettings playerView retract setSettings stat|evolution:ECONOMY_CLIMATE FACTION_RELATION FACTION_STATUS MAX_WINDS REPUTATION_LEVELS activeSnapshot addWind applyEconomy applyFactions applyInfluenceChain applyReputation decayWindsDraft getSettings rollEventsDraft roundOf setSettings tick triggerSingularityEruption|exec:cloneState mutate statBag storeOf withContext|factionChronicle:archiveFactionRecord comparePerspectives findExemptionClause|factionGraph:RELATION_KEYS STATUS_KEYS buildGraph clusters edgeOf getSettings heat simulateDynamics stat tension|factionSchism:triggerSchism|family:assignCare buildBlock contribute inherit list spend transferCare view|familyOps:advanceCycle handleGap inheritRatio|farfield:auto buildBlock getSettings partition pending setSettings stat transferPack|fate:bigrams check deck dedupe evalArith evalFormula getSettings isArithmeticSyntax jaccard judgeView oversample parse reset resolveCount resolveDC roll setSettings stat stripHeader titleGate view|financialContagion:buildBlock injectLiquidityBailout triggerRunOnBank|firstRun:build dismiss getSettings mark next reset resetAll resume setSettings stat|floorChanges:markSubscribed onFloorEvent plan reset stat stateText sweep|floorSettle:beginRound endRound getSettings list onFloorEvent reset resetStat rollback rollbackFrom scopeOf setSettings stat view|floorSnapshot:at bind bindings buildBlock byMessage clear getSettings list markCleared push resetStat rollback setSettings stat unbind view|fondness:BANDS apply buildBlock getSettings read|foreshadow:ACTIVE STATUS TERMINAL buildBlock check getSettings stat|foreshadowGermination:germinate|foreshadowTree:decay distort ferment get harvest plant|freight:arrive buildBlock cancel diagnose dispatch getSettings issueShadowRation reroute setSettings stat view|gauge:bandOf buildBlock getSettings|gear:canUse declareSlot equip getSettings lend list make repair setSettings unequip use view|gearWear:applyStress diagnose getGearStatus repairGear|genGate:KINDS buildBlock getSettings view|genTiming:buildBlock tick|geoTracker:buildBlock diagnose readLocationMarks registerPlace resolveLocation saveSettings settings updateCharacterLocation|groupGuard:detect guard isGroup|handoffPack:getSettings pack reset restore setSettings stat suggest verify|hazard:TRIGGER_KINDS buildBlock getSettings stat|healthPreflight:breakDeadlock buildBlock firstRunLine firstRunView inspectAndSanitize threeGates threeGatesLine yieldAttrib yieldAttribLine|historySearch:FACE_LABELS catalog clearRecent count diagnose filters recent remember search stat|horizon:BASE_CHANCE COOLDOWN_ROUNDS LEDGER_THRESHOLD acceptResult bounds buildPromptBlock getSettings setSettings stat|hostWbTrace:crossCheck markSubscribed onActivated stat stateText|humanRealism:applyMemoryResolve applySleepDeprivation buildBlock consumeRoutine getActor isExempt listGrudges recordGrudge setExemption setNeeds settleGrudge triggerOutburst|identityMatch:calibrate match|ideologyMemetics:broadcastMeme diagnose|idiosyncrasy:observeSubconscious registerIdiosyncrasy|incarcerationJailbreak:buildBlock executeJailOp|injectBudget:PRIORITY apply budgetView costOf costView incrementalCost plan rankOf resolveBudget summaryText tokensOf volumeView|injectChannel:SLOT_PREFIX applySlots normPos planSlots|injectCollector:buildBlock diagnose getSettings noteScene setSettings stat|injectInspector:getLastSnapshot init markRegistered statusText|injectSlotAudit:audit routeAudit snapshotSlots|injectValue:getSettings observe report setSettings settle stat|inlineTags:apply evaluateCondition hasTag parse|inputGuard:check count list num oneOf text|inspectorState:flatten inspect summaryText|inst:PERMS REASONS approve assign authority breach buildBlock charter decide getSettings post propose setSettings settle statView succession vacate view|institutionalInertia:CHARTER_STATUS SUCCESSION_PATHS auditInstitutionalDecay establishCharter institutionalInertiaProjection resolveSuccessionPath submitBureaucraticReport triggerSuccessionHandover|institutionalSchism:enactReform|intake:run|intel:CONFIDENCE LEVELS addIntel addLink believe buildBlock correct explain getSettings knownCause network networkStat project rowsOf setSettings stat truthOf visibleTo|intentBoard:board buildBlock getSettings reset setSettings stat view|interceptor:install|interestFace:leave move place publish put|interop:compatGaps freeze probeAll stat summaryText|interrogationTell:applyBacklashGrudge diagnose pressInquest|intimateArbiter:buildBlock|investigation:buildBlock checkEvidence extractFromTrace investigate pending register reveal setSettings view|judicialInquest:conductInquest diagnose|kaleidoscope:MAX_DERIVES MAX_RULES OPS buildBlock clearDerives clearRules evaluate lastEval lastFailure listDerives listRules removeDerive removeRule setDerive setRule snapshot|karma:buildBlock|knowledgePractice:PRACTICE_STATUS executePractice grantPracticeLicense knowledgePracticeProjection refineKnowledgeFromEvidence registerKnowledgeSpec|l3Registry:zeroArgDrivers|laborSchedule:book cancel claim earliestSlot getSettings interrupt isBooked previewSchedule reschedule resume split transfer view|ladder:buildBlock|ledger:buildLedgerText recordChanges saveCheckpoint|ledgerTimeline:note probeDefault reset stat summaryText|legacyOath:bindLegacyOath enforceInheritedDebt getOath|lengthPolicy:getSettings parse parseNumber resetStat setSettings stat targetOf tierOf view|liaison:coordinate getSettings sceneOpen sceneResolve sceneView|life:ACTIONS COMMITMENTS addCommitment addGoal addSchedule buildBlock commitBag commitmentsView decide getSettings makeBag setSettings stat tick tickDraft|lifeline:advance boundary buildBlock capacityOf careGap getSettings register setSettings stat view|limits:applyStableUpdate clampBackstageResult locateStable|lingqi:buildBlock getSettings listSkills normalizeSkill register resetStat route seed setSettings stat view|livingWorld:DAY_PERIODS OCCUPATIONAL_ROUTINES autonomousTick buildBlock cleanTrace consolidateLivingMemory deflectTrajectory detectEncounters getTierPrice integrateLongRest leaveTrace propagateRipple recordRelationalDebt recordSilentEcho redeemDebt registerRoutine|longline:TERMINAL buildBlock getSettings overdue pressure promise setSettings stat sweep|lonshaReader:ECHO_SECTION LONSHA_BRIDGE_ID LONSHA_BRIDGE_VERSION describeLonsha diffWithLonsha ledgerBridges ledgerSection ledgerSummary lonshaSource readLonshaSnapshot summarizeSnapshot|mapViewport:clusterCharacters computeFlyInterpolation declutterLabels diagnose renderSvgScene saveSettings settings|marginal:buildBlock|maritimeNavigation:buildBlock getVessel navigateVoyage stat|masks:buildBlock|memory:buildMemoryBlock claimStat pruneForeshadows stats|memorySampler:buildBlock buildHaystack filterRelevant sampleEntries samplerCfgStat|memoryTiers:buildBlock clearTier getSettings knot list resetStat setSettings sink stat tierOf view|mend:buildBlock close getSettings mark setSettings statView step view|metabolismClock:accumulateFatigue applyPsychicStress buildVitalsFeed|microclimatePhase:diagnose getNodeMedium simulatePhase|modelink:draftAdd draftApply draftClear draftList getSettings isMvuComment matchEntry parseFlow reset residue setSettings stat stripArtifacts updateBlocks view|monologue:getSettings plan resetMemo resetStat setSettings stat|moodGlide:baselineOf buildBlock glide miss phrase read set setBaseline|moralDilemma:diagnose poseDilemma resolveDilemma|motif:buildBlock|motiveArbitration:decide preview|narrativeDice:roll|narrativeLens:buildBlock|noesis:boundary buildBlock duty fidelity gateScene getSettings knows leakScan perceive setSettings stat|observe:advanceOffscreenShadow slice|observeSlice:actionProvesPerception extractAnchor getSettings isMicroScene isObservationPrompt resetStat setSettings slice stat view|offlineReturn:getSettings recover setSettings stat|offlineTick:KINDS KIND_LABEL anchor anchorPaths buildBlock getSettings markConsumed release setSettings stat summary tick|offstageLife:GENRE_PRESETS buildBlock getOffstageCard markOffstage progressOffstage reunionSnap|oneShotMod:advance buildBlock|operations:active buildBlock cancel disburse enact handover pending setSettings settle trackSafehouseExposure view|opinion:buildOpinionBlock claimStat generate getSettings setSettings|opportunity:SOURCES buildBlock collect getSettings list statView sweep|oracle:advance clear currentBeat generatePlanSafe plan setPlan stat|org:KINDS assignRole buildBlock canAfford closeProject creditWork debtsView deliverToProject exportJournal getSettings grant ledgerView openProject oweTo payroll penalize projectView promote reconcile reconcileWith rosterView setSettings settleDebt settleOwed stat stockOf transfer|outlineInject:apply extractFromEnd getSettings parseEntries plan preview resetStat setSettings stat undo updateCapability view|outputGuard:buildBlock checkAndRemember|parallelEvents:add buildBlock resolve|parallelWorld:CAP_MODULES CAP_NPCS CAP_RELATIONS IMPACTS IMPACT_LABEL INJECT_MIN_IMPACT addNpc advance buildParallelBlock buildPrompt dropModule dropSnapshot effectiveSettings getSettings listSnapshots removeNpc restoreSnapshot saveSnapshot setSettings shouldAuto stat|pathEcho:realizeOutcome record recordExpectation|pendingCenter:act bySource describe diagnose getSettings items setSettings soon stat timeline|perceptionManipulation:diagnose forgeIllusion getVictimPerceptionMap verifyBelief|perfBaseline:bands budget diagnose gap getSettings readings setSettings stat|perfLedger:getSettings ingest stat trend|perfTrace:CLASSES CLASS_DEF HISTORY_CAP LAYERS LAYER_LABEL alerts bandCompare baseline cacheStat coldStart curve curveAll dirtyAll flamegraph heatHistogram importSnapshot partial slots snapshot spikeOf split stat summaryText thresholds warmStart|periodicalIdeology:assessSocialTide publishIdeologyArticle triggerCollectiveAction|periodicals:checkAndPublish configure render|permissions:adopt currentUser gate gateStat|personaAnchor:auditGeneratedContent buildBlock|personalInventory:buildInventoryFeed forceInspect getInventory|perspective:allows applyView assign boundary buildBlock current getSettings getView leakScan outletAllowed setSettings setView stat|phaseTransition:declarePlaceLayout evaluatePhase evaluatePlacePath executeTransitionRoute history investPath planTransitionRoute simulateIncidentStress transition|phoneBridge:ACT_LABEL PHASES PHONE_ACTS getSettings id linkChain noteAction opTrace opsView phaseOf setSettings stat traceOf version|plan:abandon adopt advance buildBlock candidates chain chainBlock current expand getSettings rechoose review setSettings settle statView view|planAudit:diagnose evidence|playableBlueprint:checkDependencies exportPlayDefs getSample installSample listSamples migrateBlueprint previewDiff resetInitialConditions tuneConfig|playableSeed:getSettings preview seed setSettings stat view|playerArchive:checkpoint exportJSON getSettings importSeedPack previewSeed seedPack setSettings view|playtime:DATA_KEY SOURCE_NAMES getSettings lastActive setSettings sources stat story touch|plotGauge:advice getSettings setSettings stat tension trend|plugin:fire list register stat unregister|pmem:CAP_PER_PERSON applyPersonalMemory buildBlock recentText stat|populate:getSettings plan reset seed setSettings stat view|portal:claim digest getSettings release reset resetStat setSettings signature stat status view|powerAnchor:anchor buildBlock check drop|prefilterGate:alias clearRoster getSettings parseReply register resetStat resolveName roster screen setSettings stat view|preset:getAllPresets getSegmentOverrides|presetWorld:getSettings preview seed stat|proactive:isEnabled stat|probe:LEVELS addEvidence auditRecord buildBlock confront decide getSettings open resolve setSettings statView tally view wrong|production:advance cancel declareFacility deliver deliverPartial extend getSettings list open pause resume resupply setSettings staff view|profile:stat|psycheTrauma:diagnose getActorPsyche inflictTrauma soothePsyche triggerBlackening|publicAgenda:TOPIC_STATUS enactAgendaTopic publicAgendaProjection scheduleAgenda setAgendaCapacity submitProposal viewAgenda|purifier:addRuleSafe applySafe getRules importPresetSafe removeRuleSafe resetToBuiltin rules setEnabled stat|pushApiRegistry:driveDrivers|pyroTelecom:broadcastSignal diagnose|quota:buildBlock|rand:beginTape chance coordOf dice endTape getSeed id int markCoord next pick pickWeighted randStat replay seed seeded stopReplay tape tapeVol verifyTape verifyTapeWith|reasoning:buildBlock officialOnly|reasoningStrip:getSettings hasIncomplete resetStat setSettings stat strip trailingPartialTagLength view|recipe:catalogView economySpec extendedThemes getSettings judgeSpec list policyClashes preview satisfied seed staleness statView themeCatalog themeClashes|redactLayer:getSettings isSecretPath probe redact resetStat setSettings stat view|regimentTactics:buildBlock clashRegiments|region:buildBlock deliver fine getSettings heard markLane occur places register setSettings stat statView tickOffline|regional:applyIncident bounds effectiveSettings getSettings incidentTypes roll setSettings|registry:aliasOf aliasStat bindAlias clearProfile danglingRefs ensurePerson getPersona getProfile getRelation idClear idStat identityOf list personOriginStat profileStat register relationBands relationStat setPersonaDice setProfileSafe setRelations slotStat traceOf unregister|rehearsal:checkPreview preview run|rejectRecovery:explain|relationGraph:clear directedOf edgeIdOf edgesOf get getSettings list persisted reload remove resetStat setSettings stat upsert view|relationTemp:build getSettings network networkStat reset setSettings stat|render:SOURCES applyInjections buildWorldSnapshot explain getVisibility injectionLedger loadUninjectLedger setVisibility snapshotState themeContrast uninject uninjectAudit visibilityDefault visibilityStat|requestViewer:CHANNELS capture getSettings size stat|research:abandon advance buildBlock canUse disseminate list open supply view|researchClosure:evaluateReadiness recordFailureClue verifyPrereq|retrieval:RECALL_HINTS assemble audit buildBlock candidates contracts getSettings historyOf recallWanted reset setSettings stat|rewriter:CHANNEL getSettings stat|rhythmLoop:buildBlock|riskPooling:POOL_STATUS claimMutualRelief declareRiskPool disputeReliefClaim pledgeMutualFund riskPoolingProjection|rivalry:buildBlock|roleConflict:CONFLICT_SEVERITY RESOLUTION_STANCES detectRoleConflict registerAffiliationObligation resolveConflictStance roleConflictProjection viewConflictPerception|roundCost:build getSettings reset setSettings stat|roundDrivers:tickAll|routinePacing:advanceSlot buildBlock setActorProfile setDeviation setWillingness setWorldPreset|ruinMechanism:diagnose triggerMechanism|rulePack:admit apply catalog compose current detect diagnose drop exportPack get getSettings history importPack list rollback save setSettings stat template|rules:ORDER coreSummary getAll getModule getRuleCount isNewModule listModules|ruling:buildBlock|rumor:LAYERS MOTIVES PUBLIC_LAYERS buildBlock competeForAttention conceal driftRelay fullView getSettings inspectDrift investigate mutateAndAmplify refute refuteDrift relay setSettings startChain stat visibleTo|rumorCognition:projectRumorToActor|samplerCheck:runChecks|sanctuaryScramble:scramble|sandbox:isolationReport run stat|sanitize:html text|saveHealth:build getSettings reset setSettings stat|sceneBudget:note reset|sceneNarrative:currentScene perceivedHorizon resolvedSummary situation traceCausalEchoes traceFrom|sceneSlice:buildBlock read resolveSegment set|scopeTag:getSettings parse rangesOf resetStat setSettings stat view|sediment:LABEL TRACES buildBlock feel getSettings placesView setSettings settle stat|serviceNetwork:activateFacility cancelQueue checkPassage checkServiceImpact decayFacility declareFacility queueService releaseService requestService restoreFacility servicesAt|session:HOST_PERMS SEAT_PERMS auth buildBlock getSettings host identify identity join leave post resync setSettings since statView view|settingsBus:boundsOf cfgStat cfgSurface clampNum deregisterOrphan dormantGhosts exportConfig ghostScan importConfig migrationStat normalize pendingOrphan read readEx readStat registry registryStat remove removeStat save saveOrThrow selfCheck stats subkeyAudit subkeyPruner toBool verifyDefaults writeStat|settleGuard:begin commit forceNext markSkip peekForce reset stat|shadow:SHADOW_KINDS STAKES addExperience addShadow brighten buildBlock deepen experiencesOf getSettings getShadow setSettings shadowStat stat visibleTo|sharedAwareness:amendPact assertMeta confirmPact coordination openPact viewPact|siegeAttrition:advanceSiege diagnose|socialEncounter:checkBlindspot|socialLegacy:acceptLegacy clarifyClaim entrustDeathbedPact formLegacy fulfillDeathbedPact groupMemoryStance initiateHandover proposeSuccession registerClaim reorganizeUnclaimed resolveHandover spreadClaim viewLegacy witnessAccount|soloVoice:brief check countQuestions getSettings labelWeight resetStat setSettings stat view|spatialAcoustics:burstIn calculateWeatherMasking eavesdrop getConversation registerPartition whisper|spatialConflict:resolveKinetic|spatialTopology:buildBlock canTraverse connect getHierarchy getState registerNode|spatialTrace:buildBlock evolveTrace getState inspectTraces leaveTrace|spotlight:buildBlock|stage:PACKS adopt buildBlock getSettings mark plan setSettings statView transit view|stagePresence:awakenReunion buildPresenceBlock sensePresence tickOffstageAutonomy|staleGuard:begin verdict|stall:away back board buildBlock buy delist getSettings lay list pack setSettings sign statView view|stealthInfiltration:buildBlock executeInfiltration stat|storageForecast:forecast getSettings reset sample setSettings stat|store:SCHEMA_VERSION batch batchStat capsFor chatId claimAsync claimStat classifyKey committedRev conflictStat createRecoveryPoint currentBranchId defaultWorldState diagBudget dropAsync dropConflict dropQuarantine dropRecoveryPoint epoch exportAuditReport exportConflict exportRecoveryPoints externalWriteStat floorSig fnv1a get init integrity integrityStat lastConflict listConflicts listQuarantineSites listRecoveryPoints loadStat maintain maintainStat migrateReport migrations mirrorStat orphanSettingsKeys patch peopleSig quarantineAudit quarantineStat read readStat recentSig recoveryStat registryParity removeStat removeVerified reportReadFail rescueFromMirror rescueStat resetTxStat restore restoreQuarantine sameId save saveStat settleAsync sizeAudit sizeAuditFull sizeCaps sizeProfile storageStat sweepStaleKeys transact transientSnapshotKeys txStat writeGate|storyChoice:buildBlock confirm pending present review setSettings|storyLoop:audit candidates confirm contracts getSettings reset setSettings stat trace|storyTone:buildBlock clear get set|storyclock:discipline readLatest|storylineAdvance:buildBlock getSettings setSettings stat tick|style:CHOICES CHOICE_LABELS buildBlock effectiveSettings getSettings setSettings styleStat summaryText textCoverage|subtextTension:assessTension decodeSubtext encodeSubtext|successGrade:evaluateSpectrum grade|summarizer:buildBlock cursorOf stat|supplyChain:bottleneck commit diagnose plan stat verify|supplyChoke:triggerChoke|surgicalTriage:buildBlock performSurgery statView|survey:advance buildBlock confirm declareSpot fog getSettings halt knowsOf list pause report resume resupply routesOf setSettings survey view|survival:buildBlock read statusOf|tacticalCombat:diagnose resolveClash|tapeStore:drop list load save stat|techLineage:advanceRetrofit canProduce cancelRetrofit checkCompatibility confirmVariant declareStandard declareTradition getStandard listStandards outsourceWork planRetrofit produceAdapter teach|temperament:buildBlock read|tempo:buildBlock check current setGear|temporalLock:buildBlock check lock unlock|terrainHazard:assessPassability blockChannel forceTraverse unblockChannel|theater:generate send stat wrap|theme:THEMES THEME_EXT activeModules apply contrast engineFace list preview separation statView|theologyCult:buildBlock conductTheologyOp|threads:RELIABILITY TERMINAL abandon addLead buildBlock converge explain getSettings open resolve setSettings stall stat threadStat|timeline:SOURCE_ID_KEY auditRefs captureRange hashText unionRefs|tolerance:buildBlock|toolAnalyzer:ECON_SCORE analyze summaryText|toolDiag:buildErrorReport collect download flatten summaryText|toolImport:importData preview previewPlan|toolSnapshot:buildSubsetPayload download restore|toxicMetabolism:administerAntidote applyToxin diagnose getActorToxinStatus metabolize|training:abilitiesView can declare getSettings practice progress setSettings view|transitScheduler:arbitrateStranded buildBlock planCommute|travelDesk:commit diagnose ledger meet plan route stat verify|undercurrentCalendar:alignWithFestival build getSettings reset setSettings stat triggerByMessage|undo:capture clear peek pushValue stat undo|universalRoutine:deviate|userlock:buildBlock|veracityArbitration:crossExamine diagnose|vitals:buildBlock conceive endPregnancy getSettings know knows knowsOthers list phaseOf register reset setSettings stat sweep tell tick view|warrant:buildBlock|wbInject:activeOrders findCompanionName getConfig isEnabled|wbSearch:count search|weather:buildBlock getMicroclimate season weatherOf|whisperBackchannel:sendWhisper|wordBudget:count|workflow:failStats fails history list loadHistory register resetHistory resetStats run setEnabled stats|world:CHANNELS EVENT_KINDS PLACE_KINDS addBlock addEvent addPlace addRoad addUse advance arrive attendees buildBlock canBeAt depart eventsBetween getSettings move reach setSettings stat stop tick tickDraft transit useWindowOf usesOf where whereStat|worldAutobiography:autobiography buildBlock exportText getSettings reset setSettings stat|worldBlueprint:BP_VER SCENES checkIntegrity drop exportBlueprint get getSettings importBlueprint list previewImport save setSettings stat targetEmpty|worldBridge:buildBlock exportLegends getSettings importLegends seed setSettings stat toRumor view worldKey|worldBriefing:getSettings reset setSettings snap stat view|worldChanges:buildBlock capture getSettings setSettings settle view|worldClock:getSettings inspectEnd judge parseEnd resetStat setSettings stat view|worldDiary:boundary build getSettings reset setSettings stat|worldGraph:KINDS diagnose geo getSettings graph locate stat suggest timeline|worldHealth:diagnose drill getSettings setSettings sources stat summary|worldLab:adapterTable adopt advance arms beats catalog diagnose diff discard exportAs getSettings kinds parseSteps report run setSettings simulate staleness stat|worldSeed:SEED_VER drop extract get getSettings importPack initConfirm initPreview list requireContinuation save setSettings sow stat transferPack validateContinuation|worldSnapshot:IDENTITY_REFS checkCompat diagnose exportSnapshot importSnapshot libDrop libTake library previewImport roundTrip toBlueprint toJSON|worldbook:OVERRIDE_VALUES buildPromptSection getOverrides getSelectedIds hasSelection loadCurrentEntries matchKey peekEntries previewActivation saveSelection triggerEnabled|writeContract:contractOf scan stat summaryText|writeDesk:call catalog stat';
 
     if (actual2800 === FROZEN2800) {
       assert(true, '出口面契约：跨文件依赖面与冻结清单逐字一致（' + Object.keys(depMap2800).length + ' 命名空间 / ' + memberCount2800 + ' 成员）');
@@ -13389,7 +13597,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       '（负向）每一处裸读点附近都有读侧归因投递（实无归因 ' + missing2110.length + ' 处'
       + (missing2110.length ? '：' + missing2110.slice(0, 5).join('、') : '') + '）');
     // v2.294.0（V8 收口）：50 -> 51（engines/player-archive.js +1，补投 reportReadFail）。
-    assert(ROWS2110.length === 51, '产品代码裸读点总数为 51（v2.294.0（V8 收口）：engines/player-archive.js +1（玩家归档读回点，补投 store.reportReadFail）；v2.274.0（V6 收口）：engines/capability-audit.js +1（wroteFalse 的键读回点，补投 store.reportReadFail）；v2.203.0（第四批）Y6 history-search / Y5 world-snapshot 各 +1；v2.156.0（SP1）：engines/playtime.js +1（活动基准读回点，补投 store.reportReadFail）；v2.148.0（RP2）：engines/tape-store.js +1（仓库读回点，补投 noteRead）；v2.132.0 O19：engines/life.js +1（跨会话游标读回点，补投 noteRead）；v2.113.0 A1 收口：core/audit-log.js +2；此前 42 = v2.108.0 L2 自愈取回点 +1 + v2.82.0 快照与分支 +1；实 ' + ROWS2110.length + '）');
+    assert(ROWS2110.length === 53, '产品代码裸读点总数为 53（v2.381.0：engines/channel-probe.js +1 + engines/inline-tags.js +1（两处账本读回点补投 reportReadFail 后显式入册）；v2.294.0（V8 收口）：engines/player-archive.js +1（玩家归档读回点，补投 store.reportReadFail）；v2.274.0（V6 收口）：engines/capability-audit.js +1（wroteFalse 的键读回点，补投 store.reportReadFail）；v2.203.0（第四批）Y6 history-search / Y5 world-snapshot 各 +1；v2.156.0（SP1）：engines/playtime.js +1（活动基准读回点，补投 store.reportReadFail）；v2.148.0（RP2）：engines/tape-store.js +1（仓库读回点，补投 noteRead）；v2.132.0 O19：engines/life.js +1（跨会话游标读回点，补投 noteRead）；v2.113.0 A1 收口：core/audit-log.js +2；此前 42 = v2.108.0 L2 自愈取回点 +1 + v2.82.0 快照与分支 +1；实 ' + ROWS2110.length + '）');
   }
 
   // ── 块3：面B 指纹读侧消费（状态机 + `.d`/`.at` 首次被读 + 双消费端） ──
@@ -15863,26 +16071,26 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       'UI 层装载在 if(!ALREADY) 之外（否则复用路径少 3 个命名空间、uiPhantom/uiDead 互换）');
     // ── C. 现场锚点（口径不许漂移）──
     const r2700 = inv2700.collect();
-    assert(r2700.refs === 9270, '现场静态引用 9270 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.117.0（计划二 B1–B6）：新增 engines/act.js（B1 行动七型）/ engines/opportunity.js（B6 机会窗口）/ engines/recipe.js（B6 题材配方）三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96，读数一并重冻；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31；）');
-    assert(r2700.namespaces === 338 && r2700.members === 4167,
-      '定义面 338 命名空间 / 4167 成员；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：新增 engines/perf-trace.js（27 导出：21 口 + 6 枚只读数据成员），其中 partial 一口接面板真消费方；v2.101.0：O11 跨插件互操作面新增 engines/interop.js（11 导出：6 口接真消费方 + 5 枚只读数据成员）与 lonshaReader.LONSHA_BRIDGE_VERSION ⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方（面板按号入口 + 诊断节只读）⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出（tapeVol / verifyTapeWith）且各接真消费方；v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
-    assert(r2700.dead.length === 1174 && r2700.uiDead.length === 6 && r2700.dataOnly.length === 553,
-      'dead 1174 / uiDead 6 / dataOnly 553；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.102.0（A2/O12）：perf-trace 九口如实登记为 self-only（内部自用、外部零引用 = 过度导出），另六枚只读数据成员 ⇒ dataOnly +2；其中 slots / baseline / curveAll 已接面板真消费方故不在此列；v2.101.0：interop.probePartner 是按伙伴分发口、外部零引用 ⇒ dead +1；五枚只读数据成员零引用 ⇒ dataOnly +4；v2.99.0：canon.LIMITS 是数据成员、产品零引用 ⇒ dataOnly +1；v2.88.0：' + 'O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方；v2.97.0：O9/O10/X5 三线新增导出全部接上真消费方（面板 / 诊断 / 见证表），死面零新增，'
+    assert(r2700.refs === 11204, '现场静态引用 11204 处（真代码口径，实 ' + r2700.refs + '；v2.114.0（计划二 #56/#68/#59/#64）新增 core/sandbox.js / core/plugin.js（两模块 12 口 + chrono/collab 面）⇒ refs +45 / 命名空间 +2 / 成员 +10；v2.114.0 收口：collab.prune 三处与 chrono.entries 落盘后各接 WA.evict.array（容量治理补挤出侧）⇒ refs 再 +4（2750 → 2754）；v2.102.0（A2/O12）：性能面 partial 一口接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.98.0 P2：面板两处真调 tapeVol / 两处 verifyTapeWith + rand 内部一处；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.117.0（计划二 B1–B6）：新增 engines/act.js（B1 行动七型）/ engines/opportunity.js（B6 机会窗口）/ engines/recipe.js（B6 题材配方）三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96，读数一并重冻；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31；）');
+    assert(r2700.namespaces === 440 && r2700.members === 4870,
+      '定义面 440 命名空间 / 4870 成员；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：新增 engines/perf-trace.js（27 导出：21 口 + 6 枚只读数据成员），其中 partial 一口接面板真消费方；v2.101.0：O11 跨插件互操作面新增 engines/interop.js（11 导出：6 口接真消费方 + 5 枚只读数据成员）与 lonshaReader.LONSHA_BRIDGE_VERSION ⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方（面板按号入口 + 诊断节只读）⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出（tapeVol / verifyTapeWith）且各接真消费方；v2.87.0：新增 engines/theme.js + B6 观测面；v2.88.0：O1 成本面 +2 导出；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出（导出面刻意零新增，新增的是模块本身）；v2.97.0：O9 registry +4 导出 / O10 rand +2 导出 / X5 新增 engines/phone-bridge.js 12 导出，实 ' + r2700.namespaces + '/' + r2700.members + '）');
+    assert(r2700.dead.length === 1440 && r2700.uiDead.length === 7 && r2700.dataOnly.length === 640,
+      'dead 1440 / uiDead 7 / dataOnly 640；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.102.0（A2/O12）：perf-trace 九口如实登记为 self-only（内部自用、外部零引用 = 过度导出），另六枚只读数据成员 ⇒ dataOnly +2；其中 slots / baseline / curveAll 已接面板真消费方故不在此列；v2.101.0：interop.probePartner 是按伙伴分发口、外部零引用 ⇒ dead +1；五枚只读数据成员零引用 ⇒ dataOnly +4；v2.99.0：canon.LIMITS 是数据成员、产品零引用 ⇒ dataOnly +1；v2.88.0：' + 'O1 成本面；v2.89.0：O2 磁带面——七个新口都接上真消费方；v2.97.0：O9/O10/X5 三线新增导出全部接上真消费方（面板 / 诊断 / 见证表），死面零新增，'
       + '只有 causal.replayWith 如实登记为 test-only（它重跑代码，而会写世界的轮次不能用它，产品内确无安全调用点），实 '
       + r2700.dead.length + '/' + r2700.uiDead.length + '/' + r2700.dataOnly.length + '）');
-    assert(r2700.deadInTestsOnly === 412, '其中仅测试引用 412（v2.92.0：O5 的资源账本两口入此列，实 ' + r2700.deadInTestsOnly + '）');
+    assert(r2700.deadInTestsOnly === 458, '其中仅测试引用 458（v2.92.0：O5 的资源账本两口入此列，实 ' + r2700.deadInTestsOnly + '）');
     // ── D. 账本健全：条目数一致、归因在词表内、无占位 ──
     const led2700 = gate2700.loadLedger();
     assert(!!led2700 && typeof led2700 === 'object', '账本可加载（tests/dead-export-ledger.json）');
-    assert(Object.keys(led2700.dead).length === 1174 && Object.keys(led2700.uiDead).length === 6,
-      '账本条目数与现场一致（dead 1174 / uiDead 6；v2.110.0 新增三个基元模块的 26 个口'
+    assert(Object.keys(led2700.dead).length === 1440 && Object.keys(led2700.uiDead).length === 7,
+      '账本条目数与现场一致（dead 1440 / uiDead 7；v2.110.0 新增三个基元模块的 26 个口'
       + '按实测归因登记，面内净增为零）');
     const reasons2700 = Array.from(new Set(Object.keys(led2700.dead).concat(Object.keys(led2700.uiDead))
       .map(function (k) { return (led2700.dead[k] || led2700.uiDead[k] || {}).reason; })));
     assert(reasons2700.every(function (x) { return gate2700.REASON_CODES.indexOf(x) >= 0; }),
       '归因全在词表内（' + reasons2700.join(',') + '）');
     assert(JSON.stringify(led2700).indexOf('TODO') < 0, '账本无占位归因（归因由测量得出，不留 TODO）');
-    assert(led2700.advisory && led2700.advisory.dataOnly === 553, 'advisory 面只记计数不拦截（dataOnly=553，v2.138.0（E7）：weather.places 是纯读出口、被 weather 的导出面登记 ⇒ +1；v2.129.0（A1–A10）：十个新引擎无一新增只读数据成员（它们的可调面全部落在设置表与容器上）⇒ 计数不变；v2.110.0：新增三个基元模块的只读数据成员 +6（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）；v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS +1）');
+    assert(led2700.advisory && led2700.advisory.dataOnly === 640, 'advisory 面只记计数不拦截（dataOnly=640，v2.138.0（E7）：weather.places 是纯读出口、被 weather 的导出面登记 ⇒ +1；v2.129.0（A1–A10）：十个新引擎无一新增只读数据成员（它们的可调面全部落在设置表与容器上）⇒ 计数不变；v2.110.0：新增三个基元模块的只读数据成员 +6（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）；v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS +1）');
     // ── E. 判定四态（纯判定面，用现场结果驱动）──
     const clone2700 = function (o) { return JSON.parse(JSON.stringify(o)); };
     assert(gate2700.judge(r2700, led2700).ok === true, '（基线）现场与账本一致 ⇒ ok');
@@ -15974,7 +16182,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       + '（须全在 ui/ 层，且命名空间数不多于现场 ' + uiNs2700 + ' 个 UI 命名空间：'
       + Object.keys(boomFiles2700).sort().map(function (f) { return f + '=' + boomFiles2700[f]; }).join(' ') + '）');
     console.log('  ✓ 口径单源（collect 复用、依赖单向无环、复用判据不退回宿主壳）');
-    console.log('  ✓ 现场锚点（refs 1950 / 命名空间 89 / 成员 996 / dead 284 · uiDead 6 · dataOnly 131）');
+    console.log('  ✓ 现场锚点（refs 1950 / 命名空间 89 / 成员 996 / dead 284 · uiDead 7 · dataOnly 131）');
     console.log('  ✓ 账本健全（条目数一致、归因在词表内、无 TODO、advisory 只计数）');
     console.log('  ✓ 判定四态（新增=红 / 归因腐坏=红 / 消失=提示 / 账本缺失=红）');
     console.log('  ✓ 负向自证（破坏「已装载」判据 ⇒ 定义面塌成 0、退出码非零、症状 JSON 可解析）');
@@ -16066,7 +16274,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     const dist2800 = {};
     allEnt2800.forEach(function (e) { dist2800[e.item.reason] = (dist2800[e.item.reason] || 0) + 1; });
             // 注：dist2800 统计的是 **dead + uiDead** 两个冻结面（与下面 allEnt2800 同源）。
-            //   uiDead 6 项全为 test-only ⇒ test-only = 293(dead 里的 test-only) + 4(uiDead) = 297（v2.93.0 现场）。
+            //   uiDead 7 项全为 test-only ⇒ test-only = 293(dead 里的 test-only) + 4(uiDead) = 297（v2.93.0 现场）。
             //   v2.73.0 之前测试面只读 run.js，两侧分别是 135 / 4。
              //   v2.101.0：interop.probePartner 只有本模块内部调用 ⇒ self-only 119 → 120，总条目 448 → 449。
              //   v2.129.0：十个新引擎入册 ⇒ 总条目 610 → 693（test-only 352 / self-only 274 / unwired 67）。
@@ -16115,11 +16323,11 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     // ── F. 判据不越界：冻结面与归因宽度本版不动；现场锚点随 v2.29.0 真代码口径更新 ──
     assertDeepEq(gate2800.FROZEN_KINDS, ['dead', 'uiDead'], '冻结面仍为 dead/uiDead（本版不扩面）');
     assertDeepEq(gate2800.ADVISORY_KINDS, ['dataOnly'], 'advisory 面仍为 dataOnly（不升级为拦截）');
-assert(r2800.dead.length === 1174 && r2800.uiDead.length === 6 && r2800.dataOnly.length === 553
-&& r2800.deadInTestsOnly === 412,
-'现场锚点（dead 1174 / uiDead 6 / dataOnly 553 / 仅测试 412，v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥；v2.129.0（拓展计划 A1–A10）：新增十个引擎（userlock / rewriter / storyclock / rhythm-loop / motif / beat-mask / preset-world / power-anchor / request-viewer / wb-search），冻结面 610 → 693，其中 7 项带 tests/run.js 真引用、76 项本模块自用、6 项待接线）');
-assert(r2800.refs === 9270 && r2800.namespaces === 338 && r2800.members === 4167,
-    '清册面（refs 9270 / 命名空间 338 / 成员 4167；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
+assert(r2800.dead.length === 1440 && r2800.uiDead.length === 7 && r2800.dataOnly.length === 640
+&& r2800.deadInTestsOnly === 458,
+'现场锚点（dead 1440 / uiDead 7 / dataOnly 640 / 仅测试 458，v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0：O9 别名表 + O10 回放坐标 + X5 跨插件因果桥；v2.129.0（拓展计划 A1–A10）：新增十个引擎（userlock / rewriter / storyclock / rhythm-loop / motif / beat-mask / preset-world / power-anchor / request-viewer / wb-search），冻结面 610 → 693，其中 7 项带 tests/run.js 真引用、76 项本模块自用、6 项待接线）');
+assert(r2800.refs === 11204 && r2800.namespaces === 440 && r2800.members === 4870,
+    '清册面（refs 11204 / 命名空间 440 / 成员 4870；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.114.0：v2.112.0 起的 chrono / collab 与 v2.114.0 的 sandbox / plugin 一并计入——此前 v2.112.0 未同步冻结读数，本轮补登；v2.102.0（A2/O12）：engines/perf-trace.js 新增且 partial 接面板真消费方 ⇒ refs +44 / 命名空间 +1 / 成员 +27；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面 +8 导出；v2.90.0：O3 解释面 +1 导出；v2.91.0：O4 开关矩阵面 +1 导出；v2.92.0：O5 资源账本面 +2 导出；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
     // 证据与清册同源：产品扫描面与引用正则都取自清册（不各写一份）
     assert(inv2800.PRODUCT_FILES && inv2800.PRODUCT_FILES.length === r2800.files.product,
       '清册导出 PRODUCT_FILES 与产品文件面同源（' + (inv2800.PRODUCT_FILES || []).length + ' 个）');
@@ -16236,12 +16444,17 @@ assert(r2800.refs === 9270 && r2800.namespaces === 338 && r2800.members === 4167
       '（保真）模板字符串的纯文本部分只是一段字，剥掉');
 
     // ── C. 本轮缺陷的直接锁：加注释不得改变冻结面 ──
+    // v2.382.0（探针跟位）：本锁需要一个「仍在死导出账本里、产品零引用」的探针成员。
+    //   原探针 bridge.snapshot 已被 engines/cascade-bus.js:267 真接通（正确收敛、移出账本），
+    //   铁证一对照在其上恒红（真消费方在场 ⇒ 注入调用不再产生 gone）。换仍在账本的
+    //   bridge.buildSnapshot（refs 0）为探针 —— 判据形态一字不变，只换探针成员。
+    const PROBE2900 = 'bridge.buildSnapshot';
     const srcBridge2900 = fs.readFileSync(path.join(BASE, 'engines/bridge.js'), 'utf8');
-    const cmtAdd2900 = srcBridge2900 + '\n// 修：外部调用方可直接用 WA.bridge.snapshot 读快照\n';
-    const callAdd2900 = srcBridge2900 + '\nfunction __ncProbeBridgeSnapshot() { return WA.bridge.snapshot; }\n';
-    const refCmt2900 = gate2900.refCountIn(cmtAdd2900)['bridge.snapshot'] || 0;
-    const refCall2900 = gate2900.refCountIn(callAdd2900)['bridge.snapshot'] || 0;
-    assert(refCmt2900 === 0, '（负控制）加一行注释后 bridge.snapshot 的产品引用数仍为 0（实 ' + refCmt2900 + '）——提及不是引用');
+    const cmtAdd2900 = srcBridge2900 + '\n// 修：外部调用方可直接用 WA.bridge.buildSnapshot 读快照\n';
+    const callAdd2900 = srcBridge2900 + '\nfunction __ncProbeBridgeSnapshot() { return WA.bridge.buildSnapshot; }\n';
+    const refCmt2900 = gate2900.refCountIn(cmtAdd2900)[PROBE2900] || 0;
+    const refCall2900 = gate2900.refCountIn(callAdd2900)[PROBE2900] || 0;
+    assert(refCmt2900 === 0, '（负控制）加一行注释后 bridge.buildSnapshot 的产品引用数仍为 0（实 ' + refCmt2900 + '）——提及不是引用');
     assert(refCall2900 > 0, '（负控制对照）真写一次调用 ⇒ 计为引用（实 ' + refCall2900 + '）——真消费方才可解冻');
 
     // ── D. 端到端真源码注入：注释注入 ⇒ 门禁结论一字不变；真调用注入 ⇒ 报「死导出消失」 ──
@@ -16269,8 +16482,8 @@ assert(r2800.refs === 9270 && r2800.namespaces === 338 && r2800.members === 4167
     assert(vCmt2900 && vCmt2900.ok === true && vCmt2900.gone.length === 0 && vCmt2900.added.length === 0,
       '（铁证一锁）加一行纯注释 ⇒ 冻结面一字不变（旧口径下此处会报「bridge.snapshot 消失」并催跑 --update ⇒ 条目被永久删除）');
     assert(vCall2900 && vCall2900.ok === true && vCall2900.added.length === 0
-      && vCall2900.gone.length === 1 && vCall2900.gone[0].key === 'bridge.snapshot',
-      '（铁证一对照）真写一次调用 ⇒ 报「已登记的死导出消失 1 项：bridge.snapshot」（真消费方被识别出来）');
+      && vCall2900.gone.length === 1 && vCall2900.gone[0].key === PROBE2900,
+      '（铁证一对照）真写一次调用 ⇒ 报「已登记的死导出消失 1 项：' + PROBE2900 + '」（真消费方被识别出来）');
 
     // ── E. 异常隔离：复算失败 ⇒ 记一条失实，不许静默跳过、不许抛栈中断 ──
     const ANCH_EV2900 = 'function evidenceOf(rec) {';
@@ -16298,11 +16511,11 @@ assert(r2800.refs === 9270 && r2800.namespaces === 338 && r2800.members === 4167
     assert(gate2900.evidenceDrift(r2900, led2900).length === 0, '（负向自证）同一输入在原版上零失实（判据纯度）');
 
     // ── F. 口径升级：dead 208→211 / refs 1223→1202 的差量，必须恰是旧口径算作活着的「提及」──
-assert(r2900.refs === 9270 && r2900.namespaces === 338 && r2900.members === 4167,
-'清册面（refs 9270 / 命名空间 338 / 成员 4167）；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填——真代码口径下的现场值（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
-assert(r2900.dead.length === 1174 && r2900.uiDead.length === 6 && r2900.dataOnly.length === 553
-&& r2900.deadInTestsOnly === 412,
-'dead 1174 / uiDead 6 / dataOnly 553 / 仅测试 412；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0，实 ' + r2900.dead.length + '/'
+assert(r2900.refs === 11204 && r2900.namespaces === 440 && r2900.members === 4870,
+'清册面（refs 11204 / 命名空间 440 / 成员 4870）；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填——真代码口径下的现场值（v2.117.0：新增 engines/act.js / engines/opportunity.js / engines/recipe.js 三模块 ⇒ refs +158 / 命名空间 +3 / 成员 +96；v2.102.0（A2/O12）：engines/perf-trace.js；v2.101.0：O11 跨插件互操作面（interop 11 导出 + LONSHA_BRIDGE_VERSION）⇒ refs +22 / 命名空间 +1 / 成员 +11；v2.100.0：原著对位四新口（alignView / gap / position / signal）各接真消费方 ⇒ refs +6 / 成员 +4；v2.99.0：新增 engines/canon.js（原著幕目，12 导出且全部接真消费方——面板两枚「按号」入口 + 诊断节只读；LIMITS 为数据成员）⇒ refs +31 / 命名空间 +1 / 成员 +13；v2.98.0：P2 磁带卷 +2 导出；v2.88.0：O1 成本面；v2.89.0：O2 磁带面；v2.90.0：O3 解释面；v2.91.0：O4 开关矩阵面；v2.92.0：O5 资源账本面；v2.93.0：X4 通行面 +2 导出；v2.94.0：O6/O7/O8 账本三面 +2 导出；v2.95.0：X2 经济引擎 +7 导出；v2.96.0：X3 传播与辟谣 +1 模块 15 导出；v2.97.0：O9 registry +4 / O10 rand +2 / X5 phone-bridge 12 导出；v2.129.0（拓展计划 A1–A10）：十个新引擎 83 个导出 ⇒ 命名空间 +10 / 成员 +94 / refs +122（五条产注入块的引擎在 render/inject.js 真调 buildBlock，并在 ui/panel.js 与本测试面各接真读者；preset-world / request-viewer / wb-search 三条为旁路，其取样口已接测试面）；v2.173.0（TX4b）：五模块 UI 面板接线 ⇒ refs +31）');
+assert(r2900.dead.length === 1440 && r2900.uiDead.length === 7 && r2900.dataOnly.length === 640
+&& r2900.deadInTestsOnly === 458,
+'dead 1440 / uiDead 7 / dataOnly 640 / 仅测试 458；v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎（beat-report / plan-audit / beat-ledger / gen-gate）带来的现场增量，读数由 inventory / dead-export-gate 实测回填（v2.102.0：perf-trace 九口 self-only + 六枚数据成员；v2.101.0：interop 一死口 + 五数据成员；v2.99.0：canon 数据成员 +1；v2.97.0，实 ' + r2900.dead.length + '/'
       + r2900.uiDead.length + '/' + r2900.dataOnly.length + '/' + r2900.deadInTestsOnly + '）');
     // v2.230.0 收口：「只被注释/字符串提及」这件事**不该写成三个常量名** —— 集合会变。
     //   现场实测：engines/world-lab.js 起 `rand.seed` 有了真消费方（真代码面命中 6 处），
@@ -16355,7 +16568,7 @@ assert(r2900.dead.length === 1174 && r2900.uiDead.length === 6 && r2900.dataOnly
     assertDeepEq(gate2900.EVIDENCE_KEYS, ['src', 'refs', 'tref', 'own'], '证据键不变（refs 与「死」的定义仍同宽）');
     assert(inv2900.PRODUCT_FILES.length === r2900.files.product && inv2900.REF_RE instanceof RegExp,
       '清册导出 PRODUCT_FILES / REF_RE 与产品面同源（门禁复算不另写扫描面）');
-    assert(led2900.advisory && led2900.advisory.dataOnly === 553, 'advisory 只记计数（dataOnly 553（v2.138.0（E7）：weather.places 纯读出口入册 +1）v2.129.0：十个新引擎零数据成员入册）v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS 数据成员 +1）');
+    assert(led2900.advisory && led2900.advisory.dataOnly === 640, 'advisory 只记计数（dataOnly 640（v2.138.0（E7）：weather.places 纯读出口入册 +1）v2.129.0：十个新引擎零数据成员入册）v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS 数据成员 +1）');
     // 旧灯一盏不少
     const ledAdd2900 = clone2900(led2900);
     delete ledAdd2900.dead[Object.keys(ledAdd2900.dead)[0]];
@@ -16625,13 +16838,14 @@ assert(r2900.dead.length === 1174 && r2900.uiDead.length === 6 && r2900.dataOnly
       // D1 先喂热缓存（模拟「同一进程里先算过一次」）
       driftBefore2320 = gate2320.evidenceDrift(r2320, led2320).length;
       // D2 注入**纯注释**：提及不是引用 ⇒ 结论必须一字不变
-      fs.writeFileSync(pB2320, bakB2320 + '\n// 修：外部调用方可直接用 WA.bridge.snapshot 读快照\n');
+      // v2.382.0（探针跟位）：bridge.snapshot 已被 cascade-bus 真接通，换仍在死导出账本的 bridge.buildSnapshot。
+      fs.writeFileSync(pB2320, bakB2320 + '\n// 修：外部调用方可直接用 WA.bridge.buildSnapshot 读快照\n');
       driftCmt2320 = gate2320.evidenceDrift(r2320, led2320).length;
       // D3 注入**真调用**：缓存若假绿，这里会错误地仍然是 0
-      fs.writeFileSync(pB2320, bakB2320 + '\nfunction __ncProbe2320() { return WA.bridge.snapshot; }\n');
+      fs.writeFileSync(pB2320, bakB2320 + '\nfunction __ncProbe2320() { return WA.bridge.buildSnapshot; }\n');
       const dCall2320 = gate2320.evidenceDrift(r2320, led2320);
       driftCall2320 = dCall2320.length;
-      keyCall2320 = dCall2320.some(function (x) { return x.key === 'bridge.snapshot'; });
+      keyCall2320 = dCall2320.some(function (x) { return x.key === 'bridge.buildSnapshot'; });
     } finally {
       fs.writeFileSync(pB2320, bakB2320);
       md5Back2320 = md5of2320(fs.readFileSync(pB2320, 'utf8'));
@@ -16640,7 +16854,7 @@ assert(r2900.dead.length === 1174 && r2900.uiDead.length === 6 && r2900.dataOnly
     assert(driftBefore2320 === 0, 'v2320: （基线）喂热缓存后复算零失实（实 ' + driftBefore2320 + '）');
     assert(driftCmt2320 === 0, 'v2320: （负向）注入纯注释 ⇒ 复算仍零失实（实 ' + driftCmt2320 + '）——提及不是引用，缓存未把它当真');
     assert(driftCall2320 > 0 && keyCall2320,
-      'v2320: （铁证·缓存不假绿）真写一次调用 ⇒ 复算当场报出 bridge.snapshot（实 ' + driftCall2320 + ' 条）'
+      'v2320: （铁证·缓存不假绿）真写一次调用 ⇒ 复算当场报出 bridge.buildSnapshot（实 ' + driftCall2320 + ' 条）'
       + '——若缓存按内容/无键缓存，此处会读到旧值而恒为 0（本版最大风险点）');
     assert(md5Back2320 === md5B2320, 'v2320: （负控制）注入结束已逐字节还原 engines/bridge.js（md5 ' + md5Back2320.slice(0, 8) + '）');
     assert(driftAfter2320 === 0, 'v2320: （还原后）复算回到零失实（实 ' + driftAfter2320 + '）——失效－重建闭环');
@@ -17178,7 +17392,10 @@ assert(r2900.dead.length === 1174 && r2900.uiDead.length === 6 && r2900.dataOnly
     assert(rp.ok, 'v2350: registryParity 仍绿（snapshots/ledger 已物化）');
     // v2.162.0 回填（现场实测 137）：与 v1700 段那条同源 —— 精确非通配登记键，
     //   集合面（哪个键在册）由 checkedKeys 与登记表双向核对，本处只钉精确等值。
-    assert(rp.checked === 175, 'v2350: checked 精确值 175（现场实测；与 v1700 段同源，集合面由 checkedKeys 双向核对）');
+    //   v2.382.0 回填（187 → 185）：与 v1700 段同源同因（撤除 humanRealism.log /
+    //   routinePacing.history 两条零写点死容器登记）。两处必须同步改，否则本段与
+    //   v1700 段会对同一个量给出两个不同的期望值 —— 那正是「同一份真源两处手抄」。
+    assert(rp.checked === 185, 'v2350: checked 精确值 185（现场实测；与 v1700 段同源，集合面由 checkedKeys 双向核对）');
     assert((rp.checkedKeys || []).indexOf('parallelWorld.snapshots') >= 0, 'v2350: snapshots 进精确键');
     assert((rp.checkedKeys || []).indexOf('evolution.ledger') >= 0, 'v2350: ledger 进精确键');
 
@@ -17389,7 +17606,7 @@ assert(r2900.dead.length === 1174 && r2900.uiDead.length === 6 && r2900.dataOnly
     });
     assert(missingVis.length === 0, "v2380: 门禁——SOURCES 每项都在快照里有真读（缺: " + missingVis.join(",") + "）");
     // v2.294.0（V8 OPV8-1）：新增 injectCollector（结构汇流）注入源 ⇒ 108 → 109。
-    assert((W.render.SOURCES || []).length === 115, "v2380: SOURCES 为 115 项（V9 新增四 owner、托管及变化摘要六源，109 → 115）（v2.294.0（V8）：新增结构汇流 injectCollector 注入源 ⇒ 108 → 109）（v2.292.0（EXV7-8）：新增世界自传 worldAutobiography 注入源 ⇒ 107 → 108）（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
+    assert((W.render.SOURCES || []).length === 144, "v2380: SOURCES 为 144 项（V9 新增四 owner、托管及变化摘要六源，109 → 115）（v2.294.0（V8）：新增结构汇流 injectCollector 注入源 ⇒ 108 → 109）（v2.292.0（EXV7-8）：新增世界自传 worldAutobiography 注入源 ⇒ 107 → 108）（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
     // E. 负向自证：把 echoes 分支从源码里抹掉 ⇒ 门禁必须现形
     const broken2380 = srcIj2380.split("if (vis.echoes)").join("if (false)");
     assert(broken2380 !== srcIj2380, "v2380: （负向自证）破坏锚点在真源码中恰命中（可观测改行为）");
@@ -19087,8 +19304,17 @@ assert(r2900.dead.length === 1174 && r2900.uiDead.length === 6 && r2900.dataOnly
     // ── A 组：写侧 ──
     assert(srcInj2490.indexOf('mainCount: mainItems.length,') >= 0,
       'v2490: [A1] 快照落 mainCount（主块项数，供三数自洽）');
-    assert(srcInj2490.indexOf('len: combined.length, sources: mainItems.map(i => i.source),') >= 0,
-      'v2490: [A2] len / sources 写点仍在（未被本次改动破坏）');
+    // v2.380.0（历史欠账消红跟位）：A2 原先钉的是**连续字面串**
+    //   `len: combined.length, sources: mainItems.map(i => i.source),`。
+    //   v2.298.0（V11 OPV11-2）在这两个写点之间合法地插入了 `mainCount: mainItems.length,`
+    //   （宿主实收面，与 sources/len 同一份打点）—— 两个写点都还在，只是因为「中间多了一个字段」
+    //   整串不再连续 ⇒ 判据失配。这是**判据的输入面窄于事实**（把「写点存在」偷换成「写点相邻」），
+    //   属历史欠账，不是本轮改动破坏。
+    //   跟位为**顺序无关的两处写点**：各自单独命中即可，不绑定相邻关系。
+    assert(srcInj2490.indexOf('len: combined.length') >= 0,
+      'v2490: [A2] len 写点仍在（与 sources/mainCount 同一份打点；v2.298.0 起允许其间插入宿主实收面字段）');
+    assert(srcInj2490.indexOf('sources: mainItems.map(i => i.source)') >= 0,
+      'v2490: [A2] sources 写点仍在（与 len/mainCount 同一份打点）');
 
     // ── B 组：空分支落实为真检查 ──
     assert(srcAud2490.indexOf("code: 'slot.mainDuplicate'") >= 0,
@@ -20794,7 +21020,7 @@ assert(r2900.dead.length === 1174 && r2900.uiDead.length === 6 && r2900.dataOnly
     //   —— 只被 tests/run.js 与诊断节 secStitch2130 读，后者按口径不计入产品源面读集合）⇒ 13 → 22。
     // v2.114.0：现场从 12 降到 10 —— modules 面与 index 面同步后零读 ns 收敛；
     //   读数只报不红，但「恰 N 个」这条判据本身仍须与现场同宽（否则它会在读数没异常时误红）。
-    assert(a.deadNs.length === 37 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
+    assert(a.deadNs.length === 35 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
       'v2107: 零读 ns 恰 ' + a.deadNs.length + ' 个且不含任何核心 ns（读数只报不红）');
 
     // v2.131.0（O16 收口）：**端到端读数与账本现场同源**（把 R115/R116 的人工漏改面接进自动化）。
@@ -23165,7 +23391,8 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.192.0（第二批·U5）：拒收码 → 恢复动作的统一映射（三面分开）');
   {
     const rrNew = require('../tools/reject-recovery.js');
-    // ① 现场复算：804 条 reason 字面量按「所属对象字面量带不带 ok」分三面（括号配对，不看邻近窗口）
+    // ① 现场复算：**全部** reason 字面量按「所属对象字面量带不带 ok」分三面（括号配对，不看邻近窗口）
+    //   v2.189.0 那轮是 804 条，v2.380.0 已是 1721 条 —— 条数由 live() 当场数出，这里不写死。
     const fNew = rrNew.live();
     const codesNew = Object.keys(fNew);
     const faceNew = { reject: 0, success: 0, neutral: 0 };
@@ -25284,11 +25511,19 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runScript('./v10-inject-pipeline.js');
     await runScript('./v10-unified-pending.js');
-    await runScript('./v10-ui-pills.js');
+    // v2.380.0（V10 hosted 档位）：这两个是**真 SillyTavern 宿主**验收（runLiveHosted 语义），
+    //   不是自包含的 route.fulfill 模拟。保留 runScript 字面调用（引用面不漂），
+    //   只在**宿主可达时**才真跑；不可达则显式跳过并计进读数（见 __skipHosted）。
+    if (await __hostReachable(process.env.WA_HOSTED_URL || 'http://127.0.0.1:8000', 1500)) {
+      await runScript('./v10-ui-pills.js');
+      await runScript('./v10-r3-persist-hosted.js');
+    } else {
+      __skipHosted('./v10-ui-pills.js', 'UI 分类 pill / 32 tab 联动只在真宿主面板 DOM 上成立');
+      __skipHosted('./v10-r3-persist-hosted.js', 'V9 持久记录写入/重载/拒收走真宿主 localStorage 链路');
+    }
     await runScript('./v10-eighteen-matrix.js');
     await runScript('./v10-master-matrix.js');
     await runScript('./v10-r3-storage-stress.js');
-    await runScript('./v10-r3-persist-hosted.js');
   }
   // ── v2.297.0（V11 OPV11-8）：注入源五表契约锁 ────────────────────────────────
   //   为什么单独一节而不是塞进 V10 那段：这条锁的判据口径是**五表交叉 + 双面白名单 +
@@ -25355,6 +25590,22 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runScript('./v11-master-matrix.js');
   }
+
+  // ── v2.380.0 (V21): 文明盛衰 / 神权军团 / 刑狱血脉 / 工程拓扑 / 生态政变 六条端到端场景专锁 ──
+  //   此前这 6 个文件**从未被主回归执行**（test-surface-gate 判为 unregistered-orphan）：
+  //   人工手动跑能过，CI 跑全量却完全绕开它们 —— 「场景锁全绿」只在人工执行时成立。
+  //   这里逐个 runScript 挂上，与 scenario 家族同层，按 v21 前缀可分层选区。
+  //   六条各自覆盖：神权狂热审判 / 军团阵型相克 / 水牢地道气味追踪 / 血脉信托与诅咒 /
+  //   攻城器械超载自爆 / 地牢机关×生态灾警×宫廷政变三方共振。
+  section('v2.380.0 (V21): 文明盛衰与生态政变六条端到端场景专锁');
+  {
+    await runScript('./scenario-v50-theology-cult-crusade.js');
+    await runScript('./scenario-v51-regiment-tactics-clash.js');
+    await runScript('./scenario-v52-incarceration-jailbreak-hounds.js');
+    await runScript('./scenario-v53-bloodline-heritage-trust.js');
+    await runScript('./scenario-v54-engineering-siege-explosion.js');
+    await runScript('./scenario-v55-dungeon-eco-court-mesh.js');
+  }
   // ── v2.302.0（缝 World Chronicle）：正文内联状态回报标签 ──────────────────
   //   执行 engines/inline-tags.js 真实源码（vm 受控桩：store / calendar 按既有写口形状）。
   //   四类判据：解析边界 / 落账归属 / 去重纪律 / 不造假，另加三条反向自证。
@@ -25372,6 +25623,94 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.300.0 (V11 OPV11-6): 多写者字段写权声明（append / merge / overwrite + 冲突登记）');
   {
     await runScript('./v11-field-writers.js');
+  }
+  {
+  // ── v2.380.0（历史欠账消红 · orphan 族）：把 75 个「从不执行」的回归资产接回执行面 ──
+  //   取证：tests/test-surface-gate.js 报孤儿 75 个（HEAD 基线 70 个 —— 这族在 HEAD 就存在，
+  //   是历史欠账，不是本轮引入）；orphan-lock-v2750 的 [B]「真仓库零孤儿」随之红。
+  //   口径选择：**不往 EXEMPT 塞条目**（那是把红压掉）。这 75 个文件逐个实测：70 个当场 rc=0 全绿，
+  //   5 个炸「没搭台」（window 未定义 / WA.rand 缺席）—— 已由 tests/host-boot.js 统一补台面并修好，
+  //   现全部 rc=0。它们是真资产，缺的只是一条执行入口。
+  //   形态：全部是**纯脚本体**（无 runAll 导出、无 require.main 守卫），故走 runScript 档
+  //   （子进程 + 退出码即结论，与 scenario-v50..v55 / v11 / inline-tags 同一档位）。
+  //   runScript 是全仓**唯一** spawn 站点（gate-timeout 的 script-body-lock 已入表），
+  //   故这里只加调用点、不新增武装项 —— 预算仍是统一值 1344000ms。
+  //   实测合计约 76s（最重 gates.js 5.6s，其余多在 1s 内）。
+    await runScript('./action-desk-v14-routing-regression.js');
+    await runScript('./agency-real-cycle-regression.js');
+    await runScript('./agency-workflow-integration.js');
+    await runScript('./choice-board-v2325.js');
+    await runScript('./engines-ns-gate.js');
+    await runScript('./gates.js');
+    await runScript('./human-realism-transaction-regression.js');
+    await runScript('./intake-goal-idempotency.js');
+    await runScript('./life-boundary-batch-regression.js');
+    await runScript('./linkage-verify.js');
+    await runScript('./luke-stitch-v2326.js');
+    await runScript('./member-surface-gate.js');
+    await runScript('./motive-preview-regression.js');
+    await runScript('./persona-schedule-evidence-regression.js');
+    await runScript('./routine-agency-regression.js');
+    await runScript('./scenario-v12-broken-promise.js');
+    await runScript('./scenario-v12-era-transition.js');
+    await runScript('./scenario-v12-exv-cross-experience.js');
+    await runScript('./scenario-v12-multiple-perspectives.js');
+    await runScript('./scenario-v12-town-shortage.js');
+    await runScript('./scenario-v12-travel-return.js');
+    await runScript('./scenario-v13-border-drift.js');
+    await runScript('./scenario-v13-family-legacy.js');
+    await runScript('./scenario-v13-room-acoustics.js');
+    await runScript('./scenario-v13-ruin-relic-sandbox.js');
+    await runScript('./scenario-v13-taboo-festival.js');
+    await runScript('./scenario-v14-choke-courier.js');
+    await runScript('./scenario-v14-cost-foreshadow.js');
+    await runScript('./scenario-v14-credit-rupture.js');
+    await runScript('./scenario-v14-grand-cascade.js');
+    await runScript('./scenario-v14-multi-whisper.js');
+    await runScript('./scenario-v14-poison-dilemma.js');
+    await runScript('./scenario-v14-sanctuary-echo.js');
+    await runScript('./scenario-v14-schism-reform.js');
+    await runScript('./scenario-v15-living-threads.js');
+    await runScript('./scenario-v16-human-realism.js');
+    await runScript('./scenario-v17-storm-evacuation.js');
+    await runScript('./scenario-v18-acoustic-whisper.js');
+    await runScript('./scenario-v19-contraband-frisk.js');
+    await runScript('./scenario-v20-routine-pacing.js');
+    await runScript('./scenario-v20-universal-evacuation.js');
+    await runScript('./scenario-v21-quagmire-crossing.js');
+    await runScript('./scenario-v22-toxic-pursuit.js');
+    await runScript('./scenario-v23-contraband-pipeline.js');
+    await runScript('./scenario-v24-panic-cover-ballistics.js');
+    await runScript('./scenario-v25-v16-living-world-integration.js');
+    await runScript('./scenario-v26-psyche-trauma-blackening.js');
+    await runScript('./scenario-v27-conspiracy-coup-domino.js');
+    await runScript('./scenario-v28-moral-dilemma-tide.js');
+    await runScript('./scenario-v29-butterfly-chekhov-gun.js');
+    await runScript('./scenario-v30-ideology-memetics-cascade.js');
+    await runScript('./scenario-v31-v17-causal-psyche-integration.js');
+    await runScript('./scenario-v32-tactical-combat-trauma.js');
+    await runScript('./scenario-v33-interrogation-psychic-tell.js');
+    await runScript('./scenario-v34-ecosystem-predation-wild.js');
+    await runScript('./scenario-v35-siege-attrition-starvation.js');
+    await runScript('./scenario-v36-ruin-mechanism-trap.js');
+    await runScript('./scenario-v37-v18-epic-world-grand-pulse.js');
+    await runScript('./scenario-v38-stage-presence-offstage-living.js');
+    await runScript('./scenario-v39-covert-espionage-heist.js');
+    await runScript('./scenario-v40-epidemic-surgical-triage.js');
+    await runScript('./scenario-v41-maritime-navigation-storm.js');
+    await runScript('./scenario-v42-stealth-infiltration-kill.js');
+    await runScript('./scenario-v43-v19-epic-living-network-pulse.js');
+    await runScript('./scenario-v44-embodied-prompt-perception.js');
+    await runScript('./scenario-v45-cross-plugin-full-duplex-resonance.js');
+    await runScript('./scenario-v46-epochal-collapse-transition.js');
+    await runScript('./scenario-v47-cataclysm-topological-rupture.js');
+    await runScript('./scenario-v48-financial-contagion-collapse.js');
+    await runScript('./scenario-v49-v20-epic-holistic-convergence.js');
+    await runScript('./settings-bus-api-gate.js');
+    await runScript('./test-advanced-maps.js');
+    await runScript('./test-affection-nexus.js');
+    await runScript('./test-intimate-arbiter.js');
+    await runScript('./test-inventory-metabolism.js');
   }
   // ── v2.277.0（V7 OPV7-1）：入口版本**不早于**（历史段，防回退）──────────────
   //   ⚠ 形态必须是「不早于」而不是「等于」：上一段（v2.276.0）踩过前缀锁，本段若写成
@@ -25497,7 +25836,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     const __verPin293 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
       .match(/const VERSION = '([\d.]+)'/) || [])[1];
-    const __wantPin293 = '2.301.0';
+    const __wantPin293 = '2.380.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');
@@ -25507,6 +25846,17 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   console.log('  ⏱ 超 60s 的节：' + __slowSec119 + ' 个');
   console.log('\n══════════════════════');
   console.log('通过 ' + pass + ' / 失败 ' + fail);
+  // v2.380.0（V10 hosted 档位）：「跳过必须显式声明并计进读数」不只在分层选区，真宿主验收同理。
+  //   缺宿主时这两条套件被 runHostedScript 登记进 __hostSkips，这里逐条报出；且**不得**再打印
+  //   「全部测试通过 ✓」—— 证据强度不完整时给出通过结论 = 假绿，而本仓纪律是「算不出来不得当作算过」。
+  if (__hostSkips.length) {
+    console.log('真宿主验收跳过 ' + __hostSkips.length + ' 项（真 SillyTavern 宿主不可达，非产品判据红）：');
+    __hostSkips.forEach(function (s) {
+      console.log('  · ' + path.basename(s.spec) + ' @ ' + s.host + ' —— ' + s.why);
+    });
+    console.log('  （涉及文件：' + __hostSkips.map(function (s) { return path.basename(s.spec); }).join(', ')
+      + '；可在真宿主就绪后以 WA_HOSTED_URL=... 或直接单跑该脚本复验；本趟未执行即未证明其通过）');
+  }
   // v2.187.0（O6）：**跳过必须显式声明并记录在读数里**（计划 O6 边界原文）。
   //   不给这行的话，「跑了子集」与「跑了全量」在输出里长得一样 —— 而两者的证据强度差一个量级。
   // v2.187.0（O6）：读数行与收尾裁定同源（读数行本体在 tools/test-layers.js）。
@@ -25533,6 +25883,14 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       : '被点名的节不可单独跑 —— ' + __layerRefused.join(' | ')));
   }
   if (__layerOut.exit !== 0) process.exit(__layerOut.exit);
+  // v2.380.0：有真宿主验收被跳过 ⇒ 证据面不完整，**不打印**「全部测试通过 ✓」（那是假绿）。
+  //   但也不判红：跳过项是环境缺席（真宿主不可达），不是产品判据失败，故仍以 0 退出，
+  //   只把结论降级为「已执行的判据全部通过；真宿主项未执行，见上方跳过清单」。
+  if (__hostSkips.length) {
+    console.log('已执行的判据全部通过 ✓（但真宿主验收 ' + __hostSkips.length + ' 项未执行 —— 见上方跳过清单，'
+      + '不可据此宣称整仓全绿）');
+    process.exit(0);
+  }
   console.log('全部测试通过 ✓');
   process.exit(0);
 })().catch(e => { console.error('测试运行器异常: ', e); process.exit(2); });

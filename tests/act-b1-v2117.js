@@ -56,7 +56,13 @@ const A_BUDGET = "if (used >= budget) { out.deferred.push({ id: x.id, person: x.
 //   试演期指向隔离世界）。**破坏的语义逐字不变**：仍然是不传 `row.use` 第五参
 //   ⇒ 场所用途窗口在准入路径上失效。锚点跟着源码走，不是判据放宽。
 const A_USE    = "worldOf().canBeAt(row.person, row.place, t, needMs, row.use)";
-const A_HEART  = "id: 'act.advance', chain: 'after', order: 21, critical: false,";
+//   v2.381.0 前提漂移（如实留账）：本锚点原为 `order: 21`，依据是 v2.117.0 的
+//   「结算必须**晚于** backstage.simulate(20)」。v2.325.0（9fa7be3，设计记录
+//   .agents/notes/implemented/architecture/2026-11-06-committed-snapshot-action-cycle.md）
+//   把整条动作链改成「消费**上一轮已提交**快照」：准入 18 / 结算 19 / 回执 19.5，
+//   再才是后台推演发起 20 —— 结算因此**改到 20 之前**，且挂着 backstage-running 守卫。
+//   这是产品侧有意改序，不是缺陷回退；旧判据「晚于 20」与设计记录直接冲突，故按记录改判。
+const A_HEART  = "id: 'act.advance', chain: 'after', order: 19, critical: false,";
 const A_NOGOAL = "if (!activeGoal(p, row.goalId)) return { ok: false, reason: 'no-goal', goalId: row.goalId };";
 const A_BUSY   = "const busy = runningOf(row.person);";
 const A_TERM   = "if (isTerminal(row.status)) return { ok: false, reason: 'not-active', status: row.status };";
@@ -241,7 +247,11 @@ function probeHeartBody(WA) {
   const row = rowOf(WA, x.id);
   return (row && row.status === 'done') ? 'settled' : ('stuck:' + (row && row.status));
 }
-// P5 心跳挂在 after 链且晚于 backstage.simulate（order 20）
+// P5 心跳挂在 after 链、位于 backstage.simulate(20) **之前**、parallel.simulate(22) 之前
+  //   v2.381.0：口径按 v2.325.0 设计记录改判 —— 动作三节点（准入 18 / 结算 19 / 回执 19.5）
+  //   消费的是**上一轮已提交**快照，必须排在后台推演发起(20)之前；回执(19.5)之后才轮到 20。
+  //   故本条判的不再是「晚于 20」，而是「在 20 之前、且早于 22（不插进平行世界）」，并把
+  //   `agency.receipts` 的位序一并钉住 —— 三节点相对次序被打乱同样该红。
 function probeHeart(WA) {
   const list = WA.workflow.list('after') || [];
   const node = list.filter(function (n) { return n.id === 'act.advance'; })[0];
@@ -250,8 +260,13 @@ function probeHeart(WA) {
   if (before) return 'on-before';
   const sim = list.filter(function (n) { return n.id === 'backstage.simulate'; })[0];
   const par = list.filter(function (n) { return n.id === 'parallel.simulate'; })[0];
-  const okOrder = (!sim || node.order > sim.order) && (!par || node.order < par.order);
-  return okOrder ? 'in-chain' : 'misordered:' + node.order;
+  const sched = list.filter(function (n) { return n.id === 'agency.schedule'; })[0];
+  const rcpt = list.filter(function (n) { return n.id === 'agency.receipts'; })[0];
+  const okOrder = (!sched || sched.order < node.order)
+    && (!rcpt || node.order < rcpt.order)
+    && (!sim || node.order < sim.order)
+    && (!par || node.order < par.order);
+  return okOrder ? 'in-chain' : ('misordered:' + node.order);
 }
 
 // P6 目标撤销后不得照常开工（否定式 ③）
@@ -337,11 +352,11 @@ function judge(a) {
       'v2117/b1: [4] 用途是封闭集合 ⇒ bad-use 并给出全部可选');
   }
   // ── ⑤ 心跳在 after 链、晚于 backstage.simulate ──
-  a(probeClean(probeHeart) === 'in-chain', 'v2117/b1: [5] act.advance 挂在 after 链且晚于 backstage.simulate');
+  a(probeClean(probeHeart) === 'in-chain', 'v2117/b1: [5] act.advance 挂在 after 链、位于 backstage.simulate 之前（消费上一轮已提交快照）');
   //   破坏后节点落到 before 链 ⇒ after 链里**查不到**它（probeHeart 早退 return 'missing'）。
   //   两种症状都要认：missing（不在 after 链）或 on-before（明确跑到 before 去了）。
   a(['missing', 'on-before', 'misordered'].indexOf(probeWith(BROKEN[B.heart], probeHeart)) >= 0,
-    'v2117/b1: [5] 挂错链 ⇒ 结算不在 after 链上推进（拿本轮尚未写的行程算到达）');
+    'v2117/b1: [5] 挂错链 ⇒ 结算不在 after 链上推进（到点结算永远不发生）');
   // ⑤b 心跳真能推动结算（不是「注册了但跑不动」）
   a(probeClean(probeHeartBody) === 'settled',
     'v2117/b1: [5] 心跳节点的体真的推动结算（到期行到终态，不靠手工调用 act.advance）');
@@ -570,7 +585,7 @@ function runNegative(a) {
     'v2117/b1: [N1] 不传用途 ⇒ 用途窗口在准入上完全失效（缺口④复现）');
   // 挂到 before 链 ⇒ 症状可能是 on-before（明确跑到 before 去了）或 misordered:21
   //   （不在 after 链里、`workflow.list` 的返回顺序随链序改变）。两者都算现形。
-  a(['on-before', 'misordered:21', 'missing'].indexOf(probeWith(BROKEN[B.heart], probeHeart)) >= 0,
+  a(['on-before', 'misordered:19', 'misordered:21', 'missing'].indexOf(probeWith(BROKEN[B.heart], probeHeart)) >= 0,
     'v2117/b1: [N1] 心跳挂错链 ⇒ 结算不再排在 after 链的正确序位上（缺口⑤复现）');
   a(probeWith(BROKEN[B.nogoal], probeNoGoal) !== 'guarded',
     'v2117/b1: [N1] 去掉目标判据 ⇒ 撤销了的决定照样执行（缺口⑥复现）');

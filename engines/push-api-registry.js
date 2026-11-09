@@ -9,7 +9,11 @@
  *   「被 dispatch 注册表引用」也算进了零调用。两者都是要治的问题，但治法不同：
  *     · 真零调用 ⇒ 必须逐条裁决（本表）；
  *     · 仅自调/注册表引用 ⇒ 是「接上了但没确证被调」，属 OPV11-2 那一类读数缺口。
- *   本表只处置**真零调用**的 11 条，每条给一个裁决与可机器复算的证据。
+ *   本表只处置**真零调用**的那些 API，每条给一个裁决与可机器复算的证据。
+ *   v2.382.0 表跟位：`floorChanges.sweep` / `world.advance` / `beatFacade.run` 已被
+ *   `engines/action-desk.js` 的 ROUTES 分发表真实调用（`WA.ns.method(` 形态，非注释/字符串），
+ *   按本表「真零调用」口径它们不该再占裁决位 ⇒ 出表（连带 `floorChanges.sweep` 退出 drive 派生）；
+ *   `choiceBoard.refresh` 现场复算为零调用且未归 l3/基线 ⇒ 补入本表并裁决为 ui。
  *
  * 【四类裁决】
  *   drive     应接进调度：推进语义明确、可安全调用。本轮已接进 roundDrivers，
@@ -41,8 +45,6 @@
       reason: '量表步进：零参自足，读自身阈值与步长配置' },
     { api: 'followupGate.due', cls: 'drive', driver: { method: 'due' },
       reason: '跟进闸门到期检查：零参，读自身到期表' },
-    { api: 'floorChanges.sweep', cls: 'drive', driver: { method: 'sweep' },
-      reason: '楼层变更扫描：零参，只读自身快照与引用表' },
     { api: 'activity.settle', cls: 'entry', driver: null,
       reason: '结算需表演对象：settle(idOrOpts) 的入参是具体活动编号，只能由剧情事件提供' },
     { api: 'liaison.advance', cls: 'entry', driver: null,
@@ -53,10 +55,6 @@
       reason: '一次性修正刷盘：flush() 清空 pending，需修正已被采纳这一业务时机' },
     { api: 'interestFace.flush', cls: 'entry', driver: null,
       reason: '兴趣面收件箱刷盘：flush() 把 pending 推入 inbox 并清空，需读者取件时机' },
-    { api: 'world.advance', cls: 'entry', driver: null,
-      reason: '世界推进需推进语义：advance 的入参是推进什么，由推演主路径提供' },
-    { api: 'beatFacade.run', cls: 'entry', driver: null,
-      reason: '节拍门面需操作与上下文：run(op,ctx) 两个入参都由调用方提供' },
     { api: 'ensemble.run', cls: 'entry', driver: null,
       reason: '多通道合成需消息与通道入参：run(channels,messages,opts)，由调用方提供' },
     { api: 'hazard.roll', cls: 'entry', driver: null,
@@ -70,7 +68,9 @@
     { api: 'vitals.sweep', cls: 'ui', driver: null,
       reason: '体征整表扫描是边路读面：同一引擎只能有一个驱动口（已归 vitals.tick），本口不参与轮次推进' },
     { api: 'cyberUI.progress', cls: 'ui', driver: null,
-      reason: '进度条 HTML 生成器：属于 UI 组件工具箱，由页面渲染时调用，不是引擎推进' }
+      reason: '进度条 HTML 生成器：属于 UI 组件工具箱，由页面渲染时调用，不是引擎推进' },
+    { api: 'choiceBoard.refresh', cls: 'ui', driver: null,
+      reason: '选项板重绘口：由页面在字体/布局变化后调用，不是引擎推进，故不进轮次' }
   ];
 
   const CLS = ['drive', 'entry', 'ui', 'dead'];

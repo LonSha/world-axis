@@ -29,8 +29,7 @@
 (function () {
   'use strict';
   const root = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this);
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_alchemy_toxicology_settings_v1';
   const DEF = {
@@ -145,6 +144,11 @@
           // 中和解毒
           const patientId = cleanStr(spec.patientId || actorId, 48);
           let pCase = store.cases[patientId];
+          if (!pCase && Object.keys(store.cases).length >= Math.max(1, Math.floor(settings().maxPatients))) {
+            noteFault('patient-capacity');
+            result = { ok: false, refusal: 'patient-capacity' };
+            return;
+          }
           if (!pCase) {
             pCase = {
               patientId: patientId,
@@ -171,7 +175,7 @@
             return;
           }
 
-          const remedyPower = clamp(spec.remedyPower != null ? spec.remedyPower : 40, 10, 80);
+          const remedyPower = clamp(spec.remedyPower != null ? spec.remedyPower : settings().neutralizeRate, 10, 80);
           const oldSev = pCase.severity;
           pCase.severity = clamp(pCase.severity - remedyPower, 0, 100);
           if (pCase.severity <= 0) pCase.status = 'detoxified';
@@ -196,7 +200,7 @@
           const potency = clamp(spec.potency != null ? spec.potency : 75, 10, 100);
 
           const recipe = {
-            id: 'tox_' + Date.now(),
+            id: 'tox_' + clockNow('alchemy-toxicology'),
             name: toxinName,
             type: toxinType,
             potency: potency,
@@ -204,7 +208,7 @@
             createdAt: now
           };
           store.recipes.unshift(recipe);
-          if (store.recipes.length > 20) store.recipes.length = 20;
+          store.recipes.length = Math.min(store.recipes.length, Math.max(1, Math.floor(settings().maxToxinTypes)));
           stat.toxinsBrewed++;
 
           result = {

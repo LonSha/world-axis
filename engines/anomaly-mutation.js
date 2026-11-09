@@ -18,8 +18,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
   const VERSION = '2.340.0';
 
@@ -51,7 +51,7 @@
       mutations: Array.isArray(opt.mutations) ? opt.mutations.slice() : [],
       hallucinations: [],
       isAscendedOrMonster: false,
-      updatedAt: Date.now()
+      updatedAt: clockNow('anomaly-mutation')
     };
     _mutations.set(id, state);
     return { ok: true, profile: JSON.parse(JSON.stringify(state)) };
@@ -141,7 +141,7 @@
       result.summary = `${actId} 经受异化源冲击，侵蚀度上升至 ${prof.corruptionLevel}%，神志勉强守住。`;
     }
 
-    prof.updatedAt = Date.now();
+    prof.updatedAt = clockNow('anomaly-mutation');
     return result;
   }
 

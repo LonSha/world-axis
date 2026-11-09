@@ -11,6 +11,7 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
 
   const LS_KEY = 'worldaxis_subtext_tension_settings_v1';
   const DEF = { enabled: true, maxHistory: 80 };
@@ -161,7 +162,7 @@
 
     const packageResult = {
       ok: true,
-      subtextId: 'st_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      subtextId: 'st_' + clockNow('subtext-tension') + '_' + Math.floor(WA.rand.next('subtext-tension') * 1000),
       speaker: speaker,
       listener: listener,
       surfaceSpeech: surfaceSpeech,

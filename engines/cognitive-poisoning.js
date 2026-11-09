@@ -77,7 +77,7 @@
     const deceived = targetInsight < disguiseDC;
 
     const intelRecord = {
-      intelId: 'forge_' + (at % 10000) + '_' + Math.floor(Math.random() * 1000),
+      intelId: 'forge_' + (at % 10000) + '_' + Math.floor(WA.rand.next('cognitive-poisoning') * 1000),
       planterId: planterId,
       targetActorId: targetActorId,
       fakeClaim: fakeClaim,

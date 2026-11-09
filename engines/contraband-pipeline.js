@@ -15,8 +15,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -44,7 +44,7 @@
       restrictedItems: new Set(items),
       severityLevel: sev,
       inspectionBonus: typeof opt.inspectionBonus === 'number' ? opt.inspectionBonus : sev * 15,
-      lastUpdated: Date.now()
+      lastUpdated: clockNow('contraband-pipeline')
     };
     _jurisdictionPolicies.set(jurisdictionId, policy);
 
@@ -104,7 +104,7 @@
         wantedLevel: policy.severityLevel,
         reason: 'contraband_smuggling_caught',
         bounty: policy.severityLevel * 500,
-        timestamp: Date.now()
+        timestamp: clockNow('contraband-pipeline')
       });
 
       return {

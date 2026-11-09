@@ -21,8 +21,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -77,7 +77,7 @@
     if (vis <= 0.05 && sType !== 'signal_arrow') {
       return {
         ok: true,
-        broadcastId: 'sig_' + Date.now(),
+        broadcastId: 'sig_' + clockNow('pyro-telecom'),
         sourceNodeId: opts.sourceNodeId,
         effectiveRadius: 0,
         perceivedNodes: [],
@@ -103,11 +103,11 @@
     const effectiveRadius = Math.round(baseRadius * vis);
 
     const broadcastRecord = {
-      id: 'sig_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      id: 'sig_' + clockNow('pyro-telecom') + '_' + WA.rand.next('pyro-telecom').toString(36).substr(2, 5),
       sourceNodeId: opts.sourceNodeId,
       signalType: sType,
       effectiveRadius: effectiveRadius,
-      createdAt: Date.now()
+      createdAt: clockNow('pyro-telecom')
     };
     _broadcastHistory.push(broadcastRecord);
 
@@ -129,7 +129,7 @@
           signalId: broadcastRecord.id,
           sourceNodeId: opts.sourceNodeId,
           signalType: sType,
-          perceivedAt: Date.now(),
+          perceivedAt: clockNow('pyro-telecom'),
           distanceMeters: dist
         });
       }

@@ -31,6 +31,7 @@
   'use strict';
 
   const WA = window.WorldAxis = window.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
 
   /**
    * 待办收集聚合器
@@ -61,7 +62,7 @@
   ];
   function collectPending() {
     const list = [];
-    const now = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('unifiedPending') : Date.now();
+    const now = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('unifiedPending') : clockNow('unified-pending');
     // hands：真的接上并调用了的模块数；skipped：模块缺席/无入口（带原因）；
     //   faults：接上了但抛异常的模块（带原始错误文本，可定位，不是一句「失败了」）。
     const hands = [];

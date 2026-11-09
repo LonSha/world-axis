@@ -469,7 +469,7 @@
     listActors: listActors,
     buildBlock: buildBlock,
     diagnose: diagnose,
-    stat: function () { return Object.assign({}, stat); },
+    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); },
     SLOTS: SLOTS,
     WORLD_PRESETS: WORLD_PRESETS,
     LEISURE_ACTIONS: LEISURE_ACTIONS

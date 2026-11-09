@@ -32,8 +32,7 @@
 (function () {
   'use strict';
   const root = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this);
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_stealth_infiltration_settings_v1';
   const DEF = {
@@ -102,7 +101,7 @@
    */
   function registerGuard(guardSpec) {
     guardSpec = guardSpec || {};
-    const guardId = cleanStr(guardSpec.guardId || guardSpec.id || ('guard_' + Date.now()), 48);
+    const guardId = cleanStr(guardSpec.guardId || guardSpec.id || ('guard_' + clockNow('stealth-infiltration')), 48);
     const postLocation = cleanStr(guardSpec.location || 'gate_courtyard', 48);
 
     let created = null;
@@ -111,6 +110,10 @@
         const store = getStealthStore(draft);
         if (!store) return;
         let g = store.guards.find(function (it) { return it.guardId === guardId; });
+        if (!g && store.guards.length >= Math.max(1, Math.floor(settings().maxGuards))) {
+          noteFault('guard-capacity');
+          return;
+        }
         if (!g) {
           g = {
             guardId: guardId,
@@ -119,7 +122,7 @@
             awarenessState: cleanStr(guardSpec.awareness || 'calm', 24), // calm | suspicious | alarmed | neutralized
             facingAngle: clamp(guardSpec.facing != null ? guardSpec.facing : 0, 0, 360),
             viewConeFov: clamp(guardSpec.fov != null ? guardSpec.fov : 100, 30, 180),
-            viewDistance: clamp(guardSpec.viewDistance != null ? guardSpec.viewDistance : 30, 5, 80),
+            viewDistance: clamp(guardSpec.viewDistance != null ? guardSpec.viewDistance : settings().baseViewDistance, 5, 100),
             coords: guardSpec.coords || { x: 10, y: 10 },
             bodyHidden: false,
             updatedAt: clockNow('regGuard')
@@ -129,7 +132,7 @@
         created = JSON.parse(JSON.stringify(g));
       });
     }
-    return { ok: true, guard: created };
+    return created ? { ok: true, guard: created } : { ok: false, reason: 'guard-capacity-or-store-unavailable' };
   }
 
   /**
@@ -179,7 +182,7 @@
         if (tactic === 'shadowMelt') {
           // 潜伏于暗影屏息潜行
           const stealthScore = Math.round(shadowFactor * 0.8 + (100 - (actionSpec.footstepDb || 20)) * 0.2);
-          const detected = stealthScore < 40 && isInLineOfSight;
+          const detected = stealthScore < settings().stealthSuccessThreshold && isInLineOfSight;
           if (detected && guard) {
             guard.awarenessState = 'suspicious';
           }
@@ -199,6 +202,11 @@
           if (!guard) {
             result = { ok: false, refusal: 'guard-not-found', reason: '未指定受引诱目标守卫' };
             noteFault('guard-not-found');
+            return;
+          }
+          if (distanceToGuard > settings().distractRadius) {
+            noteFault('distraction-out-of-range');
+            result = { ok: false, refusal: 'distraction-out-of-range' };
             return;
           }
           // 守卫转向声源方向

@@ -23,8 +23,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.340.0';
@@ -45,7 +45,7 @@
       resourceConsumptionMultiplier: 1.0,
       travelFrictionMultiplier: 1.0
     },
-    startedAt: Date.now()
+    startedAt: clockNow('epoch-tide')
   };
 
   function shiftEpoch(epochType, severity, durationEpochTurns, opts) {
@@ -90,7 +90,7 @@
       severity: sev,
       remainingTurns: dur,
       activeModifiers: mods,
-      startedAt: Date.now()
+      startedAt: clockNow('epoch-tide')
     };
 
     return {
@@ -137,7 +137,7 @@
         resourceConsumptionMultiplier: 1.0,
         travelFrictionMultiplier: 1.0
       },
-      startedAt: Date.now()
+      startedAt: clockNow('epoch-tide')
     };
     return { ok: true, cleared: true };
   }

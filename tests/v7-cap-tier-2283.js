@@ -109,7 +109,10 @@ function runB(WA) {
   eq(stdItem && stdItem.size, 34, 'B5: standard 档规模为 34');
   //   v2.295.0（V9 基线跟位）：MECH 103 → 105（V9 两个新注入面），排除名单仍是 35
   //   ⇒ 规模 68 → 70。判据形态未变（仍是「有注入面的 − 排除」）。
-  eq(fullItem && fullItem.size, 70, 'B6: full 档下调后规模恰为 70（105 - 35）');
+  //   v2.382.0（幽灵引用治理批次⑦）：MECH 105 → 109（v2.360.0 起新增四个有注入面的引擎），
+  //   排除名单仍是 35 ⇒ 规模 70 → 74。现场实测 `view().tiers[full].size = 74`（探针 cap_probe.js）。
+  //   与 `checked 187→185` 同族：这是「表跟位」，不是把判据放宽 —— 109 − 35 = 74 仍是同一条口径。
+  eq(fullItem && fullItem.size, 74, 'B6: full 档下调后规模恰为 74（109 - 35）');
   assert(fullItem && typeof fullItem.note === 'string' && fullItem.note.indexOf('35') >= 0, 'B7: full 档包含 35 排除注记');
 
   assert(Array.isArray(v.manualOnly) && v.manualOnly.length === 35, 'B8: view().manualOnly 暴露 35 个排除机制');
@@ -125,13 +128,14 @@ function runC(WA) {
   assert(rFull.ok === true, 'C1: 切到 full 档成功');
   eq(rFull.tier, 'full', 'C2: applyTier 返回 tier 为 full');
   assert(Array.isArray(rFull.notEffective) && rFull.notEffective.length === 0, 'C3: notEffective 为空（全部当场复核生效）');
-  eq(rFull.turnedOn.length, 63, 'C4: full 档新开 63 个（70 目标 - 7 出厂机制）');
+  eq(rFull.turnedOn.length, 64, 'C4: full 档新开 64 个（74 目标 - 10 出厂机制）');
   //   注：v2.293.0 复核发现本行**与 B6/C5 自相矛盾**（65 目标下新开应为 60，随目标
   //   涨到 67、出厂涨到 7，新开仍恰为 60 —— 60 = 67 − 7 与 65 − 5 同值，故**本行不该变**）。
   //   这正是「只改登记值」的边界：目标与出厂同涨同落时，差值判据保持不变。
-
+  //   v2.382.0 这次**不同**：目标 70 → 74（+4），出厂 7 → 10（+3），差值 63 → 64（+1），
+  //   故本行必须跟位 —— 上一次的「不该变」是巧合，不是规律（探针实测 turnedOn 64）。
   const vFull = cap.view();
-  eq(vFull.running, 70, 'C5: full 档运行机制数为 70（= MECH 105 − 排除 35）');
+  eq(vFull.running, 74, 'C5: full 档运行机制数为 74（= MECH 109 − 排除 35）');
   eq(vFull.dormant, 35, 'C6: full 档休眠机制数为 35');
 
   // 验证 35 个排除机制无一被打开
@@ -152,8 +156,11 @@ function runC(WA) {
   eq(rRoll.tier, 'lite', 'C10: 回滚后返回 tier 为 lite');
 
   const vLite = cap.view();
-  eq(vLite.running, 7, 'C11: 回滚后运行机制数恢复出厂 7 台（v2.293.0：自传 + 播种）');
-  eq(vLite.dormant, 98, 'C12: 回滚后休眠机制数恢复 98 台（105 − 7，未随 BASE_ON 变）');
+  eq(vLite.running, 10, 'C11: 回滚后运行机制数恢复出厂 10 台（v2.293.0：自传 + 播种；v2.382.0：再 +3）');
+  //   v2.382.0：出厂 7 → 10（+3），休眠 98 → 99（+1）。现场实测 rollback 后 running=10 / dormant=99。
+  //   注意这两条**不同步涨**：running +3、dormant +1，因为 MECH 105 → 109 只 +4，
+  //   其中 3 台进了 BASE_ON（出厂即开），剩 1 台落在休眠面 —— 所以 C11 改 10、C12 改 99。
+  eq(vLite.dormant, 99, 'C12: 回滚后休眠机制数恢复 99 台（109 − 10，未随 BASE_ON 变）');
 }
 
 function runD() {

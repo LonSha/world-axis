@@ -26,8 +26,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
   const VERSION = '2.340.0';
 
@@ -66,7 +66,7 @@
       weaponId: _cleanStr(opt.weaponId, 48) || 'unarmed',
       isDisarmed: false,
       postureBroken: false,
-      updatedAt: Date.now()
+      updatedAt: clockNow('tactical-combat')
     };
     _combatants.set(id, state);
     return { ok: true, state: JSON.parse(JSON.stringify(state)) };
@@ -233,8 +233,8 @@
       result.summary += ` [姿态崩溃] ${defId} 重心彻底瓦解，陷入僵直瘫倒！`;
     }
 
-    att.updatedAt = Date.now();
-    def.updatedAt = Date.now();
+    att.updatedAt = clockNow('tactical-combat');
+    def.updatedAt = clockNow('tactical-combat');
 
     return result;
   }
@@ -249,7 +249,12 @@
   function linkInventoryAttrition(actorId, combatResult, inventoryRef) {
     if (!actorId) return { ok: false, reason: 'missing-actor' };
     const res = combatResult || {};
-    const inv = inventoryRef || (WA.personalInventory && typeof WA.personalInventory.view === 'function' ? WA.personalInventory : null);
+    // v2.381.0: personalInventory 从未导出 view —— 真源是 getInventory(characterId)。
+    //   此前这里拿到的是 null（两重失配：方法名不存在 + 后面还调了同样不存在的
+    //   consumeItem），于是「战术碰撞顺便消耗急救耗材」这条联动从未执行。
+    const inv = inventoryRef || (WA.personalInventory && typeof WA.personalInventory.getInventory === 'function'
+      ? WA.personalInventory.getInventory(actorId)
+      : null);
 
     // 负控制：未参与真实战斗或结果无损耗判定
     if (!res.action && !res.hit && !res.parried) {

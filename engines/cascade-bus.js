@@ -28,24 +28,26 @@
 
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
-  const VERSION = '2.330.0';
-
+  const VERSION = '2.380.0';
   const LAYERS = Object.freeze([
-    'physical',  // 物理底层
-    'somatic',   // 机能中层
+    'physical',  // 物理环境层
+    'somatic',   // 机能生理层
+    'tactical',  // 战术博弈层（战役军团、刑狱地牢、刺杀潜行）
     'behavioral',// 行为决策层
-    'social'     // 社会顶层与跨插件桥
+    'social',    // 社会门阀与信仰层
+    'epochal'    // 宏观文明生态与纪元层
   ]);
-
   const _subscribers = {
     physical: new Set(),
     somatic: new Set(),
+    tactical: new Set(),
     behavioral: new Set(),
-    social: new Set()
+    social: new Set(),
+    epochal: new Set()
   };
 
   let _tickCounter = 0;
@@ -90,7 +92,7 @@
   function dispatchTick(worldContext) {
     worldContext = worldContext || {};
     _tickCounter++;
-    const now = Date.now();
+    const now = clockNow('cascade-bus');
     const hour = Number.isFinite(Number(worldContext.hour)) ? Number(worldContext.hour) : 9;
     const actors = Array.isArray(worldContext.activeActors) ? worldContext.activeActors : ['player'];
     const places = Array.isArray(worldContext.currentZones) ? worldContext.currentZones : ['zone_center'];
@@ -133,10 +135,11 @@
       }
     }
     // V17 EXV17-6: 宏观时代浪潮时钟演进与全局常数约束
+    // v2.381.0: 删掉恒不可达的 else-if。epochTide 的真入口只有 advanceEpoch(turns)，
+    //   advanceEpochTurns 从来不存在 —— 这个回退枝永远走不到，留着只会让未来的
+    //   审计误以为引擎暴露了两套推进接口。
     if (WA.epochTide && typeof WA.epochTide.advanceEpoch === 'function') {
       WA.epochTide.advanceEpoch(1);
-    } else if (WA.epochTide && typeof WA.epochTide.advanceEpochTurns === 'function') {
-      WA.epochTide.advanceEpochTurns(1);
     }
     // V17 EXV17-1: 混沌蝴蝶长程因果多米诺演化
     if (WA.butterflyCascade && typeof WA.butterflyCascade.advanceEpoch === 'function') {
@@ -161,9 +164,9 @@
     dispatchEvent('physical', 'physical_tick', { places: places, tick: _tickCounter });
     // ── Layer 2: 机能中层演化 ──
     for (const aid of actors) {
-      if (WA.engines && WA.engines.metabolismClock && typeof WA.engines.metabolismClock.accumulateFatigue === 'function') {
+      if (WA.engines && WA.metabolismClock && typeof WA.metabolismClock.accumulateFatigue === 'function') {
         // 自然醒觉代谢
-        WA.engines.metabolismClock.accumulateFatigue(aid, 2, 'circadian_tick');
+        WA.metabolismClock.accumulateFatigue(aid, 2, 'circadian_tick');
       }
       // V16 EXV16-2: 生物毒素半衰期生化代谢
       if (WA.toxicMetabolism && typeof WA.toxicMetabolism.metabolize === 'function') {
@@ -177,11 +180,15 @@
         }
       }
       // V17 EXV17-2: 深层心智心理防御与情绪应激自然稳态衰减
-      if (WA.psycheTrauma && typeof WA.psycheTrauma.getProfile === 'function') {
-        const prof = WA.psycheTrauma.getProfile(aid);
-        if (prof && prof.traumaLevel > 0 && !prof.isBlackened) {
+      // v2.381.0: psycheTrauma 的读口是 getActorPsyche(actorId)，恢复口是
+      //   soothePsyche(actorId, power, method) —— 原代码探测的 getProfile / healTrauma
+      //   都不存在，于是「非黑化态下的心智时间自愈」这条联动从未执行。
+      if (WA.psycheTrauma && typeof WA.psycheTrauma.getActorPsyche === 'function') {
+        const prof = WA.psycheTrauma.getActorPsyche(aid);
+        const isBlack = !!(prof && (prof.isBlackened || prof.mentalState === 'blackening'));
+        if (prof && prof.traumaLevel > 0 && !isBlack) {
           // 非黑化态下的微弱自愈倾向
-          WA.psycheTrauma.healTrauma(aid, 1.0, 'time_restoration');
+          WA.psycheTrauma.soothePsyche(aid, 1.0, 'time_restoration');
         }
       }
       // V19 EXV19-7: 药理毒素微观侵蚀代谢衰减巡检
@@ -262,9 +269,10 @@
         WA.bridge.snapshot({ reason: 'cascade_bus_tick' });
         report.social.externalBridgesSynced++;
       } catch (e) {}
-    } else if (WA.bridge && typeof WA.bridge.dumpFacts === 'function') {
-      report.social.externalBridgesSynced++;
     }
+    // v2.381.0: 删掉恒不可达的 else-if（bridge.dumpFacts 不存在，真入口只有
+    //   snapshot / buildSnapshot / handshake）。原回退枝只 +1 计数、不做事，
+    //   等于虚报一次同步。
     // V19 EXV19-5: 地下钱庄与黑市高利贷逾期巡检
     if (WA.blackmarketUsury && typeof WA.blackmarketUsury.transactBlackMarket === 'function') {
       try {
@@ -294,9 +302,10 @@
       try {
         WA.phoneBridge.phaseOf();
       } catch (e) {}
-    } else if (WA.phoneBridge && typeof WA.phoneBridge.processQueue === 'function') {
-      WA.phoneBridge.processQueue();
     }
+    // v2.381.0: 删掉恒不可达的 else-if。phoneBridge 的心跳口是 phaseOf()，
+    //   processQueue 从来不存在（导出面：noteAction/linkChain/traceOf/opTrace/
+    //   phaseOf/opsView）。原回退枝是死代码。
     dispatchEvent('social', 'social_tick', { tick: _tickCounter, report: report });
 
     _lastCascadeSummary.tick = _tickCounter;
@@ -318,9 +327,56 @@
       subscriberCounts: {
         physical: _subscribers.physical.size,
         somatic: _subscribers.somatic.size,
+        tactical: _subscribers.tactical.size,
         behavioral: _subscribers.behavioral.size,
-        social: _subscribers.social.size
+        social: _subscribers.social.size,
+        epochal: _subscribers.epochal.size
       }
+    };
+  }
+
+  /**
+   * OPV21-1: 自适应波次因果级联分发与拓扑环路熔断检测
+   * 支持跨物理、机能、战术、社会与宏观文明的动态冲击波
+   */
+  function dispatchAdaptiveWave(waveSpec) {
+    if (!waveSpec || typeof waveSpec !== 'object') {
+      return { ok: false, error: 'invalid-wave-spec' };
+    }
+    const waveId = waveSpec.id || ('wave_' + clockNow('cascade-bus'));
+    const sourceLayer = waveSpec.sourceLayer || 'physical';
+    const targetLayers = Array.isArray(waveSpec.targetLayers) ? waveSpec.targetLayers : LAYERS.slice();
+    const payload = waveSpec.payload || {};
+    const chain = Array.isArray(waveSpec.dependencyChain) ? waveSpec.dependencyChain : [];
+
+    // 负控制拦截：检测恶意环状因果依赖（如 A -> B -> C -> A）并在 3 轮检测内精准熔断
+    const seen = new Set();
+    for (const link of chain) {
+      if (seen.has(link)) {
+        return {
+          ok: false,
+          refusal: 'causal-cycle-broken',
+          cycleNode: link,
+          error: `检测到因果级联拓扑环路 [${link}]，总线自愈保护器已强制熔断！`
+        };
+      }
+      seen.add(link);
+    }
+
+    const propagated = [];
+    for (const tgt of targetLayers) {
+      if (_subscribers[tgt] && _subscribers[tgt].size > 0) {
+        const evRes = dispatchEvent(tgt, `adaptive_wave:${waveId}`, Object.assign({ from: sourceLayer }, payload));
+        propagated.push({ layer: tgt, count: evRes.triggered });
+      }
+    }
+
+    return {
+      ok: true,
+      waveId: waveId,
+      sourceLayer: sourceLayer,
+      propagatedLayers: propagated,
+      cycleChecksPassed: true
     };
   }
 
@@ -344,7 +400,7 @@
     }
 
     const interruptRecord = {
-      interruptedAt: Date.now(),
+      interruptedAt: clockNow('cascade-bus'),
       priority: prio,
       emergencyType: payload.emergencyType || 'catastrophe',
       reason: payload.reason || 'emergency_preemption',
@@ -383,6 +439,7 @@
     unsubscribe: unsubscribe,
     dispatchEvent: dispatchEvent,
     dispatchTick: dispatchTick,
+    dispatchAdaptiveWave: dispatchAdaptiveWave,
     interrupt: interrupt,
     getCascadeState: getCascadeState,
     resetAll: resetAll,

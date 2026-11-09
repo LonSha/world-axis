@@ -149,18 +149,28 @@
     let out = null;
     WA.store.transact(function (draft) {
       const b = ensureBucket(draft);
-      const cap = cfg.maxCharacters || 48;
-      const keys = Object.keys(b.characters);
-      if (!b.characters[name] && keys.length >= cap) {
-        // 挤出最久未活跃的
-        let oldestKey = keys[0];
-        let oldestTime = (b.characters[oldestKey] && b.characters[oldestKey].lastTickAt) || 0;
-        for (let i = 1; i < keys.length; i++) {
-          const k = keys[i];
-          const t = (b.characters[k] && b.characters[k].lastTickAt) || 0;
-          if (t < oldestTime) { oldestTime = t; oldestKey = k; }
-        }
-        delete b.characters[oldestKey];
+      const cfgNow = cfg || {};
+      const cap = cfgNow.maxCharacters || 48;
+      // v2.381.0 修复（evict-meta-v2610 的 A 面「悬空: offstageLife.characters」）：
+      //   本容器在两张台账里都登记为**对象型有界容器**——
+      //     · core/evict.js   SITES['offstageLife.characters'] = { kind:'object', cap:48 }
+      //     · core/store.js   __BOUNDED_CAPS['offstageLife.characters'] = { kind:'object',
+      //                        site:'offstage-life.js WA.evict.object(characters, "offstageLife.characters")' }
+      //   但本文件此前是**手写**「找 lastTickAt 最小的一条再 delete」：行为等价，
+      //   淘汰却从不经 core/evict.js 记账 ⇒ `evict.stat()` / 诊断面看不到这条站的任何
+      //   一次挤出，台账里的声明成了没有消费者的死声明（本仓点名的孤儿形态）。
+      //   改走 WA.evict.object：照样按 lastTickAt 最旧优先，但删除与记账同源，
+      //   声明⇄执行不再漂移。顺序键由调用方给出（object() 的契约是「前 excess 个被删」）。
+      //   注意：这里**不预先**判「满没满」—— `object()` 自己比 before/cap，未满即 evictNoops++。
+      //   也**不**给新来者留位：重名时本次是覆盖而非新增，object() 只在超出 cap 时才删，
+      //   覆盖分支 before 不变，自然不会误删任何一条。
+      if (!b.characters[name] && WA.evict) {
+        const keys = Object.keys(b.characters).sort(function (x, y) {
+          const tx = (b.characters[x] && b.characters[x].lastTickAt) || 0;
+          const ty = (b.characters[y] && b.characters[y].lastTickAt) || 0;
+          return tx - ty;   // 升序：最久未活跃的排在前面，由 object() 从头部删
+        });
+        WA.evict.object(b.characters, 'offstageLife.characters', keys);
       }
 
       const presetPool = GENRE_PRESETS[genre] || GENRE_PRESETS.generic;
@@ -239,7 +249,24 @@
             card.misadventures = card.misadventures.concat([event]).slice(-5);
             card.reunionGossip = event;
             b.log.push({who:name, event:event, evidence:evidence, at:at});
-            b.log = b.log.slice(-(cfg.maxLogs || 32));
+            // v2.382.0 修复（与 v2.381.0 的 offstageLife.characters 同族，A 面「悬空站点」）：
+            //   此处原先写 `b.log = b.log.slice(-(cfg.maxLogs || 32));` —— 截断确实发生了，
+            //   但它绕过了 core/evict.js 的单一出口 ⇒ 站点表里 `offstageLife.log` 声明了
+            //   `evict.array(log, "offstageLife.log")` 却零调用（回归报「声明悬空站点」），
+            //   且 `evict.stat()` / 诊断面看不到这条站的任何丢弃读数。
+            //   改走 WA.evict.array：容量与记账同源，诊断面从此能看见这条站的丢弃。
+            //   关于第三参：本站在 `core/evict.js` 的 SITES 里是**静态 cap: 32**，不是
+            //   `'per-call'`，故 array() 走 `cap = capOf(site)` 分支、**不看**第三参。
+            //   这与本站点的事实一致——`DEF.maxLogs` 没有进 `__REG.bounds`，用户改不动它
+            //   （对照 engines/beat-mask.js 的 `bounds: { maxRows: [8, 200] }` 才是可调旋钮）。
+            //   所以这里仍把 `cfg.maxLogs` 传进去：一旦将来给它补上 bounds、站点改 per-call，
+            //   这条调用**无需再改**就会按用户旋钮生效（传参无害、不传将来会变成 hardcode）。
+            //   注意：这里**不预先**判「满没满」——array() 自己比 before/cap，未满即 evictNoops++。
+            if (WA.evict && typeof WA.evict.array === 'function') {
+              WA.evict.array(b.log, 'offstageLife.log', cfg.maxLogs);
+            } else {
+              b.log = b.log.slice(-(cfg.maxLogs || 32));
+            }
             stat.misadventures++;
           }
           card.factStatus = 'reported';

@@ -81,6 +81,9 @@
       blacklisted: true,
       guarantorDebtCreated: true,
       affinityPenalty: cfg.defaultPenaltyAffinity,
+      // v2.382.0（死键族）：黑名单有效期改由登记的 blacklistDurationDays 生效（此前零消费）。
+      blacklistDurationDays: cfg.blacklistDurationDays,
+      blacklistUntil: at + (Number(cfg.blacklistDurationDays) || 0) * 86400000,
       timestamp: at
     };
 
@@ -90,6 +93,7 @@
       d.socialBlacklist = d.socialBlacklist || {};
       d.socialBlacklist[borrowerId] = {
         since: at,
+        until: at + (Number(cfg.blacklistDurationDays) || 0) * 86400000,
         reason: 'collateral-default',
         defaultAmount: defaultAmount,
         guarantorId: guarantorId

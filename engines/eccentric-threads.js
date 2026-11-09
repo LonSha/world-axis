@@ -87,7 +87,7 @@
     }
 
     const genre = clean(s.genre || cfg.defaultGenre || 'generic', 30);
-    const id = clean(s.id || ('ethread_' + clockNow('eccentricThreads') + '_' + Math.floor(Math.random() * 1000)), 60);
+    const id = clean(s.id || ('ethread_' + clockNow('eccentricThreads') + '_' + Math.floor(WA.rand.next('eccentric-threads') * 1000)), 60);
     const at = Number.isFinite(s.at) ? s.at : clockNow('eccentricThreads');
 
     const participants = [];
@@ -116,8 +116,31 @@
         // 挤出最旧的一条进入 history
         const popped = b.threads.shift();
         if (popped) {
+          // v2.382.0：本条站的丢弃记账。threads 被 shift 掉的那条**并不消失**——它马上被
+          //   搬进 history（见下）。所以这里记的是「从活跃环转出」这件事，不是数据蒸发。
+          //   与 history 那条同口径：两站都静态 cap，note() 走 capOf(site)、忽略第三参。
+          if (WA.evict && typeof WA.evict.note === 'function') {
+            WA.evict.note('eccentricThreads.threads', [popped], cfg.maxThreads || 32);
+          }
           b.history.push({ id: popped.id, title: popped.title, stage: popped.stage, closedAt: at });
-          if (b.history.length > 20) b.history.shift();
+          // v2.382.0 修复（A 面「悬空站点」：站点表声明了 `eccentricThreads.history` 却零调用）：
+          //   此处与下一行的 `eccentricThreads.threads` 是**归档式挤出**，不是静默丢弃——
+          //   threads 满 ⇒ 最旧一条**转入** history（内容还在，只是换了容器语义）。
+          //   这种形态不能用 `evict.array`：array() 的语义是「切掉尾部并记账」，而这里
+          //   必须先把被挤出的那条**搬进 history** 再腾位，搬运动作只有本模块知道。
+          //   故用 `evict.note(site, droppedItems, limit)`——它是仓库给「调用方已完成挤出、
+          //   只申请记账」准备的接口（先例：chapters.history / enemies / parallelWorld.*）。
+          //   记账的意义：诊断面与 `evict.stat()` 从此能看见这两条站的丢弃读数，
+          //   而不是「数据悄悄换了容器、任何读数都不动」。
+          //   limit 传的是**本条站的静态 cap**（history 20 / threads cfg.maxThreads）：
+          //   两站在 SITES 里都是静态数字，note() 会走 capOf(site)、忽略第三参，
+          //   传进去只为将来升级成 'per-call' 时无需再改这一行。
+          if (b.history.length > 20) {
+            if (WA.evict && typeof WA.evict.note === 'function') {
+              WA.evict.note('eccentricThreads.history', b.history.slice(0, b.history.length - 20), 20);
+            }
+            b.history.shift();
+          }
         }
       }
 
@@ -171,12 +194,12 @@
 
       if (!target) {
         out = { ok: false, reason: 'thread-not-found' };
-        return;
+        return false;
       }
 
       if (target.stage === 'settled') {
         out = { ok: false, reason: 'already-settled', note: '该支线已市井化解完结，不可继续推进' };
-        return;
+        return false;
       }
 
       const currIdx = STAGES.indexOf(target.stage);
@@ -244,12 +267,12 @@
 
       if (!target) {
         out = { ok: false, reason: 'thread-not-found' };
-        return;
+        return false;
       }
 
       if (target.stage === 'settled') {
         out = { ok: false, reason: 'already-settled' };
-        return;
+        return false;
       }
 
       target.stage = 'settled';

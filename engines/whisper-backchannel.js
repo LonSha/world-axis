@@ -66,7 +66,7 @@
     }
 
     const whisperRecord = {
-      id: 'whp_' + clockNow('whisper') + '_' + Math.floor(Math.random() * 1000),
+      id: 'whp_' + clockNow('whisper') + '_' + Math.floor(WA.rand.next('whisper-backchannel') * 1000),
       senderId: senderId,
       recipientId: recipientId,
       content: content,

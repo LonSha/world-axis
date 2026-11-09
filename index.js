@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.360.0';
+  const VERSION = '2.380.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -651,6 +651,15 @@
     'engines/epochal-transition.js',
     'engines/cataclysm-hazard.js',
     'engines/financial-contagion.js',
+    // v2.380.0 (V21): 文明盛衰、神权军团、刑狱血脉、工程拓扑与生态政变大系
+    'engines/theology-cult.js',
+    'engines/regiment-tactics.js',
+    'engines/incarceration-jailbreak.js',
+    'engines/bloodline-heritage.js',
+    'engines/engineering-blueprint.js',
+    'engines/dungeon-hazard-mesh.js',
+    'engines/ecosystem-cascade.js',
+    'engines/court-intrigue.js',
     // v2.325.0: 剧情生活动线与身份世界观节律
     'engines/routine-pacing.js',
     // v2.251.0（拓展 WD-1）：阶位权重池 + 未得补偿 + 幸运封顶（cf. aifarm gacha/soft-pity）。

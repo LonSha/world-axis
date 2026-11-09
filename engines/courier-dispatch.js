@@ -69,7 +69,7 @@
     const eta = at + Math.round(travelHours * 3600 * 1000);
 
     const letter = {
-      id: 'ltr_' + (at % 100000) + '_' + Math.floor(Math.random() * 1000),
+      id: 'ltr_' + (at % 100000) + '_' + Math.floor(WA.rand.next('courier-dispatch') * 1000),
       fromRegion: fromRegion,
       toRecipient: toRecipient,
       content: content,

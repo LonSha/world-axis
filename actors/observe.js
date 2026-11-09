@@ -170,7 +170,7 @@
           if (progress.action) p.action = progress.action;
 
           const logEntry = {
-            round: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('shadow') : Date.now(),
+            round: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('shadow') : clockNow('observe'),
             location: progress.location || p.location,
             intent: progress.intent || p.intent,
             action: progress.action || p.action,

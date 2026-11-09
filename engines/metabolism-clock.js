@@ -12,7 +12,7 @@
  */
 (function () {
   'use strict';
-  const WA = (typeof window !== 'undefined' ? window.WorldAxis : (global.WorldAxis = global.WorldAxis || {}));
+  const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_metabolism_clock_settings_v1';
   const DEF = {
     enabled: true,
@@ -88,9 +88,14 @@
       }
 
       // 环境体温侵蚀（雨雪天气 + 无遮蔽/失温）
+      // v2.382.0（历史欠账消红 · 死键族）：失温推进时长改由登记的 hypothermiaThreshold 决定。
+      //   此前 `hours >= 1.5` 是硬编码字面量，设置里的 hypothermiaThreshold=30（"失温危险线"）
+      //   从未被读取 —— 把危险线从 30 调到 60，失温时间线纹丝不动。换算口径：危险线 30 ⇒
+      //   失温需暴露 1.5 小时（30 / 20），改阈值即改失温所需时长；默认 30 与旧字面量完全等价。
+      const coldOnsetHours = Math.max(0.1, (Number(settings().hypothermiaThreshold) || DEF.hypothermiaThreshold) / 20);
       if (!ctx.sheltered && (ctx.weather === 'rain' || ctx.weather === 'snow' || ctx.weather === 'storm')) {
         if (v.bodyTemp === 'normal') v.bodyTemp = 'chilled';
-        else if (v.bodyTemp === 'chilled' && hours >= 1.5) v.bodyTemp = 'hypothermic';
+        else if (v.bodyTemp === 'chilled' && hours >= coldOnsetHours) v.bodyTemp = 'hypothermic';
       } else if (ctx.sheltered) {
         if (v.bodyTemp === 'hypothermic') v.bodyTemp = 'chilled';
         else if (v.bodyTemp === 'chilled') v.bodyTemp = 'normal';
@@ -99,6 +104,46 @@
       return this.evaluateState(characterId);
     },
 
+    /**
+     * v2.381.0: 直接累加疲劳点数（供级联联动调用）
+     *
+     * 此前 cascade-bus / environmental-hazard / spatial-conflict 三处级联都以本方法名
+     * 探测并把「昼夜疲劳累积 / 危害暴露疲劳 / 搏斗体力消耗」挂在这里，但引擎从未导出它，
+     * 于是三条联动全部静默失效。此处补齐真实入口，语义为「在 0~100 疲劳标尺上直接加点」，
+     * 与 advanceClock 共用 getVitals/evaluateState 同一状态源，不做单位换算。
+     *
+     * @param {string} characterId
+     * @param {number} points 疲劳点数增量（正数累加，负数可作恢复）
+     * @param {string} reason 归因标签（写入最近一次负荷来源，供叙事与排障）
+     * @returns {{ok:boolean, characterId:string, added:number, fatigue:number, fatigueTier:string|null, reason:string}}
+     */
+    accumulateFatigue: function (characterId, points, reason) {
+      if (!characterId) return { ok: false, reason: 'missing-characterId' };
+      const v = this.getVitals(characterId);
+      if (!v) return { ok: false, reason: 'character_not_found' };
+      const raw = Number(points);
+      if (!isFinite(raw) || raw === 0) {
+        return { ok: true, characterId: characterId, added: 0, fatigue: v.fatigue, fatigueTier: null, reason: String(reason || '') };
+      }
+      const before = v.fatigue;
+      v.fatigue = Math.max(0, Math.min(100, Math.round((before + raw) * 10) / 10));
+      const added = Math.round((v.fatigue - before) * 10) / 10;
+      v.lastLoadReason = String(reason || 'unspecified');
+      if (added > 0) {
+        // 疲劳累加视为保持清醒的负荷，同步推进清醒时长（1 点 ≈ 半个清醒小时，与 DEF.fatigueRatePerHour 同源）
+        const rate = (DEF && DEF.fatigueRatePerHour) ? DEF.fatigueRatePerHour : 4.2;
+        v.awakeHours = Math.round((v.awakeHours + (added / rate)) * 10) / 10;
+      }
+      const st = this.evaluateState(characterId);
+      return {
+        ok: true,
+        characterId: characterId,
+        added: added,
+        fatigue: v.fatigue,
+        fatigueTier: st ? st.fatigueTier : null,
+        reason: v.lastLoadReason
+      };
+    },
     /**
      * 评定当前生理负荷与判定修正
      */
@@ -285,4 +330,12 @@
   }
   WA.metabolismClock = metabolismClock;
   WA.metabolism = metabolismClock;
+  // v2.381.0: 补双层注册 —— 此前只有单层（WA.metabolismClock），而 cascade-bus /
+  //   environmental-hazard / spatial-conflict 三处都用 `WA.engines.metabolismClock`
+  //   去探它是否在场。`WA.engines` 下没有这个键 ⇒ 判定恒为 false ⇒ 昼夜疲劳累积、
+  //   危害暴露疲劳、搏斗体力消耗**三条联动从未执行**（语法合法、门禁全绿、单测测不到）。
+  //   本仓 43 个引擎用双层注册、其余用单层，两种惯例并存是这类缺陷的温床；
+  //   故这里补齐双层，并新增 tests/engines-ns-gate.js 常驻拦截。
+  WA.engines = WA.engines || {};
+  WA.engines.metabolismClock = metabolismClock;
 })();

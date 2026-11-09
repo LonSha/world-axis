@@ -15,11 +15,7 @@
 'use strict';
 
 (function () {
-  const WA = (typeof window !== 'undefined' && window.WorldAxis)
-    ? window.WorldAxis
-    : (typeof global !== 'undefined' && global.WorldAxis)
-      ? global.WorldAxis
-      : {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
 
   WA.engines = WA.engines || {};
 

@@ -21,8 +21,8 @@
 
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -96,7 +96,7 @@
       severity: sev,
       shelterReduction: shelterReduction,
       desc: _cleanStr(opts.desc || '', 120),
-      registeredAt: Date.now()
+      registeredAt: clockNow('environmental-hazard')
     };
 
     zoneMap.set(ht, record);
@@ -241,7 +241,7 @@
         accumulatedErosion: nextAccum,
         stage: stage,
         symptom: symptomText,
-        lastEvaluatedAt: Date.now()
+        lastEvaluatedAt: clockNow('environmental-hazard')
       });
 
       totalNewErosion += erosionDelta;
@@ -258,10 +258,10 @@
     }
 
     // 若挂载了 metabolism-clock，级联反哺疲劳
-    if (WA.engines && WA.engines.metabolismClock && typeof WA.engines.metabolismClock.accumulateFatigue === 'function') {
+    if (WA.engines && WA.metabolismClock && typeof WA.metabolismClock.accumulateFatigue === 'function') {
       const extraFatigue = Math.round(totalNewErosion * 0.4);
       if (extraFatigue > 0) {
-        WA.engines.metabolismClock.accumulateFatigue(aid, extraFatigue, `hazard_exposure:${pid}`);
+        WA.metabolismClock.accumulateFatigue(aid, extraFatigue, `hazard_exposure:${pid}`);
       }
     }
 

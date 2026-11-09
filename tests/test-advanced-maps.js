@@ -4,6 +4,10 @@
  */
 'use strict';
 const assert = require('assert');
+// v2.380.0（历史欠账消红）：本文件是「纯引擎直跑」老形态，直接 require 引擎而未搭台 ——
+//   引擎头 `const WA = window.WorldAxis = ...` 与 `WA.rand.next(...)` 都需要宿主+随机源。
+//   台子统一收在 tests/host-boot.js（宿主 = mock.js、随机源 = 真 core/rand.js），本文件只调它。
+require('./host-boot.js').boot();
 
 // 1. 测试空间分形拓扑引擎
 require('../engines/spatial-topology.js');

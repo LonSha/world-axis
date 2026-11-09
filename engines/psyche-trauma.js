@@ -29,8 +29,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.340.0';
@@ -62,7 +62,7 @@
       immune: opt.immune === true || opt.stoicSage === true, // 圣贤/道心豁免
       willpowerThreshold: typeof opt.willpowerThreshold === 'number' ? opt.willpowerThreshold : 60.0,
       traumaHistory: Array.isArray(opt.traumaHistory) ? opt.traumaHistory : [],
-      updatedAt: Date.now()
+      updatedAt: clockNow('psyche-trauma')
     };
     _psycheRegistry.set(actorId, record);
     return { ok: true, actorId: actorId, record: record };
@@ -113,7 +113,7 @@
       type: type,
       shock: effectiveShock,
       sourceId: sourceId || 'unknown_origin',
-      timestamp: Date.now()
+      timestamp: clockNow('psyche-trauma')
     });
 
     // 状态转移判定
@@ -130,7 +130,7 @@
       profile.mentalState = 'distressed';
     }
 
-    profile.updatedAt = Date.now();
+    profile.updatedAt = clockNow('psyche-trauma');
 
     return {
       ok: true,
@@ -170,7 +170,7 @@
     profile.obsessionTarget = obsessionTarget || 'nemesis';
     profile.sanityIndex = Math.min(profile.sanityIndex, 30);
     profile.obsessionRating = Math.max(profile.obsessionRating, 85);
-    profile.updatedAt = Date.now();
+    profile.updatedAt = clockNow('psyche-trauma');
 
     return {
       ok: true,
@@ -218,7 +218,7 @@
       profile.mentalState = 'distressed';
     }
 
-    profile.updatedAt = Date.now();
+    profile.updatedAt = clockNow('psyche-trauma');
 
     return {
       ok: true,

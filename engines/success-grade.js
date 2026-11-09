@@ -32,6 +32,7 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_successgrade_settings_v1';
   const DEF = { enabled: false, extremeDiv: 5, hardDiv: 2, lowTargetCut: 50,
     fumbleHighMin: 96, fumbleAt: 100 };
@@ -114,7 +115,7 @@
       spectrum: spectrum,
       cost: cost,
       insight: insight,
-      at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('successGrade') : Date.now()
+      at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('successGrade') : clockNow('success-grade')
     };
   }
   function isInt100(v) { return typeof v === 'number' && isFinite(v) && (v | 0) === v && v >= 1 && v <= 100; }

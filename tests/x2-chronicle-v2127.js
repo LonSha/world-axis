@@ -46,10 +46,18 @@ const ANCHORS = {
   limit: { rel: CH, txt: "const r = chronicle({ limit: 12 });" },
   exp: { rel: CH, txt: "chronicle: chronicle, buildBlock: buildBlock," },
   injBranch: { rel: INJ, txt: "if (vis.chrono && WA.chrono) { const chb = engineCall('chrono', function () { return WA.chrono.buildBlock(); }); if (chb) items.push({ source: '世界编年史', content: chb }); }" },
-  injSrc: { rel: INJ, txt: "'chrono'];" },
+  //   v2.381.0 修正：原锚点是 `'chrono'];`（假定 chrono 是 SOURCES 末项）。V20 OPV20-1 与
+  //   V21 OPV21-2 两批把 epochalTransition…courtIntrigue 共 11 个源追加到 chrono **之后**，
+  //   末项早已易主 ⇒ 锚点在 render/inject.js 命中 0 次（negative-control-audit 报 not-unique）。
+  //   改锚在 narrativeLens → chrono 这一对相邻项上：它只随「chrono 前一行是谁」变化，
+  //   不再依赖「chrono 是不是末项」这个与判据无关的事实。
+  injSrc: { rel: INJ, txt: "'narrativeLens',\n    'chrono'," },
   injName: { rel: INJ, txt: "chrono: '世界编年史'," },
   injMod: { rel: INJ, txt: "worldaxis_chrono_settings_v1'," },
-  panelName: { rel: PANEL, txt: "worldAutobiography: '世界自传' };" },  // EXV7-8 后 VIS_NAMES 末项；与 injName 锚点互不重叠
+  //   v2.381.0 修正：原锚点是 `worldAutobiography: '世界自传' };`（假定它是 VIS_NAMES 末项）。
+  //   V8/V21 两批在该项之后追加了 narrativeLens 与 V20/V21 的显示名 ⇒ 末项易主、命中 0 次。
+  //   改锚为不带尾部 `};` 的项本身，并保留首个冒号上下文，确保在本表内仍唯一。
+  panelName: { rel: PANEL, txt: "worldAutobiography: '世界自传'," },  // 与 injName 锚点互不重叠
   diagRead: { rel: DIAG, txt: "const cr = WA.chrono.chronicle({ limit: 12 });" }
 };
 const TAG = '__x2_2127_';
@@ -169,7 +177,10 @@ function runB(a) {
 function runC(a) {
   // 四处同批登记（v2.56.0 立的规矩）
   const inj = src(INJ), pn = src(PANEL), dg = src(DIAG);
-  a(inj.indexOf('\'chrono\'];') > 0 && inj.indexOf('vis.chrono && WA.chrono') > 0,
+  //   v2.381.0 修正：原判据用 `'chrono'];` 判「源表登记了 chrono」，前提是 chrono 为末项。
+  //   V20/V21 之后末项易主，该串恒不存在 ⇒ 判据恒假（这不是缺陷被发现，是判据自己坏了）。
+  //   改为按 SOURCES 列表内**项形**判定：行首缩进 + 单引号键 + 逗号，且不与分支同名混淆。
+  a(/^\s*'chrono',\s*$/m.test(inj) && inj.indexOf('vis.chrono && WA.chrono') > 0,
     'v2127/x2: [C] 源表与注入分支**同批**登记（只加一边 = 声明了没人消费 / 开关点了零效果）');
   a(hits(inj, 'chrono:') >= 2,
     'v2127/x2: [C] 显示名表与模块开关映射都登记了（缺名 ⇒ 失败台账与开关两面裸露英文键）');
@@ -262,7 +273,9 @@ function runNegative(a) {
   a(probeInjectItem(fresh(over(INJ, n5))) === 0,
     'v2127/x2: [N5] 摘掉注入分支后新源产不出注入项（C 面判据不是恒真）');
   // N6 源表不登记 ⇒ 开关点了零效果（面板根本没有这个开关）
-  const n6 = breakOnce(I0, ANCHORS.injSrc.txt, '\'session\'];', 'N6');
+  //   v2.381.0：破坏串随锚点一起改。锚点现为「narrativeLens → chrono」相邻两行，
+  //   破坏动作 = 把 chrono 那一行整行删掉（只留 narrativeLens），SOURCES 里就真的没有 chrono。
+  const n6 = breakOnce(I0, ANCHORS.injSrc.txt, "'narrativeLens',", 'N6');
   const W6 = fresh(over(INJ, n6));
   reset(W6, ROWS);
   a((W6.render.SOURCES || []).indexOf('chrono') < 0,
@@ -272,7 +285,9 @@ function runNegative(a) {
   a(n7.indexOf('WA.chrono.chronicle(') < 0,
     'v2127/x2: [N7] 诊断不再读 chronicle 时该读数为零（C 面判据不是恒真）');
   // N8 显示名不登记 ⇒ 裸露英文键
-  const n8 = breakOnce(P0, ANCHORS.panelName.txt, 'worldAutoStub: \'世界自传\' };', 'N8');
+  //   v2.381.0：破坏串随锚点一起改（锚点已去掉尾部的 `};`）。
+  //   把 worldAutobiography 那一项的值改成一个不存在的键名 ⇒ 原判据「该键缺失」现形。
+  const n8 = breakOnce(P0, ANCHORS.panelName.txt, "worldAutoStub: '世界自传',", 'N8');
   a(hits(n8, 'worldAutobiography: \'世界自传\'') === 0,
     'v2127/x2: [N8] 面板显示名不登记时该键缺失（C 面判据不是恒真）');
   // N9 纯度：全部负控制跑完后四个真文件逐字未变 + 原版同款判据成立

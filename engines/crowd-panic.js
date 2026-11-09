@@ -17,8 +17,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -96,7 +96,7 @@
       stampedeTriggered: stampedeTriggered,
       participants: new Set(actors),
       casualties: casualties,
-      updatedAt: Date.now()
+      updatedAt: clockNow('crowd-panic')
     };
     _panicZones.set(zoneId, zoneState);
 

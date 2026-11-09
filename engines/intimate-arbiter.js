@@ -16,11 +16,7 @@
 'use strict';
 
 (function () {
-  const WA = (typeof window !== 'undefined' && window.WorldAxis)
-    ? window.WorldAxis
-    : (typeof global !== 'undefined' && global.WorldAxis)
-      ? global.WorldAxis
-      : {};
+  const WA = window.WorldAxis = window.WorldAxis || {};
 
   WA.engines = WA.engines || {};
 
@@ -175,7 +171,7 @@
 
     // 4. 意外检查：激烈抽插姿势偏角导致的【脱出/滑脱】（Slip Out）
     let isSlipOut = false;
-    if (ins.velocity === 'extreme' && !state.lockedState && Math.random() < 0.15) {
+    if (ins.velocity === 'extreme' && !state.lockedState && WA.rand.next('intimate-arbiter') < 0.15) {
       isSlipOut = true;
       notes.push('由于动作剧烈且角度偏差，插入物意外滑脱，节奏短暂脱节。');
     }

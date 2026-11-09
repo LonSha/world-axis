@@ -30,8 +30,7 @@
   'use strict';
 
   const root = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this);
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
 
   const LS_KEY = 'worldaxis_covert_espionage_settings_v1';
@@ -218,17 +217,23 @@
     WA.store.transact(function (draft) {
       const list = getSpies(draft);
       const spy = list.find(function (s) { return s.actorId === spyId || s.coverName === spyId; });
+      // v2.382.0（死键族）：静默轮次自然降疑改由登记的 defaultSuspicionDecay 生效（此前零消费）。
+      //   口径：调用方声明 roundsElapsed（这段潜伏期内未行动），可疑度按每轮固定量回落。
+      const quietRounds = Math.max(0, Math.floor(Number(spec.roundsElapsed) || 0));
+      if (spy && quietRounds > 0) {
+        spy.suspicion = clamp(spy.suspicion - (Number(settings().defaultSuspicionDecay) || 0) * quietRounds, 0, 100);
+      }
 
       if (!spy) {
         noteFault('spy-not-found');
         result = { ok: false, reason: 'spy-not-found', spyId: spyId };
-        return;
+        return false;
       }
 
       if (spy.status === 'captured') {
         noteFault('spy-captured');
         result = { ok: false, reason: 'spy-captured-cannot-act', spyId: spyId };
-        return;
+        return false;
       }
 
       const now = clockNow('covertEspionage');
@@ -242,7 +247,7 @@
         if (!targetLocation) {
           noteFault('missing-location');
           result = { ok: false, reason: 'missing-location' };
-          return;
+          return false;
         }
 
         // 真实破坏性负控制门禁：掩护完整度为 0 且无文牒强行潜入高戒备据点 -> 必当场识破抓捕
@@ -272,7 +277,9 @@
         stat.infiltrations++;
 
         // 检查是否超出阈值暴露
-        const exposed = spy.suspicion >= spy.coverIntegrity;
+        // v2.382.0（死键族）：暴露阈值比例改由登记的 exposureThresholdRatio 生效（此前零消费）。
+        //   默认 1.0 ⇒ 与旧判据完全等价；调低则该间谍更早暴露（掩护耐久被更快吃穿）。
+        const exposed = spy.suspicion >= spy.coverIntegrity * (Number(settings().exposureThresholdRatio) || 1);
         if (exposed) {
           spy.status = 'exposed';
           stat.exposures++;
@@ -300,14 +307,14 @@
         if (!assetTarget) {
           noteFault('missing-target-asset');
           result = { ok: false, reason: 'missing-target-asset' };
-          return;
+          return false;
         }
 
         // 负控制：空头支票利诱（贿赂额 <= 0 且方法为 bribe）拦截
         if (method === 'bribe' && bribeAmount <= 0) {
           noteFault('invalid-bribe-amount');
           result = { ok: false, reason: 'invalid-bribe-amount', refusal: 'bribe-requires-funds' };
-          return;
+          return false;
         }
 
         let baseLoyalty = 60;
@@ -357,10 +364,10 @@
           if (!spec.content) {
             noteFault('dispatch-not-found');
             result = { ok: false, reason: 'dispatch-not-found', dispatchId: dispatchId };
-            return;
+            return false;
           }
           dispatch = {
-            id: dispatchId || ('disp-' + now + '-' + Math.floor(Math.random() * 1000)),
+            id: dispatchId || ('disp-' + now + '-' + Math.floor(WA.rand.next('covert-espionage') * 1000)),
             sender: cleanStr(spec.sender || 'unknown', 50),
             recipient: cleanStr(spec.recipient || 'unknown', 50),
             content: cleanStr(spec.content, 200),
@@ -368,6 +375,8 @@
             createdAt: now
           };
           dispatches.push(dispatch);
+          // v2.382.0（死键族）：密函数量上限改由登记的 maxDispatches 生效（此前零消费）。
+          while (dispatches.length > settings().maxDispatches) dispatches.shift();
         }
 
         dispatch.intercepted = true;
@@ -405,7 +414,7 @@
         if (!targetFaction || !rumor) {
           noteFault('missing-disinformation-params');
           result = { ok: false, reason: 'missing-disinformation-params' };
-          return;
+          return false;
         }
 
         spy.disinformationCount = (spy.disinformationCount || 0) + 1;
@@ -517,7 +526,7 @@
     WA.store.transact(function (draft) {
       const dispatches = getDispatches(draft);
       const now = clockNow('covertEspionage:ingest');
-      const dispatchId = 'wiretap_' + now + '_' + Math.random().toString(36).slice(2, 6);
+      const dispatchId = 'wiretap_' + now + '_' + WA.rand.next('covert-espionage').toString(36).slice(2, 6);
       const entry = {
         dispatchId: dispatchId,
         sourceChannel: channel,

@@ -30,8 +30,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.350.0';
@@ -56,9 +56,14 @@
     }
   };
 
+  // v2.381.0: 此处原本读 WA.stagePresence.__customSettings —— 但本函数定义在
+  //   `WA.stagePresence = api` 之前，模块内调用时 WA.stagePresence 恒为 undefined
+  //   （只有外部/测试先行注入才可能命中）。改为读模块内的覆盖变量，
+  //   并由 api.__customSettings 的 setter 同步写入，保持既有注入通路可用。
+  let _customSettings = null;
   function settings() {
-    if (WA.stagePresence && WA.stagePresence.__customSettings) {
-      return Object.assign({}, DEF, WA.stagePresence.__customSettings);
+    if (_customSettings) {
+      return Object.assign({}, DEF, _customSettings);
     }
     if (!WA.settingsBus) return Object.assign({}, DEF);
     const raw = WA.settingsBus.read(__REG);
@@ -175,7 +180,7 @@
           ps.lastSeenActors[name] = {
             round: ps.currentRound,
             status: 'onstage',
-            at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('stagePresence') : Date.now()
+            at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('stagePresence') : clockNow('stage-presence')
           };
           // 若之前在 offstageLife 中登记，重归正文后重置其 roundsAway
           if (draft.offstageLife && draft.offstageLife.characters && draft.offstageLife.characters[name]) {
@@ -189,7 +194,7 @@
             ps.lastSeenActors[name] = {
               round: 0,
               status: 'offstage',
-              at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('stagePresence') : Date.now()
+              at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('stagePresence') : clockNow('stage-presence')
             };
           } else {
             ps.lastSeenActors[name].status = 'offstage';
@@ -212,12 +217,24 @@
                 roundsAway: 1,
                 misadventures: [],
                 reunionGossip: '',
-                offstageSince: Date.now(),
-                lastTickAt: Date.now()
+                offstageSince: clockNow('stage-presence'),
+                lastTickAt: clockNow('stage-presence')
               };
             }
           }
         });
+
+        // v2.382.0（死键族）：追踪角色规模改由登记的 maxTrackedActors 生效（此前零消费）。
+        //   超限时按登记轮次最旧者挤出 —— 否则 lastSeenActors 会随出场人数无界增长。
+        const seenKeys = Object.keys(ps.lastSeenActors || {});
+        if (seenKeys.length > cfg.maxTrackedActors) {
+          seenKeys.sort(function (a, b) {
+            return ((ps.lastSeenActors[a] || {}).round || 0) - ((ps.lastSeenActors[b] || {}).round || 0);
+          });
+          seenKeys.slice(0, seenKeys.length - cfg.maxTrackedActors).forEach(function (k) {
+            delete ps.lastSeenActors[k];
+          });
+        }
 
         stat.scans++;
         stat.onstageCount = onstage.length;
@@ -263,7 +280,7 @@
 
         // 离场轮次累加
         card.roundsAway = (card.roundsAway || 0) + 1;
-        card.lastTickAt = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('stagePresence') : Date.now();
+        card.lastTickAt = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('stagePresence') : clockNow('stage-presence');
 
         const genre = card.genre || 'generic';
         const genreData = (presetPool && presetPool[genre]) ? presetPool[genre] : (presetPool && presetPool.generic);
@@ -290,9 +307,9 @@
 
         // 概率触发题材生活小糗事/市井小插曲 (misadventures)
         const misChance = cfg.misadventureChance || 0.35;
-        if (Math.random() < misChance && genreData && Array.isArray(genreData.misadventures) && genreData.misadventures.length > 0) {
+        if (WA.rand.next('stage-presence') < misChance && genreData && Array.isArray(genreData.misadventures) && genreData.misadventures.length > 0) {
           const pool = genreData.misadventures;
-          const chosen = pool[Math.floor(Math.random() * pool.length)];
+          const chosen = pool[Math.floor(WA.rand.next('stage-presence') * pool.length)];
           if (chosen && card.misadventures.indexOf(chosen) < 0) {
             card.misadventures = (card.misadventures || []).concat([chosen]).slice(-5);
             card.reunionGossip = chosen;
@@ -437,8 +454,17 @@
     tickOffstageAutonomy: tickOffstageAutonomy,
     awakenReunion: awakenReunion,
     buildPresenceBlock: buildPresenceBlock,
-    stat: function () { return Object.assign({}, stat); }
+    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
+  // v2.381.0: 把 __customSettings 接到模块闭包里的覆盖变量上。
+  //   此前它是「凭空读一个不存在的属性」，测试却照样往 api 上写它 ——
+  //   写进去对 settings() 完全无影响（两套真源）。现在读写同源。
+  Object.defineProperty(WA.stagePresence, '__customSettings', {
+    configurable: true,
+    enumerable: false,
+    get: function () { return _customSettings; },
+    set: function (v) { _customSettings = (v && typeof v === 'object') ? v : null; }
+  });
 
   if (typeof WA.registerModule === 'function') {
     WA.registerModule('engines/stage-presence.js', { kind: 'engine', ver: VERSION });

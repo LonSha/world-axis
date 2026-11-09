@@ -7,6 +7,9 @@
 //   collab.flush / liaison.advance / beatMask.due / beatFacade.run / ensemble.run / cyberUI.progress。
 //   立项数字偏大在于把「仅自调」与「被 dispatch 注册表引用」也算进了零调用。
 //   本锁的口径是**真零调用**：产品面里不存在 `WA.ns.method(` 或 `ns.method(` 形式的调用点。
+//   v2.382.0 口径跟位：与 `v11-push-api-coverage.js` 同源，扫描前先剥掉注释与字符串字面量
+//   （否则 `ui/panel.js` 里给玩家看的 `WorldAxis.clock.advance()` 说明文字、
+//   `engines/bridge.js` 的 `clockNow('bridge.refresh')` 站点标签都会被读成调用点）。
 //
 // 【判据】
 //   A1  登记表键集 == 现场真零调用集（双向：表多一条、现场多一条，都红）。
@@ -49,8 +52,26 @@ function productSources() {
   });
   return out;
 }
+function stripLiterals(s) {
+  let out = '', i = 0;
+  const n = s.length;
+  while (i < n) {
+    const c = s[i], d = s[i + 1];
+    if (c === '/' && d === '/') { while (i < n && s[i] !== '\n') i++; continue; }
+    if (c === '/' && d === '*') { i += 2; while (i < n && !(s[i] === '*' && s[i + 1] === '/')) i++; i += 2; continue; }
+    if (c === '"' || c === "'" || c === '`') {
+      const q = c; i++;
+      while (i < n) { if (s[i] === '\\') { i += 2; continue; } if (s[i] === q) { i++; break; } i++; }
+      out += '""'; continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
 function liveZeroCall(WA) {
-  const srcs = productSources();
+  const raw = productSources();
+  const srcs = {};
+  Object.keys(raw).forEach(function (f) { srcs[f] = stripLiterals(raw[f]); });
   const cand = [];
   Object.keys(WA).forEach(function (ns) {
     const m = WA[ns];
@@ -205,7 +226,7 @@ function runAll(a) {
   {
     const s = R.stat();
     const sum = R.CLASSES.reduce(function (n, c) { return n + (s.byClass[c] || 0); }, 0);
-    a(s.total === 21, 'v11push: [A10a] 登记总数 == 18（实 ' + s.total + '）');
+    a(s.total === 19, 'v11push: [A10a] 登记总数 == 19（实 ' + s.total + '）');
     a(sum === s.total, 'v11push: [A10b] 各裁决之和 == 总数（' + sum + ' vs ' + s.total + '）');
   }
 }

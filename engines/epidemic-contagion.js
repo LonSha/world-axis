@@ -30,8 +30,7 @@
   'use strict';
 
   const root = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this);
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
 
   const LS_KEY = 'worldaxis_epidemic_contagion_settings_v1';
@@ -136,6 +135,11 @@
       const outbreaks = getOutbreaks(draft);
       let record = outbreaks[loc];
 
+      if (!record && Object.keys(outbreaks).length >= Math.max(1, Math.floor(settings().maxSettlements))) {
+        noteFault('settlement-capacity');
+        result = { ok: false, reason: 'settlement-capacity' };
+        return;
+      }
       if (!record) {
         // 如果初次创建但完全没有传染源（exposed + infectious == 0）
         if (initialExposed === 0 && initialInfectious === 0) {
@@ -147,7 +151,7 @@
             locationId: loc,
             message: '该区域无任何初始感染者或输入病原，未爆发疫情。'
           };
-          return;
+          return false;
         }
 
         record = {
@@ -201,7 +205,7 @@
       const transmissionRate = (record.effectiveR / 3.0);
       const newExposed = Math.min(S, Math.floor((transmissionRate * S * I) / Math.max(1, record.totalPop)));
       // 潜伏期发病 (1/3 的 E 转化为 I)
-      const newInfectious = Math.min(E, Math.max(1, Math.floor(E * 0.35)));
+      const newInfectious = Math.min(E, Math.max(1, Math.floor(E / Math.max(1, Number(settings().defaultIncubationDays) || 3))));
       // 康复或病亡 (15% 的 I 康复，5% 的 I 病亡)
       const newRecovered = Math.floor(I * 0.15);
       const fatalityRate = clamp(sp.fatalityRate || 0.05, 0.01, 0.5);
@@ -317,7 +321,7 @@
     }
 
     // 非完全隔离，存在暴露概率
-    const infected = record.infectious > 0 && Math.random() < (record.effectiveR / 5.0);
+    const infected = record.infectious > 0 && WA.rand.next('epidemic-contagion') < (record.effectiveR / 5.0);
     return {
       ok: true,
       subjectId: subjectId,

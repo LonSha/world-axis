@@ -22,8 +22,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
   const VERSION = '2.340.0';
 
@@ -58,7 +58,7 @@
       countdownTurns: _clamp(opt.countdownTurns || 3, 1, 10),
       isCollapsed: !!opt.isCollapsed,
       hasMasterKey: !!opt.hasMasterKey,
-      updatedAt: Date.now()
+      updatedAt: clockNow('ruin-mechanism')
     };
     _ruins.set(id, state);
     return { ok: true, mechanism: JSON.parse(JSON.stringify(state)) };
@@ -153,7 +153,7 @@
       }
     }
 
-    ruin.updatedAt = Date.now();
+    ruin.updatedAt = clockNow('ruin-mechanism');
     return result;
   }
 

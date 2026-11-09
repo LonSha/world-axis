@@ -80,19 +80,22 @@
     const stockRatio = Math.max(0, currentStock / Math.max(1, safetyStock));
 
     // 物价通胀因子：库存越低，通胀倍数越高（最高可达 maxInflationFactor）
-    let inflationFactor = 1.0;
+    // v2.382.0（死键族）：通胀基准改由登记的 baseInflationFactor 生效 —— 此前基准与夹取下界
+    //   都写死 1.0，设置里的 baseInflationFactor 从未被读取（改它不会让任何一次评估变化）。
+    const baseFactor = Number(cfg.baseInflationFactor) || 1.0;
+    let inflationFactor = baseFactor;
     let shortageSeverity = 'normal';
     if (stockRatio <= 0.25) {
       shortageSeverity = 'critical_scarcity';
       inflationFactor = cfg.maxInflationFactor;
     } else if (stockRatio < 0.5) {
       shortageSeverity = 'severe_shortage';
-      inflationFactor = 1.0 + (1.0 - stockRatio) * 2.5;
+      inflationFactor = baseFactor + (baseFactor - stockRatio * baseFactor) * 2.5;
     } else if (stockRatio < 0.8) {
       shortageSeverity = 'mild_shortage';
-      inflationFactor = 1.0 + (1.0 - stockRatio) * 1.0;
+      inflationFactor = baseFactor + (1.0 - stockRatio) * baseFactor;
     }
-    inflationFactor = +Math.min(cfg.maxInflationFactor, Math.max(1.0, inflationFactor)).toFixed(2);
+    inflationFactor = +Math.min(cfg.maxInflationFactor, Math.max(baseFactor, inflationFactor)).toFixed(2);
     const inflatedPrice = +(basePrice * inflationFactor).toFixed(2);
     const blackMarketMargin = +(inflationFactor * 1.5).toFixed(2); // 黑市溢价倍数
 
@@ -122,7 +125,7 @@
     const cfg = settings();
     if (!cfg.enabled) return { ok: false, reason: 'disabled' };
     const s = spec || {};
-    const rid = clean(s.id || ('route_contra_' + Date.now()), 60);
+    const rid = clean(s.id || ('route_contra_' + clockNow('contraband')), 60);
     const from = clean(s.from, 40);
     const to = clean(s.to, 40);
     const res = clean(s.resource, 40);
@@ -194,7 +197,7 @@
     }
 
     // 巡防判定：投骰与风险率对抗
-    const rollVal = evasionRoll !== null ? evasionRoll : Math.floor(Math.random() * 100) + 1;
+    const rollVal = evasionRoll !== null ? evasionRoll : Math.floor(WA.rand.next('contraband') * 100) + 1;
     const isBusted = rollVal <= route.riskRate;
 
     let out = null;

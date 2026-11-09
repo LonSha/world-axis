@@ -22,8 +22,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
   const VERSION = '2.340.0';
 
@@ -57,7 +57,7 @@
         master: { minMerit: 2000, title: '宗师/长老' }
       },
       candidates: new Map(),
-      updatedAt: Date.now()
+      updatedAt: clockNow('bureaucracy-ascension')
     };
     _orgs.set(id, state);
     return { ok: true, org: { orgId: id, nepotismBias: state.nepotismBias } };
@@ -132,7 +132,7 @@
       result.summary = `${candId} 虽有微功但资历名望尚浅，经长老会商议暂缓晋升。`;
     }
 
-    org.updatedAt = Date.now();
+    org.updatedAt = clockNow('bureaucracy-ascension');
     return result;
   }
 

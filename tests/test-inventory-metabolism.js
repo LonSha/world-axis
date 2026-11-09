@@ -4,6 +4,8 @@
  */
 'use strict';
 const assert = require('assert');
+// v2.380.0（历史欠账消红）：纯引擎直跑老形态，需先搭宿主台子（宿主 = mock.js、随机源 = 真 core/rand.js）。
+require('./host-boot.js').boot();
 
 // 1. 加载随身行囊引擎
 require('../engines/personal-inventory.js');

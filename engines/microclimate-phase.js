@@ -20,8 +20,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -48,7 +48,7 @@
       visibilityFactor: typeof opt.visibilityFactor === 'number' ? opt.visibilityFactor : 1.0, // 能见度系数 (0.0 彻底失明 ~ 1.0 清晰)
       dragPenalty: typeof opt.dragPenalty === 'number' ? opt.dragPenalty : 0.0, // 移速延时/体力惩罚
       activeFire: Boolean(opt.activeFire),
-      lastUpdated: Date.now()
+      lastUpdated: clockNow('microclimate-phase')
     };
     _nodeMedia.set(nodeId, state);
     return { ok: true, nodeMedium: Object.assign({}, state) };
@@ -133,7 +133,7 @@
       }
     }
 
-    state.lastUpdated = Date.now();
+    state.lastUpdated = clockNow('microclimate-phase');
 
     return {
       ok: true,

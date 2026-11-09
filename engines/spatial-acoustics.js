@@ -31,7 +31,14 @@
     barrier = barrier || {};
     _roomPartitions.set(key, {
       type: barrier.type || 'door', // door | wall | screen | open
-      damping: barrier.damping != null ? barrier.damping : (barrier.type === 'wall' ? 0.90 : (barrier.type === 'screen' ? 0.25 : 0.65)),
+      // v2.382.0（死键族）：墙/屏/门三档默认衰减改由登记的 baseWallDamping / baseScreenDamping /
+      //   baseDoorDamping 决定。此前只有 baseDoorDamping 被 getPartition 读到，另两个声明了却零消费，
+      //   真正生效的是这行三元里的硬编码 0.90 / 0.25 —— 改设置对隔墙窃听毫无影响。默认值等同旧字面量。
+      damping: barrier.damping != null ? barrier.damping : (function () {
+        const ac = settings();
+        return barrier.type === 'wall' ? ac.baseWallDamping
+          : (barrier.type === 'screen' ? ac.baseScreenDamping : ac.baseDoorDamping);
+      })(),
       occluded: barrier.occluded !== false,
       locked: !!barrier.locked
     });

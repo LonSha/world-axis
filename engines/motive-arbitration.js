@@ -91,9 +91,14 @@
     if (!person) return null;
     const f = facts || {};
     let stamina = (person.resources && person.resources.stamina != null) ? Number(person.resources.stamina) : null;
-    if (stamina == null && WA.survival && typeof WA.survival.rowOf === 'function' && person.id) {
-      const sRow = WA.survival.rowOf(person.id);
-      if (sRow && sRow.stamina != null) stamina = Number(sRow.stamina);
+    // v2.381.0: survival 从未导出 rowOf —— 真源是 read(who)，读口是 read().stamina.value。
+    //   此前探测恒 false，于是「动机仲裁前先按生理精力做硬熔断」这条链路
+    //   完全拿不到 survival 的精力值，只能依赖调用方自己塞进 person.resources。
+    if (stamina == null && WA.survival && typeof WA.survival.read === 'function' && person.id) {
+      const sRow = WA.survival.read(person.id);
+      if (sRow && sRow.ok && sRow.stamina && typeof sRow.stamina.value === 'number') {
+        stamina = Number(sRow.stamina.value);
+      }
     }
     const stress = (person.stress != null) ? Number(person.stress) : ((f.stress != null) ? Number(f.stress) : 0);
     const trauma = (person.trauma != null) ? Number(person.trauma) : ((f.trauma != null) ? Number(f.trauma) : 0);

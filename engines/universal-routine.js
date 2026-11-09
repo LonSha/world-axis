@@ -25,8 +25,8 @@
 
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -124,7 +124,7 @@
       slots: Object.assign({}, baseArch, scheduleConfig.customSlots || {}),
       deviation: null, // { kind, customActivity, targetZone, expiresAt }
       willingness: Number.isFinite(Number(scheduleConfig.willingness)) ? Number(scheduleConfig.willingness) : 80,
-      updatedAt: Date.now()
+      updatedAt: clockNow('universal-routine')
     };
 
     _actorRoutines.set(aid, profile);
@@ -151,7 +151,7 @@
       kind: dk,
       customActivity: act,
       targetZone: tz,
-      setAt: Date.now()
+      setAt: clockNow('universal-routine')
     };
 
     return { ok: true, actorId: aid, deviation: profile.deviation };
@@ -260,7 +260,7 @@
     profile.deviation = {
       type: devType,
       reason: reason || 'stress_induced_defiance',
-      deviatedAt: Date.now(),
+      deviatedAt: clockNow('universal-routine'),
       targetNode: opt.targetNode || 'safe_house_bunker'
     };
 

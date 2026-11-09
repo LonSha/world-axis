@@ -21,8 +21,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -48,7 +48,7 @@
       coverHp: hp,
       maxHp: hp,
       destroyed: false,
-      lastUpdated: Date.now()
+      lastUpdated: clockNow('cover-ballistics')
     };
     _coverNodes.set(nodeId, cover);
     return { ok: true, cover: Object.assign({}, cover) };

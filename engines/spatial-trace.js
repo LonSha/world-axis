@@ -20,8 +20,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.328.0';
@@ -67,7 +67,7 @@
 
       const spec = TRACE_SPECS[type] || { name: type, halfLife: 4.0, sensory: 'sight', desc: '不明物理残留' };
       const trace = {
-        id: 'tr_' + Math.random().toString(36).slice(2, 9),
+        id: 'tr_' + WA.rand.next('spatial-trace').toString(36).slice(2, 9),
         type,
         name: spec.name,
         sensory: spec.sensory,
@@ -76,7 +76,7 @@
         initialStrength: typeof opts.initialStrength === 'number' ? Math.max(0.1, Math.min(1.0, opts.initialStrength)) : 1.0,
         halfLifeHours: spec.halfLife,
         createdHour: typeof opts.createdHour === 'number' ? opts.createdHour : 12.0,
-        createdAt: Date.now()
+        createdAt: clockNow('spatial-trace')
       };
 
       state.tracesByNode[nodeId].push(trace);

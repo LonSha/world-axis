@@ -1136,7 +1136,12 @@
       const use = WA.ui.usageStat(), calls = use.controls || {};
       const rows = [];
       UI_BINDINGS.forEach(function (g) {
-        ['ids', 'cond', 'dynamic'].forEach(function (layer) {
+        // v2.382.0：四层必须全遍历。此前只走 ids/cond/dynamic，于是 v2.381.0 新增的
+        //   `player` 层那三枚（wa-set-devmode / wa-set-simple-mode / wa-set-simple-save）
+        //   在「控件使用统计」里**整条不出现**——不是读数偏差，是这三枚永远进不了
+        //   `zero` 名单，于是「渲染了但没人点」这类缺陷在这层永远查不出来。
+        //   `layer` 字段原样报 'player'，读者据此知道「它在玩家面，开发者面本就不该有」。
+        ['ids', 'cond', 'dynamic', 'player'].forEach(function (layer) {
           (g[layer] || []).forEach(function (entry) {
             const id = typeof entry === 'string' ? entry : entry.id;
             if (id) rows.push({ page: g.page, id: id, layer: layer, calls: calls[id] || 0 });
@@ -3392,6 +3397,25 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   守卫与契约面同时看不见它，而专锁照绿）。
     'engines/world-autobiography.js': 'worldAutobiography',
     'engines/player-archive.js': 'playerArchive',
+    // v2.381.0（诊断清单全部磁盘模块收口）：12 个漏登记模块。
+    //   判据是 tests/run.js 的「诊断清单覆盖全部磁盘模块」——它按 core/engines/actors/
+    //   direction/render/compat/ui 七个目录逐个 listdir 再与本表求差集。本批 12 个全部
+    //   是**引擎已落地、注入链已接、本表未登记**：后果不是「少一行字」，而是它们在
+    //   inventory 的定义面上不存在——而 inventory 正是出口面契约与死子面账本的唯一来源。
+    //   更直接的后果是自检（secModules / 诊断包）看不见它们：模块装载失败、契约漂移
+    //   这两类故障对它们**没有出口**。ns 名逐一取自各文件 `WA.<ns> = ` 的实测导出面。
+    'core/unified-pending.js': 'unifiedPending',
+    'engines/bloodline-heritage.js': 'bloodlineHeritage',
+    'engines/cataclysm-hazard.js': 'cataclysmHazard',
+    'engines/court-intrigue.js': 'courtIntrigue',
+    'engines/dungeon-hazard-mesh.js': 'dungeonHazardMesh',
+    'engines/ecosystem-cascade.js': 'ecosystemCascade',
+    'engines/engineering-blueprint.js': 'engineeringBlueprint',
+    'engines/epochal-transition.js': 'epochalTransition',
+    'engines/financial-contagion.js': 'financialContagion',
+    'engines/incarceration-jailbreak.js': 'incarcerationJailbreak',
+    'engines/regiment-tactics.js': 'regimentTactics',
+    'engines/theology-cult.js': 'theologyCult',
     // v2.352.0: V19 史诗新引擎与跨四层调度总线系统全量补齐登记
     'engines/alchemy-toxicology.js': 'alchemyToxicology',
     'engines/anomaly-mutation.js': 'anomalyMutation',
@@ -3986,7 +4010,45 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   后果正是本表注释写的那个：inventory 的定义面与出口面契约都从本表取，
     //   漏了就等于它在定义面上不存在（自检看不见的黑盒）—— 回归里
     //   「store 台账的每个归因来源都有可读标签（实缺 1：playerArchive）」就是它现形。
-    'engines/player-archive.js': 'playerArchive'
+    'engines/player-archive.js': 'playerArchive',
+    // v2.381.0（诊断清单全部磁盘模块收口）：12 个漏登记模块。
+    //   判据是 tests/run.js 的「诊断清单覆盖全部磁盘模块」——它按 core/engines/actors/
+    //   direction/render/compat/ui 七个目录逐个 listdir 再与本表求差集。本批 12 个全部
+    //   是**引擎已落地、注入链已接、本表未登记**：后果不是「少一行字」，而是它们在
+    //   inventory 的定义面上不存在——而 inventory 正是出口面契约与死子面账本的唯一来源。
+    //   更直接的后果是自检（secModules / 诊断包）看不见它们：模块装载失败、契约漂移
+    //   这两类故障对它们**没有出口**。ns 名逐一取自各文件 `WA.<ns> = ` 的实测导出面。
+    'core/unified-pending.js': 'unifiedPending',
+    'engines/bloodline-heritage.js': 'bloodlineHeritage',
+    'engines/cataclysm-hazard.js': 'cataclysmHazard',
+    'engines/court-intrigue.js': 'courtIntrigue',
+    'engines/dungeon-hazard-mesh.js': 'dungeonHazardMesh',
+    'engines/ecosystem-cascade.js': 'ecosystemCascade',
+    'engines/engineering-blueprint.js': 'engineeringBlueprint',
+    'engines/epochal-transition.js': 'epochalTransition',
+    'engines/financial-contagion.js': 'financialContagion',
+    'engines/incarceration-jailbreak.js': 'incarcerationJailbreak',
+    'engines/regiment-tactics.js': 'regimentTactics',
+    'engines/theology-cult.js': 'theologyCult',
+    // v2.381.0（诊断清单全部磁盘模块收口）：12 个漏登记模块。
+    //   判据是 tests/run.js 的「诊断清单覆盖全部磁盘模块」——它按 core/engines/actors/
+    //   direction/render/compat/ui 七个目录逐个 listdir 再与本表求差集。本批 12 个全部
+    //   是**引擎已落地、注入链已接、本表未登记**：后果不是「少一行字」，而是它们在
+    //   inventory 的定义面上不存在——而 inventory 正是出口面契约与死子面账本的唯一来源。
+    //   更直接的后果是自检（secModules / 诊断包）看不见它们：模块装载失败、契约漂移
+    //   这两类故障对它们**没有出口**。ns 名逐一取自各文件 `WA.<ns> = ` 的实测导出面。
+    'core/unified-pending.js': 'unifiedPending',
+    'engines/bloodline-heritage.js': 'bloodlineHeritage',
+    'engines/cataclysm-hazard.js': 'cataclysmHazard',
+    'engines/court-intrigue.js': 'courtIntrigue',
+    'engines/dungeon-hazard-mesh.js': 'dungeonHazardMesh',
+    'engines/ecosystem-cascade.js': 'ecosystemCascade',
+    'engines/engineering-blueprint.js': 'engineeringBlueprint',
+    'engines/epochal-transition.js': 'epochalTransition',
+    'engines/financial-contagion.js': 'financialContagion',
+    'engines/incarceration-jailbreak.js': 'incarcerationJailbreak',
+    'engines/regiment-tactics.js': 'regimentTactics',
+    'engines/theology-cult.js': 'theologyCult'
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
   // v2.152.0：新增 ui 模块（ui/render-perf.js）同步进本名单 —— 漏登记的后果不是「少一行字」，
@@ -4765,7 +4827,15 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'wa-ck-out',
       // v2.301.0（EXV11-1/3）：开局页与驱动页的动态输出/按钮（setOut 动态写入 + 刷新按钮）。
       'wa-boot-out', 'wa-drive-view', 'wa-drive-out'] },
-    { page: 'overview', ids: ['wa-setting-search'], dynamic: ['wa-setting-search-count'] },
+    { page: 'overview', ids: ['wa-setting-search'],
+      // v2.380.0（幽灵引用治理批次⑦）：V19/V20/V21 三个跨版本态势大盘**真挂进概览页**
+      //   之后，其内层折叠 id 由渲染函数的 `wrap.innerHTML` 生成（只有函数被真调用才成树）。
+      //   静态正则抓得到它们，守卫表却一条没登记 ⇒「渲染了却没登记」那一面整片放行。
+      //   档位取 dynamic 而非 ids：判据比的是**调用点**（`__dashboardBlock('renderXxx', …)`
+      //   的调用串里带着渲染函数名），不是静态字面量 id —— 这正是不把「静态看不到」
+      //   当成「没渲染」的那条口径（与 v2.294.0 的 wa-prof-* 同规）。
+      dynamic: ['wa-setting-search-count',
+        'wa-epoch-holomap', 'wa-cataclysm-holomap', 'wa-finance-holomap', 'wa-theology-hub', 'wa-regiment-hub', 'wa-prison-hub', 'wa-bloodline-hub', 'wa-engineering-hub', 'wa-dungeon-hub', 'wa-eco-hub', 'wa-court-hub', 'wa-trauma-fold', 'wa-blackmarket-fold', 'wa-shadow-network-fold', 'wa-naval-fold'] },
     { page: 'world', ids: [], cond: ['wa-current-auto-on','wa-current-auto-turns'] },
     { page: 'inject', ids: [], cond: ['wa-collector-enabled','wa-collector-tokens','wa-changes-enabled','wa-budget-source-board'] },
     { page: 'tools', ids: [], cond: ['wa-par-round','wa-par-continue'] },
@@ -4775,6 +4845,24 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   三件齐做，否则「按钮渲染了但绑定的 id 写错」永远不会被守卫表发现。
       //   wa-wdesk-ports / wa-wdesk-out 是输出区（同 v2.151.0 wa-ot-out 的口径：面板回显，也登记）。
       'wa-wdesk-ports', 'wa-wdesk-out'] },
+    // v2.382.0（幽灵引用治理批次⑦）：**开局页 / 驱动页**——v2.301.0（V11 EXV11-1/-3）加了两页
+    //   却漏了这一步登记，于是这两个页面的控件全部落在守卫表之外，直到本版被 C11 判据抓到。
+    //   为什么漏了整整一版都没人发现：C11 那条判据当时把 `ui/panel.js` 的 `const CATS`（分类清单）
+    //   也当成页清单读，于是它**恒报** `core/workshop/meta/all` 四个「未覆盖」——那四个 id 根本
+    //   不是页。一批假红挡在前面，真未覆盖的 `boot`/`drive` 就没人往下看了。本版先修判据
+    //   （只从 `const PAGES` 段取页 id）才让这两页现形：**假红会把真红藏起来**，这是代价。
+    //   登记口径与 desk 页同源：三枚都是本页**静态渲染**的控件（`renderBootDesk` 尾部的
+    //   `wa-boot-out`，`renderDriveDesk` 的 `wa-drive-view` / `wa-drive-out`），不走动态拼接，
+    //   故进 `ids` 而非 `dynamic`。
+    //   关于降级分支（必须写明，否则后续维护者会误判成「漏登记」）：两个渲染函数都有
+    //   「模块缺席 ⇒ 提前返回占位」的短路（`playableBlueprint` / `l3Registry`+`roundDrivers`），
+    //   短路时不渲染这三枚。这与 desk 页 `writeDesk` 缺席时的形态**逐字同构**，而 desk 的
+    //   `wa-wdesk-*` 同样在 `ids` 层——故本组按同口径处理，不为降级分支单独开 cond 层。
+    //   依据是 `ids` 的语义边界：它钉的是「在本页正常态下它就该在」，不是「任何缺席分支下
+    //   它都必须在」。真要把「模块缺席」也当判据面，那是 `secModules` / 能力清单的活，
+    //   不是守卫表的活（混进来会让守卫表对每台引擎的开关状态敏感，反而变成噪声源）。
+    { page: 'boot', ids: ['wa-boot-out'] },
+    { page: 'drive', ids: ['wa-drive-view', 'wa-drive-out'] },
     { page: 'world', ids: ['wa-set-clock', 'wa-cal-auto', 'wa-bg', 'wa-save-bg', 'wa-next-day', 'wa-wb-trigger', 'wa-wb-refresh', 'wa-wb-preview', 'wa-wb-scan', 'wa-wb-list', 'wa-wb-out'], dynamic: ['wa-conc-v'] },
     { page: 'people', ids: ['wa-ll-enabled', 'wa-ll-id', 'wa-ll-due', 'wa-ll-promise', 'wa-ll-sweep', 'wa-ll-out', 'wa-org-enabled', 'wa-org-kind', 'wa-org-name', 'wa-org-item', 'wa-org-qty', 'wa-org-to-kind', 'wa-org-to-name', 'wa-org-grant', 'wa-org-transfer', 'wa-org-check', 'wa-org-ledger', 'wa-org-out',
        // v2.94.0（O6）：流水导出 / 带外对账 / 经济风三控件。同 v2.51.0 的理由——新控件必须
@@ -5397,14 +5485,25 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.255.0（SIMPLIFY-NAV）：界面分区的开发者模式开关（设置页）。同一页同一纪律：
       //   渲染（ui/settings.js 的「界面」分区）+ 绑定（bind 的 #wa-set-devmode onchange）+
       //   守卫登记（本行）三件齐做 —— 漏登记的表现是 ui-gate 的「每个控件都在守卫表内」红灯。
-      'wa-set-devmode',
+      //   v2.381.0 收口：**它只由玩家分支渲染**（开发者分支里没有它 —— 开了开发者模式就不需要
+      //   「显示高级设置」这个入口了），故移入 player 层。留在 ids 里等于要求「两种模式下都在」，
+      //   而它在开发者模式下**本来就不该存在**。这是一条恒假的判据，不是控件丢了。
       // v2.273.0（V6 拓展线）：设置页档位面读数 span/出口 + 动线导航条。
       //   档位四条与 `wa-rc-topnv` 同规格（滑块读数 span 必须与滑块同列）；
       //   动线导航条是 v2.262.0（OPV6-7）引入、此前一直在守卫表之外。
       'wa-set-tier-now', 'wa-set-tier-gap', 'wa-set-tier-hold', 'wa-set-tier-out',
+      // v2.380.0（幽灵引用治理批次⑦）：玩家模式（出厂 devMode:false）下由
+      //   `playerSettingsHtml()` 渲染的「世界节奏」两枚控件此前没登记。它们**恒渲染**
+      //   （不挂 cond / dynamic）：玩家一进设置页就看得见，改动直接落 backstage.simulationMode。
+      //   v2.381.0 收口：同上 —— 它们只由玩家分支拼出，故与 wa-set-devmode 一同移入 player 层。
       'wa-lane-bar', 'wa-lane-all', 'wa-lane-world', 'wa-lane-people', 'wa-lane-story',
-      'wa-lane-power', 'wa-lane-ui', 'wa-lane-note',
+'wa-lane-power', 'wa-lane-ui', 'wa-lane-note',
       'wa-set-out'],
+      // v2.381.0 收口：**只由 playerSettingsHtml() 拼出**的三枚控件。
+      //   它们不是「依赖态」（cond）也不是「动态生成」（dynamic）—— 玩家一进设置页它们就在，
+      //   是玩家面稳定的出口。把它们放进 ids 会让「逐页无缺失」在开发者模式下恒假，
+      //   放进 cond 又会让「这三种东西为什么有时不在」失去可分辨性。故单列一层。
+      player: ['wa-set-devmode', 'wa-set-simple-mode', 'wa-set-simple-save'],
       cond: ['wa-set-tier-rollback', 'wa-prm-find', 'wa-prm-repl', 'wa-prm-add', 'wa-prm-reset', 'wa-prm-import', 'wa-prm-json', 'wa-prm-out'] },
     // v2.33.0: 记忆页 / 注入页——本版把「能力面」第一次接到「呈现面」：memory（92 方法，
     //   全库最大单体）与 timeline（记忆溯源）此前产品 UI 零入口。两页控件一并纳管，
@@ -5642,8 +5741,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   连同四个输出容器一起补登。输出容器仍是动态容器（由 show* 回调填，非静态成树）。
       'wa-desk-life', 'wa-desk-flow', 'wa-desk-sched', 'wa-desk-epistemic', 'wa-desk-v14-multi', 'wa-desk-v14-sanctuary', 'wa-desk-v14-crisis', 'wa-desk-v14-pact',
       'wa-desk-v15-offstage', 'wa-desk-v15-eccentric', 'wa-desk-v16-realism', 'wa-desk-v16-grudge',
-      'wa-desk-v17-routine', 'wa-desk-v17-deviate'],
-      dynamic: ['wa-desk-out', 'wa-desk-life-out', 'wa-desk-flow-out', 'wa-desk-sched-out', 'wa-desk-epistemic-out', 'wa-desk-v14-out', 'wa-desk-v15-out', 'wa-desk-v16-out', 'wa-desk-v17-out'] },
+      // v2.380.0（幽灵引用治理批次⑦）：概览降噪把 8 个纯读诊断按钮收进两个 <details>，
+      //   两个容器 id 渲染在 actiondesk 页的静态模板里（不是回调拼接），故进 ids 档而不是
+      //   dynamic：容器一进页就在，只是里面默认收起。
+      'wa-desk-tactical-fold', 'wa-desk-somatic-fold'],
+      dynamic: ['wa-desk-out', 'wa-desk-life-out', 'wa-desk-flow-out', 'wa-desk-sched-out', 'wa-desk-epistemic-out', 'wa-desk-v14-out', 'wa-desk-v15-out', 'wa-desk-v16-out', ''] },
     { page: 'health', ids: ['wa-periodical-id', 'wa-periodical-name', 'wa-periodical-days', 'wa-periodical-profile', 'wa-periodical-enabled',
       'wa-periodical-config', 'wa-periodical-publish', 'wa-periodical-read'],
       dynamic: ['wa-periodical-out'] }
@@ -5665,11 +5767,26 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         const condMissing = (grp.cond || []).filter(miss);
         // 动态生成：只在容器在场时校验（容器不在 ⇒ 该域未展开，不算断裂）
         const dynMissing = (grp.dynamic || []).filter(miss);
+        // v2.381.0 收口：**渲染面互斥**的第三层——「只在玩家分支里才有的控件」。
+        //   病灶（本版实测）：`ui/settings.js` 自 v2.325.0「界面简化动线」起有两个互斥分支
+        //   （`playerSettingsHtml()` / `devSettingsHtml()`），而 UI_BINDINGS 的 settings 组
+        //   把两个分支的 id 混装在同一份 `ids` 里。于是**任何单一模式下都会有一撮必缺**：
+        //     · 开发者模式：[wa-set-devmode, wa-set-simple-mode, wa-set-simple-save] 缺
+        //       （这三枚只由玩家分支拼出——玩家分支出厂就渲染，它是玩家的「出口」）
+        //     · 玩家模式：其余两百枚缺（它们只由开发者分支拼出）
+        //   而 `ids` 的语义必须保持「在本页它就该在」——那是这条门禁的全部力量所在。
+        //   故新增 `player` 层：登记「只由玩家分支渲染」的控件。校验规则与 cond 同形
+        //   （缺失只记不判失败，因为另一个分支下它们**本来就不该存在**），
+        //   但**用独立读数报出**，避免与「依赖态缺失」混在一起说不清是哪种局面。
+        //   反向判据仍在 tests/run.js 的「玩家模式下设置页只出玩家面」那一条上：
+        //   那条钉的是「玩家面不泄漏开发者控件」，与本层不重复。
+        const playerMissing = (grp.player || []).filter(miss);
         return {
           page: grp.page, active: active,
           expected: grp.ids.length, missing: missing, ok: !active || missing.length === 0,
           condExpected: (grp.cond || []).length, condMissing: condMissing,
-          dynamicExpected: (grp.dynamic || []).length, dynamicMissing: dynMissing
+          dynamicExpected: (grp.dynamic || []).length, dynamicMissing: dynMissing,
+          playerExpected: (grp.player || []).length, playerMissing: playerMissing
         };
       });
       const activeGroups = out.filter(function (g) { return g.active; });
@@ -6946,7 +7063,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         tapeStore: '磁带仓库读回（读失败 ⇒ 空仓库与存储故障同形）',
         // v2.274.0（V6 收口）：capability-audit 的 wroteFalse 读回点（G16 新增来源）。
         //   漏进本表 = 消费端退回裸桶名 ⇒ 读者只看到 `capabilityAudit×1` 而不知其后果。
-        capabilityAudit: '能力档位表态读回（读失败 ⇒ 与「玩家没表过态」同形）'
+        capabilityAudit: '能力档位表态读回（读失败 ⇒ 与「玩家没表过态」同形）',
+        // v2.381.0 收口：两个新引擎的裸读点补投归因（G16 排查）。与 store.LAB / panel.LAB_P 同源同键集。
+        //   漏进本表 ⇒ 诊断包退回裸桶名 ⇒ 读者只看到 `channelProbe×1` / `inlineTags×1` 而不知其后果。
+        channelProbe: '渠道探针账本读回（读失败 ⇒ 与「本渠道还没有任何结论」同形）',
+        inlineTags: '内联标签解析账读回（读失败 ⇒ 与「本聊天还没有任何内联标签」同形）'
       };
       const srcTxt = Object.keys(byS).filter(function (k) { return byS[k] > 0; })
         .map(function (k) { return (SRC_LABEL[k] || k) + '×' + byS[k]; }).join('、');

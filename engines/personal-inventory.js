@@ -13,7 +13,7 @@
  */
 (function () {
   'use strict';
-  const WA = (typeof window !== 'undefined' ? window.WorldAxis : (global.WorldAxis = global.WorldAxis || {}));
+  const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_personal_inventory_settings_v1';
   const DEF = {
     enabled: true,
@@ -77,7 +77,7 @@
       }
 
       container.push(Object.assign({
-        id: item.id || ('item_' + Math.random().toString(36).slice(2, 7)),
+        id: item.id || ('item_' + WA.rand.next('personal-inventory').toString(36).slice(2, 7)),
         name: item.name || '未知物件',
         size: itemSize,
         concealed: !!item.concealed, // 是否处于暗格夹层
@@ -152,14 +152,14 @@
           if (hasRoll) {
             if (roll >= (thorough === 'thorough' ? 40 : 65)) found.push(it);
           } else {
-            if (thorough === 'thorough' || Math.random() < 0.6) found.push(it);
+            if (thorough === 'thorough' || WA.rand.next('personal-inventory') < 0.6) found.push(it);
           }
         } else if (tier === 'deep') {
           if (hasRoll) {
             // 深层暗格常规搜查绝对查不到；深度搜身需 roll >= 80 才能识破
             if (thorough === 'thorough' && roll >= 80) found.push(it);
           } else {
-            if (thorough === 'thorough' && Math.random() < 0.3) found.push(it);
+            if (thorough === 'thorough' && WA.rand.next('personal-inventory') < 0.3) found.push(it);
           }
         }
       });

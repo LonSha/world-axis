@@ -25,8 +25,7 @@
   'use strict';
 
   const root = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this);
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
 
   const LS_KEY = 'worldaxis_surgical_triage_settings_v1';
@@ -117,6 +116,11 @@
     let result = null;
     WA.store.transact(function (draft) {
       const map = getPatients(draft);
+      if (!map[pid] && Object.keys(map).length >= Math.max(1, Math.floor(settings().maxPatients))) {
+        noteFault('patient-capacity');
+        result = { ok: false, reason: 'patient-capacity' };
+        return;
+      }
       const record = {
         patientId: pid,
         traumaType: traumaType,

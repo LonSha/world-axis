@@ -12,8 +12,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.328.0';
@@ -171,6 +171,52 @@
     },
 
     /**
+     * v2.381.0: 灾难封锁/解封某个地点的所有出入通道。
+     *
+     * 此前 disaster-evacuation 在灾难发生与解除时都以
+     * `WA.engines.spatialTopology.setTransitLock(placeId, bool, reason)` 调用本方法，
+     * 但引擎从未导出它 —— 于是「灾区被物理封锁、其他人不许走进来」这条联动从未生效。
+     *
+     * 语义：按 nodeId 找出所有 from/to 落在该地点的 portal，加锁时把 status 置为
+     *   'sealed' 并把原状态压进 transitLocks 台账，解封时逐条还原 —— 不粗暴覆盖，
+     *   否则原本 locked 的门禁（需要钥匙那种）会被当作 open 放行。
+     *
+     * @param {string} nodeId 地点 id
+     * @param {boolean} locked true=封锁 / false=解封
+     * @param {string} reason 归因（如 'disaster:d_xxx'），写进台账便于叙事追溯
+     * @returns {{ok:boolean, nodeId:string, affected:number, locked:boolean, reason:string}}
+     */
+    setTransitLock(nodeId, locked, reason) {
+      if (!nodeId) return { ok: false, reason: 'missing-nodeId' };
+      const id = String(nodeId);
+      const state = this.getState();
+      state.portals = Array.isArray(state.portals) ? state.portals : [];
+      state.transitLocks = (state.transitLocks && typeof state.transitLocks === 'object') ? state.transitLocks : {};
+      const tag = String(reason || 'unspecified');
+      if (locked) {
+        const ledger = Array.isArray(state.transitLocks[id]) ? state.transitLocks[id] : [];
+        const seen = new Set(ledger.map(x => x.portalId));
+        let affected = 0;
+        for (const p of state.portals) {
+          if (!p || (p.from !== id && p.to !== id)) continue;
+          if (seen.has(p.id)) continue;           // 已登账，不重复压栈（幂等）
+          ledger.push({ portalId: p.id, prevStatus: p.status, reason: tag });
+          p.status = 'sealed';
+          affected++;
+        }
+        state.transitLocks[id] = ledger;
+        return { ok: true, nodeId: id, affected: affected, locked: true, reason: tag };
+      }
+      const ledger = Array.isArray(state.transitLocks[id]) ? state.transitLocks[id] : [];
+      let restored = 0;
+      for (const rec of ledger) {
+        const p = state.portals.find(x => x && x.id === rec.portalId);
+        if (p) { p.status = rec.prevStatus || 'open'; restored++; }
+      }
+      delete state.transitLocks[id];
+      return { ok: true, nodeId: id, affected: restored, locked: false, reason: tag };
+    },
+    /**
      * 角色进入具体子空间/位置
      */
     locateCharacter(charName, nodeId, detail) {
@@ -181,7 +227,7 @@
         nodeId: String(nodeId),
         floor: detail.floor || null,
         room: detail.room || null,
-        timestamp: Date.now()
+        timestamp: clockNow('spatial-topology')
       };
       return { ok: true, location: state.activeScenes[charName] };
     },

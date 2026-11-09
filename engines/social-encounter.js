@@ -19,8 +19,8 @@
 
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -134,7 +134,7 @@
       encountered: true,
       interactionType: interactionType,
       narrativeBrief: narrativeBrief,
-      timestamp: Date.now()
+      timestamp: clockNow('social-encounter')
     };
 
     _encounterHistory.unshift(record);

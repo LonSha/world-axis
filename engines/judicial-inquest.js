@@ -25,8 +25,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
   const VERSION = '2.340.0';
 
@@ -61,7 +61,7 @@
       verdict: null,
       captorId: null,
       judgeId: null,
-      updatedAt: Date.now()
+      updatedAt: clockNow('judicial-inquest')
     };
     _warrants.set(id, state);
     return { ok: true, warrant: JSON.parse(JSON.stringify(state)) };
@@ -85,7 +85,7 @@
 
     w.status = 'captured';
     w.captorId = cid;
-    w.updatedAt = Date.now();
+    w.updatedAt = clockNow('judicial-inquest');
     return {
       ok: true,
       warrantId: wid,
@@ -157,7 +157,7 @@
     }
 
     w.verdict = result.verdict;
-    w.updatedAt = Date.now();
+    w.updatedAt = clockNow('judicial-inquest');
     return result;
   }
 

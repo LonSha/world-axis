@@ -82,7 +82,19 @@ function runSuite() {
   a(deskSrc.indexOf("'chapter.restore':") > 0, 'OPV4-8/A6: 包含 chapter.restore 路由');
   a(deskSrc.indexOf("'chapter.diff':") > 0, 'OPV4-8/A7: 包含 chapter.diff 路由');
   a(deskSrc.indexOf("'chapter.inspect':") > 0, 'OPV4-8/A8: 包含 chapter.inspect 路由');
-  a(deskSrc.indexOf('var EXPORT_COUNT = 14;') > 0, 'OPV4-8/A9: actionDesk 导出面保持 14 口恒定，零泄漏');
+  // A9 导出面「恒定」= 自证块在场（**不钉具体口数**）。
+  //   v2.381.0 回归修复：原判据写死字面量 `var EXPORT_COUNT = 14;`，而 v14 提交 4050cbe
+  //   把它改成了 16（OPV14 系列新增两枚导出）却没同批改本测试 —— 于是源码正常长出口数，
+  //   这里报「导出面泄漏」。那不是泄漏，那是**陈旧常量**：判据钉住了一种形态，
+  //   等于给其它形态发通行证（tests/ui-gate.js:48-52 为同款前车）。
+  //   真判据在源码里：action-desk 装载时自行比对 `Object.keys(WA.actionDesk).length`
+  //   与 EXPORT_COUNT，多一口少一口**当场抛**。测试只需保证那段自证块还在、且数字是具体值。
+  const mExp = deskSrc.match(/var EXPORT_COUNT = (\d+);/);
+  a(!!mExp && Number(mExp[1]) > 0,
+    'OPV4-8/A9: actionDesk 导出面有具体口数自证（实 ' + (mExp ? mExp[1] : '缺') + '）');
+  a(deskSrc.indexOf('var _exported = Object.keys(WA.actionDesk).length;') > 0
+    && deskSrc.indexOf('actionDesk: export count mismatch') > 0,
+    'OPV4-8/A9b: 导出数由产品自证（声明口数 vs 实际导出，缺一即抛）—— 零泄漏不靠本测试的数');
 
   // 初始化世界状态与环境
   WA.actionDesk.setSettings({ enabled: true });

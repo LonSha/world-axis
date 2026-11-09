@@ -22,8 +22,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.340.0';
@@ -58,7 +58,7 @@
       status: 'posed',
       chosenBranch: null,
       rationale: null,
-      createdAt: Date.now()
+      createdAt: clockNow('moral-dilemma')
     };
 
     _dilemmaRegistry.set(dilemmaKey, rec);
@@ -86,7 +86,7 @@
     rec.status = 'resolved';
     rec.chosenBranch = chosenBranch;
     rec.rationale = rationale || 'tragic_necessity';
-    rec.resolvedAt = Date.now();
+    rec.resolvedAt = clockNow('moral-dilemma');
 
     // 联动心智创伤：决断者因残酷取舍承受 40 级不可逆心智创伤
     if (WA.psycheTrauma && typeof WA.psycheTrauma.inflictTrauma === 'function') {

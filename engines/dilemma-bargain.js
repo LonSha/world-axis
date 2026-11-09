@@ -59,7 +59,7 @@
     const ratified = uA >= threshold && uB >= threshold;
     const resolveCrisisId = s.resolveCrisisId ? String(s.resolveCrisisId).trim() : '';
     const pactRecord = {
-      pactId: 'pact_' + (at % 10000) + '_' + Math.floor(Math.random() * 1000),
+      pactId: 'pact_' + (at % 10000) + '_' + Math.floor(WA.rand.next('dilemma-bargain') * 1000),
       partyA: partyA,
       partyB: partyB,
       ratified: ratified,

@@ -68,7 +68,7 @@
     const at = Number.isFinite(s.at) ? s.at : clockNow('branchTransplant');
 
     const memoryEntry = {
-      id: 'dejavu_' + at + '_' + Math.random().toString(36).slice(2, 6),
+      id: 'dejavu_' + at + '_' + WA.rand.next('branch-transplant').toString(36).slice(2, 6),
       sourceBranch: sourceBranch,
       factText: factText,
       clarity: clarity,

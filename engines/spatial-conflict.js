@@ -21,8 +21,8 @@
 
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -95,7 +95,7 @@
     const item = {
       actorId: aid,
       priorityScore: score,
-      enqueuedAt: Date.now()
+      enqueuedAt: clockNow('spatial-conflict')
     };
 
     // 按 priority 降序插入
@@ -234,9 +234,9 @@
     }
 
     // 扣除体力代谢 (若 metabolism-clock 可用)
-    if (WA.engines && WA.engines.metabolismClock && typeof WA.engines.metabolismClock.accumulateFatigue === 'function') {
-      if (staminaCostWinner > 0) WA.engines.metabolismClock.accumulateFatigue(winner, staminaCostWinner, 'spatial_conflict_clash');
-      if (staminaCostLoser > 0) WA.engines.metabolismClock.accumulateFatigue(loser, staminaCostLoser, 'spatial_conflict_bumped');
+    if (WA.engines && WA.metabolismClock && typeof WA.metabolismClock.accumulateFatigue === 'function') {
+      if (staminaCostWinner > 0) WA.metabolismClock.accumulateFatigue(winner, staminaCostWinner, 'spatial_conflict_clash');
+      if (staminaCostLoser > 0) WA.metabolismClock.accumulateFatigue(loser, staminaCostLoser, 'spatial_conflict_bumped');
     }
 
     return {

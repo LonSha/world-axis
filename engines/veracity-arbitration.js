@@ -15,8 +15,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -31,7 +31,7 @@
         testimonies: new Map(),
         evidenceTraces: [],
         verdicts: new Map(),
-        createdAt: Date.now()
+        createdAt: clockNow('veracity-arbitration')
       });
     }
     return _caseLedger.get(caseId);
@@ -52,7 +52,7 @@
       deniesInvolvement: claim.deniesInvolvement !== false,
       alibiProvided: Boolean(claim.alibiProvided),
       statementText: claim.statementText || '',
-      submittedAt: Date.now()
+      submittedAt: clockNow('veracity-arbitration')
     };
     c.testimonies.set(actorId, testimony);
     return { ok: true, caseId: caseId, actorId: actorId, testimonyRecorded: true };

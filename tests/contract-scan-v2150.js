@@ -125,15 +125,42 @@ function runB(a) {
   //   而不是「码必须用内联写法写」。故改判「该码在去注释的产品面源码文本里存在」——
   //   面内/面外两种写法都算存在，判据强度不降（凭空捏造的码仍然红）。
   //   面外清单仍显式钉住：防它们静默漂移或悄悄混进面内（口径与 reject-lock-v2780.js 同源）。
+  // v2.381.0 口径修正（本清单与 tests/reject-lock-v2780.js 的 OUT_FACE_OK 是**同一集合的两份冻结**，
+  //   两处必须逐字同集）：
+  //     · 补进 __exp7-absent-check / __exp7-rain-check / __exp7-settle-check：它们是 EXP-7 的
+  //       **正向见证标记**（「缺席者不能获奖」这类验收通过的判据，不是拒收码），确实在见证表里、
+  //       也确实在扫描面外。旧版本清单漏了它们，只因为 tools/contract-scan.js 的 witnessDeclared
+  //       静态正则首字符类写的是 [a-zA-Z]，把下划线开头的这 3 个**静默漏掉**（正则已同版修正为
+  //       [A-Za-z_]，静态 776→779 与运行时 expect 779 对齐）。补清单是补**后果**，修正则才是补**病根**。
+  //     · 摘掉 already-exists：它现在是面内码（city-folklore:77 / foreshadow-tree:86 / legacy-oath:76
+  //       三处内联 reason），留在面外清单里即「把面内码登记成面外」，本判据会报红。
   const OUT_FACE_OK = ['unknown-worker', 'no-such-facility', 'bad-days', 'order-paused', 'facility-full',
     'shift-conflict', 'crew-full', 'no-road',
-    'activity-closed', 'already-exists', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
-    'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day', 'bad-sign', 'no-such-listing', 'not-there', 'offline', 'self-buy', 'too-far', 'unknown-buyer', 'unknown-owner'].sort();
+    'activity-closed', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
+    'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day', 'bad-sign', 'no-such-listing', 'not-there', 'offline', 'self-buy', 'too-far', 'unknown-buyer', 'unknown-owner',
+    '__exp7-absent-check', '__exp7-rain-check', '__exp7-settle-check'].sort();
   const stripC = function (s) { return require('./test-surface-gate.js').stripComments(s); };
   const faceText = TOOL.productFiles(BASE).map(function (rel) {
     return stripC(fs.readFileSync(path.join(BASE, rel), 'utf8'));
   }).join('\n');
-  const ghost = w.filter(function (c) { return faceText.indexOf("'" + c + "'") < 0; });
+  // v2.381.0 口径修正（B7 判 ghost 的**面**选择错了）：witnessDeclared 取的是「见证表声明了哪些码」，
+  //   而见证表里混着两类东西 ——
+  //     ① 真·拒收码（首字符字母）：它们必须**在产品源码里真的写着**，凭空捏造即红（本判据原意）；
+  //     ② 正向见证标记（`__` 开头，如 __exp7-absent-check：「缺席者不能获奖」这类**验收通过**
+  //        的判据）：它们**本就不在产品源码里**，只在 tests/reject-v2780.js 的 want() 里声明，
+  //        拿「产品面有没有这个词」去问它，等于用错的面 —— 必然恒红。
+  //   旧实现把两类混在一起判，于是 3 个正向标记被读成「幽灵见证」。
+  //   修法按面分流（与台账 v2.102.0 的 reuse / v2.142.0 的 omniscient 同规格：正常归因词
+  //   以同一词法形状出现，一并带见证，但要按各自的面判在场性）：
+  //     ① 拒收码 ⇒ 仍须在产品面源码里逐字存在（强度不降）；
+  //     ② 内部标记 ⇒ 须在见证表真源里逐字存在（更严格：必须在 want() 声明处出现，否则凭空捏造）。
+  //   `__` 前缀不是开后门：任何以 __ 开头的码若在 reject-v2780.js 里查无实据，照样红。
+  const WITNESS_SRC = stripC(fs.readFileSync(path.join(BASE, 'tests', 'reject-v2780.js'), 'utf8'));
+  const isInternalMark = function (c) { return c.indexOf('__') === 0; };
+  const ghost = w.filter(function (c) {
+    if (isInternalMark(c)) return WITNESS_SRC.indexOf("'" + c + "'") < 0;  // 内部标记：见证表里必须有
+    return faceText.indexOf("'" + c + "'") < 0;                             // 拒收码：产品面里必须有
+  });
   const wInFace = w.filter(function (c) { return !!r.codes.hits[c]; });
   const wOutFace = w.filter(function (c) { return !r.codes.hits[c]; }).sort();
   a(ghost.length === 0,

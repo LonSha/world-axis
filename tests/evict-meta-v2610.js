@@ -81,6 +81,12 @@ const PRODUCERS = [
     drive: function (WA, name) { WA.life.addCommitment(name, { target: 't', text: 'x', kind: 'promise' }); } },
   { key: 'life.addSchedule', file: 'engines/life.js',
     drive: function (WA, name) { WA.life.addSchedule(name, { activity: 'a', start: 1, end: 2 }); } },
+// v2.381.0：`engines/idiosyncrasy.js` 的 registerIdiosyncrasy 也是一条 people 建人路径
+  //   （它绕开 registry.ensurePerson 直接写 draft.people ⇒ C2 的源码面枚举把它抓了出来）。
+  //   与上面各条不同，它**不结构免疫**：容器满时它就真的要与全场人争挤出位，
+  //   因此可以（也必须）由行为驱动探测 —— 这正是它此前漏检的原因：没人给它写 drive。
+  { key: 'idiosyncrasy.registerIdiosyncrasy', file: 'engines/idiosyncrasy.js',
+    drive: function (WA, name) { WA.idiosyncrasy.registerIdiosyncrasy(name, { triggerTag: 't', microBehavior: 'b' }); } },
   { key: 'registry.setProfileSafe', file: 'actors/registry.js',
     drive: function (WA, name) { WA.registry.setProfileSafe(name, { persona: { d1: 1, d2: 2, d3: 3, d4: 4, d5: 5 } }); } }
 ];

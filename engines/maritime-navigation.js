@@ -35,8 +35,7 @@
 (function () {
   'use strict';
   const root = typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this);
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_maritime_navigation_settings_v1';
   const DEF = {
@@ -105,7 +104,7 @@
    */
   function registerVessel(spec) {
     spec = spec || {};
-    const vesselId = cleanStr(spec.vesselId || spec.id || ('vessel_' + Date.now()), 48);
+    const vesselId = cleanStr(spec.vesselId || spec.id || ('vessel_' + clockNow('maritime-navigation')), 48);
     const name = cleanStr(spec.name || '远洋探险舟', 48);
     const vesselType = cleanStr(spec.vesselType || 'caravel', 32);
 
@@ -114,6 +113,10 @@
       WA.store.transact(function (draft) {
         const vessels = getVessels(draft);
         let existing = vessels.find(function (v) { return v.vesselId === vesselId; });
+        if (!existing && vessels.length >= Math.max(1, Math.floor(settings().maxVessels))) {
+          noteFault('vessel-capacity');
+          return;
+        }
         if (!existing) {
           existing = {
             vesselId: vesselId,
@@ -139,7 +142,7 @@
         created = JSON.parse(JSON.stringify(existing));
       });
     }
-    return { ok: true, vessel: created };
+    return created ? { ok: true, vessel: created } : { ok: false, reason: 'vessel-capacity-or-store-unavailable' };
   }
 
   /**
@@ -198,7 +201,7 @@
           // 若在风暴中强行全帆航行，增加进水与船体损伤
           if (stormLevel >= 6) {
             const waterIntake = Math.round(stormLevel * 4.5 * (1 + waveMeters * 0.1));
-            const hullWear = Math.round(stormLevel * 2.0);
+            const hullWear = Math.round(stormLevel * 2.0 * settings().stormDamageFactor);
             vessel.bilgeWater = clamp(vessel.bilgeWater + waterIntake, 0, 100);
             vessel.hullIntegrity = clamp(vessel.hullIntegrity - hullWear, 0, 100);
             vessel.riggingIntegrity = clamp(vessel.riggingIntegrity - (stormLevel * 3), 0, 100);
@@ -237,7 +240,7 @@
           };
         } else if (action === 'pumpBilge') {
           // 排水抽舱
-          const pumpPwr = clamp(spec.pumpEfficiency || 25, 10, 60);
+          const pumpPwr = clamp(spec.pumpEfficiency != null ? spec.pumpEfficiency : settings().drainEfficiencyPerPumping, 5, 60);
           const oldWater = vessel.bilgeWater;
           vessel.bilgeWater = clamp(vessel.bilgeWater - pumpPwr, 0, 100);
           if (vessel.bilgeWater < 80 && vessel.status === 'distressed') vessel.status = 'sailing';
@@ -289,7 +292,7 @@
           result: result.narrative,
           at: now
         });
-        if (vessel.logs.length > 20) vessel.logs.length = 20;
+        vessel.logs.length = Math.min(vessel.logs.length, Math.max(1, Math.floor(settings().maxVoyageLogs)));
       });
     }
 

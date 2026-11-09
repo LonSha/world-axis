@@ -21,8 +21,8 @@
 'use strict';
 (function () {
   const root = typeof window !== 'undefined' ? window : global;
-  root.WorldAxis = root.WorldAxis || {};
-  const WA = root.WorldAxis;
+  const WA = root.WorldAxis = root.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
   const VERSION = '2.330.0';
@@ -83,7 +83,7 @@
         concentration: 0.0,
         peakDose: 0.0,
         stage: 'none',
-        lastTick: Date.now()
+        lastTick: clockNow('toxic-metabolism')
       };
       tMap.set(toxinType, record);
     }
@@ -92,7 +92,7 @@
     record.concentration = Math.min(100.0, Math.round((record.concentration + d) * 10) / 10);
     record.peakDose = Math.max(record.peakDose, record.concentration);
     record.stage = _calcStage(record.concentration);
-    record.lastTick = Date.now();
+    record.lastTick = clockNow('toxic-metabolism');
 
     // 计算即时机能减损判定
     const penalty = {
@@ -133,7 +133,7 @@
       const decayFactor = Math.pow(0.5, minutes / halfLife);
       rec.concentration = Math.max(0.0, Math.round(rec.concentration * decayFactor * 10) / 10);
       rec.stage = _calcStage(rec.concentration);
-      rec.lastTick = Date.now();
+      rec.lastTick = clockNow('toxic-metabolism');
 
       results.push({
         toxinType: tType,

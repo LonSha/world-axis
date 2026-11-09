@@ -29,8 +29,18 @@ function runAll(assertFn){let pass=0,fail=0;const a=(v,m)=>{v?pass++:fail++;if(!
  let green=false;try{green=executeDesk({[rel]:bad}).ok;}catch(e){green=false;}a(!green,'same real-click predicate detects product markup regression');
  const coverage=require('./ui-binding-coverage');const good=coverage.audit();a(good.ok&&good.percent===100,'all literal UI id references are registered in three-layer guard');
  const W=load(),groups=JSON.parse(JSON.stringify(W.toolDiag.UI_BINDINGS));
- for(const g of groups)for(const layer of ['ids','cond','dynamic'])g[layer]=(g[layer]||[]).filter(x=>x!=='wa-wdesk-load');
+ // v2.382.0：剥离面也要遍历四层。此前只剥三层，`player` 层整层不在剥离范围内 ——
+ //   本条负控制只剥了 wa-wdesk-load（在 ids），仍能过；但「player 层被漏遍历」这件事
+ //   恰恰就是本轮三条假红的成因，负控制自己不该再用同一个漏法。
+ for(const g of groups)for(const layer of ['ids','cond','dynamic','player'])g[layer]=(g[layer]||[]).filter(x=>x!=='wa-wdesk-load');
  const lost=coverage.audit({groups});a(!lost.ok&&lost.missing.some(x=>x.id==='wa-wdesk-load'),'reverse inventory detects removed actual guard registration');
+ // v2.382.0：两侧豁免清单必须逐字同集。H2（tests/run.js 的 EXEMPT_H）与本门禁的
+ //   SKELETON_IDS 是同一份语义的两处字面；本轮的红就是「H2 加了 wa-search-bar 豁免、
+ //   本侧没加」长出来的。此处直接读 tests/run.js 的文本比对，不许再各写一份。
+ const runSrc=fs.readFileSync(path.join(BASE,'tests/run.js'),'utf8');
+ const ex=runSrc.match(/const EXEMPT_H = \[([\s\S]*?)\];/);
+ const exIds=ex?[...ex[1].matchAll(/'([^']+)'/g)].map(x=>x[1]):null;
+ a(exIds&&JSON.stringify(exIds)===JSON.stringify(coverage.SKELETON_IDS),'skeleton exemptions stay verbatim-identical across H2 and coverage');
  console.log('v8 desk UI/coverage: '+pass+' pass / '+fail+' fail');return {pass,fail};
 }
 module.exports={runAll,executeDesk};if(require.main===module){try{process.exit(runAll().fail?1:0);}catch(e){console.error(e.stack);process.exit(1);}}

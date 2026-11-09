@@ -211,7 +211,11 @@ function runAll(a) {
   //   靠各自引擎的专锁咬住；此处钉住清单，防它们静默漂移或悄悄混进面内。
   const OUT_FACE_OK = ['unknown-worker', 'no-such-facility', 'bad-days', 'order-paused', 'facility-full',
     'shift-conflict', 'crew-full', 'no-road',
-    'activity-closed', 'already-exists', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
+    // v2.381.0：'already-exists' 已从本清单**移除** —— 它现在是面内码
+    //   （engines/city-folklore.js:77 / foreshadow-tree.js:86 / legacy-oath.js:76 三处内联
+    //   `reason: 'already-exists'`），继续留在这里等于「把面内的码登记成面外」，
+    //   本判据会以「实 26 vs 登记 27」报红。这正是本清单该干的事：**面外清单会过期**。
+    'activity-closed', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
     'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day',
     '__exp7-absent-check', '__exp7-rain-check', '__exp7-settle-check',
     // v2.253.0（漏摊寄售 engines/stall.js）：只有这 8 个是 refuse() 独有写法（其余码另有内联

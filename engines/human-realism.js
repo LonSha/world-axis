@@ -249,6 +249,12 @@
       actor.emotions.anger = Math.min(100, actor.emotions.anger + 8 * rounds);
     }
 
+    const root = getRoot();
+    (root.grudges || []).forEach(function (g) {
+      if (!g || g.who !== who || g.settled) return;
+      g.roundsHeld = (Number(g.roundsHeld) || 0) + rounds;
+      g.intensity = Math.max(0, g.intensity - Math.max(0, Number(cfg.grudgeDecayPerRound) || 0) * rounds);
+    });
     actor.updatedAt = clockNow('humanRealism');
     stat.routinesConsumed++;
 
@@ -314,7 +320,7 @@
     }
 
     const intensity = Math.max(10, Math.min(100, Math.round(Number(o.intensity) || 50)));
-    const grudgeId = 'grd_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+    const grudgeId = 'grd_' + clockNow('human-realism').toString(36) + '_' + WA.rand.next('human-realism').toString(36).slice(2, 6);
 
     const root = getRoot();
     const entry = {
