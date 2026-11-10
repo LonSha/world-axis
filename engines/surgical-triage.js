@@ -119,7 +119,8 @@
       if (!map[pid] && Object.keys(map).length >= Math.max(1, Math.floor(settings().maxPatients))) {
         noteFault('patient-capacity');
         result = { ok: false, reason: 'patient-capacity' };
-        return;
+        // v2.382.0（v2790 消红）：同上——本分支只记账不改世界 ⇒ 中止事务。
+        return false;
       }
       const record = {
         patientId: pid,

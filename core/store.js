@@ -3695,8 +3695,30 @@
             score -= 3;
             issues.push({ level: 'warn', key: 'bridge', detail: '对外桥已开闸（' + bd.refreshes + ' 次刷新请求）却一次也没发布——开关开着没在干活' });
           } else if (!bridgeEnabledN && bd.externalReads > 0) {
-            score -= 3;
-            issues.push({ level: 'warn', key: 'bridge', detail: '对外桥休眠但已被外部读取 ' + bd.externalReads + ' 次：对方拿到的永远是 null，看起来像「这个世界没有任何世界状态」（开闸：WA.bridge.setSettings({ enabled: true })）' });
+            // v2.382.0（历史欠账消红）：本格原判据是「闸关着 且 externalReads > 0 ⇒ warn -3」。
+            //   它同时踩了两条本仓已确立的裁决，故改为 info（不扣分）：
+            //   ① **健康分 = 当前状态缺陷，审计计数 = 历史经历**（v0.4.0 给 rescue / integrity
+            //      定的口径）。`externalReads` 是进程级**累计**计数（engines/bridge.js 的模块级
+            //      __stat，清 localStorage 清不掉）——它只增不减，用一条只增的计量去判「此刻
+            //      有没有缺陷」，等于让健康分在第一次外部读取之后**永久**回不到 100。
+            //      这正是 rescue 判据当初被改掉的同一种错法。
+            //   ② **出厂默认值不构成缺陷**。桥的 def 就是 `enabled:false`（休眠是设计内默认态，
+            //      下方 `else if (!bridgeEnabledN)` 分支自己写的就是「不是故障」）。
+            //      本格真正想说的是「对方这个世界需要它，但闸关着」——那是**配置建议**，
+            //      属 info/建议，不是本扩展的状态缺陷：本扩展此刻的行为（休眠、
+            //      返回 null、把拒绝记进 refused 与 lastRefusal）**完全正确**。
+            //   现场立据：v0.4.0「干净库健康分 100/ok」段实测 97/ok + warn:bridge，
+            //      扣的正是这 3 分；而该段自己的 localStorage 是清空的（存储面干净），
+            //      污染来自同进程内更早的 bridge 专锁真调过一次 snapshot() 记账。
+            //   保留可追溯：读取次数、最近被拒时间、开闸写口全部如实给出。
+            //   ⚠ 两条**真实**缺陷的扣分原样保留：`failures > 0`（发布失败 ⇒ 外部拿到 null
+            //     且分不清原因，-5）与 `enabled && publishes === 0`（开关开着零产出，-3）。
+            issues.push({ level: 'info', key: 'bridge.idleRead',
+              detail: '对外桥休眠（出厂默认）期间被外部读取过 ' + bd.externalReads + ' 次'
+                + (bd.lastRefusal && bd.lastRefusal.at ? '（最近一次 ' + Math.round((clockWall() - bd.lastRefusal.at) / 1000) + 's 前）' : '')
+                + '：每次返回 null 并已如实记入 refused —— 本扩展行为正确，这是**配置建议**'
+                + '（若确需互操作，开闸：WA.bridge.setSettings({ enabled: true })）'
+                + '，不计入健康分（累计计量不是当前缺陷）' });
           } else if (!bridgeEnabledN) {
             issues.push({ level: 'info', key: 'bridge', detail: '对外桥休眠（默认）：RubyPhone 世界脉搏/TimeManager 与 LonSha 世界推进此刻各自描述世界——不是故障，但「两边对不上」的根因在此' });
           } else if (bd.publishes > 0) {

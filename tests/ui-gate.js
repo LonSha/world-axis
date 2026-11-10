@@ -217,6 +217,16 @@ async function main() {
       "const v = prompt('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null)");
     assert(bA !== srcP, '（自证）负向注入点 A 命中（世界钟裸 prompt）');
     const envA = fresh({ srcOverride: { 'ui/panel.js': bA } });
+    // v2.382.0（历史欠账消红）：G18 的两个负控制取证对象都在 **开发者模式**设置页里。
+    //   自 v2.255.0 SIMPLIFY-NAV 起出厂 `devMode:false`，`render()` 走 `playerSettingsHtml()`
+    //   ——`#wa-set-out` / `#wa-op-now` / 裸 prompt 所在的那一整段根本不会被拼接。
+    //   于是负控制 B 的注入「打在一个不在树里的节点上」：`out()` 恒为 null，
+    //   `out().textContent = text` 与 `if (o) o.textContent = text` 行为完全一致，
+    //   一条拒绝都拿不到（实测 0 项）—— 这是判据缺前提，不是产品缺陷。
+    //   修法与 v2.381.0（`#wa-hz-save`）/ #wa-set-save 同族：先走产品公开写口切开发者模式。
+    //   ⚠ 顺序：必须在 fresh() 之后、checkClickable() 之前（setDevMode 会重绘面板）。
+    assert(typeof envA.WA.ui.setDevMode === 'function', '面板提供开发者模式写口（G18 取证面的前置）');
+    envA.WA.ui.setDevMode(true);
     const rA = await checkClickable(envA);
     assert(rA.thrown.length > 0, '（负向）裸 prompt → ReferenceError 被同步抛出抓到（实 ' + rA.thrown.length + ' 项）');
     const srcS = fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8');
@@ -226,6 +236,10 @@ async function main() {
       'const setOut = function (text) { out().textContent = text; };');
     assert(bB !== srcS, '（自证）负向注入点 B 命中（settings 判空出口）');
     const envB = fresh({ srcOverride: { 'ui/settings.js': bB } });
+    // v2.382.0：同上一段 —— 切到开发者模式后实测拿到 1 项
+    //   `Cannot set properties of null (setting 'textContent')`，正是本条要证的缺陷形态。
+    assert(typeof envB.WA.ui.setDevMode === 'function', '面板提供开发者模式写口（G18 负控制 B 的前置）');
+    envB.WA.ui.setDevMode(true);
     const rB = await checkClickable(envB);
     assert(rB.rejections.length > 0, '（负向）异步出口写回失败 → 未处理拒绝被拿到（实 ' + rB.rejections.length + ' 项）');
   }

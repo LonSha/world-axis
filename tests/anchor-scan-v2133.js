@@ -78,6 +78,8 @@ const ANCHORS = {
   threeWay: { rel: SCAN_REL, txt: 'anchors += ex.anchors.length;          // v2.133.0：**不再以「已识别」为门**（教训二）' },
   // ⑤ 自证范围：全部模式逐个摘（原版只摘 anchor 面）
   allPatterns: { rel: SCAN_REL, txt: 'PATTERNS.forEach(function (p) {' },
+  // ⑦ v2.383.0（v2133 消红）：破坏面存在性谓词 — 摘掉它 ⇒ 八把「本无锚点面」的锁退回去冒充欠账
+  mutFace: { rel: SCAN_REL, txt: 'if (!MUT_FACE.test(selfSrc)) {' },
   // ⑥ 死判据已删（零消费能力）：单条版 `file-const` 不得复活
   deadFileConst: { rel: SCAN_REL, txt: "{ id: 'file-const', what: 'const REL/FILE/MOD = \"rel\"（唯一的文件常量）'," }
 };
@@ -126,8 +128,26 @@ function runB(a) {
   a(r.summary.reachRate >= 92 && r.summary.reach >= 104,
     'v2133/B: 覆盖率 ≥ 92%（实 ' + r.summary.reachRate + '% / ' + r.summary.reach + ' 把）'
       + ' —— O18 第一刀是 39.81% → 90.18%，本版再推一档');
-  a(r.nonUniform.unidentified <= 15,
-    'v2133/B: 未识别 ≤ 8 把（实 ' + r.nonUniform.unidentified + '）—— 三把「认不出目标文件」的锁已落地');
+  // v2.383.0（v2133 消红）：阈值口径拆档后**不变**（8）—— 变的只是「谁该被算进来」。
+  //   noFace 档（锁自己不读改源码、runNegative 只做行为反向断言）不进本计数。
+  a(r.nonUniform.unidentified <= 8,
+    'v2133/B: 未识别（仅真欠账）≤ 8 把（实 ' + r.nonUniform.unidentified + '；无锚点面档 '
+      + r.nonUniform.noFace + ' 把不计入）');
+  // 拆档的口径自证一（正向）：三档均非空 —— 否则说明谓词把某一档整个吞了
+  a(r.nonUniform.noFace > 0 && r.nonUniform.unidentified > 0 && r.nonUniform.scanned > 0,
+    'v2133/B: 三档（覆盖 ' + r.nonUniform.scanned + ' / 欠账 ' + r.nonUniform.unidentified
+      + ' / 无面 ' + r.nonUniform.noFace + '）均非空 —— 拆档不是把某一档整个抹掉');
+  // 拆档的口径自证二（反向）：无面档里不得混进「真读改源码」的锁。
+  //   判据：读源码（readFileSync/srcOf/productSources）**且**存在破坏实参形态的，必须落到欠账或覆盖，
+  //   一旦出现在无面档就说明 MUT_FACE 漏了那种写法，等于把真欠账抹成「本来就没有」。
+  const leaked = r.noFace.filter(function (u) {
+    const t = fs.readFileSync(path.join(BASE, 'tests', u.file), 'utf8');
+    return /readFileSync|\bsrcOf\s*\(|productSources\s*\(/.test(t)
+      && /\.(?:replace|split)\(\s*['"`]|\bwreck\s*\(|\bmust1\s*\(/.test(t);
+  }).map(function (u) { return u.file; });
+  a(leaked.length === 0,
+    'v2133/B: 无锚点面档未吞掉真欠账（实漏 ' + leaked.length + ' 把'
+      + (leaked.length ? '：' + leaked.slice(0, 5).join('、') : '') + '）');
   a(r.uniform.problems === 0 && r.summary.gateProblems === 0,
     'v2133/B: 统一档零问题且门禁面为零（非统一档「只报不红」口径未变）');
   // 三把锁逐把：目标面必须认出来，且**不再**落在 unidentified

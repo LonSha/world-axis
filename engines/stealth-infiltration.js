@@ -207,7 +207,8 @@
           if (distanceToGuard > settings().distractRadius) {
             noteFault('distraction-out-of-range');
             result = { ok: false, refusal: 'distraction-out-of-range' };
-            return;
+            // v2.382.0（v2790 消红）：同上——本分支只记账不改世界 ⇒ 中止事务。
+            return false;
           }
           // 守卫转向声源方向
           const distractorAngle = clamp(actionSpec.distractAngle != null ? actionSpec.distractAngle : (guard.facingAngle + 120) % 360, 0, 360);

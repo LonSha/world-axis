@@ -858,6 +858,26 @@
     'undercurrentCalendar-unavailable', 'universalRoutine-unavailable', 'unknown-group', 'unsubstantiated-bluff-refused', 'unsupported-procedure', 'unsupported-spy-action',
     'veracityArbitration-unavailable', 'warrant-not-active', 'warrant-not-found', 'whisperBackchannel-unavailable', 'worldChanges-unavailable', 'worldClock-unavailable',
     'worldGraph-unavailable', 'worldHealth-unavailable', 'worldLab-unavailable', 'worldSnapshot-unavailable', 'writeDesk-unavailable',
+    // ── v2.383.0（补漏）：上一批（v2.380.0）按现场复算收敛时**漏掉**的七条容量类拒收码。
+    //   来源是 v2.322.0 ~ v2.380.0 之间落地的九把引擎的 `ok:false` 站点：
+    //     capacity-reached                        ← bloodline-heritage / dungeon-hazard-mesh / ecosystem-cascade
+    //     court-capacity                          ← court-intrigue
+    //     patient-capacity                        ← alchemy-toxicology / surgical-triage
+    //     sanctuary-capacity                      ← sanctuary-scramble
+    //     settlement-capacity                     ← epidemic-contagion
+    //     vessel-capacity-or-store-unavailable    ← maritime-navigation
+    //     guard-capacity-or-store-unavailable     ← stealth-infiltration
+    //   口径与同批逐字一致：**逐条照抄现场分面结果**，不改档、不猜语义。
+    //   探针实测七条**全部**由规则表收住（`via:'rule'`、`kind:'adjust-input'`、无档 0 条）
+    //   ⇒ 一条都不写 OVERRIDES（重复登记会让 A8 与规则表打架）。
+    //   病根：这七条此前**只进码面口径、没进本快照**，于是
+    //     `tools/reject-recovery.js` 现场拒收面 1538 条 vs 本数组 1531 条，
+    //     `reject-recovery-lock-v2192.js` 的 B3/B4/C4 自那时起一直红着。
+    //   同一形态本仓已记过七次（v2.203.0 / v2.209.0 / v2.221.0 / v2.222.0 / v2.231.0 /
+    //   全量回归体检批次 / v2.380.0）—— 本版是第八次。判据不是「人读一遍」，
+    //   而是 tools/reject-recovery.js 的现场复算；补完 A9 三面不相交仍成立。
+    'capacity-reached', 'court-capacity', 'guard-capacity-or-store-unavailable', 'patient-capacity',
+    'sanctuary-capacity', 'settlement-capacity', 'vessel-capacity-or-store-unavailable',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。

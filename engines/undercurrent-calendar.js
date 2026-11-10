@@ -10,7 +10,12 @@
  *   投影为「未来三天风险日历」，直观给出距离撞上的剩余轮次与行动窗口。
  *
  * ── 铁律（零写盘、真实依据、认知边界）──────────────────────────
- *   1 纯读聚合：零 store.transact、零 settingsBus 写、零 localStorage。
+ *   1 纯读聚合：**读路径**（build / reset / stat）零 store.transact、零 settingsBus 写、
+ *     零 localStorage。写路径只有两个**显式入口**——alignWithFestival（节庆共振催化暗流
+ *     跃迁）与 triggerByMessage（讯息触发推进 stage），它们改 draft.currents 是本职。
+ *     v2.382.0 校正：本行原写「零 store.transact」，但同一版起引擎已有上述两个写入口，
+ *     声明与实现互相矛盾（undercurrent-calendar-v2268 的 A2 因此恒红）。现按事实写明边界，
+ *     并有 A2a/A2b/A2c 三段守它：读路径零写、写口逐个登记、全文件站点数对账。
  *   2 单一真源：暗流取自 store.get().currents，时间基准取自 storyclock / store.get().clock。
  *   3 认知防护：hidden 级别暗流遵循 showHidden 设置，默认不剧透具体内情，防全知作弊。
  *   4 拒绝虚构：紧迫度和剩余窗口严格由 stage 映射，绝不臆造未发生的事实。

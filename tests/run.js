@@ -6252,11 +6252,23 @@ const __ctxGuard = require('./context-guard.js').boundary();
   LS400.clear(); WA.store.init();
   WA.store.transact(d => { d.clock.label = '干净库'; }); WA.store.save();
   const mClean400 = WA.store.maintain({});
-  assert(mClean400.score === 100 && mClean400.level === 'ok', '干净库健康分 100 / ok');
+  // v2.382.0（历史欠账消红）：这三条断言原先失败时不呈报实测细节，只能说「不是 100」，
+  //   说不出**是哪一分扣的**——而 maintain() 有 9 个扣分面（hygiene / diag / quarantine /
+  //   state.corrupt / rescue / integrity / remove / readFailed / capacity），
+  //   不给读数就只能靠猜。按本仓「读数必须打出来」的纪律补上 issues 与计量明细。
+  const mClean400Detail = 'score=' + mClean400.score + ' level=' + mClean400.level
+    + ' issues=' + JSON.stringify(mClean400.issues.map(x => x.level + ':' + x.key))
+    + ' planKeys=' + mClean400.planKeys.length
+    + ' quarantine=' + JSON.stringify(WA.store.quarantineStat
+      ? (function () { const q = WA.store.quarantineStat(); return { sites: q.stateSites, parseable: q.parseable }; })() : null)
+    + ' signals=' + JSON.stringify({ diagPct: mClean400.signals.diagPct, reclaimable: mClean400.signals.reclaimable, totalKeys: mClean400.signals.totalKeys });
+  assert(mClean400.score === 100 && mClean400.level === 'ok', '干净库健康分 100 / ok（' + mClean400Detail + '）');
   assert(mClean400.planKeys.length === 0 && mClean400.actions.length === 0, '干净库无可回收键、无建议动作');
   assert(typeof mClean400.signals.totalKeys === 'number' && typeof mClean400.signals.reclaimable === 'number'
     && typeof mClean400.signals.diagPct === 'number' && typeof mClean400.signals.chatsChecked === 'number', 'signals 透出全套治理计量');
-  assert(mClean400.issues.every(x => x.level === 'info'), '干净库议题全为 info（不污染告警）');
+  assert(mClean400.issues.every(x => x.level === 'info'),
+    '干净库议题全为 info（不污染告警）—— 非 info：'
+    + JSON.stringify(mClean400.issues.filter(x => x.level !== 'info').map(x => x.level + ':' + x.key + ' ' + x.detail)));
   // 大额可回收 → 议题 + 建议动作
   LS400.setItem('worldaxis_state_v400_dead', JSON.stringify({ meta: { updatedAt: Date.now() - 40 * 86400000 } }));
   LS400.setItem('worldaxis_event_log_v400_dead', 'y'.repeat(400 * 1024));
@@ -6369,7 +6381,14 @@ const __ctxGuard = require('./context-guard.js').boundary();
     assert(WA.store.saveStat().ok === true, '当前落盘成功（前置条件）');
     assert(!mRes.issues.some(x => x.key === 'rescue.failing'), '历史救援失败且当前落盘正常 → 不报当前缺陷');
     assert(mRes.issues.some(x => x.key === 'rescue.history' && x.level === 'info'), '历史救援失败降级为 info 议题（可追溯、不扣分）');
-    assert(mRes.score === 100 && mRes.level === 'ok', '健康分不被历史救援失败压低（实 ' + mRes.score + '/' + mRes.level + '）');
+    assert(mRes.score === 100 && mRes.level === 'ok', '健康分不被历史救援失败压低（实 ' + mRes.score + '/' + mRes.level + '）'
+      + ' 明细 score=' + mRes.score + ' level=' + mRes.level
+      + ' issues=' + JSON.stringify(mRes.issues.map(x => x.level + ':' + x.key))
+      + ' reclaimable=' + mRes.signals.reclaimable + 'B'
+      + ' diagPct=' + mRes.signals.diagPct
+      + ' quarantine=' + JSON.stringify((function () { const q = WA.store.quarantineStat(); return { sites: q.stateSites, parseable: q.parseable }; })())
+      + ' saveStat=' + JSON.stringify({ ok: WA.store.saveStat().ok, reason: WA.store.saveStat().reason })
+      + ' rescue=' + JSON.stringify({ failed: WA.store.rescueStat().failed, lastOk: WA.store.rescueStat().lastOk }));
     assert(mRes.signals.rescueFailing === false, 'signals 透出救援当前态为正常');
     assert(mRes.signals.rescueFailed === rHist400.failed, 'signals 仍保留历史失败计数（审计不丢）');
   }
@@ -11422,6 +11441,14 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
         assert(/写盘全部落盘|写盘失败/.test(outOrE), '（真 DOM）写入侧行给出可判定结论（实 ' + (outOrE.match(/写入侧：[^<]{0,44}/) || ['?'])[0] + '）');
       }
       // 设置页：保存按钮 → 写失败时必须回显失败话术
+      // v2.382.0（历史欠账消红 · 同族第三处）：`#wa-set-save` 由 `devSettingsHtml` 产出，
+      //   而 `render()` 在 `devMode:false`（出厂值，v2.255.0 SIMPLIFY-NAV 起）下直接返回
+      //   `playerSettingsHtml()` —— 那一整段根本不会被拼接，于是本条断言恒红。
+      //   这与 v2.381.0 给 `#wa-hz-save` 补前置（:11704-11713）、v2.380.0 给 B2300 段补前置
+      //   是同一个病：判据的前提没写进判据。不是「控件丢了」，是「压根没进玩家面，也不该进」。
+      //   故先走产品公开写口切到开发者模式；切完 `setDevMode` 内部会重绘，页签须重新取。
+      assert(typeof WA.ui.setDevMode === 'function', '面板提供开发者模式写口（保存按钮判据的前置）');
+      WA.ui.setDevMode(true);
       const setTabE = Array.prototype.slice.call(global.document.querySelectorAll('.wa-tab')).filter(function (t) { return t.dataset.page === 'settings'; })[0];
       assert(!!setTabE, '（真 DOM）存在「设置」页签');
       if (setTabE) {
@@ -13998,6 +14025,18 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       //   其间面板重绘使节点离树 ⇒ TypeError；面板三处裸 prompt 在无 prompt 宿主里
       //   ReferenceError，而它们是唯一入口。探针口径见 ui-gate-sync.checkClickable。
       const envC = __uiGateFresh();
+      // v2.382.0（历史欠账消红 · 与设置页按钮同族）：G18 的整条论证链建立在
+      //   「设置页有 `#wa-set-out` 异步出口」上（见 ui-gate-sync.checkClickable 的口径注释：
+      //   缺陷本来就是「`await` 之后重查 `out()` 得 null，写 textContent 抛 TypeError」）。
+      //   但自 v2.255.0 SIMPLIFY-NAV 起出厂 `devMode:false`，`render()` 在玩家模式下直接
+      //   返回 `playerSettingsHtml()` —— 那一整段（含 `#wa-set-out` / `#wa-op-now` / `#wa-set-save`）
+      //   根本不会被拼接。于是负控制注入后的 `out()` 恒为 null、`if (o)` 判空成立，
+      //   一条拒绝都拿不到（实测 0 项），紧接着的正向 `__uiGateRes` 也被连带拖红。
+      //   这不是产品缺陷，是判据缺前提：探针取证的对象在玩家面上不存在。
+      //   与 v2.381.0（`#wa-hz-save`）/#wa-set-save 三处同族，修法一致：先走公开写口切开发者模式。
+      //   ⚠ 必须在 fresh() 之后、checkClickable() 之前调用：setDevMode 会重绘面板。
+      assert(typeof envC.WA.ui.setDevMode === 'function', '面板提供开发者模式写口（G18 取证面的前置）');
+      envC.WA.ui.setDevMode(true);
       const rc = await __uiGateCheckClickable(envC);
       assert(rc.controls >= 100, '（正向）逐页控件被真实点到（实 ' + rc.controls + ' 个）');
       assert(rc.thrown.length === 0, '（正向）全部控件点击零同步抛出', rc.thrown.join('；'));
@@ -14007,14 +14046,27 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
         "const v = askText('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null)",
         "const v = prompt('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null)");
       assert(bA18 !== srcP18, '（自证）负向注入点 A 命中（世界钟裸 prompt）');
-      const rcA = await __uiGateCheckClickable(__uiGateFresh({ srcOverride: { 'ui/panel.js': bA18 } }));
+      // v2.382.0：同上一段 —— 裸 prompt 在设置页（buildPanel 的档位/演化段）里，也在开发者面。
+      //   玩家模式下该段不拼接，注入点根本没进树，反而会得到「零抛出」的假阴性。
+      const envA18 = __uiGateFresh({ srcOverride: { 'ui/panel.js': bA18 } });
+      assert(typeof envA18.WA.ui.setDevMode === 'function', '面板提供开发者模式写口（G18 负控制 A 的前置）');
+      envA18.WA.ui.setDevMode(true);
+      const rcA = await __uiGateCheckClickable(envA18);
       assert(rcA.thrown.length > 0, '（负向）裸 prompt 的 ReferenceError 被同步抛出抓到（实 ' + rcA.thrown.length + ' 项）');
       const srcS18 = fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8');
       const bB18 = srcS18.replace(
         'const setOut = function (text) { const o = out(); if (o) o.textContent = text; };',
         'const setOut = function (text) { out().textContent = text; };');
       assert(bB18 !== srcS18, '（自证）负向注入点 B 命中（settings 判空出口）');
-      const rcB = await __uiGateCheckClickable(__uiGateFresh({ srcOverride: { 'ui/settings.js': bB18 } }));
+      // v2.382.0：这条是本次转红的直接现场 —— `out()` 查的 `#wa-set-out` 只在 devSettingsHtml 里，
+      //   玩家模式下它不在树中，于是 `out().textContent = text` 与 `if (o) o.textContent = text`
+      //   行为完全一致（都不写），注入不产生任何未处理拒绝（实测 0 项）。
+      //   切到开发者模式后实测拿到 1 项：Cannot set properties of null (setting 'textContent')
+      //   —— 正是这条负控制要证的那个缺陷形态。
+      const envB18 = __uiGateFresh({ srcOverride: { 'ui/settings.js': bB18 } });
+      assert(typeof envB18.WA.ui.setDevMode === 'function', '面板提供开发者模式写口（G18 负控制 B 的前置）');
+      envB18.WA.ui.setDevMode(true);
+      const rcB = await __uiGateCheckClickable(envB18);
       assert(rcB.rejections.length > 0, '（负向）异步出口写回失败的未处理拒绝被拿到（实 ' + rcB.rejections.length + ' 项）');
     }
     // v2.21.0: 总线复位。本进程把模块反复装载进**同一个** global.WorldAxis，而总线监听登记
@@ -20515,7 +20567,19 @@ assert(r2900.dead.length === 1440 && r2900.uiDead.length === 7 && r2900.dataOnly
 
     // ③ UI 可访问性门禁（#14）：覆盖率读数 + 缺口清单
     const a11y = require('./ui-a11y-gate.js');
-    const ad = a11y.audit(__uiGateFresh({}));
+    // v2.382.0（历史欠账消红 · 与 #wa-set-save / #wa-hz-save / G18 同族第四处）：
+    //   本条与下一条「名源两侧同宽」比对的是「源面写下的 aria-label 名」与「DOM 上真的
+    //   渲染出来的同名」。但 `__uiGateFresh({})` 出来的是**出厂态**（`devMode:false`），
+    //   `settings.js` 的 `render()` 在玩家模式下直接返回 `playerSettingsHtml()`。
+    //   于是 devSettingsHtml 里那一批控件（推演尺度 / 时间策略 / 世界脉搏活跃度 / NPC预算 /
+    //   注入预算 / 手动上限 / 采样上限 / 骰子面数 … 实测 15 个名）根本没进树：
+    //   源面 194 名 vs DOM 179 名，差 15，恒红。
+    //   这不是「UI 漏了 aria-label」，是判据缺少「取证面必须在开发者模式下」这一前提。
+    //   修法与同族三处一致：先走公开写口切开发者模式，再 audit。
+    const envA11y = __uiGateFresh({});
+    assert(typeof envA11y.WA.ui.setDevMode === 'function', '面板提供开发者模式写口（a11y 取证面的前置）');
+    envA11y.WA.ui.setDevMode(true);
+    const ad = a11y.audit(envA11y);
     console.log('  ' + a11y.summary(ad));
     assert(ad.total >= 300, 'v2109/a11y: 控件面 ' + ad.total + ' 个 ≥300（含常驻头部 + 逐页控件；空集上的覆盖率恒真）');
     assert(ad.gaps.length === 0, 'v2109/a11y: 零无可访问名控件（实 ' + ad.gaps.length
@@ -21588,9 +21652,12 @@ assert(r2900.dead.length === 1440 && r2900.uiDead.length === 7 && r2900.dataOnly
     //   「模式表不宽到能吞一切」。O18 第三刀把 112 把锁全部认完（未识别 0）后该代理失效，
     //   改为**完备性 + 逐条带原因**（空清单下 every 恒真，无需额外计数）；判别力由
     //   `anchor-scan-v2126.js` 的 C1（摘掉形态表 ⇒ 一个都认不出）两向自证把住。
-    assert(scanR.nonUniform.unidentified + scanR.nonUniform.scanned === scanR.nonUniform.total
-      && scanR.unidentified.every(function (u) { return u.why; }),
-      'v2126: 非统一档每把锁都归入已识别/未识别两档，且未识别逐条带原因（不拿「零问题」冒充「已覆盖」）');
+    // v2.383.0（v2133 消红）：三档恒等式（已覆盖 / 扫描器欠账 / **本无锚点面**）。
+    //   拆第三档的理由见 tools/anchor-scan.js 的 MUT_FACE 注释：一把 `runNegative` 只做行为
+    //   反向断言的锁**没有任何锚点原文可抽**，把它记进「认不出」等于让扫描器为别人的东西背账。
+    assert(scanR.nonUniform.unidentified + scanR.nonUniform.scanned + scanR.nonUniform.noFace
+      === scanR.nonUniform.total && scanR.unidentified.every(function (u) { return u.why; }),
+      'v2126: 非统一档每把锁都归入已识别/未识别/无锚点面三档，且未识别逐条带原因（不拿「零问题」冒充「已覆盖」）');
     assert(scanR.summary.gateProblems === scanR.uniform.problems,
       'v2126: 门禁面只算统一档（非统一档「只报不红」在读数上可辨）');
   }
@@ -21827,8 +21894,31 @@ assert(r2900.dead.length === 1440 && r2900.uiDead.length === 7 && r2900.dataOnly
     assert(scanR2133.summary.reach >= 104 && scanR2133.summary.reachRate >= 92,
       'v2133: 覆盖率 ≥ 92%（实 ' + scanR2133.summary.reachRate + '% / '
         + scanR2133.summary.reach + ' 把）—— O18 第一刀 90.18% 之上再推一档');
+    // v2.383.0（v2133 消红）：阈值口径改为**只算真欠账**。
+    //   原判据把「扫描器认不出」与「本锁无锚点面」混在一个数字里（13 把里 8 把是后者），
+    //   于是每新增一把纯行为反向断言的锁都会抬高「认不出」计数，而那根本不是扫描器的错。
+    //   拆档后 unidentified=5（见 /tmp 实测），阈值仍取 8 —— **不因为拆档就放宽**：
+    //   真欠账的容忍度不该变，变的只是「谁该被算进来」。
     assert(scanR2133.nonUniform.unidentified <= 8,
-      'v2133: 未识别 ≤ 8 把（实 ' + scanR2133.nonUniform.unidentified + '；O18 第一刀为 11）');
+      'v2133: 未识别（仅真欠账，不含无锚点面档）≤ 8 把（实 ' + scanR2133.nonUniform.unidentified
+        + '；O18 第一刀为 11）');
+    // 反向：拆档不得变成**吞掉真欠账**的漏斗 —— 被归入 noFace 的锁必须逐把证明「确实不读改源码」。
+    //   判据：noFace 档里但凡出现读源码文件（readFileSync / srcOf / productSources）又**没有**任何
+    //   破坏迹象的组合，就说明谓词放得太宽，把真欠账当成无面抹掉了。
+    const noFaceFiles2133 = (scanR2133.noFace || []).map(function (u) { return u.file; });
+    const noFaceLeak = [];
+    noFaceFiles2133.forEach(function (f) {
+      const srcNF = fs.readFileSync(path.join(BASE, 'tests', f), 'utf8');
+      // 「静默破坏」形态：用标识符（非字面量）当实参去 replace/split —— 谓词只认字面量形态，会漏。
+      //   这类锁确实改源码副本，却可能被误判成无面 ⇒ 必须逐条报警。
+      if (/\.(?:replace|split)\(\s*[A-Za-z_$][\w$.]*\s*,\s*(?:function|['"`]|\(|[A-Za-z_$])/.test(srcNF)
+        && /readFileSync|srcOf\s*\(|productSources\s*\(/.test(srcNF)) {
+        noFaceLeak.push(f);
+      }
+    });
+    assert(noFaceLeak.length === 0,
+      'v2133: 无锚点面档未吞掉真欠账（实漏 ' + noFaceLeak.length + ' 把'
+        + (noFaceLeak.length ? '：' + noFaceLeak.slice(0, 5).join('、') : '') + '）');
     const unid2133 = scanR2133.unidentified.map(function (u) { return u.file; });
     ['journal-v2940.js', 'perf-recalc-v2123.js', 'life-turn-v2132.js'].forEach(function (f) {
       assert(unid2133.indexOf(f) < 0, 'v2133: ' + f + ' 不再落在未识别（声明串目标面已认出）');
@@ -25707,6 +25797,15 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./scenario-v48-financial-contagion-collapse.js');
     await runScript('./scenario-v49-v20-epic-holistic-convergence.js');
     await runScript('./settings-bus-api-gate.js');
+    // v2.382.0（历史欠账消红 · orphan 族补漏）：这两个文件是 v2.380.0 批次（提交 47cb472
+    //   「补齐设置消费点与世界状态骨架消红」）里新增的行为回归，当时**只写了文件、没挂入口**，
+    //   于是 test-surface-gate 判它们 unregistered-orphan，orphan-lock-v2750 的 [B]
+    //   「真仓库零孤儿」随之红。这不是陈旧读数，是真欠账：验证器存在、CI 从不跑。
+    //   口径：与上一批 75 个同档 —— 纯脚本体（无 runAll 导出、无 require.main 守卫），
+    //   走 runScript（子进程 + 退出码即结论）。实测 rc=0：68 项 / 43 容器。
+    //   不塞 EXEMPT：豁免是「允许它不跑」，而这两个文件本身能跑且有效。
+    await runScript('./settings-consumption-regression.js');
+    await runScript('./world-state-materialization-regression.js');
     await runScript('./test-advanced-maps.js');
     await runScript('./test-affection-nexus.js');
     await runScript('./test-intimate-arbiter.js');

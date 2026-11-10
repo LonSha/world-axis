@@ -464,7 +464,7 @@
       "src": "engines/alchemy-toxicology.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
+      "own": 6
     },
     "anomalyMutation.getAnomalyProfile": {
       "reason": "self-only",
@@ -1016,7 +1016,7 @@
       "src": "engines/blackmarket-usury.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
+      "own": 5
     },
     "bloodlineHeritage.diagnose": {
       "reason": "self-only",
@@ -1047,7 +1047,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/bloodline-heritage.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 2
     },
     "bloodlineHeritage.resetStat": {
@@ -1072,7 +1072,7 @@
       "src": "engines/bloodline-heritage.js",
       "refs": 0,
       "tref": 0,
-      "own": 7
+      "own": 8
     },
     "bloodlineHeritage.stat": {
       "reason": "self-only",
@@ -2495,7 +2495,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/court-intrigue.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 4,
       "own": 2
     },
     "courtIntrigue.resetStat": {
@@ -2520,7 +2520,7 @@
       "src": "engines/court-intrigue.js",
       "refs": 0,
       "tref": 0,
-      "own": 7
+      "own": 8
     },
     "courtIntrigue.stat": {
       "reason": "self-only",
@@ -2544,7 +2544,7 @@
       "src": "engines/covenant-sanction.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
+      "own": 6
     },
     "coverBallistics.getCoverStatus": {
       "reason": "self-only",
@@ -3167,7 +3167,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/dungeon-hazard-mesh.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 2
     },
     "dungeonHazardMesh.getDungeon": {
@@ -3208,7 +3208,7 @@
       "src": "engines/dungeon-hazard-mesh.js",
       "refs": 0,
       "tref": 0,
-      "own": 8
+      "own": 9
     },
     "dungeonHazardMesh.stat": {
       "reason": "self-only",
@@ -3263,7 +3263,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/ecosystem-cascade.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 2
     },
     "ecosystemCascade.resetStat": {
@@ -3288,7 +3288,7 @@
       "src": "engines/ecosystem-cascade.js",
       "refs": 0,
       "tref": 0,
-      "own": 8
+      "own": 9
     },
     "ecosystemCascade.stat": {
       "reason": "self-only",
@@ -3423,7 +3423,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/engineering-blueprint.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 2
     },
     "engineeringBlueprint.resetStat": {
@@ -3448,7 +3448,7 @@
       "src": "engines/engineering-blueprint.js",
       "refs": 0,
       "tref": 0,
-      "own": 8
+      "own": 9
     },
     "engineeringBlueprint.stat": {
       "reason": "self-only",
@@ -3751,7 +3751,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/epidemic-contagion.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 3,
       "own": 1
     },
     "epidemicContagion.view": {
@@ -4943,7 +4943,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/incarceration-jailbreak.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 3
     },
     "incarcerationJailbreak.advanceEscapePrep": {
@@ -5008,7 +5008,7 @@
       "src": "engines/incarceration-jailbreak.js",
       "refs": 0,
       "tref": 0,
-      "own": 8
+      "own": 10
     },
     "incarcerationJailbreak.stat": {
       "reason": "self-only",
@@ -6095,7 +6095,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/maritime-navigation.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 4,
       "own": 3
     },
     "maritimeNavigation.saveSettings": {
@@ -6112,7 +6112,7 @@
       "src": "engines/maritime-navigation.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
+      "own": 7
     },
     "masks.dropMask": {
       "reason": "test-only",
@@ -6248,7 +6248,7 @@
       "src": "engines/metabolism-clock.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
+      "own": 4
     },
     "microclimatePhase.registerNodeMedium": {
       "reason": "self-only",
@@ -8199,7 +8199,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/regiment-tactics.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 3,
       "own": 2
     },
     "regimentTactics.resetStat": {
@@ -8224,7 +8224,7 @@
       "src": "engines/regiment-tactics.js",
       "refs": 0,
       "tref": 0,
-      "own": 9
+      "own": 10
     },
     "regimentTactics.stat": {
       "reason": "self-only",
@@ -9639,7 +9639,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/stealth-infiltration.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 6,
       "own": 3
     },
     "stealthInfiltration.saveSettings": {
@@ -9656,7 +9656,7 @@
       "src": "engines/stealth-infiltration.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
+      "own": 7
     },
     "store.batchDepth": {
       "reason": "test-only",
@@ -9895,7 +9895,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/surgical-triage.js",
       "refs": 0,
-      "tref": 4,
+      "tref": 7,
       "own": 3
     },
     "surgicalTriage.getSettings": {
@@ -9911,7 +9911,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/surgical-triage.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 4,
       "own": 1
     },
     "surgicalTriage.view": {
@@ -10199,7 +10199,7 @@
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/theology-cult.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 2
     },
     "theologyCult.resetStat": {
@@ -10224,7 +10224,7 @@
       "src": "engines/theology-cult.js",
       "refs": 0,
       "tref": 0,
-      "own": 7
+      "own": 9
     },
     "theologyCult.stat": {
       "reason": "self-only",

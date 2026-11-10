@@ -29,7 +29,10 @@ const ANCHOR = {
   pvShield: "const isHidden = (c.visibility === 'hidden');",
   pvSort: "const wa = URGENCY_WEIGHT[a.urgency] || 0;",
   pvEmpty: "line: '未来三天未发现迫近的未结算暗流，局势相对平稳。'",
-  exportsFace: "WA.undercurrentCalendar = {\n    DEF: DEF,\n    BOUNDS: BOUNDS,\n    STAGE_WINDOWS: STAGE_WINDOWS,"
+  // v2.382.0：导出面已含 triggerByMessage（引擎后来长出的显式写入口），锚点随实现收敛。
+  //   若只改锚点而不看它守护什么，就成了「让判据追上实现」——故同时补了 A2a/A2b/A2c 三段，
+  //   见下方（读路径零写盘 / 写口必须登记 / 站点数对账）。
+  exportsFace: "WA.undercurrentCalendar = {\n    triggerByMessage: triggerByMessage,\n    DEF: DEF,\n    BOUNDS: BOUNDS,\n    STAGE_WINDOWS: STAGE_WINDOWS,"
 };
 
 const TGT = {};
@@ -55,7 +58,11 @@ function runAll(assertFn) {
     a(c === 1, 'v2268/A1: 锚点 ' + k + ' 在 ' + TGT[k] + ' 恰中 1 次（实 ' + c + '）');
   });
 
-  a(cnt(Ec, 'store.transact(') === 0, 'v2268/A2: 引擎源码中零 store.transact 写调用');
+// A2（v2.268.0 原文「引擎源码中零 store.transact 写调用」）已于 v2.382.0 拆成
+  //   A2a/A2b/A2c 三段（见下方 A9 之后）：引擎后来长出两个显式写入口，全文件零写盘
+  //   这条判据已与实现矛盾——留着它只能靠删功能或删判据来「转绿」，两条都不能选。
+  //   新三段守的是同一条不变量，但边界按事实写：读路径零写 / 写口逐个登记 / 站点数对账。
+  //   ⚠ 判据工整性检查：本注释提到 A2a/A2b/A2c，它们必须真存在于下方（否则就是注释许诺）。
   a(cnt(Ec, 'settingsBus.write') === 0 && cnt(Ec, 'settingsBus.save(') === 0, 'v2268/A3: 引擎源码中读路径零 settingsBus 写');
   a(typeof UC.build === 'function', 'v2268/A4: 导出 build 函数');
   a(typeof UC.build().line === 'string', 'v2268/A5: 人话一行由 build() 直接给出（导出面不另立 line 口）');
@@ -63,6 +70,42 @@ function runAll(assertFn) {
   a(typeof UC.reset === 'function', 'v2268/A7: 导出 reset 函数');
   a(typeof UC.getSettings === 'function', 'v2268/A8: 导出 getSettings 函数');
   a(typeof UC.setSettings === 'function', 'v2268/A9: 导出 setSettings 函数');
+  // ── v2.382.0（历史欠账消红）：A2 判据口径收窄 ─────────────────────────────
+  //   v2.268.0 建段时这条写的是「引擎源码中零 store.transact」，当时引擎是**纯读聚合**。
+  //   此后引擎长出了两个**显式写入口**：`alignWithFestival`（节庆共振催化暗流跃迁）与
+  //   `triggerByMessage`（讯息触发推进 stage）—— 它们改 `draft.currents` 是本职，不是泄漏。
+  //   于是旧判据恒红，而它想守的真不变量其实是：**读路径（build / reset）零写盘**。
+  //   这正是 C1「多次调用 build 前后 store 逐字一致」的静态对偶。
+  //   故把判据拆成三段，既不放弃这条防线，也不让它跟实现打架：
+  //     A2a 读路径函数体里零 store.transact（真不变量）
+  //     A2b 写入口逐个登记，且**必须真在函数体里**（登记表不许空转）
+  //     A2c 全文件 transact 站点数 === 登记表条数（多出来的写口 = 红灯，不许偷偷长）
+  const fnBody = function (name) {
+    const i = Ec.indexOf('function ' + name + '(');
+    if (i < 0) return '';
+    // 从函数头往后取到下一个 `function <ident>(` 的段（本模块函数均为同层声明，够用）
+    const rest = Ec.slice(i + 10);
+    const m = rest.match(/\n  function [A-Za-z_$][\w$]*\(/);
+    return m ? Ec.slice(i, i + 10 + m.index) : Ec.slice(i);
+  };
+  const WRITE_ENTRIES = ['alignWithFestival', 'triggerByMessage'];
+  ['build', 'reset'].forEach(function (name) {
+    a(fnBody(name).indexOf('store.transact') < 0,
+      'v2268/A2a: 读路径 ' + name + '() 零 store.transact（纯读不变式，实 '
+      + (fnBody(name).split('store.transact').length - 1) + ' 处）');
+  });
+  WRITE_ENTRIES.forEach(function (name) {
+    a(fnBody(name).indexOf('store.transact') >= 0,
+      'v2268/A2b: 写入口 ' + name + '() 真在函数体里写盘（登记表不许空转）');
+  });
+  {
+    // 只数**调用站点**（带左括号）：`typeof WA.store.transact === 'function'` 是能力探测，
+    // 注释里出现的「零 store.transact」是说明文字 —— 两者都不是写盘，不能进这条对账。
+    const sites = Ec.split('store.transact(').length - 1;
+    a(sites === WRITE_ENTRIES.length,
+      'v2268/A2c: 全文件 transact 调用站点数 === 登记写口数（实 ' + sites + ' vs ' + WRITE_ENTRIES.length
+      + '）—— 新长出来的写口必须显式登记，否则就是暗写盘');
+  }
 
   // ── B 运行时用例 ────────────────────────────────────────────────────────
   UC.reset();

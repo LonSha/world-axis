@@ -203,6 +203,22 @@ const PATTERNS = [
 /** 自引用排除：本工具与统一档审计器本身不是被测锁。 */
 const SELF = ['anchor-scan.js'];
 /**
+ * v2.383.0（v2133 消红）：**破坏面存在性谓词**（与「认不认得出锚点」是两件事）。
+ *   治的病：`unidentified` 原先把两类东西混在一个数字里 ——
+ *     · 类一「扫描器认不出」：锁**确实**改产品源码副本，锚点原文存在，只是写法没被形态表覆盖
+ *       ⇒ 这是**真欠账**，每多一把就多一段无人核的锚点。
+ *     · 类二「本来就没有锚点面」：锁的 `runNegative` 只做**行为反向断言**
+ *       （关掉开关必须放行、非法坐标必须被滤掉）或**运行期故障注入**（把 store.transact 换掉），
+ *       从不读改产品源码 ⇒ **没有任何锚点原文可抽**，扫描器无物可认。
+ *   把类二记成「认不出」，等于让扫描器为「别人没有的东西」背账 —— 判据范围（能不能抽出锚点）
+ *   与被测对象（这把锁有没有锚点面）不是同一件事。本仓同型教训已出现过四次
+ *   （v2.131.0 txt-field 假零贡献、v2.133.0 自证口径、v2.134.0 未识别计数、v2.256.0 README 名单）。
+ *   故本表只判**存在性**（有破坏迹象的写法），**不判能否解析**：解析失败仍如实进 `unidentified`。
+ *   刻意求宽：宁可把一把「其实没有锚点面」的锁误判成欠账（保守方向，会亮红要人看），
+ *   也不要把一把真欠账误判成「无面」（那才是抹红）。
+ */
+const MUT_FACE = /\.(?:replace|split)\(\s*['"`]|\bwreck\s*\(|\bmust1\s*\(|\bcopyAnchor\s*:|\bbreakOnce\b|\bANCHORS\s*=|\btxt\s*:\s*['"`]/;
+/**
  * v2.131.0（O18）：**值拒收表**（对所有锚点模式生效）。
  *   值形态门只管「像不像代码片段」；本表管「是代码片段、但确定不是锚点原文」的形态：
  *     · 点分路径 / 相对路径：`causal.chains`、`README.md`、`engines/world.js`
@@ -325,6 +341,18 @@ function scanLock(file, readCache) {
   const ex = extract(selfSrc);
   const out = { file: file, anchors: ex.anchors.length, targets: ex.targets.length, problems: [] };
   if (!ex.anchors.length || !ex.targets.length) {
+    // v2.383.0（v2133 消红）：**先问「有没有面」，再问「认不认得出」**。
+    //   原版把所有抽不出锚点的锁都归 `unidentified`，于是一把**从设计上就不读改源码**的锁
+    //   （`runNegative` 只做行为反向断言：关掉开关必须放行、非法坐标必须被滤掉）
+    //   与一把**真锚点漂了**的锁长得一模一样，混在同一个计数里。
+    //   两类需要的动作相反：前者要么补说明（本就无面），要么没人可以核；后者必须修扫描器。
+    //   故拆出第三档 `no-mut-face`：它不是「已覆盖」，也**不是扫描器的亏欠**——
+    //   它进 `noFace` 单列，`unidentified` 只留真欠账。门禁面（gateProblems）仍只算统一档，不受影响。
+    if (!MUT_FACE.test(selfSrc)) {
+      out.kind = 'no-mut-face';
+      out.why = '本锁不读改产品源码（runNegative 只做行为反向断言 / 运行期故障注入）⇒ 无锚点原文可抽';
+      return out;
+    }
     out.kind = 'unidentified';
     out.why = !ex.anchors.length ? '认不出锚点原文（无具名常量 / 无 txt|from 字段）' : '认不出目标文件（无文件常量 / 无 path.join / 无 srcOverride 键）';
     return out;
@@ -410,11 +438,15 @@ function scan(opts) {
   const nonUniformFiles = uni.locks.filter(function (l) { return l.kind === AUDIT.KINDS.NON_UNIFORM; })
     .map(function (l) { return l.file; });
   // ② 非统一档：本工具的启发式面
-  const scanned = [], unidentified = [];
+  const scanned = [], unidentified = [], noFace = [];
   nonUniformFiles.forEach(function (f) {
     if (SELF.indexOf(f) >= 0) return;
     const r = scanLock(f, readCache);
-    (r.kind === 'scanned' ? scanned : unidentified).push(r);
+    // v2.383.0（v2133 消红）：三档并列 —— 已覆盖 / 扫描器欠账 / 本无锚点面。
+    //   第二档才是「欠账」；第三档只是**事实登记**（它没有锚点原文，不是有人把它弄丢了）。
+    if (r.kind === 'scanned') scanned.push(r);
+    else if (r.kind === 'no-mut-face') noFace.push(r);
+    else unidentified.push(r);
   });
   const issues = [];
   scanned.forEach(function (r) { r.problems.forEach(function (p) { issues.push(p); }); });
@@ -424,11 +456,15 @@ function scan(opts) {
       total: nonUniformFiles.length,
       scanned: scanned.length,
       unidentified: unidentified.length,
+      // v2.383.0：「本无锚点面」单列（既不算已覆盖，也不算扫描器欠账）。
+      //   恒等式随之变成 scanned + unidentified + noFace === total。
+      noFace: noFace.length,
       anchors: scanned.reduce(function (a, r) { return a + r.anchors; }, 0),
       issues: issues.length
     },
     scanned: scanned,
     unidentified: unidentified.map(function (r) { return { file: r.file, why: r.why }; }),
+    noFace: noFace.map(function (r) { return { file: r.file, why: r.why }; }),
     issues: issues,
     summary: {
       locksTotal: uni.summary.locks,

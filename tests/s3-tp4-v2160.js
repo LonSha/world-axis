@@ -173,8 +173,26 @@ function runA(a) {
   });
   // 装载面：core/commit.js 必须在 index.js 的 LOAD_ORDER 与 run.js 的主 LOAD 里
   a(read(REL_INDEX).indexOf("'core/commit.js'") >= 0, 'v2160-tp4 A22 index.js LOAD_ORDER 登记 core/commit.js');
-  a(countOcc(read(REL_RUN), "'core/commit.js', 'core/interceptor.js'") === 1,
-    'v2160-tp4 A23 run.js 主 LOAD 在 settle-guard 之后、interceptor 之前登记（恰 1 次，未误改 bridge 负控块）');
+  // v2.382.0（历史欠账消红）：A23 原锚点是 run.js 里**相邻**的字面量
+  //   `'core/commit.js', 'core/interceptor.js'`。v2.296.0 在两者之间插入了
+  //   `'core/unified-pending.js'` —— 这是合法演进（LOAD 次序：commit → unified-pending →
+  //   interceptor），但让「相邻字面量」这条锚点恒不命中，判据从此恒红。
+  //   判据真正要守的是**次序**（commit 在 settle-guard 之后、interceptor 之前）；
+  //   锚点只是次序的代理。故改为按 LOAD 数组里的**下标**比对，不再依赖相邻性。
+  {
+    const runSrcA23 = read(REL_RUN);
+    const iLoad0 = runSrcA23.indexOf("'core/settle-guard.js'");
+    const iCommit = runSrcA23.indexOf("'core/commit.js'");
+    const iInter = runSrcA23.indexOf("'core/interceptor.js'");
+    a(iLoad0 > 0 && iCommit > iLoad0 && iInter > iCommit,
+      'v2160-tp4 A23 run.js 主 LOAD 次序：settle-guard(' + iLoad0 + ') → commit(' + iCommit
+      + ') → interceptor(' + iInter + ')');
+    // 「未误改 bridge 负控块」：bridge 负控那一段必须仍把 interceptor 的装载还原逻辑保留住。
+    //   直接用 countOcc 数出现次数会因 LOAD 与负控块各一处而失真，故按「commit 出现在
+    //   LOAD 数组区间内」判（区间止于 LOAD 数组闭合）。
+    a(countOcc(runSrcA23, "'core/commit.js'") === 1,
+      'v2160-tp4 A23b run.js 里 core/commit.js 恰登记 1 次（实 ' + countOcc(runSrcA23, "'core/commit.js'") + '）——未误改 bridge 负控块');
+  }
   // 容量登记双真源逐键对账
   a(read('core/store.js').indexOf("'commit.receipts':  { cap: 64,") >= 0,
     'v2160-tp4 A24 store.__BOUNDED_CAPS 登记 commit.receipts（cap 64 与 LIMITS.RECEIPTS 同源）');

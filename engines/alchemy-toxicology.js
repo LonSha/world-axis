@@ -147,7 +147,9 @@
           if (!pCase && Object.keys(store.cases).length >= Math.max(1, Math.floor(settings().maxPatients))) {
             noteFault('patient-capacity');
             result = { ok: false, refusal: 'patient-capacity' };
-            return;
+            // v2.382.0（v2790 消红）：本分支只写模块级 stat 与局部 result，未改世界 ⇒ 中止事务
+            //   （此前为裸 return，拒收照样提交：stateRev 推进、落一次盘、updatedAt 更新）。
+            return false;
           }
           if (!pCase) {
             pCase = {

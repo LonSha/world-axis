@@ -113,9 +113,13 @@ function runB(a) {
   //   有无判别力）不是同一件事 —— 判别力改由 C1 的**两向自证**直接证明
   //   （摘掉形态表 ⇒ 非统一档一个都认不出）。本处只保留**完备性**：每把锁都必须
   //   落进「已识别 / 未识别」之一，不许有锁从两档之间漏掉。
-  a(r.nonUniform.unidentified + r.nonUniform.scanned === r.nonUniform.total,
-    'v2126/B: 非统一档每把锁都归入已识别/未识别两档（实 ' + r.nonUniform.scanned + ' + '
-      + r.nonUniform.unidentified + ' = ' + r.nonUniform.total + '）—— 判别力由 C1 两向自证把住');
+  // v2.383.0（v2133 消红）：三档恒等式。第三档 `noFace` = 锁本身不读改产品源码
+  //   （runNegative 只做行为反向断言 / 运行期故障注入）⇒ 无锚点原文可抽，不是扫描器欠账。
+  //   拆档理由见 tools/anchor-scan.js 的 MUT_FACE 注释；本判据守住「每把锁仍落进某一档」。
+  a(r.nonUniform.unidentified + r.nonUniform.scanned + r.nonUniform.noFace === r.nonUniform.total,
+    'v2126/B: 非统一档每把锁都归入已识别/未识别/无锚点面三档（实 ' + r.nonUniform.scanned + ' + '
+      + r.nonUniform.unidentified + ' + ' + r.nonUniform.noFace + ' = ' + r.nonUniform.total
+      + '）—— 判别力由 C1 两向自证把住');
   // 三类归因都出现了（not-found / impure 至少各一；not-unique 或 ambiguous 至少一）
   const kinds = {};
   r.issues.forEach(function (p) { kinds[p.kind] = (kinds[p.kind] || 0) + 1; });

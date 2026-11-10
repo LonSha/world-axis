@@ -3,13 +3,13 @@
 > 台账 version：`2.380.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **1721** 个内联拒收码：见证 750 / 死表 52 / 基线 919
+共 **1728** 个内联拒收码：见证 757 / 死表 52 / 基线 919
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
 **基线**=存量未分类（新增未分类码即红灯）。
 
-## 见证（可执行）（750）
+## 见证（可执行）（757）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -181,6 +181,7 @@
 | `build-throw` | engines/canon.js | canon.buildOutline：切分过程内部异常 ⇒ 与「你给的东西不对」分开报（引擎坏了是另一件事，v2.99.0） |
 | `built` | engines/relation-temp.js | EXV6-3：关系温度正常生成 ⇒ built |
 | `cannot-afford` | engines/economy.js, engines/stall.js | economy.buy：钱不够就是不够 ⇒ 不把欠款伪装成成交（拓展③） |
+| `capacity-reached` | engines/bloodline-heritage.js, engines/dungeon-hazard-mesh.js, engines/ecosystem-cascade.js, engines/engineering-blueprint.js, engines/incarceration-jailbreak.js, engines/regiment-tactics.js, engines/theology-cult.js | 容量闸：已登记容量上限被读进注册入口 ⇒ 超限新建被拒并报 capacity-reached，而同 id 的存量仍可更新（不是「恒拒」） |
 | `carries-world-facts` | engines/rule-pack.js | Y8：导入体顶层带着世界事实字段（人物/事件/地图）⇒ 写盘之前拒收并带回名单（不静默丢弃） |
 | `case-closed` | engines/ruling.js | EXP-6：这桩案子已执行完毕 ⇒ 如实报 case-closed（除退款外不再收指令）—— 与 bad-phase 分列：一个「案结了」、一个「顺序不对」 |
 | `case-not-ruled` | engines/ruling.js | EXP-6：还没裁决就执行不了 ⇒ 如实报 case-not-ruled（处罚只能来自定罪后的裁决） |
@@ -211,6 +212,7 @@
 | `contract-cancelled` | engines/act.js | act.advance：挂钩的委托已取消 ⇒ 如实记成失败并给出 contract-cancelled |
 | `contrast-failed` | render/inject.js | render.themeContrast：对照返回空 ⇒ 如实归因 contrast-failed（不把它读成「一致」）（X7） |
 | `contrast-thrown` | render/inject.js | render.themeContrast：模块级对照抛错 ⇒ 不吞掉，如实记为 contrast-thrown（X7） |
+| `court-capacity` | engines/court-intrigue.js | 朝堂数量闸：maxCourts 被读进 registerCourt ⇒ 超限报 court-capacity，同 id 可更新 |
 | `current-missing` | engines/backstage.js | V9 real owner rejection: current-missing |
 | `cycle` | engines/kaleidoscope.js | 两个派生量互相引用 |
 | `dangling-continuation-relation` | engines/world-seed.js | V9 real owner rejection: dangling-continuation-relation |
@@ -275,6 +277,7 @@
 | `goal-not-active` | engines/plan.js | plan.expand：目标已不是 active ⇒ 不给它排计划（拓展①） |
 | `goods-full` | engines/economy.js | economy.stock：在册货品数达上限 ⇒ 不静默丢弃（拓展③） |
 | `graded` | engines/success-grade.js | successGrade：开着时给五档，reason 记 graded 并带档名 |
+| `guard-capacity-or-store-unavailable` | engines/stealth-infiltration.js | 守卫数量闸：maxGuards 读进 registerGuard ⇒ 超限报 guard-capacity-or-store-unavailable，同 id 可更新 |
 | `guarded-key` | engines/checkpoints.js | checkpoints 显式点名守卫键（schemaVersion）存快照 |
 | `halted` | engines/world.js | world.where：中止过的行程位置**未知**（既不在出发地也不在目的地）（B2） |
 | `hard-cut` | engines/beat-ledger.js | A3：换场不给过渡 ⇒ hard-cut（不许一句话从宿舍切到列车） |
@@ -537,6 +540,7 @@
 | `parent-locked` | engines/world.js | 已有归属不得被冲突改写（v2.85.0 B2：无→有是补全、x→y 才是改写） |
 | `pass` | engines/world.js | world.effectiveBlockOf：三层都放行时的正名（不是「没有理由」，是「可以过」）（B2） |
 | `path-missing` | engines/coop.js | coop.coopSetPath：路径末段那一格不存在 ⇒ 不凭空补一格出来（不代造中间层）（拓展⑨） |
+| `patient-capacity` | engines/surgical-triage.js | 病人数量闸：maxPatients 读进外科收治与毒理建病历两条路 ⇒ 超限报 patient-capacity，同 id 可更新 |
 | `penalties-full` | engines/ruling.js | EXP-6：处罚行到上限 ⇒ 如实报 penalties-full（不静默挤掉已执行的处罚） |
 | `pending-mismatch` | engines/world-blueprint.js, engines/world-seed.js | worldSeed.initConfirm：预览票据已不在册（过期 / 被挤出 / 已被消费）⇒ 拒收 pending-mismatch 并给出「重新预览」提示 —— 它与 no-preview（从没预览过）绝不可同形：前者要重预览，后者要补预览 |
 | `permission-denied` | core/permissions.js, core/store.js | permissions.has/check：人在册但没有该权限位 ⇒ permission-denied（与 unknown-user 分开，v2.111.0 plan-2 #67） |
@@ -595,6 +599,7 @@
 | `rumor-threw` | engines/evidence-board.js | N4：撤回转述链时 rumor 面抛错 ⇒ 记 rumor-threw（层/完整位读不出来也不静默当没撤） |
 | `same-cell` | engines/interest-face.js | interestFace：同格内移动 ⇒ same-cell 且不重算覆盖集合 |
 | `same-sign` | engines/stall.js | stall：招牌没变 ⇒ same-sign（不白改一次台账） |
+| `sanctuary-capacity` | engines/sanctuary-scramble.js | 庇护所数量闸：maxSanctuaries 读进 scramble ⇒ 批量与单发两条路的超限都报 sanctuary-capacity |
 | `sandbox-failed` | engines/rehearsal.js, engines/world-lab.js | rehearsal.run：隔离快照建不起来 ⇒ 不拿真世界试演（宁可拒收）（B7） |
 | `sandbox-throw` | core/sandbox.js | sandbox.run：脚本自己抛错 ⇒ 吞成 sandbox-throw（沙箱口不许把调用方搞挂；与「Access denied」分列——前者是脚本坏了，后者是边界挡下了，v2.114.0） |
 | `sandbox-timeout` | core/sandbox.js | sandbox.run：同步体跑过 timeoutMs ⇒ sandbox-timeout（超时是读数不是崩：仍把已完成的返回值带出供调用方判，v2.114.0） |
@@ -616,6 +621,7 @@
 | `settings-bus-absent` | engines/rule-pack.js | E7：切换包时发现写入口缺席 ⇒ 不逐键半写，先整体拒收 |
 | `settle-failed` | core/commit.js, engines/agency.js | commit.settle：事务外补记回执时写盘失败 ⇒ 拒收 settle-failed（如实报「补账没成功」，不粉饰成 ok） |
 | `settle-not-here` | engines/liaison.js | liaison.advance：终档不许从推进面走 ⇒ 结算只有一个出口（拓展⑧） |
+| `settlement-capacity` | engines/epidemic-contagion.js | 疫区数量闸：maxSettlements 读进 propagateDisease ⇒ 超限报 settlement-capacity，同地可推进 |
 | `short-cost` | engines/contest.js | EXP-5：要付的代价手里不够 ⇒ 如实报 short-cost（**先判后扣**：一克都不动，不出现「扣了一半又失败」） |
 | `short-fine` | engines/ruling.js | EXP-6：罚款要扣的钱不够 ⇒ 如实报 short-fine（**先判后扣**：一克都不动，不出现「扣了一半又失败」） |
 | `short-input` | engines/economy.js, engines/production.js | economy.craft：原料不够 ⇒ 拒收并列明缺哪几样（拓展③） |
@@ -754,6 +760,7 @@
 | `unreciprocated` | engines/life.js | 单向宣布的合作不得被当作已建立的协作（v2.85.0 B1） |
 | `unsupported-stage` | engines/backstage.js | V9 real owner rejection: unsupported-stage |
 | `unusable` | engines/handoff-pack.js | handoff-pack.restore：包里一块都没有 ⇒ 拒绝复原（与「不完整」分列，后者仍可复原） |
+| `vessel-capacity-or-store-unavailable` | engines/maritime-navigation.js | 船舶数量闸：maxVessels 读进 registerVessel ⇒ 超限报 vessel-capacity-or-store-unavailable，同 id 可更新 |
 | `weak-evidence` | engines/intel.js | intel.verify：弱证据不改认知 ⇒ 报 weak-evidence 且零变化（B3） |
 | `window-closed` | engines/opportunity.js | opportunity.respond：过窗口末刻的作答一律拒收，且这次作废真落盘（B6） |
 | `window-too-short` | engines/plan.js, engines/world.js | world.canBeAt：窗口容不下这件事 ⇒ 报短多少，不硬塞（B2） |

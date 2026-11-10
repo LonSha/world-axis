@@ -138,7 +138,8 @@
       if (!record && Object.keys(outbreaks).length >= Math.max(1, Math.floor(settings().maxSettlements))) {
         noteFault('settlement-capacity');
         result = { ok: false, reason: 'settlement-capacity' };
-        return;
+        // v2.382.0（v2790 消红）：同上——本分支只记账不改世界 ⇒ 中止事务。
+        return false;
       }
       if (!record) {
         // 如果初次创建但完全没有传染源（exposed + infectious == 0）

@@ -8385,6 +8385,212 @@ function runWitness(WA) {
       if (__keepPop && typeof P.setSettings === 'function') P.setSettings({ enabled: true });
     }
   }
+  // ── v2.382.0（历史欠账消红）：容量类配置接入生产消费点后新长出的 7 个码 —— 必须带可执行见证 ──
+  //   来路如实登记：它们的**产生**不是本版新增功能，而是本版修「设置声明了却无生产消费点」
+  //   这一族死键时，把 12 个引擎里早已声明的容量上限（max* 常驻在 DEF 里、此前没有任何读取方）
+  //   真正接进了注册入口。也就是说：这些码以前不存在，因为那条路根本不存在。
+  //   为什么不能进 base（存量未分类）：它们是**容量闸**，是玩家在长局里最可能撞上的一句话
+  //   （「这一格满了」）。登记成「存量未分类」等于让门禁替我们说「没人会跑到」。
+  //   为什么不能进死表：它们一个个都跑得出来（下面逐条真跑，不构造返回体）。
+  //   口径：这批码全是「容器满 ⇒ 拒收新建、但同 id 的存量仍可更新」的形状 ——
+  //     见证必须同时证明「第二次新建被拒」与「同 id 再写不被拒」，否则测到的只是「恒拒」。
+  {
+    // 设置面收卷：所有动过 max* 的引擎一律还原成见证前的现场值（同本文件各段契约）。
+    const __capSettled = [];
+    const capModule = function (mod, patch) {
+      if (!WA.settingsBus || typeof WA.settingsBus.registry !== 'function') return false;
+      const reg = WA.settingsBus.registry().filter(function (r) { return r && r.module === mod; })[0];
+      if (!reg) return false;
+      __capSettled.push({ reg: reg, keep: (typeof WA.settingsBus.read === 'function') ? WA.settingsBus.read(reg) : null });
+      WA.settingsBus.saveOrThrow(reg, Object.assign({}, reg.def, patch));
+      return true;
+    };
+    const capRestore = function () {
+      __capSettled.forEach(function (x) {
+        try { WA.settingsBus.saveOrThrow(x.reg, x.keep || x.reg.def); } catch (e) {}
+      });
+      __capSettled.length = 0;
+    };
+    // 世界面收卷：容量见证会往容器里塞占位行，整份快照/还原不给后面留残局。
+    const __capKeys = ['bloodlines', 'dungeons', 'ecosystemCascade', 'engineeringWorkshop',
+      'prisonSystem', 'regiments', 'theologySects', 'courtIntrigue', 'stealthTactics',
+      'sanctuaries', 'sanctuaryOccupants', 'epidemicOutbreaks', 'maritimeVessels', 'surgicalPatients'];
+    const capSnap = function () {
+      const s = WA.store.get() || {};
+      const o = {};
+      __capKeys.forEach(function (k) { o[k] = (s[k] === undefined) ? undefined : JSON.parse(JSON.stringify(s[k])); });
+      return o;
+    };
+    const capRestoreWorld = function (b) {
+      WA.store.transact(function (d) {
+        __capKeys.forEach(function (k) {
+          if (b[k] === undefined) { try { delete d[k]; } catch (e) {} } else { d[k] = b[k]; }
+        });
+      }, 'witness:capacity-restore');
+    };
+    const snap0 = capSnap();
+    try {
+      // ① capacity-reached：七个引擎共用这一个码，逐个真跑（一处跑不出就是那条路没接上）
+      want('capacity-reached',
+        '容量闸：已登记容量上限被读进注册入口 ⇒ 超限新建被拒并报 capacity-reached，'
+        + '而同 id 的存量仍可更新（不是「恒拒」）');
+      const CAP_ENGINES = [
+        { ns: 'bloodlineHeritage', mod: 'bloodlineHeritage', cap: 'maxLineages', key: 'bloodlines', call: function (id) { return WA.bloodlineHeritage.registerClan(id, {}); } },
+        { ns: 'dungeonHazardMesh', mod: 'dungeonHazardMesh', cap: 'maxDungeons', key: 'dungeons', call: function (id) { return WA.dungeonHazardMesh.generateDungeon(id, {}); } },
+        { ns: 'ecosystemCascade', mod: 'ecosystemCascade', cap: 'maxRegions', key: 'ecosystemCascade', call: function (id) { return WA.ecosystemCascade.registerEcoRegion(id, {}); } },
+        { ns: 'engineeringBlueprint', mod: 'engineeringBlueprint', cap: 'maxWorkshops', key: 'engineeringWorkshop', call: function (id) { return WA.engineeringBlueprint.registerWorkshop(id, {}); } },
+        { ns: 'incarcerationJailbreak', mod: 'incarcerationJailbreak', cap: 'maxPrisoners', key: 'prisonSystem', call: function (id) { return WA.incarcerationJailbreak.admitPrisoner(id, {}); } },
+        { ns: 'regimentTactics', mod: 'regimentTactics', cap: 'maxRegiments', key: 'regiments', call: function (id) { return WA.regimentTactics.registerRegiment(id, { headcount: 100 }); } },
+        { ns: 'theologyCult', mod: 'theologyCult', cap: 'maxSects', key: 'theologySects', call: function (id) { return WA.theologyCult.registerSect(id, {}); } }
+      ];
+      const capSeen = [];
+      CAP_ENGINES.forEach(function (e) {
+        const b = capSnap();
+        try {
+          if (!WA[e.ns] || typeof WA[e.ns].setSettings !== 'function') return;
+          WA[e.ns].setSettings({ enabled: true });
+          if (!capModule(e.mod, (function () { const p = {}; p[e.cap] = 1; return p; })())) return;
+          const r1 = e.call('cap-first');
+          const r2 = e.call('cap-second');
+          const r3 = e.call('cap-first');
+          if (r1 && r1.ok === true && r2 && r2.reason === 'capacity-reached' && r3 && r3.ok === true) {
+            capSeen.push(e.ns);
+          }
+        } finally { capRestoreWorld(b); }
+      });
+      if (capSeen.length) { seen['capacity-reached'] = true; }
+      // 七个入口一个都不能少：只跑出一个就记 seen 会让「其余六条根本没接上」隐身。
+      //   不全 ⇒ 撤掉 seen（于是该码既无见证、又不在死表、也不在基线 ⇒ 门禁按「未分类」红灯点名），
+      //   不额外造一个诊断码把红灯解释掉。
+      if (capSeen.length !== CAP_ENGINES.length) { delete seen['capacity-reached']; }
+
+      // ② court-capacity：朝堂数量闸（与 ① 同形，单列因为它是独立码）
+      want('court-capacity',
+        '朝堂数量闸：maxCourts 被读进 registerCourt ⇒ 超限报 court-capacity，同 id 可更新');
+      {
+        const b = capSnap();
+        try {
+          if (WA.courtIntrigue && typeof WA.courtIntrigue.setSettings === 'function') {
+            WA.courtIntrigue.setSettings({ enabled: true });
+            capModule('courtIntrigue', { maxCourts: 1 });
+            const r1 = WA.courtIntrigue.registerCourt('wit-court-a');
+            const r2 = WA.courtIntrigue.registerCourt('wit-court-b');
+            const r3 = WA.courtIntrigue.registerCourt('wit-court-a');
+            trip('court-capacity', function () { return [r2 && r2.reason]; });
+            if (!(r1 && r1.ok === true && r3 && r3.ok === true)) { delete seen['court-capacity']; }
+          }
+        } finally { capRestoreWorld(b); }
+      }
+
+      // ③ sanctuary-capacity：庇护所数量闸（批量与单发两条路共用同一个码）
+      want('sanctuary-capacity',
+        '庇护所数量闸：maxSanctuaries 读进 scramble ⇒ 批量与单发两条路的超限都报 sanctuary-capacity');
+      {
+        const b = capSnap();
+        try {
+          if (WA.sanctuaryScramble && typeof WA.sanctuaryScramble.setSettings === 'function') {
+            WA.sanctuaryScramble.setSettings({ enabled: true });
+            capModule('sanctuaryScramble', { maxSanctuaries: 1 });
+            WA.store.transact(function (d) { d.sanctuaries = {}; d.sanctuaryOccupants = {}; }, 'witness:sanctuary-clean');
+            const r1 = WA.sanctuaryScramble.scramble({ sanctuaryId: 'wit-sanc-a', applicants: [{ actorId: 'a' }] });
+            const r2 = WA.sanctuaryScramble.scramble({ sanctuaryId: 'wit-sanc-b', applicants: [{ actorId: 'b' }] });
+            trip('sanctuary-capacity', function () { return [r2 && r2.reason]; });
+            if (!(r1 && r1.ok === true)) { delete seen['sanctuary-capacity']; }
+          }
+        } finally { capRestoreWorld(b); }
+      }
+
+      // ④ patient-capacity：病人/伤员数量闸（毒理科与外科共用一个码，两处都要跑到）
+      want('patient-capacity',
+        '病人数量闸：maxPatients 读进外科收治与毒理建病历两条路 ⇒ 超限报 patient-capacity，同 id 可更新');
+      {
+        const b = capSnap();
+        const hit = [];
+        try {
+          if (WA.surgicalTriage && typeof WA.surgicalTriage.setSettings === 'function') {
+            WA.surgicalTriage.setSettings({ enabled: true });
+            capModule('surgicalTriage', { maxPatients: 1 });
+            WA.store.transact(function (d) { d.surgicalPatients = {}; }, 'witness:surgical-clean');
+            const s1 = WA.surgicalTriage.admitPatient('wit-p-a', {});
+            const s2 = WA.surgicalTriage.admitPatient('wit-p-b', {});
+            const s3 = WA.surgicalTriage.admitPatient('wit-p-a', {});
+            if (s1 && s1.ok === true && s2 && s2.reason === 'patient-capacity' && s3 && s3.ok === true) hit.push('surgicalTriage');
+          }
+          if (WA.alchemyToxicology && typeof WA.alchemyToxicology.setSettings === 'function') {
+            WA.alchemyToxicology.setSettings({ enabled: true });
+            capModule('alchemyToxicology', { maxPatients: 1 });
+            WA.store.transact(function (d) { d.toxicologyLedger = { cases: {}, recipes: [] }; }, 'witness:toxic-clean');
+            const t1 = WA.alchemyToxicology.brewOrTestToxin({ action: 'counterToxin', patientId: 'wit-t-a', severity: 60 });
+            const t2 = WA.alchemyToxicology.brewOrTestToxin({ action: 'counterToxin', patientId: 'wit-t-b', severity: 60 });
+            if (t1 && t1.ok === true && t2 && t2.refusal === 'patient-capacity') hit.push('alchemyToxicology');
+          }
+        } finally { capRestoreWorld(b); }
+        if (hit.length === 2) { seen['patient-capacity'] = true; } else { delete seen['patient-capacity']; }
+      }
+
+      // ⑤ settlement-capacity：疫区数量闸
+      want('settlement-capacity',
+        '疫区数量闸：maxSettlements 读进 propagateDisease ⇒ 超限报 settlement-capacity，同地可推进');
+      {
+        const b = capSnap();
+        try {
+          if (WA.epidemicContagion && typeof WA.epidemicContagion.setSettings === 'function') {
+            WA.epidemicContagion.setSettings({ enabled: true });
+            capModule('epidemicContagion', { maxSettlements: 1 });
+            WA.store.transact(function (d) { d.epidemicOutbreaks = {}; }, 'witness:epidemic-clean');
+            const e1 = WA.epidemicContagion.propagateDisease('wit-town-a', { initialInfectious: 5, totalPopulation: 200 });
+            const e2 = WA.epidemicContagion.propagateDisease('wit-town-b', { initialInfectious: 5, totalPopulation: 200 });
+            const e3 = WA.epidemicContagion.propagateDisease('wit-town-a', { initialInfectious: 5, totalPopulation: 200 });
+            trip('settlement-capacity', function () { return [e2 && e2.reason]; });
+            if (!(e1 && e1.ok === true && e3 && e3.ok === true)) { delete seen['settlement-capacity']; }
+          }
+        } finally { capRestoreWorld(b); }
+      }
+
+      // ⑥ vessel-capacity-or-store-unavailable：船舶数量闸（引擎把「满」与「无 store」并进一个码，
+      //   如实登记这个形态 —— 见证只证明「满」这一半跑得出来）
+      want('vessel-capacity-or-store-unavailable',
+        '船舶数量闸：maxVessels 读进 registerVessel ⇒ 超限报 vessel-capacity-or-store-unavailable，同 id 可更新');
+      {
+        const b = capSnap();
+        try {
+          if (WA.maritimeNavigation && typeof WA.maritimeNavigation.setSettings === 'function') {
+            WA.maritimeNavigation.setSettings({ enabled: true });
+            capModule('maritimeNavigation', { maxVessels: 1 });
+            WA.store.transact(function (d) { d.maritimeVessels = []; }, 'witness:vessel-clean');
+            const v1 = WA.maritimeNavigation.registerVessel({ vesselId: 'wit-v-a' });
+            const v2 = WA.maritimeNavigation.registerVessel({ vesselId: 'wit-v-b' });
+            const v3 = WA.maritimeNavigation.registerVessel({ vesselId: 'wit-v-a' });
+            trip('vessel-capacity-or-store-unavailable', function () { return [v2 && v2.reason]; });
+            if (!(v1 && v1.ok === true && v3 && v3.ok === true)) { delete seen['vessel-capacity-or-store-unavailable']; }
+          }
+        } finally { capRestoreWorld(b); }
+      }
+
+      // ⑦ guard-capacity-or-store-unavailable：守卫数量闸（同上，两义并码如实登记）
+      want('guard-capacity-or-store-unavailable',
+        '守卫数量闸：maxGuards 读进 registerGuard ⇒ 超限报 guard-capacity-or-store-unavailable，同 id 可更新');
+      {
+        const b = capSnap();
+        try {
+          if (WA.stealthInfiltration && typeof WA.stealthInfiltration.setSettings === 'function') {
+            WA.stealthInfiltration.setSettings({ enabled: true });
+            capModule('stealthInfiltration', { maxGuards: 1 });
+            WA.store.transact(function (d) { d.stealthTactics = { guards: [], infiltrators: {}, logs: [] }; }, 'witness:guard-clean');
+            const g1 = WA.stealthInfiltration.registerGuard({ guardId: 'wit-g-a' });
+            const g2 = WA.stealthInfiltration.registerGuard({ guardId: 'wit-g-b' });
+            const g3 = WA.stealthInfiltration.registerGuard({ guardId: 'wit-g-a' });
+            trip('guard-capacity-or-store-unavailable', function () { return [g2 && g2.reason]; });
+            if (!(g1 && g1.ok === true && g3 && g3.ok === true)) { delete seen['guard-capacity-or-store-unavailable']; }
+          }
+        } finally { capRestoreWorld(b); }
+      }
+    } finally {
+      capRestore();
+      capRestoreWorld(snap0);
+    }
+  }
+
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected,
     asyncPumpProof: asyncPumpProof };
 }

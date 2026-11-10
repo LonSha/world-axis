@@ -6626,7 +6626,15 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
           issues.push({ level: 'warn', key: 'bridge', detail: '对外桥已开闸且有 ' + bd.refreshes + ' 次刷新请求，但一次也没成功发布（最近理由：' + (bd.lastReason || '?') + '）——开关开着却没在干活' });
         }
         if (bd.enabled === false && bd.externalReads > 0) {
-          issues.push({ level: 'warn', key: 'bridge', detail: '对外桥当前**休眠**（设置键 worldaxis_bridge_settings_v1 的 enabled=false），但外部已尝试读取 ' + bd.externalReads + ' 次——对方拿到的永远是 null，看起来像「这个世界没有任何世界状态」' });
+          // v2.382.0（历史欠账消红 · 与 core/store.js 的 maintain 同批同规）：
+          //   本格原为 warn，但 `externalReads` 是**进程级累计计数**（engines/bridge.js 的
+          //   模块级 __stat，只增不减、清 localStorage 清不掉），拿它判「当前有没有缺陷」
+          //   会让这条 warn 在第一次外部读取之后**永久**亮着 —— 与 v0.4.0 给 rescue /
+          //   integrity 立的「健康分=当前状态、审计计数=历史经历」直接矛盾。
+          //   且桥的 `enabled:false` 是**出厂默认**，本扩展休眠时返回 null 并把每次拒绝
+          //   记进 refused/lastRefusal 是**正确行为**：这不是故障，是「对方需要它但闸关着」
+          //   的**配置建议**。故降为 info，措辞按建议写（保留全部可追溯读数与开闸写口）。
+          issues.push({ level: 'info', key: 'bridge.idleRead', detail: '对外桥当前**休眠**（出厂默认，设置键 worldaxis_bridge_settings_v1 的 enabled=false），期间被外部读取过 ' + bd.externalReads + ' 次：每次返回 null 并已如实记入 refused —— 本扩展行为正确，这是**配置建议**（若确需互操作，开闸：WorldAxis.bridge.setSettings({ enabled: true })），不计为当前缺陷' });
         }
         if (bd.enabled === false) {
           issues.push({ level: 'info', key: 'bridge', detail: '对外桥休眠中（默认）：另两个插件（RubyPhone 世界脉搏 / TimeManager、LonSha 世界推进）此刻各自用自己的办法描述世界；要共享真值开 `WorldAxis.bridge.setSettings({ enabled: true })`' });
