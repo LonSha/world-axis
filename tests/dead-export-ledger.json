@@ -1368,14 +1368,14 @@
       "src": "engines/cascade-bus.js",
       "refs": 0,
       "tref": 0,
-      "own": 8
+      "own": 10
     },
     "cascadeBus.dispatchTick": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/cascade-bus.js 内部自用、外部零引用（过度导出）",
       "src": "engines/cascade-bus.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 4
     },
     "cascadeBus.getCascadeState": {
@@ -3170,14 +3170,6 @@
       "tref": 2,
       "own": 2
     },
-    "dungeonHazardMesh.getDungeon": {
-      "reason": "self-only",
-      "detail": "engines/dungeon-hazard-mesh.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/dungeon-hazard-mesh.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 2
-    },
     "dungeonHazardMesh.listDungeons": {
       "reason": "self-only",
       "detail": "engines/dungeon-hazard-mesh.js 内部自用、外部零引用（过度导出）",
@@ -3849,14 +3841,6 @@
       "refs": 0,
       "tref": 0,
       "own": 11
-    },
-    "eraCycle.tick": {
-      "reason": "test-only",
-      "detail": "engines/era-cycle.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/era-cycle.js",
-      "refs": 0,
-      "tref": 11,
-      "own": 3
     },
     "events.active": {
       "reason": "test-only",
@@ -9266,20 +9250,12 @@
       "tref": 4,
       "own": 3
     },
-    "siegeAttrition.getFortress": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/siege-attrition.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
     "siegeAttrition.registerFortress": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/siege-attrition.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 4
     },
     "siegeAttrition.resetAll": {

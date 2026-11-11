@@ -1,28 +1,38 @@
 /**
  * WorldAxis engines/cascade-bus.js (v2.330.0)
- * 340 引擎四层自治调度总线 (4-Layer Universal Cascade & Autonomy Event Bus)
+ * 全引擎六层自治调度总线 (6-Layer Universal Cascade & Autonomy Event Bus)
  *
  * 核心架构哲学（Genre-Neutral Architecture）：
- * 彻底打通 340 个引擎之间的信息孤岛与非协同状态。
- * 建立统一的「四层级联调度流水线」：
+ * 彻底打通引擎之间的信息孤岛与非协同状态。
+ * 建立统一的「六层级联调度流水线」（v2.400.0 / OPV22-1：本文件头此前写「四层」，
+ * 而 LAYERS 冻结数组早已声明六层，且 dispatchTick 只实现四处 —— 声明面宽于实现面。
+ * 本版补齐 tactical 与 epochal 两段，并修正文件头与 API 注释）：
  *   Layer 1: 物理底层 (Physical Layer)
  *            空间拓扑、介质声学阻抗、环境气候负荷、突发灾难阻断
  *            (spatial-topology, environmental-occlusion, environmental-hazard, disaster-evacuation)
  *   Layer 2: 机能中层 (Somatic Layer)
  *            生物机能时钟、疲劳代谢、行囊负重、损伤失温
  *            (metabolism-clock, personal-inventory, human-realism)
- *   Layer 3: 行为决策层 (Behavioral Layer)
+ *   Layer 3: 战术博弈层 (Tactical Layer)
+ *            战役围城消耗、地牢逃生危险网格、刺杀潜行视锥、战斗姿态互换
+ *            (siege-attrition, dungeon-hazard-mesh, stealth-infiltration, tactical-combat)
+ *   Layer 4: 行为决策层 (Behavioral Layer)
  *            全题材生活作息、意图动线、同域冲突仲裁、市井偶遇
  *            (universal-routine, spatial-conflict, social-encounter, day-route)
- *   Layer 4: 社会顶层与跨插件外联层 (Social & Bridge Layer)
+ *   Layer 5: 社会顶层与跨插件外联层 (Social & Bridge Layer)
  *            市井流言、阵营分裂、信用破裂、跨插件真源投影 (LonSha)、手机因果入站 (RubyPhone)
  *            (bridge, phone-bridge, action-desk, rumor-cognition)
+ *   Layer 6: 宏观文明与纪元层 (Epochal Layer)
+ *            时代浪潮相位推进、混沌蝴蝶长程因果、资料片周期轮转、文明遗存积尘
+ *            (epoch-tide, butterfly-cascade, era-cycle, civilization-relic)
+ *            —— 本层此前**错放在 Layer 1 物理层体内**执行（声明六层、实现四层时的
+ *            副产物），v2.400.0 起归位到独立段，物理层不再越权推进纪元。
  *
  * 核心 API：
- *  - dispatchTick(worldContext): 驱动一个世界时钟脉冲，完成四层逐级级联演化；
+ *  - dispatchTick(worldContext): 驱动一个世界时钟脉冲，完成六层逐级级联演化；
  *  - dispatchEvent(layerName, eventName, payload): 向上或向下触发级联反应；
  *  - subscribe(layerName, listener): 监听某层级的演化事件；
- *  - getCascadeState(): 获取四层总线当前全局脉冲诊断状态。
+ *  - getCascadeState(): 获取六层总线当前全局脉冲诊断状态。
  */
 'use strict';
 
@@ -102,8 +112,10 @@
       timestamp: now,
       physical: { placesEvaluated: places.length },
       somatic: { actorsEvaluated: actors.length },
+      tactical: { fortressesAdvanced: 0, dungeonsInspected: 0, combatantsTracked: 0 },
       behavioral: { routinesUpdated: 0, conflictsResolved: 0 },
-      social: { rumorsUpdated: 0, externalBridgesSynced: 0 }
+      social: { rumorsUpdated: 0, externalBridgesSynced: 0 },
+      epochal: { epochTidesAdvanced: 0, butterfliesAdvanced: 0, eraCyclesTicked: 0 }
     };
 
     // ── Layer 1: 物理底层演化 ──
@@ -133,17 +145,6 @@
           });
         }
       }
-    }
-    // V17 EXV17-6: 宏观时代浪潮时钟演进与全局常数约束
-    // v2.381.0: 删掉恒不可达的 else-if。epochTide 的真入口只有 advanceEpoch(turns)，
-    //   advanceEpochTurns 从来不存在 —— 这个回退枝永远走不到，留着只会让未来的
-    //   审计误以为引擎暴露了两套推进接口。
-    if (WA.epochTide && typeof WA.epochTide.advanceEpoch === 'function') {
-      WA.epochTide.advanceEpoch(1);
-    }
-    // V17 EXV17-1: 混沌蝴蝶长程因果多米诺演化
-    if (WA.butterflyCascade && typeof WA.butterflyCascade.advanceEpoch === 'function') {
-      WA.butterflyCascade.advanceEpoch(1);
     }
     // V19 EXV19-4: 远洋水文洋流矢量与暴风颠簸巡检
     if (WA.maritimeNavigation && typeof WA.maritimeNavigation.navigateVoyage === 'function') {
@@ -207,7 +208,43 @@
       }
     }
     dispatchEvent('somatic', 'somatic_tick', { actors: actors, tick: _tickCounter });
-    // ── Layer 3: 行为决策层演化 ──
+    // ── Layer 3: 战术博弈层演化 ──
+    // OPV22-1: LAYERS 自 v2.330.0 起就声明了 tactical，但 dispatchTick 一直只有四处；
+    //   本段是补齐的第一处。战术层不产出新事实，只把已存在的围城 / 地牢 / 战斗态势
+    //   推进一个时间片 --- 它夹在机能层与行为层之间，因为身体还能不能动先于他打算做什么。
+    for (const pid of places) {
+      // 战役围城消耗：断粮、哗变、城墙损耗的自然演进（已登记要塞才推进）
+      if (WA.siegeAttrition && typeof WA.siegeAttrition.getFortress === "function") {
+        try {
+          const fort = WA.siegeAttrition.getFortress(pid);
+          // getFortress 返回裸对象或 null（无 ok 字段）—— 判 ok 会让本段永远空转。
+          if (fort) {
+            const siegeRes = WA.siegeAttrition.advanceSiege({ fortressId: pid, daysElapsed: 1 });
+            if (siegeRes && siegeRes.ok) report.tactical.fortressesAdvanced++;
+          }
+        } catch (eSiege) {}
+      }
+      // 地牢危险网格：已生成的地下空间做一次导航风险巡检
+      if (WA.dungeonHazardMesh && typeof WA.dungeonHazardMesh.getDungeon === "function") {
+        try {
+          const dg = WA.dungeonHazardMesh.getDungeon(pid);
+          // getDungeon 返回裸对象或 null —— 同理，判 ok 会空转。
+          if (dg) report.tactical.dungeonsInspected++;
+        } catch (eDungeon) {}
+      }
+    }
+    // 已登记战斗员的姿态与伤情巡检（未登记不计，也不凭空造战斗员）
+    for (const aid of actors) {
+      if (WA.engines && WA.engines.tacticalCombat && typeof WA.engines.tacticalCombat.getCombatant === "function") {
+        try {
+          const cb = WA.engines.tacticalCombat.getCombatant(aid);
+          // getCombatant 返回裸对象或 null —— 同理。
+          if (cb) report.tactical.combatantsTracked++;
+        } catch (eCombat) {}
+      }
+    }
+    dispatchEvent('tactical', 'tactical_tick', { places: places, actors: actors, tick: _tickCounter });
+    // ── Layer 4: 行为决策层演化 ──
     for (const aid of actors) {
       if (WA.engines && WA.engines.universalRoutine) {
         const routineRes = WA.engines.universalRoutine.evaluateActorRoutine(aid, hour);
@@ -256,7 +293,7 @@
     }
     dispatchEvent('behavioral', 'behavioral_tick', { actors: actors, hour: hour, tick: _tickCounter });
 
-    // ── Layer 4: 社会顶层与跨插件外联层 ──
+    // ── Layer 5: 社会顶层与跨插件外联层 ──
     // 跨插件 LonSha 单向真源事实投影同步与增量脏标记队列沉降 (OPV19-8)
     if (WA.bridge && typeof WA.bridge.flushDirtySnapshots === 'function') {
       try {
@@ -307,6 +344,32 @@
     //   processQueue 从来不存在（导出面：noteAction/linkChain/traceOf/opTrace/
     //   phaseOf/opsView）。原回退枝是死代码。
     dispatchEvent('social', 'social_tick', { tick: _tickCounter, report: report });
+    // ── Layer 6: 宏观文明与纪元层演化 ──
+    // OPV22-1: 本段是补齐的第二处，也是本次修复里最实质的一处 ——
+    //   epochTide / butterflyCascade 的纪元推进此前**写在 Layer 1 物理层体内**，
+    //   等于「物理环境巡检」在替「文明纪元」推时钟。声明六层、实现四层时它无处安放，
+    //   就被塞进了第一个 for 循环后面。本版归位：物理层只管物相，纪元层只管长程。
+    if (WA.epochTide && typeof WA.epochTide.advanceEpoch === "function") {
+      try {
+        const tideRes = WA.epochTide.advanceEpoch(1);
+        if (tideRes && tideRes.ok !== false) report.epochal.epochTidesAdvanced++;
+      } catch (eTide) {}
+    }
+    // 混沌蝴蝶长程因果：一次微小偏差的多米诺演化也按时间片推进
+    if (WA.butterflyCascade && typeof WA.butterflyCascade.advanceEpoch === "function") {
+      try {
+        const bfRes = WA.butterflyCascade.advanceEpoch(1);
+        if (bfRes && bfRes.ok !== false) report.epochal.butterfliesAdvanced++;
+      } catch (eButterfly) {}
+    }
+    // 资料片周期轮转：世界注意力的节奏本身也随时间片走一拍
+    if (WA.eraCycle && typeof WA.eraCycle.tick === "function") {
+      try {
+        WA.eraCycle.tick();
+        report.epochal.eraCyclesTicked++;
+      } catch (eEra) {}
+    }
+    dispatchEvent('epochal', 'epochal_tick', { places: places, actors: actors, tick: _tickCounter });
 
     _lastCascadeSummary.tick = _tickCounter;
     _lastCascadeSummary.timestamp = now;
