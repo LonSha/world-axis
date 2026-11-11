@@ -77,7 +77,7 @@ const EXPORTS_THM = ['THEME_EXT'];
 //   下面两段逐字取自当前 FROZEN2800，等于一次人工确认过的同步。
 const CONTRACT_SEG = {
   recipe: 'recipe:catalogView economySpec extendedThemes getSettings judgeSpec list policyClashes preview satisfied seed staleness statView themeCatalog themeClashes',
-  economy: 'economy:RECIPES buildBlock buy craft declaredBase economySpec getSettings markRoute money price recipeKeys recipeOf route routeView setSettings shelf ship statView stock tick view',
+  economy: 'economy:RECIPES buildBlock buy craft declaredBase economySpec getSettings markRoute money price recipeKeys recipeOf route routeView setSettings shelf ship simulateTradeShock statView stock tick view',
   fate: 'fate:bigrams check deck dedupe evalArith evalFormula getSettings isArithmeticSyntax jaccard judgeView oversample parse reset resolveCount resolveDC roll setSettings stat stripHeader titleGate view',
   theme: 'theme:THEMES THEME_EXT activeModules apply contrast engineFace list preview separation statView'
 };
