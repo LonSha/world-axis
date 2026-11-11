@@ -206,10 +206,22 @@ function runB(a) {
 function runC(a) {
   const S = require(path.join(BASE, 'tools/smoke.js'));
   a(Array.isArray(S.SMOKE_SET), 'v2256/C1: smoke 集仍是数组');
-  a(S.SMOKE_SET.length === 10, 'v2256/C1b: smoke 集减员到 10 成员（实 ' + S.SMOKE_SET.length + '）');
+  // C1b 口径（v2.400.0 OPV22-8 治）：旧写法是 `length === 10` —— 把「减员」写成了「恒等于 10」，
+  //   于是合法扩员（OPV22-6 把 reject-recovery --check 接入快档）9-→ 11）会假报红。
+  //   真正要守的不是数字，是「这十个底座成员一个不能少」。故改为逐名点名：
+  //   基线成员全在（防减员）+ 总数 >= 10（允许合法扩员，但不允许变成空壳）。
+  const BASELINE10 = ['tools/net-audit.js', 'tools/repo-hygiene.js', 'tests/export-contract.js',
+    'tests/reject-code-gate.js', 'tests/module-registry-gate.js', 'tests/module-cycle-gate.js',
+    'tests/dead-export-gate.js', 'tests/field-liveness-gate.js', 'tests/dup-decl-gate.js',
+    'tests/ui-a11y-gate.js'];
+  const smokeRels = S.SMOKE_SET.map(function (m) { return m.rel; });
+  const missing = BASELINE10.filter(function (r) { return smokeRels.indexOf(r) < 0; });
+  a(missing.length === 0, 'v2256/C1b: smoke 集十个底座成员零减员（缺：'
+    + (missing.join(', ') || '无') + '；实 ' + S.SMOKE_SET.length + ' 成员）');
+  a(S.SMOKE_SET.length >= 10, 'v2256/C1c: smoke 集总数不小于基线（实 ' + S.SMOKE_SET.length + '）');
   const v = S.verifySet({});
   a(!!v && Array.isArray(v.complaints), 'v2256/C2: verifySet 仍可驱动（自证入口在职）');
-  a(v.complaints.length === 0, 'v2256/C2b: 10 成员全部通过三条入集口径（complaints '
+  a(v.complaints.length === 0, 'v2256/C2b: 全部成员通过三条入集口径（complaints '
     + (v && v.complaints ? v.complaints.length : '?') + '）');
   const M = require(path.join(BASE, 'tools/mid-tier.js'));
   ['ENTRY_SELFTEST', 'ENTRY_CLI', 'ENTRY_EXPORTS'].forEach(function (k) {
