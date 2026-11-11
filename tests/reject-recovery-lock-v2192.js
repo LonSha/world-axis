@@ -198,6 +198,32 @@ function runB(A) {
   // B12 契约外登记：确有「不在这份契约里」的码被如实分开（不硬塞进六档）
   A(Object.keys(p.NEUTRAL_REVIEW).some(function (k) { return !!p.NEUTRAL_REVIEW[k].out; }),
     'B12 判不出面确有「契约外」登记（决策理由与治理理由不得硬塞进六档）');
+  // B13 显式登记必须**真的生效**（v2.400.0 新增，补一条窄了五版的判据）
+  //   现场（v2.400.0）：`explain` 原先把 `ruleKind(c)` 放在 `has(OVERRIDES, c)` 之前，
+  //   于是凡是码名形态被规则表认得的，OVERRIDES 就永远轮不到 —— 显式登记形同注释。
+  //   实测 OVERRIDES 119 条里 **14 条被规则表抢走、其中 9 条档位被真改写**
+  //   （unknown-step / archive-failed / archive-write-failed / contract-unavailable /
+  //    control-usage-unavailable / panel-yield-unavailable / projection-failed /
+  //    ui-not-loaded / mourning-prohibited）。
+  //   既有判据为什么五版都没发现：B8 的 DIRECTIONS 只有五条样本，而它们**恰好都不在
+  //   OVERRIDES 里** —— 判定对、所以不红。这是本仓点名的「判据输入面比事实窄」第 N 次复发。
+  //   本条的输入面是 Object.keys(OVERRIDES) **全量**，不是抽样。
+  const stolen = [];
+  Object.keys(p.OVERRIDES).forEach(function (c) {
+    const r = p.explain(c, { face: liveFaceMap });
+    if (r.face !== 'reject') { stolen.push(c + '（face=' + r.face + '）'); return; }
+    if (r.via !== 'override') stolen.push(c + '（via=' + r.via + ' kind=' + r.kind + '）');
+    else if (r.kind !== p.OVERRIDES[c].kind) {
+      stolen.push(c + '（得 ' + r.kind + ' 登记 ' + p.OVERRIDES[c].kind + '）');
+    }
+  });
+  A(stolen.length === 0, 'B13 全部 ' + Object.keys(p.OVERRIDES).length
+    + ' 条显式登记都真生效（被抢走/改写 ' + stolen.length + '：'
+    + (stolen.slice(0, 6).join(' / ') || '无') + '）'
+    + ' —— 规则表不得先于显式登记，否则「故显式覆盖」是一句空话');
+  // B13b 输入面非空（否则 B13 在空集上恒真，与 B7b 同一纪律）
+  A(Object.keys(p.OVERRIDES).length > 100,
+    'B13b 显式登记面确实够大（实 ' + Object.keys(p.OVERRIDES).length + ' 条）—— 不是在空集/个位上恒真');
 }
 function rrDirections(p, f) {
   const out = [];
@@ -310,6 +336,35 @@ function runN(A) {
     A(ks.length === 1 && f['only-ok'].face === 'success',
       'N8 全部换成合成源码后只剩一条成功码（实 ' + ks.length + ' 条：' + ks.slice(0, 5).join(',') + '）');
     A(rr.live()['only-ok'] === undefined, 'N8b 原版上不存在合成码（破坏可观测地改变了结果）');
+  }
+  // ── N9 显式登记优先序破坏（v2.400.0 新增，与 B13 配对）─────────────────────
+  //   把 explain 的分派顺序**改回**旧形态（规则表先于 OVERRIDES）⇒ B13 必须现形。
+  //   为什么这条负控制必须存在：B13 是本轮新加的判据，若不证明它真会红，
+  //   「绿」就只是「没跑」的另一种说法（本仓对每条判据都要求两向自证）。
+  {
+    const S = rd(PROD_REL);
+    //   旧形态逐字还原：把 `} else if (has(OVERRIDES, c)) { ... } else { const k = ruleKind(c); ... }`
+    //   换回 `} else { const k = ruleKind(c); ... else if (has(OVERRIDES, c)) {...} else ... }`。
+    //   这里用「把 OVERRIDES 分支的守卫改成恒假」这一更小的破坏面：
+    //   语义等价于「显式登记永远轮不到」—— 与旧代码的行为一致，且锚点唯一。
+    const broken = breakOnce(S, '} else if (has(OVERRIDES, c)) {', '} else if (false && has(OVERRIDES, c)) {', 'n9-override-order');
+    const p9 = loadBrokenProduct(broken);
+    //   前置断言：破坏确实让某条显式登记失效（而不是没打中）
+    const lost = Object.keys(p9.OVERRIDES).filter(function (c) {
+      const r = p9.explain(c);
+      return r.face === 'reject' && r.via !== 'override';
+    });
+    A(lost.length > 0,
+      'N9 破坏版里 ' + lost.length + ' 条显式登记失效（例：' + (lost.slice(0, 3).join(',') || '无') + '）'
+      + ' —— 判据的输入面真的够到了这条路径');
+    //   原版上同一条必须生效（两向自证）
+    const kept = Object.keys(rr.product().OVERRIDES).filter(function (c) {
+      const r = rr.product().explain(c);
+      return r.face === 'reject' && r.via === 'override';
+    });
+    A(kept.length === Object.keys(rr.product().OVERRIDES).length,
+      'N9b 原版上全部 ' + Object.keys(rr.product().OVERRIDES).length + ' 条显式登记都生效（实 '
+      + kept.length + '）—— 所以 N9 的红是破坏引起，不是恒红');
   }
 }
 /** 在内存里装载一份破坏版产品模块（不进模块缓存、不碰真文件）。 */

@@ -1,13 +1,13 @@
 {
- "version": "2.380.0",
- "loadOrderCount": 440,
- "loadedCount": 426,
- "uiCount": 14,
- "nsCount": 437,
+ "version": "2.400.0",
+ "loadOrderCount": 449,
+ "loadedCount": 434,
+ "uiCount": 15,
+ "nsCount": 445,
  "totals": {
-  "loadEdges": 280,
+  "loadEdges": 296,
   "hardEdges": 0,
-  "callRefs": 495,
+  "callRefs": 511,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -54,6 +54,7 @@
     "engines/beat-mask.js",
     "engines/beat-report.js",
     "engines/beat.js",
+    "engines/betrothal-alliance.js",
     "engines/binding.js",
     "engines/blackmarket-usury.js",
     "engines/branch-diff.js",
@@ -65,8 +66,10 @@
     "engines/campaign.js",
     "engines/capacity-audit.js",
     "engines/care-chain.js",
+    "engines/cartography-survey.js",
     "engines/cascade-bus.js",
     "engines/cataclysm-hazard.js",
+    "engines/celestial-omens.js",
     "engines/channel-probe.js",
     "engines/chapters.js",
     "engines/choice-board.js",
@@ -143,10 +146,12 @@
     "engines/labor-schedule.js",
     "engines/legacy-oath.js",
     "engines/length-policy.js",
+    "engines/levy-corvee.js",
     "engines/liaison.js",
     "engines/life.js",
     "engines/lifeline.js",
     "engines/lingqi.js",
+    "engines/lingua-broker.js",
     "engines/living-world.js",
     "engines/maritime-navigation.js",
     "engines/memory-tiers.js",
@@ -154,6 +159,7 @@
     "engines/mend.js",
     "engines/modelink.js",
     "engines/mood-glide.js",
+    "engines/mortuary-rites.js",
     "engines/motif.js",
     "engines/narrative-lens.js",
     "engines/noesis.js",
@@ -184,6 +190,7 @@
     "engines/polish.js",
     "engines/populate.js",
     "engines/portal.js",
+    "engines/postal-relay.js",
     "engines/power-anchor.js",
     "engines/prefilter-gate.js",
     "engines/preset-world.js",
@@ -218,6 +225,7 @@
     "engines/ruin-mechanism.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
+    "engines/sartorial-regalia.js",
     "engines/save-health.js",
     "engines/scene-narrative.js",
     "engines/scope-tag.js",
@@ -376,10 +384,13 @@
     "engines/action-methods.js",
     "engines/agency.js",
     "engines/backstage.js",
+    "engines/betrothal-alliance.js",
     "engines/branch-transplant.js",
     "engines/bridge.js",
     "engines/calendar.js",
+    "engines/cartography-survey.js",
     "engines/cascade-bus.js",
+    "engines/celestial-omens.js",
     "engines/chapters.js",
     "engines/cognitive-poisoning.js",
     "engines/collateral-rupture.js",
@@ -403,22 +414,27 @@
     "engines/institutional-schism.js",
     "engines/kaleidoscope.js",
     "engines/labor-schedule.js",
+    "engines/levy-corvee.js",
     "engines/life.js",
+    "engines/lingua-broker.js",
     "engines/living-world.js",
     "engines/memory.js",
     "engines/metabolism-clock.js",
+    "engines/mortuary-rites.js",
     "engines/offline-return.js",
     "engines/offstage-life.js",
     "engines/opinion.js",
     "engines/parallel-world.js",
     "engines/personal-inventory.js",
     "engines/pmem.js",
+    "engines/postal-relay.js",
     "engines/proactive.js",
     "engines/regional.js",
     "engines/research-closure.js",
     "engines/routine-pacing.js",
     "engines/rumor-cognition.js",
     "engines/sanctuary-scramble.js",
+    "engines/sartorial-regalia.js",
     "engines/stage-presence.js",
     "engines/summarizer.js",
     "engines/supply-choke.js",
@@ -465,6 +481,7 @@
     "engines/beat-mask.js",
     "engines/beat-report.js",
     "engines/beat.js",
+    "engines/betrothal-alliance.js",
     "engines/binding.js",
     "engines/blackmarket-usury.js",
     "engines/branch-diff.js",
@@ -474,7 +491,9 @@
     "engines/campaign.js",
     "engines/capacity-audit.js",
     "engines/care-chain.js",
+    "engines/cartography-survey.js",
     "engines/cataclysm-hazard.js",
+    "engines/celestial-omens.js",
     "engines/channel-probe.js",
     "engines/choice-board.js",
     "engines/chronicle-view.js",
@@ -542,15 +561,18 @@
     "engines/labor-schedule.js",
     "engines/legacy-oath.js",
     "engines/length-policy.js",
+    "engines/levy-corvee.js",
     "engines/liaison.js",
     "engines/lifeline.js",
     "engines/lingqi.js",
+    "engines/lingua-broker.js",
     "engines/living-world.js",
     "engines/maritime-navigation.js",
     "engines/memory-tiers.js",
     "engines/mend.js",
     "engines/modelink.js",
     "engines/mood-glide.js",
+    "engines/mortuary-rites.js",
     "engines/motif.js",
     "engines/narrative-lens.js",
     "engines/noesis.js",
@@ -578,6 +600,7 @@
     "engines/polish.js",
     "engines/populate.js",
     "engines/portal.js",
+    "engines/postal-relay.js",
     "engines/power-anchor.js",
     "engines/prefilter-gate.js",
     "engines/preset-world.js",
@@ -610,6 +633,7 @@
     "engines/ruin-mechanism.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
+    "engines/sartorial-regalia.js",
     "engines/save-health.js",
     "engines/scene-narrative.js",
     "engines/scope-tag.js",
@@ -8129,6 +8153,190 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_capability_audit_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/celestial-omens.js": {
+   "ns": [
+    "celestialOmens"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_celestial_omens_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/postal-relay.js": {
+   "ns": [
+    "postalRelay"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_postal_relay_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/levy-corvee.js": {
+   "ns": [
+    "levyCorvee"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_levy_corvee_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/mortuary-rites.js": {
+   "ns": [
+    "mortuaryRites"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_mortuary_rites_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/sartorial-regalia.js": {
+   "ns": [
+    "sartorialRegalia"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_sartorial_regalia_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/betrothal-alliance.js": {
+   "ns": [
+    "betrothalAlliance"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_betrothal_alliance_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/cartography-survey.js": {
+   "ns": [
+    "cartographySurvey"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_cartography_survey_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/lingua-broker.js": {
+   "ns": [
+    "linguaBroker"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_lingua_broker_settings_v1"
    ],
    "consumedBy": []
   }

@@ -287,6 +287,20 @@
     'disarmed-or-keyed-cannot-detonate': { kind: 'request-setup', why: '机关已被卸除或被钥匙卡住：先恢复机关或取走钥匙（ruin-mechanism:100）' },
     'exempted-from-grudge': { kind: 'permanent-reject', why: '该角色享有超然/构造体豁免、不滋生凡俗记恨：这条记恨对他不成立（human-realism:313）' },
     'exempted-from-outburst': { kind: 'permanent-reject', why: '该角色豁免情绪失控与爆发：这条爆发对他不成立（human-realism:436）' },
+
+    // ── v2.400.0（V22 第 4 批 EXV22-4）：丧葬禁令的恢复档（**必须显式覆盖，不交给规则表**）──
+    //   为什么不交给规则表：规则表按码名形态把它归成 `permanent-reject`
+    //   （「这件事本身不被允许：换做法，不要重试」）—— 那是**误判**。
+    //   本码的真实语义是「现在不行、期满就行」，C4d 判据（tests/exv22-v2400.js）
+    //   已经实证：同一 mourner、同一 marry 动作，`at = until + 1` 时返回
+    //   `ok:true + outcome:'mourning-over'`。若按 permanent-reject 处置，玩家会被
+    //   建议「换个做法别重试」，而正确动作是**等**（与本文件既有 aftermath-wait 同型）。
+    //   给档不给 out:true 的理由：这是真的 ok:false（带 reportable 可告发），
+    //   不是筛选结论，调用方确实需要一句「该怎么办」。
+    //   ⚠ 踩坑记录：本段第一次编辑插到了 **NEUTRAL_REVIEW** 的末尾（与第 434 行上方
+    //   那批 out:true 条目同尾），于是 explain 仍走规则表、探针读数照旧是 permanent-reject。
+    //   这与文件下方 v2.380.0 段已记过的「插错数组、读数翻倍」是同一个坑，第二次踩到。
+    'mourning-prohibited': { kind: 'retry-same-input', why: '服丧期内禁婚娶/宴饮/出仕：期满后同一动作即可放行（不是永久禁止，别换做法）' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -908,6 +922,16 @@
     'ledger-unavailable', 'oneShotMod-unavailable', 'pathEcho-unavailable',
     'personaAnchor-unavailable', 'rehearsal-unavailable', 'survival-unavailable',
     'vitals-unavailable', 'weather-unavailable',
+    // ── v2.400.0（V22 第 4 批 EXV22-4）：丧葬禁令的一条真拒收码 ──
+    //   本仓同一形态已栽过六次（v2.203.0 的 17 条 / v2.209.0 的 14 条 / v2.221.0 的 3 条 /
+    //   v2.222.0 的 3 条 / v2.231.0 的 49 条 / v2.292.0 的 10 条）。本轮的差异是：
+    //   它**不是**「历史欠账」，而是本批新引擎 legitimately 新增的一条真拒收码，
+    //   且 reject-code-gate 已通过见证（tests/reject-v2780.js 的 v2.400.0 段真跑过
+    //   holdFuneral → checkProhibition）。此处差额 1 条是同一件事的另一面：
+    //   码面口径与**产品快照面**是两个独立真源，新码必须两边都落。
+    //
+    //   为什么不写 OVERRIDES：见下方探针读数（本段落定后 explain 给出的 via）。
+    'mourning-prohibited',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1038,14 +1062,29 @@
       if (!r) out = { code: c, face: face, kind: null, action: null, via: 'undecided', why: '判不出面未登记' };
       else if (r.out) out = { code: c, face: face, kind: null, action: null, via: 'out-of-contract', why: r.why };
       else out = { code: c, face: face, kind: r.kind, action: KIND_ACTION[r.kind], why: r.why, via: 'neutral-review' };
+    } else if (has(OVERRIDES, c)) {
+      //   ⚠ 显式登记**必须先于**规则表（v2.400.0 修）。
+      //   本行原先是 `const k = ruleKind(c); if (k) {...} else if (has(OVERRIDES, c)) {...}` ——
+      //   于是只要码名形态被规则表认得，OVERRIDES 就**永远轮不到**，显式登记形同注释。
+      //   这不是「顺序可商榷」，是**与文件自己的意图冲突**：
+      //     · 上方 OVERRIDES 表头（第 103 行）写的是「规则判不了的**残余**」；但
+      //     · 表内 v2.275.0 段（第 111-113 行）明确举了反例：`unknown-step` 会被
+      //       `unknown` 抢成 request-setup，而它其实是步骤 id 拼错 ⇒「**故显式覆盖**」。
+      //       —— 若规则优先，那句「故显式覆盖」根本无法成立。
+      //   现场读数（v2.400.0 实测）：OVERRIDES 共 119 条，被规则表抢走 14 条，
+      //   其中 **9 条档位被真改写**（unknown-step / archive-failed / archive-write-failed /
+      //   contract-unavailable / control-usage-unavailable / panel-yield-unavailable /
+      //   projection-failed / ui-not-loaded / mourning-prohibited）。也就是说：
+      //   这些码对调用方给出的「该怎么办」一直是**错的**，而既有专锁看不见 ——
+      //   因为它的 DIRECTIONS 样本五条恰好都不在 OVERRIDES 里（判定对，所以不红）。
+      //   这正是本仓反复点名的形态：**判据的输入面比事实窄**。
+      const r2 = OVERRIDES[c];
+      out = { code: c, face: face, kind: r2.kind, action: KIND_ACTION[r2.kind], why: r2.why, via: 'override' };
     } else {
       const k = ruleKind(c);
       if (k) out = { code: c, face: face, kind: k, action: KIND_ACTION[k], via: 'rule',
         why: '按码名形态归入「' + k + '」' };
-      else if (has(OVERRIDES, c)) {
-        const r2 = OVERRIDES[c];
-        out = { code: c, face: face, kind: r2.kind, action: KIND_ACTION[r2.kind], why: r2.why, via: 'override' };
-      } else out = { code: c, face: face, kind: null, action: null, via: 'undecided', why: '拒收面残余未登记' };
+      else out = { code: c, face: face, kind: null, action: null, via: 'undecided', why: '拒收面残余未登记' };
     }
     if (out.kind) { stat.matched += 1; bump(out.kind); } else if (face === 'reject') stat.unknown += 1;
     stat.lastKind = out.kind || '';

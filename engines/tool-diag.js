@@ -4052,7 +4052,19 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/financial-contagion.js': 'financialContagion',
     'engines/incarceration-jailbreak.js': 'incarcerationJailbreak',
     'engines/regiment-tactics.js': 'regimentTactics',
-    'engines/theology-cult.js': 'theologyCult'
+    'engines/theology-cult.js': 'theologyCult',
+    // ── v2.400.0（V22 拓展线 EXV22-1～8）：八项制度性引擎 ──
+    //   与上段同一病（引擎已落地、本表未登记），后果也同一个：
+    //   inventory 的定义面上不存在它们 ⇒ 出口面契约与死子面账本都看不见；
+    //   自检（secModules / 诊断包）对它们也没有出口。ns 名逐一取自各文件 `WA.<ns> = {`。
+    'engines/celestial-omens.js': 'celestialOmens',
+    'engines/postal-relay.js': 'postalRelay',
+    'engines/levy-corvee.js': 'levyCorvee',
+    'engines/mortuary-rites.js': 'mortuaryRites',
+    'engines/sartorial-regalia.js': 'sartorialRegalia',
+    'engines/betrothal-alliance.js': 'betrothalAlliance',
+    'engines/cartography-survey.js': 'cartographySurvey',
+    'engines/lingua-broker.js': 'linguaBroker'
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
   // v2.152.0：新增 ui 模块（ui/render-perf.js）同步进本名单 —— 漏登记的后果不是「少一行字」，

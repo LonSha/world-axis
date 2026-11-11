@@ -64,11 +64,15 @@ const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面
 //     539（拆前）→ 541（+段文件 tests/segments/tool-diag-v092.js +本锁）
 //                 → 542（+OPV22-7 的 tests/settings-audit-v2400.js）
 //                 → 543（+OPV22-4 第二段的 tests/panel-source.js）
+//                 → 544（+本轮 V22 第 4 批的 tests/exv22-v2400.js）
+//   这次的动它正好证明了上面那句话：新锁落地后若不登记进 run.js，
+//   test-surface-gate 就把它判成 unregistered-orphan；登记了则面必然 +1。
+//   两个数字（面 +1 / 孤儿 0）同时成立，说明「新增了一个真测试文件」而不是「多了一个死文件」。
 //   为什么不用「>= 541」了事：下界判据对「面塌了」是瞎的 —— 少 3 个文件仍然 >= 541 吗？
 //   不，但少 0 个与少 1 个同样不可分辨。C1a 要钉的是**面本身没有意外增减**，
 //   所以它必须精确。代价是每加一把锁就要动这个常量，而这正是它的价值：
 //   动它的人必须亲手确认「我确实新增了一个测试文件」。
-const BASE_TEST_FILES = 543;  // 539（拆前）+ 段文件 1 + segment-extract 1 + settings-audit 1 + panel-source 1
+const BASE_TEST_FILES = 550;  // 539（拆前）+ 段文件 1 + segment-extract 1 + settings-audit 1 + panel-source 1 + exv22 1 + V22 场景锁 6
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
 function exists(rel) { return fs.existsSync(path.join(BASE, rel)); }
@@ -129,13 +133,26 @@ function stripComments(src) {
   }
   return out;
 }
-/** 数 `section(` / `assert(` 调用点（去注释面）。 */
-function countCalls(src, name) {
-  const text = stripComments(src);
+/**
+ * 数 `section(` / `assert(` 调用点（**已去注释面**，调用方自行准备面）。
+ *  ⚠ 为什么拆成两层（v2.400.0 收口轮）：原写法在函数内部调 `stripComments(src)`，
+ *    而 B 段对**同一段文本**要数两次（section 一次 / assert 一次），B4b/B4c 对
+ *    重组后的 1.6MB 文本也是两次。`stripComments` 是逐字符扫描器，
+ *    同一文本第二遍实测 345–900ms —— 重复计算的是**同一个结果**。
+ *    现场实测本锁总耗时 12252ms，已顶破 smoke 的 12000ms 上限；
+ *    拆成两层后同一段只去一次注释面，**判据一条未减**。
+ *    不选「加缓存 Map」：字符串做 key 要靠长度+片段哈希，碰撞即给出错读数，
+ *    而「错读数」比「慢」坏得多。显式传面不会碰撞。
+ */
+function countCallsIn(text, name) {
   const re = new RegExp('(^|[^\\w$.])' + name + '\\s*\\(', 'g');
   let m, n = 0;
   while ((m = re.exec(text))) n += 1;
   return n;
+}
+/** 便利包装：只数一次的场景用它（内部只去一次注释面）。 */
+function countCalls(src, name) {
+  return countCallsIn(stripComments(src), name);
 }
 /** 段文件的解构行（`const { ... } = ctx;`）→ 键名数组。 */
 function ctxKeys(src) {
@@ -231,7 +248,13 @@ function runA(A) {
     if (/require\s*\(\s*'\.\/segments\/tool-diag-v092\.js'\s*\)/.test(lines[i])) { callLine = i + 1; break; }
   }
   A(callLine > 0, 'A6a 调用点存在（run.js 里 require 了段文件）');
-  A(callLine > 2240 && callLine < 2260, 'A6b 调用点仍在原位（实 L' + callLine + '，须落在 2240–2260 区间；原位=顺序与共享状态不变）');
+  //   区间上限由 2260 改为 2290（v2.400.0 第 4 批）：本轮在 tests/run.js 的 LOAD 尾
+  //   插了八引擎登记（+11 行）、又在 settings-audit 后插了 exv22 登记（+13 行），
+  //   两处都在调用点**之前**，故调用点从 L2251 下移到 L2262。
+  //   为什么不改成「只要在文件里就行」：A6b 的本意是「段体跑在同一个共享状态阶段」，
+  //   它不能被挪到文件末尾（那时 WA 已被后面的节改过）。所以保留窄区间，
+  //   只适当松上限（+30 行），守住「不能大幅挪动」这个真意图。
+  A(callLine > 2240 && callLine < 2290, 'A6b 调用点仍在原位（实 L' + callLine + '，须落在 2240–2290 区间；原位=顺序与共享状态不变）');
   // A7 调用点必须 await（段函数是 async，漏 await 会让段体跑在回归结束之后）
   A(/await\s+require\s*\(\s*'\.\/segments\/tool-diag-v092\.js'\s*\)/.test(run),
     'A7 调用点保留 await（漏 await ⇒ 段体与后续节并发，共享 WA 状态会错位）');
@@ -292,13 +315,19 @@ function recombinedRunText() {
 function runB(A) {
   const seg = rd(SEG_REL);
   const run = rd(RUN_REL);
+  // v2.400.0 收口轮：**同一段文本只去一次注释面**。
+  //   原写法 sRun/sSeg/aRun/aSeg 各调一次 countCalls（内部各去一遍注释面），
+  //   重组面的 B4b/B4c 又各去一遍 1.6MB 文本 —— 四次重复计算同一个结果。
+  //   下面显式准备 runFace / segFace，之后只做计数（countCallsIn）。
+  const runFace = stripComments(run);
+  const segFace = stripComments(seg);
   // B1/B2 判据守恒：**绝对基线**（拆前实测）—— 这条逮「丢失/多出判据」
-  //   注意：用 countCalls（去注释面）而非裸 grep，故读数比 grep -o 略小；
+  //   注意：用 countCallsIn（去注释面）而非裸 grep，故读数比 grep -o 略小；
   //   基线取自同一口径在拆前备份上的实测值，两条口径不能混用。
-  const sRun = countCalls(run, 'section');
-  const sSeg = countCalls(seg, 'section');
-  const aRun = countCalls(run, 'assert');
-  const aSeg = countCalls(seg, 'assert');
+  const sRun = countCallsIn(runFace, 'section');
+  const sSeg = countCallsIn(segFace, 'section');
+  const aRun = countCallsIn(runFace, 'assert');
+  const aSeg = countCallsIn(segFace, 'assert');
   A(sRun + sSeg === BASE_SECTION_CC,
     'B1 绝对守恒 section（去注释口径）：run.js ' + sRun + ' + 段 ' + sSeg + ' = ' + (sRun + sSeg)
     + '，拆前 ' + BASE_SECTION_CC + '（少一条/多一条都红）');
@@ -311,22 +340,31 @@ function runB(A) {
   const recombined = recombinedRunText();
   A(!!recombined, 'B4a 内存重组成功（段体边界可机械还原）');
   if (recombined) {
-    A(countCalls(recombined, 'assert') === aRun + aSeg,
-      'B4b 重组自证 assert：重组 ' + countCalls(recombined, 'assert') + ' === 拆开 ' + (aRun + aSeg));
-    A(countCalls(recombined, 'section') === sRun + sSeg,
-      'B4c 重组自证 section：重组 ' + countCalls(recombined, 'section') + ' === 拆开 ' + (sRun + sSeg));
+    // 重组面 1.6MB，也只去一次注释面（原写法 B4b/B4c 各去一遍）。
+    const recombFace = stripComments(recombined);
+    A(countCallsIn(recombFace, 'assert') === aRun + aSeg,
+      'B4b 重组自证 assert：重组 ' + countCallsIn(recombFace, 'assert') + ' === 拆开 ' + (aRun + aSeg));
+    A(countCallsIn(recombFace, 'section') === sRun + sSeg,
+      'B4c 重组自证 section：重组 ' + countCallsIn(recombFace, 'section') + ' === 拆开 ' + (sRun + sSeg));
   }
   // B4 段函数可装载且是函数
   let mod = null, loadErr = '';
   try { mod = require(path.join(BASE, SEG_REL)); } catch (e) { loadErr = e.message; }
   A(!!mod && typeof mod === 'function', 'B4 段文件可 require 且导出函数' + (loadErr ? '（错：' + loadErr + '）' : ''));
-  // B5 段函数必须返回 Promise（async 体）——同步函数会让 await 变成无意义
+  // B5 段函数本体必须是 async 函数（否则 await 它时 await 变成无意义）
+  //   ⚠ 初版写法是「调一次并看返回值有没有 then」，它有两个问题：
+  //     ① **误判**：一个同步函数只要 return 了一个 Promise，就能混过——而它本身不是 async，
+  //        段体里的 await 仍会失效。判据测的不是它声称的东西。
+  //     ② **顺带把整段跑了一遍**：调用它就会真的执行段体里 900+ 条判据，
+  //        实测 3209ms（本锁总耗时 12252ms，已顶破 smoke 的 12000ms 上限）。
+  //        为了判一个字段去跑整段，这是本锁自己违反了「读数必须与现场对齐」。
+  //   async 性由**函数对象本身**决定，不需要执行。改后更**严**（同步返回 Promise 的伪 async会被抓）
+  //   且更**快**（零执行）—— 这不是放宽判据，是把判据写对。
   if (mod) {
-    let p = null, callErr = '';
-    try { p = mod({ BASE: BASE, WA: {}, assert: function () {}, assertDeepEq: function () {}, fs: fs, path: path, section: function () {} }); }
-    catch (e) { callErr = e.message; }
-    A(!!p && typeof p.then === 'function', 'B5 段函数返回 Promise（async 体，await 有效）' + (callErr ? '（错：' + callErr + '）' : ''));
-    if (p && typeof p.catch === 'function') p.catch(function () {});
+    const isAsync = Object.prototype.toString.call(mod) === '[object AsyncFunction]'
+      || (mod.constructor && mod.constructor.name === 'AsyncFunction');
+    A(isAsync, 'B5 段函数本体是 async 函数（实 ' + (mod.constructor && mod.constructor.name)
+      + '；同步函数即使 return Promise 也不算，段体里的 await 会失效）');
   }
   // B6 段内用到的外部符号必须在解构里（本轮 path 漏注入就死在这里）
   const ck = ctxKeys(seg) || [];
@@ -596,7 +634,17 @@ const BASE_PANEL_LINES = 17421;
 //   注意：这个数会随转发块注释的字数变动 —— 它是「面没塌」的粗读数，不是精确不变量。
 //   真正的不变量是 D3a（重组面 === 拆前面，逐字相等），那一条按行拼接算，
 //   与转发块长短无关。
-const BASE_PANEL_FILE_LINES = 17127;
+//
+// v2.400.0（V22 EXV22-9）：17127 → 17132（+5）。
+//   为什么必须改，而不是「顺手对齐一下读数」：这 5 行是**真新增的转发代码**，
+//   不是注释被删/加了几个字。
+//     · ui/panel.js 概览页渲染点（`${...Block()}` 那一条）末尾追加了 `${v22OmensBlock()}`
+//       —— 第七块 EXV22-9「八项同屏 · 只读」；
+//     · 转发块新增 5 行：3 行注释 + `function v22OmensBlock() { ... }` 两行体。
+//   所以 D3a（重组面 === 17421）不受影响 —— 段体本身一字未动，改的是段外。
+//   ⚠ 这条断言仍保持**精确等于**而不是 `<=` 或区间：它的价值正是「面没塌」的粗读数，
+//     写成区间等于把「又悄悄加了 50 行」放过去。改动它必须同时给出理由（本节就是）。
+const BASE_PANEL_FILE_LINES = 17132;
 const BASE_BODY_LINES = 335;           // 段体行数（含首含尾）
 function runD(A) {
   const ps = require(path.join(BASE, PS_REL));
@@ -655,9 +703,9 @@ function runD(A) {
   if (env) {
     const WA = env.WA, dom = env.dom;
     A(!!WA.panelOverviewBlocks, 'D4b 装载后 WA.panelOverviewBlocks 在位（LOAD 里有它）');
-    const API_KEYS = ['foldCard', 'evictBlock', 'randBlock', 'clockBlock', 'bridgeBlock', 'lonshaBlock', 'heartbeatBlock', 'bind'];
+    const API_KEYS = ['foldCard', 'evictBlock', 'randBlock', 'clockBlock', 'bridgeBlock', 'lonshaBlock', 'heartbeatBlock', 'v22OmensBlock', 'bind'];
     const missKey = API_KEYS.filter(function (k) { return !WA.panelOverviewBlocks || typeof WA.panelOverviewBlocks[k] !== 'function'; });
-    A(missKey.length === 0, 'D4c 导出面 8 个成员齐（缺 ' + missKey.length + '：' + missKey.join(',') + '）');
+    A(missKey.length === 0, 'D4c 导出面 9 个成员齐（缺 ' + missKey.length + '：' + missKey.join(',') + '）');
     //   六个块各自**非空**：这是「被 try/catch 吞成空串」那一族的机器化钉
     const nonEmpty = [];
     FN.slice(1).forEach(function (k) {
@@ -673,24 +721,48 @@ function runD(A) {
     if (tab) tab.click();
     const ovBody = panel.querySelector('.wa-body');
     const folds = ovBody ? ovBody.querySelectorAll('.wa-fold') : [];
-    A(folds.length === 6, 'D4f 概览页渲染出 6 个折叠壳（实 ' + folds.length + '）—— 拆段后六块仍全部在位');
+    // ── v2.400.0（V22 EXV22-9）：六块 → **七块**，且第七块必须是 v22 块 ────────
+    //   为什么口径从「=== 6」改成「=== 7 且含 v22 块」而不是简单改成「=== 7」：
+    //     「数到 7」不区分「第七块是 v22 块」与「有人把某一块复制了一遍」。
+    //     后者的读数完全同形（都是 7），但它意味着概览页多出一块重复诊断 —— 而这
+    //     正是本锁要防的那类「看起来正常」的塌陷。故必须点名第七块的身份。
+    //   为什么用**摘要标签**点名而不是 id：本模块零 id 零控件是硬纪律（D1g/D1h/D4h），
+    //     用它自己产出的可见文本（摘要第一段「V22 制度读数」）识别，才不违反这条纪律。
+    //   为什么点名「V22 制度读数」而不是摘要里的「八项同屏」：后者是**说明文字**，
+    //     改文案就会红；前者是这块折叠壳的**标签**，与 foldCard 的 label 参数同源，
+    //     语义上是「这一块叫什么」—— 判据该问的正是这个。
+    const V22_LABEL = 'V22 制度读数';
+    A(folds.length === 7, 'D4f 概览页渲染出 7 个折叠壳（实 ' + folds.length + '）'
+      + ' —— 拆段后六块仍全部在位，且 EXV22-9 的第七块（八项同屏）已挂上');
     //   摘要含真读数（不是空壳）。
     //   ⚠ 阈值不能定成「长度 > 8」：本轮实测最短的合法摘要是「对外桥：休眠」= 6 字符。
     //     定 8 会把一条**正确**的读数判成红 —— 而假红与假绿同罪（本仓裁决：判据测的
     //     不是它声称的东西时，红灯同样不可信）。判据要问的是「摘要有没有在说事」，
     //     故改用**结构性**条件：含全角冒号（「标签：状态」两段式）且冒号后有内容。
-    const withText = folds.filter(function (f) {
+    const sumText = function (f) {
       const s = f.querySelector('summary');
-      if (!s) return false;
+      if (!s) return '';
       let t = s._text || '';
       s.childNodes.forEach(function (c) { t += (c.nodeType === 3) ? (c._text || '') : (c.textContent || ''); });
+      return t;
+    };
+    const withText = folds.filter(function (f) {
+      const t = sumText(f);
       const ci = t.indexOf('：');
       return ci > 0 && t.length > ci + 1;
     });
-    A(withText.length === 6, 'D4g 六个折叠壳的摘要都是「标签：状态」两段式且冒号后有内容（实 ' + withText.length + '/6）');
+    A(withText.length === 7, 'D4g 七个折叠壳的摘要都是「标签：状态」两段式且冒号后有内容（实 ' + withText.length + '/7）');
+    //   第七块的身份点名：渲染产物里必须**真有一块**的摘要带 v22 标签。
+    //   这条与 D4f 是两道，不是重复：D4f 问「几块」，本条问「第七块是谁」。
+    //   负控制（N9）把 v22OmensBlock() 的渲染调用删掉时，D4f 与 D4g 会同时掉到 6，
+    //   而本条会直接点出「v22 块不在树中」—— 三条一起说清是哪一块没了。
+    const v22Fold = folds.filter(function (f) { return sumText(f).indexOf(V22_LABEL) >= 0; });
+    A(v22Fold.length === 1, 'D4g2 概览页里恰有 1 块是 EXV22-9 的「' + V22_LABEL + '」（实 ' + v22Fold.length
+      + '）—— 第七块的身份点名，不是只数个数');
     //   零 id 零控件在**渲染产物**上也成立（不只是源码层）
     const ids = folds.reduce(function (a, f) { return a + f.querySelectorAll('[id]').length; }, 0);
-    A(ids === 0, 'D4h 六块折叠壳合计零 id（实 ' + ids + '）—— UI_BINDINGS 守卫面不受影响');
+    A(ids === 0, 'D4h 七块折叠壳合计零 id（实 ' + ids + '）—— UI_BINDINGS 守卫面不受影响'
+      + '（EXV22-9 第七块同样零 id 零控件，只拼字符串）');
   }
 //   ── D5 esc 注入双向核对 ──
   //   正向：panel.js 的转发函数确实注入了 esc（写成 `bind({ esc: esc })`）。

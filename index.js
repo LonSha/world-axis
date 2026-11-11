@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.380.0';
+  const VERSION = '2.400.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1357,6 +1357,22 @@
     'engines/write-desk.js',
     'engines/capability-tier.js',
     'engines/capability-audit.js',
+    // ══ v2.400.0（V22 拓展线 EXV22-1～8）：八项制度性引擎 ══
+    //   八项共用同一条纪律（见各自文件头）：**零 store 写**，只算不落账。
+    //   为什么统一如此：这八项都会「死人 / 逼走人 / 定罪 / 走错路」，
+    //   它们给出的是读数与拒收原因，落账必须走各自领域的既有写口
+    //   （economy / bonds / diplomacy / atlas），这样才不会出现
+    //   「一个纯算引擎顺手改了世界」这种无法归因的写入。
+    //   八项之间互不依赖，排列只要在两处之前即可：**在 ui/panel.js 之前**
+    //   （EXV22-9 的全景中心要读它们的 view），与 capability-audit 之后（无强依赖）。
+    'engines/celestial-omens.js',      // EXV22-1 天文星象 / 历法漂移 / 农时误判
+    'engines/postal-relay.js',         // EXV22-2 驿传网络 / 换马耗时 / 驿路断毁
+    'engines/levy-corvee.js',          // EXV22-3 税制徭役 / 征发额度 / 逃户流亡
+    'engines/mortuary-rites.js',       // EXV22-4 丧葬儀式 / 服丧禁令 / 遗产清算
+    'engines/sartorial-regalia.js',    // EXV22-5 服饰规制 / 僭越风险 / 身份识别
+    'engines/betrothal-alliance.js',   // EXV22-6 婚约聘娶 / 妆匛议价 / 门第联姻
+    'engines/cartography-survey.js',   // EXV22-7 舆图测绘 / 精度分层 / 迷雾认知
+    'engines/lingua-broker.js',        // EXV22-8 方言隔阂 / 译语掮客 / 误译后果
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；

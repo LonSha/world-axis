@@ -8652,6 +8652,53 @@ function runWitness(WA) {
     }
   }
 
+  // ── v2.400.0（V22 第 4 批 EXV22-4）：engines/mortuary-rites.js 的拒收码见证 ──
+  //   为什么需要这一段：EXV22-4「丧葬仪式 / 服丧禁令」是本批新增引擎，它有一条
+  //   **真拒收码** `mourning-prohibited`（服丧期内婚娶/宴饮/出仕会被禁，且可告发）。
+  //   这条码不是「做不到」，是「做了要被告发」—— 所以它是 ok:false + reason，
+  //   与「成功结果码」不同（后者本批统一改用 outcome 字段，见各引擎注释）。
+  //   见证方式：**真调用**（不读源码字符串、不直调内部函数），走公开 API：
+  //     ① 打开开关（默认关闭时先返回 disabled，取不到本码）；
+  //     ② 真办一场斩衰（27 月 = 810 日）；
+  //     ③ 在服丧期内请求婚娶 ⇒ 必须拿到 mourning-prohibited；
+  //     ④ 顺带反证「期外放行」与「非禁令动作放行」两条**不是**拒收（它们是 ok:true），
+  //        避免把成功路径也塞进 reason（那正是本批初版踩过的坑：15 条成功码被
+  //        reject-code-gate 判成未分类拒收码）。
+  if (WA.mortuaryRites && typeof WA.mortuaryRites.holdFuneral === 'function') {
+    want('mourning-prohibited',
+      'mortuary-rites：服丧期内婚娶被禁且可告发（EXV22-4；违禁≠做不到，是可告发的社会后果）');
+    const MR = WA.mortuaryRites;
+    const keepCfg = MR.getSettings ? MR.getSettings() : null;
+    try {
+      if (MR.setSettings) MR.setSettings({ enabled: true });
+      const held = MR.holdFuneral({ mournerId: 'witness_mourning', kin: 'zhan-cui', at: 0, deceased: '父' });
+      if (held && held.ok && held.until) {
+        //   期内婚娶：必须真返回 mourning-prohibited（trip 读的是 reason 字段）
+        trip('mourning-prohibited', function () {
+          const r = MR.checkProhibition({ mournerId: 'witness_mourning', action: 'marry', at: 1 });
+          return [r && r.reason];
+        });
+        //   反证：期外放行与非法定动作**不得**返回该码（它们是 ok:true + outcome）。
+        //   这两条不进 expect（它们不是拒收码），只作为「见证没跑偏」的自检：
+        //   若哪天有人把放行也写成 reason:'mourning-prohibited'，下面两条 trip 会失败，
+        //   而失败信息会指出「放行被写成了拒收」——这正是要防的方向。
+        const over = MR.checkProhibition({ mournerId: 'witness_mourning', action: 'marry', at: held.until + 1 });
+        const other = MR.checkProhibition({ mournerId: 'witness_mourning', action: 'trade', at: 1 });
+        if (over && over.reason === 'mourning-prohibited') {
+          throw new Error('见证自检失败：期外放行被写成了拒收码 mourning-prohibited（应为 ok:true + outcome）');
+        }
+        if (other && other.reason === 'mourning-prohibited') {
+          throw new Error('见证自检失败：非禁令动作被写成了拒收码 mourning-prohibited（应为 ok:true + outcome）');
+        }
+      }
+    } finally {
+      //   无条件还原设置（不拿「跑通了」当还原的理由 —— 与本文件既有 finally 同规）
+      if (keepCfg && MR.setSettings) {
+        try { MR.setSettings({ enabled: !!keepCfg.enabled }); } catch (e) {}
+      }
+    }
+  }
+
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected,
     asyncPumpProof: asyncPumpProof };
 }

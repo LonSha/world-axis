@@ -301,14 +301,38 @@ const ALIAS_RE = (function () {
     '\\.WorldAxis\\s*=\\s*' + host + '\\.WorldAxis\\s*\\|\\|\\s*\\{\\s*\\}\\s*\\)?\\s*;');
 })();
 
+/**
+ * 文件面：**委托单一真源** tests/product-files.js（v2.400.0 · V22 EXV22-9 收口）。
+ *
+ * 为什么改（这不是「顺手统一风格」，是判据输入面比事实窄 —— 本仓治过八次的同族病）：
+ *   本函数此前是**本文件自带的非递归遍历器**：`DIRS` 七个子目录各 readdirSync 一层。
+ *   而 tests/product-files.js 自 v2.400.0（OPV22-4 拆段）起已改为**递归**
+ *   （discoverFilesDeep），因为 `ui/pages/*.js` 与 `tests/segments/*.js` 就是这么长出来的。
+ *   于是 `ui/pages/overview-blocks.js` 落在**本门禁的文件面之外**。实测差集：
+ *     product-files.js 450 个 · 本文件 449 个 · onlyInProductFiles = ['ui/pages/overview-blocks.js']
+ *   （差集恰好只有这一个文件，方向单一，不是互相都缺）。
+ *
+ * 后果不是「少一行读数」——EXV22-9 的消费点恰好就写在该文件里：
+ *   八个新引擎（celestialOmens / postalRelay / levyCorvee / mortuaryRites /
+ *   sartorialRegalia / betrothalAlliance / cartographySurvey / linguaBroker）的
+ *   `WA.<ns>.view()` 字面引用全部落在 overview-blocks.js 的 READERS 表里。
+ *   本门禁看不见该文件 ⇒ 八个 ns 被**稳定地**报成
+ *     「零读 ns 未定性 8」+「ns 面漂移 8（static-only）」，读面读数纹丝不动（453）。
+ *   在人眼里已经接上了，在判据眼里永远接不上 —— 这正是 v2.73.0（测试面只读 run.js）、
+ *   v2.274.0（子目录整体漏进产品面）、v2.43.0（四处各写一份遍历器）反复治的那一类。
+ *
+ * 处置：**把文件面上收到单一真源**，让「什么算产品文件面」只在一处定义。
+ *   明确**不**采用的两条捷径：
+ *     · 不往 NS_FACE_EXPECT.onlyStatic / internalPrefixed 里塞这八个 ns 把红压掉 ——
+ *       那等于把「扫描器瞎了」写成「本来就没有消费点」，是本文件头注第 65 行自己点过名的病；
+ *     · 不放宽 ALIAS_RE / 引用面正则 —— 那会连真·漏接一起放过。
+ *
+ * 方向性自证（改完必须成立）：文件面 449 → 450（+1）、读面 453 → 461（+8）、
+ *   零读 ns 43 → 35（−8）。三条同时到位才算「输入面补齐」，只涨文件数不涨读面就是没接上。
+ */
+const { productFiles: _productFiles } = require('./product-files.js');
 function productFiles() {
-  const out = ['index.js'];
-  DIRS.forEach(function (d) {
-    const abs = path.join(BASE, d);
-    if (!fs.existsSync(abs)) return;
-    fs.readdirSync(abs).sort().forEach(function (f) { if (f.endsWith('.js')) out.push(d + '/' + f); });
-  });
-  return out;
+  return _productFiles(BASE);
 }
 
 function safeRead(p) {

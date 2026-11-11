@@ -1063,6 +1063,22 @@ const LOAD = [
   'engines/write-desk.js',
   'engines/capability-tier.js',
   'engines/capability-audit.js',
+  // ── v2.400.0（V22 拓展线 EXV22-1～8）：八项制度性引擎 ──
+  //   与 index.js LOAD_ORDER 同序（那里是 capability-audit 之后、ui/panel.js 之前；
+  //   本清单不含 ui/ 层，故相对次序仍单调）。
+  //   为什么必须进 LOAD：本清单是 reject-code-gate / reject-v2780 见证面的**唯一装载真源**。
+  //   漏登的后果不是“少测一项”，而是 **静默失效**：见证段 `if (WA.mortuaryRites && …)`
+  //   探测恒假 → 整段跳过 → 该文件的真拒收码 `mourning-prohibited` 被判成
+  //   「未分类（既无见证也未列死）」。这正是本轮现场：十五个码收敛到最后一个，
+  //   表面看是见证没写，实际是**装载面漏登**。
+  'engines/celestial-omens.js',      // EXV22-1 天文星象 / 历法漂移 / 农时误判
+  'engines/postal-relay.js',         // EXV22-2 驿传网络 / 换马耗时 / 驿路断毁
+  'engines/levy-corvee.js',          // EXV22-3 税制徭役 / 征发额度 / 逃户流亡
+  'engines/mortuary-rites.js',       // EXV22-4 丧葬儀式 / 服丧禁令 / 遗产清算
+  'engines/sartorial-regalia.js',    // EXV22-5 服饰规制 / 僭越风险 / 身份识别
+  'engines/betrothal-alliance.js',   // EXV22-6 婚约聘娶 / 妆匛议价 / 门第联姻
+  'engines/cartography-survey.js',   // EXV22-7 舆图测绘 / 精度分层 / 迷雾认知
+  'engines/lingua-broker.js',        // EXV22-8 方言隔阂 / 译语掮客 / 误译后果
   'compat/host.js', 'compat/mvu.js', 'compat/th-helper.js'
 ];
 for (const rel of LOAD) {
@@ -22246,6 +22262,19 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./scenario-v53-bloodline-heritage-trust.js');
     await runScript('./scenario-v54-engineering-siege-explosion.js');
     await runScript('./scenario-v55-dungeon-eco-court-mesh.js');
+    // ── v2.400.0 (V22): 八引擎制度贯通六条端到端场景专锁 ──
+    //   这六条是 V22 八引擎（星象/驿传/徭役/丧葬/服饰/婚约/舆图/语族）的**唯一贯通验证**：
+    //   exv22-v2400.js 逐引擎单点验，六条链验「因果真的串得起来」——
+    //   观星历差→农时减产→超额征发→逃户；驿路换马→军情迟到→战局；
+    //   僭越着装→盘查风险→官帽；门第差→妆匛→悔婚罚；烂图→亲见也走错→伏击。
+    //   场景 61 是收口：九级链跑完后**在同一个宿主**里装 EXV22-9 面板段模块，
+    //   逐项比对八个 view() 真值与渲染 HTML —— 面板若自己算一份，这一级会点名。
+    await runScript('./scenario-v56-omens-harvest-levy.js');
+    await runScript('./scenario-v57-relay-delay-battle.js');
+    await runScript('./scenario-v58-regalia-checkpoint.js');
+    await runScript('./scenario-v59-betrothal-dowry-feud.js');
+    await runScript('./scenario-v60-cartography-ambush.js');
+    await runScript('./scenario-v61-v22-grand-convergence.js');
     // v2.400.0 OPV22-1: 总线六层声明面与实现面逐字对齐
     await runScript('./cascade-six-layer-v2400.js');
     await runScript('./bus-topology-v2400.js');
@@ -22259,6 +22288,15 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   ⚠ 它内含 N2/N3 两处**真源码破坏**（改 engines/routine-pacing.js 与 tests/run.js
     //     后 try/finally + sha256 还原），故不可与别的节并行；本位置在末尾单节内串行。
     await runScript('./settings-audit-v2400.js');
+    // v2.400.0 第 4 批（V22 EXV22-1～8 + EXV22-9）：八引擎专锁
+    //   为什么必须登记进本清单：tests/test-surface-gate.js 把「磁盘有、从不执行、未豁免」
+    //   的测试文件判为 orphan（unregistered-orphan）。不登记的后果不是「少跑一项」，
+    //   而是本锁**从未在全量里跑过**，且同时把 segment-extract-v2400 的 C4b/C4e 拉红。
+    //   用 runScript 而不是 runLock：本锁既导出 runAll(assert) 也有 CLI 入口，但它内含 N1~N4
+    //   四处**真源码破坏**（改 engines/levy-corvee.js / engines/lingua-broker.js /
+    //   ui/pages/overview-blocks.js / ui/panel.js，后 try/finally + sha256 还原），
+    //   故不可与别的节并行，用 spawn 子进程串行最稳。
+    await runScript('./exv22-v2400.js');
   }
   // ── v2.302.0（缝 World Chronicle）：正文内联状态回报标签 ──────────────────
   //   执行 engines/inline-tags.js 真实源码（vm 受控桩：store / calendar 按既有写口形状）。
@@ -22499,7 +22537,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     const __verPin293 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
       .match(/const VERSION = '([\d.]+)'/) || [])[1];
-    const __wantPin293 = '2.380.0';
+    const __wantPin293 = '2.400.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

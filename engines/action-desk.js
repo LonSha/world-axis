@@ -2103,6 +2103,83 @@
     'weather.setWeather': function (o) {
       if (WA.weather && typeof WA.weather.setWeather === 'function') return WA.weather.setWeather(o.place, o.kind || o.weather);
       return { ok: false, reason: 'weather-unavailable' };
+    },
+    // ══════════════════════════════════════════════════════════════════════
+    // v2.400.0（V22 拓展线 EXV22-1～8）：八项制度性引擎的路由──
+    //
+    //   为什么必须接到这里（而不是「引擎存在就行」）：
+    //   tests/dead-export-gate.js 的判据是「定义文件之外的**产品代码**有零引用」。
+    //   八引擎初版只有 EXV22-9 面板读了 `view()`（只读口），机制入口（observeSky /
+    //   buildRoute / levySeason …）在产品侧零引用，门禁当场报了 39 项死导出。
+    //   那不是误报：「能算但没人叫它算」的引擎就是死的（本仓既有裁决：
+    //   新导出必须有真实生产消费点）。而 action-desk 正是本仓「玩家动作→引擎」的
+    //   唯一入口（courierDispatch / riskPooling 等 17 组均逐字同形），所以路由就是它们的正当消费点。
+    //
+    //   因此本段**不**写任何新拒收码：引擎缺席时的归因用已有共享码 `unsupported`
+    //   （与上方 riskPooling / rehearsal 同口径），不另造 `<ns>-unavailable` 新码面。
+    //   为什么：上方那批 `<ns>-unavailable` 是 v2.380.0 的既有码，已有见证；
+    //   本批若新造八个同形新码，就要再走一遍「三面齐走」（码面 / 见证 / 快照），
+    //   而它们与已有码的语义**逐字相同**（都是「该引擎没装」）—— 那就是重复码面。
+    // ══════════════════════════════════════════════════════════════════════
+    'omens.observeSky': function (o) {
+      if (WA.celestialOmens && typeof WA.celestialOmens.observeSky === 'function') return WA.celestialOmens.observeSky(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'omens.settle': function (o) {
+      if (WA.celestialOmens && typeof WA.celestialOmens.settle === 'function') return WA.celestialOmens.settle(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'postal.buildRoute': function (o) {
+      if (WA.postalRelay && typeof WA.postalRelay.buildRoute === 'function') return WA.postalRelay.buildRoute(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'postal.dispatch': function (o) {
+      if (WA.postalRelay && typeof WA.postalRelay.dispatchByRelay === 'function') return WA.postalRelay.dispatchByRelay(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'levy.raise': function (o) {
+      if (WA.levyCorvee && typeof WA.levyCorvee.levySeason === 'function') return WA.levyCorvee.levySeason(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'funeral.hold': function (o) {
+      if (WA.mortuaryRites && typeof WA.mortuaryRites.holdFuneral === 'function') return WA.mortuaryRites.holdFuneral(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'funeral.checkProhibition': function (o) {
+      if (WA.mortuaryRites && typeof WA.mortuaryRites.checkProhibition === 'function') return WA.mortuaryRites.checkProhibition(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'attire.wear': function (o) {
+      if (WA.sartorialRegalia && typeof WA.sartorialRegalia.attireAs === 'function') return WA.sartorialRegalia.attireAs(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'attire.inspectAtGate': function (o) {
+      if (WA.sartorialRegalia && typeof WA.sartorialRegalia.identifyAtGate === 'function') return WA.sartorialRegalia.identifyAtGate(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'match.propose': function (o) {
+      if (WA.betrothalAlliance && typeof WA.betrothalAlliance.proposeMatch === 'function') return WA.betrothalAlliance.proposeMatch(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'match.settle': function (o) {
+      if (WA.betrothalAlliance && typeof WA.betrothalAlliance.settle === 'function') return WA.betrothalAlliance.settle(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'match.breach': function (o) {
+      if (WA.betrothalAlliance && typeof WA.betrothalAlliance.breach === 'function') return WA.betrothalAlliance.breach(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'survey.chartRegion': function (o) {
+      if (WA.cartographySurvey && typeof WA.cartographySurvey.chartRegion === 'function') return WA.cartographySurvey.chartRegion(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'survey.resolveLandmark': function (o) {
+      if (WA.cartographySurvey && typeof WA.cartographySurvey.resolveLandmark === 'function') return WA.cartographySurvey.resolveLandmark(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'tongue.converse': function (o) {
+      if (WA.linguaBroker && typeof WA.linguaBroker.converse === 'function') return WA.linguaBroker.converse(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
     }
   };
 

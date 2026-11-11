@@ -6841,3 +6841,119 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - 一处**误报，如实记下**：本轮末把 `tools/gen-gates-doc.js` 误写成 `tests/gates-doc-gen.js` 去跑，得到 `MODULE_NOT_FOUND` 并被当时读成了「专锁抛错」。现场只有一个 `tests/gates-doc-gen-v2400.js`，跑它是 **35 项 exit 0**。**路径敲错时的报错与判据红在日志里长得很像**，这正是「读数必须与现场对齐」这条纪律要拦的东西。
 - `docs/gates.md`：`node tools/gen-gates-doc.js --check` 报 3 行差异，与拆段完全吻合（inventory 441→442、test-surface 542/484/542→543/485/543、module-cycle 边 3620→3616），`--write` 回填后 `--check` 通过。
 - 未动：`index.js` / `manifest.json` 版本仍为 `2.380.0`（版本面统一是第 6 批收口事项）。
+
+### R238 · 2026-11-11 · v2.400.0 V22 第 4~6 批收口：八引擎专锁 137 项、六把场景锁、版本面统一
+**本条覆盖三批**（第 4 批 EXV22-1～8 八引擎 / 第 5 批 EXV22-9 全景消费点与场景 56～61 / 第 6 批版本面收口）。
+分三段写，因为三段各栽在不同的地方，混在一起写会把「判据缺口」和「产品缺陷」搅成一团。
+- 第 4 批（八引擎专锁 `tests/exv22-v2400.js`）：
+  - 收敛过程 `FAIL（123 / 9）` → `pass（137 / 0）`。九个红全部是 **G 组路由面**，根因只有一个：
+    `engines/action-desk.js` 第 45 行 `const DEF = { enabled: false, maxRows: 32, maxPerGroup: 8 }`，
+    `plan()` 第 3402–3404 行 `if (!cfg.enabled) return { ok:false, reason:'disabled' }`。
+    G 组只开了八引擎的开关，**没开 action-desk 自己的** ⇒ G4a~G4h 十六条路由读到的全是门禁，
+    不是路由。这不是引擎缺陷，是**判据缺口**：判据以为在测路由，实际在测「桌子有没有开」。
+  - 修法：`runG` 里补 `AD.setSettings({ enabled: true })`，并新增 **G4a0 探门判据** ——
+    用必拒动作 `__g4_probe__` 确认开关**真打开**（`reason !== 'disabled'`），否则后面的
+    G4a~G4h 一律不判。**先证明门开了，再证明路通了**：顺序颠倒时，门关着也能全绿。
+  - 负控制：把 `if (AD && ...)` 改成 `if (false && ...)` ⇒ G4a0 当场报 `"disabled"`、
+    G4a~G4i 全红、`FAIL（123 / 10）`；还原后 sha256 `ed5987b9…` 一致。
+  - 同批还修掉一处**同型真缺陷**（见下「三处同型」第一条）：`setSettings` 原写法
+    `WA.settingsBus.write(__REG, merged)` —— `settingsBus` 导出面只有
+    `read / normalize / save / saveOrThrow / remove / stat / faces`，**没有 `write`**，
+    于是八个开关永远打不开。全部改为 `saveOrThrow` + 回读校验（`write-verify`）。
+- 第 5 批（六把场景锁 + EXV22-9 全景中心）：
+  - `scenario-v56-omens-harvest-levy`（七级）、`v57-relay-delay-battle`（七级）、
+    `v58-regalia-checkpoint`（八级）、`v59-betrothal-dowry-feud`（八级）、
+    `v60-cartography-ambush`（八级）、`v61-v22-grand-convergence`（十一级）全部达标。
+  - 场景 61 是收口：九级链跑完后**在同一个宿主里**用 vm 装 `ui/pages/overview-blocks.js`，
+    调 `v22OmensBlock()` 渲染，逐项比对八个 `view()` 真值与 HTML（driftDays / `N 条驿路` /
+    `逃户 N` / `N 人服丧` / `人僭越` / `门亲事已定` / `N 片有图` / `误译 N`）。
+    **为什么必须在同一宿主**：换宿主装一遍面板，读的是新状态，比对就成了两份默认值互比。
+  - 六把锁登记进 `tests/run.js`（`scenario-v55` 之后六行 `runScript`），
+    `segment-extract-v2400` 的 `BASE_TEST_FILES` 544 → **550**，`test-surface-gate`
+    测试文件面 **550 / 孤儿 0**。
+- 第 6 批（版本面）：
+  - `index.js` VERSION、`manifest.json` version、五本账 `version` 与 `_note` 末次版本词、
+    `tests/run.js` 钉版字面量（`__wantPin293`，runPins 的唯一供养）统一到 **2.400.0**。
+  - 版本白名单两种形态按**形态**跟位（14 个文件、31 条），不逐串枚举 —— 枚举正是
+    `version-surface-gate-v2185` 记过的病灶。
+  - `_note` 只升**最后一次**出现的旧版本词：`_note` 是追加式沿革，历史段里留着旧版本词
+    是**正确的**（把「v2.380.0 时发生过什么」改成「v2.400.0 时发生过什么」就是篡改）。
+- **三处同型真缺陷（同一形态，本批三处现场）**：成功路径把结果码写进**拒收专用字段** `reason`。
+  1. `engines/lingua-broker.js:138` 之后（上一轮已修，本批先例）。
+  2. `engines/sartorial-regalia.js:153` `reason: caught ? 'caught' : 'passed'` → `outcome:`。
+  3. `engines/cartography-survey.js:160` `reason: misled ? 'misled' : 'found'` → `outcome:`。
+  第 2、3 处**逃过了 D1 的字面量正则**，因为写成了三元拼接 —— 正则只认
+  `reason: 'literal'` 形态，拼接形态连「它污染了码面」都看不见。
+  **这是本仓最贵的一类假绿：不是判据错了，是判据的输入面比病灶窄。**
+- 判据自证（三处，均为**我自己写的判据先错**，不是产品错）：
+  - D8 的样本数组初版只放 2 条，于是 `identifyAtGate` 与 `resolveLandmark` 两处
+    成功路径写 `reason` **五轮没被发现**。扩到 11 条覆盖八引擎后立刻现形。
+  - D8b 初稿写成「另拿一份硬编码数组去比另一份硬编码数组」—— 两份都在测试里、永远相等、
+    **空集上恒真**，是本仓最恨的假判据形态。改为从 `D8_CASES` 本身派生，并新增
+    D8b2「`D8_CASES.length >= 10`」防空集。
+  - 场景 61 第 9 级初版拿**整张卡片**去正则 `/未装载/` —— 卡片脚注本身就写着
+    「「休眠」与「未装载」是两件事」，于是产品完全正确时判据必红。改为**先切行区再查**，
+    并先断言行区非空（切不出来时行区是空串，空串上「无未装载 / 无休眠」两条恒真）。
+  - 场景 57 首次红：`postal-relay` 的 `maxHours: 720`，6000km×2 加急后约 560h **没超限**，
+    判据却断言「必须拒」。改 10000km×2（约 934h）—— 取**远超**上限而非刚好过线，
+    刚好过线会被将来微调阈值抹平。
+  - 场景 58 首次红：商人 rank=1 穿官帽 minRank=5，差 4 × 0.35 = 1.4 **封顶后仍是 1**，
+    与「庶民穿龙袍」同为 1，判据在**饱和区**里空转。改儒生（rank=3）差 2 ⇒ 0.7 未封顶。
+  - 场景 60 首次红：断言「烂图上亲见点该找得到」—— 读源码确认
+    `certainty = pt.seen ? chart.precision : chart.precision × hearsayWeight`，
+    **亲见点的确定性就是整张图的精度**，烂图上连亲见点也走错。这是应有语义，不是缺陷。
+    改为三条对照（bad 图亲见也走错 / good 图亲见找到 / good 图传闻仍走错）。
+  - `version-surface-gate-v2185` 的 N1 初版写 `curMinor - 1` 作破坏后期望值，隐含
+    「版本号逐连递增」这个假设。本轮 380 直接跳到 400，破坏后最大项是 380 而
+    `curMinor-1 = 399` ⇒ 判据误报而产品一点没错。改为从白名单本身派生（剪掉末项后剩的最大项）。
+- 验证（九道门禁全 exit 0，全部为**单个门禁 / 专锁**，无全量回归）：
+  - `reject-code-gate` 产品 449 / 码 1749 / 见证 808 / 死表 52 / 基线 918。
+  - `dead-export-gate` dead 1435 / uiDead 7 / dataOnly 641 / test-only 456。
+  - `module-cycle-gate` 文件 450 / 读面 461 / 边 3670 / LOAD_ORDER 449 / 未定性 0。
+  - `module-registry-gate` 文件 434 / ns 445 / 装载期边 296 / 调用期 511 / 结构问题 0。
+  - `inventory` 产品 450 / 登记 449 / 成员 4928 / 悬空 0 / 未登记 0 / 登记表悬空 0。
+  - `test-surface-gate` 文件面 550 / 锁 492 / 可达 550 / 孤儿 0。
+  - `reject-recovery-lock-v2192 --check` pass(199)；`segment-extract-v2400` pass(125)；
+    `settings-audit-v2400` pass(57)；`gates-doc-gen-v2400` pass(35)；
+    `version-surface-gate-v2185` pass(14)。
+  - 专锁：`exv22-v2400` **137/0**；六把场景锁各自「全部达标」。
+- 账本按纪律**重建**（不是手改）：
+  - `tests/dead-export-ledger.json`：六把场景锁引用 `setSettings` / `registerRegiment`，
+    导致 9 条 `tref` 账本 0 / 复算 1 ⇒ **证据失实 9 项**。跑 `--update` 重算 1442 条。
+    **这条红不是判据太严，是账本真的落后于现场** —— 它正是「账本随改动重建」这条纪律的现场执法。
+  - `tools/evidence-index.js --write` 得 548 条（verified 29 / wired 502 / consumed 7 / unwired 10），
+    `--check` stale 0。
+  - `tools/gen-gates-doc.js --write` 回填 `docs/gates.md`，`--check` 一致。
+  - `tools/gen-error-codes.js` 重生成 `docs/ERROR_CODES.md`（1749 码 / 见证 779 / 死表 52 / 基线 918），
+    `--check` 无缺无余。
+- `tools/fact-report.js` ①：版本三方 **index.js 2.400.0 / manifest.json 2.400.0 / run.js 消息面钉 1 处**。
+- **本批末尾新发现的一处真缺陷（在 `tests/segment-extract-v2400.js` 自己身上）**：
+  smoke 复跑报 `⚠ tests/segment-extract-v2400.js 12348ms ← 超上限`（上限 12000ms）。
+  查成分（插桩量段，只写临时副本、还原后 sha 逐字相同）：
+  `N 7217ms / B 3154ms / D 1438ms / A 56ms / C 101ms`。B 段两处热点，**都是同一段文本被反复处理**：
+  1. **B5 原写法是「调一次段函数，看返回值有没有 `.then`」**。它有两个问题：
+     ① **误判** —— 同步函数只要 `return` 了一个 Promise 就能混过，而它本身不是 async，
+     段体里的 `await` 仍会失效。**判据测的不是它声称的东西。**
+     ② **顺带把整段跑了一遍** —— 调用它就真的执行段体里 900+ 条判据，实测 3209ms。
+     为了判一个字段去跑整段，是本锁自己违反了「读数必须与现场对齐」。
+     改为判**函数本体**（`[object AsyncFunction]` / `constructor.name`）：更**严**（伪 async 会被抓）
+     且更**快**（零执行）。**这不是放宽判据，是把判据写对。**
+  2. `countCalls(src, name)` 内部调 `stripComments(src)`，而 B 段对同一文本要数两次
+     （section / assert），B4b/B4c 对重组后的 1.6MB 文本又各去一遍 —— 四次重复计算同一结果。
+     `stripComments` 是逐字符扫描器，第二遍实测 345–900ms。拆成
+     `countCallsIn(已去注释面, name)` + `countCalls` 便利包装，**判据一条未减**。
+     不选「加缓存 Map」：字符串做 key 要靠长度+片段哈希，碰撞即给出**错读数**，
+     而「错读数」比「慢」坏得多。
+  - 修后 **125 项不变**，耗时 **12190 → 10518ms**（smoke 实测 10456ms，余量 ~1.5s）。
+  - B5 负控制：把段文件改成**语法合法**的伪 async（同步外壳 `return (async function(){…})()`，
+    返回真 Promise）⇒ `✗ A3`（导出形态）+ `✗ B5 段函数本体是 async 函数（实 Function…）`、
+    `FAIL 2 / 125`。还原后 sha256 `3f0b4847…` 一致。
+    ⚠ 第一次负控制**没打中**：直接把 `async` 去掉导致段体语法错误，B4 先红、B5 被跳过。
+    **负控制打不中时，先怀疑破坏本身不合法，不要急着改判据。**
+  - `tools/smoke.js` 的注释读数同步更新为 10456ms / 余量 ~1.5s（原来写 9495–9869 / ~2.1s）。
+- 未做（如实登记）：
+  - 全量回归未跑（纪律 12：只在双计划收口后跑一次；V22 已收口但 V23 未立项，故留待下一轮统一跑）。
+  - `tools/smoke.js` 已复跑：**14 / 14 全绿、45.1s**。`segment-extract-v2400` 修后 10456ms，
+    余量 ~1.5s —— **下次再往 N 组加 spawn / 加全扫 / 往 D 段加一次 `fresh()` 之前必须先重测**。
+  - `module-cycle-gate` 的 `UI_NS` 未加 `v22OmensBlock`（`panelOverviewBlocks` 已登记，
+    块函数不是独立 ns），判定为不需要。

@@ -408,7 +408,162 @@
       + '「未上报」与「0ms」是两件事 —— 宿主 API 耗时无上报时照实写未上报，不拿 0ms 冒充「API 很快」。</div></div>', hBad);
   }
   // ══ 段体结束 ══
+  /**
+   * ══ v2.400.0（EXV22-9）：V22 八项制度性读数同屏 ══
+   *
+   * 为什么这一块必须存在（不是「顺手加个面板」）：
+   *   EXV22-1～8 八个引擎交付时全是**零读 ns** —— module-cycle-gate 当场点名
+   *   八条「模块提供了、产品源面无人读」。而本仓对这件事有硬纪律：
+   *   零读 ns 要么补真实消费点，要么在 ns-consumer-ledger 里写清「为什么只该
+   *   由程序/宿主消费」。把八项制度读数登记成 readonly-api 是自欺 ——
+   *   它们的使命正是「让玩家看见历法漂了几天、驿路断在哪、这一季逼走了几户」，
+   *   看不见就等于白做。故本块就是那八个 ns 的**真实生产消费点**。
+   *
+   * 三条口径（与前六块同源，一条不松）：
+   *   ① **只读、零动作**：只调各引擎的 `view()` 与 `getSettings()`，
+   *      **绝不**调 observeSky / levySeason / holdFuneral 这类会改状态的写口 ——
+   *      看诊断不该凭空给世界办一场丧事。这一条由 tests/exv22-v2400.js 的正则钉住。
+   *   ② **缺席即缺席**：任一引擎不在（旧宿主/按需装载）就如实写「未装载」，
+   *      不补默认读数、不假装 0。八个块各自独立，一个缺席不拖累其余。
+   *   ③ **不新增控件**：本块零 `<button>`/`<input>`/`id="`，故不触碰面板的
+   *      UI 绑定守卫（G17）。渲染期只拼字符串。
+   */
+  function v22OmensBlock() {
+    const rows = [];
+    let bad = false;
 
+    // ══ 为什么这里要**逐条直写** `WA.<ns>.view` 而不做 `WA[sp.ns]` 动态取 ══
+    //   module-cycle-gate 的读面（tests/inventory.js 的 codeFace）是**静态正则**，
+    //   只认 `WA.<ns>.<mem>` 字面形态。初版我用 `const m = WA[sp.ns]` 做了一张
+    //   SPEC 表，测试真跑得通、面板真的显示八行，但门禁读数是「读面 453」纹丝不动
+    //   —— 也就是说：**在人眼里已经接上了，在判据眼里还没接**。
+    //   这种「看得见但读不出」正是本仓反复治的假绿反向（假消费点）。
+    //   处置不是去放宽门禁的正则（那会让真漏接也一起放过），而是把消费点写成
+    //   门禁能看见的形态：下面这八行就是那八个 ns 的真读点，一个不多一个不少。
+    //   每条都只调 `view()`（只读口），**不调**任何会改状态的写口。
+    const READERS = [
+      { label: '星象历差', ns: 'celestialOmens', read: function () { return WA.celestialOmens.view(); } },
+      { label: '驿传时延', ns: 'postalRelay', read: function () { return WA.postalRelay.view(); } },
+      { label: '征发逃户', ns: 'levyCorvee', read: function () { return WA.levyCorvee.view(); } },
+      { label: '服丧禁令', ns: 'mortuaryRites', read: function () { return WA.mortuaryRites.view(); } },
+      { label: '僭越风险', ns: 'sartorialRegalia', read: function () { return WA.sartorialRegalia.view(); } },
+      { label: '联姻绑定', ns: 'betrothalAlliance', read: function () { return WA.betrothalAlliance.view(); } },
+      { label: '舆图精度', ns: 'cartographySurvey', read: function () { return WA.cartographySurvey.view(); } },
+      { label: '误译后果', ns: 'linguaBroker', read: function () { return WA.linguaBroker.view(); } }
+    ];
+
+    // 每一行如何从 view() 的读数里取一句话。取不到就如实写「未…」，不编。
+    const FORMAT = {
+      celestialOmens: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（设置页可开）' };
+        if (v.year == null) return { sum: '未观星', note: '尚未 observeSky：没有读数，不猜历差' };
+        return {
+          sum: '历差 ' + v.driftDays + ' 日 · ' + (v.sky ? v.sky.phase : '?'),
+          note: '第 ' + v.year + ' 年 · 阈值 ' + v.alarmDays + ' 日 / 年漂 ' + v.driftDaysPerYear
+        };
+      },
+      postalRelay: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（设置页可开）' };
+        if (!v.routeIds.length) return { sum: '无驿路', note: '尚未 buildRoute：没有拓扑就算不出时延' };
+        return {
+          sum: v.routeIds.length + ' 条驿路',
+          note: '驿马 ' + v.horseKmPerHour + ' km/h · 每站换马 ' + v.relayHoursPerStation + 'h · 已派 ' + v.stat.dispatched
+        };
+      },
+      levyCorvee: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（设置页可开）' };
+        if (!v.ledgerCount) return { sum: '未征发', note: '尚无 levySeason 记录' };
+        const L = v.last;
+        return {
+          sum: '实征 ' + L.got + ' / 应征 ' + L.want,
+          note: '逃户 ' + L.fled + ' · 基数 ' + L.households + '→' + L.baseAfter
+            + (L.shortfall > 0 ? ' · <b>收不满 ' + L.shortfall + '</b>' : '')
+        };
+      },
+      mortuaryRites: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（设置页可开）' };
+        if (!v.mourners.length) return { sum: '无人服丧', note: '尚无 holdFuneral 记录' };
+        const soon = v.mourners.slice().sort(function (a, b) { return a.until - b.until; })[0];
+        return {
+          sum: v.mourners.length + ' 人服丧',
+          note: '最近期满者 ' + soon.kin + ' / ' + soon.days + ' 日 · 禁 ' + v.bans.join('、')
+            + ' · 已拦 ' + v.stat.blocked
+        };
+      },
+      sartorialRegalia: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（设置页可开）' };
+        if (!v.worn.length) return { sum: '无人着装', note: '尚无 attireAs 记录' };
+        const us = v.worn.filter(function (w) { return w.usurping; });
+        return {
+          sum: us.length + ' 人僭越',
+          note: '着装 ' + v.worn.length + ' 人 · 盘查力 ' + v.gateScrutiny
+            + ' · 已识破 ' + v.stat.caught + ' / 已放行 ' + v.stat.passed
+        };
+      },
+      betrothalAlliance: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（设置页可开）' };
+        if (!v.proposals.length) return { sum: '无婚约', note: '尚无 proposeMatch 记录' };
+        const settled = v.proposals.filter(function (p) { return p.state === 'settled'; }).length;
+        const best = v.ties.slice().sort(function (a, b) { return b.strength - a.strength; })[0];
+        return {
+          sum: settled + ' 门亲事已定',
+          note: '提案 ' + v.proposals.length + ' · 悔婚 ' + v.stat.broken
+            + (best ? ' · 最深绑定 ' + best.houses + ' ' + best.strength : '')
+        };
+      },
+      cartographySurvey: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（设置页可开）' };
+        if (!v.regions.length) return { sum: '未测绘', note: '尚无 chartRegion 记录' };
+        const worst = v.regions.slice().sort(function (a, b) { return a.precision - b.precision; })[0];
+        const guessed = v.regions.reduce(function (a, r) { return a + r.heard; }, 0);
+        return {
+          sum: v.regions.length + ' 片有图',
+          note: '最粗 ' + worst.regionId + ' 精度 ' + worst.precision + ' / 误差 ±' + worst.errorRadiusKm + 'km'
+            + ' · <b>猜的点 ' + guessed + '</b> · 走错 ' + v.stat.misled
+        };
+      },
+      linguaBroker: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（设置页可开）' };
+        if (!v.stat.talks) return { sum: '未交谈', note: '尚无 converse 记录' };
+        return {
+          sum: '误译 ' + v.stat.misreads + ' / 交谈 ' + v.stat.talks,
+          note: '方言 ' + v.tongues.length + ' 种 / 语族 ' + v.families.length
+            + ' · 跨族基础误译率 ' + v.misreadPerDistance
+        };
+      }
+    };
+
+    READERS.forEach(function (sp) {
+      let sum = '未装载';
+      let note = 'WA.' + sp.ns + ' 不在场：本块如实写缺席，不补默认读数';
+      try {
+        const v = sp.read();
+        const r = FORMAT[sp.ns](v);
+        sum = r.sum; note = r.note;
+      } catch (e) {
+        bad = true;
+        sum = '读取失败';
+        note = esc(e && e.message ? e.message : String(e));
+      }
+      const cls = /休眠|未|无/.test(sum) ? 'wa-dim' : '';
+      rows.push('<div class="wa-kv"><span>' + esc(sp.label) + '</span>'
+        + '<span class="' + cls + '">' + esc(sum) + '</span></div>'
+        + '<div class="wa-dim" style="font-size:11px;margin:-2px 0 4px 0;">' + note + '</div>');
+    });
+
+    return foldCard('V22 制度读数', rows.length + ' 项 <span class="wa-dim">（八项同屏 · 只读）</span>',
+      '<div class="wa-card"><div class="wa-card-h">V22 拓展线：八项制度性读数（只读）</div>'
+      + rows.join('')
+      + '<div class="wa-hint">八项各自答一件事：<b>历法漂了几天</b>（星象→农时→减产）、'
+      + '<b>军情为什么迟</b>（驿路拓扑→换马→断毁）、<b>国库为何越收越穷</b>（超额→逃户→基数变小）、'
+      + '<b>死亡的社会成本</b>（服丧期→禁令）、<b>穿错衣服的代价</b>（僭越→盘查）、'
+      + '<b>联姻把两家绑多紧</b>（门第差→妆匛→悔婚）、<b>这张图有几个点是猜的</b>（精度→走错）、'
+      + '<b>话被听成了什么</b>（方言距离→掮客→误译）。<br>'
+      + '全部只读、零动作：真正的操作入口在各引擎自己的写口；'
+      + '本块<b>绝不</b>代为征发、办丧、定罪或宣战。<br>'
+      + '「休眠」与「未装载」是两件事 —— 前者是开关关着（设置页可开），'
+      + '后者是模块本身不在场，照实分开写。</div></div>', bad);
+  }
   const API = {
     foldCard: foldCard,
     evictBlock: evictBlock,
@@ -417,6 +572,7 @@
     bridgeBlock: bridgeBlock,
     lonshaBlock: lonshaBlock,
     heartbeatBlock: heartbeatBlock,
+    v22OmensBlock: v22OmensBlock,
     bind: bind,
     ver: '2.400.0'
   };

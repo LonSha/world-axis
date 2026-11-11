@@ -166,7 +166,6 @@ function runNegative(a) {
   const src = read(rel);
   const cur = currentVersion();
   const curMinor = Number(cur.split('.')[1]);
-  const prevMinor = curMinor - 1;
   // 旧白名单脚本可能落后于入口版本；N1 只要求选中的现场白名单确实包含当前版本，
   //   破坏锚点取其末两项，不把历史文件的旧版本尾项误当作本版锚点。
   const alt = scanSrc(src).filter(function (h) { return h.form === 'alt'; })[0];
@@ -179,7 +178,12 @@ function runNegative(a) {
   a(broken !== src, 'v2185/vs N1: 破坏真的改变了源码文本');
   const inMemory = scanSrc(broken);
   const hit = inMemory.filter(function (h) { return h.form === 'alt'; })[0];
-  a(!!hit && hit.max === prevMinor, 'v2185/vs N1: 破坏版被扫出的最大版本退回 ' + prevMinor + '（实 ' + (hit ? hit.max : '（无命中）') + '）');
+  // ⚠ 破坏后的期望值必须从**白名单本身**派生（= 剪掉末项后剩下的最大项 penult），
+  //   不能写成 `curMinor - 1`。初版写的就是 curMinor - 1，它隐含一个假设：版本号**逐连递增**。
+  //   本轮从 2.380.0 直接跳到 2.400.0（V22 回到整百），白名单末两项是 380|400，
+  //   破坏后最大项是 380，而 curMinor-1 = 399 —— 判据当场误报，而产品一点没错。
+  //   真意图从来不是「退回上一版」，而是「退回剩下的最大项」。
+  a(!!hit && hit.max === Number(penult), 'v2185/vs N1: 破坏版被扫出的最大版本退回 ' + penult + '（实 ' + (hit ? hit.max : '（无命中）') + '）');
   a(hit && hit.max !== curMinor, 'v2185/vs N1: 破坏版与当前版本 ' + cur + ' 不符 ⇒ 判据现形（原版为绿）');
   // N2 原版成绿（判据纯度：不是「破坏才现形」的恒假）
   a(scanSrc(src).every(function (h) { return h.max === curMinor; }),

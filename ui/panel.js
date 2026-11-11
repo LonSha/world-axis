@@ -554,6 +554,11 @@
   function bridgeBlock() { return __obBind() ? WA.panelOverviewBlocks.bridgeBlock() : ''; }
   function lonshaBlock() { return __obBind() ? WA.panelOverviewBlocks.lonshaBlock() : ''; }
   function heartbeatBlock() { return __obBind() ? WA.panelOverviewBlocks.heartbeatBlock() : ''; }
+  // v2.400.0（EXV22-9）：V22 八项制度读数同屏。与上面六块同一条契约：
+  //   模块缺席时返回空串（缺席好于假值），绝不在这里兜底造读数。
+  //   直写 `WA.panelOverviewBlocks.v22OmensBlock` 而不经中间变量：死子面门禁的
+  //   正则只认 `WA.<ns>.<mem>` 字面形态，否则账本会记下与事实相反的证据。
+  function v22OmensBlock() { return __obBind() ? WA.panelOverviewBlocks.v22OmensBlock() : ''; }
   // <<<OPV22-4 OVERVIEW-BLOCKS END>>>
   function renderOverview() {
     const s = WA.store.get();
@@ -1135,7 +1140,7 @@
           ${visLine}
         </div>
       </details>
-      <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}</div>
+      <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}</div>
       <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
         <summary style="cursor:pointer;opacity:0.75;font-size:12px;">⚡ 工作流节点开关（${nodes.length}）</summary>
         <div class="wa-sec" style="margin-top:4px;">工作流节点开关</div>
