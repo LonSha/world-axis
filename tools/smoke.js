@@ -55,13 +55,21 @@ const SMOKE_SET = [
   { rel: 'tests/dead-export-gate.js', why: '死子面改名/新增无痕迹（账本与现场脱钩）' },
   { rel: 'tests/field-liveness-gate.js', why: '世界状态一级键的写侧幽灵物化' },
   { rel: 'tests/dup-decl-gate.js', why: '同一文件里函数被重复定义（补丁重跑事故）' },
-  { rel: 'tests/ui-a11y-gate.js', why: '面板控件的可访问性回归' }
+  { rel: 'tests/ui-a11y-gate.js', why: '面板控件的可访问性回归' },
+  // v2.400.0 OPV22-6：REJECT_FACE 快照与现场脱钩已是本仓第八次复发
+  //   （v2.203/209/221/222/231/全量体检/v2.380/上轮）。audit() 早就能现场复算，
+  //   缺的是「默认动作」—— 于是每次 commit 前都由快档跑一次 --check，差额非零即红。
+  //   现场耗时 1245ms（远低于 MAX_MS 12000），符合口径②。
+  { rel: 'tools/reject-recovery.js', why: 'REJECT_FACE 快照与现场脱钩（第八次复发的那个形态）', args: ['--check'] }
 ];
 /** 现场跑一个成员，返回 `{rel, ms, rc, out}`。不抛（子进程失败也如实返回）。 */
 function runOne(rel, opt) {
   const root = (opt && opt.root) || BASE;
   const t0 = Date.now();
-  const r = cp.spawnSync(process.execPath, [path.join(root, rel)], { cwd: root, encoding: 'utf8', timeout: (opt && opt.ms) || 120000 });
+  // OPV22-6：成员可自带 CLI 参数（如 reject-recovery 的 --check）。
+  //   成员参数是真凭证：不给参数时它走完整报告，给 --check 才是可判定的差额口径。
+  const extraArgs = (opt && Array.isArray(opt.args)) ? opt.args : [];
+  const r = cp.spawnSync(process.execPath, [path.join(root, rel)].concat(extraArgs), { cwd: root, encoding: 'utf8', timeout: (opt && opt.ms) || 120000 });
   const ms = Date.now() - t0;
   return { rel: rel, ms: ms, rc: r.status === null ? -1 : r.status,
     out: String((r.stdout || '') + (r.stderr || '')).split('\n').slice(-3).join(' | ').slice(0, 200) };
@@ -159,7 +167,7 @@ function main() {
   let bad = 0;
   SMOKE_SET.forEach(function (m) {
     if (listOnly) { rows.push({ rel: m.rel, ms: -1, rc: 0 }); return; }
-    const r = runOne(m.rel);
+    const r = runOne(m.rel, { args: m.args });
     rows.push(r);
     const slow = r.ms > MAX_MS;
     const mark = r.rc === 0 && !slow ? '✓' : (r.rc === 0 ? '⚠' : '✗');

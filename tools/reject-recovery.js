@@ -173,6 +173,21 @@ function audit(opt) {
 module.exports = { live: live, codes: codes, audit: audit, product: product, enclosingObject: enclosingObject };
 if (require.main === module) {
   const a = audit();
+  // v2.400.0 OPV22-6：把「人记得同步」换成「跑一次就知」。
+  //   本形态已是本仓第八次复发（v2.203/209/221/222/231/全量体检/v2.380/上轮）。
+  //   audit() 早就有现场复算，缺的只是让它成为**默认动作**并给出可读差额。
+  //   --check：只输出差额三行 + 退出码，供 tools/smoke.js 快档每次调用。
+  if (process.argv.indexOf('--check') >= 0) {
+    const diffs = a.problems.length + a.undecided.length + a.tainted.length;
+    console.log('REJECT_FACE 对账：快照 ' + a.total + ' / 现场 ' + a.totals.reject + '+' + a.totals.success + '+' + a.totals.neutral + ' / 差额 ' + diffs);
+    if (diffs) {
+      console.log('  ✗ 承诺与现场不一致 ' + diffs + ' 处（详情跑不带 --check 的完整输出）');
+      process.exit(1);
+    }
+    if (!a.product.ok) { console.log('  ✗ 产品自证 diagnose.ok = false'); process.exit(1); }
+    console.log('  ✓ 承诺与现场逐条一致');
+    process.exit(0);
+  }
   if (process.argv.indexOf('--json') >= 0) {
     console.log(JSON.stringify(a, null, 2));
   } else {

@@ -25698,6 +25698,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     // v2.400.0 OPV22-1: 总线六层声明面与实现面逐字对齐
     await runScript('./cascade-six-layer-v2400.js');
     await runScript('./bus-topology-v2400.js');
+    await runScript('./reject-facediff-v2400.js');
   }
   // ── v2.302.0（缝 World Chronicle）：正文内联状态回报标签 ──────────────────
   //   执行 engines/inline-tags.js 真实源码（vm 受控桩：store / calendar 按既有写口形状）。
