@@ -52,6 +52,29 @@ const SMOKE_SET = [
   { rel: 'tests/reject-code-gate.js', why: '新增拒收码没有归属（码存在 ≠ 码可达）' },
   { rel: 'tests/module-registry-gate.js', why: '磁盘有模块而自检看不见（黑盒模块）' },
   { rel: 'tests/module-cycle-gate.js', why: '模块间循环依赖' },
+  // v2.400.0 OPV22-3：零读 ns 此前「只报不红、只给数字」⇒「本该接却漏接」与「本来就只该
+  //   tests/宿主读」同形不可分辨。本锁把每个零读 ns 钉到可复算裁决上，并带真源码破坏负控制。
+  //   现场实测耗时 7172ms（含 2 次 spawn 门禁 CLI 做真源码破坏负控制 + ~12 次进程内 audit，
+  //   audit 结果按 opt 序列化缓存）。上限 MAX_MS 12000，余量 4.8s；若再往 N 组加 spawn 必须重测。
+  { rel: 'tests/ns-consumer-ledger-v2400.js', why: '零读 ns 未定性/过期登记/分类不合规（同形不可分辨）' },
+  // v2.400.0 OPV22-4：巨型文件拆分。「拆了」这件事本身极易假绿 —— 文件变短了、语法也过了，
+  //   但判据可能整段不再执行、或丢了外部符号、或顺序变了。本锁用**绝对基线 + 内存重组**
+  //   双判据钉住「拆前判据数 === 拆后判据数」，N1 就是计划原文要求的那条负控制
+  //   （故意漏挂一段 ⇒ test-surface-gate 报孤儿）。本轮它当场逮住一个真缺陷：
+  //   testFiles() 非递归 ⇒ tests/segments/ 整个落在测试面外，段内 41 个 WA.* 引用从归因里消失。
+  //   现场实测耗时 9495–9869ms（含 1 次真门禁 CLI 子进程做漏挂负控制 + 2 次进程内全扫，
+//   扫描结果按「文件面 mtime + run.js 内容 sha」缓存；另含 D 段一次完整 ui 层装载
+//   —— ui-gate-sync.fresh() 走 vm.runInContext 逐文件求值，约 2.5s）。
+//   上限 MAX_MS 12000，余量 ~2.1s；**若再往 N 组加 spawn、加全扫、或往 D 段再加一次
+//   fresh()，必须先重测** —— 这条已经贴到上限的 82%，再加一次装载就会顶穿。
+  { rel: 'tests/segment-extract-v2400.js', why: '拆段后判据丢失/外部符号漏注入/调用点漂移（拆分假绿；含面板拆段）' },
+  // v2.400.0 OPV22-7：设置面总账。这条治的病**出在审计工具自己身上** ——
+  //   第一版把「装载引擎」这行读数直接抄成 `__settingsRegs.length`（292），
+  //   而磁盘 engines/ 有 391 个文件、LOAD 里也恰 391 条。两个 292 互相印证，
+  //   于是「少装载一个引擎」在总账上**根本不可能现形**。
+  //   本锁的 C 组专钉这一面：装载数必须与磁盘独立对齐，且 `loadedEngines ≠ registrations`。
+  //   现场实测耗时 4258ms（含 N2/N3 两处真源码破坏 + 4 次 --check 子进程）。
+  { rel: 'tests/settings-audit-v2400.js', why: '设置面总账把装载数抄成登记数（读数与现场脱钩，本轮真踩）' },
   { rel: 'tests/dead-export-gate.js', why: '死子面改名/新增无痕迹（账本与现场脱钩）' },
   { rel: 'tests/field-liveness-gate.js', why: '世界状态一级键的写侧幽灵物化' },
   { rel: 'tests/dup-decl-gate.js', why: '同一文件里函数被重复定义（补丁重跑事故）' },

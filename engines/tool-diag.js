@@ -3862,6 +3862,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.225.0(Q8):专家段折叠。登记为**必载** —— 面板每个 wa-sec 段头都走它;
     //   缺席就是「折叠整条失效」本身(而失效的表现是「点了没反应」,零读数)。
     'ui/panel-fold.js': 'panelFold',
+    // v2.400.0（V22 OPV22-4）：概览页六块只读诊断。登记为**必载** —— panel.js 的七个
+    //   同名转发函数在运行期惰性读它；缺席时六块静默返回空串（renderOverview 的
+    //   try/catch 不报错），那正是「看起来正常、实际没读数」那一族。
+    'ui/pages/overview-blocks.js': 'panelOverviewBlocks',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -4518,6 +4522,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
           //   与「用户从没配过」在诊断包里长得一模一样——而前者是唯一会被用户当成
           //   「我的设置被程序改回去了」的故障，也是本仓库里后果最严重的静默失效。
           const reads = WA.settingsBus.readStat ? WA.settingsBus.readStat() : null;
+          // v2.400.0（V22 OPV22-7）: 设置面**总账**——此前没有任何读口回答
+          //   「一共几个设置面、几个出厂默认就是关着的」。
+          //   与 registryStat 的区别（不是重复读口）：registryStat 数的是**登记表行**，
+          //   faces 数的是**设置面**并按 enabled 缺省=true 折算出厂默认分布，且单独报重复 key
+          //   （同一 key 被两个模块登记 = 双真源，必然有一方读到别人的值）。
+          //   「玩家以为开着、其实是关的」这类投诉此前在诊断包里无从判定，这一节就是判据。
+          const faces = WA.settingsBus.faces ? WA.settingsBus.faces() : null;
           // v2.10.0（逆向审计自纠）: `readEx`（带来源的结构化读取）若只导出不给消费端，
           //   就是本版命题所治的「声明面空转」——一个没人用的出口等于没有。此处做**真实抽查**：
           //   对登记表里有磁盘值的若干键走 readEx，回答「诊断包里我看到的配置是不是用户配的」。
@@ -4550,6 +4561,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
             coherent: coherent, defaultDrift: drift, dormant: dormant, subkeys: subkeys,
             lifecycle: lifecycle, migrations: mig, ghosts: ghosts, writes: writes, removes: removes,
             reads: reads, readSpotCheck: spot,
+            // v2.400.0（V22 OPV22-7）：设置面总账（设置面数 / 出厂默认分布 / 重复 key）。
+            faces: faces,
             // v2.11.0: 结构指纹状态（面B 的读侧消费口）——与读失败台账并列，
             //   才可判定「配置读到了，但它可能是另一个结构版本写的」。
             schema: (reads && reads.schema) ? reads.schema : null };

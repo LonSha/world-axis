@@ -1337,6 +1337,54 @@
       backupCount: bks.length, maxBackups: CFG_MAX_BACKUPS, backupBytes: bytes
     };
   }
+  /**
+   * v2.400.0（V22 OPV22-7）：**设置面总账**——回答「一共几个设置面、几个默认开启」。
+   *
+   * 缺口（实测）：391 个引擎各自 `WA.__settingsRegs = (WA.__settingsRegs||[]).concat([__REG])`，
+   * 但**没有任何读口**回答「一共登记了几个设置面、几个出厂默认就是开的」。
+   * 于是两类默认值没有任何账：
+   *   · `enabled:false` 是出厂默认 —— 谁默认关着，没人能一次读出来；
+   *   · 默认值与登记声明不一致时（def 写了但 normalize 夹成别的值）也无人比对。
+   * 本仓既有教训：externalReads 是进程级累计计数、enabled:false 是出厂默认 ——
+   * 这类「默认值」必须有账，否则「玩家以为开着、其实是关的」永远查不出来。
+   *
+   * 口径（三条，均可复算）：
+   *   ① 只读 `WA.__settingsRegs`（单一真源），不另立第二份登记表；
+   *   ② `enabled` 缺省视为 **true**（本仓 normalize 的既有契约：未声明即原样/默认启用）；
+   *   ③ 重复 key 单独报（同一 key 被两个模块登记 = 双真源，必然有一方读到别人的值）。
+   *
+   * @returns {{total:number, enabled:number, disabled:number, modules:number,
+   *            dupKeys:string[], missingKey:number, byModule:Object, disabledList:string[]}}
+   */
+  function faces() {
+    const rows = WA.__settingsRegs || [];
+    const byModule = {};
+    // 局部标识符刻意**不叫 seen**：core/settings-bus.js 已有一个对外读口 `seen(key)`，
+    //   tests/dead-export-ledger.json 里 `settingsBus.seen` 冻结的证据是 own=3（该标识符在
+    //   本文件的出现次数）。再引入一个同名局部量会让那份账的 own 读数变成 6 ⇒ dead-export-gate
+    //   判「证据失实」。改名为 seenKeys 而不是改账本 —— 账本是判据的输入真源，不许改它凑绿。
+    const seenKeys = {};
+    const dupKeys = [];
+    const disabledList = [];
+    let enabled = 0, disabled = 0, missingKey = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || !r.key) { missingKey += 1; continue; }
+      const mod = r.module || '(anonymous)';
+      byModule[mod] = (byModule[mod] || 0) + 1;
+      if (seenKeys[r.key]) { if (dupKeys.indexOf(r.key) < 0) dupKeys.push(r.key); }
+      seenKeys[r.key] = true;
+      // enabled 缺省视为 true：normalize 的既有契约是「未声明即原样」
+      const d = r.def || {};
+      const on = (typeof d.enabled === 'boolean') ? d.enabled : true;
+      if (on) enabled += 1; else { disabled += 1; disabledList.push(r.key); }
+    }
+    return {
+      total: rows.length, enabled: enabled, disabled: disabled,
+      modules: Object.keys(byModule).length, dupKeys: dupKeys,
+      missingKey: missingKey, byModule: byModule, disabledList: disabledList
+    };
+  }
   /** 当前配置面规模（面板/诊断一行读数）：已登记键数、未登记键数、总字节。 */
   function cfgSurface() {
     let reg = 0, unreg = 0, bytes = 0;
@@ -1355,6 +1403,8 @@
     //   实现与本导出面同在本文件 —— 理由见实现块头部（设置键真源在这里、结构指纹与迁移器
     //   契约是存储层概念、新造存储家族会踩 ghostScan 的假警报）。
     cfgStat: cfgStat, cfgSurface: cfgSurface, exportConfig: cfgExport, importConfig: cfgImport,
+    /** v2.400.0（V22 OPV22-7）：设置面总账读口 —— 几个面 / 几个默认开 / 重复键 */
+    faces: faces,
 
     /**
      * v2.9.0: 设置家族键的删除出口（对外）——与 save() 对称。

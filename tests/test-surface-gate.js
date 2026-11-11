@@ -53,8 +53,11 @@ const GLOBAL_PROBE = [
   { g: 'global.document', mark: 'mock DOM' }
 ];
 const INLINE_MARK = /内联|inline|embeds/i;
-// 包装入口：`IDENT('./x.js'` —— IDENT 必须先是本文件里**已定义且体内执行**的函数（见 wrapperOf）。
-const WRAP_CALL = /([A-Za-z_$][\w$]*)\s*\(\s*'\.\/([\w.-]+\.js)'/g;
+// 包装入口：`IDENT('./x.js'` 或 `IDENT('./segments/x.js'` —— IDENT 必须先是本文件里**已定义且体内执行**的函数（见 wrapperOf）。
+//   v2.400.0（OPV22-4）：路径段由 `[\w.-]+` 放宽为 `[\w.\-/]+`，因为拆段后调用点写成
+//   `require('./segments/tool-diag-v092.js')`。若仍只认单层，段文件永远算不出可达边 ⇒
+//   本门禁对「抽出去的段」整体失明（负控制实测：注释掉调用点，门禁仍然全绿 —— 判据没现形）。
+const WRAP_CALL = /([A-Za-z_$][\w$]*)\s*\(\s*'\.\/([\w.\-/]+\.js)'/g;
 // 判据必须**容许标识符前缀**，不能用 \b 也不能用「前界不是 word 字符」的 lookbehind。
 //   本仓 run.js 把 spawnSync 存成别名：`const cp_spawnSync = require('child_process').spawnSync;`，
 //   调用点写成 `cp_spawnSync(…)`。`_` 是 word 字符，故 \b 在 `_`/`s` 之间不成立；
@@ -67,8 +70,11 @@ const WRAP_CALL = /([A-Za-z_$][\w$]*)\s*\(\s*'\.\/([\w.-]+\.js)'/g;
 //   这个反空转下限（实测 run.js 里就有 9 行这样的误判，虽无 ref 不造假边，但会抬高指标）。
 //   口径须与 wrapperOf 里的 spawn 族判据完全一致，否则上下限说的不是同一件事。
 const SPAWN_CALL = /[\w$]*(spawnSync|spawn|execFileSync|execFile)\s*\(/;
-const RE_REQUIRE = /require\s*\(\s*'(\.\/[\w.-]+\.js)'/g;
-const RE_TEST_PATH = /tests\/([\w.-]+\.js)/g;
+// v2.400.0（OPV22-4）：两条路径正则同样放宽到多层 —— 段文件在 `tests/segments/` 下。
+//   若只认单层，`require('./segments/x.js')` 不构成边、`tests/segments/x.js` 不被认作测试路径，
+//   于是段文件在可达图里是孤立点，而门禁看不出来。
+const RE_REQUIRE = /require\s*\(\s*'(\.\/[\w.\-/]+\.js)'/g;
+const RE_TEST_PATH = /tests\/([\w.\-/]+\.js)/g;
 
 /** 去注释、**保留字符串原文**的最小剥离器（与 inventory.codeFace 同一状态机思路，但不抹字符串）。 */
 function stripComments(src) {

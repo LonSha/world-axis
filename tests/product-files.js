@@ -56,6 +56,37 @@ function discoverFiles(dir, prefix) {
     .sort()
     .map(function (n) { return (prefix ? prefix + '/' : '') + n; });
 }
+/**
+ * **递归**的 .js 发现器，返回 `prefix/子目录/name.js` 形态、升序。
+ *
+ * v2.400.0（V22 OPV22-4）—— 为什么必须有它：
+ *   OPV22-4 把巨型文件拆成 `tests/segments/*.js` 与 `ui/pages/*.js`。而本文件此前的
+ *   `discoverFiles` 是**非递归**的，于是：
+ *     · `testFiles()` 只收 `tests/*.js` —— `tests/segments/tool-diag-v092.js` 整个落在
+ *       测试面之外 ⇒ tests/inventory.js 的 testRefSet 看不见段体里的 41 个 `WA.*` 引用 ⇒
+ *       tests/dead-export-gate.js 当场报 40 项「证据失实：账本 tref=N，复算更少」。
+ *       实测：拆段后 dead 面从 1437 掉到大量项复算为 0，**这不是产品有洞，是判据输入面窄了**。
+ *     · `uiFiles()` 同理，`ui/pages/*.js` 会从 UI 面消失。
+ *   本仓此前已治过七次同族病（v2.73.0 测试面只读 run.js、v2.119.1 只认字面 require、
+ *   v2.43.0 四处各写一份遍历器）。这是第八次，且方向与 v2.73.0 完全一致：
+ *   **判据的输入面比事实窄，结论就会稳定地错**。故把递归能力收进单一真源，而不是
+ *   让每个消费方各自补一层。
+ *
+ * 排除口径与 productFiles 一致：跳过 .git / node_modules（防把依赖树算进来）。
+ */
+function discoverFilesDeep(dir, prefix) {
+  const out = [];
+  (function walk(cur, rel) {
+    fs.readdirSync(cur, { withFileTypes: true }).forEach(function (e) {
+      if (e.name === '.git' || e.name === 'node_modules') return;
+      const p = path.join(cur, e.name);
+      const r = rel ? rel + '/' + e.name : e.name;
+      if (e.isDirectory()) return walk(p, r);
+      if (/\.js$/.test(e.name)) out.push((prefix ? prefix + '/' : '') + r);
+    });
+  })(dir, '');
+  return out.sort();
+}
 
 /**
  * UI 文件面：`ui/` 下全部 .js。
@@ -64,14 +95,12 @@ function discoverFiles(dir, prefix) {
  * dir 可注入，便于门禁在临时目录上做行为级负向自证（证明它真读文件系统而非常量）。
  */
 function discoverUIFiles(dir) {
-  return discoverFiles(dir || path.join(BASE, 'ui'), 'ui');
+  return discoverFilesDeep(dir || path.join(BASE, 'ui'), 'ui');
 }
-
-/** 便捷形态：直接给仓库根，返回 ui/ 下的 .js 清单。 */
+/** 便捷形态：直接给仓库根，返回 ui/ 下的 .js 清单（v2.400.0 起递归，含 ui/pages/*.js）。 */
 function uiFiles(root) {
-  return discoverFiles(path.join(root || BASE, 'ui'), 'ui');
+  return discoverFilesDeep(path.join(root || BASE, 'ui'), 'ui');
 }
-
 /**
  * 仓库内全部 .js（仅排 .git / node_modules）——**含 tests/ 与 tools/**。
  * 与 productFiles 的区别：productFiles 是「产品模块面」（模块清单/出口面/骨架归属用），
@@ -108,7 +137,7 @@ function repoFiles(root) {
  *   收敛到本文件后，「什么算测试面」只有一处定义，消费方一律委托。
  */
 function testFiles(root) {
-  return discoverFiles(path.join(root || BASE, 'tests'), 'tests');
+return discoverFilesDeep(path.join(root || BASE, 'tests'), 'tests');
 }
 module.exports = {
   BASE: BASE,
@@ -116,6 +145,7 @@ module.exports = {
   productFiles: productFiles,
   repoFiles: repoFiles,
   discoverFiles: discoverFiles,
+  discoverFilesDeep: discoverFilesDeep,
   discoverUIFiles: discoverUIFiles,
   uiFiles: uiFiles,
   testFiles: testFiles

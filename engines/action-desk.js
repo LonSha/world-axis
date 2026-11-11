@@ -1874,6 +1874,235 @@
     'ruin.triggerMechanism': function (o) {
       if (WA.ruinMechanism && typeof WA.ruinMechanism.triggerMechanism === 'function') return WA.ruinMechanism.triggerMechanism(o);
       return { ok: false, reason: 'ruinMechanism-unavailable' };
+    },
+    // ── v2.400.0（V22 OPV22-2）：补 21 条真写口路由 ─────────────────────────
+    //   这 21 条的共同来历：tools/desk-coverage.js 的 wired 档（有入站调用、无入口面）
+    //   里，**公开导出成员中确有写口**的那一批。判据不是「名字像写口」，
+    //   而是「该成员的传递闭包能到达 transact」（makeWriteJudge 口径），
+    //   且必须是 `WA.<ns> = { ... }` 里真实上台面的成员 —— 被同样的判据挡回去的
+    //   反例有 toolImport.regional / farfield.run / digest 的 contract-audit 侧，
+    //   它们是同文件的内部辅助函数，没有上台面，补路由也调不到。
+    //   每条路由只做**转发**：不合成参数、不兜底默认值、不吞 refuse ——
+    //   缺项由 owner 自己返回 `{ok:false, reason:'missing-xxx'}`，与本表既有风格一致。
+    'vitals.register': function (o) {
+      if (WA.vitals && typeof WA.vitals.register === 'function') return WA.vitals.register(o.name || o.who, o);
+      return { ok: false, reason: 'vitals-unavailable' };
+    },
+    'vitals.conceive': function (o) {
+      if (WA.vitals && typeof WA.vitals.conceive === 'function') return WA.vitals.conceive(o.name || o.who, o);
+      return { ok: false, reason: 'vitals-unavailable' };
+    },
+    'vitals.know': function (o) {
+      if (WA.vitals && typeof WA.vitals.know === 'function') return WA.vitals.know(o.name || o.who, o.level, o.via);
+      return { ok: false, reason: 'vitals-unavailable' };
+    },
+    'vitals.tell': function (o) {
+      if (WA.vitals && typeof WA.vitals.tell === 'function') return WA.vitals.tell(o.name || o.who, o.to || o.target, o.via);
+      return { ok: false, reason: 'vitals-unavailable' };
+    },
+    'vitals.endPregnancy': function (o) {
+      if (WA.vitals && typeof WA.vitals.endPregnancy === 'function') return WA.vitals.endPregnancy(o.name || o.who, o.reason);
+      return { ok: false, reason: 'vitals-unavailable' };
+    },
+    'vitals.tick': function (o) {
+      if (WA.vitals && typeof WA.vitals.tick === 'function') return WA.vitals.tick(o.name || o.who, o.days);
+      return { ok: false, reason: 'vitals-unavailable' };
+    },
+    'vitals.sweep': function (o) {
+      if (WA.vitals && typeof WA.vitals.sweep === 'function') return WA.vitals.sweep();
+      return { ok: false, reason: 'vitals-unavailable' };
+    },
+    'affect.setChannel': function (o) {
+      if (WA.affect && typeof WA.affect.setChannel === 'function') return WA.affect.setChannel(o.person || o.who, o.spec || o);
+      return { ok: false, reason: 'affect-unavailable' };
+    },
+    'affect.setLoad': function (o) {
+      if (WA.affect && typeof WA.affect.setLoad === 'function') return WA.affect.setLoad(o.person || o.who, o.patch || o);
+      return { ok: false, reason: 'affect-unavailable' };
+    },
+    'affect.imprintTrauma': function (o) {
+      if (WA.affect && typeof WA.affect.imprintTrauma === 'function') return WA.affect.imprintTrauma(o.person || o.who, o.traumaType, o.triggerKey, o.behavioralConstraint);
+      return { ok: false, reason: 'affect-unavailable' };
+    },
+    'elsewhere.open': function (o) {
+      if (WA.elsewhere && typeof WA.elsewhere.open === 'function') return WA.elsewhere.open(o.name, o);
+      return { ok: false, reason: 'elsewhere-unavailable' };
+    },
+    'elsewhere.update': function (o) {
+      if (WA.elsewhere && typeof WA.elsewhere.update === 'function') return WA.elsewhere.update(o.name, o.patch || o);
+      return { ok: false, reason: 'elsewhere-unavailable' };
+    },
+    'elsewhere.romance': function (o) {
+      if (WA.elsewhere && typeof WA.elsewhere.romance === 'function') return WA.elsewhere.romance(o.name, o.ev || o);
+      return { ok: false, reason: 'elsewhere-unavailable' };
+    },
+    'elsewhere.remove': function (o) {
+      if (WA.elsewhere && typeof WA.elsewhere.remove === 'function') return WA.elsewhere.remove(o.name, o.reason);
+      return { ok: false, reason: 'elsewhere-unavailable' };
+    },
+    'foreshadow.track': function (o) {
+      if (WA.foreshadow && typeof WA.foreshadow.track === 'function') return WA.foreshadow.track(o.hintId, o.text, o);
+      return { ok: false, reason: 'foreshadow-unavailable' };
+    },
+    'foreshadow.develop': function (o) {
+      if (WA.foreshadow && typeof WA.foreshadow.develop === 'function') return WA.foreshadow.develop(o.hintId);
+      return { ok: false, reason: 'foreshadow-unavailable' };
+    },
+    'foreshadow.resolve': function (o) {
+      if (WA.foreshadow && typeof WA.foreshadow.resolve === 'function') return WA.foreshadow.resolve(o.hintId, o.eventId);
+      return { ok: false, reason: 'foreshadow-unavailable' };
+    },
+    'foreshadow.recycle': function (o) {
+      if (WA.foreshadow && typeof WA.foreshadow.recycle === 'function') return WA.foreshadow.recycle(o.hintId, o.reason);
+      return { ok: false, reason: 'foreshadow-unavailable' };
+    },
+    'horizon.rollLane': function (o) {
+      if (WA.horizon && typeof WA.horizon.rollLane === 'function') return WA.horizon.rollLane(o.kind, o);
+      return { ok: false, reason: 'horizon-unavailable' };
+    },
+    'horizon.acceptResult': function (o) {
+      if (WA.horizon && typeof WA.horizon.acceptResult === 'function') return WA.horizon.acceptResult(o.kind, o.result);
+      return { ok: false, reason: 'horizon-unavailable' };
+    },
+    'oneShot.dose': function (o) {
+      if (WA.oneShotMod && typeof WA.oneShotMod.dose === 'function') return WA.oneShotMod.dose(o);
+      return { ok: false, reason: 'oneShotMod-unavailable' };
+    },
+    'oneShot.advance': function (o) {
+      if (WA.oneShotMod && typeof WA.oneShotMod.advance === 'function') return WA.oneShotMod.advance();
+      return { ok: false, reason: 'oneShotMod-unavailable' };
+    },
+    'oneShot.consume': function (o) {
+      if (WA.oneShotMod && typeof WA.oneShotMod.consume === 'function') return WA.oneShotMod.consume(o.id);
+      return { ok: false, reason: 'oneShotMod-unavailable' };
+    },
+    'oneShot.flush': function (o) {
+      if (WA.oneShotMod && typeof WA.oneShotMod.flush === 'function') return WA.oneShotMod.flush();
+      return { ok: false, reason: 'oneShotMod-unavailable' };
+    },
+    'human.setNeeds': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.setNeeds === 'function') return WA.humanRealism.setNeeds(o.name || o.who, o.patch || o);
+      return { ok: false, reason: 'humanRealism-unavailable' };
+    },
+    'human.consumeRoutine': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.consumeRoutine === 'function') return WA.humanRealism.consumeRoutine(o.name || o.who, o);
+      return { ok: false, reason: 'humanRealism-unavailable' };
+    },
+    'human.recordGrudge': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.recordGrudge === 'function') return WA.humanRealism.recordGrudge(o);
+      return { ok: false, reason: 'humanRealism-unavailable' };
+    },
+    'human.settleGrudge': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.settleGrudge === 'function') return WA.humanRealism.settleGrudge(o.grudgeId || o.id, o);
+      return { ok: false, reason: 'humanRealism-unavailable' };
+    },
+    'human.triggerOutburst': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.triggerOutburst === 'function') return WA.humanRealism.triggerOutburst(o.name || o.who, o);
+      return { ok: false, reason: 'humanRealism-unavailable' };
+    },
+    'human.setExemption': function (o) {
+      if (WA.humanRealism && typeof WA.humanRealism.setExemption === 'function') return WA.humanRealism.setExemption(o.name || o.who, o);
+      return { ok: false, reason: 'humanRealism-unavailable' };
+    },
+    'aftermath.triggerIncident': function (o) {
+      if (WA.aftermathImpact && typeof WA.aftermathImpact.triggerIncident === 'function') return WA.aftermathImpact.triggerIncident(o);
+      return { ok: false, reason: 'aftermathImpact-unavailable' };
+    },
+    'aftermath.settleRedress': function (o) {
+      if (WA.aftermathImpact && typeof WA.aftermathImpact.settleRedress === 'function') return WA.aftermathImpact.settleRedress(o.incidentId || o.id, o);
+      return { ok: false, reason: 'aftermathImpact-unavailable' };
+    },
+    'aftermath.triggerCascadingChain': function (o) {
+      if (WA.aftermathImpact && typeof WA.aftermathImpact.triggerCascadingChain === 'function') return WA.aftermathImpact.triggerCascadingChain(o);
+      return { ok: false, reason: 'aftermathImpact-unavailable' };
+    },
+    'aftermath.interveneCascadingChain': function (o) {
+      if (WA.aftermathImpact && typeof WA.aftermathImpact.interveneCascadingChain === 'function') return WA.aftermathImpact.interveneCascadingChain(o.chainId || o.id, o.nodeIndex, o.actionSpec || o);
+      return { ok: false, reason: 'aftermathImpact-unavailable' };
+    },
+    'aftermath.advanceCascadingChains': function (o) {
+      if (WA.aftermathImpact && typeof WA.aftermathImpact.advanceCascadingChains === 'function') return WA.aftermathImpact.advanceCascadingChains(o.days);
+      return { ok: false, reason: 'aftermathImpact-unavailable' };
+    },
+    'beatLedger.plan': function (o) {
+      if (WA.beatLedger && typeof WA.beatLedger.plan === 'function') return WA.beatLedger.plan(o.titles);
+      return { ok: false, reason: 'beatLedger-unavailable' };
+    },
+    'beatLedger.land': function (o) {
+      if (WA.beatLedger && typeof WA.beatLedger.land === 'function') return WA.beatLedger.land(o);
+      return { ok: false, reason: 'beatLedger-unavailable' };
+    },
+    'beatLedger.claim': function (o) {
+      if (WA.beatLedger && typeof WA.beatLedger.claim === 'function') return WA.beatLedger.claim(o.no);
+      return { ok: false, reason: 'beatLedger-unavailable' };
+    },
+    'beatLedger.transition': function (o) {
+      if (WA.beatLedger && typeof WA.beatLedger.transition === 'function') return WA.beatLedger.transition(o);
+      return { ok: false, reason: 'beatLedger-unavailable' };
+    },
+    'coordinate.anchorAdd': function (o) {
+      if (WA.coordinate && typeof WA.coordinate.anchorAdd === 'function') return WA.coordinate.anchorAdd(o);
+      return { ok: false, reason: 'coordinate-unavailable' };
+    },
+    'coordinate.capture': function (o) {
+      if (WA.coordinate && typeof WA.coordinate.capture === 'function') return WA.coordinate.capture(o);
+      return { ok: false, reason: 'coordinate-unavailable' };
+    },
+    'dream.weave': function (o) {
+      if (WA.dream && typeof WA.dream.weave === 'function') return WA.dream.weave(o.op, o.payload);
+      return { ok: false, reason: 'dream-unavailable' };
+    },
+    'dream.archive': function (o) {
+      if (WA.dream && typeof WA.dream.archive === 'function') return WA.dream.archive(o.summary, o);
+      return { ok: false, reason: 'dream-unavailable' };
+    },
+    'gauge.create': function (o) {
+      if (WA.gauge && typeof WA.gauge.create === 'function') return WA.gauge.create(o.key, o);
+      return { ok: false, reason: 'gauge-unavailable' };
+    },
+    'gauge.step': function (o) {
+      if (WA.gauge && typeof WA.gauge.step === 'function') return WA.gauge.step(o.key, o.delta, o.event);
+      return { ok: false, reason: 'gauge-unavailable' };
+    },
+    'ledger.saveCheckpoint': function (o) {
+      if (WA.ledger && typeof WA.ledger.saveCheckpoint === 'function') return WA.ledger.saveCheckpoint();
+      return { ok: false, reason: 'ledger-unavailable' };
+    },
+    'ledger.recordChanges': function (o) {
+      if (WA.ledger && typeof WA.ledger.recordChanges === 'function') return WA.ledger.recordChanges();
+      return { ok: false, reason: 'ledger-unavailable' };
+    },
+    'beat.report': function (o) {
+      if (WA.beatReport && typeof WA.beatReport.report === 'function') return WA.beatReport.report(o);
+      return { ok: false, reason: 'beatReport-unavailable' };
+    },
+    'bonds.setBond': function (o) {
+      if (WA.bonds && typeof WA.bonds.setBond === 'function') return WA.bonds.setBond(o.a, o.b, o.types);
+      return { ok: false, reason: 'bonds-unavailable' };
+    },
+    'digest.generate': function (o) {
+      if (WA.digest && typeof WA.digest.generate === 'function') return WA.digest.generate();
+      return { ok: false, reason: 'digest-unavailable' };
+    },
+    'pathEcho.record': function (o) {
+      if (WA.pathEcho && typeof WA.pathEcho.record === 'function') return WA.pathEcho.record(o.a || o.actual, o.b || o.expected);
+      return { ok: false, reason: 'pathEcho-unavailable' };
+    },
+    'persona.registerAnchor': function (o) {
+      if (WA.personaAnchor && typeof WA.personaAnchor.registerAnchor === 'function') return WA.personaAnchor.registerAnchor(o.person || o.who, o.spec || o);
+      return { ok: false, reason: 'personaAnchor-unavailable' };
+    },
+    'rehearsal.preview': function (o) {
+      if (WA.rehearsal && typeof WA.rehearsal.preview === 'function') return WA.rehearsal.preview(o.steps, o);
+      return { ok: false, reason: 'rehearsal-unavailable' };
+    },
+    'survival.set': function (o) {
+      if (WA.survival && typeof WA.survival.set === 'function') return WA.survival.set(o.who || o.name, o.axes || o);
+      return { ok: false, reason: 'survival-unavailable' };
+    },
+    'weather.setWeather': function (o) {
+      if (WA.weather && typeof WA.weather.setWeather === 'function') return WA.weather.setWeather(o.place, o.kind || o.weather);
+      return { ok: false, reason: 'weather-unavailable' };
     }
   };
 

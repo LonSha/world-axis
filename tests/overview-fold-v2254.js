@@ -39,6 +39,17 @@ const SELF_REL = 'tests/overview-fold-v2254.js';
 const DIAG = 'engines/tool-diag.js';
 function rd(rel, ov) {
   if (ov && ov[rel] !== undefined) return ov[rel];
+  // v2.400.0（V22 OPV22-4）：面板源码面改走 tests/panel-source.js 的**重组面**。
+  //   本锁的全部断言都是对「面板源码」的文本锚点（foldCard 定义恰 1 处、六块各走折叠壳、
+  //   挂载行逐字未动、心跳块只读一次因果链…）。OPV22-4 把这七块搬到了
+  //   ui/pages/overview-blocks.js，若本锁继续只读 ui/panel.js，那些锚点会命中 0 次 ——
+  //   本轮实测 17 项红（A1b / A2×6 / A3×6 / A8 / D3 / D3b / N0）。
+  //   红的原因不是产品坏了，是**判据的输入面比事实窄**（本仓已八次裁决同族）。
+  //   panelSource() 按原位置把段体拼回标记处，结果与拆段前的 ui/panel.js 逐字相等，
+  //   故下面所有断言**一条都不用改**，它们仍在断言同一件事。
+  //   注意 srcOverride 分支仍原样保留：负控制要的是「破坏后的面板源码」，
+  //   它在内存副本上破坏，与拆段无关。
+  if (rel === PANEL) return require('./panel-source.js').panelSource();
   return fs.readFileSync(path.join(BASE, rel), 'utf8');
 }
 function cnt(s, n) { return String(s).split(n).length - 1; }

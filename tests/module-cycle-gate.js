@@ -46,6 +46,12 @@
  *     （本仓实测 10 个；v2.110.0 的 11 个里 faultContext / schema / permissions 只有 tests 侧消费，而 v2.111.0 的 auditLog 与 sanitize 都接了产品真消费方故**离开这一面**，10 个里绝大多数各有 tests 侧或运行时消费方；唯一真正零消费的是
  *     core/interceptor.js 的 LEAK_THRESHOLD，它已被 dead-export-gate 记为 dead，
  *     本门禁不抢那份账）。
+ *     **v2.400.0（V22 OPV22-3）起：零读本身仍是读数，但「没定性」开始计红。**
+ *     每个零读 ns 必须在 tests/ns-consumer-ledger.json 里有一条可复算裁决（cls / provider /
+ *     evidence / recompute）；门禁有而账本无 ⇒ undeterminedNs 计红，账本有而门禁无 ⇒
+ *     expiredNs 计红，条目不合规（cls 未定义 / 缺 provider / 缺 evidence）⇒ badClassNs 计红。
+ *     账本缺失或解析失败 ⇒ 本面整面跳过并显式报「未核对」（不可用 ≠ 未定性）。
+ *     这不是「改判据放行」：零读的判定口径一字未动，红的来源是「未定性」。
  *   · 账本 requires 里 NS_FIELD_MAP 未登记的 ns = 未定性读数（不许当成 0 条边蒙过去）。
  *
  * 静态图无环：load 边 + 顶替序（供者在前 → 被顶替者在后）。这两类边方向由「事实」给定
@@ -97,6 +103,16 @@ const { codeFace } = require('./inventory.js');
 
 const DIRS = ['core', 'engines', 'actors', 'direction', 'render', 'compat', 'ui'];
 const LEDGER = path.join(__dirname, 'module-registry-ledger.json');
+/**
+ * v2.400.0（V22 OPV22-3）：零读 ns 定性账本。
+ *   dead-ns 这条读数此前「只报不红、只给数字」⇒「本该有消费点却漏接了」与「它本来就只该由
+ *   tests/宿主消费」在读数上完全同形（同 l3-registry 治过的那种病）。
+ *   本账本把每个零读 ns 钉到一条可复算的裁决上；门禁据此把「只报不红」升级为「必须定性」：
+ *     · 门禁有、账本无  ⇒ undeterminedNs，计红（新出现的零读 ns 不许当读数蒙过去）
+ *     · 账本有、门禁无  ⇒ expiredNs，计红（过期登记会静默掩盖真·未提供）
+ *   注意：这不等于「放行」。判据的零读口径一字未动，红的来源是「未定性」，不是「零读」。
+ */
+const NS_LEDGER = path.join(__dirname, 'ns-consumer-ledger.json');
 
 /** 外名：由宿主 / 测试外壳提供，不属于任何模块文件。逐条必须给理由 */
 const EXTERNAL = {};
@@ -178,6 +194,16 @@ const UI_NS = {
   //   panelFold)。漏在这里的后果同上面两条:panelFold 被判成「未登记的一对一差」,
   //   而它明明是 UI 层 —— 先装后装的差别会被读成「接线出了问题」。
   panelFold: 'UI 面板折叠协议(ui/panel-fold.js)',
+  // v2.400.0(V22 OPV22-4):第七个 UI 层命名空间(ui/pages/overview-blocks.js)。
+  //   本仓 UI ns 名单有**四处副本**,必须同批 —— tests/run.js 的 UI_NS2800 /
+  //   tests/export-contract.js 的 OPTIONAL / engines/tool-diag.js 的 OPTIONAL_EXPORTS /
+  //   本表。前三处在本批落地时已改,**本表是第四处** —— 本轮现场报的是
+  //   「未提供 1 · panelOverviewBlocks ← ui/panel.js」:panel.js 真在直写
+  //   `WA.panelOverviewBlocks.<mem>`(七个转发 + bind),而静态图看不见提供方。
+  //   为什么看不见:本门禁的提供方集合从**模块文件的赋值形态**取,而本 ns 由
+  //   ui/pages/overview-blocks.js 提供 —— 它在 ui/ 子目录里,是 OPV22-4 新建的。
+  //   漏在本表的后果同前三条:被判成「读了无人提供」,而它明明是 UI 层。
+  panelOverviewBlocks: 'UI 概览页六块只读诊断(ui/pages/overview-blocks.js)',
 };
 
 /**
@@ -309,6 +335,22 @@ function readLedger(opt) {
   const raw = d.ledgerText !== undefined ? d.ledgerText : safeRead(LEDGER);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (e) { return null; }
+}
+/**
+ * v2.400.0（V22 OPV22-3）：读零读 ns 定性账本。
+ *   与 readLedger 同口径：缺账本返回 null（此时「定性」这一面整体不可用，读数必须显式报出），
+ *   解析失败也返回 null —— 不可用 ≠ 未定性，不许把「账本读不到」报成 35 条未定性。
+ */
+function readNsLedger(opt) {
+  const d = opt || {};
+  if (d.nsLedger === null) return null;
+  const raw = d.nsLedgerText !== undefined ? d.nsLedgerText : safeRead(NS_LEDGER);
+  if (!raw) return null;
+  try {
+    const j = JSON.parse(raw);
+    if (!j || !j.entries || typeof j.entries !== 'object') return null;
+    return j;
+  } catch (e) { return null; }
 }
 
 /** 有向图环检测（DFS + 三色）。返回环路径数组或 null。 */
@@ -517,6 +559,29 @@ function audit(opt) {
   // ④ dead-ns：模块提供了、产品源面零读（只报不红）
   const deadNs = Object.keys(g.nsOwner).filter(function (ns) { return !readAll[ns]; }).sort()
     .map(function (ns) { return { ns: ns, providers: g.nsOwner[ns].slice() }; });
+  // ④b v2.400.0（V22 OPV22-3）：零读 ns 必须被定性 —— 未定性 / 过期登记 都计红。
+  //   这一面治的是「同形不可分辨」：零读本身仍是读数，红的是「没人写过它为什么零读」。
+  const nsLed = readNsLedger(d);
+  const deadNsSet = {};
+  deadNs.forEach(function (x) { deadNsSet[x.ns] = true; });
+  const undeterminedNs = [];   // 门禁有、账本无 ⇒ 新的零读 ns 没定性
+  const expiredNs = [];        // 账本有、门禁无 ⇒ 过期登记，会静默掩盖真·未提供
+  const badClassNs = [];       // 登记了但 cls 不在 _classes 里 / 缺 provider / 缺 evidence
+  if (nsLed) {
+    deadNs.forEach(function (x) {
+      if (!nsLed.entries[x.ns]) undeterminedNs.push({ ns: x.ns, providers: x.providers });
+    });
+    Object.keys(nsLed.entries).forEach(function (ns) {
+      if (!deadNsSet[ns]) expiredNs.push(ns);
+      const e = nsLed.entries[ns] || {};
+      const clsOk = e.cls && nsLed._classes && nsLed._classes[e.cls];
+      if (!clsOk || !e.provider || !e.evidence) {
+        badClassNs.push({ ns: ns, cls: e.cls || null, hasProvider: !!e.provider, hasEvidence: !!e.evidence });
+      }
+    });
+    undeterminedNs.sort(function (a, b) { return a.ns < b.ns ? -1 : 1; });
+    expiredNs.sort();
+  }
 
   // 交叉验证：账本 requires 的定性
   const led = readLedger(d);
@@ -575,7 +640,9 @@ function audit(opt) {
 
   const problems = unprovided.length + orderViolation.length + crossFileWrite.length +
     staleRegistration.length + unreflected.length + ownerMismatch.length +
-    nsFaceDrift.length + misattributed.length;
+    nsFaceDrift.length + misattributed.length +
+    // v2.400.0（V22 OPV22-3）：未定性 / 过期登记 / 分类不合法 三类计红。
+    undeterminedNs.length + expiredNs.length + badClassNs.length;
 
   return {
     files: g.files.length, aliasFiles: g.coverage.aliasFiles, refFiles: g.coverage.refFiles,
@@ -587,6 +654,9 @@ function audit(opt) {
     unprovided: unprovided, orderViolation: orderViolation, crossFileWrite: crossFileWrite,
     staleRegistration: staleRegistration, unreflected: unreflected, ownerMismatch: ownerMismatch,
     nsFaceDrift: nsFaceDrift, misattributed: misattributed, deadNs: deadNs,
+    nsLedgerAvailable: !!nsLed,
+    nsLedgerCount: nsLed ? Object.keys(nsLed.entries).length : 0,
+    undeterminedNs: undeterminedNs, expiredNs: expiredNs, badClassNs: badClassNs,
     unidentified: unidentified, nsOnlyStatic: nsOnlyStatic, nsOnlyLedger: nsOnlyLedger,
     registeredUsed: registeredUsed, registeredTotal: registered.length,
     notInOrder: notInOrder, unknownProvider: unknownProvider,
@@ -610,6 +680,12 @@ function summary(opt) {
     + ' · LOAD_ORDER ' + r.orderLen
     + ' · 未提供 ' + r.unprovided.length + ' · 次序违规 ' + r.orderViolation.length
     + ' · 跨文件写 ' + r.crossFileWrite.length + ' · 过期登记 ' + r.staleRegistration.length
+    // v2.400.0（V22 OPV22-3）：定性面读数。账本不可用时显式报「未核对」，不报 0。
+    + ' · 零读 ns 定性 ' + (r.nsLedgerAvailable
+      ? (r.nsLedgerCount - r.undeterminedNs.length) + '/' + r.nsLedgerCount +
+        '（未定性 ' + r.undeterminedNs.length + ' / 过期 ' + r.expiredNs.length +
+        ' / 不合规 ' + r.badClassNs.length + '）'
+      : '账本不可用·未核对 ' + r.deadNs.length)
     + ' · 静态漏扫 ' + r.unreflected.length + ' · 归属错配 ' + r.ownerMismatch.length
     + ' · ns 面漂移 ' + r.nsFaceDrift.length + ' · 零读 ns ' + r.deadNs.length
     + ' · 账本未定性 ' + r.unidentified.length
@@ -685,6 +761,27 @@ if (require.main === module) {
   if (r.deadNs.length) {
     console.log('  · 零读 ns（模块提供了但产品源面无人读，消费者可能是 tests/宿主，只报不红）: '
       + r.deadNs.map(function (x) { return x.ns; }).join('、'));
+  }
+  // v2.400.0（V22 OPV22-3）：零读 ns 的定性面。
+  //   缺账本 ⇒ 整面不可用，显式报出（不可用 ≠ 未定性：不许把「读不到账本」报成 35 条未定性）。
+  if (!r.nsLedgerAvailable) {
+    console.log('  ! 零读 ns 定性账本不可用（tests/ns-consumer-ledger.json 缺失或解析失败）'
+      + ' ⇒ 本面整面跳过，' + r.deadNs.length + ' 个零读 ns 的定性**未核对**');
+  } else if (r.undeterminedNs.length) {
+    console.log('  ✗ 零读 ns 未定性（门禁有、账本无 ⇒ 新的零读 ns 没写为什么零读）:');
+    r.undeterminedNs.forEach(function (u) {
+      console.log('      · ' + u.ns + '（提供方 ' + u.providers.join(' / ') + '）');
+    });
+  }
+  if (r.nsLedgerAvailable && r.expiredNs.length) {
+    console.log('  ✗ 定性账本过期登记（账本有、门禁无 ⇒ 该 ns 已不零读或已不存在，会静默掩盖真·未提供）: '
+      + r.expiredNs.join('、'));
+  }
+  if (r.nsLedgerAvailable && r.badClassNs.length) {
+    console.log('  ✗ 定性账本条目不合规（cls 不在 _classes / 缺 provider / 缺 evidence）:');
+    r.badClassNs.forEach(function (b) {
+      console.log('      · ' + b.ns + '（cls=' + b.cls + ' provider=' + b.hasProvider + ' evidence=' + b.hasEvidence + '）');
+    });
   }
   if (r.unknownProvider.length) {
     console.log('  ✗ 装载期边的提供方不在装载序:');

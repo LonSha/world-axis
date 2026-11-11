@@ -8591,6 +8591,67 @@ function runWitness(WA) {
     }
   }
 
+  // ── v2.400.0（V22 OPV22-2 + 验收纪律 3）：action-desk 新增 21 条路由的 20 条缺席码 ──
+  //   为什么这 20 条必须在这里有**可执行**见证，而不是列进死表：
+  //     它们不是「结构不可达」的守卫。触发路径就是玩家真的下了一条对应行动，
+  //     而 owner 引擎因为扩展目录被部分同步 / 清单漏项而**没装上** —— 这是会发生的局面，
+  //     且发生时调用方必须拿到「谁缺席」而不是一个 TypeError。
+  //   见证手法：每条路由的缺席分支都写成 `if (WA.<ns> && typeof ...) return ...;`
+  //     后面紧跟 `return { ok:false, reason:'<ns>-unavailable' }`。
+  //     故把 WA.<ns> 临时摘掉、再真调那条路由，就能把码跑出来 —— 这是**真 API 调用**，
+  //     不是读源码字符串。摘除与还原都在 finally 里，跑完必须逐字复原。
+  //   为什么用 `actionDesk.plan('<key>', ...)` 而不是直接调 owner：
+  //     被测的就是「路由在 owner 缺席时是否如实归因」这一层。直接调 owner 会绕过它，
+  //     那样见证的是引擎而不是路由 —— 而本批新增的判据恰恰在路由上。
+  //   `WA.actionDesk.plan` 需要 enabled；plan 的早退会返回 disabled 而不是本码，
+  //     故先确认 settings().enabled（默认开启），并在取不到 plan 时如实跳过（不伪造 seen）。
+  {
+    const AD = WA.actionDesk;
+    if (AD && typeof AD.plan === 'function') {
+      const ABSENT = [
+        ['vitals', 'vitals-unavailable', 'vitals.register'],
+        ['affect', 'affect-unavailable', 'affect.setChannel'],
+        ['elsewhere', 'elsewhere-unavailable', 'elsewhere.open'],
+        ['foreshadow', 'foreshadow-unavailable', 'foreshadow.track'],
+        ['horizon', 'horizon-unavailable', 'horizon.rollLane'],
+        ['oneShotMod', 'oneShotMod-unavailable', 'oneShot.dose'],
+        ['humanRealism', 'humanRealism-unavailable', 'human.setNeeds'],
+        ['aftermathImpact', 'aftermathImpact-unavailable', 'aftermath.triggerIncident'],
+        ['beatLedger', 'beatLedger-unavailable', 'beatLedger.plan'],
+        ['coordinate', 'coordinate-unavailable', 'coordinate.anchorAdd'],
+        ['dream', 'dream-unavailable', 'dream.weave'],
+        ['gauge', 'gauge-unavailable', 'gauge.create'],
+        ['ledger', 'ledger-unavailable', 'ledger.saveCheckpoint'],
+        ['beatReport', 'beatReport-unavailable', 'beat.report'],
+        ['bonds', 'bonds-unavailable', 'bonds.setBond'],
+        ['digest', 'digest-unavailable', 'digest.generate'],
+        ['pathEcho', 'pathEcho-unavailable', 'pathEcho.record'],
+        ['personaAnchor', 'personaAnchor-unavailable', 'persona.registerAnchor'],
+        ['rehearsal', 'rehearsal-unavailable', 'rehearsal.preview'],
+        ['survival', 'survival-unavailable', 'survival.set'],
+        ['weather', 'weather-unavailable', 'weather.setWeather'],
+      ];
+      // 全量路由键都必须在表里（缺一条就说明 ROUTES 表已漂移，本见证面会静默漏测）
+      const known = {};
+      (AD.ROUTES || []).forEach(function (k) { known[k] = true; });
+      ABSENT.forEach(function (row) {
+        const ns = row[0], code = row[1], key = row[2];
+        if (!known[key]) return;   // 路由被删了 ⇒ 不硬造见证（缺路由本身由 desk-coverage 管）
+        want(code, 'action-desk 路由「' + key + '」在 owner ' + ns + ' 缺席时如实归因 ' + code);
+        const keep = WA[ns];
+        try {
+          WA[ns] = undefined;
+          trip(code, function () {
+            const r = AD.plan(key + ':witness-absent', { name: 'witness', who: 'witness', person: 'witness' });
+            return [r && r.reason];
+          });
+        } finally {
+          WA[ns] = keep;   // 无条件还原（不拿「跑通了」当还原的理由）
+        }
+      });
+    }
+  }
+
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected,
     asyncPumpProof: asyncPumpProof };
 }

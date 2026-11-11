@@ -1382,6 +1382,12 @@
     //   `WA.ui.pages()` 做页白名单核对。先装会让 `isCollapsed` 恒报 page-table-absent
     //   (折叠整条静默失效,比不装更难查)。本模块**零世界写、零落盘**(状态走 settingsBus)。
     'ui/panel-fold.js',
+    // v2.400.0（V22 OPV22-4）：概览页六块只读诊断（原 ui/panel.js 517–851 行，335 行 / 7 个函数）。
+    //   **必须排在 ui/panel.js 之后**：panel.js 的七个同名转发函数在运行期惰性读
+    //   `WA.panelOverviewBlocks`，先装会让首次渲染读到 undefined ⇒ 六块全返回空串
+    //   （而 renderOverview 的 try/catch 不会报错，症状是「概览页那几块突然没内容了」）。
+    //   本模块零世界写、零落盘、零控件、零 id（只拼 HTML 字符串）。
+    'ui/pages/overview-blocks.js',
     'ui/settings.js',
     'ui/assistant.js',
   ];

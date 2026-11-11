@@ -878,6 +878,36 @@
     //   而是 tools/reject-recovery.js 的现场复算；补完 A9 三面不相交仍成立。
     'capacity-reached', 'court-capacity', 'guard-capacity-or-store-unavailable', 'patient-capacity',
     'sanctuary-capacity', 'settlement-capacity', 'vessel-capacity-or-store-unavailable',
+    // ── v2.400.0（V22 OPV22-2 + 验收纪律 3）：本批 21 条新路由带出的 20 条拒收码 ──
+    //   来历：action-desk.ROUTES 补 21 条真写口路由时，每条都带一个
+    //   `<ns>-unavailable` 的 owner 缺席分支（与本表既有风格一致：先判 owner 在不在，
+    //   不在就如实报缺席，而不是让 TypeError 飞到调用栈）。现场复算因此涨 20 条，
+    //   而本快照没有 ⇒ tools/reject-recovery.js --check 差额 20。
+    //
+    //   为什么必须逐条进快照（而不是让 --check 宽容）：OPV22-6 刚把对账挂成默认动作，
+    //   它的全部价值就在「差额非零即红」。为了让红变绿去放宽判据，等于把刚装的门禁
+    //   一次拆掉 —— 这正是本仓反复拒绝的做法。
+    //
+    //   为什么**不**写 OVERRIDES：这 20 条的形状是 `X-unavailable`，与规则表的
+    //   `*-unavailable` 词法同族（探针实测 via:'rule'、无档 0 条）。重复登记会让 A8
+    //   （OVERRIDES 键必须在 REJECT_FACE 里且与规则表不打架）出现两处真源。
+    //
+    //   三条面同批落定：REJECT_FACE 收这 20 条；SUCCESS_FACE / NEUTRAL_FACE 不动
+    //   （它们既不是成功回执，也不是「判不出」）。
+    //   ⚠ 踩坑记录：本批第一次编辑把这段追加到了 **NEUTRAL_FACE** 的末尾
+    //   （两数组只隔 5 行，且都以「v2.380.0 同上批次」那一段注释收尾）。
+    //   结果差额不是 20 而是 **40** —— 拒收面缺 20（现场有快照没有）+ 判不出面多 20
+    //   （快照有现场没有），两类各报一遍。数组位置选错时读数会**翻倍**而不是「少补一点」，
+    //   这正好说明 `--check` 报的是逐条差集而不是计数差。
+    //   第 21 条 humanRealism-unavailable 已在码面口径内（human-realism.js 早有同形码
+    //   的既有站点），本条不重复登记。
+    'affect-unavailable', 'aftermathImpact-unavailable', 'beatLedger-unavailable',
+    'beatReport-unavailable', 'bonds-unavailable', 'coordinate-unavailable',
+    'digest-unavailable', 'dream-unavailable', 'elsewhere-unavailable',
+    'foreshadow-unavailable', 'gauge-unavailable', 'horizon-unavailable',
+    'ledger-unavailable', 'oneShotMod-unavailable', 'pathEcho-unavailable',
+    'personaAnchor-unavailable', 'rehearsal-unavailable', 'survival-unavailable',
+    'vitals-unavailable', 'weather-unavailable',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。

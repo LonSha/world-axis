@@ -41,7 +41,18 @@ const path = require('path');
 const gate = require('./ui-gate-sync.js');
 const BASE = path.join(__dirname, '..');
 const STORE = 'core/store.js', PERM = 'core/permissions.js', BUS = 'core/settings-bus.js', PANEL = 'ui/panel.js';
-function src(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+// v2.400.0（V22 OPV22-4）：ui/panel.js 的面板源码面改走 tests/panel-source.js 的**重组面**。
+//   本文件的 C 面与 N5 负控制都读 ui/panel.js 的文本锚点（心跳块实现在位、挂载行在位、
+//   三源真读、零控件、未上报口径）。OPV22-4 把「心跳块 + 五块只读诊断」搬到了
+//   ui/pages/overview-blocks.js，若继续只读 ui/panel.js，这些锚点会命中 0 次 ——
+//   本轮实测 C 面 3 项红（dryRun 档位结构 / gateStat / 「未上报」）。
+//   红的原因不是产品坏了，是**判据的输入面比事实窄**（本仓已八次裁决同族）。
+//   panelSource() 按原位置把段体拼回标记处，结果与拆段前的 ui/panel.js 逐字相等，
+//   故下面所有断言一条都不用改。
+function src(rel) {
+  if (rel === PANEL) return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
 function hits(s, x) { return s.split(x).length - 1; }
 function must1(s, x, tag) { const n = hits(s, x); if (n !== 1) throw new Error('锚点命中 ' + n + ' 次（要求恰 1 次）: ' + tag + ' :: ' + x.slice(0, 70)); return n; }
 function fresh(ov) { return (ov ? gate.fresh({ srcOverride: ov }) : gate.fresh()).WA; }

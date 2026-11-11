@@ -1,0 +1,229 @@
+{
+  "_note": "WorldAxis 零读 ns 定性账本（v2.400.0 · V22 OPV22-3）。治的缺口：tests/module-cycle-gate.js 报 35 个『模块提供了、产品源面零读』的命名空间，但这条读数此前只有数字、没有任何地方写明『为什么它零读』。于是『本该有消费点却漏接了』与『它本来就只该由程序或宿主消费』在读数上完全同形 —— 这正是 l3-registry 治过的同一种病（同形不可分辨）。本账本把每一个零读 ns 钉到一条可复算的裁决上。",
+  "_classes": {
+    "wired": "产品面本该读它、当前确实漏接了消费点 ⇒ 必须补消费点。本仓当前 0 条（补完即出表）。",
+    "readonly-api": "对外诊断/自证读口，产品源面**刻意**不读：由 tests、宿主（SillyTavern）、或人读诊断面消费。零读是设计，不是缺陷。",
+    "stale": "真死面：无产品读点、无测试读点、无运行时消费方。已在 tests/dead-export-ledger.json 受控冻结，本账本只做指向，不抢那份账。",
+    "derived-handle": "同一函数的第二句柄（主句柄已在 WA.<ns>.<method> 上）。保留是为了向后兼容，产品面只用主句柄 ⇒ 零读是预期的。",
+    "gate-selfwitness": "模块自身的出口面自证位（__ 前缀）：形状不符时写进去供人读，正常运行期恒为 null/缺席。产品面不读它是**正确**的 —— 它被读的那一刻就是缺陷已发生。"
+  },
+  "_discipline": [
+    "① 每条必须给出可复算证据（provider 文件 + 消费方类型 + 复算命令口径）。",
+    "② stale 类必须在 dead-export-ledger 有对应条目；本账本不得替代那份账（禁止改账本销账）。",
+    "③ 新增零读 ns 而本账本未登记 ⇒ 门禁报『未定性』并计红（不许当成 0 条边蒙过去）。",
+    "④ 本账本的键集与门禁 deadNs 读数双向一致：门禁多一个 → 未定性；账本多一个 → 过期登记。"
+  ],
+  "version": "2.400.0",
+  "entries": {
+    "LEAK_THRESHOLD": {
+      "cls": "gate-selfwitness",
+      "provider": "core/interceptor.js",
+      "evidence": "interceptor 的监听器泄漏阈值常量（24），用于 leakSuspect 判定。产品面不需要读它：阈值只在本文件内参与比较，对外暴露是为让 tests 与诊断面能复算『为什么判成泄漏』。",
+      "recompute": "grep -n 'LEAK_THRESHOLD' core/interceptor.js"
+    },
+    "__agencyStepShapeWarn": {
+      "cls": "gate-selfwitness",
+      "provider": "engines/agency.js",
+      "evidence": "agency 的步进形状自证位：只在该引擎读到非预期形状时被赋值（{got, at}）。正常运行时恒为 undefined。产品面读它没有意义 —— 它被读到的时刻就是形状已经错了。",
+      "recompute": "grep -n '__agencyStepShapeWarn' engines/agency.js"
+    },
+    "__agencyWarn": {
+      "cls": "gate-selfwitness",
+      "provider": "engines/agency.js",
+      "evidence": "agency 的出口数自证位：__exportCount !== 7 时写入 {expected, got}。同理，产品面不读；tests/s3-tx2-v2166.js 读它做负控制。",
+      "recompute": "grep -n '__agencyWarn' engines/agency.js tests/s3-tx2-v2166.js"
+    },
+    "__diplomacyWarn": {
+      "cls": "gate-selfwitness",
+      "provider": "engines/diplomacy.js",
+      "evidence": "diplomacy 的写口数目自证位：writers 与 DP_ORDER 不符时写入原因串。产品面不读。",
+      "recompute": "grep -n '__diplomacyWarn' engines/diplomacy.js"
+    },
+    "__freightWarn": {
+      "cls": "gate-selfwitness",
+      "provider": "engines/freight.js",
+      "evidence": "freight 的导出数自证位：expected 与实际导出数不符时写入。tests/s3-tx3-v2167.js 读它做负控制。",
+      "recompute": "grep -n '__freightWarn' engines/freight.js tests/s3-tx3-v2167.js"
+    },
+    "__inited": {
+      "cls": "readonly-api",
+      "provider": "index.js",
+      "evidence": "入口幂等标记：index.js 重复装载时靠它早退。产品面不该读它（读它等于依赖装载次数）；tests/run.js 读它确认入口只初始化一次。",
+      "recompute": "grep -n '__inited' index.js tests/run.js"
+    },
+    "__inputGuardInternal": {
+      "cls": "readonly-api",
+      "provider": "core/input-guard.js",
+      "evidence": "输入闸门的内部句柄，对外暴露仅为让 tests/input-guard-v2840.js 能直接驱动内部判定而不必走完整链路。产品面走公开入口。",
+      "recompute": "grep -n '__inputGuardInternal' core/input-guard.js tests/input-guard-v2840.js"
+    },
+    "archiveHide": {
+      "cls": "stale",
+      "provider": "engines/archive-hide.js",
+      "evidence": "全引擎导出已在 dead-export-ledger 逐条冻结（archiveHide.getSettings / archiveHide.plan …）。产品面零读、tests 零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('archiveHide.')).length)\""
+    },
+    "binding": {
+      "cls": "stale",
+      "provider": "engines/binding.js",
+      "evidence": "对象绑定引擎（bind/unbind 直写 store），7 条导出全部在 dead-export-ledger 冻结。产品面零读、tests 零读。与 tools/desk-coverage.js 的 orphan 档同一台，两个独立工具交叉确认。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('binding.')).length)\""
+    },
+    "calendarPlan": {
+      "cls": "stale",
+      "provider": "engines/calendar-custom.js",
+      "evidence": "自定义历法月表（setMonths/clear 写 store），8 条导出全部在 dead-export-ledger 冻结。产品面零读、tests 零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('calendarPlan.')).length)\""
+    },
+    "clearEventLog": {
+      "cls": "readonly-api",
+      "provider": "index.js",
+      "evidence": "事件日志清空口，供玩家/宿主手动清理诊断环。产品代码不需要调它（那是用户动作，不是推演动作）；tests/mock.js 与 tests/run.js 用它做用例间隔离。",
+      "recompute": "grep -n 'clearEventLog' index.js tests/mock.js tests/run.js"
+    },
+    "compactTiming": {
+      "cls": "stale",
+      "provider": "engines/compact-timing.js",
+      "evidence": "压缩时机引擎导出全部在 dead-export-ledger 冻结（compactTiming.plan / compactTiming.saveSettings …）。产品面零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('compactTiming.')).length)\""
+    },
+    "dreamSettle": {
+      "cls": "stale",
+      "provider": "engines/dream-settle.js",
+      "evidence": "梦境结算导出全部在 dead-export-ledger 冻结。tests/reject-v2780.js 有见证引用，但产品面零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('dreamSettle.')).length)\""
+    },
+    "ensemble": {
+      "cls": "stale",
+      "provider": "engines/ensemble.js",
+      "evidence": "多通道合成引擎导出全部在 dead-export-ledger 冻结。注：engines/perspective-lock.js 里有同名字符串，但不是 WA.ensemble 读点。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('ensemble.')).length)\""
+    },
+    "ephemeralScrub": {
+      "cls": "stale",
+      "provider": "engines/ephemeral-scrub.js",
+      "evidence": "瞬时清理导出全部在 dead-export-ledger 冻结。产品面零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('ephemeralScrub.')).length)\""
+    },
+    "faultContext": {
+      "cls": "readonly-api",
+      "provider": "core/fault-context.js",
+      "evidence": "故障上下文分类器（wrap / classify / isRetriable）：把『一次失败怎么被讲清楚』归因成码。产品主路径不读它 —— 只有出错时才用得上，这与 reject-recovery 的分工一致。**消费方只有 tests 面**：tests/reject-v2780.js:1771 取 WA.faultContext 并真调 Fc.wrap(...)、tests/fault-context-v2110.js 是它的专锁（B 段运行时探针 + A 段导出面配平）。注意 engines/tool-diag.js:3456 的 'core/fault-context.js': 'faultContext' 只是**模块名登记表的一行**，不是对 WA.faultContext 的读取 —— 不要把它当成产品消费点（同 loadRetry 的陷阱）。dead-export-ledger 已把 7 个成员冻结为 self-only（refs=0/tref=0），两份账不冲突：那份账说的是『成员级过度导出』，本账说的是『ns 级零产品读』。",
+      "recompute": "grep -n 'Fc.wrap' tests/reject-v2780.js; grep -n 'faultContext' engines/tool-diag.js"
+    },
+    "fieldWriters": {
+      "cls": "stale",
+      "provider": "engines/field-writers.js",
+      "evidence": "字段写入方清册：导出全部在 dead-export-ledger 冻结。产品面零读。消费方只有 tests 面：tests/v11-field-writers.js 是它的专锁（真调 view / conflicts / stat / undeclaredConflicts）。engines/tool-diag.js:3432 的 'engines/field-writers.js': 'fieldWriters' 只是模块名登记表的一行，不是读取。另见 tests/module-cycle-gate-v2107.js:546 的历史读数：v2.300.0 时该 ns 就被记为『只有测试与面板候选消费』。",
+      "recompute": "grep -n 'WA.fieldWriters' tests/v11-field-writers.js | head -3"
+    },
+    "followupGate": {
+      "cls": "stale",
+      "provider": "engines/followup-gate.js",
+      "evidence": "跟进闸门导出全部在 dead-export-ledger 冻结；其 due 口另被 push-api-registry 裁决为 drive（轮次驱动），但产品源面仍无 WA.followupGate 读点。与 desk-coverage 的 orphan 档交叉确认。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('followupGate.')).length)\""
+    },
+    "lensCulling": {
+      "cls": "stale",
+      "provider": "engines/lens-culling.js",
+      "evidence": "镜片裁剪导出全部在 dead-export-ledger 冻结。产品面零读、tests 零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('lensCulling.')).length)\""
+    },
+    "loadRetry": {
+      "cls": "readonly-api",
+      "provider": "index.js",
+      "evidence": "装载重试入口：模块装载失败后由人/宿主按 WA.loadRetry(rel) 重试。产品面不自动调用它是**正确的**（自动重试会把『文件缺失』变成无限重试）；core/store.js 与 engines/reject-recovery.js 只在 reason 文案里提到它作为恢复指引。",
+      "recompute": "grep -rn 'loadRetry' index.js engines/reject-recovery.js | head"
+    },
+    "loadScript": {
+      "cls": "readonly-api",
+      "provider": "index.js",
+      "evidence": "脚本装载器（宿主侧 script 注入）。产品模块不该直接调它 —— 装载次序由 index.js 的 LOAD 统一管理；tests/run.js 读它做装载面自证。",
+      "recompute": "grep -n 'loadScript' index.js tests/run.js | head"
+    },
+    "logCaps": {
+      "cls": "readonly-api",
+      "provider": "index.js",
+      "evidence": "诊断环动态上限读数（源码注释原文：『供测试/诊断消费』）。产品面不读它是设计：上限是诊断参数，不是推演输入。",
+      "recompute": "grep -n 'logCaps' index.js"
+    },
+    "logTrimStat": {
+      "cls": "readonly-api",
+      "provider": "index.js",
+      "evidence": "诊断环裁剪统计读数，与 logCaps 同族：供测试/诊断面读，产品主路径不消费。",
+      "recompute": "grep -n 'logTrimStat' index.js"
+    },
+    "narrativeDeduction": {
+      "cls": "stale",
+      "provider": "engines/narrative-deduction.js",
+      "evidence": "双轨推演导出全部在 dead-export-ledger 冻结（9 条）。产品面零读，仅 tests/ 有 auditDualTrack 用例。与 desk-coverage 的 orphan 档交叉确认。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('narrativeDeduction.')).length)\""
+    },
+    "observationProjection": {
+      "cls": "stale",
+      "provider": "engines/observation-projection.js",
+      "evidence": "观测投影导出全部在 dead-export-ledger 冻结。产品面零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('observationProjection.')).length)\""
+    },
+    "off": {
+      "cls": "readonly-api",
+      "provider": "core/interceptor.js",
+      "evidence": "事件解绑口 WA.off(evt, fn)，与 WA.interceptor.on 成对。产品模块只在自己 install 时绑一次、生命周期内不解绑，故不读它；宿主/测试面用它做清理。注：core/settings-bus.js 与 engines/backstage.js 里的 'off' 是布尔字面量与选项名，与本 ns 无关（本账本已复核，不是读点）。",
+      "recompute": "grep -n 'WA.off' core/interceptor.js"
+    },
+    "polish": {
+      "cls": "stale",
+      "provider": "engines/polish.js",
+      "evidence": "润色引擎导出全部在 dead-export-ledger 冻结。产品面零读、tests 零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('polish.')).length)\""
+    },
+    "preflight": {
+      "cls": "stale",
+      "provider": "engines/rehearse.js",
+      "evidence": "预演引擎导出全部在 dead-export-ledger 冻结（preflight.capability / preflight.backup …）。产品面零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('preflight.')).length)\""
+    },
+    "purifyScope": {
+      "cls": "stale",
+      "provider": "engines/purify-scope.js",
+      "evidence": "净化范围引擎导出全部在 dead-export-ledger 冻结。产品面零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('purifyScope.')).length)\""
+    },
+    "refine": {
+      "cls": "stale",
+      "provider": "engines/refine.js",
+      "evidence": "精炼引擎导出全部在 dead-export-ledger 冻结。产品面零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('refine.')).length)\""
+    },
+    "schema": {
+      "cls": "readonly-api",
+      "provider": "core/schema.js",
+      "evidence": "结构定义/校验基元（define / attach / validate / validateNamed）：给『字段类型错了』『没注册过的具名 schema』这类现网每日都会发生的局面一条如实拒收出口。产品主路径用的是 settingsBus 的结构指纹（readStat().schema），不直接读本 ns —— 本仓既有裁决：结构指纹与迁移器契约只属存储层。**消费方只有 tests 面**：tests/reject-v2780.js:1771 取 WA.schema 并真调 Sc.validate / Sc.validateNamed，它是 invalid-input / not-registered 两条码的证人。注意 engines/tool-diag.js:3456 的 'core/schema.js': 'schema' 只是模块名登记表的一行，不是读取。dead-export-ledger 的 8 条 schema.* 冻结说的是『成员级过度导出』，与本账的『ns 级零产品读』是两件事。",
+      "recompute": "grep -n 'Sc.validate' tests/reject-v2780.js; grep -n 'schema' engines/tool-diag.js | head -3"
+    },
+    "situation": {
+      "cls": "derived-handle",
+      "provider": "engines/scene-narrative.js",
+      "evidence": "同一函数的第二句柄：WA.sceneNarrative.situation 已正式导出（sceneNarrative 是被产品面真实消费的 ns），WA.situation 是它的别名。产品面只用主句柄 ⇒ 本句柄零读是预期的。",
+      "recompute": "grep -n 'WA.situation = situation' engines/scene-narrative.js"
+    },
+    "unifiedPending": {
+      "cls": "stale",
+      "provider": "core/unified-pending.js",
+      "evidence": "统一待定项导出全部在 dead-export-ledger 冻结。产品面零读，tests/v10-unified-pending.js 与 tests/v10-master-matrix.js 消费。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('unifiedPending.')).length)\""
+    },
+    "weightedDraw": {
+      "cls": "stale",
+      "provider": "engines/weighted-draw.js",
+      "evidence": "加权抽取导出全部在 dead-export-ledger 冻结。产品面零读。",
+      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('weightedDraw.')).length)\""
+    },
+    "writeGate": {
+      "cls": "readonly-api",
+      "provider": "index.js",
+      "evidence": "写入闸门读数口：内部转调 WA.store.writeGate()。产品面不读它是设计 —— 闸门在 store 内部自动生效，本口只给诊断面/人读『当前闸门什么状态』。",
+      "recompute": "grep -n 'WA.writeGate' index.js"
+    }
+  }
+}

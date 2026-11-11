@@ -55,11 +55,24 @@ function auditWire(src) {
 // v2.43.0：发现的**定义**上收至 tests/product-files.js（文件面单一真源），此处不再自带过滤逻辑。
 //   本函数保留原签名 uiFiles(dir) 与返回体形态（{rel, src}[]），既有调用方与 v2.42.0 的
 //   行为级负向自证（临时目录多一模块即跟随）逐项不变——只是背后换了唯一的实现。
+// v2.400.0（V22 OPV22-4）：**必须去掉 basename**。
+//   原写法 `fs.readFileSync(path.join(d, path.basename(rel)))` 只在「ui/ 下全是平铺文件」
+//   时碰巧成立：basename('ui/panel.js') = 'panel.js'，拼回去正好。而
+//   discoverUIFiles 自 v2.400.0 起**递归**（它要收 ui/pages/*.js），于是
+//   basename('ui/pages/overview-blocks.js') = 'overview-blocks.js'，
+//   拼成 `ui/overview-blocks.js` ⇒ ENOENT，整道门禁**运行器异常**（不是断言红，
+//   是直接崩），而这在「本门禁全绿」的语境里会被读成「门禁坏了」，不是「面窄了」。
+//   正确做法：discoverUIFiles 返回的 rel 已带 `ui/` 前缀，把前缀剥掉再拼 d ——
+//   这样 dir 注入（v2.42.0 的临时目录负向自证）仍然成立。
 const { discoverUIFiles } = require('./product-files.js');
+const UI_PREFIX = 'ui';
 function uiFiles(dir) {
   const d = dir || path.join(BASE, 'ui');
   return discoverUIFiles(d).map(function (rel) {
-    return { rel: rel, src: fs.readFileSync(path.join(d, path.basename(rel)), 'utf8') };
+    //   rel 形如 `ui/pages/overview-blocks.js`；剥掉前缀得到 d 内的相对路径。
+    //   不用 path.basename（它会把子目录丢掉 —— 见上面的 ENOENT 记录）。
+    const inner = rel.indexOf(UI_PREFIX + '/') === 0 ? rel.slice(UI_PREFIX.length + 1) : rel;
+    return { rel: rel, src: fs.readFileSync(path.join(d, inner), 'utf8') };
   });
 }
 
