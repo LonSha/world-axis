@@ -1,3 +1,15 @@
+### R239 · 2026-11-12 · v2.400.0：拆段契约补课（三段拆分前置批）
+
+- **本批不在计划内**：动 `ui/panel.js` 三段拆分前按纪律先拿 baseline，结果两把锁在**未改动的工作树上就红着** —— `overview-fold-v2254` FAIL 3/68、`p3-x1-v2149` FAIL 3/54。V22 九把专锁复核清单漏了这两把，它们的锚点还停在「六块」形态，而 V22 已把全知块加成七块。
+- **真缺陷（不是判据问题）**：`overview-fold` 的负控制抛 `ReferenceError: v22OmensBlock is not defined`。V22 的 EXV22-9 把这个函数（156 行、含 3 处 `esc` 调用）写在了 `OPV22-4` 段体结束标记**之外**（L431 vs 段体止于 L410）—— 于是 `panelSource()` 的重组面里「挂载行调用它、却没有它的定义」，是一份**跑不起来的假源码**。D3a 当初只数行数（17421 恰好对上）没抓到语义破坏，这是「判据的输入面比事实窄」的第 N 次复发。
+- **修法（收编定义，不是改判据口径）**：把段体结束标记移到 `v22OmensBlock` 之后 → 段体 335→491 行、`panel.js` 17577 行（重组面行数），`new Function(src)` 语法检查通过。同步五处读数：`BASE_BODY_LINES 335→491`、`BASE_PANEL_LINES 17421→17577`、`escCalls 57→60`、`FN` 函数表七项→八项（补 `v22OmensBlock`）、`nonEmpty.length 6→7`。
+- **两把锁的锚点扩输入面**：`overview-fold-v2254` 的 `A_MOUNT` 从六块扩到七块、`B1` 从 6 个折叠壳改 7 个并加 `B1b` 点名第七块身份（'V22 制度读数'）、labels 数组同步补一项；`p3-x1-v2149` 的 omni `from/to` 补上 `${v22OmensBlock()}`（修复前 `from` 作为子串部分命中，造成「摘标记但块还在」的半破坏，N1g 数到 14→13 误报）。两处都留注释记来历，属「扩输入面、锚点跟现场走」，不削判据。
+- **三处「判据被说明文字满足」的镜像问题一并修掉**：D1g/D1h 与 delete-gate C 面在段体**纯文本**里扫到了 v22 块注释中的纪律说明（「零 `<button>`/`<input>`/`id="`」），于是「没有控件」这个事实被一句描述「没有控件」的注释满足了。统一改成在 `stripComments` **去注释面**上查。
+- **`stripComments` 写进 `delete-gate-v2124.js` 时踩了转义地狱**：`edit_file`/shell 多层转义 `'`、`\`、`` ` `` 反复 SyntaxError。最终用 Python 以 `String.fromCharCode(39/34/96/10/92)` 生成 `Q1/Q2/Q3/NL/BS` 常量重写函数体，`node -c` 过才恢复绿。**教训：复杂补丁一律 `create_file` 落盘 + 立即可执行校验，不用 heredoc。**
+- **proot 时序波动实测**：smoke 单跑报 `segment-extract 13338ms > MAX_MS=12000`。插桩两次读数差异巨大（N=10369ms vs N=6064ms，同一段差 70%），拆开看 D 段新增的 `stripComments(body)` 只 2ms，大头是历史形态的 N 段（`scanCached` 两次 + `gateCli` 子进程）。环境为 Android proot、刚重启（uptime 2min），同一锁多次计时 **8.8s–14.8s** 宽幅波动。`MAX_MS=12000` 是既有判据，**不调**（调它等于削判据）；重跑 smoke 得 14/14 全绿、63.6s。
+- 九锁全绿读数：segment-extract 125 项 / overview-fold 91 项 / p3-x1 54 项 / delete-gate 63 项 / q8-panel-fold 79-0 / o9 / p5 / first-run-ui / world-diary-ui 全 exit=0。
+- 本批 5 文件 +67/−17；三段拆分本体（`overview-main` / `dashboards` / `tools-page`）在下一批开工。
+
 ### R235 · 2026-11-01 · v2.293.0：EXV7-9 一键播种（V7 收口）
 - 新增 `engines/populate.js`：给空世界一个**批量种人**的入口 —— 答「从零开一局，怎么在十秒内得到一个能跑的世界」。V7 立项硬读数里最疼的一条就是「空世界非空产出 4」，而这四个机制里有几个还需要至少一个人或一处地点才出内容；此前玩家只能一格一格点十几分钟。
 - **这是 V7 九项里唯一带写面的一项**，故四条边界先写进文件头再写代码：① **只走真写口**（`world.addPlace/addRoad`、`life.addGoal`、`bonds.setBond`、`org.grant/assignRole`、`editorFaction.add`、`registry.ensurePerson`），源码零 `draft.X =`；② **容量全部现场复读** `WA.evict.siteDecls()`，绝不写死 48/24/40/16/24（写死即第二真源，改一处漏一处的那天会把真人挤掉而调用方拿 `ok:true`）；③ **满则如实拒收 `no-room`**，绝不「按要的数目硬写」让 evict 静默挤掉玩家填的真人；④ **不替作者做剧情判断** —— 关系型一律「平行共存」（六型里语义承诺最弱）、职阶一律 `novice`（`need:0` 那一档；`chief` 要 `need:120`，凭空给就是编履历）。

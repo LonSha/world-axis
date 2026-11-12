@@ -64,8 +64,12 @@ const BROKEN = [
     from: "    const steps = Math.floor(age / w);\n",
     to:   "    const steps = 0;\n" },
   { key: 'omni', rel: 'ui/panel.js',
-    from: "      <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}</div>\n",
-    to:   "      <div>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}</div>\n" },
+    // v2.400.0（V22 后续）：from/to 同步补上第七块 `${v22OmensBlock()}` —— V22 加块
+    //   时本锚停在六块形态：from 作为子串仍部分命中（前缀仍在），于是破坏变成
+    //   「摘掉 data-omniscient 标记但块还在」的半破坏，N1g 数到 14→13 误报。
+    //   修法是扩输入面（锚点跟现场走）。与 overview-fold-v2254 的 A_MOUNT 同族漏网。
+    from: "      <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}</div>\n",
+    to:   "      <div>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}</div>\n" },
   { key: 'writeset', rel: 'engines/sediment.js',
     from: "    setSettings: saveSettings,\n",
     to:   "    setSettingsX: saveSettings,\n" }

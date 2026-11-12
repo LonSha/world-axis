@@ -239,9 +239,30 @@ function runC(a) {
     'v2124/C: 真读档位**结构**面（dryRun —— 看一眼概览页不该等于跑一轮基准）');
   a(pn.indexOf('WA.permissions.gateStat()') > 0,
     'v2124/C: 真读删除闸门读数（P5 的落地面：没有它，闸门接没接上只能靠读源码）');
-  // 零控件：块内不得渲染任何 id（否则须同时改守卫表与接线门禁）
+// 零控件：块内不得渲染任何 id（否则须同时改守卫表与接线门禁）
+  // v2.400.0（V22 后续修正）：v22 块收进段体后，其注释里的纪律说明「零 `<input>`/`id=\"`」
+  //   会被纯文本扫描误读成控件（「判据被说明文字满足」的镜像）。修法与 D5a 同款：
+  //   在**去注释面**上查 —— 注释消失、真控件（模板串里的 id=\"...\"）仍在。
+  // stripComments 与 segment-extract-v2400 同款实现（逐字符扫描，正确处理字符串字面量里的 //）。
+  function stripCommentsLocal(sc) {
+    // 用 String.fromCharCode 避开引号转义地狱：Q1/Q2/Q3 = 单引号/双引号/反引号
+    const Q1 = String.fromCharCode(39), Q2 = String.fromCharCode(34), Q3 = String.fromCharCode(96), NL = String.fromCharCode(10), BS = String.fromCharCode(92);
+    let out = String.fromCharCode(0).slice(0,0), i = 0;
+    while (i < sc.length) {
+      const c = sc[i];
+      if (c === '/' && sc[i + 1] === '/') { while (i < sc.length && sc[i] !== NL) i++; }
+      else if (c === '/' && sc[i + 1] === '*') { i += 2; while (i < sc.length && !(sc[i] === '*' && sc[i + 1] === '/')) i++; i += 2; }
+      else if (c === Q1 || c === Q2 || c === Q3) {
+        const q = c; out += c; i++;
+        while (i < sc.length && sc[i] !== q) { if (sc[i] === BS) { out += sc[i + 1]; i += 2; continue; } out += sc[i]; i++; }
+        out += q; i++;
+      }
+      else { out += c; i++; }
+    }
+    return out;
+  }
   const seg = pn.slice(pn.indexOf(ANCHORS.panelBlock.txt), pn.indexOf('function renderOverview() {'));
-  a(seg.indexOf('id="') < 0, 'v2124/C: 心跳块零控件（块内无 `id="` —— 纯展示，不触碰两道 UI 门禁）');
+  a(stripCommentsLocal(seg).indexOf('id="') < 0, 'v2124/C: 心跳块零控件（去注释面上查，块内无 `id=\"` —— 纯展示，不触碰两道 UI 门禁）');
   a(seg.indexOf('未上报') > 0,
     'v2124/C: 宿主耗时无上报时照实写「未上报」（不拿 0ms 冒充「API 很快」）');
   const diag = src('engines/tool-diag.js');

@@ -629,7 +629,9 @@ const PS_REL = 'tests/panel-source.js';
 //   两个口径都对，但**不能混用** —— 本仓已有多次「两个口径各算一遍」的教训。
 //   本锁一律用 split 口径（与下面 panelSourceLines() 的实现同源）。
 //   为什么记行数：它是「面没塌」的粗读数 —— 若有人把段体删了一截，重组行数会变。
-const BASE_PANEL_LINES = 17421;
+//   v2.400.0（V22 后续修正）：17421 → 17577。重组面的语义是「假如没拆，
+//   v22OmensBlock 应该就在 panel.js 里」—— 它现在收进段体后真的回去了。
+const BASE_PANEL_LINES = 17577;
 // 拆后 panel.js 自己的行数（split 口径；拆前 17421 - 段体 335 + 转发块 41 = 17127）。
 //   注意：这个数会随转发块注释的字数变动 —— 它是「面没塌」的粗读数，不是精确不变量。
 //   真正的不变量是 D3a（重组面 === 拆前面，逐字相等），那一条按行拼接算，
@@ -645,7 +647,10 @@ const BASE_PANEL_LINES = 17421;
 //   ⚠ 这条断言仍保持**精确等于**而不是 `<=` 或区间：它的价值正是「面没塌」的粗读数，
 //     写成区间等于把「又悄悄加了 50 行」放过去。改动它必须同时给出理由（本节就是）。
 const BASE_PANEL_FILE_LINES = 17132;
-const BASE_BODY_LINES = 335;           // 段体行数（含首含尾）
+//   v2.400.0（V22 后续修正）：335 → 491。EXV22-9 把 v22OmensBlock 写在段体标记
+//   之外（重组面里定义缺席、调用在场 ⇒ 假源码），本次把段体结束标记移回函数之后，
+//   段体收编 v22 块的 156 行。段体 esc 调用同步 57 → 60（v22 块 3 处）。
+const BASE_BODY_LINES = 491;           // 段体行数（含首含尾）
 function runD(A) {
   const ps = require(path.join(BASE, PS_REL));
   // ── D1 结构 ──
@@ -659,12 +664,19 @@ function runD(A) {
   A(body.indexOf('require(') < 0, 'D1e 段体零 require（ui 层是 vm.runInContext 装载，没有 module 作用域）');
   A(body.indexOf('module.exports') < 0, 'D1f 段体零 module.exports（同上）');
   //   零控件零 id：这是它能被安全搬走的**前提**，也是既有锁（G17 / overview-fold A6）钉住的纪律
-  A(body.indexOf('id="') < 0, 'D1g 段体零 id（零控件 ⇒ 不触碰 UI 绑定守卫 G17）');
+  //   v2.400.0（V22 后续修正）：v22 块的注释里写着「零 `<button>`/`<input>`/`id=\"`」的
+  //   纪律说明 —— 纯文本扫描把说明文字当成了控件（「判据被说明文字满足」的镜像）。
+  //   修法与 D5a 同款：在**去注释面**上查。字符串里真出现 '<button' 照样会命中（模板串拼
+  //   进 innerHTML 的就是它们），只有注释里的说明文字会消失 —— 这正是要区分的两件事。
+  const bodyNC = stripComments(body);
+  A(bodyNC.indexOf('id="') < 0, 'D1g 段体零 id（去注释面上查；零控件 ⇒ 不触碰 UI 绑定守卫 G17）');
   const ctrlTags = ['<button', '<input', '<select', '<textarea'];
-  const ctrlHit = ctrlTags.filter(function (t) { return body.indexOf(t) >= 0; });
-  A(ctrlHit.length === 0, 'D1h 段体零控件（实命中 ' + ctrlHit.length + ' 种：' + ctrlHit.join(',') + '）');
-  //   七个函数一个不少（少一个就少一块诊断，而面板照常渲染 ⇒ 零读数）
-  const FN = ['foldCard', 'evictBlock', 'randBlock', 'clockBlock', 'bridgeBlock', 'lonshaBlock', 'heartbeatBlock'];
+  const ctrlHit = ctrlTags.filter(function (t) { return bodyNC.indexOf(t) >= 0; });
+  A(ctrlHit.length === 0, 'D1h 段体零控件（去注释面上查；实命中 ' + ctrlHit.length + ' 种：' + ctrlHit.join(',') + '）');
+  //   八个函数一个不少（少一个就少一块诊断，而面板照常渲染 ⇒ 零读数）
+  //   v2.400.0（V22 后续修正）：v22OmensBlock 收进段体后，本表从七项补为八项 ——
+  //   此前它不在段体里，本表数不到它，正是「定义在标记外」漏网的一环。
+  const FN = ['foldCard', 'evictBlock', 'randBlock', 'clockBlock', 'bridgeBlock', 'lonshaBlock', 'heartbeatBlock', 'v22OmensBlock'];
   const missFn = FN.filter(function (n) { return body.indexOf('  function ' + n + '(') < 0; });
   A(missFn.length === 0, 'D1i 七个函数一个不少（缺 ' + missFn.length + ' 个：' + missFn.join(',') + '）');
   // ── D2 逐字：段体行数与内容 ──
@@ -713,7 +725,7 @@ function runD(A) {
       try { out = String(WA.panelOverviewBlocks[k]() || ''); } catch (e) { out = ''; }
       if (out.length > 40) nonEmpty.push(k);
     });
-    A(nonEmpty.length === 6, 'D4d 六块各自产出非空读数（实 ' + nonEmpty.length + '/6）—— 漏注入/漏装载都会让这里归零');
+    A(nonEmpty.length === 7, 'D4d 七块各自产出非空读数（实 ' + nonEmpty.length + '/7；v22 块收进段体后 FN.slice(1) 已含它）—— 漏注入/漏装载都会让这里归零');
     //   真实渲染路径：点页签 → renderBody → innerHTML 解析 → bindBody
     const panel = dom.getElementById('wa-panel');
     const tab = panel && panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === 'overview'; })[0];
@@ -780,7 +792,7 @@ function runD(A) {
     'D5a2 注释面上也有这句字样（证明 D5a 的 stripComments 是必要的，不是空转）');
   //   反向：段体里 esc 调用次数与拆前一致（57 处）—— 少一处就说明搬迁时改动了逻辑
   const escCalls = (body.match(/(^|[^\w$.])esc\s*\(/g) || []).length;
-  A(escCalls === 57, 'D5b 段体 esc 调用 57 处（实 ' + escCalls + '）—— 搬迁不得改动任何一处转义点');
+  A(escCalls === 60, 'D5b 段体 esc 调用 60 处（实 ' + escCalls + '；335 行时代 57 处 + v22 块 3 处）—— 搬迁不得改动任何一处转义点');
   //   段模块自己的 esc 兜底必须是**恒等**（不转义）：否则 bind 之前就凭空多一份转义实现
   A(blk.indexOf("let esc = function (s) { return String(s == null ? '' : s); };") > 0,
     'D5c 段模块的 esc 兜底是恒等（不制造第二份转义实现）');
