@@ -4097,6 +4097,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'panelOverviewMain',
       'panelToolsPage',
       'uiDashboards',
+      // v2.401.0(OPV23-4): ui/pages/overview-blocks.js 同款补登记（OPV22-4 拆出的第四段）。
+      'panelOverviewBlocks',
     ];
   function secModules() {
     const missing = [], loaded = [], optionalMissing = [];

@@ -52,7 +52,8 @@ const PANEL = path.join(BASE, 'ui/panel.js');
 const DIAG = path.join(BASE, 'engines/tool-diag.js');
 function src(p) { return fs.readFileSync(p, 'utf8'); }
 function auditSrc() { return src(AUDIT); }
-function panelSrc() { return src(PANEL); }
+function panelSrc() { // v2.401.0(OPV23): panel 模板拆进 ui/pages/*.js，改读 panelSource() 重组面（与拆前逐字相等）
+  return require('./panel-source.js').panelSource(); }
 function diagSrc() { return src(DIAG); }
 // ── 两个真源码破坏锚点（各须恰中 1 次）──
 //   锚点选的是**判据所依赖的那一行**，不是随便一处代码：

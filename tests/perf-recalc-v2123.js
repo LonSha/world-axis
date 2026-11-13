@@ -45,7 +45,9 @@ const gate = require('./ui-gate-sync.js');
 const BASE = path.join(__dirname, '..');
 const BUDGET = 'engines/inject-budget.js', INJECT = 'render/inject.js', PERF = 'engines/perf-trace.js';
 const DIAG = 'engines/tool-diag.js', PANEL = 'ui/panel.js';
-function src(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function src(rel) { // v2.401.0(OPV23): panel.js 改读 panelSource() 重组面，其余文件照读磁盘
+  if (rel === 'ui/panel.js') return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function hits(s, x) { return s.split(x).length - 1; }
 function must1(s, x, tag) { const n = hits(s, x); if (n !== 1) throw new Error('锚点命中 ' + n + ' 次（要求恰 1 次）: ' + tag + ' :: ' + x.slice(0, 70)); return n; }
 function intersect(x, y) { return x.filter(function (k) { return y.indexOf(k) >= 0; }); }

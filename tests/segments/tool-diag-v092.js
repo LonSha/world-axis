@@ -22,7 +22,7 @@
  */
 module.exports = async function toolDiagV092(ctx) {
   // 外部符号解构：段内代码保持逐字不变（不改成 ctx.WA.xxx 这种改写）。
-  const { BASE, WA, assert, assertDeepEq, fs, path, section } = ctx;
+  const { BASE, WA, assert, assertDeepEq, fs, path, section, panelSource } = ctx;
   section('engines/tool-diag v0.9.2');
   assert(WA.toolDiag && typeof WA.toolDiag.collect === 'function', '诊断引擎已导出');
   const dg = WA.toolDiag.collect();
@@ -2502,6 +2502,12 @@ module.exports = async function toolDiagV092(ctx) {
   };
   const srcCache = {};
   const readSrc = function (rel) {
+    // v2.401.0(OPV23): panel 模板拆进 ui/pages/*.js —— 读 panel.js 走 panelSource() 重组面
+    //   （与拆前逐字相等），其余文件照读磁盘。缓存在 srcCache 里，语义不变。
+    if (rel === 'ui/panel.js') {
+      if (!srcCache[rel]) srcCache[rel] = panelSource();
+      return srcCache[rel];
+    }
     if (!srcCache[rel]) srcCache[rel] = fs.readFileSync(path.join(BASE, rel), 'utf8');
     return srcCache[rel];
   };
@@ -3326,7 +3332,7 @@ module.exports = async function toolDiagV092(ctx) {
   // ═══════════════════════════════════════════════════════════
   v0152: {
   // ── 1. panel 源码断言：按钮 + 二次确认绑定已注入 ──
-  const panelSrc152 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  const panelSrc152 = readSrc('ui/panel.js'); // v2.401.0(OPV23): 改读 panelSource() 重组面
   assert(panelSrc152.indexOf('wa-key-check') >= 0 && panelSrc152.indexOf('存储键体检') >= 0, '面板含「存储键体检」按钮');
   assert(panelSrc152.indexOf('wa-key-sweep-go') >= 0 && panelSrc152.indexOf('确认清理（不可撤销）') >= 0, '体检走二次确认制（dry-run 计划先展示）');
   // v2.5.0: apply 段的参数随「幽灵设置键」出口扩了一维（ghostSettings），
@@ -3419,7 +3425,7 @@ module.exports = async function toolDiagV092(ctx) {
   assert(WA.errorLog.length === 0 && global.localStorage.getItem('worldaxis_error_log_' + cid153) === null, 'clearEventLog 同时清内存与持久 error 子环');
 
   // ── 7. 面板「仅看错误」开关（源码断言）──
-  const panelSrc153 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  const panelSrc153 = readSrc('ui/panel.js'); // v2.401.0(OPV23): 改读 panelSource() 重组面
   assert(/wa-log-err/.test(panelSrc153) && /仅看错误/.test(panelSrc153), '面板含「仅看错误」开关');
   // 边界严格断言：WA.errorLog 后不得紧跟标识符字符（防 errorLogGone 类前缀蒙混）
   assert(/WA\.errorLog[^A-Za-z0-9_]/.test(panelSrc153) && /__logErrOnly\s*=\s*!__logErrOnly/.test(panelSrc153), '开关切换 errorLog 子环视图');
@@ -3484,7 +3490,7 @@ module.exports = async function toolDiagV092(ctx) {
   assert(w4_154 === w3_154, '清理后空集不告警（' + w3_154 + ' 恒定）');
 
   // ── 6. 面板按钮（源码断言，词边界严格版）──
-  const panelSrc154 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  const panelSrc154 = readSrc('ui/panel.js'); // v2.401.0(OPV23): 改读 panelSource() 重组面
   assert(/id="wa-err-report"/.test(panelSrc154) && /on\('#wa-err-report'/.test(panelSrc154), '「复制错误报告」按钮 id 与绑定成对');
   assert(/buildErrorReport[^A-Za-z0-9_]/.test(panelSrc154), '面板调用 buildErrorReport（词边界）');
 
