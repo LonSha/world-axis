@@ -40,7 +40,16 @@ const LINE_ENGINES = [
 ];
 // 八台有 reset 的引擎（上七台 + 打包器）
 const RESET_ENGINES = LINE_ENGINES.concat([['engines/handoff-pack.js', 'handoffPack', '一键交班']]);
-function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function rd(rel) {
+  // v2.401.0：`ui/panel.js` 走 panel-source 的**重组面**（与 first-run-ui-v2271 /
+  //   delete-gate-v2124 / overview-fold-v2254 同规）。理由是本文件 A4 自 OPV23 拆段起
+  //   就红着：`#wa-gauge-reset` 已随 OPV23-2 搬进 `ui/pages/tools-page.js`，而这里
+  //   仍直读 panel.js 单文件 ⇒ 计数恒 0。判据的输入面比事实窄，结论就会稳定地错
+  //   —— 这正是 tests/panel-source.js 文件头记的那一族（本仓第九次同型）。
+  //   换成重组面后四条（A4/A4b/A5/A5b）全部为真，且断言字面量一条未改。
+  if (rel === PANEL_REL) return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
 function cnt(s, n) { return s.split(n).length - 1; }
 function j(x) { return JSON.stringify(x); }
 /**

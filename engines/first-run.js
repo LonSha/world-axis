@@ -157,9 +157,17 @@
     if (s === 'todo' || s === 'unconfigured') return 'todo';
     return 'cannot-tell';
   }
+  // v2.401.0（玩家动线收口）：出口从 `openSettings` 改成 `openConnect`。
+  //   缺陷现场：原出口把玩家送到**设置页**，提示还写着「在设置页『接口』一格填
+  //   Base URL / API Key / 模型」—— 而 `ui/settings.js` 全文没有任何 baseUrl /
+  //   apiKey 命中，**设置页根本没有那一格**（玩家照提示去找，找不到，动线在此断）。
+  //   真正能填 API 的是 connect 页：`renderConnect()` 逐通道出
+  //   `wa-ch-base / wa-ch-key / wa-ch-model / wa-ch-save`，且 v2.255.0 SIMPLIFY-NAV
+  //   已把它的页签文案改成「API」（id 不动），正是为「玩家第一步」准备的。
+  //   出口与目的地必须同宽：判据读 apiRouter，出口就该指向写 apiRouter 的那一页。
   const STEPS = [
     { id: 'api', order: 1, title: '配一个 API', why: '没有它，插件不会说话',
-      probe: probeApi, exit: { do: 'openSettings', hint: '在设置页「接口」一格填 Base URL / API Key / 模型' } },
+      probe: probeApi, exit: { do: 'openConnect', hint: '在「API」页填第一个通道（default）的 Base URL / API Key / 模型，点保存' } },
     { id: 'tier', order: 2, title: '选一个档位', why: '100 项机制出厂只跑 5 项',
       probe: probeTier, exit: { do: 'applyTier', arg: 'standard', hint: '在设置页顶部切「标准」档，一次多开一批机制' } },
     { id: 'talk', order: 3, title: '说第一句话', why: '世界要等你开口才动',

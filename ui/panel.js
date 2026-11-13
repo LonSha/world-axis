@@ -4509,10 +4509,15 @@ ${emptyDrill}
     if(changesOn)changesOn.onchange=()=>{WA.worldChanges.setSettings({enabled:changesOn.checked});renderBody();};
     // v2.271.0（V6 EXV6-7）：开局引导「去做」按钮的点击实现。
     //   出口来自引擎 next()（面板不自己编动作）；本处置的是「点了之后该去哪」：
+    //     · openConnect ⇒ 切到 API 页（唯一能填 Base URL / API Key / 模型的页）；
     //     · openSettings / applyTier ⇒ 切到设置页（切档按钮在那一格）；
     //     · openOverview ⇒ 已经在概览页，只需提示「回对话说一句」。
     //   为什么不在这里直接切档：切档要逐引擎真写并复核（capabilityTier.applyTier 的事），
     //   面板越权调用等于把「部分成功」报成「已开启」——那是已付过价的形态。
+    //   v2.401.0：新增 openConnect 一支。此前 api 步的出口是 openSettings，而设置页
+    //   没有任何 API 输入格（见 engines/first-run.js STEPS 的说明）—— 玩家被送到
+    //   一个填不了的地方，动线第一步就断。目的地必须与判据同宽：probeApi 读 apiRouter，
+    //   出口就该指向写 apiRouter 的那一页。
     try {
       panelEl.querySelectorAll('[data-first-go]').forEach(function (b) {
         if (typeof b.onclick === 'function') return;   // 幂等：重入不叠处理器
@@ -4522,6 +4527,11 @@ ${emptyDrill}
           const action = nx ? nx.do : 'openSettings';
           if (action === 'openOverview') {
             setOut('#wa-first-out', '回对话里随便说一句即可（推演会随即开始）');
+            return;
+          }
+          if (action === 'openConnect') {
+            if (WA.ui && typeof WA.ui.goPage === 'function') WA.ui.goPage('connect');
+            if (nx && nx.hint) setOut('#wa-first-out', nx.hint);
             return;
           }
           if (WA.ui && typeof WA.ui.goPage === 'function') WA.ui.goPage('settings');

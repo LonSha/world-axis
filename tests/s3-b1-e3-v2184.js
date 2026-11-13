@@ -36,7 +36,14 @@ const CK_IDS = ['wa-ck-enabled', 'wa-ck-name', 'wa-ck-save', 'wa-ck-list', 'wa-c
   // v2.197.0（Y3）：另开计划的两枚控件（新世界顶层键输入 + 只读计划按钮）。
   'wa-ck-newkey', 'wa-ck-plan',
   'wa-ck-out'];
-function readOf(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+// v2.401.0：`ui/panel.js` 走 panel-source 的**重组面**（与 first-run-ui-v2271 /
+//   gauge-wire-v2274 / s3-sp6-v2158 / s3-tx5-v2164 同规）。OPV23 把工具页搬进
+//   ui/pages/tools-page.js 后，存档槽那一整段（含分区标题与分工说明）不在
+//   panel.js 单文件里了 —— 直读单文件必然读成「界面没写」。断言字面量未改。
+function readOf(rel) {
+  if (rel === PANEL) return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
 
 // ── A 段：静态契约 ───────────────────────────────────────────────────────
 function runA(a) {

@@ -143,6 +143,34 @@ function runAll(assertFn) {
     a(dom.querySelector('.wa-body') !== null, 'v2271ui/B3b: 点完之后面板仍在（没炸）');
   }
 
+  // ── B4 出口与目的地**同宽**（v2.401.0）──────────────────────────────────
+  //   它治什么：api 步的判据是 `apiRouter`（probeApi 读它），而**写它的地方只有
+  //   connect 页**（renderConnect 的 wa-ch-* 三输入 + wa-ch-save 落 setChannel）。
+  //   `ui/settings.js` 全文没有任何 baseUrl / apiKey 命中 —— 设置页根本没有那一格。
+  //   此前出口是 `openSettings`，提示还写着「在设置页『接口』一格填」，玩家照提示
+  //   找过去，那里什么都没有：动线第一步就断，而所有既有断言都是绿的
+  //   （它们只咬「按钮在、点了会切页」，没咬「切到的那一页能不能做这件事」）。
+  //   这条断言咬的正是那个缺口：目的地必须是 connect。
+  {
+    const env = freshEnv();
+    pageHtml(env, 'overview');
+    const dom = env.dom;
+    const WA = env.WA;
+    // ① 引擎侧：出口动作就是 openConnect（不是 openSettings）
+    const nx = (WA.firstRun && typeof WA.firstRun.next === 'function') ? WA.firstRun.next('api') : null;
+    a(!!nx && nx.do === 'openConnect', 'v2271ui/B4a: api 步的出口动作是 openConnect（实 ' + j(nx && nx.do) + '）');
+    a(!!nx && String(nx.hint || '').indexOf('设置页') < 0, 'v2271ui/B4b: 提示不再指向设置页（那里没有 API 输入格）');
+    // ② 面板侧：点「去做」真的落在 connect 页
+    const btn = dom.querySelector('[data-first-go="api"]');
+    a(!!btn && typeof btn.onclick === 'function', 'v2271ui/B4c: api 步「去做」真绑上处理器');
+    if (btn && btn.onclick) btn.onclick();
+    a(WA.ui.currentPage() === 'connect', 'v2271ui/B4d: 点击后停在 API 页（当前 ' + j(WA.ui.currentPage()) + '）');
+    // ③ 落地那一页**真的有**能填 API 的控件（同宽判据的另一半：不是「切对了页」就够）
+    const html = String((dom.getElementById('wa-panel').querySelector('.wa-body') || {}).innerHTML || '');
+    a(html.indexOf('wa-ch-base') >= 0 && html.indexOf('wa-ch-key') >= 0 && html.indexOf('wa-ch-model') >= 0,
+      'v2271ui/B4e: 落地页真有 Base URL / API Key / 模型三格（出口与目的地同宽）');
+  }
+
   // ── C 设置页控件与绑定 ────────────────────────────────────────────────
   {
     const env = freshEnv();

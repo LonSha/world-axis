@@ -47,7 +47,15 @@ const ANCHOR_META_SKELETON = 'lastSettle: null, initFrom: null }';
 const ANCHOR_RETAIN_NOTE = 'const RETAIN_NOTE =';
 
 function countOcc(s, sub) { return s.split(sub).length - 1; }
-function read(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+// v2.401.0：`ui/panel.js` 走 panel-source 的**重组面**（与 first-run-ui-v2271 /
+//   gauge-wire-v2274 / delete-gate-v2124 / overview-fold-v2254 同规）。OPV23 把
+//   概览主线 / 工具页 / 四大盘搬进 ui/pages/*.js 之后，直读 panel.js 单文件的
+//   计数会恒为 0 —— 判据的输入面比事实窄，结论就稳定地错（本仓第十次同型）。
+//   断言字面量一条未改，只把输入面换回重组面。
+function read(rel) {
+  if (rel === REL_PANEL) return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
 function ov(file, src) { const o = {}; o[file] = src; return o; }
 function clone(v) { return JSON.parse(JSON.stringify(v)); }
 function freshW(o) { return sync.fresh(o ? { srcOverride: o } : {}).WA; }
