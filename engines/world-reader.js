@@ -138,7 +138,7 @@
     };
 
     return {
-      ok: true, ver: '2.405.0', at: Date.now(),
+      ok: true, ver: '2.406.0', at: Date.now(),
       clock: (s.clock && s.clock.label) ? txt(s.clock.label, 60) : '',
       people: people, currents: currents, facts: facts,
       choices: choices, foreshadows: foreshadows,
@@ -158,68 +158,84 @@
     }
     const line = function (cls, html) { return '<div class="' + cls + '">' + html + '</div>'; };
     const parts = [];
+    // v2.406.0：卡片头——「世界脉搏」标题 + 脉搏徽章（收紧/松下来/维持现状/无读数）。
+    //   措辞仍全部来自引擎（不造第二真源）；徽章只是把已有 trend 措辞放进稳定 class。
+    //   头单独进 head 变量不算正文段——quiet 判定只看正文段（v2.406 修正：头入 parts
+    //   曾让空世界永远渲染成只有头没有内容的伪 live）。
+    let pulseBadge = '<span class="wa-world-badge wa-world-badge-steady">安静</span>';
+    if (snap.pulse) {
+      const trMap = { rising: '收紧', falling: '松下来', steady: '维持' };
+      pulseBadge = '<span class="wa-world-badge wa-world-badge-' + esc(snap.pulse.trend || 'steady') + '">'
+        + esc(trMap[snap.pulse.trend] || '维持') + '</span>';
+    }
+    const head = line('wa-world-head', '<b>世界脉搏</b>' + pulseBadge);
 
     // 段一：谁在哪、要做什么（人物公开动线）
     const ppl = snap.people.filter(function (p) { return p.loc || p.act || p.intent; });
     if (ppl.length) {
-      parts.push(line('wa-ppl-line', '<b>谁在哪、要做什么</b>'));
+      parts.push(line('wa-sec wa-sec-ppl', '<b>谁在哪、要做什么</b>'));
       ppl.slice(0, 5).forEach(function (p) {
         const seg = [p.loc, p.act, p.intent].filter(Boolean).join('，');
-        parts.push(line('wa-ppl-row', esc(p.name) + (seg ? ' — ' + esc(seg) : '（行踪未定）')));
+        parts.push(line('wa-ppl-row', '<span class="wa-world-name">' + esc(p.name) + '</span>'
+          + (seg ? '<span class="wa-world-sep"> — </span><span class="wa-world-val">' + esc(seg) + '</span>'
+          : '<span class="wa-world-sep">（行踪未定）</span>')));
       });
     }
 
     // 段二：哪条线在动（可见暗流，玩家视角措辞）
     if (snap.currents.length) {
-      parts.push(line('wa-cur-line', '<b>哪些事正在动</b>'));
+      parts.push(line('wa-sec wa-sec-cur', '<b>哪些事正在动</b>'));
       snap.currents.slice(0, 4).forEach(function (c) {
         parts.push(line('wa-cur-row',
-          '<b>' + esc(c.title) + '</b>（' + esc(c.stageText) + ' · ' + esc(c.visText) + '）'
-          + (c.summary ? ' ' + esc(c.summary) : '')));
+          '<span class="wa-world-name">' + esc(c.title) + '</span>'
+          + '<span class="wa-world-badge wa-world-badge-stage">' + esc(c.stageText) + '</span>'
+          + '<span class="wa-world-badge wa-world-badge-vis">' + esc(c.visText) + '</span>'
+          + (c.summary ? '<div class="wa-world-val">' + esc(c.summary) + '</div>' : '')));
       });
     }
 
     // 段三：你的抉择（两源选择，v2.404 回流数据首次亮给玩家面）
     if (snap.choices.length) {
-      parts.push(line('wa-cho-line', '<b>你的抉择</b>'));
+      parts.push(line('wa-sec wa-sec-cho', '<b>你的抉择</b>'));
       snap.choices.slice(0, 4).forEach(function (c) {
-        const tail = c.st === 'chosen'
-          ? (c.pick ? '选了「' + esc(c.pick) + '」' : '已选择')
-            + (c.applied ? '（已兑现）' : '（正被世界结算）')
-          : '等你决定';
-        parts.push(line('wa-cho-row', esc(c.q) + ' — ' + tail));
+        const badge = c.st === 'chosen'
+          ? '<span class="wa-world-badge wa-world-badge-chosen">' + (c.applied ? '已兑现' : '结算中') + '</span>'
+          : '<span class="wa-world-badge wa-world-badge-open">等你决定</span>';
+        parts.push(line('wa-cho-row',
+          '<span class="wa-world-name">' + esc(c.q) + '</span>' + badge
+          + (c.st === 'chosen' && c.pick ? '<span class="wa-world-val">选了「' + esc(c.pick) + '」</span>' : '')));
       });
     }
 
     // 段四：埋着的线（伏笔）与脉搏——有才出，不占屏
     if (snap.foreshadows.length) {
-      parts.push(line('wa-fs-line', '<b>埋着的线</b>'));
+      parts.push(line('wa-sec wa-sec-fs', '<b>埋着的线</b>'));
       snap.foreshadows.slice(0, 3).forEach(function (f) {
-        parts.push(line('wa-fs-row', esc(f.content)));
+        parts.push(line('wa-fs-row', '<span class="wa-world-val">' + esc(f.content) + '</span>'));
       });
     }
     if (snap.pulse && (snap.pulse.note || snap.pulse.pressure > 0)) {
       const tr = { rising: '世界在收紧', falling: '世界在松下来', steady: '世界维持现状' };
       parts.push(line('wa-pulse-row', esc(tr[snap.pulse.trend] || '世界维持现状')
-        + (snap.pulse.note ? '：' + esc(String(snap.pulse.note)) : '')));
+        + (snap.pulse.note ? '<span class="wa-world-sep">：</span><span class="wa-world-val">' + esc(String(snap.pulse.note)) + '</span>' : '')));
     }
 
-    // quiet：四段全空 = 世界还没动静，一句话收住不占屏
+    // quiet：四段全空 = 世界还没动静，一句话收住不占屏（头也要，但正文零段才 quiet）
     if (!parts.length) {
-      return '<div class="wa-world-card wa-world-quiet" id="wa-world-pulse-card">'
+      return '<div class="wa-world-card wa-world-quiet" id="wa-world-pulse-card">' + head
         + '世界暂时风平浪静。</div>';
     }
     return '<div class="wa-world-card wa-world-live" id="wa-world-pulse-card">'
-      + parts.join('') + '</div>';
+      + head + parts.join('') + '</div>';
   }
 
   WA.worldReader = {
     snapshot: snapshot,
     renderCard: renderCard,
-    ver: '2.405.0'
+    ver: '2.406.0'
   };
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('engines/world-reader.js', { kind: 'engine', ver: '2.405.0' });
+    WA.registerModule('engines/world-reader.js', { kind: 'engine', ver: '2.406.0' });
   }
   if (WA.log) WA.log('info', '世界读数通道已加载（只读聚合）');
 })();

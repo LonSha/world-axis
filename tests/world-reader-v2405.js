@@ -91,7 +91,7 @@ function runAll(assertFn) {
   a(card.indexOf('哪些事正在动') >= 0 && card.indexOf('北门密约') >= 0, 'D3 段二：可见暗流带玩家措辞');
   a(card.indexOf('在推进') >= 0 && card.indexOf('你已知情') >= 0, 'D4 stage/visibility 出玩家话（不是原始桶值）');
   a(card.indexOf('你的抉择') >= 0 && card.indexOf('等你决定') >= 0, 'D5 段三：open 选择出「等你决定」');
-  a(card.indexOf('选了「公开」') >= 0 && card.indexOf('正被世界结算') >= 0, 'D6 chosen 未兑现出「正被世界结算」');
+  a(card.indexOf('选了「公开」') >= 0 && card.indexOf('结算中') >= 0, 'D6 chosen 未兑现出「结算中」徽章（v2.406.0 措辞）');
   a(card.indexOf('埋着的线') >= 0 && card.indexOf('墙上的划痕') >= 0, 'D7 段四：伏笔玩家话');
   a(card.indexOf('世界在收紧') >= 0, 'D8 脉搏 trend 出玩家话');
   // 信息边界硬红线：trace/hidden/已结束 一律不上玩家面
@@ -126,7 +126,7 @@ function runAll(assertFn) {
   // ── N 面：引擎源锚点自证 ──
   const wr = fs.readFileSync(path.join(BASE, 'engines/world-reader.js'), 'utf8');
   a(cnt(wr, "WA.worldReader = {") === 1, 'N1 引擎导出锚恰 1 次');
-  a(cnt(wr, "ver: '2.405.0'") === 3, 'N2 版本锚 3 处（snapshot.ver + API.ver + registerModule）');
+  a(cnt(wr, "ver: '2.406.0'") === 3, 'N2 版本锚 3 处（snapshot.ver + API.ver + registerModule，v2.406.0 排版轮推进）');
   a(cnt(wr, 'visibility === \'known\'') === 1 && cnt(wr, "visibility === 'direct'") === 1,
     'N3 信息边界过滤锚在引擎源中恰在位');
   const idxSrc = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
