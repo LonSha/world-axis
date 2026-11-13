@@ -7078,7 +7078,9 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - **版本面**：VERSION/manifest → 2.406.0；白名单 widen（13 alternation + 13 数组）；version-surface-gate 14/14；三账本 --update（version=2.406.0）；q9 67/0；q1 64/0。
 - **快档批次**：--only-v-section=v2.405（覆盖 405+406 两节）隔离跑 **passed，通过 2222 / 失败 0**（digest 27abf849）。过程插曲（登记）：上一轮 v2.405 终验批次占全局回归锁致快档两度被拒（Regression lock unavailable），且该终验跑的是启动时的旧树快照已过时——SIGTERM 清掉后重跑成功。
 - 未做（如实登记）：三缝（增量阅读书签/总结接口适配层/导演调度）已侦察未实施（R246 遗留排队）；全量回归未跑。
-
 ## R247（v2.406.0 · 收尾读数）
+
+- **BUILD_ID** → `99274cbccab1f5e16506c7f94b07cdc712b168e8`（首笔 `v2.406.0: 世界脉搏统一卡完整排版——卡片壳/徽章体系/quiet态修正（R247）`，25 文件 +356/−151）。q1 复验通过。
+
 
 
