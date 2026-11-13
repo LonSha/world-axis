@@ -22455,6 +22455,13 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runScript('./cold-start-v2403.js');
   }
+  // ── v2.404.0：选择回流（choices_recent 快照面 + 选择结算义务条款）──────────
+  //   两源合并（storyChoice.points + branchTree.nodes）真回流推演快照；
+  //   chosen=必须结算（events_update/create + currents 起线，causes 引用选择 id）
+  section('v2.404.0: 选择回流专锁（choices_recent 两源回流 / 结算义务条款 / open反代写边界）');
+  {
+    await runScript('./choice-reflux-v2404.js');
+  }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
   //   核心判据是「声明 vs 现场静态扫描」双向对账 —— 不做对账，声明表只是文档。

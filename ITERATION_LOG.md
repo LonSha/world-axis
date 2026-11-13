@@ -7045,3 +7045,12 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - **版本面**：VERSION/manifest → 2.403.0；14 文件跟随型白名单 widen 到 403（version-surface-gate 14/14 绿）；dead-export / module-registry 账本 --update（version=2.403.0）；evidence-index --write（550 条，stale 46 清偿，q9 67/0）；o6-layer-gate 71/0（现场复算，无钉死）。
 - **快档批次**：--only-v-section=v2.402.0+v2.403.0 隔离跑 passed，通过 2223 / 失败 0（digest 61d07a78，版本面升版前形态；收尾形态终验见下）。
 - 未做（如实登记）：全量回归未跑；「选择回流」（branchTree 显式注入推演快照）留待下一轮，涉及 story-choice 默认值的产品决策。
+
+## R245（v2.404.0 · 选择回流）
+
+- **病灶（R245）**：玩家在 branchTree/storyChoice 确认的选择，推演模型看不见——快照里没有它，契约里没人要求结算它。选择记了账，但世界推不出后果：分支没分支、后果没后果、暗线没暗线。与 v2.403.0 同型：那次是「契约由构造即死」，这次是「输入由构造缺席」。
+- **修复（engines/backstage.js）**：① compactState 新增 choices_recent 面：两源合并（storyChoice.points 走 commit 兑现链的正式选择 + branchTree.nodes 轻量分叉记账），三档口径 chosen=必须结算（pick 带玩家选择、opts 收空省 token）/ open=悬挂线索（给全选项，模型可预判各分支含义）/ applied=已兑现照常推进；按 round 降序取最近 6 条，零选择时空数组零 token。② 输出契约新增「选择结算义务」条款：st=chosen 的条目必须用 events_update 推进事件链（或 events_create 新建由该选择直接触发的事件）并用 currents 起线至少 1 条暗流（causes 引用该选择的 id）；st=open 不替玩家做决定，但可为各选项预埋 trace 伏笔。
+- **专锁 tests/choice-reflux-v2404.js 20/0**：真数据驱动——store.transact 种入真实形态的两源选择点，buildPrompt 真返回后断言快照含 choices_recent、open/chosen 两档字段正确、branchTree 源回流、round 降序；契约条款锚点恰 1 次；v2.403.0 两项成果（起线义务/suppress 边界）不回退。
+- **版本面**：VERSION/manifest → 2.404.0；14 文件白名单 widen 到 404（12 处 alternation + 13 处数组）；version-surface-gate 14/14；dead-export/module-registry 账本 --update（version=2.404.0）；evidence-index --write（551 条，choice-reflux 新入账 wired+1）。
+- **复验**：cold-start-v2403 29/0（v2.403.0 成果不回退）、rel-contract-v2600 23 项 pass（契约节字段对账）。
+- 未做（如实登记）：全量回归未跑；storyChoice 引擎本身仍默认关（enabled:false）——本轮只打通「确认过的选择必须被推演结算」的回流管道，选择点的「呈现→确认」入口（面板/正文 <choice> 标签）的产品决策留待下一轮。

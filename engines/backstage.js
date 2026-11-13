@@ -244,6 +244,34 @@
       currents: (s.currents || []).filter(c => !['已结束', 'closed'].includes(c.stage)).slice(0, 10).map(c => ({
         id: c.id, t: c.title, v: c.visibility, pub: c.publicity || 'private', st: c.stage, s: (c.summary || '').slice(0, 120)
       })),
+      // v2.404.0 选择回流：玩家确认过的选择是**必须结算的显式输入**。病灶（R245）：
+      //   推演模型只看「世界现在的样子」，看不到「世界为什么变成这样」——它在
+      //   branchTree/storyChoice 里确认的选择推不出后果：分支没分支、后果没后果。
+      //   三档口径：chosen=必须结算；open=悬挂线索（给全选项，模型可预判各分支含义）；
+      //   applied=已兑现（照常结算但注明）。零选择时数组为空，零 token。
+      choices_recent: (() => {
+        // v2.404.0 两源合并：storyChoice.points（走 commit 兑现链的正式选择）+
+        //   branchTree.nodes（轻量分叉记账：只有 prompt/options/choice，无 ops 兑现链）。
+        //   branchTree 的 fork 也是「模型在正文给选项」的来源，同样回流；同 id 同源去重。
+        const scPts = (s.storyChoice && Array.isArray(s.storyChoice.points)) ? s.storyChoice.points : [];
+        const btNodes = (s.branchTree && Array.isArray(s.branchTree.nodes)) ? s.branchTree.nodes : [];
+        const rows = [];
+        scPts.forEach(p => rows.push({
+          id: p.id, round: p.round, q: (p.prompt || '').slice(0, 80),
+          st: p.chosenAt > 0 ? 'chosen' : 'open',
+          pick: p.choice || '', applied: p.appliedAt > 0, src: 'sc',
+          opts: p.chosenAt > 0 ? [] : (p.options || []).map(o => o.label).filter(Boolean).slice(0, 6)
+        }));
+        btNodes.forEach(n => rows.push({
+          id: n.id, round: n.round, q: (n.prompt || '').slice(0, 80),
+          st: n.chosenAt > 0 ? 'chosen' : 'open',
+          pick: n.choice || '', applied: false, src: 'bt',
+          opts: n.chosenAt > 0 ? [] : (n.options || []).filter(Boolean).slice(0, 6)
+        }));
+        const seen = {}; const uniq = [];
+        rows.sort((a, b2) => (b2.round || 0) - (a.round || 0)).forEach(r => { if (!seen[r.id + ':' + r.src]) { seen[r.id + ':' + r.src] = 1; uniq.push(r); } });
+        return uniq.slice(0, 6);
+      })(),
       echoes_recent: (s.echoes || []).slice(-5).map(e => ({ r: e.refCurrent, res: (e.result || '').slice(0, 80) })),
       foreshadows: (s.memory.foreshadows || []).filter(f => f.status === 'waiting' || f.status === 'developing').slice(0, 8).map(f => ({ id: f.id, c: f.content.slice(0, 60), st: f.status })),
       opinion_top: (s.opinion.canon || []).slice(-3).map(o => ({ t: o.title || o, cl: o.claim_status || '' })),
@@ -681,7 +709,10 @@
         // v2.403.0 冷启动起线：规则5 本来就把「正文」列为合法 cause 源，但旧尾句「宁缺毋滥：无变化就给空数组」
         //   在空世界开局时被模型读成「没有既有状态 ⇒ 没有变化 ⇒ 全给空数组」—— 世界永远起不了线（自锁）。
         //   改写：空数组只许用于「确无变化」，不许用于「不敢起线」；并把起线义务写成硬条款。
-        '宁缺毋滥：空数组只许用于「结算后确无变化」。若当前暗流为空而近期正文存在玩家行动或人物互动，你必须在 currents 里从正文事实起线至少1条暗流（causes 引用正文楼层），这是义务而非可选——正文本身就是因果源，与规则5一致。绝不代写玩家言行。绝不剧透suppress列内容。'
+        // v2.404.0 选择回流条款：choices_recent 里 st=chosen 的选择是**必须结算的显式输入**。
+        //   病灶：玩家在分支面板确认的选择，推演模型看不见 ⇒ 选择永远推不出后果（分支/后果/暗线三空）。
+        '选择结算义务：世界快照的 choices_recent 列出了玩家最近的分支选择。st=chosen 的条目是你必须结算的输入：本回合必须用 events_update 推进该选择引发的事件链（或 events_create 新建由该选择直接触发的事件），并用 currents 为该选择起线至少1条暗流（causes 引用该选择的 id）。st=open 的条目是悬挂的选择点，不要替玩家做决定，但可以在 currents 里为各选项预埋可见的伏笔（visibility 用 trace）。已兑现（applied=true）的选择照常推进其后续。绝不代写玩家言行。绝不剧透suppress列内容。'
+        + '\n宁缺毋滥：空数组只许用于「结算后确无变化」。若当前暗流为空而近期正文存在玩家行动或人物互动，你必须在 currents 里从正文事实起线至少1条暗流（causes 引用正文楼层），这是义务而非可选——正文本身就是因果源，与规则5一致。绝不代写玩家言行。绝不剧透suppress列内容。'
       ].filter(Boolean).join('\n');
       const user = [
         '【世界快照】' + JSON.stringify(snap),
