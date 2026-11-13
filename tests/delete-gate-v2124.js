@@ -76,7 +76,8 @@ const ANCHORS = {
   //   锚点必须选带缩进的那一形态，否则命中 2 次（「锚点恰中 1 次」是全部破坏判据的前置）。
   permReset: { rel: PERM, txt: '\n    _byAction = {};' },
   panelBlock: { rel: PANEL, txt: 'function heartbeatBlock() {' },
-  panelMount: { rel: PANEL, txt: '${heartbeatBlock()}${evictBlock()}' }
+  // v2.401.0(OPV23):挂载行锚点已搬进 ui/pages/overview-main.js 段体——rel 跟现场走（全仓锚点审计直读 rel 真文件，重组面只服务锁内 src()）
+  panelMount: { rel: 'ui/pages/overview-main.js', txt: '${heartbeatBlock()}${evictBlock()}' }
 };
 // ── A 面：P5 结构 ───────────────────────────────────────────────────
 function runA(a) {

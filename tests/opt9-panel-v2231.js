@@ -32,11 +32,17 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const SELF_REL = 'tests/opt9-panel-v2231.js';
 const FOLD = 'ui/panel-fold.js', PANEL = 'ui/panel.js';
+// v2.401.0(OPV23):renderTools 段体(含 lazy/foldSec 调用面)搬进 ui/pages/tools-page.js。
+//   读取 panel.js 时走 panelSource() 重组面(== 拆前面,逐字相等,锚点语义不变)。
+function PANEL_SRC() { return require('./panel-source.js').panelSource(); }
 // v2.275.0：capability 段（v2.257.0）的 view() 是全渲染链上**唯一**会遍历全部引擎的读数面。
 //   它的重复读缺陷由 B3 的「扫描」那一格咬 —— 故本锁也要能装载它的破坏副本。
 const CAPTIER = 'engines/capability-tier.js';
 function rd(rel, ov) {
   if (ov && ov[rel] !== undefined) return ov[rel];
+  // v2.401.0(OPV23):renderTools 段体(lazy/foldSec 调用面)搬进 ui/pages/tools-page.js;
+  //   panel.js 走 panelSource() 重组面(== 拆前面,逐字相等,锚点语义不变)。
+  if (rel === 'ui/panel.js') return require('./panel-source.js').panelSource();
   return fs.readFileSync(path.join(BASE, rel), 'utf8');
 }
 function cnt(s, n) { return s.split(n).length - 1; }

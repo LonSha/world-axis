@@ -73,7 +73,12 @@ const NS_ALL = ENGINES.map(function (e) { return e.ns; });
 /** 有副作用入口总数（B 组逐条断言，17 条） */
 const ENTRY_TOTAL = ENGINES.reduce(function (a, e) { return a + e.entries.length; }, 0);
 
-function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function rd(rel) {
+  // v2.401.0(OPV23):挂载行随 renderOverview 段体搬进 ui/pages/overview-main.js;
+  //   panel.js 走重组面(锚点语义不变,OPV22-4 同款迁移)。
+  if (rel === 'ui/panel.js') return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
 function sha(rel) { return crypto.createHash('sha256').update(rd(rel)).digest('hex'); }
 /**
  * 剥掉注释与**字符串内容**，只留真代码面。
@@ -866,14 +871,19 @@ function runF(T, S) {
 
   // ── F5 panel.js 的挂载点 ──
   //   渲染点必须真调 v22OmensBlock()（不是「函数定义了但没人调」）。
+  //   v2.401.0(OPV23-1)：渲染点随段体搬进 ui/pages/overview-main.js，故 F5a 读重组面
+  //   （重组面 == 拆前面，段体里的调用原样可见）；F5b/F5c 断言的是**转发接线**，
+  //   只在真实 panel.js 文件里（重组面会把转发块换成段体，转发字面就看不见了）——
+  //   两类输入面分开，正是「判据的输入面不得比事实窄」。
+  const panelReal = stripComments(fs.readFileSync(path.join(BASE, PANEL_REL), 'utf8'));
   const panelCode = stripComments(rd(PANEL_REL));
   T(/\$\{\s*v22OmensBlock\(\)\s*\}/.test(panelCode),
     'F5a ui/panel.js 的概览页渲染点真调 ${v22OmensBlock()}（不是定义了没人调）');
-  T(/function\s+v22OmensBlock\s*\(/.test(panelCode),
+  T(/function\s+v22OmensBlock\s*\(/.test(panelReal),
     'F5b ui/panel.js 有转发函数 v22OmensBlock（直写字面形态）');
   //   转发必须是**直写** `WA.panelOverviewBlocks.v22OmensBlock()`，不经中间变量：
   //   门禁读面认字面，经变量就看不见（本轮真踩过）。
-  T(/WA\.panelOverviewBlocks\.v22OmensBlock\(\)/.test(panelCode),
+  T(/WA\.panelOverviewBlocks\.v22OmensBlock\(\)/.test(panelReal),
     'F5c 转发函数直写 WA.panelOverviewBlocks.v22OmensBlock()（不经中间变量，否则门禁看不见）');
 }
 // ════════════════════════════════════════════════════════════════════
@@ -1056,7 +1066,9 @@ function runNeg(T) {
   });
 
   // ── N4 摘掉渲染调用 ⇒ F5a 必须现形 ──
-  withMutated(PANEL_REL, function (src) {
+  //   v2.401.0(OPV23-1)：挂载行随 renderOverview 段体搬进 ui/pages/overview-main.js，
+  //   破坏对象跟着现场走（锚点语义不变：摘掉后 F5a 在重组面上现形）。
+  withMutated('ui/pages/overview-main.js', function (src) {
     return src.replace('${v22OmensBlock()}', '');
   }, function (changed) {
     T(changed, 'N4a 内存副本确实摘掉了渲染调用（否则 N4 是空转）');

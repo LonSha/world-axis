@@ -3866,6 +3866,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   同名转发函数在运行期惰性读它；缺席时六块静默返回空串（renderOverview 的
     //   try/catch 不报错），那正是「看起来正常、实际没读数」那一族。
     'ui/pages/overview-blocks.js': 'panelOverviewBlocks',
+    // v2.401.0（OPV23-1~3）：三段拆分。登记为**必载** —— panel.js 的转发函数在
+    //   运行期惰性读它们；缺席时整页降级行，那正是「看起来正常、实际没读数」那一族。
+    'ui/pages/overview-main.js': 'panelOverviewMain',
+    'ui/pages/tools-page.js': 'panelToolsPage',
+    'ui/pages/dashboards.js': 'uiDashboards',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -4086,6 +4091,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'cyberpunkTheme',
       'themeStyles',
       'themeSwitch',
+      // v2.401.0(OPV23-1~3):三段拆分 —— 与 tests/export-contract.js 的 OPTIONAL 成对
+      //   （两处口径必须一致）。无头环境里 ui/pages/*.js 不装载，不登记会被
+      //   secModules 报成 missing（那是「真缺席」，不是「可选缺席」）。
+      'panelOverviewMain',
+      'panelToolsPage',
+      'uiDashboards',
     ];
   function secModules() {
     const missing = [], loaded = [], optionalMissing = [];

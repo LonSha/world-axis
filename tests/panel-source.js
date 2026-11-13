@@ -56,74 +56,96 @@
  */
 const fs = require('fs');
 const path = require('path');
-
 const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const BLOCKS_REL = 'ui/pages/overview-blocks.js';
 const MARK_BEGIN = '// <<<OPV22-4 OVERVIEW-BLOCKS BEGIN>>>';
 const MARK_END = '// <<<OPV22-4 OVERVIEW-BLOCKS END>>>';
-// 段体在新文件里的起止标记（各占一行，且**不含**在段体内）
+// 段体在新文件里的起止标记（各占一行，且**不含**在段体内）。
+//   OPV23（v2.401.0）起本文件是**四段**重组器：每个段文件的段体首标记都以
+//   `  // ══ 段体开始（原 ui/panel.js` 开头（后面的行号区间各段不同），
+//   故前缀匹配；结束标记统一 `  // ══ 段体结束 ══`。
 const BODY_OPEN = '  // ══ 段体开始（原 ui/panel.js 517–851 行，逐字搬迁，一个字符未改）══';
 const BODY_CLOSE = '  // ══ 段体结束 ══';
-
+// v2.401.0（OPV23 三段拆分）：四对标记 → 段文件的登记表。
+//   顺序**无关**：panelSource() 按每个标记在自己文本里的位置就地替换，
+//   从后往前只是避免下标漂移的实现细节（见 panelSource 内注释）。
+const SEGMENTS = [
+  { tag: 'OPV22-4 OVERVIEW-BLOCKS', rel: 'ui/pages/overview-blocks.js', ns: 'panelOverviewBlocks' },
+  { tag: 'OPV23-1 OVERVIEW-MAIN',   rel: 'ui/pages/overview-main.js',   ns: 'panelOverviewMain' },
+  { tag: 'OPV23-2 TOOLS-PAGE',      rel: 'ui/pages/tools-page.js',      ns: 'panelToolsPage' },
+  { tag: 'OPV23-3 DASHBOARDS',      rel: 'ui/pages/dashboards.js',      ns: 'uiDashboards' }
+];
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
-
 /**
- * 从 ui/pages/overview-blocks.js 切出**段体**（不含起止标记行）。
+ * 从任意一个段文件里切出**段体**（不含起止标记行）。
  *   为什么要有起止标记而不是「从第一个 function 到文件尾」：
  *   新文件尾部还有 API 汇总与 registerModule，那些**不是**原段体的一部分；
  *   靠「第一个 function 起」会把它们一并切进来，于是重组面上多出一段拆前没有的
  *   代码 —— round-trip 会红，而且红得莫名其妙。标记把边界变成显式事实。
  */
-function overviewBlocksBody() {
-  const src = rd(BLOCKS_REL);
+function segmentBody(rel) {
+  const src = rd(rel);
   const lines = src.split('\n');
-  const open = lines.findIndex(function (l) { return l === BODY_OPEN; });
+  const open = lines.findIndex(function (l) { return l.indexOf('  // ══ 段体开始（原 ui/panel.js') === 0; });
   const close = lines.findIndex(function (l) { return l === BODY_CLOSE; });
-  if (open < 0) throw new Error('panel-source: ' + BLOCKS_REL + ' 缺少段体起始标记（OPV22-4 的边界被改动过）');
-  if (close < 0) throw new Error('panel-source: ' + BLOCKS_REL + ' 缺少段体结束标记（OPV22-4 的边界被改动过）');
-  if (close <= open) throw new Error('panel-source: 段体标记顺序颠倒（open L' + (open + 1) + ' / close L' + (close + 1) + '）');
+  if (open < 0) throw new Error('panel-source: ' + rel + ' 缺少段体起始标记（拆段的边界被改动过）');
+  if (close < 0) throw new Error('panel-source: ' + rel + ' 缺少段体结束标记（拆段的边界被改动过）');
+  if (close <= open) throw new Error('panel-source: ' + rel + ' 段体标记顺序颠倒（open L' + (open + 1) + ' / close L' + (close + 1) + '）');
   return lines.slice(open + 1, close).join('\n');
 }
-
+/** 旧名保留：OPV22-4 段体（三把既有专锁的调用面不因此变）。 */
+function overviewBlocksBody() { return segmentBody(BLOCKS_REL); }
 /**
- * 面板源码面 = panel.js 里标记之间的转发块，整段换成段体。
+ * 面板源码面 = panel.js 里**每一对**标记之间的转发块，整段换成对应段体。
  *
- *   返回值与「拆段之前的 ui/panel.js」**逐字相等**（这一点由 segment-extract-v2400
- *   的 D 段用冻结基线钉住）。三把既有专锁只需把 `fs.readFileSync('ui/panel.js')`
- *   换成 `panelSource()`，断言一条都不用改。
+ *   v2.401.0（OPV23）起是四段：重组时逐段替换，结果仍与「拆段之前的
+ *   ui/panel.js」**逐字相等**（这一点由 segment-extract-v2400 的 D 段用冻结基线钉住）。
+ *   既有锁只需把 `fs.readFileSync('ui/panel.js')` 换成 `panelSource()`，
+ *   断言一条都不用改。
+ *
+ *   按行拼接（不按字符下标）：见文件头口径 1。多处替换从标记**位置**起算、
+ *   每段独立定位（不依赖其它标记的相对位置），从后往前做只为避免下标漂移。
  */
 function panelSource() {
   const src = rd(PANEL_REL);
-  const lines = src.split('\n');
-  const begins = [];
-  const ends = [];
-  lines.forEach(function (l, i) {
-    if (l.indexOf(MARK_BEGIN) >= 0) begins.push(i);
-    if (l.indexOf(MARK_END) >= 0) ends.push(i);
+  let lines = src.split('\n');
+  const found = [];
+  SEGMENTS.forEach(function (seg) {
+    const b = '  // <<<' + seg.tag + ' BEGIN>>>';
+    const bTight = '// <<<' + seg.tag + ' BEGIN>>>';
+    const eTight = '// <<<' + seg.tag + ' END>>>';
+    const begins = [], ends = [];
+    lines.forEach(function (l, i) {
+      if (l.indexOf(bTight) >= 0) begins.push(i);
+      if (l.indexOf(eTight) >= 0) ends.push(i);
+    });
+    if (begins.length !== 1) throw new Error('panel-source: ' + PANEL_REL + ' 的 ' + seg.tag + ' BEGIN 标记应恰 1 处，实 ' + begins.length + ' 处');
+    if (ends.length !== 1) throw new Error('panel-source: ' + PANEL_REL + ' 的 ' + seg.tag + ' END 标记应恰 1 处，实 ' + ends.length + ' 处');
+    if (ends[0] <= begins[0]) throw new Error('panel-source: ' + seg.tag + ' 标记顺序颠倒（BEGIN L' + (begins[0] + 1) + ' / END L' + (ends[0] + 1) + '）');
+    found.push({ b: begins[0], e: ends[0], rel: seg.rel });
   });
-  if (begins.length !== 1) throw new Error('panel-source: ' + PANEL_REL + ' 的 BEGIN 标记应恰 1 处，实 ' + begins.length + ' 处');
-  if (ends.length !== 1) throw new Error('panel-source: ' + PANEL_REL + ' 的 END 标记应恰 1 处，实 ' + ends.length + ' 处');
-  if (ends[0] <= begins[0]) throw new Error('panel-source: 标记顺序颠倒（BEGIN L' + (begins[0] + 1) + ' / END L' + (ends[0] + 1) + '）');
-  const body = overviewBlocksBody().split('\n');
-  //   按行拼接：见文件头口径 1。此处若改成字符下标拼接，会静默多出两个空格。
-  return lines.slice(0, begins[0]).concat(body, lines.slice(ends[0] + 1)).join('\n');
+  //   从后往前替换：先替换文本上靠后的段，靠前段的下标不受影响。
+  found.sort(function (x, y) { return y.b - x.b; }).forEach(function (f) {
+    const body = segmentBody(f.rel).split('\n');
+    lines = lines.slice(0, f.b).concat(body, lines.slice(f.e + 1));
+  });
+  return lines.join('\n');
 }
-
-/** 面板源码面的行数（拆段前 17420 行；用于「面没塌」的粗读数）。 */
+/** 面板源码面的行数（拆段前 17577 行；用于「面没塌」的粗读数）。 */
 function panelSourceLines() { return panelSource().split('\n').length; }
-
 /** 拆段之后 panel.js 自己的行数（不含重组）。 */
 function panelFileLines() { return rd(PANEL_REL).split('\n').length; }
-
 module.exports = {
   BASE: BASE,
   PANEL_REL: PANEL_REL,
   BLOCKS_REL: BLOCKS_REL,
   MARK_BEGIN: MARK_BEGIN,
   MARK_END: MARK_END,
-  BODY_OPEN: BODY_OPEN,
+BODY_OPEN: BODY_OPEN,
   BODY_CLOSE: BODY_CLOSE,
+  SEGMENTS: SEGMENTS,
+  segmentBody: segmentBody,
   overviewBlocksBody: overviewBlocksBody,
   panelSource: panelSource,
   panelSourceLines: panelSourceLines,

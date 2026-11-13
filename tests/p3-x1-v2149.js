@@ -63,7 +63,9 @@ const BROKEN = [
   { key: 'decay', rel: 'engines/sediment.js',
     from: "    const steps = Math.floor(age / w);\n",
     to:   "    const steps = 0;\n" },
-  { key: 'omni', rel: 'ui/panel.js',
+  { key: 'omni', rel: 'ui/pages/overview-main.js',
+    // v2.401.0（OPV23-1）：挂载行随 renderOverview 段体搬进 ui/pages/overview-main.js。
+    //   rel 跟着现场走（扩输入面，不是削判据）：srcOverride 覆盖同一路径装载，破坏照旧现形。
     // v2.400.0（V22 后续）：from/to 同步补上第七块 `${v22OmensBlock()}` —— V22 加块
     //   时本锚停在六块形态：from 作为子串仍部分命中（前缀仍在），于是破坏变成
     //   「摘掉 data-omniscient 标记但块还在」的半破坏，N1g 数到 14→13 误报。

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.400.0';
+  const VERSION = '2.401.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1404,6 +1404,12 @@
     //   （而 renderOverview 的 try/catch 不会报错，症状是「概览页那几块突然没内容了」）。
     //   本模块零世界写、零落盘、零控件、零 id（只拼 HTML 字符串）。
     'ui/pages/overview-blocks.js',
+    // v2.401.0（OPV23-1~3）：三段拆分 —— 概览主线 / 工具页 / 四大盘。**必须排在 ui/panel.js 之后**：
+    //   panel.js 的转发函数在运行期惰性读 WA.panelOverviewMain / WA.panelToolsPage /
+    //   WA.uiDashboards，先装会让首次渲染读到 undefined（缺席降级行）。零世界写、零落盘。
+    'ui/pages/overview-main.js',
+    'ui/pages/tools-page.js',
+    'ui/pages/dashboards.js',
     'ui/settings.js',
     'ui/assistant.js',
   ];

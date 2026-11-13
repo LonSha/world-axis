@@ -84,7 +84,9 @@ function boot() {
 const HP_PATH = path.join(BASE, 'engines/health-preflight.js');
 const HP_SRC = fs.readFileSync(HP_PATH, 'utf8');
 const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
-const PANEL_SRC = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+// v2.401.0(OPV23):锚点已搬进 ui/pages/overview-main.js 段体——改读 panelSource() 重组面
+//  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
+const PANEL_SRC = require('./panel-source.js').panelSource();
 // ── 锚点：字面量在此声明一次，判据区只引用变量（H5 判据纯度）──
 const A_ORDER_UNKNOWN = "if (!mechOk || !g || nums.absent > 0) state = 'unknown';";
 const A_ORDER_BLOCKED = "else if (nums.blocked > 0) state = 'blocked';";

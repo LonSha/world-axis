@@ -68,11 +68,15 @@ const { discoverUIFiles } = require('./product-files.js');
 const UI_PREFIX = 'ui';
 function uiFiles(dir) {
   const d = dir || path.join(BASE, 'ui');
+  // v2.401.0(OPV23):panel.js 的渲染模板已拆进 ui/pages/*.js 段体——「引用面 → 渲染面」
+  //   必须在**同一个面**上对账，否则 panel.js 的引用会全部被误判成幽灵（渲染提及搬走了）。
+  //   故 panel.js 一项返回 panelSource() 重组面（= 拆前面，逐字等价）；其余文件照读磁盘。
+  const panelSrcWire = require('./panel-source.js').panelSource();
   return discoverUIFiles(d).map(function (rel) {
     //   rel 形如 `ui/pages/overview-blocks.js`；剥掉前缀得到 d 内的相对路径。
     //   不用 path.basename（它会把子目录丢掉 —— 见上面的 ENOENT 记录）。
     const inner = rel.indexOf(UI_PREFIX + '/') === 0 ? rel.slice(UI_PREFIX.length + 1) : rel;
-    return { rel: rel, src: fs.readFileSync(path.join(d, inner), 'utf8') };
+    return { rel: rel, src: (inner === 'panel.js') ? panelSrcWire : fs.readFileSync(path.join(d, inner), 'utf8') };
   });
 }
 

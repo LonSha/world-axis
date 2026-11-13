@@ -32,10 +32,16 @@ module.exports = async function toolDiagV092(ctx) {
   assert(dg.modules.loadedCount >= 30 && dg.modules.missingCount === 0, '模块装载清单零缺失');
   assert(WA.toolDiag.UI_BINDINGS.filter(g => g.page === 'tools')[0].ids.includes('wa-diag-run'), '自检控件已纳入UI绑定校验清单');
   // 全树盘查：诊断清单必须覆盖磁盘上每一个 js 模块（防漏登记）
+  // v2.401.0(OPV23):段文件进了 ui/pages/ 子目录——盘查枚举改递归（扩输入面:磁盘有子目录,盘查就要跟下去,与 ui-gate-sync 的 discoverUIFiles 同口径;判据不动）
   const realFiles = [];
-  ['core', 'engines', 'actors', 'direction', 'render', 'compat', 'ui'].forEach(dir => {
-    fs.readdirSync(path.join(BASE, dir)).filter(f => f.endsWith('.js')).forEach(f => realFiles.push(dir + '/' + f));
-  });
+  const listJS = (relDir) => {
+    fs.readdirSync(path.join(BASE, relDir), { withFileTypes: true }).forEach(e => {
+      const rel = relDir + '/' + e.name;
+      if (e.isDirectory()) listJS(rel);
+      else if (e.name.endsWith('.js')) realFiles.push(rel);
+    });
+  };
+  ['core', 'engines', 'actors', 'direction', 'render', 'compat', 'ui'].forEach(listJS);
   const listed = Object.keys(WA.toolDiag.MODULE_EXPORTS);
   const uncovered = realFiles.filter(f => listed.indexOf(f) < 0);
   const ghost = listed.filter(f => realFiles.indexOf(f) < 0);

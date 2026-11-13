@@ -325,7 +325,8 @@ async function judge(a) {
 //   —— 本门禁是**运行期实测**（Proxy 拦 WA.访问），真读到了就是引用，与「有没有兜底」无关。
 //   归因实证脚本：/tmp/clock_attr.js（扫 HEAD 与工作树的 WA.clock 出现面做差，epoch-tide.js
 //   在 HEAD 版 WA.clock 出现次数为 0，工作树为 4）+ /tmp/sum494.js（账本求和闭合）。
-a(led.totals.loadEdges === 280 && led.totals.callRefs === 495,
+// v2.401.0(OPV23):账本实测回填（node tools/loose-readings.js 报出 4 处失配——三段拆分 4 个段文件尾部各 registerModule ⇒ 装载期边 +4 / 调用期 +4 / 命名空间 +3 / 装载文件 +4）
+  a(led.totals.loadEdges === 296 && led.totals.callRefs === 511,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 装载期边 +1(尾部调 registerModule)、调用期引用 +2(读 store 的 registerModule 与 settingsBus)、命名空间 +1、装载文件 +1 —— 本处四个数字由 U3 散装读数核对器(node tools/loose-readings.js)一次报出,不必等全量回归;\n    v2830/mr: 装载期边 108 / 调用期引用 212（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（引用多 ≠ 必须先装载；v2.187.0（第三批 E4/E6/E8）：新增 engines/campaign.js / engines/atlas.js / engines/dep-check.js ⇒ 装载期边 +3（尾部各调 registerModule）、调用期 +4；v2.135.0（E6）：新增 engines/foreshadow.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎尾部各调 registerModule ⇒ 装载期边 +12；其调用期读 store/clock/evict/settingsBus/apiRouter ⇒ 调用期 +24；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
@@ -355,7 +356,8 @@ a(led.totals.loadEdges === 280 && led.totals.callRefs === 495,
 //   欠债来源同上一条：v2.224.0 加 branch-diff 引擎时改了账本却漏同步这两处散装读数。
   // v2.294.0（V8 收口）：账本实测 nsCount 327 -> 331 / loadedCount 318 -> 322
   //   （V8 新增 injectCollector / playerArchive / roundDrivers / writeDesk 四个命名空间）。
-  a(led.nsCount === 437 && led.loadedCount === 426,
+  // v2.401.0(OPV23):账本实测回填（同上——nsCount 445 / loadedCount 434）
+  a(led.nsCount === 445 && led.loadedCount === 434,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 两边各 +1(装载期边与调用期引用另计,见上一条);本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出,不必等全量回归;\n    v2830/mr: 命名空间 213 / 装载文件 205（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（v2.187.0（第三批 E4/E6/E8）：campaign / atlas / depCheck 三命名空间 ⇒ 两边各 +1，叠加 ui/* 三件后装载文件面 194 → 197；v2.135.0（E6）新增 engines/foreshadow.js ⇒ 两边各 +1；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）十二个新引擎 ⇒ 两边各 +12；v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '
@@ -429,7 +431,8 @@ a(led.totals.loadEdges === 280 && led.totals.callRefs === 495,
   a(/\/diff:0\//.test(rs), 'v2830/cfg: 回滚后本次写入的键全部还原（diff 0）');
 
   // 导出面接线（面板/诊断真消费）
-  const pSrc = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+  // v2.401.0(OPV23):锚点已搬进 ui/pages/overview-main.js 段体——改读 panelSource() 重组面
+  const pSrc = require('./panel-source.js').panelSource();
   a(pSrc.indexOf('id="wa-cfg-view"') > 0, 'v2830/ui: 配置包控件真在面板模板里');
   a(/cfgBtn\.onclick = /.test(pSrc), 'v2830/ui: 配置包绑定无短路守卫');
   a(/wa-cfg-view[\s\S]{0,4000}exportConfig\(/.test(pSrc) || /exportConfig\(\)[\s\S]{0,4000}wa-cfg-view/.test(pSrc) || /const ex = WA\.settingsBus\.exportConfig\(\);/.test(pSrc),

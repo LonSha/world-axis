@@ -35,6 +35,11 @@ const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf',
   // v2.400.0(V22 OPV22-4):ui/pages/overview-blocks.js —— 与 tests/run.js 的 UI_NS2800 成对。
   //   无头环境里 ui/*.js 不装载，故它是可选缺席（与 panelFold 同款）。
   'panelOverviewBlocks',
+  // v2.401.0(OPV23-1~3):三段拆分 —— 与 tests/run.js 的 UI_NS2800 成对。
+  //   无头环境里 ui/*.js 不装载，故可选缺席（与 panelOverviewBlocks 同款）。
+  'panelOverviewMain',
+  'panelToolsPage',
+  'uiDashboards',
   // v2.181.0：赛博朋克 UI 主题层 9 个 ns（与 tests/run.js 的 UI_NS2800 同口径）。
   'cyberUI',
   'cyberDashboard',

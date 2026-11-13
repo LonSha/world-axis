@@ -26,7 +26,12 @@ const PANEL_REL = 'ui/panel.js';
 const SET_REL = 'ui/settings.js';
 const DIAG_REL = 'engines/tool-diag.js';
 const SELF_REL = 'tests/world-diary-ui-v2265.js';
-function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+// v2.401.0(OPV23):日记闸门随 renderOverview 段体搬进 ui/pages/overview-main.js。
+//   rd 对 panel.js 走 panelSource() 重组面(锚点语义不变,OPV22-4 同款迁移)。
+function rd(rel) {
+  if (rel === PANEL_REL) return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
 function cnt(s, n) { return s.split(n).length - 1; }
 function j(x) { return JSON.stringify(x); }
 function runAll(assertFn) {

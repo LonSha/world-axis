@@ -204,6 +204,11 @@ const UI_NS = {
   //   ui/pages/overview-blocks.js 提供 —— 它在 ui/ 子目录里,是 OPV22-4 新建的。
   //   漏在本表的后果同前三条:被判成「读了无人提供」,而它明明是 UI 层。
   panelOverviewBlocks: 'UI 概览页六块只读诊断(ui/pages/overview-blocks.js)',
+  // v2.401.0(OPV23-1~3):第 8~10 个 UI 层命名空间。panel.js 的转发函数在运行期惰性读它们，
+  //   静态图看不见提供方（ui/ 子目录文件）—— 漏在本表的后果同上条：被判「读了无人提供」。
+  panelOverviewMain: 'UI 概览页主线(ui/pages/overview-main.js)',
+  panelToolsPage: 'UI 工具页(ui/pages/tools-page.js)',
+  uiDashboards: 'UI 四个大盘(ui/pages/dashboards.js)',
 };
 
 /**

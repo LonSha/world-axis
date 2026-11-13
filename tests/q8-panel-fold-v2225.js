@@ -36,7 +36,13 @@ const path = require('path');
 const vm = require('vm');
 require('./mock.js');
 const BASE = path.join(__dirname, '..');
-const RD = function (rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); };
+// v2.401.0(OPV23):panel.js 拆三段后,foldSec 调用面搬进 ui/pages/tools-page.js。
+//   RD 对 panel.js 走 panelSource() 重组面(== 拆前面,逐字相等,OPV22-4 同款迁移);
+//   锚点断言一条不改 —— 重组面上 foldSec 调用原样可见。
+const RD = function (rel) {
+  if (rel === PANEL_REL) return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+};
 
 // v2.225.0 收口:计数与本地 `a` **只在独立入口里存在**(见文件尾)——
 //   被 run.js 的 runLock 聚合时,判据用调用方传进来的 assert(那一套才是汇总读数的真源);

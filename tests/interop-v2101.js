@@ -382,7 +382,8 @@ function jSeparation(W) {
   } catch (e) { return false; }
 }
 function runAll(a) {
-  const iSrc = src(INTEROP), diagSrc = src(DIAG), panSrc = src(PANEL), runSrc = src(RUNJS), idxSrc = src(INDEX);
+  // v2.401.0(OPV23):A3 面板真消费方锚点已搬进 ui/pages/*.js 段体——panSrc 改读 panelSource() 重组面（锚点跟现场走，扩输入面）
+  const iSrc = src(INTEROP), diagSrc = src(DIAG), panSrc = require('./panel-source.js').panelSource(), runSrc = src(RUNJS), idxSrc = src(INDEX);
   // ── A 静态面（消费方在位；这类判据读真文件，故不做负控制，见文件头）──
   a(diagSrc.indexOf("'engines/interop.js': 'interop',") >= 0
     // v2.155.0 收口：原判据把 OPTIONAL_EXPORTS 的**字面量**写死（v2.102.0 时的五项→六项已漂移，

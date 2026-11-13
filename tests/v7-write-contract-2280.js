@@ -18,7 +18,8 @@ const BASE = path.join(__dirname, '..');
 const WC_REL = 'engines/write-contract.js';
 const WC_SRC = fs.readFileSync(path.join(BASE, WC_REL), 'utf8');
 const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
-const PANEL_SRC = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+// v2.401.0(OPV23):锚点已搬进 ui/pages/overview-main.js 段体——改读 panelSource() 重组面（重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面）
+const PANEL_SRC = require('./panel-source.js').panelSource();
 const RUN_SRC = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
 const IDX_SRC = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
 
