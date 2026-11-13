@@ -7034,3 +7034,14 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
     余量 ~1.5s —— **下次再往 N 组加 spawn / 加全扫 / 往 D 段加一次 `fresh()` 之前必须先重测**。
   - `module-cycle-gate` 的 `UI_NS` 未加 `v22OmensBlock`（`panelOverviewBlocks` 已登记，
     块函数不是独立 ns），判定为不需要。
+
+## R244（v2.403.0 · 冷启动起线 + 推演健康台账）
+
+- **实测反馈（玩家截图）**：第 4 轮后「追踪人物 / 活跃暗流 / 长期事实」三个读数全是 0，面板诚实报「不是『没读到』，是确实没有」。根因：推演契约在冷启动期「由构造即死」——规则 5「无源变化禁止入账」与尾行「无变化就给空数组」合谋，空世界开局被模型解读为「没有既有状态 ⇒ 没有变化 ⇒ 全给空数组」自锁；且推演被跳过/失败时玩家面零可见（静默失败）。用户证实只配了主通道（inference 未配置自动回落 default，排除「通道未配置」假设）。
+- **刀①（engines/backstage.js 契约尾行改写）**：空数组只许用于「结算后确无变化」；当前暗流为空而近期正文存在玩家行动或人物互动时，必须在 currents 里从正文事实起线至少 1 条暗流（causes 引用正文楼层），这是义务而非可选——正文本身就是因果源，与规则 5 一致；反代写/反剧透两条边界原样保留。
+- **刀②（推演健康台账 simHealth）**：__simHealth 台账在推演链每个分岔口记账（requestSimulate 四条早退 auto-off/manual-mode/no-chat/queued、_runInference 的 channel-unset、_start 的 running/ok/failed(stale|aborted|store|error)/no-result 兜底，12 处 __simMark + 5 处 __simSkip）；导出 simHealth() 读口 + simHealthLine() 玩家面措辞真源（不面板自拼）。
+- **消费面**：health-preflight.firstRunView 新增推演面（skipped/failed→blocked、读不到→unknown、ok/running 不拉升；blocked 且开关数=0 时改说推演话）；ui/pages/overview-main.js 新增 wa-sim-health-line 玩家面行（推演正常时空内容不占屏、异常时显引擎原话），tool-diag 守卫表 ids 层登记。
+- **专锁 tests/cold-start-v2403.js 29/0**：A 面真返回驱动（buildPrompt 取 sys 真文本，钉起线义务/数量下限/因果源依据/旧尾行移除/边界保留）；B 面真调用驱动（simHealth 初始 never、requestSimulate 真进 _start 主链并真实记账 channel-unset——恰是「只配主通道」场景以前被静默吞掉的路径）；C 面玩家面接线；N 面同源锚自证。
+- **版本面**：VERSION/manifest → 2.403.0；14 文件跟随型白名单 widen 到 403（version-surface-gate 14/14 绿）；dead-export / module-registry 账本 --update（version=2.403.0）；evidence-index --write（550 条，stale 46 清偿，q9 67/0）；o6-layer-gate 71/0（现场复算，无钉死）。
+- **快档批次**：--only-v-section=v2.402.0+v2.403.0 隔离跑 passed，通过 2223 / 失败 0（digest 61d07a78，版本面升版前形态；收尾形态终验见下）。
+- 未做（如实登记）：全量回归未跑；「选择回流」（branchTree 显式注入推演快照）留待下一轮，涉及 story-choice 默认值的产品决策。

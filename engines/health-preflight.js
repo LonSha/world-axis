@@ -712,11 +712,13 @@
     const nums = {
       mechanisms: 0, running: 0, dormantWorld: 0,
       sources: 0, sourcesOn: 0,
-      blocked: 0, degraded: 0, absent: 0
+      blocked: 0, degraded: 0, absent: 0,
+      simState: 'absent', simReason: ''
     };
     let state = 'running';
     // ── 面一：机制开关（走 capabilityTier.view，与档位面/题材面同一份判据）──
     let mechOk = false;
+    let simBad = false; let simErr = false; // v2.403.0 推演面：true=推演没在正常出内容
     try {
       if (WA.capabilityTier && typeof WA.capabilityTier.view === 'function') {
         const v = WA.capabilityTier.view();
@@ -742,20 +744,39 @@
       nums.sources = Number(g.sourceTotal) || 0;
       nums.sourcesOn = Number(g.sourcePassing) || 0;
     }
+    // ── 面三：推演健康（v2.403.0：走 backstage.simHealth()，引擎单一真源）──
+    //   病灶（实测 R244）：推演被跳过/失败时，玩家面只剩三个 0，无从分辨
+    //   「机制坏了」与「真没变化」。本面只读不改判主链：skipped/failed 把结论
+    //   拉低为 blocked（推演没在跑），读不到拉低为 unknown；ok/running 不拉升
+    //   （推演正常时不覆盖前两面的结论）。措辞真源走 backstage.simHealthLine()。
+    try {
+      if (WA.backstage && typeof WA.backstage.simHealth === 'function') {
+        const shv = WA.backstage.simHealth();
+        nums.simState = shv.state || 'absent';
+        nums.simReason = shv.reason || '';
+        if (shv.state === 'skipped' || shv.state === 'failed') simBad = true;
+      } else { simErr = true; }
+    } catch (e) { simErr = true; }
     // ── 四态判定（顺序即优先级：读不到 > 卡死 > 太少 > 在跑）──
     //   ⚠ unknown 排在最前：三面里任一面读不到，后面三个结论都无从谈起。
     //     把它排在 blocked 之后会让「机制面缺席 + 预算面卡死」报成 blocked ——
     //     那是拿一半读数替全体下判断。
     if (!mechOk || !g || nums.absent > 0) state = 'unknown';
-    else if (nums.blocked > 0) state = 'blocked';
+    else if (simErr) state = 'unknown';
+    else if (simBad) state = 'blocked';
     // ⚠ thin 只认 threeGates 的 degraded —— 门槛②已按「≥半数 pass / 不足半数 degraded」判过，
     //   这里再算一遍 sourcesOn/sources 就是同一条规则的第二份真源（两处阈值必然漂移）。
     else if (nums.degraded > 0) state = 'thin';
     else state = 'running';
     let line, next;
+    // v2.403.0：推演面缺席/异常时，追加引擎原话（措辞真源在 backstage.simHealthLine，不在此另拼）。
+    const simTail = (simBad || simErr) && WA.backstage && typeof WA.backstage.simHealthLine === 'function'
+      ? ' 另外，' + WA.backstage.simHealthLine() : '';
     if (state === 'running') {
-      line = '本局世界正在运转：' + nums.running + ' 项机制在跑，' + nums.sourcesOn
-        + ' 个源在出内容。';
+      line = (simBad
+        ? '本局世界机制在跑，但推演这一环没有正常出内容。'
+        : '本局世界正在运转：' + nums.running + ' 项机制在跑，' + nums.sourcesOn
+          + ' 个源在出内容。') + simTail;
       next = { do: 'openSettings',
         hint: '想让它更热闹，到「设置」页顶部切一个更高的档位（会一次性多开一批机制）。' };
     } else if (state === 'thin') {
@@ -764,10 +785,17 @@
       next = { do: 'applyTier', arg: 'standard',
         hint: '到「设置」页切到标准档，会把那批能开的一次性打开。' };
     } else if (state === 'blocked') {
-      line = '本局世界这一轮大概率是空的：有 ' + nums.blocked + ' 处开关把内容全挡住了。';
-      const bf = (g && g.gates || []).filter(function (x) { return x.state === 'blocked' && x.fix; })[0];
-      next = bf ? { do: bf.fix.do, arg: bf.fix.arg, hint: bf.fix.hint }
-        : { do: 'openSettings', hint: '到「设置」页把挡住的开关打开。' };
+      // v2.403.0：挡住内容的若只有推演面（开关数=0），改说推演的话，不拿「0 处开关」
+      //   冒充结论（那会变成一句自相矛盾的空话）。措辞真源仍在 backstage.simHealthLine。
+      if (simBad && !(nums.blocked > 0)) {
+        line = '本局世界机制在跑，但推演这一环没有正常出内容，世界暂时不会有变化。' + simTail;
+        next = { do: 'openDiagnostics', hint: '到「诊断」页看推演被跳过或失败的具体原因。' };
+      } else {
+        line = '本局世界这一轮大概率是空的：有 ' + nums.blocked + ' 处开关把内容全挡住了。';
+        const bf = (g && g.gates || []).filter(function (x) { return x.state === 'blocked' && x.fix; })[0];
+        next = bf ? { do: bf.fix.do, arg: bf.fix.arg, hint: bf.fix.hint }
+          : { do: 'openSettings', hint: '到「设置」页把挡住的开关打开。' };
+      }
     } else {
       line = '这一局的世界状态读不到 —— 这不是「正常」，是有读数缺席。';
       next = { do: 'openDiagnostics',

@@ -9,6 +9,23 @@
   // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
+  // ── v2.403.0：推演健康台账（simHealth）─────────────────────────────
+  //   治病（实测 R244）：推演被跳过/失败/没结果时，玩家面只剩三个 0，无从分辨
+  //   「机制坏了」与「真没变化」。本台账在推演链每个分岔口记账：requestSimulate
+  //   的四条早退（auto-off/manual-mode/no-chat/queued）、_runInference 的
+  //   channel-unset、_start 的 running/ok/failed(stale|aborted|store|error)/
+  //   no-result 兜底。由 simHealth() 读出，health-preflight 与概览页消费。
+  //   只记账不改判：不抛错、不影响主链行为。
+  const __simHealth = { state: 'never', reason: '', at: 0, floor: 0, okCount: 0, failCount: 0, skipCount: 0 };
+  function __simMark(state, reason, floor) {
+    __simHealth.state = state; __simHealth.reason = reason || '';
+    __simHealth.at = clockNow('backstage.simHealth');
+    if (typeof floor === 'number') __simHealth.floor = floor;
+    if (state === 'ok') __simHealth.okCount++;
+    else if (state === 'failed') __simHealth.failCount++;
+    else if (state === 'skipped') __simHealth.skipCount++;
+  }
+  function __simSkip(rsn, floor) { __simMark('skipped', rsn, floor); return { ok: false, reason: rsn }; }
   const LS_SETTINGS = 'worldaxis_backstage_settings_v1';
   // v1.0.0: 人物容器容量（与 __BOUNDED_CAPS['people'] 登记同源）
   const PEOPLE_CAP = 48;
@@ -350,24 +367,49 @@
     isRunning: () => !!currentTask,
     pending: () => pendingAnchor,
 
+    /** v2.403.0：推演健康台账读口（只读副本）。台账定义见文件头 __simHealth 注释。 */
+    simHealth() { return Object.assign({}, __simHealth); },
+    /** v2.403.0：推演健康一句话（玩家面措辞真源，health-preflight 与概览页整句取用，不各自拼）。 */
+    simHealthLine() {
+      const h = __simHealth;
+      const t = (h.at && typeof h.at === 'number') ? new Date(h.at) : null;
+      const when = t ? (t.getHours() + ':' + String(t.getMinutes()).padStart(2, '0')) : '';
+      if (h.state === 'never') return '世界推演还没启动过：回复一轮后自动开始。';
+      if (h.state === 'running') return '世界推演正在结算这一轮。';
+      if (h.state === 'ok') return '世界推演正常：最近一次结算在 ' + when + '，共入账 ' + h.okCount + ' 次。';
+      if (h.state === 'skipped') {
+        const why = {
+          'auto-off': '自动推演已关（可在设置里打开）',
+          'manual-mode': '推演处于手动模式（需在面板手动触发）',
+          'no-chat': '还没有聊天正文可供推演',
+          'queued': '上一轮还没结算完，本轮已排队',
+          'channel-unset': '推演通道没有配置（未配置时会回落默认通道，请到设置页检查）',
+          'no-result': '推演跑了但没有拿到结果，本轮没有变化入账'
+        }[h.reason];
+        return '世界推演被跳过了：' + (why || ('原因：' + h.reason)) + (when ? '（' + when + '）' : '');
+      }
+      // failed
+      return '世界推演失败了（' + h.reason + (when ? '，' + when : '') + '）：下一轮回复后会自动重试。';
+    },
+
     requestSimulate(reason) {
       const st = loadSettings();
       // v2.4.0: 布尔配置归一化。此前 `!st.autoSimulate` 把 undefined（旧存档缺该子键）
       //   与字符串 'false' 一并判为「关」，自动推演被静默关停且用户看不到任何开关变化。
       //   回落值取登记 def（单一真源），不在此另写一份默认值。
-      if (!WA.settingsBus.toBool(st.autoSimulate, __REG_B.def.autoSimulate) && reason === 'after-reply') return { ok: false, reason: 'auto-off' };
-      if (st.simulationMode === 'manual' && reason === 'after-reply') return { ok: false, reason: 'manual-mode' };
+      if (!WA.settingsBus.toBool(st.autoSimulate, __REG_B.def.autoSimulate) && reason === 'after-reply') return __simSkip('auto-off');
+      if (st.simulationMode === 'manual' && reason === 'after-reply') return __simSkip('manual-mode');
       const anchor = latestAnchor();
-      if (!anchor) return { ok: false, reason: 'no-chat' };
-      if (currentTask) { pendingAnchor = { anchor, reason }; return { ok: true, queued: true }; }
+      if (!anchor) return __simSkip('no-chat', anchor && anchor.idx);
+      if (currentTask) { __simMark('skipped', 'queued', anchor && anchor.idx); pendingAnchor = { anchor, reason }; return { ok: true, queued: true }; }
       return this._start(anchor, reason);
     },
 
     /** 手动触发（绕过manual/auto限制） */
     forceSimulate() {
       const anchor = latestAnchor();
-      if (!anchor) return { ok: false, reason: 'no-chat' };
-      if (currentTask) { pendingAnchor = { anchor, reason: 'manual' }; return { ok: true, queued: true }; }
+      if (!anchor) return __simSkip('no-chat', anchor && anchor.idx);
+      if (currentTask) { __simMark('skipped', 'queued', anchor && anchor.idx); pendingAnchor = { anchor, reason: 'manual' }; return { ok: true, queued: true }; }
       return this._start(anchor, 'manual');
     },
 
@@ -378,6 +420,7 @@
       const ac = new AbortController();
       currentTask = { id, ac, anchor, reason };
       WA.emit('backstage:started', { id, reason });
+      __simMark('running', reason, anchor && anchor.idx);
       try {
         // v0.8 账本存档点：推演前快照演化状态
         if (WA.ledger) WA.ledger.saveCheckpoint();
@@ -392,7 +435,7 @@
           ? (function () { try { return WA.staleGuard.begin('backstage'); } catch (e) { return null; } })()
           : null;
         const result = await this._runInference(anchor, ac.signal);
-        if (ac.signal.aborted) return { ok: false, aborted: true };
+        if (ac.signal.aborted) { __simMark('failed', 'aborted', anchor && anchor.idx); return { ok: false, aborted: true }; }
         if (result) {
           // 落地前问「还算数吗」：**拒收即丢弃整份结果**（不写库、不落人格），
           //   并把拒收写进日志 —— 「推演没生效」与「模型没给」必须能分开读。
@@ -401,6 +444,7 @@
             if (v) {
               WA.log('warn', '推演结果作废（现场已变：' + ((v.faces || []).join('/') || v.reason) + '）'
                 + (v.was && v.now ? '：' + JSON.stringify({ was: v.was, now: v.now }) : ''));
+              __simMark('failed', 'stale', anchor && anchor.idx);
               return { ok: false, stale: true, verdict: v, anchor: anchor };
             }
           }
@@ -529,13 +573,19 @@
             WA.log('error', '世界推演结算事务失败，未提交');
             const __why = 'store-' + ((tx && (tx.aborted ? 'aborted' : tx.error ? 'threw' : 'refused')) || 'failed');
             WA.emit('backstage:failed', { id, anchor, reason: __why });
+            __simMark('failed', __why, anchor && anchor.idx);
             return { ok: false, reason: __why };
           }
         }
+        // v2.403.0：result 为空 ⇒ 推演没产出（通道未配置已在 _runInference 记 channel-unset；
+        //   此处兜底 no-result，防止「静默冒充成功」再次骗过玩家面）。
+        if (__simHealth.state === 'running') __simMark('skipped', 'no-result', anchor && anchor.idx);
         WA.emit('backstage:settled', { id, anchor });
+        __simMark('ok', 'settled', anchor && anchor.idx);
         return { ok: true };
       } catch (e) {
         WA.log('error', '世界推演失败: ' + (e && e.message || e));
+        __simMark('failed', 'error:' + ((e && e.message) || e), anchor && anchor.idx);
         return { ok: false, error: e };
       } finally {
         currentTask = null;
@@ -628,7 +678,10 @@
         ' "events_update": [{"title":"要更新的已有事件名（改名不换链）","name":"改名后的新名（可选）","stage":"该类型合法阶段","desc":"≤50字","stall":true|false,"stallReason":"停滞原因"}],',
         ' "next_turn_injection": {"required":[],"conditional":[],"suppress":[]}',
         '}',
-        '宁缺毋滥：无变化就给空数组。绝不代写玩家言行。绝不剧透suppress列内容。'
+        // v2.403.0 冷启动起线：规则5 本来就把「正文」列为合法 cause 源，但旧尾句「宁缺毋滥：无变化就给空数组」
+        //   在空世界开局时被模型读成「没有既有状态 ⇒ 没有变化 ⇒ 全给空数组」—— 世界永远起不了线（自锁）。
+        //   改写：空数组只许用于「确无变化」，不许用于「不敢起线」；并把起线义务写成硬条款。
+        '宁缺毋滥：空数组只许用于「结算后确无变化」。若当前暗流为空而近期正文存在玩家行动或人物互动，你必须在 currents 里从正文事实起线至少1条暗流（causes 引用正文楼层），这是义务而非可选——正文本身就是因果源，与规则5一致。绝不代写玩家言行。绝不剧透suppress列内容。'
       ].filter(Boolean).join('\n');
       const user = [
         '【世界快照】' + JSON.stringify(snap),
@@ -660,7 +713,7 @@
 
     async _runInference(anchor, signal) {
       const cfg = WA.apiRouter.getChannel('inference');
-      if (!cfg.baseUrl || !cfg.model) { WA.log('info', '推演通道未配置，跳过世界推演'); return null; }
+      if (!cfg.baseUrl || !cfg.model) { __simMark('skipped', 'channel-unset'); WA.log('info', '推演通道未配置，跳过世界推演'); return null; }
       // v0.8: 世界书注入段（扫描文本=近期正文）
       let wbSection = '';
       if (WA.worldbook && WA.worldbook.hasSelection()) {

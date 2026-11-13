@@ -5208,6 +5208,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       //   它是面板回显，不是控件」。理由：渲染了不登记 ⇒ 守卫表查不到它，
       //   而「块渲染了但 id 写错」这类断裂只有在登记过的 id 上才会被发现（本表全部意义）。
       'wa-cap-line', 'wa-health-line', 'wa-vis-line', 'wa-first-line', 'wa-diary-block', 'wa-route-block', 'wa-temp-block', 'wa-cal-block', 'wa-cost-block', 'wa-save-block',
+      // v2.403.0：推演健康行。常在场（恒渲染容器：推演正常时空内容、异常时显引擎原话），
+      //   按「常在场登 ids 层」口径与 wa-first-line 同列。
+      'wa-sim-health-line',
       // v2.271.0（V6 EXV6-7）：概览页开局引导块的两个出口。v2.274.0 从 settings 组迁来
       //   （firstBlock 拼进的是 overview 模板，登在 settings 组等于永不校验）。
       //   `wa-first-block` 的三态渲染（缺席提示 / 关闭不渲染 / 三步做完不占屏）由

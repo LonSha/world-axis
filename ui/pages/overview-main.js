@@ -177,6 +177,31 @@
         return '<div class="wa-dim" id="wa-first-line">首局体检读数异常：' + esc((e && e.message) || e) + '</div>';
       }
     })();
+    // v2.403.0：推演健康行 —— 「推演这一环到底在不在跑」。与 firstLine（机制面结论）
+    //   分工：firstLine 答的是「这套机制跑没跑起来」（诊断面），本行答的是「推演
+    //   有没有在给世界记账」（玩家面），两句话各答一面，混排就是两个措辞真源。
+    //   三条口径（与 firstLine 同规）：
+    //   ① **整句取自引擎原话**：`backstage.simHealthLine()` 一句到底，面板不拼措辞；
+    //   ② **先经 firstRunView 的推演面裁决**：推演正常（ok/running/never）时本行不占屏
+    //      —— 推演正常不是新闻，不打扰；只在推演缺席或异常时出现；
+    //   ③ **缺席可见**：引擎不在时明写「读数不可用」，不静默消失。
+    const simHealthLine = (function () {
+      try {
+        if (!WA.backstage || typeof WA.backstage.simHealthLine !== 'function') {
+          return '<div class="wa-dim" id="wa-sim-health-line">推演健康读数不可用（engines/backstage.js 缺席）</div>';
+        }
+        const fv = WA.healthPreflight && typeof WA.healthPreflight.firstRunView === 'function'
+          ? WA.healthPreflight.firstRunView({ sample: 0 }) : null;
+        const nums = fv && fv.nums ? fv.nums : null;
+        if (nums && (nums.simState === 'ok' || nums.simState === 'running' || nums.simState === 'never')) {
+          return '<div class="wa-dim wa-sim wa-sim-' + esc(nums.simState) + '" id="wa-sim-health-line" data-state="' + esc(nums.simState) + '"></div>';
+        }
+        return '<div class="wa-dim wa-sim wa-sim-' + esc(nums && nums.simState || 'absent') + '" id="wa-sim-health-line" data-state="' + esc(nums && nums.simState || 'absent') + '">'
+          + esc(WA.backstage.simHealthLine()) + '</div>';
+      } catch (e) {
+        return '<div class="wa-dim" id="wa-sim-health-line">推演健康读数异常：' + esc((e && e.message) || e) + '</div>';
+      }
+    })();
     // v2.265.0（V6 EXV6-1）：世界日记 —— 「你看不见的地方发生了什么」。
     //   与上面四条并列行（firstLine / capLine / healthLine / visLine）的分工必须说清：
     //   那四条答的都是「这套机制跑没跑起来」（诊断面语言），本块答的是「世界这一刻发生过什么」
@@ -612,6 +637,7 @@
       </div>
       ${firstBlock}
       ${firstLine}
+      ${simHealthLine}
       ${diaryBlock}
       ${briefBlock}
       ${intentBlock}

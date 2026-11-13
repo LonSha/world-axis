@@ -22447,6 +22447,14 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runScript('./v23-stitch-v2402.js');
   }
+  // ── v2.403.0：冷启动起线 + 推演健康台账（实测 R244 的两刀修复）──────────
+  //   刀① 改写推演契约尾行：暗流为空而正文有玩家行动时，起线是义务不是可选
+  //   刀② __simHealth 台账 + simHealth/simHealthLine 读口，玩家面可见
+  //   （firstRunView 推演面 + 概览页 wa-sim-health-line + tool-diag 登记同批落地）
+  section('v2.403.0: 冷启动起线条款 + 推演健康台账（起线义务 / skip与fail记账 / 玩家面接线）');
+  {
+    await runScript('./cold-start-v2403.js');
+  }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
   //   核心判据是「声明 vs 现场静态扫描」双向对账 —— 不做对账，声明表只是文档。
