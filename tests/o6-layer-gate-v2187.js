@@ -149,7 +149,7 @@ function runA() {
   a(L.select(shEntry, ['x']).verdict === 'refuse', 'A8 select(选中但共享上下文) → refuse');
   a(L.select(null, ['x']).verdict === 'refuse', 'A9 select(归属表里没有这个节) → refuse（不是静默 skip）');
   // v2.253.0（表外节分流）：旧 A9 对 no-entry **无条件** refuse，代价是任何选区整趟 RC 3
-  //   —— 本仓有 10 个节的 section() 写在 3/4 空格缩进（G17-A…G18 / v2.19.0 / v2.49.0 /
+  //   —— 本仓有若干个节的 section() 写在 3/4 空格缩进或嵌死在注释行里（G17-A…G18 / v2.19.0 / v2.49.0 /
   //   v2.50.0 / v2.231.0），它们按设计进不了表（A11b：四空格是块内局部调用），于是
   //   「跑子集」这件事在真仓库上等于不可用（实测：1830 断言全过、RC 仍 3）。
   //   判据改成按**有没有被点名**分流：没点名 ⇒ skip（本轮轮不到它），点名 ⇒ refuse（坏消息）。
