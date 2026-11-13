@@ -18,6 +18,8 @@
 - **契约账本三份各自收敛**：`export-contract` 410→413 ns（三 ns 进串：`stageSession:activate begin end resume view` / `memoryRelay:attach compose view` / `chatRecycle:enforce hide lock restore view`）、`module-registry-gate --update`（文件 434→437 / ns 445→448）、`dead-export-gate --update`（dead 1436→1452，13 条新冻结）。
 - **回归读数**：V23 专锁 100/0 · overview-fold 96 项 · segment-extract 126 项 · exv22 138/0 · p3-x1 54 项 · q1-load-integrity 64/0 · test-surface-gate 零孤儿 · version-surface-gate 14/14 · module-registry pass · dead-export pass · export-contract 413 ns / 2782 成员 · orphan-lock pass · delete-gate 63 项 · inject-sources 20 项 · settings-audit 57 项 · first-run-ui 76/0。
 - **未做**：全量回归（上一轮 OOM 的坑已定位到 `tests/isolated-runner.js` 的 `cleanEnv()` 剥 `NODE_OPTIONS`、worker 内存参数只从 `process.execArgv` 取 —— 须让外壳进程自己带 `--max-old-space-size` 才能透传；本条未在本轮复验）。
+- **收尾（二次提交）**：快档批次 `--only-v-section=v2.402.0` 隔离跑 passed（通过 2223 / 失败 0，digest 66f11ecf…）；BUILD_ID 按惯例在首次提交 `3e648818` 后二次提交指向它（q1-load-integrity 64/0、version-surface-gate 14/14 复验绿）。留面：新 section 未登记 test-layers 归属表（读数如实报「归属表外 8 节」），下轮补。
+
 ### R242 · 2026-11-13 · v2.401.0：OPV23 拆段遗留红一次清偿（八把锁）+ 两处口径分叉的真修法
 - **起点是上一轮那句如实登记**：R241 收尾写了「全量回归未跑完，不构成本轮阻断」。本轮把它跑完，结果**不是「跑不完」，是 OOM 崩了**：`result.json` 记 `status: runner-failed` / `signal: SIGABRT`，日志末行 `FATAL ERROR: Ineffective mark-compacts near heap limit`，堆涨到 2934MB 后被杀（3428s 处）。旧结论「工具中断」是误读 —— 现场一直有明确死因，只是没人去看 `result.json` 的 `signal` 字段。重跑改用 `node --max-old-space-size=8192`。
 - **失败项的根因只有两类，但各自的「正确修法」完全不同**：
