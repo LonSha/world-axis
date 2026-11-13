@@ -2180,6 +2180,65 @@
     'tongue.converse': function (o) {
       if (WA.linguaBroker && typeof WA.linguaBroker.converse === 'function') return WA.linguaBroker.converse(o.spec || o);
       return { ok: false, reason: 'unsupported' };
+    },
+    // ══════════════════════════════════════════════════════════════════════
+    // v2.402.0（V23 缝合线）：异空间 V1.4 三台账本引擎的路由──
+    //   与上段同一条纪律：死导出门禁的判据是「定义文件之外的**产品代码**有零引用」。
+    //   三引擎若只被 tests 读，productUnused 会把全部导出报成 self-only / unwired
+    //   —— 那不是误报：「能算但没人叫它算」的引擎就是死的。action-desk 是本仓
+    //   「玩家动作→引擎」的唯一入口，故这里就是它们的正当消费点。
+    //
+    //   沿用共享拒收码 `unsupported`（与上方 V22 八条同口径），不新造新码面。
+    //
+    //   ⚠ 三条纪律（与引擎边界对齐，改这里前先读各引擎的文件头）：
+    //     ① `recycle.enforce` **永远不删**：它只回「请宿主删这几个」+ irreversible。
+    //        真正的删除必须由宿主在收到回执后执行，本路由不代理任何删除动作。
+    //     ② `stage.end` 的 policy 必须由调用方显式给出（archive / discard / cancel）：
+    //        这里**不补默认值** —— 引擎对缺 policy 的拒收（missing-policy）要能原样透出。
+    //        否则「替用户选了保存」这类静默决定就发生在路由层，事后无法归因。
+    //     ③ `relay.compose` 只收摘要（summary），**没有** messages / raw 通道：
+    //        路由层也不许顺手把正文塞进去（那是「合并两份聊天」的唯一入口）。
+    // ══════════════════════════════════════════════════════════════════════
+    'stage.begin': function (o) {
+      if (WA.stageSession && typeof WA.stageSession.begin === 'function') return WA.stageSession.begin(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'stage.activate': function (o) {
+      if (WA.stageSession && typeof WA.stageSession.activate === 'function') return WA.stageSession.activate(o.id);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'stage.end': function (o) {
+      if (WA.stageSession && typeof WA.stageSession.end === 'function') return WA.stageSession.end(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'stage.resume': function (o) {
+      if (WA.stageSession && typeof WA.stageSession.resume === 'function') return WA.stageSession.resume(o.id);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'relay.compose': function (o) {
+      if (WA.memoryRelay && typeof WA.memoryRelay.compose === 'function') return WA.memoryRelay.compose(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'relay.attach': function (o) {
+      if (WA.memoryRelay && typeof WA.memoryRelay.attach === 'function') return WA.memoryRelay.attach(o.relayId, o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'recycle.hide': function (o) {
+      if (WA.chatRecycle && typeof WA.chatRecycle.hide === 'function') return WA.chatRecycle.hide(o.spec || o);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'recycle.lock': function (o) {
+      if (WA.chatRecycle && typeof WA.chatRecycle.lock === 'function') return WA.chatRecycle.lock(o.file);
+      return { ok: false, reason: 'unsupported' };
+    },
+    'recycle.restore': function (o) {
+      if (WA.chatRecycle && typeof WA.chatRecycle.restore === 'function') return WA.chatRecycle.restore(o.file);
+      return { ok: false, reason: 'unsupported' };
+    },
+    // 只出清单：purged 恒 0，真正的删除由宿主执行（见上面纪律 ①）。
+    'recycle.enforce': function (o) {
+      if (WA.chatRecycle && typeof WA.chatRecycle.enforce === 'function') return WA.chatRecycle.enforce();
+      return { ok: false, reason: 'unsupported' };
     }
   };
 

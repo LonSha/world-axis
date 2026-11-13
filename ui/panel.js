@@ -559,6 +559,9 @@
   //   直写 `WA.panelOverviewBlocks.v22OmensBlock` 而不经中间变量：死子面门禁的
   //   正则只认 `WA.<ns>.<mem>` 字面形态，否则账本会记下与事实相反的证据。
   function v22OmensBlock() { return __obBind() ? WA.panelOverviewBlocks.v22OmensBlock() : ''; }
+  // v2.402.0（V23 缝合线）：三缝只读读数块。同上，直写 `WA.panelOverviewBlocks.<mem>`
+  //   字面形态（死子面门禁的引用正则只认这个形态），且模块缺席时返回空串。
+  function v23StitchBlock() { return __obBind() ? WA.panelOverviewBlocks.v23StitchBlock() : ''; }
   // <<<OPV22-4 OVERVIEW-BLOCKS END>>>
   // <<<OPV23-1 OVERVIEW-MAIN BEGIN>>>
   // ══ OPV23-1（2.401.0）：概览页主线已抽到 ui/pages/overview-main.js ══
@@ -580,7 +583,8 @@
         bridgeBlock: bridgeBlock,
         lonshaBlock: lonshaBlock,
         heartbeatBlock: heartbeatBlock,
-        v22OmensBlock: v22OmensBlock
+        v22OmensBlock: v22OmensBlock,
+        v23StitchBlock: v23StitchBlock
       });
     }
     return true;

@@ -1079,6 +1079,13 @@ const LOAD = [
   'engines/betrothal-alliance.js',   // EXV22-6 婚约聘娶 / 妆匛议价 / 门第联姻
   'engines/cartography-survey.js',   // EXV22-7 舆图测绘 / 精度分层 / 迷雾认知
   'engines/lingua-broker.js',        // EXV22-8 方言隔阂 / 译语掮客 / 误译后果
+  // ── v2.402.0（V23 缝合线）：从异空间 V1.4 缝入的三台账本引擎 ──
+  //   为什么必须进本 LOAD：不入清单的后果不是「少测三项」，而是它们的三 ns
+  //   在 engines/tool-diag.js 的 MODULE_EXPORTS 里有、在本装载面没有 ⇒
+  //   export-contract 的契约串把三 ns 的所有调用点静默跳过（OWNER 认、现场没装）。
+  'engines/stage-session.js',        // V23-1 小剧场会话账本 / 退出三选 / 单活跃
+  'engines/memory-relay.js',         // V23-2 记忆互通 / 只传摘要不合并原文
+  'engines/chat-recycle.js',         // V23-3 聊天回收站 / 上限 10 / 锁定保护
   'compat/host.js', 'compat/mvu.js', 'compat/th-helper.js'
 ];
 for (const rel of LOAD) {
@@ -22426,6 +22433,20 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./periodicals-v2303.js');
     await runScript('./loader-recursion-runtime.js');
   }
+  // ── v2.402.0（V23 缝合线）：异空间 V1.4 三缝专锁 ──────────────────────────
+  //   缝的是什么：V1.4 那套酒馆助手脚本里，有三件事本仓**产品面零命中** ——
+  //   小剧场会话生命周期 / 跨聊天摘要挂载 / 聊天文件级回收站。三引擎一律
+  //   「零 store 写，只算不落账」，边界九成是否定式（它们都会丢东西）。
+  //   为什么不缝另四块（昼夜主题 / 氛围滤镜 / 自动标题 / 诊断面板）：本仓
+  //   ui/theme-switch.js + ui/cyberpunk-theme.js + engines/summarizer.js +
+  //   engines/tool-diag.js 各自已有对应实现。缝合纪律的第一条是**不缝重复轮子**。
+  //   用 runScript 而不是 runLock：本锁既导出 runAll 也有 CLI 入口，但它内含
+  //   N1/N2 两处**真源码破坏**（改 engines/chat-recycle.js 后 try/finally + sha256 还原），
+  //   与 exv22-v2400.js 同档，不可与别的节并行 ⇒ 子进程串行。
+  section('v2.402.0 (V23 缝合线): 异空间三缝专锁（会话生命周期 / 跨聊天摘要 / 聊天回收站）');
+  {
+    await runScript('./v23-stitch-v2402.js');
+  }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
   //   核心判据是「声明 vs 现场静态扫描」双向对账 —— 不做对账，声明表只是文档。
@@ -22654,7 +22675,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     const __verPin293 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
       .match(/const VERSION = '([\d.]+)'/) || [])[1];
-    const __wantPin293 = '2.401.0';
+    const __wantPin293 = '2.402.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

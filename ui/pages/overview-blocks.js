@@ -563,6 +563,107 @@
       + '「休眠」与「未装载」是两件事 —— 前者是开关关着（设置页可开），'
       + '后者是模块本身不在场，照实分开写。</div></div>', bad);
   }
+  // ══ V23 缝合线：异空间三缝只读读数（v2.402.0）═════════════════════════════
+  /**
+   * 异空间 V1.4 缝进来的三个账本引擎的只读面板块。
+   *
+   * ── 为什么这一块必须存在（与上面 v22OmensBlock 同一条理由）────────
+   *   三个引擎的导出若只被 tests 读，dead-export-gate 会逐条报 self-only /
+   *   unwired。那不是误报 —— 「能算但没人看得见」的账本就是死的。但是：
+   *   它们的**写口**（begin/end/compose/hide/enforce）不该由面板代按，
+   *   所以本块只接 `view()` / `getSettings()` 两个只读口，写入口留在 action-desk。
+   *
+   * ── 三条口径（与 V22 那八行逐字同源）──────────────────────────
+   *   ① **只读、零动作**：只调 view() 与 getSettings()。本块**绝不**调
+   *      end() / enforce() / hide() —— 「看诊断」不该顺手替玩家结束一段演绎，
+   *      更不该替他把聊天文件列进待删清单（那个动作不可撤销）。
+   *   ② **缺席即缺席**：任一引擎不在场就如实写「未装载」，不补默认读数、
+   *      不假装 0。三个块各自独立，一个缺席不拖累其余。
+   *   ③ **不新增控件**：零 `<button>` / `<input>` / `id="`，不触碰 UI 绑定守卫。
+   *
+   * ── 直写 `WA.<ns>.view()` 而不做 `WA[ns].view()` 动态取 ────────────
+   *   与 V22 那段的教训逐字相同：module-cycle-gate 的读面是**静态正则**，
+   *   只认 `WA.<ns>.<mem>` 字面形态。用表驱动写成 `WA[sp.ns].view()` 时，
+   *   人眼里已经接上了、判据眼里还没接 —— 那是假消费点。
+   */
+  function v23StitchBlock() {
+    const rows = [];
+    let bad = false;
+
+    const READERS = [
+      { label: '小剧场', ns: 'stageSession', read: function () { return WA.stageSession.view(); } },
+      { label: '记忆互通', ns: 'memoryRelay', read: function () { return WA.memoryRelay.view(); } },
+      { label: '聊天回收站', ns: 'chatRecycle', read: function () { return WA.chatRecycle.view(); } }
+    ];
+
+    // 每行怎么从 view() 的读数里说一句话。取不到就如实写「未…」，不编。
+    const FORMAT = {
+      stageSession: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（action-desk 的 stage.* 路由仍可调用）' };
+        if (!v.sessions.length) return { sum: '未开场', note: '还没有 begin 过任何小剧场' };
+        const a = v.active;
+        const arch = v.sessions.filter(function (s) { return s.state === 'archived'; }).length;
+        return {
+          sum: a ? ('演绎中：' + a.title) : '无进行中',
+          note: '会话 ' + v.sessions.length + ' 段 · 已存档 ' + arch
+            + ' · 回收索引 ' + v.trash.count
+            + (a ? (' · 已进行 ' + a.blocks + ' 块') : '')
+        };
+      },
+      memoryRelay: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（action-desk 的 relay.* 路由仍可调用）' };
+        const targets = Object.keys(v.attached || {});
+        const n = targets.reduce(function (a, k) { return a + v.attached[k].length; }, 0);
+        if (!v.relays || !v.relays.length) return { sum: '无摘要', note: '还没有 compose 过跨聊天摘要' };
+        return {
+          sum: '摘要 ' + v.relays.length + ' 条 / 挂载 ' + n,
+          note: '挂到 ' + targets.length + ' 段聊天 · <b>只传摘要，不合并原文</b>'
+        };
+      },
+      chatRecycle: function (v) {
+        if (!v.enabled) return { sum: '休眠', note: '开关关着（action-desk 的 recycle.* 路由仍可调用）' };
+        const locked = v.items.filter(function (it) { return it.locked; }).length;
+        if (!v.count) return { sum: '回收站空', note: '没有移入过聊天文件' };
+        return {
+          sum: v.count + ' / ' + v.limit,
+          note: '锁定 ' + locked + ' 个已保护'
+            + (v.nextPurge && v.nextPurge.length
+              ? (' · <b>超限待清 ' + v.nextPurge.length + ' 个（最旧未锁定）</b>')
+              : ' · 未超限')
+            // 这句话是给玩家看的硬边界：本模块不删，删必须由宿主执行。
+            + ' · 本面板只读数、<b>不删除任何文件</b>'
+        };
+      }
+    };
+
+    READERS.forEach(function (sp) {
+      let sum = '未装载';
+      let note = 'WA.' + sp.ns + ' 不在场：本块如实写缺席，不补默认读数';
+      try {
+        const v = sp.read();
+        const r = FORMAT[sp.ns](v);
+        sum = r.sum; note = r.note;
+      } catch (e) {
+        bad = true;
+        sum = '读取失败';
+        note = esc(e && e.message ? e.message : String(e));
+      }
+      const cls = /休眠|未|无/.test(sum) ? 'wa-dim' : '';
+      rows.push('<div class="wa-kv"><span>' + esc(sp.label) + '</span>'
+        + '<span class="' + cls + '">' + esc(sum) + '</span></div>'
+        + '<div class="wa-dim" style="font-size:11px;margin:-2px 0 4px 0;">' + note + '</div>');
+    });
+
+    return foldCard('V23 缝合线', rows.length + ' 项 <span class="wa-dim">（三缝同屏 · 只读）</span>',
+      '<div class="wa-card"><div class="wa-card-h">V23 缝合线：异空间三缝读数（只读）</div>'
+      + rows.join('')
+      + '<div class="wa-hint">三件事各自答一个问题：<b>现在在演哪一段</b>（小剧场会话）、'
+      + '<b>这段聊天知道多少别处的事</b>（跨聊天摘要）、<b>回收站还能再装几个</b>（文件上限 10）。<br>'
+      + '三件都必须说清的两条硬边界：<b>记忆互通只传摘要，不合并两份完整聊天</b>；'
+      + '<b>回收站超限时最旧且未锁定的会被彻底删除</b> —— 所以重要聊天请先在列表里锁定，'
+      + '而本块<b>只负责读数，不替你锁定、也不替你删除</b>。<br>'
+      + '「休眠」是开关关着（设置页可开），「未装载」是模块本身不在场 —— 两件事分开写。</div></div>', bad);
+  }
   // ══ 段体结束 ══
   //   v2.400.0（V22 后续修正）：EXV22-9 当初把本块写在了段体标记**之外**，
   //   后果是重组面（panelSource() 还原的「假如没拆」的 panel.js）里挂载行
@@ -578,6 +679,7 @@
     lonshaBlock: lonshaBlock,
     heartbeatBlock: heartbeatBlock,
     v22OmensBlock: v22OmensBlock,
+    v23StitchBlock: v23StitchBlock,
     bind: bind,
     ver: '2.400.0'
   };

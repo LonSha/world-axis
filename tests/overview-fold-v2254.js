@@ -77,7 +77,11 @@ const A_BLOCKS = [
 //   读数），本锁的 A_MOUNT 停在六块形态 ⇒ A4 命中 0 次、N0 跟着红。这是 V22 收口
 //   时九把专锁复核清单未含本锁的漏网（同族：p3-x1-v2149 的 omni 锚）。修法是扩
 //   输入面（锚点跟现场走），不是砍判据 —— 挂载行本身逐字未动，V22 那次是对的。
-const A_MOUNT = '<div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}</div>';
+//   v2.402.0（V23）：V23 给挂载行追加了第八块 `${v23StitchBlock()}`（异空间三缝读数），
+//   本锁的 A_MOUNT 停在七块形态 ⇒ A4 命中 0 次、N0 跟着红。与上一次（V22 追加
+//   v22OmensBlock）逐字同族：修法是扩输入面（锚点跟现场走），不是砍判据 ——
+//   挂载行本身逐字未动。
+const A_MOUNT = '<div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}${v23StitchBlock()}</div>';
 // ⑤ 折叠壳的 CSS 三件套
 const A_CSS = '.wa-fold { border: 1px solid';
 // ⑥ 折叠体的零控件纪律写在代码注释里（判据读注释 = 证明「这条纪律是明写的」）
@@ -176,10 +180,13 @@ function runB(a) {
   //   v2.400.0（V22 后续）：六块 → 七块（EXV22-9 的 v22OmensBlock 同走折叠壳）。
   //   数到 7 还不够 —— 必须点名第七块的身份（「有人复制了一块」也是 7），
   //   与 segment-extract-v2400 D4f 同口径。
-  a(folds.length === 7, 'B1: 概览页有 7 个折叠壳（实 ' + folds.length + '）—— 七块只读诊断全部折起');
+  //   v2.402.0（V23）：七块 → 八块（v23StitchBlock 同走折叠壳）。同上一次一样：
+//   数到 8 还不够 —— 必须点名第八块的身份（「有人复制了一块」也是 8）。
+  a(folds.length === 8, 'B1: 概览页有 8 个折叠壳（实 ' + folds.length + '）—— 八块只读诊断全部折起');
   a(!!foldByLabel(body, 'V22 制度读数'), 'B1b: 第七块是 V22 制度读数（v22OmensBlock，不是任何一块的复制品）');
+    a(!!foldByLabel(body, 'V23 缝合线'), 'B1c: 第八块是 V23 缝合线（v23StitchBlock，不是任何一块的复制品）');
   // 每块都有 summary，且摘要含真读数（不是空壳）
-  const labels = ['引擎心跳', '容量收纳', '随机源', '时间源', '对外桥', '记忆桥', 'V22 制度读数'];
+  const labels = ['引擎心跳', '容量收纳', '随机源', '时间源', '对外桥', '记忆桥', 'V22 制度读数', 'V23 缝合线'];
   labels.forEach(function (lb) {
     const f = foldByLabel(body, lb);
     a(!!f, 'B2: 「' + lb + '」块在树中且带独立摘要');

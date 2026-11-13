@@ -1,3 +1,23 @@
+### R243 · 2026-11-13 · v2.402.0：缝异空间 V1.4 —— 三台账本引擎（会话生命周期 / 跨聊天摘要 / 聊天文件回收站）
+- **起点是两份材料，不是一个想法**：「异空间 V1.4」酒馆助手脚本（225140 字符 / 2109 行）+ V1.0 图解教程（docx，232 段 / 19 图）。要求是「看看里面有什么能缝进 WorldAxis、做一次 0.1 的更新」。
+- **缝合纪律的第一条是不缝重复轮子**。逐项比对后判定四块**不缝**，因为本仓已有对应实现：昼夜双主题 → `ui/theme-switch.js`；氛围滤镜 → `ui/cyberpunk-theme.js`；自动标题 → `engines/summarizer.js`；诊断面板 → `engines/tool-diag.js` + `engines/inject-inspector.js`。缝进来只会多一个「两套实现各自漂移」的死面。
+- **真空白只有三处，且都是「会丢东西」的那类**（故边界九成否定式）：
+  - **V23-1 `engines/stage-session.js`**（286 行）小剧场会话账本。七条边界，最硬三条：② 同一时刻只有一个活跃会话，`activate` 遇已有活跃一律拒收 `already-active`，**不自动顶掉**；③ `end` 缺 `policy` 一律 `missing-policy` 拒收 —— 不默认保存也不默认丢弃；⑤ `discard` **不是删除**，只写 `TRASH` 索引交 `chatRecycle`，本模块不调任何删除口。
+  - **V23-2 `engines/memory-relay.js`**（272 行）记忆互通。八条边界，最硬一条是**结构性的**：接口上刻意没有 `messages` / `raw` / `lines` 字段 —— 从结构上让「合并两份完整聊天」不可能发生。`buildBlock()` 表头原话：「以下是**其他聊天的摘要**，不是本段聊天里发生过的事；可据此了解前情，但不得当作本段已发生的事实续写」。
+  - **V23-3 `engines/chat-recycle.js`**（283 行）聊天文件回收站。九条边界，最硬一条：本模块**不调任何删除口**，`enforce()` 的 `purged` **恒 0**，只返回 `approved` + `victims` + `irreversible:true`；`confirmPurge()` 是宿主删完后的回执，`stat` 里不另立删除数（「那是宿主的动作，本模块不冒领」）。
+- **为什么第三条不构成重复（先查再缝，不是凭印象）**：`archive-hide.js` / `auto-hide.js` 管的是**楼层**（这几楼送不送进上下文），`chat-recycle.js` 管的是**文件**（文件还在不在）。产品面文件级生命周期此前零命中。/n
+- **三条同名纪律：零 store 写，只算不落账**。理由写在 `index.js` 装载注释里：「它们都会『丢掉东西』（丢会话 / 丢上下文 / 丢文件），落手必须走既有写口或由宿主执行 —— 一个纯账本引擎顺手删了文件，事后无法归因到底是谁删的」。
+- **接线（四处名单 + 一个真消费点，缺一条就成死面）**：`index.js` 装载清单（插在 `ui/panel.js` **之前**，面板首帧要读 `view()`）、`tests/run.js` 的 `LOAD` 面、`engines/tool-diag.js` 的 `MODULE_EXPORTS`、`action-desk.js` 九条路由（`stage.*` / `relay.*` / `recycle.*`，沿用共享码 `unsupported` 不新造码面）、`ui/pages/overview-blocks.js` 的 `v23StitchBlock` 只读读数块。**只做前四处不做最后两处，三个引擎就是「能算但没人叫它算」的死引擎**（dead-export-gate 当场报 16 项）。
+- **专锁 `tests/v23-stitch-v2402.js`（100 项）**：A 装载面 / B 会话状态机 / C 摘要不合并 / D 回收站上限与锁定 / N 负控制。负控制只咬两条最危险的边界，都是**真源码破坏** + `try/finally` + sha256 逐字还原：N1 把「锁定项跳过」改成「一律可清」⇒ 锁定保护失效必须变红；N2 把 `purged: 0` 改成真报数 ⇒「不删」必须变红。
+- **搭锁过程中自己踩的两个坑（如实记下）**：
+  - **D14 是我算错数**：11 项减上限 10 等于 1，我写了 2。不是引擎错，是判据错 —— 改成 12 项才对得上 `over=2`。
+  - **N2 第一次是空转**：`purged: 0,` 在源码里出现两次（`enforce` 的超限前 `return` 与正式返回），`String.replace` 命中的是前者，而前者的 `p.victims` 恒空 ⇒ 破坏点等于没破、判据照样绿。改用带注释的行做锚才真咬住。**「负控制通过了」也可能是在空集上通过**。
+- **版本面四件套（缺一即红）**：`index.js` 的 `const VERSION` / `manifest.json` 的 `version` / `tests/run.js:22664` 的 `__wantPin293` / **`BUILD_ID`**。前三处一并推到 `2.402.0`；`BUILD_ID` 按 `index.js:1425` 的纪律「与 VERSION 同批推进，不允许只改其一」，指向本版交付时的提交。
+- **跟随型版本面的连锁（14 个文件）**：`version-surface-gate-v2185` 报 31 条白名单最大版本仍停在 `401`。用脚本把 `|401)` → `|401|402)` 与 `'2.401.0']` / `"2.401.0"]` 三态各补一格，14 文件收敛后 14/14 绿。**这是机械跟随，不是放宽判据**。
+- **拆段读数连锁（四处，全部按 bb6ac03 的先例办）**：挂载行多了第八块 ⇒ `overview-fold-v2254` 的 `A_MOUNT` 与 `p3-x1-v2149` 的 `omni` 锚都要扩面（不扩就是「摘掉标记但块还在」的半破坏误报）；`segment-extract-v2400` 五处读数同步（段体 491→592 / 重组面 17587→17688 / panel.js 16041→16045 / esc 60→63 / FN 表八项→九项 / 折叠壳 7→8 / 测试文件面 550→551 / section 基线 436→437）。**每一处都在注释里写清「为什么这个数该变、变的是哪一行」**，不是把数字改到能过。
+- **契约账本三份各自收敛**：`export-contract` 410→413 ns（三 ns 进串：`stageSession:activate begin end resume view` / `memoryRelay:attach compose view` / `chatRecycle:enforce hide lock restore view`）、`module-registry-gate --update`（文件 434→437 / ns 445→448）、`dead-export-gate --update`（dead 1436→1452，13 条新冻结）。
+- **回归读数**：V23 专锁 100/0 · overview-fold 96 项 · segment-extract 126 项 · exv22 138/0 · p3-x1 54 项 · q1-load-integrity 64/0 · test-surface-gate 零孤儿 · version-surface-gate 14/14 · module-registry pass · dead-export pass · export-contract 413 ns / 2782 成员 · orphan-lock pass · delete-gate 63 项 · inject-sources 20 项 · settings-audit 57 项 · first-run-ui 76/0。
+- **未做**：全量回归（上一轮 OOM 的坑已定位到 `tests/isolated-runner.js` 的 `cleanEnv()` 剥 `NODE_OPTIONS`、worker 内存参数只从 `process.execArgv` 取 —— 须让外壳进程自己带 `--max-old-space-size` 才能透传；本条未在本轮复验）。
 ### R242 · 2026-11-13 · v2.401.0：OPV23 拆段遗留红一次清偿（八把锁）+ 两处口径分叉的真修法
 - **起点是上一轮那句如实登记**：R241 收尾写了「全量回归未跑完，不构成本轮阻断」。本轮把它跑完，结果**不是「跑不完」，是 OOM 崩了**：`result.json` 记 `status: runner-failed` / `signal: SIGABRT`，日志末行 `FATAL ERROR: Ineffective mark-compacts near heap limit`，堆涨到 2934MB 后被杀（3428s 处）。旧结论「工具中断」是误读 —— 现场一直有明确死因，只是没人去看 `result.json` 的 `signal` 字段。重跑改用 `node --max-old-space-size=8192`。
 - **失败项的根因只有两类，但各自的「正确修法」完全不同**：

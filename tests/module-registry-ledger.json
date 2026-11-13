@@ -1,13 +1,13 @@
 {
- "version": "2.401.0",
- "loadOrderCount": 452,
- "loadedCount": 434,
+ "version": "2.402.0",
+ "loadOrderCount": 455,
+ "loadedCount": 437,
  "uiCount": 18,
- "nsCount": 445,
+ "nsCount": 448,
  "totals": {
-  "loadEdges": 296,
+  "loadEdges": 302,
   "hardEdges": 0,
-  "callRefs": 511,
+  "callRefs": 517,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -72,6 +72,7 @@
     "engines/celestial-omens.js",
     "engines/channel-probe.js",
     "engines/chapters.js",
+    "engines/chat-recycle.js",
     "engines/choice-board.js",
     "engines/chronicle-view.js",
     "engines/city-folklore.js",
@@ -154,6 +155,7 @@
     "engines/lingua-broker.js",
     "engines/living-world.js",
     "engines/maritime-navigation.js",
+    "engines/memory-relay.js",
     "engines/memory-tiers.js",
     "engines/memory.js",
     "engines/mend.js",
@@ -236,6 +238,7 @@
     "engines/social-legacy.js",
     "engines/solo-voice.js",
     "engines/stage-presence.js",
+    "engines/stage-session.js",
     "engines/stage.js",
     "engines/stale-guard.js",
     "engines/stall.js",
@@ -392,6 +395,7 @@
     "engines/cascade-bus.js",
     "engines/celestial-omens.js",
     "engines/chapters.js",
+    "engines/chat-recycle.js",
     "engines/cognitive-poisoning.js",
     "engines/collateral-rupture.js",
     "engines/coordinate.js",
@@ -418,6 +422,7 @@
     "engines/life.js",
     "engines/lingua-broker.js",
     "engines/living-world.js",
+    "engines/memory-relay.js",
     "engines/memory.js",
     "engines/metabolism-clock.js",
     "engines/mortuary-rites.js",
@@ -436,6 +441,7 @@
     "engines/sanctuary-scramble.js",
     "engines/sartorial-regalia.js",
     "engines/stage-presence.js",
+    "engines/stage-session.js",
     "engines/summarizer.js",
     "engines/supply-choke.js",
     "engines/vitals.js",
@@ -495,6 +501,7 @@
     "engines/cataclysm-hazard.js",
     "engines/celestial-omens.js",
     "engines/channel-probe.js",
+    "engines/chat-recycle.js",
     "engines/choice-board.js",
     "engines/chronicle-view.js",
     "engines/city-folklore.js",
@@ -568,6 +575,7 @@
     "engines/lingua-broker.js",
     "engines/living-world.js",
     "engines/maritime-navigation.js",
+    "engines/memory-relay.js",
     "engines/memory-tiers.js",
     "engines/mend.js",
     "engines/modelink.js",
@@ -644,6 +652,7 @@
     "engines/social-legacy.js",
     "engines/solo-voice.js",
     "engines/stage-presence.js",
+    "engines/stage-session.js",
     "engines/stage.js",
     "engines/stale-guard.js",
     "engines/stall.js",
@@ -8337,6 +8346,75 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_lingua_broker_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/stage-session.js": {
+   "ns": [
+    "stageSession"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_stage_session_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/memory-relay.js": {
+   "ns": [
+    "memoryRelay"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_memory_relay_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/chat-recycle.js": {
+   "ns": [
+    "chatRecycle"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_chat_recycle_settings_v1"
    ],
    "consumedBy": []
   }

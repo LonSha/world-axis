@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.401.0';
+  const VERSION = '2.402.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1373,6 +1373,15 @@
     'engines/betrothal-alliance.js',   // EXV22-6 婚约聘娶 / 妆匛议价 / 门第联姻
     'engines/cartography-survey.js',   // EXV22-7 舆图测绘 / 精度分层 / 迷雾认知
     'engines/lingua-broker.js',        // EXV22-8 方言隔阂 / 译语掮客 / 误译后果
+    // ══ v2.402.0（V23 缝合线 · 异空间 V1.4 三缝）：会话账本 / 记忆互通 / 聊天回收站 ══
+    //   三缝共用一条纪律（同 V22 八引擎）：**零 store 写**，只算、只记自己的账。
+    //   为什么三缝都要如此：它们都会「丢掉东西」（丢会话 / 丢上下文 / 丢文件），
+    //   落手必须走既有写口或由宿主执行 —— 一个纯账本引擎顺手删了文件，
+    //   事后无法归因到底是谁删的（chat-recycle 的 enforce() 恒 purged:0 就是这条）。
+    //   三缝之间互不依赖；排列只需在 ui/panel.js 之前（面板要读它们的 view）。
+    'engines/stage-session.js',        // V23-1 小剧场会话生命周期 / 退出三选 / 存档快照
+    'engines/memory-relay.js',         // V23-2 记忆互通（摘要跨聊天挂载，不合并原文）
+    'engines/chat-recycle.js',         // V23-3 聊天回收站（上限 10 / 锁定保护 / 只出清单不删）
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；

@@ -763,7 +763,17 @@ function runF(T, S) {
     + notRead.length + '：' + notRead.join(',') + '）—— 动态取法会被判成假消费点');
   //   恰好 8 处：多出来说明有人又加了一个读点（可能是重复块），少一处就是漏接。
   const viewHits = (blkCode.match(/WA\.[A-Za-z_$][\w$]*\.view\s*\(/g) || []).length;
-  T(viewHits === 8, 'F1b 段文件里 view() 字面读点恰 8 处（实 ' + viewHits + '）');
+    //   v2.402.0（V23）：段文件里同屏又多了一块（v23StitchBlock），它读三个 ns 的 view()。
+  //   本判据口径不变 —— **只数 V22 那八个 ns**（NS_ALL），不把别的块算进来：
+  //   若改成 11，下一个人加一块就又要改一次，而那时「V22 八项都在」这件事已经
+  //   淹没在一个总数里了。故改成「按 ns 点名计数」，总数另立一条。
+  const v22ViewHits = NS_ALL.filter(function (ns) {
+    return new RegExp('WA\\.' + ns + '\\.view\\s*\\(', 'm').test(blkCode);
+  }).length;
+  T(v22ViewHits === 8, 'F1b 段文件里 8 个 V22 ns 的 view() 字面读点恰 8 处（实 ' + v22ViewHits + '）');
+  //   总数另一条：V22 八 + V23 三 = 11。这条守的是「没有多出第四块读点」
+  //   （重复块 / 复制粘贴的治疗点），与上一条分工：那条问「八项齐不齐」，本条问「总数对不对」。
+  T(viewHits === 11, 'F1b2 段文件里 view() 字面读点总数恰 11 处（V22 八 + V23 三；实 ' + viewHits + '）');
 
   // ── F2 只读零动作：绝不出现任何有副作用入口 ──
   //   这是本组**最重要**的一条。概览页一打开就调 levySeason / holdFuneral，
