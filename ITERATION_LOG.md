@@ -7054,3 +7054,15 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - **版本面**：VERSION/manifest → 2.404.0；14 文件白名单 widen 到 404（12 处 alternation + 13 处数组）；version-surface-gate 14/14；dead-export/module-registry 账本 --update（version=2.404.0）；evidence-index --write（551 条，choice-reflux 新入账 wired+1）。
 - **复验**：cold-start-v2403 29/0（v2.403.0 成果不回退）、rel-contract-v2600 23 项 pass（契约节字段对账）。
 - 未做（如实登记）：全量回归未跑；storyChoice 引擎本身仍默认关（enabled:false）——本轮只打通「确认过的选择必须被推演结算」的回流管道，选择点的「呈现→确认」入口（面板/正文 <choice> 标签）的产品决策留待下一轮。
+
+## R246（v2.405.0 · 玩家面统一读出：世界读数通道）
+
+- **病灶（R246）**：概览页十六块各自从约 30 个引擎口取数，玩家面没有「一份世界的同一种读法」。用户对标 ST-SevenDaysCal（一条脊柱一个读出面）与 RUBY 插件后定方向：**学 RUBY 的机制不是学它的面板排版**——read 出结构化数据、前端爱怎么渲染怎么渲染、接口不预设格式；用户 ruby 卡生态未来可直接读 WorldAxis 的统一数据口渲染状态卡。不照搬四页结构，要有我们自己的特色但必须统一。
+- **新引擎（engines/world-reader.js，纯只读现算）**：① `snapshot()` 结构化读口——人物（loc/act/intent 公开动线，内心面不出防全知）/暗流（**信息边界：只出 visibility ∈ {known, direct}**，trace/hidden/已结束不出）/长期事实（active + key 去重取最新）/选择两源合并（与 compactState.choices_recent 同口径，round 降序）/伏笔（waiting/developing）/演化 activeSnapshot 直读/脉搏/counts 对账面（含 currentsVisible 让边界差可见）；② `renderCard()` 玩家语言卡片——四段结构（谁在哪要做什么 / 哪些事正在动 / 你的抉择 / 埋着的线+脉搏），live/quiet 两态，零内部 id、零原始桶值、零诊断词，全部动态文本过 esc；③ 零 store 写 / 零 settingsBus 写 / 零 localStorage / 零模型调用，不新建第二真源。
+- **消费面（ui/pages/overview-main.js）**：`${worldPulseCard}` 置顶（统计卡之后、firstBlock 之前），既有十六块全部保留不动（overview-fold-v2254 等判据钉着的面逐字未动）；失败静默不占屏（diaryBlock 口径）。tool-diag 守卫表 cond 层登记 `wa-world-pulse-card`（依赖态不是断裂）。index.js 加载序列 chat-recycle 之后、ui/panel.js 之前。
+- **专锁 tests/world-reader-v2405.js 53/0**：真数据驱动——种入人物/暗流四态 visibility/事实（active+去重）/两源选择/伏笔两态/脉搏，断言 snapshot 各面、边界过滤（4 种 1 出 + counts 对账 3/1）、renderCard 玩家语言（含 XSS esc 防线、零 id 零桶值红线）、既有 15 块模板引用逐一保留、加载序列次序、守卫表登记。
+- **版本面**：VERSION（index.js）/manifest → 2.405.0；白名单 widen（13 alternation + 13 数组）；version-surface-gate 14/14；dead-export/module-registry 账本 --update（version=2.405.0）；evidence-index --write；q9-evidence-ledger 67/0。
+- **快档批次**：--only-v-section=v2.405 隔离跑 **passed，通过 2222 / 失败 0**。
+- 未做（如实登记）：全量回归未跑；RUBY 其余可缝机制（增量阅读书签 / 总结接口适配层 / 导演调度）已识别未立项；BUILD_ID 二次提交待首笔落定后随惯例补。
+
+## R246（v2.405.0 · 收尾读数）

@@ -1,13 +1,13 @@
 {
- "version": "2.404.0",
- "loadOrderCount": 455,
- "loadedCount": 437,
+ "version": "2.405.0",
+ "loadOrderCount": 456,
+ "loadedCount": 438,
  "uiCount": 18,
- "nsCount": 448,
+ "nsCount": 449,
  "totals": {
-  "loadEdges": 302,
+  "loadEdges": 303,
   "hardEdges": 0,
-  "callRefs": 517,
+  "callRefs": 519,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -275,6 +275,7 @@
     "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
+    "engines/world-reader.js",
     "engines/world-seed.js",
     "engines/world-snapshot.js",
     "engines/write-desk.js",
@@ -687,6 +688,7 @@
     "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
+    "engines/world-reader.js",
     "engines/world-seed.js",
     "engines/world-snapshot.js",
     "engines/write-desk.js",
@@ -8416,6 +8418,25 @@
    "stateKeys": [
     "worldaxis_chat_recycle_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/world-reader.js": {
+   "ns": [
+    "worldReader"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   }
  }

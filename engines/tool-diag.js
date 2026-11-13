@@ -5229,7 +5229,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.286.0（V7 EXV7-2）：`wa-intent-block` 同登 cond 层 —— 看板关着时整块
       //   不渲染（briefBlock 口径：关着不占屏），plan 引擎缺席时渲染的是**缺席提示**
       //   而非数据行。它缺失是设置态 / 依赖态，不是断裂；渲染了但 id 写错照样被咬到。
-      cond: ['wa-first-block', 'wa-wc-line', 'wa-brief-block', 'wa-intent-block'] },
+      // v2.405.0：`wa-world-pulse-card` 登 cond 层 —— 世界读数通道缺席或异常时
+      //   统一卡静默不渲染（diaryBlock 口径：失败不占屏）。它缺失是依赖态，
+      //   不是断裂；渲染了但 id 写错照样被咬到。
+      cond: ['wa-first-block', 'wa-wc-line', 'wa-brief-block', 'wa-intent-block', 'wa-world-pulse-card'] },
     { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat',
       // v2.290.0（EXV7-6）：跨地点沉积台账出口。三件齐做（渲染 + 绑定 + 守卫登记）——
       //   理由与 v2.149.0 那批一致：只加按钮不加登记，「渲染了但绑定 id 写错」在本出口上永不可见。

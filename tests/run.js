@@ -22462,6 +22462,13 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runScript('./choice-reflux-v2404.js');
   }
+  // ── v2.405.0：玩家面统一读出（世界读数通道 world-reader，RUBY read 机制缝入）──
+  //   snapshot 结构化读口（信息边界只出 known/direct）+ renderCard 玩家语言统一卡
+  //   置顶概览页；既有十六块全部保留不动。
+  section('v2.405.0: 玩家面统一读出专锁（snapshot读口 / 信息边界 / renderCard玩家语言 / 概览页接线）');
+  {
+    await runScript('./world-reader-v2405.js');
+  }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
   //   核心判据是「声明 vs 现场静态扫描」双向对账 —— 不做对账，声明表只是文档。

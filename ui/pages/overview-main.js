@@ -423,6 +423,15 @@
     // v2.271.0（V6 EXV6-7）：开局引导三步卡 —— 「你现在在第几步、下一步做什么」。
     //   三态如实渲染：done 划掉、todo 加粗、cannot-tell 斜体并说明**测不到**（不写成没做）。
     //   每步给一个直达按钮（出口来自引擎的 next()，面板不自己编动作）。
+    // v2.405.0：世界脉搏统一卡（engines/world-reader.js 消费面）。置顶增量：
+    //   既有十六块全部保留不动（overview-fold-v2254 等判据钉着），统一卡是唯一的
+    //   「一份世界的同一种读法」玩家面入口；措辞全部来自引擎 renderCard，不造第二真源。
+    const worldPulseCard = (function () {
+      try {
+        if (!WA.worldReader || typeof WA.worldReader.renderCard !== 'function') return '';
+        return WA.worldReader.renderCard();
+      } catch (e) { return ''; } // 统一卡失败静默不占屏（同 diaryBlock 的失败方式）
+    })();
     const firstBlock = (function () {
       try {
         if (!WA.firstRun || typeof WA.firstRun.build !== 'function') {
@@ -635,6 +644,7 @@
         <div class="wa-stat"><div class="wa-stat-v">${s.evolution.round}</div><div class="wa-stat-k">演化回合</div></div>
         <div class="wa-stat"><div class="wa-stat-v">${beforeN}+${afterN}</div><div class="wa-stat-k">工作流节点</div></div>
       </div>
+      ${worldPulseCard}
       ${firstBlock}
       ${firstLine}
       ${simHealthLine}

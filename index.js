@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.404.0';
+  const VERSION = '2.405.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1382,6 +1382,10 @@
     'engines/stage-session.js',        // V23-1 小剧场会话生命周期 / 退出三选 / 存档快照
     'engines/memory-relay.js',         // V23-2 记忆互通（摘要跨聊天挂载，不合并原文）
     'engines/chat-recycle.js',         // V23-3 聊天回收站（上限 10 / 锁定保护 / 只出清单不删）
+    // v2.405.0：世界读数通道（RUBY read 机制的 WorldAxis 版）。位置在 chat-recycle 之后、
+    //   ui/panel.js 之前：面板概览页的统一卡在调用期读它的 snapshot/renderCard。
+    //   纯只读现算——零 store 写、零 settingsBus 写、零落盘、零模型调用。
+    'engines/world-reader.js',         // 世界读数通道（snapshot 结构化读口 + 玩家面统一卡）
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；
