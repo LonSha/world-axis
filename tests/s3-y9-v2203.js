@@ -52,7 +52,16 @@ const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
 const ENG_REL = 'engines/world-lab.js';
 const SELF_REL = 'tests/s3-y9-v2203.js';
-function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+// v2.401.0（OPV23 拆段遗留红·同族第九次）：`ui/panel.js` 走 panel-source 的**重组面**
+//   —— 本锁的切片锚点（Y8/Y9 渲染段、N7 的两段）与 `wa-wl-*` / `wa-wl-adv*` 控件
+//   随 OPV23 搬进了 `ui/pages/tools-page.js`，而锁仍直读 panel.js 单文件 ⇒ 段首 indexOf 得 -1、
+//   渲染段切片成空串 ⇒ A1/A1b/A2/A4b/A4d/A12 一串在空集上恒假。
+//   **断言字面量一条未改**，只把输入面换回与事实同宽（tests/panel-source.js 的 `panelSource()`）。
+const PANEL_SRC = require('./panel-source.js');
+function rd(rel) {
+  if (rel === PANEL_REL) return PANEL_SRC.panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
 function cnt(s, n) { return s.split(n).length - 1; }
 function j(x) { return JSON.stringify(x); }
 /** 把「设置态」按各引擎**自己的**默认值显式写回（装置件、模块级 —— 理由与 Y6/Y7/Y8 同）。 */

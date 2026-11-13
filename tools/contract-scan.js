@@ -81,6 +81,24 @@ function witnessDeclared(root) {
   const re = /\bwant\(\s*'([A-Za-z_][A-Za-z0-9_-]*)'/g;
   let m;
   while ((m = re.exec(src)) !== null) out.push(m[1]);
+  // v2.401.0（同族第十一次，**新一轮口径分叉**）：`want()` 的**间接传参**形态；
+  //   病灶：`tests/reject-v2780.js` 的 action-desk 缺席见证段先建 21 行表
+  //     const ABSENT = [ ['vitals', 'vitals-unavailable', 'vitals.register'], ... ];
+  //   再在循环里 `want(code, '…')` —— 码是**变量**，不是字面量。上面那条正则只认
+  //   `want('字面量'`，于是这 21 条在静态面**完全不可见**，而 `runWitness` 运行时
+  //   `expect` 里它们**都在**（实测 inExpect=true / inScan=true）。
+  //   后果与 v2.381.0 那次逐字同型：同一个集合两份口径，contract-scan 报
+  //   `codes:*-unavailable` 无归属 21 条（contract-scan-v2150 红 8 条），
+  //   而 reject-lock 因为用运行时 expect，看不出任何异常。
+  //   为什么不能把 21 条塞进 base 收款（**已实测否掉**）：base 是「存量未分类」，
+  //   把已见证的码写进 base 会被 reject-code-gate 的 baseStale 判成「台账比现实胖」
+  //   （实 21），且三集恒等式当场差 21（779+52+939 ≠ 1749）—— 那是在给台账注水。
+  //   正确修法：让静态面认得**表型**，与运行时口径同宽；判据强度不降
+  //   （表里写错码名仍会被 reject-lock 的 w.unexpected / w.missing 咬住）。
+  //   形态收得很窄：只认「三个字符串字面量的行，且第二列以 -unavailable 结尾」——
+  //   这是 action-desk 缺席路由表的**唯一形态**，不做泛化的「任意数组第二列」。
+  const rowRe = /\[\s*'[A-Za-z_][A-Za-z0-9_-]*'\s*,\s*'([A-Za-z_][A-Za-z0-9_-]*-unavailable)'\s*,/g;
+  while ((m = rowRe.exec(src)) !== null) out.push(m[1]);
   return out.filter(function (v, i, a) { return a.indexOf(v) === i; });
 }
 

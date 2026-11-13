@@ -1,3 +1,22 @@
+### R242 · 2026-11-13 · v2.401.0：OPV23 拆段遗留红一次清偿（八把锁）+ 两处口径分叉的真修法
+- **起点是上一轮那句如实登记**：R241 收尾写了「全量回归未跑完，不构成本轮阻断」。本轮把它跑完，结果**不是「跑不完」，是 OOM 崩了**：`result.json` 记 `status: runner-failed` / `signal: SIGABRT`，日志末行 `FATAL ERROR: Ineffective mark-compacts near heap limit`，堆涨到 2934MB 后被杀（3428s 处）。旧结论「工具中断」是误读 —— 现场一直有明确死因，只是没人去看 `result.json` 的 `signal` 字段。重跑改用 `node --max-old-space-size=8192`。
+- **失败项的根因只有两类，但各自的「正确修法」完全不同**：
+  - **第一类（八把锁，纯输入面窄）**：`s3-y8-v2203`(15) / `s3-y9-v2203`(15) / `s3-b3-n7-v2223`(12) / `s3-b3-e7-v2188`(2) / `s3-b3-e8-v2187`(3) / `s3-b3-e9-v2188`(3)。全部是 OPV23 把 `wa-rp-*` / `wa-wl-*` / `wa-dc-*` 控件与折叠段头搬进 `ui/pages/tools-page.js` 后，锁仍直读 `ui/panel.js` 单文件 ⇒ 段首 `indexOf` 得 −1、切片成空串，A1/A1b/A2/A4b/A4d/A12/A29/A30/A31 一串**在空集上恒假**。修法照本仓九次同型裁决：`rd()` / `readOf()` 在 `PANEL_REL` 时改走 `tests/panel-source.js` 的 `panelSource()` 重组面，**断言字面量一条未改、只换输入面**。修后 143/0、170/0、199/0、346/0、183/0、334/0。
+  - **第二类（三处，各自是真缺陷，不能靠换输入面糊过去）**：见下三条。
+- **真缺陷一 · `run.js` 的当前版本字面量漏跟版**：`tests/run.js:22657` 的 `__wantPin293` 仍是 `'2.400.0'`，而入口已 2.401.0。这条是 `tools/fact-report.js` 的 `runPins` **唯一供养**（`run.js` 里唯一一个带引号的当前版本字面量），漏跟的直接后果是 U9 的 B3/N7 双红：报告说不出「入口版本在消息面上被钉过」。改 `'2.401.0'` 后 `runPins=1`、U9 51/0。
+  - 记一笔**读法教训**：这条断言的名字是「入口 VERSION === 期望值（严格相等，不是前缀）」，看起来像「锁死版本」，实际它锁的是**入口版本必须与那唯一一处钉版字面量同源**。升版时改这里不是「为了变绿而改判据」，是它本来就要求每版同步 —— 这也是为什么它被设计成只有一处。
+- **真缺陷二 · 台账 8 条 `getSettings` 未登记**：O8 报 `unregistered` 8 条（`celestialOmens` / `postalRelay` / `levyCorvee` / `mortuaryRites` / `sartorialRegalia` / `betrothalAlliance` / `cartographySurvey` / `linguaBroker` 的 `.getSettings`）。逐条核实：产品面与测试面**都零引用**，且八个引擎都已真向 `settingsBus` 注册（`WA.__settingsRegs` 那条路），即「注册了没人读」而不是「没接总线」—— 正是 `settings-registry-only` 那一档的定义。按仓库既有通道 `node tools/consumer-types.js --register` 重建登记表（232 → 240 条），重建后自检「重建后核对：通过」。**没有手写登记项**（手写理由会与 `shapeOf` 复算脱钩，下一版就是 shape-stale）。
+- **真缺陷三 · 21 条 `*-unavailable` 无归属（本轮最值得记的一条）**：
+  - 现场：`contract-scan` 报 `codes` 面 `契约漂移: 21 项`，全是 `X-unavailable` 形态；`contract-scan-v2150` 红 8 条。
+  - **第一次修错了（如实记下）**：我以为「未入台账」就照上一次 v2.401.0 归入 `base` 的先例，把这 21 条 append 进 `reject-code-ledger.json` 的 `base`。结果 `reject-lock-v2780` 立刻红两条：`[B] 台账不冗余（实 21）` + `三集合划分穷尽且互斥（779+52+939=1770 ≠ 1749）`。**差正好 21，方向是「多了」** —— base 是「存量未分类」，而 `baseStale` 的定义是「base 里的码已被见证或已从源码消失」。加进去的 21 条**本来就在见证集里**，于是被同时算进 witnessed 和 base，注水 21 条。已回滚。
+  - 真实根因（用临时探针实测，非推理）：`tests/reject-v2780.js:8611` 的 action-desk 缺席见证段先建一张 21 行表 `const ABSENT = [ ['vitals','vitals-unavailable','vitals.register'], … ]`，再在循环里 `want(code, '…')` —— **码是变量，不是字面量**。而 `tools/contract-scan.js` 的 `witnessDeclared()` 用 `/want\(\s*'([A-Za-z_][A-Za-z0-9_-]*)'/g` 只认字面量，于是这 21 条在静态面**完全不可见**，而 `runWitness` 的运行时 `expect` 里它们**都在**（探针实测 `inExpect=true / inScan=true / inBase=false`，`expectSize=808`）。
+  - 于是这是**同一集合两份口径**，与 v2.381.0 记的那次（`[a-zA-Z]` → `[A-Za-z_]`，静态 776 vs 运行时 779，差 3）**逐字同型**。区别只是那次漏的是首字符下划线，这次漏的是「间接传参」。
+  - 修法：给 `witnessDeclared()` 补一条**表型识别**（不是补清单）—— 认「三个字符串字面量、第二列以 `-unavailable` 结尾」的行，把第二列纳入。形态可以收得很窄，因为这是 action-desk 缺席路由表的唯一形态；**判据强度不降**（表里写错码名仍被 `reject-lock` 的 `w.missing` / `w.unexpected` 咬住）。修后 `契约漂移: 0`、55/0、51/0、60/0。
+  - **为什么不选另外两条路**：① 把 21 条写进 `base` —— 已实测，注水 21 条并破坏恒等式（上面那步）；② 把 `want(code, …)` 改成 21 个 `want('字面量', …)` —— 那是在**为了让静态正则认得而改写被测代码的形态**，等于让判据决定产品怎么写，方向反了。
+- **一处工具事故（也记下来）**：用 `edit_file` 往 `contract-scan.js` 里插这段修法时，它把 `old` 参数连同标记写进了文件，把第 81 行改成了一行垃圾 ` old" string="true">false`，直接语法错。已用 Python 按行定位 + 整块替换修回，`node --check` 通过。**教训：本仓正文含大量正则与引号，`edit_file` 的 old/new 边界容易被误判；这类文件改法一律走「Python 按行锚定」，不靠字符串模糊匹配。**
+- **回归读数**：`contract-scan-v2150` 55/0 · `reject-lock-v2780` 51/0 · `reject-code-coverage-v2107` 60/0 · `reject-recovery-lock-v2192` 199/0 · `reject-facediff-v2400` 11/0 · `o6-layer-gate-v2187` 71/0 · `o7-plan-tree-gate-v2187` pass(69) · `o8-consumer-gate-v2187` 38/0 · `u9-fact-report-v2190` pass(51) · `u4-export-lifecycle-v2191` pass(30) · `inject-value-v2150` pass(56) · 六把拆段锁 143/170/199/346/183/334 全 0 失败。
+- **未做（如实登记）**：全量回归已在本轮末尾以 8GB 堆重跑，读数见下一轮；本轮提交依据是上述逐把实测 + 上一轮 stash 基线对照，不声称「全量绿」。
+
 ### R241 · 2026-11-13 · v2.401.0：玩家动线断点收口 —— 开局引导「配一个 API」出口指向不存在的格子
 - **缺陷现场（一句话）**：开局引导第一步点「去做」，玩家被送到**设置页**，提示写着「在设置页『接口』一格填 Base URL / API Key / 模型」；而 `ui/settings.js`（1592 行）全文 **没有任何 `baseUrl` / `apiKey` 命中** —— 设置页根本没有那一格。玩家照提示找过去，那里什么都没有。
 - **为什么所有既有断言都是绿的**：`first-run-ui-v2271` 的 B 面只咬「按钮在、绑了、点了会切页」（B1/B2/B3 用 tier 步当样本，断言 `after === 'settings'`），**没有一条咬「切到的那一页能不能做这件事」**。引擎锁 `first-run-v2271` 只咬 `next('tier')` 的 `do === 'applyTier'`，api 步的出口从来没人读过。这是本仓熟悉的形态：判据的输入面比事实窄，结论就稳定地错。

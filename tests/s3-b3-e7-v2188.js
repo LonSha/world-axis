@@ -39,7 +39,15 @@ const FORMAT = 1;
 // 仓规「无消费方不挂导出」：这几口在产品代码里零消费方 ⇒ **不许**出现在导出面上。
 const MUST_BE_ABSENT = ['ACTION_TARGETS', 'MODULE_OF', 'FAIL_POLICIES', 'readKey', 'surface', 'resetStat'];
 function srcOf() { return fs.readFileSync(path.join(BASE, REL), 'utf8'); }
-function readOf(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+// v2.401.0（OPV23 拆段遗留红·同族第十次）：`ui/panel.js` 走 panel-source 的**重组面**
+//   —— 本锁 A29/A30/A31（e7 的 A44/A46、e9 的 A46/A48/C10）断言的是「面板上有真消费方 /
+//   渲染了这些 id / 分区标题是折叠段」，而这些控件随 OPV23 搬进了 `ui/pages/tools-page.js`，
+//   锁仍直读 panel.js 单文件 ⇒ 全部 indexOf 得 -1。**断言字面量一条未改**，只换输入面。
+const PANEL_SRC = require('./panel-source.js');
+function readOf(rel) {
+  if (rel === 'ui/panel.js') return PANEL_SRC.panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
 function exportBody(src) {
   const at = src.indexOf('WA.rulePack = {');
   if (at < 0) return '';
