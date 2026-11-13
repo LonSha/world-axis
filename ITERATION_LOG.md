@@ -7064,5 +7064,8 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - **版本面**：VERSION（index.js）/manifest → 2.405.0；白名单 widen（13 alternation + 13 数组）；version-surface-gate 14/14；dead-export/module-registry 账本 --update（version=2.405.0）；evidence-index --write；q9-evidence-ledger 67/0。
 - **快档批次**：--only-v-section=v2.405 隔离跑 **passed，通过 2222 / 失败 0**。
 - 未做（如实登记）：全量回归未跑；RUBY 其余可缝机制（增量阅读书签 / 总结接口适配层 / 导演调度）已识别未立项；BUILD_ID 二次提交待首笔落定后随惯例补。
-
 ## R246（v2.405.0 · 收尾读数）
+
+- **BUILD_ID** → `0883ca9` 的完整 sha（首笔提交 `v2.405.0: 玩家面统一读出——世界读数通道 world-reader（RUBY read 机制缝入）（R246）`，25 文件 +583/−133）。
+- 快档批次 passed 2222/0；version-surface-gate 14/14；q9-evidence-ledger 67/0。
+
