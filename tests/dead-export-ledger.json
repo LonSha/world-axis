@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.406.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.406.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.407.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.407.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -1025,6 +1025,94 @@
       "refs": 0,
       "tref": 0,
       "own": 14
+    },
+    "branchContinuity.branchSig": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 4
+    },
+    "branchContinuity.evaluate": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 3
+    },
+    "branchContinuity.evidence": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 5
+    },
+    "branchContinuity.evidenceRank": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 5
+    },
+    "branchContinuity.familyOf": {
+      "reason": "self-only",
+      "detail": "engines/branch-continuity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "branchContinuity.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "branchContinuity.replay": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "branchContinuity.restore": {
+      "reason": "self-only",
+      "detail": "engines/branch-continuity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "branchContinuity.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "branchContinuity.stat": {
+      "reason": "self-only",
+      "detail": "engines/branch-continuity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "branchContinuity.view": {
+      "reason": "self-only",
+      "detail": "engines/branch-continuity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/branch-continuity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "branchDiff.reset": {
       "reason": "test-only",
@@ -3042,6 +3130,54 @@
       "tref": 0,
       "own": 9
     },
+    "director.agenda": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/director.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 4
+    },
+    "director.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/director.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "director.rank": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/director.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 4
+    },
+    "director.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/director.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "director.stat": {
+      "reason": "self-only",
+      "detail": "engines/director.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/director.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "director.view": {
+      "reason": "self-only",
+      "detail": "engines/director.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/director.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "disasterEvacuation.clearDisaster": {
       "reason": "self-only",
       "detail": "engines/disaster-evacuation.js 内部自用、外部零引用（过度导出）",
@@ -4024,6 +4160,46 @@
       "src": "core/exec.js",
       "refs": 0,
       "tref": 0,
+      "own": 3
+    },
+    "factContinuity.diagnose": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/fact-continuity.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 4
+    },
+    "factContinuity.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/fact-continuity.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "factContinuity.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/fact-continuity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "factContinuity.stat": {
+      "reason": "self-only",
+      "detail": "engines/fact-continuity.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/fact-continuity.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "factContinuity.view": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/fact-continuity.js",
+      "refs": 0,
+      "tref": 1,
       "own": 3
     },
     "factionChronicle.stat": {
@@ -6162,14 +6338,6 @@
       "tref": 6,
       "own": 3
     },
-    "memoryRelay.buildBlock": {
-      "reason": "self-only",
-      "detail": "engines/memory-relay.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/memory-relay.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "memoryRelay.detach": {
       "reason": "self-only",
       "detail": "engines/memory-relay.js 内部自用、外部零引用（过度导出）",
@@ -8062,6 +8230,38 @@
       "reason": "self-only",
       "detail": "core/rand.js 内部自用、外部零引用（过度导出）",
       "src": "core/rand.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "readingBookmark.branchKey": {
+      "reason": "self-only",
+      "detail": "engines/reading-bookmark.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reading-bookmark.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "readingBookmark.pending": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/reading-bookmark.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 4
+    },
+    "readingBookmark.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/reading-bookmark.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "readingBookmark.view": {
+      "reason": "self-only",
+      "detail": "engines/reading-bookmark.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reading-bookmark.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -9978,6 +10178,54 @@
       "tref": 0,
       "own": 6
     },
+    "summarizerAdapter.exportDigest": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/summarizer-adapter.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "summarizerAdapter.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/summarizer-adapter.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "summarizerAdapter.importDigest": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/summarizer-adapter.js",
+      "refs": 0,
+      "tref": 5,
+      "own": 3
+    },
+    "summarizerAdapter.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/summarizer-adapter.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "summarizerAdapter.stat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/summarizer-adapter.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 2
+    },
+    "summarizerAdapter.view": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/summarizer-adapter.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
     "supplyChain.getSettings": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -11678,6 +11926,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 644
+    "dataOnly": 646
   }
 }

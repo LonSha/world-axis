@@ -114,7 +114,19 @@ const NON_SOURCE_BUILDBLOCK = {
   //   inject-collector.js 的 185 / 261 / 283 三处真实调用；不是死面、不是拿白名单遮羞。
   eccentricThreads: { verify: 'reasoning', reason: '市井奇闻：engines/inject-collector.js 直接调 buildBlock 折叠入正文，产品侧真调用点，非死面' },
   offstageLife: { verify: 'reasoning', reason: '台下生活：engines/inject-collector.js 直接调 buildBlock 折叠入正文，产品侧真调用点，非死面' },
-  routinePacing: { verify: 'reasoning', reason: '时序节律：engines/inject-collector.js 直接调 buildBlock 折叠入正文，产品侧真调用点，非死面' }
+  routinePacing: { verify: 'reasoning', reason: '时序节律：engines/inject-collector.js 直接调 buildBlock 折叠入正文，产品侧真调用点，非死面' },
+  // v2.402.0（V10）补登记：小剧场会话的 buildBlock 是过度导出（dead-export-ledger 归因
+  //   self-only、refs 0），正文侧零消费者；本锁 T6 的 dead 档逐字核账本归因，不凭空放行。
+  stageSession: { verify: 'dead', reason: '小剧场会话：buildBlock 内部自用、外部零引用（过度导出），dead-export-ledger 归因 self-only；产品侧给推演/正文的是 view() 与 actionDesk 路由动作，不消费该块' },
+  memoryRelay: { verify: 'reasoning', reason: '记忆中继：buildBlock 被 summarizer-adapter 的摘要适配层真实调用（engines/summarizer-adapter.js WA.memoryRelay.buildBlock），折进带来源标注的摘要块，非死面' },
+  // v2.407.0（三缝+七主线）补登记：五台新引擎的 buildBlock 进的是 backstage 推演上下文
+  //   （engines/backstage.js 真调用点），不是正文注入——与 intentBoard 的分工同款。
+  //   它们没有 def / VIS_NAMES / vis.X 分支，故不能进 SOURCES（否则 T2/T3/T4 恒红）；
+  //   裁决用 reasoning（judge 逐文件验证 WA.<ns>.buildBlock 调用点在场），非遮羞登记。
+  summarizerAdapter: { verify: 'reasoning', reason: '摘要适配层（三缝②）：engines/backstage.js WA.summarizerAdapter.buildBlock 真调用，块进推演上下文，只输出带来源的摘要，非死面' },
+  director: { verify: 'reasoning', reason: '导演排期（三缝③）：engines/backstage.js WA.director.buildBlock 真调用，块进推演上下文，只给确定性排序建议，非死面' },
+  branchContinuity: { verify: 'reasoning', reason: '分支连续性（主线A/B）：engines/backstage.js WA.branchContinuity.buildBlock 真调用，块进推演上下文，只读判据引擎的纪律注入，非死面' },
+  factContinuity: { verify: 'reasoning', reason: '事实连续性（主线C/E/F）：engines/backstage.js WA.factContinuity.buildBlock 真调用，块进推演上下文，只读判据引擎的纪律注入，非死面' }
 };
 // ─────────────────────────────────────────────────────────────────────────────
 // 白名单 B：SOURCES 源、但该命名空间上**没有** buildBlock。V11 立项实测 9 项，两种产出方式。
@@ -389,7 +401,10 @@ function runAll(a) {
   //   buildBlock 顶过期；现场复算 SOURCES 144、runtimeKeys 144。与 checked 187→185、
   //   cap-tier 70→74 同属「表跟位」，改前改后均以本脚本 N0~N6 双向自证验收。
   a(j.sources.length === 144, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.382.0 现场基线 144；立项 115）');
-  a(j.runtimeKeys.length === 144, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.382.0 现场基线 144；立项 114）');
+  //   v2.407.0 跟位：runtimeKeys 144 → 150（memoryRelay/stageSession 为 v2.402.0 V10 新增，
+  //   summarizerAdapter/director/branchContinuity/factContinuity 为 v2.407.0 三缝新增）；
+  //   SOURCES 仍 144 —— 六台都没有 def/VIS_NAMES/vis.X 注入契约，走白名单 A 归属。
+  a(j.runtimeKeys.length === 150, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.407.0 现场基线 150；v2.382.0 为 144）');
   a(j.missingDef.length === 0, 'v11src: [T2] 源表每项在 def 有默认值（缺: ' + (j.missingDef.join(',') || '无') + '）');
   a(j.missingName.length === 0, 'v11src: [T3] 源表每项有面板显示名（缺: ' + (j.missingName.join(',') || '无') + '）');
   a(j.missingVis.length === 0, 'v11src: [T4] 源表每项有 vis 读取点（缺: ' + (j.missingVis.join(',') || '无') + '）');

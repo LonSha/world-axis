@@ -32,17 +32,17 @@
   const G = (typeof window !== 'undefined') ? window : global;
   const WA = G.WorldAxis = G.WorldAxis || {};
 
+  // v2.407.0 跟位：vitals.tick / gauge.step / oneShotMod.flush / vitals.sweep 已由
+  //   actionDesk.ROUTES 登记为可执行动作（vitals.tick、vitals.sweep、gauge.step、
+  //   oneShotMod.flush 四条路由），产品侧出现真实调用点 ⇒ 「真零调用」前提失效，
+  //   四条裁决移除；它们的轮次/时机驱动由路由执行面承接（driver-ledger L2r）。
   const ENTRIES = [
     { api: 'checkpoints.tick', cls: 'drive', driver: { method: 'tick' },
       reason: '自动快照推进：读自身 autoEvery 与内部计数，零参自足' },
     { api: 'hazard.tick', cls: 'entry', driver: null,
       reason: '危机窗口推进会写存档，不属于纯状态推进，需剧情事件触发' },
-    { api: 'vitals.tick', cls: 'drive', driver: { method: 'tick' },
-      reason: '体征到期推进：读自身节奏与体征表，零参自足' },
     { api: 'farfield.tick', cls: 'drive', driver: { method: 'tick' },
       reason: '远方在途推进：零参，自带 enabled 开关，实测 wrote:false' },
-    { api: 'gauge.step', cls: 'drive', driver: { method: 'step' },
-      reason: '量表步进：零参自足，读自身阈值与步长配置' },
     { api: 'followupGate.due', cls: 'drive', driver: { method: 'due' },
       reason: '跟进闸门到期检查：零参，读自身到期表' },
     { api: 'activity.settle', cls: 'entry', driver: null,
@@ -51,8 +51,6 @@
       reason: '联络推进需企划坐标：advance(opId,stage,why) 三个入参均由运营面提供' },
     { api: 'collab.flush', cls: 'entry', driver: null,
       reason: '协作刷盘需对话上下文：flush(opts) 按轮次提交队列，由聊天轮次事件触发' },
-    { api: 'oneShotMod.flush', cls: 'entry', driver: null,
-      reason: '一次性修正刷盘：flush() 清空 pending，需修正已被采纳这一业务时机' },
     { api: 'interestFace.flush', cls: 'entry', driver: null,
       reason: '兴趣面收件箱刷盘：flush() 把 pending 推入 inbox 并清空，需读者取件时机' },
     { api: 'ensemble.run', cls: 'entry', driver: null,
@@ -65,8 +63,6 @@
       reason: '桥接刷新需具体桥接对象入参，由剧情事件提供' },
     { api: 'clock.advance', cls: 'entry', driver: null,
       reason: '时钟推进是世界时间写入口，需时间跳跃入参，由推演主路径提供' },
-    { api: 'vitals.sweep', cls: 'ui', driver: null,
-      reason: '体征整表扫描是边路读面：同一引擎只能有一个驱动口（已归 vitals.tick），本口不参与轮次推进' },
     { api: 'cyberUI.progress', cls: 'ui', driver: null,
       reason: '进度条 HTML 生成器：属于 UI 组件工具箱，由页面渲染时调用，不是引擎推进' },
     { api: 'choiceBoard.refresh', cls: 'ui', driver: null,

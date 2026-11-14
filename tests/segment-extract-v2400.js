@@ -61,7 +61,12 @@ const SEG_TITLE = 'engines/tool-diag v0.9.2';
 //   （tests/run.js 里 'v2.402.0 (V23 缝合线)' 那一节），不是拆段漂移。
 //   判断依据：B1 守的是「拆段前后 section 总数不变」，而本轮段体**未拆动**，
 //   新增的是另一件事（新专锁的挂载点）。故补基线，不动判据口径。
-const BASE_SECTION_CC = 437;  // 拆前 run.js 的 section( 计数（去注释面）
+//   v2.407.0：437 → 442（+5）。同理，中间四版各加了一节专锁 section，本批再加一节：
+//     v2.403.0 冷启动 / v2.404.0 选择回流 / v2.405.0 玩家面统一读出 / v2.406.0 统一卡排版 /
+//     v2.407.0 三缝 + 七主线。B1 守的是「拆段前后 section 总数不变」——段体未拆动，
+//     新增的是别的事（新专锁的挂载点），故补基线、不动判据口径。
+//     HEAD 上实测 441（=437+4）就已超基线，本批 +1 到 442。
+const BASE_SECTION_CC = 442;  // 拆前 run.js 的 section( 计数（去注释面）
 const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面）
 // 测试文件面的绝对基线。它**刻意不是**「动态算出来再跟自己比」——那会变成自证空转。
 //   但它是「会长的集合」：每新增一把锁，这个数就必须跟着改一次。本轮 V22 已改三次：
@@ -77,7 +82,17 @@ const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面
 //   所以它必须精确。代价是每加一把锁就要动这个常量，而这正是它的价值：
 //   动它的人必须亲手确认「我确实新增了一个测试文件」。
 //   v2.402.0（V23）：550 → 551（+1 = tests/v23-stitch-v2402.js，V23 三缝专锁）。
-const BASE_TEST_FILES = 551;  // 539（拆前）+ 段文件 1 + segment-extract 1 + settings-audit 1 + panel-source 1 + exv22 1 + V22 场景锁 6 + V23 专锁 1
+//   v2.407.0：551 → 556（+5）。逐条来历，全部是**真新增的测试文件**（不是面塌）：
+//     +1 tests/cold-start-v2403.js       （v2.403.0 冷启动起线条款专锁）
+//     +1 tests/choice-reflux-v2404.js    （v2.404.0 选择回流专锁）
+//     +1 tests/world-reader-v2405.js     （v2.405.0 玩家面统一读出专锁）
+//     +1 tests/world-card-ui-v2406.js    （v2.406.0 统一卡排版专锁）
+//     +1 tests/three-stitches-v2407.js   （v2.407.0 三缝专锁，本批）
+//   ⚠ 本常量在 v2.403~v2.406 期间**连续四版没有跟着动**（HEAD 上实测 555 vs 基线 551，
+//     本锁在 HEAD 上就已经红 —— 用 git archive 到 /tmp/wa_head 复核过，不是本批引入的）。
+//     这与 test-surface-gate 判孤儿是同一件事的两面：锁登记进 run.js 了、文件也确实在，
+//     唯独这个「面本身没有意外增减」的绝对基线没人补。本批一次补齐，不改判据口径。
+const BASE_TEST_FILES = 556;
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
 function exists(rel) { return fs.existsSync(path.join(BASE, rel)); }
@@ -642,7 +657,12 @@ const PS_REL = 'tests/panel-source.js';
 //   段体本身一字未动，所以这条读数只跟着现场走，不是判据口径变了。
 //   v2.402.0（V23）：17587 → 17688（+101：段体增的 101 行全部落在重组面内）。
 //   与段体增量逐字相等 —— 差额不等于 101 就是「段外也变了」，那正是本常量要拦的事。
-const BASE_PANEL_LINES = 17688;
+//   v2.407.0：17688 → 17724（+36）。D3a 的语义是「重组面 === 拆前面」，读数只能跟着现场走。
+//   这 36 行是 v2.403~v2.406 四个版本往 ui/pages/overview-main.js **段体内**真新增的产品代码
+//   （`git diff --stat 3e64881..HEAD -- ui/pages/` 实测：overview-main.js +36，其余三个段文件 0）。
+//   与上一轮 v2.402.0 的 +101 同族 —— 差额全部落在段体内，段外（panel.js 自身 16045 行）
+//   一字未动，D3f 因此仍然绿。中间四版同样漏补了这个常量（HEAD 上实测 17724 vs 基线 17688）。
+const BASE_PANEL_LINES = 17724;
 // 拆后 panel.js 自己的行数（split 口径；拆前 17421 - 段体 335 + 转发块 41 = 17127）。
 //   注意：这个数会随转发块注释的字数变动 —— 它是「面没塌」的粗读数，不是精确不变量。
 //   真正的不变量是 D3a（重组面 === 拆前面，逐字相等），那一条按行拼接算，

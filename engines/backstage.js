@@ -426,7 +426,14 @@
       //   与字符串 'false' 一并判为「关」，自动推演被静默关停且用户看不到任何开关变化。
       //   回落值取登记 def（单一真源），不在此另写一份默认值。
       if (!WA.settingsBus.toBool(st.autoSimulate, __REG_B.def.autoSimulate) && reason === 'after-reply') return __simSkip('auto-off');
-      if (st.simulationMode === 'manual' && reason === 'after-reply') return __simSkip('manual-mode');
+      if (st.simulationMode === 'manual' && reason === 'after-reply') {
+        // v2.407.0：这里改用**内联字面量**，因为拒收码门禁（第十二面）与恢复映射的现场复算
+        //   都只认 `reason: 'x'` 这种形态 —— 经 __simSkip 中转时码名是参数，两处判据都看不见它，
+        //   于是 REJECT_FACE 里那条码自 v2.406.0 起一直被算成「快照过期」。
+        //   语义一字未变：仍然记一次 skipped、仍然 `ok:false + reason`。
+        __simMark('skipped', 'manual-mode');
+        return { ok: false, reason: 'manual-mode' };
+      }
       const anchor = latestAnchor();
       if (!anchor) return __simSkip('no-chat', anchor && anchor.idx);
       if (currentTask) { __simMark('skipped', 'queued', anchor && anchor.idx); pendingAnchor = { anchor, reason }; return { ok: true, queued: true }; }
@@ -610,6 +617,13 @@
         if (__simHealth.state === 'running') __simMark('skipped', 'no-result', anchor && anchor.idx);
         WA.emit('backstage:settled', { id, anchor });
         __simMark('ok', 'settled', anchor && anchor.idx);
+        // v2.407.0（三缝①）：结算成功 ⇒ 本轮吃过的楼层算「已读」，把书签推进到该锚。
+        //   为什么挂在「成功」而不是「开始」：推演失败/作废的轮次没真正读过这段正文
+        //   （staleGuard 作废、通道未配置都在成功点之前返回），提前推进会让「已读」
+        //   变成假账 —— 与边界③（只前进不后退、回退如实拒绝）同一口径。
+        //   降级：模块缺席 / 总开关关闭 ⇒ mark 内部如实返回 disabled，这里静默不拦。
+        try { if (WA.readingBookmark && WA.readingBookmark.mark) WA.readingBookmark.mark(anchor); }
+        catch (e) { WA.log('warn', '阅读书签推进失败（不拦结算）', e); }
         return { ok: true };
       } catch (e) {
         WA.log('error', '世界推演失败: ' + (e && e.message || e));
@@ -733,6 +747,21 @@
         // 看板自身仍只读，buildBlock 只会输出 plan.chain 已明确的卡点。
         (WA.intentBoard && WA.intentBoard.buildBlock ? WA.intentBoard.buildBlock() : ''),
         (WA.entities && WA.entities.buildEntitiesBlock ? WA.entities.buildEntitiesBlock() : ''),
+        // v2.407.0（三缝②）：跨聊天摘要适配层的互通注入。它只输出带来源的摘要，
+        //   并明确「摘要不是本段原文」；适配层关闭/无挂载时返回空串。
+        (WA.summarizerAdapter && WA.summarizerAdapter.buildBlock ? WA.summarizerAdapter.buildBlock('current') : ''),
+        // v2.407.0（三缝③）：导演调度只提供本地确定性排序建议，不替任何引擎写状态。
+        //   建议块明写「不是已经发生的事实」，避免排期被模型当成世界事实。
+        (WA.director && WA.director.buildBlock ? WA.director.buildBlock() : ''),
+         // v2.407.0（主线A/B/C/E/F/G）：两个只读判据引擎的纪律注入。
+         //   默认关闭 ⇒ 空串零 token；开启后也只出「纪律 + 已确证读数」，不出题材措辞、
+         //   不把裁决术语漏进叙事。两者都不写 store、不调模型、不替玩家决定。
+         (WA.branchContinuity && WA.branchContinuity.buildBlock ? WA.branchContinuity.buildBlock() : ''),
+         (WA.factContinuity && WA.factContinuity.buildBlock ? WA.factContinuity.buildBlock() : ''),
+        // v2.407.0（三缝①）：增量阅读书签的补读块。缺口现场：上一行 recentText(8) 只喂最近
+        //   8 楼，长局中「书签→最新锚」之间的楼从未进过任何一次上下文，而 summarizer 的纪要
+        //   是结论不是逐楼覆盖。补读块只**点名楼层号**，内容由调用方现取，不编造原文。
+        (WA.readingBookmark && WA.readingBookmark.catchUpBlock ? WA.readingBookmark.catchUpBlock(anchor) : ''),
         '【近期正文（最新锚点=m' + anchor.idx + '）】',
         recentText(8)
       ].join('\n');

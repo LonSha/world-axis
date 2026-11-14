@@ -18,7 +18,7 @@ const vm = require('vm');
 
 const BASE = path.join(__dirname, '..');
 const TIER_REL = 'engines/capability-tier.js';
-const PANEL_REL = 'ui/panel.js';
+const PANEL_REL = 'ui/pages/tools-page.js'; // v2.401.0 (OPV23) panel.js 拆分：档位文案迁移到 tools-page.js
 const TIER_SRC = fs.readFileSync(path.join(BASE, TIER_REL), 'utf8');
 const PANEL_SRC = fs.readFileSync(path.join(BASE, PANEL_REL), 'utf8');
 const RUN_SRC = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
@@ -112,7 +112,10 @@ function runB(WA) {
   //   v2.382.0（幽灵引用治理批次⑦）：MECH 105 → 109（v2.360.0 起新增四个有注入面的引擎），
   //   排除名单仍是 35 ⇒ 规模 70 → 74。现场实测 `view().tiers[full].size = 74`（探针 cap_probe.js）。
   //   与 `checked 187→185` 同族：这是「表跟位」，不是把判据放宽 —— 109 − 35 = 74 仍是同一条口径。
-  eq(fullItem && fullItem.size, 74, 'B6: full 档下调后规模恰为 74（109 - 35）');
+  //   v2.407.0（三缝+七主线）：MECH 109 → 115（branch-continuity / director / fact-continuity /
+  //   summarizer-adapter 四台有注入面引擎），排除名单仍是 35 ⇒ 规模 74 → 80。
+  //   现场实测 `view().tiers[full].size = 80`。仍是「有注入面的 − 排除」同一条口径：115 − 35 = 80。
+  eq(fullItem && fullItem.size, 80, 'B6: full 档下调后规模恰为 80（115 - 35）');
   assert(fullItem && typeof fullItem.note === 'string' && fullItem.note.indexOf('35') >= 0, 'B7: full 档包含 35 排除注记');
 
   assert(Array.isArray(v.manualOnly) && v.manualOnly.length === 35, 'B8: view().manualOnly 暴露 35 个排除机制');
@@ -128,14 +131,15 @@ function runC(WA) {
   assert(rFull.ok === true, 'C1: 切到 full 档成功');
   eq(rFull.tier, 'full', 'C2: applyTier 返回 tier 为 full');
   assert(Array.isArray(rFull.notEffective) && rFull.notEffective.length === 0, 'C3: notEffective 为空（全部当场复核生效）');
-  eq(rFull.turnedOn.length, 64, 'C4: full 档新开 64 个（74 目标 - 10 出厂机制）');
+  eq(rFull.turnedOn.length, 70, 'C4: full 档新开 70 个（80 目标 - 10 出厂机制）');
   //   注：v2.293.0 复核发现本行**与 B6/C5 自相矛盾**（65 目标下新开应为 60，随目标
   //   涨到 67、出厂涨到 7，新开仍恰为 60 —— 60 = 67 − 7 与 65 − 5 同值，故**本行不该变**）。
   //   这正是「只改登记值」的边界：目标与出厂同涨同落时，差值判据保持不变。
   //   v2.382.0 这次**不同**：目标 70 → 74（+4），出厂 7 → 10（+3），差值 63 → 64（+1），
   //   故本行必须跟位 —— 上一次的「不该变」是巧合，不是规律（探针实测 turnedOn 64）。
+  //   v2.407.0：目标 74 → 80（+6），出厂仍 10（+0），差值 64 → 70 —— 本行再次跟位。
   const vFull = cap.view();
-  eq(vFull.running, 74, 'C5: full 档运行机制数为 74（= MECH 109 − 排除 35）');
+  eq(vFull.running, 80, 'C5: full 档运行机制数为 80（= MECH 115 − 排除 35）');
   eq(vFull.dormant, 35, 'C6: full 档休眠机制数为 35');
 
   // 验证 35 个排除机制无一被打开
@@ -160,7 +164,9 @@ function runC(WA) {
   //   v2.382.0：出厂 7 → 10（+3），休眠 98 → 99（+1）。现场实测 rollback 后 running=10 / dormant=99。
   //   注意这两条**不同步涨**：running +3、dormant +1，因为 MECH 105 → 109 只 +4，
   //   其中 3 台进了 BASE_ON（出厂即开），剩 1 台落在休眠面 —— 所以 C11 改 10、C12 改 99。
-  eq(vLite.dormant, 99, 'C12: 回滚后休眠机制数恢复 99 台（109 − 10，未随 BASE_ON 变）');
+  //   v2.407.0：MECH 109 → 115 共 +6，BASE_ON 不变（出厂仍 10），六台全落休眠面
+  //   —— C11 保持 10、C12 改 105。
+  eq(vLite.dormant, 105, 'C12: 回滚后休眠机制数恢复 105 台（115 − 10，未随 BASE_ON 变）');
 }
 
 function runD() {

@@ -4076,7 +4076,16 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   export-contract 的 OWNER 不认三 ns ⇒ 契约串里所有调用点被静默跳过。
     'engines/stage-session.js': 'stageSession',
     'engines/memory-relay.js': 'memoryRelay',
-    'engines/chat-recycle.js': 'chatRecycle'
+    'engines/chat-recycle.js': 'chatRecycle',
+    // ── v2.407.0：三缝 + 外部 11 份资料主线 A/B/C/E/F/G 的两个只读判据引擎 ──
+    //   与上段同一病：引擎已落地、本表未登记 ⇒ secModules 报成 missing、
+    //   export-contract 的 OWNER 不认这五个 ns ⇒ 调用点被静默跳过。
+    //   ns 名逐一取自各文件 `WA.<ns> = {`，不登记即等于死导出。
+    'engines/summarizer-adapter.js': 'summarizerAdapter',
+    'engines/reading-bookmark.js': 'readingBookmark',
+    'engines/director.js': 'director',
+    'engines/branch-continuity.js': 'branchContinuity',
+    'engines/fact-continuity.js': 'factContinuity'
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
   // v2.152.0：新增 ui 模块（ui/render-perf.js）同步进本名单 —— 漏登记的后果不是「少一行字」，

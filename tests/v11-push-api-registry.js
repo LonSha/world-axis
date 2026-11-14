@@ -226,7 +226,9 @@ function runAll(a) {
   {
     const s = R.stat();
     const sum = R.CLASSES.reduce(function (n, c) { return n + (s.byClass[c] || 0); }, 0);
-    a(s.total === 19, 'v11push: [A10a] 登记总数 == 19（实 ' + s.total + '）');
+    //   v2.407.0 跟位：vitals.tick / gauge.step / oneShotMod.flush / vitals.sweep 由
+    //   actionDesk 路由接线，不再是真零调用 ⇒ 移出裁决表，19 → 15。
+    a(s.total === 15, 'v11push: [A10a] 登记总数 == 15（实 ' + s.total + '）');
     a(sum === s.total, 'v11push: [A10b] 各裁决之和 == 总数（' + sum + ' vs ' + s.total + '）');
   }
 }

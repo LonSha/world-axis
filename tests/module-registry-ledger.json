@@ -1,13 +1,13 @@
 {
- "version": "2.406.0",
- "loadOrderCount": 456,
- "loadedCount": 438,
+ "version": "2.407.0",
+ "loadOrderCount": 461,
+ "loadedCount": 443,
  "uiCount": 18,
- "nsCount": 449,
+ "nsCount": 454,
  "totals": {
-  "loadEdges": 303,
+  "loadEdges": 308,
   "hardEdges": 0,
-  "callRefs": 519,
+  "callRefs": 529,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -57,6 +57,7 @@
     "engines/betrothal-alliance.js",
     "engines/binding.js",
     "engines/blackmarket-usury.js",
+    "engines/branch-continuity.js",
     "engines/branch-diff.js",
     "engines/branch-tree.js",
     "engines/bridge.js",
@@ -94,6 +95,7 @@
     "engines/dep-check.js",
     "engines/diplomacy.js",
     "engines/direct-event.js",
+    "engines/director.js",
     "engines/dream.js",
     "engines/eccentric-threads.js",
     "engines/eco-audit.js",
@@ -110,6 +112,7 @@
     "engines/events.js",
     "engines/evidence-board.js",
     "engines/evolution.js",
+    "engines/fact-continuity.js",
     "engines/faction-chronicle.js",
     "engines/faction-graph.js",
     "engines/family.js",
@@ -202,6 +205,7 @@
     "engines/public-agenda.js",
     "engines/purify-scope.js",
     "engines/push-api-registry.js",
+    "engines/reading-bookmark.js",
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
     "engines/redact-layer.js",
@@ -250,6 +254,7 @@
     "engines/storyclock.js",
     "engines/storyline-advance.js",
     "engines/subtext-tension.js",
+    "engines/summarizer-adapter.js",
     "engines/summarizer.js",
     "engines/supply-chain.js",
     "engines/surgical-triage.js",
@@ -491,6 +496,7 @@
     "engines/betrothal-alliance.js",
     "engines/binding.js",
     "engines/blackmarket-usury.js",
+    "engines/branch-continuity.js",
     "engines/branch-diff.js",
     "engines/branch-tree.js",
     "engines/bureaucracy-ascension.js",
@@ -523,6 +529,7 @@
     "engines/demographic-flow.js",
     "engines/dep-check.js",
     "engines/diplomacy.js",
+    "engines/director.js",
     "engines/dream.js",
     "engines/eccentric-threads.js",
     "engines/eco-audit.js",
@@ -534,6 +541,7 @@
     "engines/epidemic-contagion.js",
     "engines/epochal-transition.js",
     "engines/evidence-board.js",
+    "engines/fact-continuity.js",
     "engines/faction-chronicle.js",
     "engines/faction-graph.js",
     "engines/family.js",
@@ -618,6 +626,7 @@
     "engines/public-agenda.js",
     "engines/purify-scope.js",
     "engines/push-api-registry.js",
+    "engines/reading-bookmark.js",
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
     "engines/redact-layer.js",
@@ -665,6 +674,7 @@
     "engines/storyclock.js",
     "engines/storyline-advance.js",
     "engines/subtext-tension.js",
+    "engines/summarizer-adapter.js",
     "engines/supply-chain.js",
     "engines/surgical-triage.js",
     "engines/survey.js",
@@ -8397,6 +8407,25 @@
    ],
    "consumedBy": []
   },
+  "engines/summarizer-adapter.js": {
+   "ns": [
+    "summarizerAdapter"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
   "engines/chat-recycle.js": {
    "ns": [
     "chatRecycle"
@@ -8423,6 +8452,82 @@
   "engines/world-reader.js": {
    "ns": [
     "worldReader"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/reading-bookmark.js": {
+   "ns": [
+    "readingBookmark"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/director.js": {
+   "ns": [
+    "director"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/branch-continuity.js": {
+   "ns": [
+    "branchContinuity"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/fact-continuity.js": {
+   "ns": [
+    "factContinuity"
    ],
    "requires": [
     "registerModule"

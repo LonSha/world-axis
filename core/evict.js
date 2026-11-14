@@ -76,6 +76,7 @@
     'memory.facts':       { path: 'memory.facts',       cap: 100, why: '事实版本环形' },
     'memory.foreshadows': { path: 'memory.foreshadows', cap: 30,  why: '伏笔生命周期（终态回收后兜底）' },
     'memory.pmem':        { path: 'memory.pmem',        cap: 60,  why: '人物主观记忆总量' },
+    'reading.marks':      { path: 'reading.marks',      cap: 24,  why: '阅读书签环形（每分支一条，旧分支书签挤出）' },
     // v2.234.0 (Living World V5.1): 角色生活状态（行囊、生理负荷、职业作息）
     'livingWorld.characterStates': { path: 'livingWorld.characterStates', kind: 'object', cap: 48, why: '角色微观生活状态（生计行囊/生理负荷/职业）' },
     // v2.245.0 (MAP-1): 角色空间落位与感知流水容量

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.406.0';
+  const VERSION = '2.407.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1381,11 +1381,21 @@
     //   三缝之间互不依赖；排列只需在 ui/panel.js 之前（面板要读它们的 view）。
     'engines/stage-session.js',        // V23-1 小剧场会话生命周期 / 退出三选 / 存档快照
     'engines/memory-relay.js',         // V23-2 记忆互通（摘要跨聊天挂载，不合并原文）
+    // v2.407.0（三缝②）：总结接口适配层，依赖 memory-relay，必须在 backstage 调用前装载。
+    'engines/summarizer-adapter.js',   // 两级摘要 ⇄ 标准摘要/互通接口
     'engines/chat-recycle.js',         // V23-3 聊天回收站（上限 10 / 锁定保护 / 只出清单不删）
     // v2.405.0：世界读数通道（RUBY read 机制的 WorldAxis 版）。位置在 chat-recycle 之后、
     //   ui/panel.js 之前：面板概览页的统一卡在调用期读它的 snapshot/renderCard。
     //   纯只读现算——零 store 写、零 settingsBus 写、零落盘、零模型调用。
     'engines/world-reader.js',         // 世界读数通道（snapshot 结构化读口 + 玩家面统一卡）
+    // v2.407.0（三缝①/③）：书签与导演都是面板/推演的调用期读口，须在 ui/panel.js 前注册。
+    'engines/reading-bookmark.js',     // 分支感知增量阅读书签 / 漏楼补读
+    'engines/director.js',             // 世界读数归一 / 确定性导演排期建议（含事件桶/冷却/顺延）
+    // v2.407.0（外部 11 份资料主线 A/B/C/E/F/G）：两个只读判据引擎。
+    //   两者都是调用期读 WA 命名空间，装载期零上游读、零 store 写、零落盘、零模型；
+    //   位置在全部既有引擎之后、ui/panel.js 之前，与 world-reader/director 同层。
+    'engines/branch-continuity.js',    // 主线B：证据契约 / 原子提交判据 / 楼层绑定恢复
+    'engines/fact-continuity.js',      // 主线A/C/E/F/G：事实分层 / 信息边界 / 经济锚定 / 正文纪律 / 状态签名
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；

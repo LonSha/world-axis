@@ -24,7 +24,7 @@ const vm = require('vm');
 
 const BASE = path.join(__dirname, '..');
 const IB_REL = 'engines/intent-board.js';
-const PANEL_REL = 'ui/panel.js';
+const PANEL_REL = 'ui/pages/overview-main.js'; // v2.401.0 (OPV23) panel.js 拆分：看板渲染块迁移到 overview-main.js
 const SET_REL = 'ui/settings.js';
 const DIAG_REL = 'engines/tool-diag.js';
 

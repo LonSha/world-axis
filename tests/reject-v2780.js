@@ -26,13 +26,25 @@ const DEAD = {
   //    字段名是 kind 且在 perf-trace.js 内被直接 return —— 与这三处 mutate 无关。）
   //   不删：若将来某个调用方开始透传 mutate 的返回值，它是第一道防线；
   //   届时本门禁会以 deadLeak 提醒「该码可能复活」。
-  'store-absent': {
-    anchor: "      ? facade.transact(fn, opt) : { ok: false, reason: 'store-absent' };",
-    why: '三处 mutate 在存储面缺 transact 时构造 store-absent，但全仓无一处透传该返回值'
-      + '（`return mutate(` 零命中；调用点一律是 out 变量 + 各自兜底码）⇒ 不可观测。'
-      + '实测：摘掉 store 的 transact 后，各入口给出的是 store-unavailable 或更早的前置闸。'
-      + '不删：将来若有调用方开始透传 mutate 的返回值，它是第一道防线。'
-  },
+  // v2.407.0：`store-absent` **已出死表**（原 v2.119.0 条目，历史依据保留于此）。
+  //   原结论只覆盖三处 mutate 的透传面：「存储面缺 transact 时构造该码，但全仓无一处透传
+  //   其返回值 ⇒ 不可观测」（实测：摘掉 transact 后各入口给的是 store-unavailable 或更早的前置闸）。
+  //   这个结论**对那三处仍然成立**（anchor 仍逐字在 engines/act.js:251 与 engines/world.js:106）。
+  //   推翻了它的是一件本批新出现的事：三缝② engines/summarizer-adapter.js:70 的
+  //   `exportDigest` 在 `WA.store.get()` 抛错时**直接返回** `{ok:false, reason:'store-absent'}` ——
+  //   它是**透传**的，且测试里摘掉 store.get 就能真跑出来（见下方 v2.407.0 见证段的
+  //   `want('store-absent', '摘要适配：存档读口缺席拒收')`）。
+  //
+  //   所以正确处置是**出死表、入见证**，而不是两头都写：死表的语义是「已证不可达」，
+  //   而同一个码同时出现在死表与见证表会让 reject-lock-v2780 的「死表与见证表不相交」直接报红
+  //   （本轮实测正是这条 800+52+916=1768 ≠ 1767 让三集合恒等式失衡）。
+  //   出表后 801+51+916 = 1767 与现场码面逐字平衡。
+  //
+  //   为什么不顺手把原 anchor 分析删掉：它解释的是「那三处 mutate 为什么反正也看不到」，
+  //   与「这个码字符串整体可达」是两件事。下一个人若只看见证会以为「已经有路了」，
+  //   于是把三处 mutate 的兜底改成透传，等于无声改掉三个引擎的失败面。留着这段是为了
+  //   让这件事继续可见（本仓的「提及不是引用」的另一面：**结论也不是永久引用**，
+  //   依据要跟着它解释的对象一起留下来）。
   // v2.119.0（拓展⑧）备查：liaison.settleDeal 的关系后果分支里 `no-relation-face` 在现设计下
   //   **结构不可达** —— 它是 `applyRelation(...)` 返回**假值**时的兜底：
   //     `out.relation = rel ? {...rel} : { ok: false, reason: 'no-relation-face' }`
@@ -8174,8 +8186,6 @@ function runWitness(WA) {
       return null;
     });
   }
-  const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
-  const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
   // ── v2.280.0（V7 OPV7-4）：写口契约的两个「问错了」码 —— 必须带可执行见证 ──
   //   它们不是「存量未分类」：本版新写的公开失败归因，调用方（诊断面 / 面板 / 未来的自愈重试）
   //   真要消费它们。不给见证就等于让门禁替我们说「这些码没人会跑到」。
@@ -8397,14 +8407,24 @@ function runWitness(WA) {
   {
     // 设置面收卷：所有动过 max* 的引擎一律还原成见证前的现场值（同本文件各段契约）。
     const __capSettled = [];
+    // 返回**归一化之后**的真实上限（不是我们请求的那个数）：五个容量键声明了 bounds，
+    //   写 1 会被夹到下限 4。见证必须按真实上限填满，否则「超限那一次」根本不会发生。
     const capModule = function (mod, patch) {
-      if (!WA.settingsBus || typeof WA.settingsBus.registry !== 'function') return false;
+      if (!WA.settingsBus || typeof WA.settingsBus.registry !== 'function') return 0;
       const reg = WA.settingsBus.registry().filter(function (r) { return r && r.module === mod; })[0];
-      if (!reg) return false;
+      if (!reg) return 0;
       __capSettled.push({ reg: reg, keep: (typeof WA.settingsBus.read === 'function') ? WA.settingsBus.read(reg) : null });
-      WA.settingsBus.saveOrThrow(reg, Object.assign({}, reg.def, patch));
-      return true;
+      const next = Object.assign({}, reg.def, { enabled: true }, patch);
+      WA.settingsBus.saveOrThrow(reg, next);
+      // 夹取发生在 normalize() 里，read() 只还原始值 —— 必须取归一化后的上限。
+      const eff = (typeof WA.settingsBus.normalize === 'function')
+        ? WA.settingsBus.normalize(reg, next)
+        : (WA.settingsBus.read(reg) || {});
+      const k = Object.keys(patch || {})[0];
+      const v = k ? Number(eff[k]) : NaN;
+      return (isFinite(v) && v > 0) ? Math.floor(v) : 0;
     };
+    const capFill = function (lim, make) { for (let i = 0; i < lim; i++) make(i); };
     const capRestore = function () {
       __capSettled.forEach(function (x) {
         try { WA.settingsBus.saveOrThrow(x.reg, x.keep || x.reg.def); } catch (e) {}
@@ -8447,8 +8467,9 @@ function runWitness(WA) {
       CAP_ENGINES.forEach(function (e) {
         const b = capSnap();
         try {
-          if (!WA[e.ns] || typeof WA[e.ns].setSettings !== 'function') return;
-          WA[e.ns].setSettings({ enabled: true });
+          if (!WA[e.ns]) return;
+          // 这五个引擎没有 setSettings（常开读 settingsBus）；要求它存在会把整条见证静默跳过。
+          if (typeof WA[e.ns].setSettings === 'function') WA[e.ns].setSettings({ enabled: true });
           if (!capModule(e.mod, (function () { const p = {}; p[e.cap] = 1; return p; })())) return;
           const r1 = e.call('cap-first');
           const r2 = e.call('cap-second');
@@ -8470,8 +8491,8 @@ function runWitness(WA) {
       {
         const b = capSnap();
         try {
-          if (WA.courtIntrigue && typeof WA.courtIntrigue.setSettings === 'function') {
-            WA.courtIntrigue.setSettings({ enabled: true });
+          if (WA.courtIntrigue) {
+            if (typeof WA.courtIntrigue.setSettings === 'function') WA.courtIntrigue.setSettings({ enabled: true });
             capModule('courtIntrigue', { maxCourts: 1 });
             const r1 = WA.courtIntrigue.registerCourt('wit-court-a');
             const r2 = WA.courtIntrigue.registerCourt('wit-court-b');
@@ -8488,8 +8509,8 @@ function runWitness(WA) {
       {
         const b = capSnap();
         try {
-          if (WA.sanctuaryScramble && typeof WA.sanctuaryScramble.setSettings === 'function') {
-            WA.sanctuaryScramble.setSettings({ enabled: true });
+          if (WA.sanctuaryScramble) {
+            if (typeof WA.sanctuaryScramble.setSettings === 'function') WA.sanctuaryScramble.setSettings({ enabled: true });
             capModule('sanctuaryScramble', { maxSanctuaries: 1 });
             WA.store.transact(function (d) { d.sanctuaries = {}; d.sanctuaryOccupants = {}; }, 'witness:sanctuary-clean');
             const r1 = WA.sanctuaryScramble.scramble({ sanctuaryId: 'wit-sanc-a', applicants: [{ actorId: 'a' }] });
@@ -8507,22 +8528,24 @@ function runWitness(WA) {
         const b = capSnap();
         const hit = [];
         try {
-          if (WA.surgicalTriage && typeof WA.surgicalTriage.setSettings === 'function') {
-            WA.surgicalTriage.setSettings({ enabled: true });
-            capModule('surgicalTriage', { maxPatients: 1 });
+          if (WA.surgicalTriage) {
+            if (typeof WA.surgicalTriage.setSettings === 'function') WA.surgicalTriage.setSettings({ enabled: true });
+            const lim = capModule('surgicalTriage', { maxPatients: 1 });
             WA.store.transact(function (d) { d.surgicalPatients = {}; }, 'witness:surgical-clean');
-            const s1 = WA.surgicalTriage.admitPatient('wit-p-a', {});
-            const s2 = WA.surgicalTriage.admitPatient('wit-p-b', {});
-            const s3 = WA.surgicalTriage.admitPatient('wit-p-a', {});
-            if (s1 && s1.ok === true && s2 && s2.reason === 'patient-capacity' && s3 && s3.ok === true) hit.push('surgicalTriage');
+            let okAll = lim > 0;
+            capFill(lim, function (i) { const r = WA.surgicalTriage.admitPatient('wit-p-' + i, {}); if (!(r && r.ok === true)) okAll = false; });
+            const over = WA.surgicalTriage.admitPatient('wit-p-over', {});
+            const again = WA.surgicalTriage.admitPatient('wit-p-0', {});
+            if (okAll && over && over.reason === 'patient-capacity' && again && again.ok === true) hit.push('surgicalTriage');
           }
-          if (WA.alchemyToxicology && typeof WA.alchemyToxicology.setSettings === 'function') {
-            WA.alchemyToxicology.setSettings({ enabled: true });
-            capModule('alchemyToxicology', { maxPatients: 1 });
+          if (WA.alchemyToxicology) {
+            if (typeof WA.alchemyToxicology.setSettings === 'function') WA.alchemyToxicology.setSettings({ enabled: true });
+            const lim = capModule('alchemyToxicology', { maxPatients: 1 });
             WA.store.transact(function (d) { d.toxicologyLedger = { cases: {}, recipes: [] }; }, 'witness:toxic-clean');
-            const t1 = WA.alchemyToxicology.brewOrTestToxin({ action: 'counterToxin', patientId: 'wit-t-a', severity: 60 });
-            const t2 = WA.alchemyToxicology.brewOrTestToxin({ action: 'counterToxin', patientId: 'wit-t-b', severity: 60 });
-            if (t1 && t1.ok === true && t2 && t2.refusal === 'patient-capacity') hit.push('alchemyToxicology');
+            let okAll = lim > 0;
+            capFill(lim, function (i) { const r = WA.alchemyToxicology.brewOrTestToxin({ action: 'counterToxin', patientId: 'wit-t-' + i, severity: 60 }); if (!(r && r.ok === true)) okAll = false; });
+            const over = WA.alchemyToxicology.brewOrTestToxin({ action: 'counterToxin', patientId: 'wit-t-over', severity: 60 });
+            if (okAll && over && over.refusal === 'patient-capacity') hit.push('alchemyToxicology');
           }
         } finally { capRestoreWorld(b); }
         if (hit.length === 2) { seen['patient-capacity'] = true; } else { delete seen['patient-capacity']; }
@@ -8534,15 +8557,16 @@ function runWitness(WA) {
       {
         const b = capSnap();
         try {
-          if (WA.epidemicContagion && typeof WA.epidemicContagion.setSettings === 'function') {
-            WA.epidemicContagion.setSettings({ enabled: true });
-            capModule('epidemicContagion', { maxSettlements: 1 });
+          if (WA.epidemicContagion) {
+            if (typeof WA.epidemicContagion.setSettings === 'function') WA.epidemicContagion.setSettings({ enabled: true });
+            const lim = capModule('epidemicContagion', { maxSettlements: 1 });
             WA.store.transact(function (d) { d.epidemicOutbreaks = {}; }, 'witness:epidemic-clean');
-            const e1 = WA.epidemicContagion.propagateDisease('wit-town-a', { initialInfectious: 5, totalPopulation: 200 });
-            const e2 = WA.epidemicContagion.propagateDisease('wit-town-b', { initialInfectious: 5, totalPopulation: 200 });
-            const e3 = WA.epidemicContagion.propagateDisease('wit-town-a', { initialInfectious: 5, totalPopulation: 200 });
-            trip('settlement-capacity', function () { return [e2 && e2.reason]; });
-            if (!(e1 && e1.ok === true && e3 && e3.ok === true)) { delete seen['settlement-capacity']; }
+            let okAll = lim > 0;
+            capFill(lim, function (i) { const r = WA.epidemicContagion.propagateDisease('wit-town-' + i, { initialInfectious: 5, totalPopulation: 200 }); if (!(r && r.ok === true)) okAll = false; });
+            const over = WA.epidemicContagion.propagateDisease('wit-town-over', { initialInfectious: 5, totalPopulation: 200 });
+            const again = WA.epidemicContagion.propagateDisease('wit-town-0', { initialInfectious: 5, totalPopulation: 200 });
+            trip('settlement-capacity', function () { return [over && over.reason]; });
+            if (!(okAll && again && again.ok === true)) { delete seen['settlement-capacity']; }
           }
         } finally { capRestoreWorld(b); }
       }
@@ -8554,15 +8578,16 @@ function runWitness(WA) {
       {
         const b = capSnap();
         try {
-          if (WA.maritimeNavigation && typeof WA.maritimeNavigation.setSettings === 'function') {
-            WA.maritimeNavigation.setSettings({ enabled: true });
-            capModule('maritimeNavigation', { maxVessels: 1 });
+          if (WA.maritimeNavigation) {
+            if (typeof WA.maritimeNavigation.setSettings === 'function') WA.maritimeNavigation.setSettings({ enabled: true });
+            const lim = capModule('maritimeNavigation', { maxVessels: 1 });
             WA.store.transact(function (d) { d.maritimeVessels = []; }, 'witness:vessel-clean');
-            const v1 = WA.maritimeNavigation.registerVessel({ vesselId: 'wit-v-a' });
-            const v2 = WA.maritimeNavigation.registerVessel({ vesselId: 'wit-v-b' });
-            const v3 = WA.maritimeNavigation.registerVessel({ vesselId: 'wit-v-a' });
-            trip('vessel-capacity-or-store-unavailable', function () { return [v2 && v2.reason]; });
-            if (!(v1 && v1.ok === true && v3 && v3.ok === true)) { delete seen['vessel-capacity-or-store-unavailable']; }
+            let okAll = lim > 0;
+            capFill(lim, function (i) { const r = WA.maritimeNavigation.registerVessel({ vesselId: 'wit-v-' + i }); if (!(r && r.ok === true)) okAll = false; });
+            const over = WA.maritimeNavigation.registerVessel({ vesselId: 'wit-v-over' });
+            const again = WA.maritimeNavigation.registerVessel({ vesselId: 'wit-v-0' });
+            trip('vessel-capacity-or-store-unavailable', function () { return [over && over.reason]; });
+            if (!(okAll && again && again.ok === true)) { delete seen['vessel-capacity-or-store-unavailable']; }
           }
         } finally { capRestoreWorld(b); }
       }
@@ -8573,15 +8598,16 @@ function runWitness(WA) {
       {
         const b = capSnap();
         try {
-          if (WA.stealthInfiltration && typeof WA.stealthInfiltration.setSettings === 'function') {
-            WA.stealthInfiltration.setSettings({ enabled: true });
-            capModule('stealthInfiltration', { maxGuards: 1 });
+          if (WA.stealthInfiltration) {
+            if (typeof WA.stealthInfiltration.setSettings === 'function') WA.stealthInfiltration.setSettings({ enabled: true });
+            const lim = capModule('stealthInfiltration', { maxGuards: 1 });
             WA.store.transact(function (d) { d.stealthTactics = { guards: [], infiltrators: {}, logs: [] }; }, 'witness:guard-clean');
-            const g1 = WA.stealthInfiltration.registerGuard({ guardId: 'wit-g-a' });
-            const g2 = WA.stealthInfiltration.registerGuard({ guardId: 'wit-g-b' });
-            const g3 = WA.stealthInfiltration.registerGuard({ guardId: 'wit-g-a' });
-            trip('guard-capacity-or-store-unavailable', function () { return [g2 && g2.reason]; });
-            if (!(g1 && g1.ok === true && g3 && g3.ok === true)) { delete seen['guard-capacity-or-store-unavailable']; }
+            let okAll = lim > 0;
+            capFill(lim, function (i) { const r = WA.stealthInfiltration.registerGuard({ guardId: 'wit-g-' + i }); if (!(r && r.ok === true)) okAll = false; });
+            const over = WA.stealthInfiltration.registerGuard({ guardId: 'wit-g-over' });
+            const again = WA.stealthInfiltration.registerGuard({ guardId: 'wit-g-0' });
+            trip('guard-capacity-or-store-unavailable', function () { return [over && over.reason]; });
+            if (!(okAll && again && again.ok === true)) { delete seen['guard-capacity-or-store-unavailable']; }
           }
         } finally { capRestoreWorld(b); }
       }
@@ -8634,6 +8660,9 @@ function runWitness(WA) {
       // 全量路由键都必须在表里（缺一条就说明 ROUTES 表已漂移，本见证面会静默漏测）
       const known = {};
       (AD.ROUTES || []).forEach(function (k) { known[k] = true; });
+      const keepAD = AD.getSettings();
+      try {
+      AD.setSettings({ enabled: true });
       ABSENT.forEach(function (row) {
         const ns = row[0], code = row[1], key = row[2];
         if (!known[key]) return;   // 路由被删了 ⇒ 不硬造见证（缺路由本身由 desk-coverage 管）
@@ -8649,6 +8678,7 @@ function runWitness(WA) {
           WA[ns] = keep;   // 无条件还原（不拿「跑通了」当还原的理由）
         }
       });
+      } finally { AD.setSettings(keepAD); }
     }
   }
 
@@ -8698,6 +8728,133 @@ function runWitness(WA) {
       }
     }
   }
+
+  // v2.407.0：新拒收码全部走公开 API；设置、依赖和书签在 finally 中还原。
+  {
+    const B = WA.branchContinuity, A = WA.summarizerAdapter, M = WA.readingBookmark, F = WA.factContinuity;
+    const saved = {};
+    [B, A, M, F].forEach(function (mod, i) { if (mod) saved[i] = mod.getSettings(); });
+    const store = WA.store, get = store.get, transact = store.transact, relay = WA.memoryRelay;
+    const marks = JSON.parse(JSON.stringify((get().reading || {}).marks || []));
+    const doc = { v: 1, source: 'witness', entries: [{ content: '见证摘要', from: 'witness', range: '0-1' }] };
+    try {
+      [B, A, M, F].forEach(function (mod) { if (mod) mod.setSettings({ enabled: true }); });
+      want('bad-op', '分支证据：非对象操作拒收');
+      trip('bad-op', function () { return B.evidence(null).reason; });
+      want('unknown-action', '分支证据：不认识的操作拒收');
+      trip('unknown-action', function () { return B.evidence({ action: 'INVALID' }).reason; });
+      want('evidence-missing', '分支证据：SET 缺证据拒收');
+      trip('evidence-missing', function () { return B.evidence({ action: 'SET' }).reason; });
+      want('bad-evidence-kind', '分支证据：证据种类非法拒收');
+      trip('bad-evidence-kind', function () { return B.evidence({ action: 'SET', evidence: { kind: 'invalid', source: 'floor:1' } }).reason; });
+      want('evidence-no-source', '分支证据：缺出处拒收');
+      trip('evidence-no-source', function () { return B.evidence({ action: 'SET', evidence: { kind: 'explicit' } }).reason; });
+      want('lower-priority-overrides-canonical', '分支证据：低优先级证据不得覆盖已确立事实');
+      trip('lower-priority-overrides-canonical', function () { return B.evidence({ action: 'SET', evidence: { kind: 'context', source: 'floor:1' }, canonical: { kind: 'canon' } }).reason; });
+      want('missing-signature', '分支恢复：缺楼层签名拒收');
+      trip('missing-signature', function () { return B.restore({}, '').reason; });
+      want('no-established-state', '分支恢复：无既有状态时拒绝猜测');
+      trip('no-established-state', function () { return B.restore({}, 'm1_s0').reason; });
+      want('whole-reject', '分支原子判据：任一校验失败整体拒绝');
+      trip('whole-reject', function () { const x = B.evaluate({}); return x.ok === false && x.verdict === 'reject' ? x.reason : ''; });
+      want('missing-anchor', '书签：缺锚点拒收');
+      trip('missing-anchor', function () { return M.mark(null).reason; });
+      want('rewind-denied', '书签：同族回退不得静默覆盖');
+      trip('rewind-denied', function () {
+        store.transact(function (d) { d.reading = { marks: [] }; });
+        M.mark({ idx: 5, swipe: 0 });
+        return M.mark({ idx: 3, swipe: 0 }).reason;
+      });
+      want('transact-no-output', '书签：事务未执行回调时如实拒收');
+      trip('transact-no-output', function () {
+        try { store.transact = function () {}; return M.mark({ idx: 6, swipe: 0 }).reason; }
+        finally { store.transact = transact; }
+      });
+      want('bad-doc', '摘要适配：文档不是对象拒收');
+      trip('bad-doc', function () { return A.importDigest(null).reason; });
+      want('bad-version', '摘要适配：不支持的格式版本拒收');
+      trip('bad-version', function () { return A.importDigest({ v: 99 }).reason; });
+      want('empty-source', '摘要适配：空条目拒收');
+      trip('empty-source', function () { return A.importDigest({ v: 1, entries: [] }).reason; });
+      want('missing-provenance', '摘要适配：条目缺来源或区间拒收');
+      trip('missing-provenance', function () { return A.importDigest({ v: 1, entries: [{ content: 'x' }] }).reason; });
+      want('store-absent', '摘要适配：存档读口缺席拒收');
+      trip('store-absent', function () {
+        try { store.get = function () { throw new Error('witness-store'); }; return A.exportDigest().reason; }
+        finally { store.get = get; }
+      });
+      want('store-unreadable', '事实诊断：存档不可读不冒充空世界');
+      trip('store-unreadable', function () {
+        try { store.get = function () { throw new Error('witness-store'); }; return F.diagnose().reason; }
+        finally { store.get = get; }
+      });
+      want('relay-absent', '摘要适配：relay 缺席拒收');
+      trip('relay-absent', function () { WA.memoryRelay = null; return A.importDigest(doc).reason; });
+      want('relay-threw', '摘要适配：compose 抛错如实归因');
+      trip('relay-threw', function () { WA.memoryRelay = { compose: function () { throw new Error('witness-compose'); } }; return A.importDigest(doc).reason; });
+      want('attach-threw', '摘要适配：attach 抛错如实归因');
+      trip('attach-threw', function () { WA.memoryRelay = { compose: function () { return { ok: true, id: 'witness' }; }, attach: function () { throw new Error('witness-attach'); } }; return A.importDigest(doc).reason; });
+    } finally {
+      WA.memoryRelay = relay; store.get = get; store.transact = transact;
+      store.transact(function (d) { d.reading = { marks: marks }; });
+      [B, A, M, F].forEach(function (mod, i) { if (mod && saved[i]) mod.setSettings(saved[i]); });
+    }
+  }
+  // ── v2.407.0（存量补证）：两条**本批之前就在、却一直没有见证**的码 ──────────
+  //   为什么放到本批处理：它们让 reject-code-gate 的「未分类」红灯自 v2.406.0 起一直亮着。
+  //   两条都不是本批新增码，所以**不进** reject-code-ledger 的 base（那份是「存量未分类」的账，
+  //   记进去等于承认「知道但没查」）—— 正确处置是补上真见证，把账真正平掉。
+  //   ① manual-mode（engines/backstage.js）：requestSimulate 在「手动模式 + 自动触发」时如实早退。
+  //      同一个坑的另一半在源码侧：原先它经 __simSkip('manual-mode') 中转，码名是**参数**
+  //      不是内联字面量，于是门禁与恢复映射的现场复算都看不见它 —— 已改为内联字面量
+  //      （见 engines/backstage.js 该处注释），本段见证的是改后行为。
+  //   ② earliest-unlocked（engines/chat-recycle.js）：plan() 给每个待清项标的「为什么先清它」。
+  //      它属**判不出面**（那一行对象不带 ok），但「判不出」不等于「不用验」：
+  //      本段证明它真的挂在那份清单上，而不是源码里一个没人产出过的字面量。
+  {
+    const BK = WA.backstage, CR = WA.chatRecycle;
+    const keepB = BK ? BK.getSettings() : null;
+    const keepC = CR ? CR.getSettings() : null;
+    try {
+      if (BK) {
+        want('manual-mode', '推演调度：手动模式下自动触发如实早退（不是失败，是没让它跑）');
+        BK.setSettings({ autoSimulate: true, simulationMode: 'manual' });
+        trip('manual-mode', function () {
+          const r = BK.requestSimulate('after-reply');
+          return r && r.reason;
+        });
+        //  反证：切回自动后同一次调用**不得**再报 manual-mode（否则测到的只是「恒报」）。
+        BK.setSettings({ simulationMode: 'balanced' });
+        const auto = BK.requestSimulate('after-reply');
+        if (auto && auto.reason === 'manual-mode') {
+          throw new Error('见证自检失败：自动模式下仍报 manual-mode（该码变成恒报，见证无意义）');
+        }
+      }
+      if (CR) {
+        want('earliest-unlocked', '回收站：待清清单里每项都标「最早移入且未锁定」这一顺序依据');
+        CR.reset();
+        CR.setSettings({ enabled: true, limit: 1, purgeLocked: false });
+        CR.hide({ file: 'witness-recycle-a', title: 'A', at: 1 });
+        CR.hide({ file: 'witness-recycle-b', title: 'B', at: 2 });
+        trip('earliest-unlocked', function () {
+          const pl = CR.plan();
+          return pl.victims.map(function (v) { return v.reason; });
+        });
+        //  反证：未超限时清单为空 —— 该码只在**真超限**时出现，不是每次 plan 都挂一条。
+        CR.restore('witness-recycle-b');
+        const pl2 = CR.plan();
+        if (pl2 && pl2.victims && pl2.victims.length) {
+          throw new Error('见证自检失败：未超限时 victims 仍非空（earliest-unlocked 会变成恒报）');
+        }
+      }
+    } finally {
+      //   无条件还原（不拿「跑通了」当还原的理由）
+      if (CR) { try { CR.reset(); if (keepC) CR.setSettings({ enabled: !!keepC.enabled, limit: keepC.limit, purgeLocked: !!keepC.purgeLocked }); } catch (e) {} }
+      if (BK && keepB) { try { BK.setSettings({ autoSimulate: !!keepB.autoSimulate, simulationMode: keepB.simulationMode }); } catch (e) {} }
+    }
+  }
+  const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
+  const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 
   return { expect: expect, seen: seen, missing: missing, unexpected: unexpected,
     asyncPumpProof: asyncPumpProof };

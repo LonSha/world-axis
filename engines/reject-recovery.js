@@ -124,6 +124,18 @@
     // ── v2.295.0（V9 十八项）：续接链路两条分词判不出档的新码（词表收不住，逐条显式登记）。
     'continuation-tail-required': { kind: 'request-setup', why: '续接前须先回放尾巴：先补齐尾巴前置，再重发同一次续接' },
     'dangling-continuation-relation': { kind: 'manual-review', why: '续接指向的关系已悬空：修边还是弃续接，机器判不了' },
+    // ── v2.407.0（三缝 + 主线 A/B/C/E/F/G）：新引擎里**规则表判不出档**的两条 ──
+    //   其余 15 条新码都被规则表收住了（via:'rule'），这两条不是：
+    //     · lower-priority-overrides-canonical —— 分词 lower/priority/overrides/canonical
+    //       一个都不在六档词表里。它是**证据分级**判据：本次写入用 context/designed 级证据
+    //       去覆盖一条 explicit/canon 级的既有事实，所以被拒。该改的是输入（换更高优先级的
+    //       证据来源），不是去补前置，也不是同输入重试 ⇒ adjust-input。
+    //     · store-unreadable —— 分词 store/unreadable，`unreadable` 虽在词表里但不在恰当的
+    //       档（与既有的 `unreadable` / `lib-unreadable` 同规：读不到就没法判断内容是否可用，
+    //       机器判不了）⇒ manual-review。刻意与 `unreadable` 逐字同档，不另立一种口径。
+    //   ⚠ 两条都已在 REJECT_FACE 快照里（A8 要求），故此处只是补档、不改面。
+    'lower-priority-overrides-canonical': { kind: 'adjust-input', why: '本次写入的证据优先级低于既有 canonical 事实（context/designed 想覆盖 explicit/canon）：换成更高优先级的证据来源再写' },
+    'store-unreadable': { kind: 'manual-review', why: '存档读不到（不冒充空世界）：机器无从判断内容是否可用，需人先修存档再重跑诊断' },
     // ── v2.192.0 首轮分面后补登的 33 条（拒收面规则表判不了，逐条显式登记）──
     'aftermath-wait': { kind: 'retry-same-input', why: '章间冷却期未过：等窗口过去同输入再来' },
     'ahead-of-head': { kind: 'rollback', why: '客户端序号超过服务端头，说明这份状态不该落' },
@@ -435,6 +447,12 @@
     'intercepted-by-physiological-circuit-breaker': { out: true, why: '动机裁决里被剔掉选项的理由（motive-arbitration:165 的 forsaken 行），不是调用被拒' },
     'out_of_service': { out: true, why: '出行方式的可用性读数（transit-scheduler:108 的 available:false 对象不带 ok），不是调用被拒' },
     'room_partition': { out: true, why: '遮挡读数（environmental-occlusion:80，与 different_venues 同形），不是调用被拒' },
+    // ── v2.407.0：chat-recycle 的清理顺序依据 ──
+    //   `plan()` 返回的 victims 每行都带 `reason:'earliest-unlocked'`，说的是「这一项为什么
+    //   该先被清」（最早移入且未锁定）。它是**清理清单的排序依据**，不是一次拒收：
+    //   调 plan() 本身返回 ok:true，被点名的文件也还没被删。故 out:true 而非给档 ——
+    //   给它配恢复动作等于教玩家去「修」一件本就没坏的事（与 after-reply / compact 同一条边界）。
+    'earliest-unlocked': { out: true, why: '回收清单里被选中项的排序依据（最早移入且未锁定），plan 本身返回 ok:true，不是一次拒收' },
   };
 /* 拒收面冻结快照（v2.203.0 现场实测 740 条）：至少在 `ok:false` 对象里出现过 ——
    *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。
@@ -932,6 +950,35 @@
     //
     //   为什么不写 OVERRIDES：见下方探针读数（本段落定后 explain 给出的 via）。
     'mourning-prohibited',
+    // ── v2.407.0（三缝 + 主线 A/B/C/E/F/G）：五个新引擎带出的 17 条拒收码 ──
+    //   来历与上一条 mourning-prohibited 同型：**本批新引擎新增的真拒收码**，不是历史欠账。
+    //   reject-code-gate 已经用真 API 调用把它们逐条跑出来了（tests/reject-v2780.js 的
+    //   v2.407.0 见证段，unseen 0 / expected 827），但「有见证」与「产品快照认得它是拒收」
+    //   是两个真源 —— 前者管可达性，后者管 explain() 能不能独立答出这个码是什么面。
+    //   现场复算读数：新引擎把 reason 字面量面从 1749 抬到 1766（拒收 1558→1575），
+    //   而本数组没动 ⇒ tools/reject-recovery.js --check 报 16 条 missing-snapshot。
+    //
+    //   为什么必须逐条进快照（而不是靠规则表兜）：explain() 的面判定只认注入面 /
+    //   三张冻结快照 / 显式登记，**绝不拿规则表当默认档**（边界 ③）。快照缺一条，
+    //   产品就只能答 unknown —— 「这个码是什么面」这件事在运行时是答不出来的。
+    //
+    //   归属（逐条读源码站点，不按码名猜测）：
+    //     summarizer-adapter（三缝②）：bad-doc / empty-source / missing-provenance /
+    //       relay-absent / relay-threw / attach-threw —— 摘要格式与挂载的六种失败。
+    //     branch-continuity（主线 D）：evidence-missing / bad-evidence-kind /
+    //       evidence-no-source / lower-priority-overrides-canonical / missing-signature /
+    //       no-established-state / whole-reject —— 四道校验里 schema/evidence/continuity
+    //       三道的具体驳回理由，加上「任一校验失败整体拒绝」。
+    //     reading-bookmark（三缝①）：missing-anchor / rewind-denied / transact-no-output
+    //       —— 无锚可推进 / 回退被拒（只前进不后退）/ 事务没给回执。
+    //     fact-continuity（主线 G）：store-unreadable —— 存档读不到，**不冒充空世界**。
+    //
+    //   为什么不写 OVERRIDES：先按规则表跑，判不出档的再单独登记（见下方 v2.407.0 段）。
+    //   一次写死两种归类方式会让 A8（OVERRIDES 与规则表不得打架）失去意义。
+    'attach-threw', 'bad-doc', 'bad-evidence-kind', 'empty-source', 'evidence-missing',
+    'evidence-no-source', 'lower-priority-overrides-canonical', 'missing-anchor',
+    'missing-provenance', 'missing-signature', 'no-established-state', 'relay-absent',
+    'relay-threw', 'rewind-denied', 'store-unreadable', 'transact-no-output', 'whole-reject',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1009,6 +1056,11 @@
     //   键集与 NEUTRAL_REVIEW 必须逐字相同（A7），故下方登记表同批补入同样 10 条。
     'cascade_bus_tick', 'collateral-default', 'compact', 'contraband_smuggling_caught', 'debt-breach', 'different_venues',
     'forgery-detected', 'intercepted-by-physiological-circuit-breaker', 'out_of_service', 'room_partition',
+    // ── v2.407.0：engines/chat-recycle.js 的 plan() 给「待清项」标的清理依据 ──
+    //   它落在 `{ file, title, at, seq, reason:'earliest-unlocked' }` 这个**不带 ok** 的对象里
+    //   （那是 victims 数组的一行，不是调用返回体）⇒ 现场面判不出，按契约逐条登记。
+    //   键集必须与 NEUTRAL_REVIEW 逐字相同（A7 咬这一条），故下方登记表同批补入。
+    'earliest-unlocked',
   ];
   /** 三快照查表 → 面。未命中即 `unknown`（**判不出就是判不出**，不拿规则表兜）。 */
   function frozenFace(c) {
