@@ -63,6 +63,73 @@
   const KINDS = ['research', 'family', 'production', 'training', 'gear', 'travel'];
   /** 具名行动 id 前缀 → 目标 owner 写口。未知前缀一律拒收（边界 3）。 */
   const ROUTES = {
+    // ── V23 史诗扩充写口 ───────────────────────────────────────────────
+    'market.transferCargo': function (o) {
+      if (WA.commodityCirculation && typeof WA.commodityCirculation.transferCargo === 'function') {
+        return WA.commodityCirculation.transferCargo(o);
+      }
+      return { ok: false, refusal: 'commodity-circulation-unavailable' };
+    },
+    'market.settleDefault': function (o) {
+      if (WA.commodityCirculation && typeof WA.commodityCirculation.settleDefault === 'function') {
+        return WA.commodityCirculation.settleDefault(o.debtId, o.currentRound, o.paidAmount);
+      }
+      return { ok: false, refusal: 'commodity-circulation-unavailable' };
+    },
+    'body.inflictWound': function (o) {
+      if (WA.somaticTrauma && typeof WA.somaticTrauma.inflictWound === 'function') {
+        return WA.somaticTrauma.inflictWound(o.actorId, o.zone, o.damageSpec);
+      }
+      return { ok: false, refusal: 'somatic-trauma-unavailable' };
+    },
+    'body.performTriage': function (o) {
+      if (WA.somaticTrauma && typeof WA.somaticTrauma.performTriage === 'function') {
+        return WA.somaticTrauma.performTriage(o.actorId, o.zone, o.triageMethod);
+      }
+      return { ok: false, refusal: 'somatic-trauma-unavailable' };
+    },
+    'mind.triggerTraumaShock': function (o) {
+      if (WA.psycheDissociation && typeof WA.psycheDissociation.triggerTraumaShock === 'function') {
+        return WA.psycheDissociation.triggerTraumaShock(o.actorId, o.shockSpec);
+      }
+      return { ok: false, refusal: 'psyche-dissociation-unavailable' };
+    },
+    'crowd.igniteRumorWave': function (o) {
+      if (WA.mobStampede && typeof WA.mobStampede.igniteRumorWave === 'function') {
+        return WA.mobStampede.igniteRumorWave(o.placeId, o.rumorSpec);
+      }
+      return { ok: false, refusal: 'mob-stampede-unavailable' };
+    },
+    'geo.simulateTerrainShift': function (o) {
+      if (WA.geophysicalReshaping && typeof WA.geophysicalReshaping.simulateTerrainShift === 'function') {
+        return WA.geophysicalReshaping.simulateTerrainShift(o.regionId, o.pressures);
+      }
+      return { ok: false, refusal: 'geophysical-reshaping-unavailable' };
+    },
+    'craft.applyStress': function (o) {
+      if (WA.artificeDegradation && typeof WA.artificeDegradation.applyStress === 'function') {
+        return WA.artificeDegradation.applyStress(o.itemId, o.stressSpec);
+      }
+      return { ok: false, refusal: 'artifice-degradation-unavailable' };
+    },
+    'spy.infiltrateAgent': function (o) {
+      if (WA.shadowCouncil && typeof WA.shadowCouncil.infiltrateAgent === 'function') {
+        return WA.shadowCouncil.infiltrateAgent(o.agentId, o.shadowFaction, o.spec);
+      }
+      return { ok: false, refusal: 'shadow-council-unavailable' };
+    },
+    'clan.bindLineage': function (o) {
+      if (WA.dynasticLineage && typeof WA.dynasticLineage.bindLineage === 'function') {
+        return WA.dynasticLineage.bindLineage(o.actorId, o.clanId, o.spec);
+      }
+      return { ok: false, refusal: 'dynastic-lineage-unavailable' };
+    },
+    'epoch.advanceSingularityTension': function (o) {
+      if (WA.worldSingularity && typeof WA.worldSingularity.advanceSingularityTension === 'function') {
+        return WA.worldSingularity.advanceSingularityTension(o.delta, o.reason);
+      }
+      return { ok: false, refusal: 'world-singularity-unavailable' };
+    },
     'finance.triggerRunOnBank': function (o) {
       if (WA.financialContagion && typeof WA.financialContagion.triggerRunOnBank === 'function') {
         return WA.financialContagion.triggerRunOnBank(o);
@@ -3707,6 +3774,50 @@ let ckpt = null;
 
   WA.actionDesk = {
     STATES: STATES.slice(), KINDS: KINDS.slice(), ROUTES: Object.keys(ROUTES).slice(),
+    /**
+     * OPV23-2: 复合多动原子事务
+     */
+    transactActions: function (actions, opts) {
+      const list = Array.isArray(actions) ? actions : [];
+      if (list.length === 0) return { ok: true, count: 0, results: [] };
+
+      // 前置因果预检
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i];
+        if (!item || !item.route || !ROUTES[item.route]) {
+          return {
+            ok: false,
+            refusal: 'batch-atomic-preflight-failed',
+            failedIndex: i,
+            hint: '批处理中第 ' + i + ' 项动作包含未知或无效路由: ' + (item && item.route)
+          };
+        }
+      }
+
+      const results = [];
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i];
+        const res = ROUTES[item.route](item.params || {});
+        results.push({ route: item.route, result: res });
+        if (res && res.ok === false) {
+          return {
+            ok: false,
+            refusal: 'batch-atomic-execution-aborted',
+            failedIndex: i,
+            failedRoute: item.route,
+            detail: res,
+            hint: '原子动作链中途遭遇拒绝，阻断后续动作'
+          };
+        }
+      }
+
+      return {
+        ok: true,
+        count: results.length,
+        results: results,
+        at: Date.now()
+      };
+    },
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(patch); },
     board: board,
@@ -3745,7 +3856,7 @@ let ckpt = null;
     writable: true,
     configurable: true
   });
-  var EXPORT_COUNT = 16;
+  var EXPORT_COUNT = 17;
   var _exported = Object.keys(WA.actionDesk).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('actionDesk: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/action-desk.js', { kind: 'engine', ver: '2.231.0' });

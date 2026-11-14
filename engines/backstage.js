@@ -216,6 +216,11 @@
       background: s.background.text ? s.background.text.slice(0, 500) : '',
       pulse: s.worldPulse || null,
       facts: (s.worldFacts || []).slice(-20).map(f => ({ k: f.key, v: f.value })),
+      // OPV23-3: 物理因果与硬约束注面
+      world_physics: {
+        ruptures: (WA.geophysicalReshaping && WA.geophysicalReshaping.isPathPassable) ? 'enabled' : 'normal',
+        singularityTension: (WA.worldSingularity && WA.worldSingularity.getSingularityState) ? WA.worldSingularity.getSingularityState().tension : 0
+      },
       people: sorted.slice(0, budget || 8).map(p => {
         // v2.51.0：人格快照与关系量值摘要——不注入的话模型看不到「已锁定」，
         //   每轮都可能重新发明一套人格（重骰的真实成因）。

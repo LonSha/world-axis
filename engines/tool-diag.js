@@ -4070,6 +4070,16 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/betrothal-alliance.js': 'betrothalAlliance',
     'engines/cartography-survey.js': 'cartographySurvey',
     'engines/lingua-broker.js': 'linguaBroker',
+    // ── v2.408.0（EXV23-1 至 EXV23-9）：V23 超级史诗拓展引擎登记 ──
+    'engines/commodity-circulation.js': 'commodityCirculation',
+    'engines/somatic-trauma.js': 'somaticTrauma',
+    'engines/psyche-dissociation.js': 'psycheDissociation',
+    'engines/mob-stampede.js': 'mobStampede',
+    'engines/geophysical-reshaping.js': 'geophysicalReshaping',
+    'engines/artifice-degradation.js': 'artificeDegradation',
+    'engines/shadow-council.js': 'shadowCouncil',
+    'engines/dynastic-lineage.js': 'dynasticLineage',
+    'engines/world-singularity.js': 'worldSingularity',
     // ── v2.402.0（V23 缝合线）：缝异空间 V1.4 的三台账本引擎 ──
     //   与上段同一病（引擎已落地、本表未登记）。ns 名逐一取自各文件 `WA.<ns> = {`。
     //   不登记的直接后果：secModules 把三个文件报成 missing（那是「真缺席」），

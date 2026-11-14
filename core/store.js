@@ -2272,6 +2272,85 @@
      *   体检时被当容量洞上报）。测试侧靠本口拿到现场值，与 chatcache 导出面对账，
      *   不允许测试自己抄一份字面量（抄一份就等于第三处真源）。
      */
+    /**
+     * OPV23-4: 时空分支秒级差分试演（Time-Travel Fork）沙盒
+     * 纯内存克隆一份不可变影子树，与当前生产 state 隔离，试演完毕直接丢弃。
+     */
+    forkBranch: function (branchId) {
+      const live = (typeof getLiveState === 'function') ? getLiveState() : (window.WorldAxis && window.WorldAxis.store && window.WorldAxis.store.get ? window.WorldAxis.store.get() : {});
+      let clone = null;
+      try {
+        clone = JSON.parse(JSON.stringify(live || {}));
+      } catch (e) {
+        clone = Object.assign({}, live || {});
+      }
+      clone.__forkId = branchId || ('fork_' + Math.random().toString(36).slice(2, 9));
+      clone.__isShadowFork = true;
+      clone.__forkedAt = Date.now();
+      return {
+        ok: true,
+        forkId: clone.__forkId,
+        state: clone,
+        diff: function (newState) {
+          const s1 = clone, s2 = newState || {};
+          const keys = Array.from(new Set(Object.keys(s1).concat(Object.keys(s2)))).filter(function (k) { return !k.startsWith('__'); });
+          const changes = [];
+          keys.forEach(function (k) {
+            const v1 = JSON.stringify(s1[k]), v2 = JSON.stringify(s2[k]);
+            if (v1 !== v2) changes.push({ key: k, before: s1[k], after: s2[k] });
+          });
+          return { ok: true, forkId: clone.__forkId, divergenceCount: changes.length, changes: changes };
+        }
+      };
+    },
+
+    /**
+     * OPV23-6: 资源因果排他租约锁与并发竞态围栏
+     * 悲观互斥锁，多引擎争夺同一关键资源（粮食/金库/军备）时仲裁配给，杜绝负库存。
+     */
+    acquireResourceLease: function (resourceUri, claimAmount, priority) {
+      if (!window.__WA_RESOURCE_LEASES) window.__WA_RESOURCE_LEASES = {};
+      const uri = String(resourceUri || 'global:resource');
+      const amount = Math.max(0, Number(claimAmount) || 0);
+      const prio = Number(priority) || 10;
+      const existing = window.__WA_RESOURCE_LEASES[uri];
+
+      if (existing && existing.active) {
+        if (prio <= existing.priority) {
+          return {
+            ok: false,
+            refusal: 'resource-lease-conflict-exhausted',
+            hint: '资源已被更高/同等优先级租约锁定: ' + uri
+          };
+        }
+        existing.active = false;
+      }
+
+      const token = 'lease_' + Math.random().toString(36).slice(2, 9);
+      window.__WA_RESOURCE_LEASES[uri] = {
+        token: token,
+        resourceUri: uri,
+        amount: amount,
+        priority: prio,
+        active: true,
+        at: Date.now()
+      };
+      return { ok: true, leaseToken: token, resourceUri: uri, amount: amount, priority: prio };
+    },
+
+    releaseResourceLease: function (leaseToken) {
+      if (!window.__WA_RESOURCE_LEASES) return { ok: false, refusal: 'no-active-leases' };
+      const leases = window.__WA_RESOURCE_LEASES;
+      for (const uri in leases) {
+        if (leases[uri].token === leaseToken) {
+          leases[uri].active = false;
+          delete leases[uri];
+          return { ok: true, releasedToken: leaseToken };
+        }
+      }
+      return { ok: false, refusal: 'lease-not-found' };
+    },
+
     transientSnapshotKeys() { return TRANSIENT_SNAPSHOT_KEYS.slice(); },
     //   v2.275.0 收口：`isTransientSnapshotPath` **不导出**。
     //     它一度跟着名单一起转出，死导出门禁当场判 self-only（core/store.js 内部自用、

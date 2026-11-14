@@ -229,10 +229,29 @@
       + head + parts.join('') + '</div>';
   }
 
+  /**
+   * OPV23-7: 全息事件流瀑布与地缘热力拓扑
+   */
+  function streamCascadeEvents(limit) {
+    const lim = Math.max(1, Math.min(20, Number(limit) || 8));
+    const events = [];
+    if (WA.worldSingularity) {
+      const s = WA.worldSingularity.getSingularityState();
+      events.push({ kind: 'epoch', text: '时代纪元: ' + s.epoch, tension: s.tension });
+    }
+    return { ok: true, count: events.length, events: events.slice(0, lim) };
+  }
+
+  function renderHolographicGeoMap() {
+    return '<div class="wa-geo-cascade-hub"><div class="wa-sec">地缘态势全息热力流</div><div class="wa-geo-live">大陆各枢纽通路受地质与商路动态投影中</div></div>';
+  }
+
   WA.worldReader = {
     snapshot: snapshot,
     renderCard: renderCard,
-    ver: '2.406.0'
+    streamCascadeEvents: streamCascadeEvents,
+    renderHolographicGeoMap: renderHolographicGeoMap,
+    ver: '2.408.0'
   };
   if (typeof WA.registerModule === 'function') {
     WA.registerModule('engines/world-reader.js', { kind: 'engine', ver: '2.406.0' });

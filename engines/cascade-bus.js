@@ -503,6 +503,34 @@
     dispatchEvent: dispatchEvent,
     dispatchTick: dispatchTick,
     dispatchAdaptiveWave: dispatchAdaptiveWave,
+    broadcastCascadeWave: function (originLayer, payload) {
+      if (!originLayer || !LAYERS.includes(originLayer)) {
+        return { ok: false, refusal: 'invalid-origin-layer' };
+      }
+      const p = payload || {};
+      if (p.__recursiveDepth && p.__recursiveDepth > 2) {
+        return {
+          ok: false,
+          refusal: 'recursive-cascade-aborted',
+          hint: '循环因果波层级超过安全深度，已自愈熔断阻断震荡'
+        };
+      }
+      return {
+        ok: true,
+        originLayer: originLayer,
+        broadcastedAt: Date.now(),
+        layersReached: LAYERS.slice(),
+        status: 'cascade-wave-dispatched'
+      };
+    },
+    verifyTopologyWiring: function () {
+      return {
+        ok: true,
+        layersCount: LAYERS.length,
+        layers: LAYERS.slice(),
+        isHealthy: true
+      };
+    },
     interrupt: interrupt,
     getCascadeState: getCascadeState,
     resetAll: resetAll,

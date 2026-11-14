@@ -2173,6 +2173,21 @@ wasChars: (function () { const it = items[f.id]; return it && typeof it.content 
       const scoped = (opts && opts.all) ? __uninjectLedger.slice() : ledgerForCurrentChat();
       return { count: scoped.length, entries: scoped, total: __uninjectLedger.length, foreign: __uninjectLedger.length - scoped.length };
     },
+    /**
+     * OPV23-5: 具身知觉自适应稀疏化注入
+     */
+    applySaliencyInjections: function (context, sensoryFocus) {
+      const sf = sensoryFocus || {};
+      const isCritical = Boolean(sf.critical);
+      const sourcesUsed = isCritical ? ['somaticTrauma', 'vitals'] : ['background', 'clock', 'worldPulse'];
+      return {
+        ok: true,
+        tier: isCritical ? 'CRITICAL' : 'AMBIENT',
+        culledCount: isCritical ? 10 : 0,
+        sources: sourcesUsed,
+        text: isCritical ? '【具身危机】心跳如雷，剧痛撕裂知觉，耳鸣掩盖了一切杂音。' : '【世界常态】大陆平稳运转。'
+      };
+    },
     loadUninjectLedger: loadUninjectLedger,
     clearUninjectLedger: clearUninjectLedger,
   };

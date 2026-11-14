@@ -1079,6 +1079,16 @@ const LOAD = [
   'engines/betrothal-alliance.js',   // EXV22-6 婚约聘娶 / 妆匛议价 / 门第联姻
   'engines/cartography-survey.js',   // EXV22-7 舆图测绘 / 精度分层 / 迷雾认知
   'engines/lingua-broker.js',        // EXV22-8 方言隔阂 / 译语掮客 / 误译后果
+  // ── v2.408.0（EXV23-1 至 EXV23-9）：V23 超级史诗全域因果觉醒拓展引擎 ──
+  'engines/commodity-circulation.js', // EXV23-1 物资商路与债务违约
+  'engines/somatic-trauma.js',        // EXV23-2 具身肢体创伤与知觉剥夺
+  'engines/psyche-dissociation.js',    // EXV23-3 创伤闪回与记忆虚构
+  'engines/mob-stampede.js',          // EXV23-4 暴民恐慌踩踏与传闻裂变
+  'engines/geophysical-reshaping.js', // EXV23-5 水文地貌重塑与道路熔断
+  'engines/artifice-degradation.js',  // EXV23-6 器械磨损疲劳与炸膛卡死
+  'engines/shadow-council.js',        // EXV23-7 影子间谍死信箱与暗室暗杀
+  'engines/dynastic-lineage.js',      // EXV23-8 宗族谱系与夺嫡立嗣
+  'engines/world-singularity.js',     // EXV23-9 张力时钟与时代奇点收束
   // ── v2.402.0（V23 缝合线）：从异空间 V1.4 缝入的三台账本引擎 ──
   //   为什么必须进本 LOAD：不入清单的后果不是「少测三项」，而是它们的三 ns
   //   在 engines/tool-diag.js 的 MODULE_EXPORTS 里有、在本装载面没有 ⇒

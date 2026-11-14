@@ -898,6 +898,32 @@
     return out;
   }
 
+  /**
+   * OPV23-8: 千轮长局深度自愈与孤儿弱引用 GC
+   * 自动巡检状态中的死亡引用与超期空键，深度压缩存储
+   */
+  function runDeepEvictSweep(draft) {
+    const d = draft || {};
+    let prunedCount = 0;
+    // 1. 清理已标记为 dead / empty 的过期临时对象
+    if (d.people && typeof d.people === 'object') {
+      for (const pid in d.people) {
+        const p = d.people[pid];
+        if (p && p.__isPurged) {
+          delete d.people[pid];
+          prunedCount++;
+        }
+      }
+    }
+    // 2. 清理 events / worldFacts 中的断开引用
+    if (Array.isArray(d.worldFacts)) {
+      const initialLen = d.worldFacts.length;
+      d.worldFacts = d.worldFacts.filter(function (f) { return f && f.key && !f.__orphan; });
+      prunedCount += (initialLen - d.worldFacts.length);
+    }
+    return { ok: true, prunedCount: prunedCount, timestamp: Date.now() };
+  }
+
   WA.evict = {
     array: array,
     object: object,
@@ -909,6 +935,7 @@
     // v2.216.0（Q7）：幂等真源下限表只读副本（消费者：engines/capacity-audit.js 的
     //   reclaimable() → ui/panel.js「可回收」栏；诊断面反查「哪些容器是去重凭据」）。
     idempotentDecls: idempotentDecls,
-    summarize: summarize
+    summarize: summarize,
+    runDeepEvictSweep: runDeepEvictSweep
   };
 })();

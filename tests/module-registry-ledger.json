@@ -1,13 +1,13 @@
 {
  "version": "2.407.0",
- "loadOrderCount": 461,
- "loadedCount": 443,
+ "loadOrderCount": 470,
+ "loadedCount": 452,
  "uiCount": 18,
- "nsCount": 454,
+ "nsCount": 463,
  "totals": {
-  "loadEdges": 308,
+  "loadEdges": 317,
   "hardEdges": 0,
-  "callRefs": 529,
+  "callRefs": 547,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -44,6 +44,7 @@
     "engines/alchemy-toxicology.js",
     "engines/anomaly-mutation.js",
     "engines/archive-hide.js",
+    "engines/artifice-degradation.js",
     "engines/atlas.js",
     "engines/auto-hide.js",
     "engines/autobiography-epiphany.js",
@@ -79,6 +80,7 @@
     "engines/city-folklore.js",
     "engines/civilization-relic.js",
     "engines/commission.js",
+    "engines/commodity-circulation.js",
     "engines/commons-governance.js",
     "engines/community-note.js",
     "engines/compare.js",
@@ -97,6 +99,7 @@
     "engines/direct-event.js",
     "engines/director.js",
     "engines/dream.js",
+    "engines/dynastic-lineage.js",
     "engines/eccentric-threads.js",
     "engines/eco-audit.js",
     "engines/economy.js",
@@ -130,6 +133,7 @@
     "engines/gen-gate.js",
     "engines/gen-timing.js",
     "engines/geo-tracker.js",
+    "engines/geophysical-reshaping.js",
     "engines/group-refuse.js",
     "engines/handoff-pack.js",
     "engines/hazard.js",
@@ -162,6 +166,7 @@
     "engines/memory-tiers.js",
     "engines/memory.js",
     "engines/mend.js",
+    "engines/mob-stampede.js",
     "engines/modelink.js",
     "engines/mood-glide.js",
     "engines/mortuary-rites.js",
@@ -202,6 +207,7 @@
     "engines/proactive.js",
     "engines/probe.js",
     "engines/production.js",
+    "engines/psyche-dissociation.js",
     "engines/public-agenda.js",
     "engines/purify-scope.js",
     "engines/push-api-registry.js",
@@ -238,9 +244,11 @@
     "engines/sediment.js",
     "engines/service-network.js",
     "engines/session.js",
+    "engines/shadow-council.js",
     "engines/siege-attrition.js",
     "engines/social-legacy.js",
     "engines/solo-voice.js",
+    "engines/somatic-trauma.js",
     "engines/stage-presence.js",
     "engines/stage-session.js",
     "engines/stage.js",
@@ -282,6 +290,7 @@
     "engines/world-lab.js",
     "engines/world-reader.js",
     "engines/world-seed.js",
+    "engines/world-singularity.js",
     "engines/world-snapshot.js",
     "engines/write-desk.js",
     "render/map-viewport.js",
@@ -484,6 +493,7 @@
     "engines/alchemy-toxicology.js",
     "engines/anomaly-mutation.js",
     "engines/archive-hide.js",
+    "engines/artifice-degradation.js",
     "engines/atlas.js",
     "engines/auto-hide.js",
     "engines/autobiography-epiphany.js",
@@ -514,6 +524,7 @@
     "engines/city-folklore.js",
     "engines/civilization-relic.js",
     "engines/commission.js",
+    "engines/commodity-circulation.js",
     "engines/commons-governance.js",
     "engines/community-note.js",
     "engines/compare.js",
@@ -531,6 +542,7 @@
     "engines/diplomacy.js",
     "engines/director.js",
     "engines/dream.js",
+    "engines/dynastic-lineage.js",
     "engines/eccentric-threads.js",
     "engines/eco-audit.js",
     "engines/economy.js",
@@ -559,6 +571,7 @@
     "engines/gen-gate.js",
     "engines/gen-timing.js",
     "engines/geo-tracker.js",
+    "engines/geophysical-reshaping.js",
     "engines/group-refuse.js",
     "engines/handoff-pack.js",
     "engines/history-search.js",
@@ -587,6 +600,7 @@
     "engines/memory-relay.js",
     "engines/memory-tiers.js",
     "engines/mend.js",
+    "engines/mob-stampede.js",
     "engines/modelink.js",
     "engines/mood-glide.js",
     "engines/mortuary-rites.js",
@@ -623,6 +637,7 @@
     "engines/preset-world.js",
     "engines/probe.js",
     "engines/production.js",
+    "engines/psyche-dissociation.js",
     "engines/public-agenda.js",
     "engines/purify-scope.js",
     "engines/push-api-registry.js",
@@ -658,9 +673,11 @@
     "engines/sediment.js",
     "engines/service-network.js",
     "engines/session.js",
+    "engines/shadow-council.js",
     "engines/siege-attrition.js",
     "engines/social-legacy.js",
     "engines/solo-voice.js",
+    "engines/somatic-trauma.js",
     "engines/stage-presence.js",
     "engines/stage-session.js",
     "engines/stage.js",
@@ -700,6 +717,7 @@
     "engines/world-lab.js",
     "engines/world-reader.js",
     "engines/world-seed.js",
+    "engines/world-singularity.js",
     "engines/world-snapshot.js",
     "engines/write-desk.js",
     "render/map-viewport.js"
@@ -8359,6 +8377,177 @@
    "stateKeys": [
     "worldaxis_lingua_broker_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/commodity-circulation.js": {
+   "ns": [
+    "commodityCirculation"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/somatic-trauma.js": {
+   "ns": [
+    "somaticTrauma"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/psyche-dissociation.js": {
+   "ns": [
+    "psycheDissociation"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/mob-stampede.js": {
+   "ns": [
+    "mobStampede"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/geophysical-reshaping.js": {
+   "ns": [
+    "geophysicalReshaping"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/artifice-degradation.js": {
+   "ns": [
+    "artificeDegradation"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/shadow-council.js": {
+   "ns": [
+    "shadowCouncil"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/dynastic-lineage.js": {
+   "ns": [
+    "dynasticLineage"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/world-singularity.js": {
+   "ns": [
+    "worldSingularity"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/stage-session.js": {
