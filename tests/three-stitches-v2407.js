@@ -237,8 +237,27 @@ function runAll(assertFn) {
   ['summarizerAdapter', 'readingBookmark', 'director', 'branchContinuity', 'factContinuity'].forEach(function (ns, i) {
     a(td.indexOf("'" + ns + "'") >= 0, 'T7-' + (i + 11) + ' tool-diag 守卫登记 ' + ns);
   });
-  a(src('index.js').indexOf("const VERSION = '2.407.0'") >= 0, 'T7-16 版本面已升 2.407.0');
-  a(JSON.parse(src('manifest.json')).version === '2.407.0', 'T7-17 manifest 同源 2.407.0');
+  // v2.409.0：**T7-16/T7-17 从「相等」改为「不早于 2.407.0」**。
+  //   病灶：这两条原本钉 `=== '2.407.0'`，于是 v2.408.0 与 v2.409.0 一并版它们就红 ——
+  //   而它们要说的是「2.407.0 那批产品事实件存在」，不是「当前版本停在 2.407.0」。
+  //   一个历史锁钉当前版本，等于每升一版制造一次假红；本仓「当前版本」已有专节（run.js 的
+  //   __wantPin293 段）守，不该在此重复。判据改为「当前版本 ≥ 2.407.0 且仍在首位」。
+  const verOf = function () {
+    const m = src('index.js').match(/const VERSION = '([\d.]+)'/);
+    return m ? m[1] : '';
+  };
+  const atLeast = function (cur, want) {
+    const c = String(cur).split('.').map(Number), w = String(want).split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+      const x = c[i] || 0, y = w[i] || 0;
+      if (x > y) return true;
+      if (x < y) return false;
+    }
+    return true;
+  };
+  a(atLeast(verOf(), '2.407.0'), 'T7-16 版本面不早于 2.407.0（实 ' + verOf() + '）');
+  a(atLeast(JSON.parse(src('manifest.json')).version, '2.407.0'),
+    'T7-17 manifest 与入口同源且不早于 2.407.0（实 ' + JSON.parse(src('manifest.json')).version + '）');
   return { pass, fail, fails };
 }
 

@@ -4095,7 +4095,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/reading-bookmark.js': 'readingBookmark',
     'engines/director.js': 'director',
     'engines/branch-continuity.js': 'branchContinuity',
-    'engines/fact-continuity.js': 'factContinuity'
+    'engines/fact-continuity.js': 'factContinuity',
+    // v2.409.0：跨参照物缝合批三个引擎。ns 名取自各文件 `WA.<ns> = {`。
+    'engines/elapsed-evidence.js': 'elapsedEvidence',
+    'engines/source-reconcile.js': 'sourceReconcile',
+    'engines/plan-roster.js': 'planRoster'
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
   // v2.152.0：新增 ui 模块（ui/render-perf.js）同步进本名单 —— 漏登记的后果不是「少一行字」，

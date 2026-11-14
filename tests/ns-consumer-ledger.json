@@ -13,7 +13,7 @@
     "③ 新增零读 ns 而本账本未登记 ⇒ 门禁报『未定性』并计红（不许当成 0 条边蒙过去）。",
     "④ 本账本的键集与门禁 deadNs 读数双向一致：门禁多一个 → 未定性；账本多一个 → 过期登记。"
   ],
-  "version": "2.400.0",
+  "version": "2.409.0",
   "entries": {
     "LEAK_THRESHOLD": {
       "cls": "gate-selfwitness",
@@ -224,6 +224,24 @@
       "provider": "index.js",
       "evidence": "写入闸门读数口：内部转调 WA.store.writeGate()。产品面不读它是设计 —— 闸门在 store 内部自动生效，本口只给诊断面/人读『当前闸门什么状态』。",
       "recompute": "grep -n 'WA.writeGate' index.js"
+    },
+    "elapsedEvidence": {
+      "cls": "readonly-api",
+      "provider": "engines/elapsed-evidence.js",
+      "evidence": "v2.409.0 新增的时间证据解析器。产品面当前零读是**设计**：它只回答「正文这句话能不能当作推进依据、推进了多少分钟」，调用点是推演/分析流程的准入环节，而该环节在本仓仍由各引擎自带判据驱动（action-desk / mood-glide / toxic-metabolism 各自持有已算好的 deltaMinutes）。本批只落地「解析器 + 门禁」，未强行改三个既有引擎的取值链路 —— 那是独立一步（改链路会让它们的时间语义在同批里变两次，无法归因）。证据面：tests/cross-ref-stitch-v2409.js 的 EE-1~EE-25 真调 parse/verify/autoMinutes。",
+      "recompute": "grep -n 'EE-' tests/cross-ref-stitch-v2409.js | head -3"
+    },
+    "sourceReconcile": {
+      "cls": "readonly-api",
+      "provider": "engines/source-reconcile.js",
+      "evidence": "v2.409.0 新增的来源编辑撤销器。产品面当前零读是**设计**：engines/timeline.js 的 auditRefs 已有 valid/inherited/changed/missing 四态报告，而「报告之后要不要撤、撤到哪」属于调度决策，本仓尚未把该决策收进任何产品路径（撤回合会动 store，属于会改变现场的操作，需单独一批做并带自己的回滚判据）。证据面：tests/cross-ref-stitch-v2409.js 的 SR-1~SR-25 真调 reconcile/undoFrom/capture/current。",
+      "recompute": "grep -n 'SR-' tests/cross-ref-stitch-v2409.js | head -3"
+    },
+    "planRoster": {
+      "cls": "readonly-api",
+      "provider": "engines/plan-roster.js",
+      "evidence": "v2.409.0 新增的计划准入器（同行闭包 / 角色游标 / 封闭动作）。产品面当前零读是**设计**：engines/plan.js 是计划本体的唯一写者，本批只提供**准入判据**，不接管它的写入链路 —— 接管需要改 plan.js 的调用面，而那属于「会改变世界推进结果」的改动，与本批「纯只读判据、零 store 写」的边界冲突。证据面：tests/cross-ref-stitch-v2409.js 的 PR-1~PR-28 真调 admit/pick/memberProblem/knownBy/completionEvent。",
+      "recompute": "grep -n 'PR-' tests/cross-ref-stitch-v2409.js | head -3"
     }
   }
 }

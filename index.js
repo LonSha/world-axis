@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.407.0';
+  const VERSION = '2.409.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1406,6 +1406,12 @@
     //   位置在全部既有引擎之后、ui/panel.js 之前，与 world-reader/director 同层。
     'engines/branch-continuity.js',    // 主线B：证据契约 / 原子提交判据 / 楼层绑定恢复
     'engines/fact-continuity.js',      // 主线A/C/E/F/G：事实分层 / 信息边界 / 经济锚定 / 正文纪律 / 状态签名
+    // v2.409.0（跨参照物缝合批）：三个只读判据引擎。缝合来源是 npc-life 3.0.0-beta.4
+    //   与 st-4a-guard v4.3.1，逐条对照后只取本仓确实缺的能力（不搬题材、不搬破盾）。
+    //   三者都是调用期读，装载期零上游读、零 store 写、零落盘、零模型，与上两行同层。
+    'engines/elapsed-evidence.js',     // 时间流逝的证据解析：四层拒绝 + 模型分钟数双重校验
+    'engines/source-reconcile.js',     // 来源编辑 → 依赖后缀撤销 + 复合票据（十项比对）
+    'engines/plan-roster.js',          // 计划准入：同行闭包 / 角色游标 / 封闭动作白名单
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；

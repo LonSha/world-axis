@@ -349,6 +349,11 @@ async function launch(root, options) {
     if (result.status === 'passed' && (!result.summary || !/失败 0$/.test(result.summary))) result.status = 'missing-summary';
     if (!result.unchanged) result.status = 'source-changed';
     result.stopping = stopping; result.finishedAt = Date.now(); save();
+    // v2.408.0（OPV23-9）：**纯附加**的收尾回调。`tools/isolated-run.js`（调度器的委托入口）
+    //   需要把这一趟的最终 result 回带给调用方，好让它打一行机器可读读数 —— 而 `launch()`
+    //   的返回值只是退出码（0/3），拿不到状态、摘要与 task 目录。给一个可选回调比把所有
+    //   调用方改成「去读 result.json」更窄：**不传它时本函数逐字不变**（`tests/run.js` 不传）。
+    if (typeof opts.onFinish === 'function') { try { opts.onFinish(result); } catch (e) { console.error('onFinish:', e.message); } }
     console.log(result.summary || 'No completed test summary'); console.log('Status:', result.status, '| log:', logFile);
     if (result.status === 'passed') fs.rmSync(prepared.work, { recursive: true });
     return result.status === 'passed' ? 0 : 3;

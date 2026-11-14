@@ -266,7 +266,14 @@ const NS_FIELD_MAP = {
   //   模块文件），只有 perfTrace 一直没登记 —— 而它从 v2.102.0 起就在 perTrace 的提供方
   //   （engines/perf-trace.js）手里。不登记它，账本里那条 requires 会被报成「未定性」：
   //   按读数报出（不红），但下一个人读到时会以为这个 ns 的口径还没定。
-  perfTrace: 'engines/perf-trace.js'
+  perfTrace: 'engines/perf-trace.js',
+  // v2.409.0（跨参照物缝合批）：三个新引擎的 ns 名。不登记 ⇒ 本门禁判「ns 面漂移
+  //   （static-only）」—— 那是「未登记的一对一差」，读数上长得像接线出了问题，
+  //   而它们明明只是三个新文件。三处口径必须同批：本表 / engines/tool-diag.js 的
+  //   守卫登记表 / index.js 的加载序列；漏任何一处，读数都会把「新模块」读成「断裂」。
+  elapsedEvidence: 'engines/elapsed-evidence.js',
+  sourceReconcile: 'engines/source-reconcile.js',
+  planRoster: 'engines/plan-roster.js'
 };
 
 /**

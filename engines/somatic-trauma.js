@@ -40,24 +40,21 @@
   const ZONES = ['head', 'torso', 'mainHand', 'offHand', 'legs'];
   const SEVERITIES = ['minor', 'laceration', 'fracture', 'arterialBleed', 'severed'];
 
-  const STATE = {
-    wounds: {}, // actorId -> { [zone]: { severity, bleedingRate, pain, treated, severed } }
-    bloodLevels: {} // actorId -> bloodPercent (100 is healthy)
-  };
+  let STATE = null;
 
-  const stat = {
-    woundsInflicted: 0,
-    triagesPerformed: 0,
-    amputations: 0,
-    shockEpisodes: 0
-  };
+  let stat = null;
 
   function settings() {
-    if (WA.settingsBus && typeof WA.settingsBus.getModuleSettings === 'function') {
-      const s = WA.settingsBus.getModuleSettings(__REG.key, DEF);
-      return Object.assign({}, DEF, s);
-    }
-    return Object.assign({}, DEF);
+    // v2.408.0（OPV23-9 回归逮到）：本函数此前调 `WA.settingsBus.getModuleSettings(key, DEF)` ——
+    //   该成员在 settingsBus 的真实导出面上**不存在**（真实读口是 `read(reg)`）。
+    //   因为带 `typeof === 'function'` 守卫，调用**静默落空**：本引擎的开关恒等于 DEF，
+    //   「关闭引擎」这件事在宿主里从来没生效过。它是 HEAD 上就存在的预存缺陷
+    //   （tests/gates.js / member-surface-gate / settings-bus-api-gate 三处同时点名），
+    //   不是本批引入；本批按既有库内口径修正（与 engines/affect.js 逐字同规）。
+    const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
+    return WA.settingsBus
+      ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {}))
+      : Object.assign({}, DEF, raw || {});
   }
 
   function clockNow() {
@@ -225,12 +222,22 @@
     return { ok: true };
   }
 
+  function ownerCall(fn, args, readOnly) {
+    if (!WA.store || typeof WA.store.withOwnerState !== 'function') return { ok: false, refusal: 'owner-store-unavailable' };
+    return WA.store.withOwnerState('somaticTrauma', function (owned) {
+      const prevState = STATE, prevStat = stat;
+      STATE = owned; stat = owned._stats;
+      try { return fn.apply(null, args); }
+      finally { STATE = prevState; stat = prevStat; }
+    }, { readOnly: readOnly });
+  }
+
   WA.somaticTrauma = {
-    inflictWound: inflictWound,
-    performTriage: performTriage,
-    getSensoryProfile: getSensoryProfile,
-    tickMetabolism: tickMetabolism,
-    reset: reset,
+    inflictWound: function () { return ownerCall(inflictWound, arguments, false); },
+    performTriage: function () { return ownerCall(performTriage, arguments, false); },
+    getSensoryProfile: function () { return ownerCall(getSensoryProfile, arguments, true); },
+    tickMetabolism: function () { return ownerCall(tickMetabolism, arguments, false); },
+    reset: function () { return ownerCall(reset, arguments, false); },
     getSettings: settings
   };
 

@@ -3778,45 +3778,38 @@ let ckpt = null;
      * OPV23-2: 复合多动原子事务
      */
     transactActions: function (actions, opts) {
-      const list = Array.isArray(actions) ? actions : [];
-      if (list.length === 0) return { ok: true, count: 0, results: [] };
-
-      // 前置因果预检
+      if (!Array.isArray(actions)) return { ok: false, refusal: 'batch-atomic-preflight-failed' };
+      const list = actions;
+      const atomicRoutes = ['market.transferCargo', 'market.settleDefault', 'body.inflictWound', 'body.performTriage',
+        'mind.triggerTraumaShock', 'crowd.igniteRumorWave', 'geo.simulateTerrainShift', 'craft.applyStress',
+        'spy.infiltrateAgent', 'clan.bindLineage', 'epoch.advanceSingularityTension'];
       for (let i = 0; i < list.length; i++) {
         const item = list[i];
-        if (!item || !item.route || !ROUTES[item.route]) {
-          return {
-            ok: false,
-            refusal: 'batch-atomic-preflight-failed',
-            failedIndex: i,
-            hint: '批处理中第 ' + i + ' 项动作包含未知或无效路由: ' + (item && item.route)
-          };
+        if (!item || !Object.prototype.hasOwnProperty.call(ROUTES, item.route)) {
+          return { ok: false, refusal: 'batch-atomic-preflight-failed', failedIndex: i };
         }
+        // Unreviewed routes may write settings, closure state, or external effects.
+        if (!atomicRoutes.includes(item.route)) return { ok: false, refusal: 'batch-route-not-transactional', failedIndex: i, failedRoute: item.route };
       }
-
+      if (!list.length) return { ok: true, count: 0, results: [] };
+      if (!WA.store || typeof WA.store.transact !== 'function') return { ok: false, refusal: 'owner-store-unavailable' };
       const results = [];
-      for (let i = 0; i < list.length; i++) {
-        const item = list[i];
-        const res = ROUTES[item.route](item.params || {});
-        results.push({ route: item.route, result: res });
-        if (res && res.ok === false) {
-          return {
-            ok: false,
-            refusal: 'batch-atomic-execution-aborted',
-            failedIndex: i,
-            failedRoute: item.route,
-            detail: res,
-            hint: '原子动作链中途遭遇拒绝，阻断后续动作'
-          };
+      let failure = null;
+      const tx = WA.store.transact(function () {
+        for (let i = 0; i < list.length; i++) {
+          const item = list[i];
+          let result;
+          try { result = ROUTES[item.route](item.params || {}); }
+          catch (e) { result = { ok: false, reason: 'route-threw', error: String(e.message || e) }; }
+          if (!result || typeof result.then === 'function' || result.ok !== true) {
+            failure = { ok: false, refusal: 'batch-atomic-execution-aborted', failedIndex: i, failedRoute: item.route, detail: result };
+            return false;
+          }
+          results.push({ route: item.route, result: result });
         }
-      }
-
-      return {
-        ok: true,
-        count: results.length,
-        results: results,
-        at: Date.now()
-      };
+      });
+      if (!tx.ok) return Object.assign(failure || { ok: false, refusal: tx.reason || 'batch-transaction-aborted' }, { rolledBack: true, persisted: false });
+      return { ok: true, count: results.length, results: results, persisted: tx.persisted, deferred: !!tx.deferred, at: Date.now() };
     },
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(patch); },

@@ -39,6 +39,15 @@
   function defaultWorldState() {
     return {
       schemaVersion: SCHEMA_VERSION,
+      commodityCirculation: {"stockpiles":{},"debts":{},"blacklists":{},"_stats":{"transfers":0,"debtsIssued":0,"debtsSettled":0,"defaultsCount":0,"lastReason":""}},
+      somaticTrauma: {"wounds":{},"bloodLevels":{},"_stats":{"woundsInflicted":0,"triagesPerformed":0,"amputations":0,"shockEpisodes":0}},
+      psycheDissociation: {"actors":{},"_stats":{"traumasInflicted":0,"flashbacksTriggered":0,"confabulationsGenerated":0}},
+      mobStampede: {"places":{},"_stats":{"rumorsIgnited":0,"riotsTriggered":0,"stampedeIncidents":0,"quelledCount":0}},
+      geophysicalReshaping: {"ruptures":{},"hydrology":{},"_stats":{"terrainShifts":0,"rupturesCount":0,"repairsCount":0}},
+      artificeDegradation: {"items":{},"_stats":{"stressesApplied":0,"shattersOccurred":0,"jamsOccurred":0,"repairsDone":0}},
+      shadowCouncil: {"agents":{},"deadDrops":{},"_stats":{"agentsInfiltrated":0,"lettersDropped":0,"lettersRetrieved":0,"sanitizations":0}},
+      dynasticLineage: {"clans":{},"members":{},"_stats":{"lineagesBound":0,"successionsDecided":0,"privilegesClaimed":0}},
+      worldSingularity: {"currentEpoch":"classical-era","singularityTension":0,"epochHistory":[],"convergenceTriggered":false,"_stats":{"tensionsAdvanced":0,"convergencesTriggered":0,"epochsShifted":0}},
       // 世界钟
       clock: { iso: '', label: '', dayIndex: 0, source: 'unset' }, // source: unset|user|text|engine
       // 世界背景（用户设定或世界书注入的自由文本，纯框架不预设内容）
@@ -1703,6 +1712,27 @@
     return { state: target, filled: filled, conflicts: conflicts };
   }
   const __BOUNDED_CAPS = {
+    'commodityCirculation.stockpiles': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'commodityCirculation.debts': { cap: 50, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'commodityCirculation.blacklists': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'somaticTrauma.wounds': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'somaticTrauma.bloodLevels': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'psycheDissociation.actors': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'mobStampede.places': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'geophysicalReshaping.ruptures': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'geophysicalReshaping.hydrology': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'artificeDegradation.items': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'shadowCouncil.agents': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'shadowCouncil.deadDrops': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'dynasticLineage.clans': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'dynasticLineage.members': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
+    'worldSingularity.epochHistory': { cap: 128, kind: 'array', site: 'store.withOwnerState write capacity' },
+    'commodityCirculation.stockpiles.*': { cap: 64, kind: 'object', wildcard: true, site: 'store.withOwnerState write capacity' },
+    'psycheDissociation.actors.*.triggers': { cap: 32, kind: 'array', wildcard: true, site: 'store.withOwnerState write capacity' },
+    'shadowCouncil.deadDrops.*': { cap: 64, kind: 'array', wildcard: true, site: 'store.withOwnerState write capacity' },
+    'dynasticLineage.clans.*.elders': { cap: 32, kind: 'array', wildcard: true, site: 'store.withOwnerState write capacity' },
+    'dynasticLineage.clans.*.lineageTree': { cap: 128, kind: 'object', wildcard: true, site: 'store.withOwnerState write capacity' },
+    'dynasticLineage.members.*.geneticMarkers': { cap: 32, kind: 'array', wildcard: true, site: 'store.withOwnerState write capacity' },
     'periodicals.defs': { cap: 8, site: 'periodicals.js configure capacity guard' },
     'periodicals.issues': { cap: 48, site: 'periodicals.js evict.array' },
     'chronicle': { cap: 200, site: 'backstage.js slice(-200) + horizon.js CHRONICLE_CAP 同源（v1.3.0）' },
@@ -4525,6 +4555,40 @@
         drifted: concl.drifted,
         bloat: concl.bloat
       };
+    },
+    // Synchronous owner calls share the active transaction draft; readers get a clone.
+    withOwnerState(key, operation, opts) {
+      const ownerKeys = ["commodityCirculation","somaticTrauma","psycheDissociation","mobStampede","geophysicalReshaping","artificeDegradation","shadowCouncil","dynasticLineage","worldSingularity"];
+      if (!ownerKeys.includes(key) || typeof operation !== 'function') return { ok: false, refusal: 'invalid-owner-operation' };
+      const copy = function (value) { return value === undefined ? undefined : JSON.parse(JSON.stringify(value)); };
+      const current = __tx.length ? __tx[__tx.length - 1] : memCache;
+      if (opts && opts.readOnly) return copy(operation(copy((current || defaultWorldState())[key])));
+      let output, refusal = null;
+      const tx = this.transact(function (draft) {
+        if (!draft[key]) draft[key] = defaultWorldState()[key];
+        output = operation(draft[key]);
+        if (output && typeof output.then === 'function') { refusal = 'async-owner-operation'; return false; }
+        if (output === false || (output && output.ok === false)) return false;
+        const inspect = function (node, parts, meta, path) {
+          if (node == null) return;
+          if (!parts.length) {
+            if (typeof node !== 'object' || Array.isArray(node) !== (meta.kind !== 'object')) { refusal = 'owner-state-shape'; return; }
+            if (Object.keys(node).length > meta.cap) refusal = 'owner-capacity-exceeded:' + path;
+            return;
+          }
+          const part = parts[0], rest = parts.slice(1);
+          if (part === '*') Object.keys(node).forEach(function (k) { inspect(node[k], rest, meta, path); });
+          else inspect(node[part], rest, meta, path);
+        };
+        Object.keys(__BOUNDED_CAPS).filter(function (path) { return path.startsWith(key + '.'); }).forEach(function (path) {
+          inspect(draft[key], path.split('.').slice(1), __BOUNDED_CAPS[path], path);
+        });
+        return refusal ? false : undefined;
+      });
+      if (!tx.ok) return output && output.ok === false ? copy(output) : { ok: false, refusal: refusal || tx.reason || 'owner-transaction-aborted', persisted: false };
+      const result = copy(output);
+      if (result && typeof result === 'object') return Object.assign(result, { persisted: tx.persisted, deferred: !!tx.deferred });
+      return result;
     },
     get() { return memCache; },
 

@@ -1,13 +1,13 @@
 {
- "version": "2.407.0",
- "loadOrderCount": 470,
- "loadedCount": 452,
+ "version": "2.409.0",
+ "loadOrderCount": 473,
+ "loadedCount": 455,
  "uiCount": 18,
- "nsCount": 463,
+ "nsCount": 466,
  "totals": {
-  "loadEdges": 317,
+  "loadEdges": 320,
   "hardEdges": 0,
-  "callRefs": 547,
+  "callRefs": 553,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -104,6 +104,7 @@
     "engines/eco-audit.js",
     "engines/economy.js",
     "engines/ecosystem-predation.js",
+    "engines/elapsed-evidence.js",
     "engines/elsewhere.js",
     "engines/enemies.js",
     "engines/ensemble.js",
@@ -190,6 +191,7 @@
     "engines/perspective-lock.js",
     "engines/phase-transition.js",
     "engines/plan-audit.js",
+    "engines/plan-roster.js",
     "engines/plan.js",
     "engines/playable-blueprint.js",
     "engines/playable-seed.js",
@@ -249,6 +251,7 @@
     "engines/social-legacy.js",
     "engines/solo-voice.js",
     "engines/somatic-trauma.js",
+    "engines/source-reconcile.js",
     "engines/stage-presence.js",
     "engines/stage-session.js",
     "engines/stage.js",
@@ -547,6 +550,7 @@
     "engines/eco-audit.js",
     "engines/economy.js",
     "engines/ecosystem-predation.js",
+    "engines/elapsed-evidence.js",
     "engines/elsewhere.js",
     "engines/ensemble.js",
     "engines/environmental-capacity.js",
@@ -622,6 +626,7 @@
     "engines/perspective-lock.js",
     "engines/phase-transition.js",
     "engines/plan-audit.js",
+    "engines/plan-roster.js",
     "engines/plan.js",
     "engines/playable-blueprint.js",
     "engines/playable-seed.js",
@@ -678,6 +683,7 @@
     "engines/social-legacy.js",
     "engines/solo-voice.js",
     "engines/somatic-trauma.js",
+    "engines/source-reconcile.js",
     "engines/stage-presence.js",
     "engines/stage-session.js",
     "engines/stage.js",
@@ -8731,6 +8737,69 @@
    ],
    "ghostRefs": [],
    "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/elapsed-evidence.js": {
+   "ns": [
+    "elapsedEvidence"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_elapsed_evidence_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/source-reconcile.js": {
+   "ns": [
+    "sourceReconcile"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_source_reconcile_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/plan-roster.js": {
+   "ns": [
+    "planRoster"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_plan_roster_settings_v1"
+   ],
    "consumedBy": []
   }
  }

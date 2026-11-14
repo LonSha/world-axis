@@ -60,6 +60,9 @@
     epochal: new Set()
   };
 
+  let _waveDepth = 0;
+  let _waveSequence = 0;
+  let _activeWave = null;
   let _tickCounter = 0;
   const _lastCascadeSummary = {
     tick: 0,
@@ -84,7 +87,7 @@
     if (!LAYERS.includes(layerName)) return { ok: false, reason: 'invalid-layer' };
     const listeners = _subscribers[layerName];
     const results = [];
-    for (const fn of listeners) {
+    for (const fn of Array.from(listeners)) {
       try {
         const r = fn(eventName, payload);
         results.push({ ok: true, result: r });
@@ -485,10 +488,7 @@
 
   function resetAll() {
     _tickCounter = 0;
-    _subscribers.physical.clear();
-    _subscribers.somatic.clear();
-    _subscribers.behavioral.clear();
-    _subscribers.social.clear();
+    LAYERS.forEach(function (layer) { _subscribers[layer].clear(); });
     _lastCascadeSummary.tick = 0;
     _lastCascadeSummary.timestamp = 0;
     _lastCascadeSummary.layerDetails = {};
@@ -504,32 +504,51 @@
     dispatchTick: dispatchTick,
     dispatchAdaptiveWave: dispatchAdaptiveWave,
     broadcastCascadeWave: function (originLayer, payload) {
-      if (!originLayer || !LAYERS.includes(originLayer)) {
-        return { ok: false, refusal: 'invalid-origin-layer' };
+      if (!LAYERS.includes(originLayer)) return { ok: false, refusal: 'invalid-origin-layer' };
+      if (_waveDepth >= 3) {
+        if (_activeWave) _activeWave.aborted = true;
+        return { ok: false, refusal: 'recursive-cascade-aborted', depth: _waveDepth };
       }
-      const p = payload || {};
-      if (p.__recursiveDepth && p.__recursiveDepth > 2) {
+      const parent = _activeWave;
+      const wave = parent || { id: ++_waveSequence, aborted: false };
+      _activeWave = wave;
+      _waveDepth++;
+      const layersReached = [], deliveries = [], errors = [];
+      try {
+        for (const layer of LAYERS) {
+          if (wave.aborted) break;
+          const result = dispatchEvent(layer, 'cascade_wave', Object.assign({}, payload || {}, {
+            originLayer: originLayer, waveId: wave.id, depth: _waveDepth
+          }));
+          deliveries.push(result);
+          if (result.triggered > 0) layersReached.push(layer);
+          result.details.forEach(function (detail) {
+            if (!detail.ok || (detail.result && detail.result.ok === false)) {
+              errors.push({ layer: layer, error: detail.error || detail.result.refusal || detail.result.reason || 'listener-rejected' });
+            }
+          });
+        }
         return {
-          ok: false,
-          refusal: 'recursive-cascade-aborted',
-          hint: '循环因果波层级超过安全深度，已自愈熔断阻断震荡'
+          ok: !wave.aborted && errors.length === 0, originLayer: originLayer,
+          waveId: wave.id, broadcastedAt: clockNow('cascade-wave'),
+          layersReached: layersReached, deliveries: deliveries, errors: errors,
+          refusal: wave.aborted ? 'recursive-cascade-aborted' : (errors.length ? 'cascade-listener-failed' : null),
+          status: wave.aborted ? 'cascade-wave-aborted' : 'cascade-wave-dispatched'
         };
+      } finally {
+        _waveDepth--;
+        _activeWave = parent;
       }
-      return {
-        ok: true,
-        originLayer: originLayer,
-        broadcastedAt: Date.now(),
-        layersReached: LAYERS.slice(),
-        status: 'cascade-wave-dispatched'
-      };
     },
     verifyTopologyWiring: function () {
-      return {
-        ok: true,
-        layersCount: LAYERS.length,
-        layers: LAYERS.slice(),
-        isHealthy: true
-      };
+      const subscriberCounts = {}, missingLayers = [];
+      LAYERS.forEach(function (layer) {
+        subscriberCounts[layer] = _subscribers[layer].size;
+        if (!subscriberCounts[layer]) missingLayers.push(layer);
+      });
+      return { ok: true, layersCount: LAYERS.length, layers: LAYERS.slice(),
+        subscriberCounts: subscriberCounts, missingLayers: missingLayers,
+        isHealthy: missingLayers.length === 0 };
     },
     interrupt: interrupt,
     getCascadeState: getCascadeState,

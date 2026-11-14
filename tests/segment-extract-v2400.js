@@ -66,7 +66,12 @@ const SEG_TITLE = 'engines/tool-diag v0.9.2';
 //     v2.407.0 三缝 + 七主线。B1 守的是「拆段前后 section 总数不变」——段体未拆动，
 //     新增的是别的事（新专锁的挂载点），故补基线、不动判据口径。
 //     HEAD 上实测 441（=437+4）就已超基线，本批 +1 到 442。
-const BASE_SECTION_CC = 442;  // 拆前 run.js 的 section( 计数（去注释面）
+//   v2.409.0：443 → 444（+1）。增量是**跨参照物缝合批**新增的一节
+//     （tests/run.js 里 'v2.409.0: 跨参照物缝合批'），不是拆段漂移。
+//     B1 守的是「拆段前后 section 总数不变」—— 段体本轮完全未拆动，新增的是另一件事
+//     （新专锁的挂载点）。故补基线，不动判据口径。
+//     读数：node -e 裸计数 446，本题去注释口径 444（差值 2 = 本注释里提到的两处 `section(`）。
+const BASE_SECTION_CC = 444;  // 拆前 run.js 的 section( 计数（去注释面）
 const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面）
 // 测试文件面的绝对基线。它**刻意不是**「动态算出来再跟自己比」——那会变成自证空转。
 //   但它是「会长的集合」：每新增一把锁，这个数就必须跟着改一次。本轮 V22 已改三次：
@@ -96,7 +101,15 @@ const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面
 //     —— V23 双计划贯通专锁，且已按同一纪律登记进 tests/run.js 的 runScript 清单。
 //     不进清单的后果（与 v2.407.0 五把锁完全同族）：本锁成 unregistered-orphan，
 //     C1a 面数对不上、C4b/C4e 判孤儿，且这把锁从未在全量里跑过。
-const BASE_TEST_FILES = 557;
+//   v2.408.0（OPV23-9，本批第二把）：557 → 558（+1）。增量 tests/smart-runner-v2408.js
+//     —— 分层回归调度器专锁。同批同纪：它已登记进 tests/run.js 的 v2.408.0 节（runScript）。
+//     注意：tools/isolated-run.js **不计入**本面 —— tools/ 不在 product-files.testFiles() 的
+//     扫描面内（SKIP_DIRS 含 'tools'），故「新增调度入口」不改本常量，只有 tests/ 下的新锁才改。
+//   v2.409.0：558 → 559（+1）。增量只有 tests/cross-ref-stitch-v2409.js
+//     —— 跨参照物缝合批专锁，且已按同一纪律登记进 tests/run.js 的 v2.409.0 节（runScript）。
+//     同批新增的 tools/run-observer.js **不计入**本面：tools/ 不在 product-files.testFiles()
+//     的扫描面内（SKIP_DIRS 含 'tools'）。故「新增观测器」不改本常量，只有 tests/ 下的新锁才改。
+const BASE_TEST_FILES = 559;
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
 function exists(rel) { return fs.existsSync(path.join(BASE, rel)); }

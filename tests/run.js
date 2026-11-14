@@ -22415,11 +22415,6 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./scenario-v59-betrothal-dowry-feud.js');
     await runScript('./scenario-v60-cartography-ambush.js');
     await runScript('./scenario-v61-v22-grand-convergence.js');
-    // v2.408.0（V23 超级史诗）：EXV23-1~9 与 OPV23-1~9 贯通专锁（场景 62～67）
-    //   为什么必须进本清单：tests/test-surface-gate.js 把「磁盘有、从不执行、未豁免」
-    //   的测试文件判为 unregistered-orphan；不登记则本锁从未在全量里跑过，
-    //   且 segment-extract-v2400 的 C4b/C4e 会被拉红（与 V22 八引擎专锁同一纪律）。
-    await runScript('./scenario-v62-v23-epic-grand-causality.js');
     // v2.400.0 OPV22-1: 总线六层声明面与实现面逐字对齐
     await runScript('./cascade-six-layer-v2400.js');
     await runScript('./bus-topology-v2400.js');
@@ -22504,6 +22499,48 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.407.0: 三缝 + 七主线专锁（书签族复用 / 摘要契约 / 证据原子提交 / 排期顺延 / 事实分层）');
   {
     await runScript('./three-stitches-v2407.js');
+  }
+  // ── v2.408.0（V23 超级史诗）：EXV23-1~9 与 OPV23-1~9 贯通专锁（场景 62～67）─────────
+  //   为什么从 v2.380.0（V21）节里**拆出来独立成节**：这把锁此前挂在 V21「文明盛衰与生态政变
+  //   六条端到端场景」节下（那节的其余成员是 scenario-v50..v61）。两个后果，都在本批现场暴露：
+  //     ① 归属表（tools/test-layers.js）按节跨度算证据集，于是 V23 锁与 V21 的 21 个证据文件
+  //        被算成**同一节的证据** ⇒ L2 增量层无法单独征用 V23 锁（选中它就等于选中 V21 一整套）；
+  //     ② 节名说 V21、内容含 V23，读数与事实不符 —— 本仓反复点名的形态。
+  //   拆出的口径：本节的证据集**只有** V23 场景 62～67 与其同批锁，自包含（无 runLock、无共享原语）。
+  //   runScript 而非 runLock：scenario-v62 是纯脚本体（顶层跑完即退），与 V21 六条同档位。
+  //   ⚠ scenario-v62 经 `WA.<camelCase>` 命名空间逐条真调九个 V23 引擎 API（真消费），
+  //     这一点是 tools/smart-runner.js 选面判据认驼峰的直接依据，不许改回「只认文件名」。
+  section('v2.408.0 (V23 超级史诗): EXV23-1~9 与 OPV23-1~9 贯通专锁（场景 62～67）');
+  {
+    await runScript('./scenario-v62-v23-epic-grand-causality.js');
+    // v2.408.0（OPV23-9）：分层回归调度器专锁 —— 四级金字塔「每档真跑它声称的那件事」。
+    //   为什么必须登记：不登记 ⇒ tests/test-surface-gate.js 判 unregistered-orphan、
+    //   segment-extract-v2400 的 C4b/C4e 同红，且本锁**从未在全量里跑过**。
+    //   runScript 而非 runLock：本锁导 runAll 也有 CLI 入口，但它要 spawn 真调度器
+    //   （tools/smart-runner.js）与隔离入口，属「会起子进程」档，串行最稳。
+    //   ⚠ 本锁**不跑全量回归**（plans/V23_MASTER_PLAN.md 门控）：它只驱动 --plan 路径、
+    //     拒收路径、以及 L0/L1 的真跑路径；L3 只用 --plan 与门控拒收两个读数取证。
+    await runScript('./smart-runner-v2408.js');
+  }
+  // ── v2.409.0（跨参照物缝合批）：两个外部参照物逐条对照后只缝「本仓确实缺的」──────
+  //   参照物 A：muzi9277/npc-life 3.0.0-beta.4（9 个运行文件 4101 行）
+  //     只取三件本仓**没有**的能力，且都落在「模型说的与世界实际的差」这一族：
+  //       · 时间流逝证据解析（四层拒绝 + 模型分钟数双重校验）—— 本仓此前 deltaMinutes
+  //         只是「已算好的字段」，没有任何一处从正文明文取证据；
+  //       · 来源编辑 → 依赖后缀撤销（auditRefs 只报告、不撤）—— 这是 timeline 审计的下一步；
+  //       · 计划准入（同行闭包完整性 / 角色游标 / 封闭动作白名单）—— 防拆队与防发明新事实。
+  //     **不缝**：整套 NPC 状态目录（本仓人设/状态体系不同）、副 API 分流、地图导入、五页控制台。
+  //   参照物 B：xxs-ddc/st-4a-guard v4.3.1（Tavern Helper 单脚本 6852 行）
+  //     只取长跑观测的形态（本地心跳 / 双口径空闲 / 逐点硬上限），做成 tools/run-observer.js。
+  //     **不缝**：CSRF 重试（本仓不在浏览器 fetch）、静默自动更新与镜像、破盾与分类器规避
+  //     （与项目定位相反）。
+  //   runScript 而非 runLock：本锁导 runAll 也有 CLI 入口（与本仓测试文件同档）。
+  //   ⚠ 本锁**不动** tools/prune-sections.js 与 tests/isolated-runner.js：O6 门禁 N5 负控制
+  //     要求后二者逐字未变（本轮已因试图改 label 单元包裹回滚过一次）。观测器是纯新增，
+  //     接线点在调度器侧，故 T5-9/T5-10 把这条纪律**锁进判据**，防下次又顺手改。
+  section('v2.409.0: 跨参照物缝合批（时间证据解析 / 来源撤销 / 计划准入 / 长跑观测器）');
+  {
+    await runScript('./cross-ref-stitch-v2409.js');
   }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
@@ -22733,7 +22770,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     const __verPin293 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
       .match(/const VERSION = '([\d.]+)'/) || [])[1];
-    const __wantPin293 = '2.407.0';
+    const __wantPin293 = '2.409.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

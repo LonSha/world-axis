@@ -41,26 +41,21 @@
     }
   };
 
-  const STATE = {
-    stockpiles: {}, // nodeId -> { [commodityKey]: amount }
-    debts: {},      // debtId -> { id, issuerId, holderId, principal, interest, collateral, dueRound, status }
-    blacklists: {}  // actorId -> { defaultedCount, totalDefaultedAmount, lastDefaultedAt }
-  };
+  let STATE = null;
 
-  const stat = {
-    transfers: 0,
-    debtsIssued: 0,
-    debtsSettled: 0,
-    defaultsCount: 0,
-    lastReason: ''
-  };
+  let stat = null;
 
   function settings() {
-    if (WA.settingsBus && typeof WA.settingsBus.getModuleSettings === 'function') {
-      const s = WA.settingsBus.getModuleSettings(__REG.key, DEF);
-      return Object.assign({}, DEF, s);
-    }
-    return Object.assign({}, DEF);
+    // v2.408.0（OPV23-9 回归逮到）：本函数此前调 `WA.settingsBus.getModuleSettings(key, DEF)` ——
+    //   该成员在 settingsBus 的真实导出面上**不存在**（真实读口是 `read(reg)`）。
+    //   因为带 `typeof === 'function'` 守卫，调用**静默落空**：本引擎的开关恒等于 DEF，
+    //   「关闭引擎」这件事在宿主里从来没生效过。它是 HEAD 上就存在的预存缺陷
+    //   （tests/gates.js / member-surface-gate / settings-bus-api-gate 三处同时点名），
+    //   不是本批引入；本批按既有库内口径修正（与 engines/affect.js 逐字同规）。
+    const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
+    return WA.settingsBus
+      ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {}))
+      : Object.assign({}, DEF, raw || {});
   }
 
   function clockNow() {
@@ -234,14 +229,24 @@
     return { ok: true };
   }
 
+  function ownerCall(fn, args, readOnly) {
+    if (!WA.store || typeof WA.store.withOwnerState !== 'function') return { ok: false, refusal: 'owner-store-unavailable' };
+    return WA.store.withOwnerState('commodityCirculation', function (owned) {
+      const prevState = STATE, prevStat = stat;
+      STATE = owned; stat = owned._stats;
+      try { return fn.apply(null, args); }
+      finally { STATE = prevState; stat = prevStat; }
+    }, { readOnly: readOnly });
+  }
+
   WA.commodityCirculation = {
-    transferCargo: transferCargo,
-    issueDebtInstrument: issueDebtInstrument,
-    settleDefault: settleDefault,
-    setStockpile: setStockpile,
-    getStockpile: getStockpile,
-    view: view,
-    reset: reset,
+    transferCargo: function () { return ownerCall(transferCargo, arguments, false); },
+    issueDebtInstrument: function () { return ownerCall(issueDebtInstrument, arguments, false); },
+    settleDefault: function () { return ownerCall(settleDefault, arguments, false); },
+    setStockpile: function () { return ownerCall(setStockpile, arguments, false); },
+    getStockpile: function () { return ownerCall(getStockpile, arguments, true); },
+    view: function () { return ownerCall(view, arguments, true); },
+    reset: function () { return ownerCall(reset, arguments, false); },
     getSettings: settings
   };
 

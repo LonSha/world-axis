@@ -202,14 +202,46 @@ eq(WA.worldSingularity.getSingularityState().historyCount, 1, '旧纪元真进�
 // 场景 66：OPV23 系统底座（运行时读数，不是「源码里有那行字」）
 // ─────────────────────────────────────────────────────────────────────
 console.log('--- 66-1 OPV23-1 级联波与拓扑自检 ---');
-const wave = WA.cascadeBus.broadcastCascadeWave('physical', {});
-eq(wave.ok, true, '合法源层广播放行');
-eq(wave.layersReached.length, 6, '级联波真覆盖六层总线');
-const recursive = WA.cascadeBus.broadcastCascadeWave('physical', { __recursiveDepth: 3 });
-eq(recursive.refusal, 'recursive-cascade-aborted', '循环因果波真自愈熔断');
-const topo = WA.cascadeBus.verifyTopologyWiring();
-eq(topo.isHealthy, true, '拓扑自检给出健康读数');
-eq(topo.layersCount, 6, '拓扑层数与级联波覆盖数逐字对齐');
+function checkBroadcast(bus) {
+  bus.resetAll();
+  eq(bus.verifyTopologyWiring().isHealthy, false, '无消费者的总线不能报告全域接线健康');
+  const delivered = [];
+  const listeners = bus.LAYERS.map(function (layer) {
+    const fn = function (event, payload) { delivered.push([layer, event, payload.marker]); return { ok: true }; };
+    bus.subscribe(layer, fn);
+    return fn;
+  });
+  const wave = bus.broadcastCascadeWave('physical', { marker: 'real-wave' });
+  eq(wave.ok, true, '合法源层实际广播放行');
+  eq(delivered.map(function (r) { return r[0]; }).join(','), bus.LAYERS.join(','), '六层监听器按因果层序真实收到事件');
+  ok(delivered.every(function (r) { return r[2] === 'real-wave'; }), '广播保留真实输入载荷');
+  eq(wave.layersReached.join(','), bus.LAYERS.join(','), '覆盖报告来自实际派发');
+  eq(bus.verifyTopologyWiring().isHealthy, true, '六层消费者已接线时报告健康');
+  listeners.forEach(function (fn, i) { bus.unsubscribe(bus.LAYERS[i], fn); });
+  bus.subscribe('physical', function () { throw new Error('listener-failure'); });
+  const failed = bus.broadcastCascadeWave('physical', {});
+  eq(failed.ok, false, '消费者异常不能伪装广播成功');
+  ok(failed.errors.some(function (e) { return e.error === 'listener-failure'; }), '派发报告保留实际错误');
+  bus.resetAll();
+  let calls = 0;
+  bus.subscribe('physical', function () { calls++; return bus.broadcastCascadeWave('physical', {}); });
+  const recursive = bus.broadcastCascadeWave('physical', {});
+  eq(recursive.refusal, 'recursive-cascade-aborted', '无需调用方自报深度即可熔断真实递归');
+  eq(calls, 3, '内部重入最多执行三级');
+  bus.resetAll();
+  eq(bus.getCascadeState().subscriberCounts.tactical, 0, 'reset 清理战术层订阅');
+  eq(bus.getCascadeState().subscriberCounts.epochal, 0, 'reset 清理纪元层订阅');
+  eq(bus.broadcastCascadeWave('physical', {} ).ok, true, '熔断退出后计数恢复，可接受下一波');
+}
+checkBroadcast(WA.cascadeBus);
+// Same behavioral witness against an in-memory mutation of the real product source.
+const busSource = fs.readFileSync(path.join(__dirname, '../engines/cascade-bus.js'), 'utf8');
+const brokenBus = busSource.replace('const r = fn(eventName, payload);', 'const r = undefined;');
+assert.notStrictEqual(brokenBus, busSource, '广播负控制必须修改真源码');
+assert.throws(function () {
+  checkBroadcast(require('./ui-gate-sync.js').fresh({ srcOverride: { 'engines/cascade-bus.js': brokenBus } }).WA.cascadeBus);
+}, assert.AssertionError, '禁用真实派发后同款监听器断言必须失败');
+
 
 console.log('--- 66-2 OPV23-2 复合动作原子批处理 ---');
 const v23Routes = [
@@ -231,7 +263,7 @@ const aborted = WA.actionDesk.transactActions([
 ]);
 eq(aborted.refusal, 'batch-atomic-execution-aborted', '子动作失败真中断批处理');
 eq(aborted.failedIndex, 1, '失败定位到真实序号');
-eq(WA.worldSingularity.getSingularityState().tension, 5, '哨兵证明第三项未执行（阻断式原子，非回滚式）');
+eq(WA.worldSingularity.getSingularityState().tension, 0, '中途拒收后第一项张力修改也必须回滚');
 
 WA.worldSingularity.reset();
 const batch = WA.actionDesk.transactActions([
@@ -240,6 +272,78 @@ const batch = WA.actionDesk.transactActions([
 ]);
 eq(batch.ok, true, '两项合法复合动作一次提交');
 eq(batch.count, 2, '原子批处理返回真实执行条数');
+
+// Owner storage is the single authority; detached results must not mutate it.
+ok(!!WA.store.defaultWorldState().commodityCirculation, '新世界物化 V23 库存状态');
+WA.commodityCirculation.setStockpile('atomic_from', 'grain', 100);
+const beforeBatch = JSON.stringify(WA.store.get());
+const failedCargo = WA.actionDesk.transactActions([
+  { route: 'market.transferCargo', params: { fromNode: 'atomic_from', toNode: 'atomic_to', commodity: 'grain', amount: 50, hazardRate: 0 } },
+  { route: 'market.transferCargo', params: { fromNode: 'atomic_from', toNode: 'atomic_to', commodity: 'grain', amount: 9999 } }
+]);
+eq(failedCargo.ok, false, '第二笔库存不足拒收复合动作');
+eq(JSON.stringify(WA.store.get()), beforeBatch, '回滚还原完整权威状态与业务计数');
+eq(WA.commodityCirculation.getStockpile('atomic_from', 'grain'), 100, '拒收后公开读口也不留闭包残值');
+const joined = WA.actionDesk.transactActions([
+  { route: 'market.transferCargo', params: { fromNode: 'atomic_from', toNode: 'atomic_to', commodity: 'grain', amount: 25, hazardRate: 0 } },
+  { route: 'market.transferCargo', params: { fromNode: 'atomic_to', toNode: 'atomic_end', commodity: 'grain', amount: 25, hazardRate: 0 } }
+]);
+eq(joined.ok, true, '后续动作能读取同事务前序候选库存');
+eq(WA.commodityCirculation.getStockpile('atomic_end', 'grain'), 25, '同事务货物最终入账一次');
+const woundResult = WA.somaticTrauma.inflictWound('detached_actor', 'mainHand', { severity: 'severed' });
+woundResult.wound.severed = false;
+eq(WA.somaticTrauma.getSensoryProfile('detached_actor').manipulationImpaired, true, '写口返回值与权威状态分离');
+const snapshotState = JSON.stringify(WA.store.get());
+WA.somaticTrauma.getSensoryProfile('never_seen_actor');
+eq(JSON.stringify(WA.store.get()), snapshotState, '读感官剖面不创建持久角色');
+
+const realTransact = WA.store.transact;
+const beforeDenied = JSON.stringify(WA.store.get());
+WA.store.transact = function () { return { ok: false, denied: true, reason: 'permission-denied' }; };
+eq(WA.worldSingularity.advanceSingularityTension(8).ok, false, '事务拒权时业务写口不能报告成功');
+eq(JSON.stringify(WA.store.get()), beforeDenied, '拒权不产生世界修改');
+WA.store.transact = realTransact;
+const realCargo = WA.commodityCirculation.transferCargo;
+WA.commodityCirculation.transferCargo = function () { throw new Error('transaction-probe'); };
+const beforeThrow = JSON.stringify(WA.store.get());
+const thrownBatch = WA.actionDesk.transactActions([
+  { route: 'epoch.advanceSingularityTension', params: { delta: 3 } },
+  { route: 'market.transferCargo', params: {} }
+]);
+eq(thrownBatch.ok, false, '路由抛异常也拒收批处理');
+eq(JSON.stringify(WA.store.get()), beforeThrow, '抛异常还原此前子动作');
+WA.commodityCirculation.transferCargo = realCargo;
+const unsupported = WA.actionDesk.transactActions([{ route: 'epoch.advanceSingularityTension', params: { delta: 8 } }, { route: 'research.open', params: {} }]);
+eq(unsupported.refusal, 'batch-route-not-transactional', '未审计写口在执行前拒收');
+eq(JSON.stringify(WA.store.get()), beforeThrow, '前置拒收不会执行早先合法步骤');
+for (let i = Object.keys(WA.store.get().commodityCirculation.stockpiles).length; i < 128; i++) {
+  ok(WA.commodityCirculation.setStockpile('capacity_' + i, 'grain', 1), '有容量时可登记库存节点 ' + i);
+}
+const atCap = JSON.stringify(WA.store.get());
+const tooMany = WA.commodityCirculation.setStockpile('capacity_over', 'grain', 1);
+eq(tooMany.ok, false, '超出容量明确拒收');
+eq(JSON.stringify(WA.store.get()), atCap, '超容量不挤出现有库存或留下空节点');
+const storedTension = WA.worldSingularity.getSingularityState().tension;
+WA.store.init();
+eq(WA.worldSingularity.getSingularityState().tension, storedTension, '重新初始化从正式存档恢复张力');
+eq(WA.commodityCirculation.getStockpile('atomic_end', 'grain'), 25, '重新初始化从正式存档恢复库存');
+function checkAtomicRollback(w) {
+  w.worldSingularity.reset();
+  const before = JSON.stringify(w.store.get());
+  w.actionDesk.transactActions([
+    { route: 'epoch.advanceSingularityTension', params: { delta: 9 } },
+    { route: 'market.transferCargo', params: { fromNode: 'missing', toNode: 'x', commodity: 'grain', amount: 1 } }
+  ]);
+  assert.strictEqual(JSON.stringify(w.store.get()), before, '失败子动作必须撤回外层事务');
+}
+checkAtomicRollback(WA);
+const actionSource = fs.readFileSync(path.join(__dirname, '../engines/action-desk.js'), 'utf8');
+const brokenAction = actionSource.replace("detail: result };\n            return false;", "detail: result };\n            return;");
+assert.notStrictEqual(brokenAction, actionSource, '原子负控制命中真实拒收逻辑');
+assert.throws(function () {
+  checkAtomicRollback(require('./ui-gate-sync.js').fresh({ srcOverride: { 'engines/action-desk.js': brokenAction } }).WA);
+}, assert.AssertionError, '破坏事务拒收逻辑后同款回滚断言失败');
+require('./ui-gate-sync.js').fresh();
 
 console.log('--- 66-3 OPV23-4 分支差分沙盒 ---');
 const fork = WA.store.forkBranch('sandbox_sim_branch');
