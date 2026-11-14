@@ -92,7 +92,11 @@ const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面
 //     本锁在 HEAD 上就已经红 —— 用 git archive 到 /tmp/wa_head 复核过，不是本批引入的）。
 //     这与 test-surface-gate 判孤儿是同一件事的两面：锁登记进 run.js 了、文件也确实在，
 //     唯独这个「面本身没有意外增减」的绝对基线没人补。本批一次补齐，不改判据口径。
-const BASE_TEST_FILES = 556;
+//   v2.408.0：556 → 557（+1）。增量只有 tests/scenario-v62-v23-epic-grand-causality.js
+//     —— V23 双计划贯通专锁，且已按同一纪律登记进 tests/run.js 的 runScript 清单。
+//     不进清单的后果（与 v2.407.0 五把锁完全同族）：本锁成 unregistered-orphan，
+//     C1a 面数对不上、C4b/C4e 判孤儿，且这把锁从未在全量里跑过。
+const BASE_TEST_FILES = 557;
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
 function exists(rel) { return fs.existsSync(path.join(BASE, rel)); }

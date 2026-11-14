@@ -27,11 +27,11 @@
       "own": 31
     },
     "actionDesk.transactActions": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/action-desk.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 3,
       "own": 1
     },
     "actionMethods.declareTask": {
@@ -579,35 +579,35 @@
       "own": 1
     },
     "artificeDegradation.inspectStructuralIntegrity": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/artifice-degradation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/artifice-degradation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "artificeDegradation.performMaintenance": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/artifice-degradation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/artifice-degradation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "artificeDegradation.registerItem": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/artifice-degradation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/artifice-degradation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 4
     },
     "artificeDegradation.reset": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/artifice-degradation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/artifice-degradation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "auditLog.byAction": {
@@ -1435,11 +1435,11 @@
       "own": 3
     },
     "cascadeBus.broadcastCascadeWave": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/cascade-bus.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 1
     },
     "cascadeBus.dispatchAdaptiveWave": {
@@ -1499,11 +1499,11 @@
       "own": 3
     },
     "cascadeBus.verifyTopologyWiring": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/cascade-bus.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 1
     },
     "cataclysmHazard.saveSettings": {
@@ -2195,35 +2195,35 @@
       "own": 1
     },
     "commodityCirculation.getStockpile": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/commodity-circulation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/commodity-circulation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 3,
       "own": 5
     },
     "commodityCirculation.issueDebtInstrument": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/commodity-circulation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/commodity-circulation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "commodityCirculation.reset": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/commodity-circulation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/commodity-circulation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "commodityCirculation.setStockpile": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/commodity-circulation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/commodity-circulation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 5
     },
     "commodityCirculation.view": {
@@ -3475,19 +3475,19 @@
       "own": 12
     },
     "dynasticLineage.claimPrivilege": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/dynastic-lineage.js 内部自用、外部零引用（过度导出）",
       "src": "engines/dynastic-lineage.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "dynasticLineage.conveneSuccession": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/dynastic-lineage.js 内部自用、外部零引用（过度导出）",
       "src": "engines/dynastic-lineage.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 3
     },
     "dynasticLineage.getSettings": {
@@ -3499,11 +3499,11 @@
       "own": 1
     },
     "dynasticLineage.reset": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/dynastic-lineage.js 内部自用、外部零引用（过度导出）",
       "src": "engines/dynastic-lineage.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "economy.bandOf": {
@@ -4211,11 +4211,11 @@
       "own": 3
     },
     "evict.runDeepEvictSweep": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "core/evict.js 内部自用、外部零引用（过度导出）",
       "src": "core/evict.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "evict.summarize": {
@@ -4947,27 +4947,27 @@
       "own": 1
     },
     "geophysicalReshaping.repairInfrastructure": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/geophysical-reshaping.js 内部自用、外部零引用（过度导出）",
       "src": "engines/geophysical-reshaping.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 3
     },
     "geophysicalReshaping.reset": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/geophysical-reshaping.js 内部自用、外部零引用（过度导出）",
       "src": "engines/geophysical-reshaping.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 3,
       "own": 3
     },
     "geophysicalReshaping.ruptureInfrastructure": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/geophysical-reshaping.js 内部自用、外部零引用（过度导出）",
       "src": "engines/geophysical-reshaping.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 3
     },
     "groupGuard.stat": {
@@ -6651,11 +6651,11 @@
       "own": 3
     },
     "mobStampede.escalateMobTension": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/mob-stampede.js 内部自用、外部零引用（过度导出）",
       "src": "engines/mob-stampede.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "mobStampede.getSettings": {
@@ -6667,27 +6667,27 @@
       "own": 1
     },
     "mobStampede.quellMob": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/mob-stampede.js 内部自用、外部零引用（过度导出）",
       "src": "engines/mob-stampede.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "mobStampede.reset": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/mob-stampede.js 内部自用、外部零引用（过度导出）",
       "src": "engines/mob-stampede.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "mobStampede.setCrowdDensity": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/mob-stampede.js 内部自用、外部零引用（过度导出）",
       "src": "engines/mob-stampede.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 3
     },
     "moodGlide.getSettings": {
@@ -8235,19 +8235,19 @@
       "own": 2
     },
     "psycheDissociation.confabulateMemory": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/psyche-dissociation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/psyche-dissociation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "psycheDissociation.evaluateSanityFringe": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/psyche-dissociation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/psyche-dissociation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 3
     },
     "psycheDissociation.getSettings": {
@@ -8259,11 +8259,11 @@
       "own": 1
     },
     "psycheDissociation.reset": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/psyche-dissociation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/psyche-dissociation.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "psycheTrauma.registerActorPsyche": {
@@ -8859,11 +8859,11 @@
       "own": 11
     },
     "render.applySaliencyInjections": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "render/inject.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 1
     },
     "render.buildStyleBlock": {
@@ -9795,19 +9795,19 @@
       "own": 3
     },
     "shadowCouncil.dropDeadLetter": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/shadow-council.js 内部自用、外部零引用（过度导出）",
       "src": "engines/shadow-council.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 3
     },
     "shadowCouncil.establishDeadDrop": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/shadow-council.js 内部自用、外部零引用（过度导出）",
       "src": "engines/shadow-council.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "shadowCouncil.getSettings": {
@@ -9819,19 +9819,19 @@
       "own": 1
     },
     "shadowCouncil.reset": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/shadow-council.js 内部自用、外部零引用（过度导出）",
       "src": "engines/shadow-council.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "shadowCouncil.retrieveDeadLetters": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/shadow-council.js 内部自用、外部零引用（过度导出）",
       "src": "engines/shadow-council.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "shadowCouncil.triggerSanitization": {
@@ -9907,11 +9907,11 @@
       "own": 3
     },
     "somaticTrauma.getSensoryProfile": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/somatic-trauma.js 内部自用、外部零引用（过度导出）",
       "src": "engines/somatic-trauma.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "somaticTrauma.getSettings": {
@@ -9923,19 +9923,19 @@
       "own": 1
     },
     "somaticTrauma.reset": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/somatic-trauma.js 内部自用、外部零引用（过度导出）",
       "src": "engines/somatic-trauma.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "somaticTrauma.tickMetabolism": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/somatic-trauma.js 内部自用、外部零引用（过度导出）",
       "src": "engines/somatic-trauma.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "spatialConflict.advanceChokepointQueue": {
@@ -10307,11 +10307,11 @@
       "own": 7
     },
     "store.acquireResourceLease": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "core/store.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 3,
       "own": 1
     },
     "store.batchDepth": {
@@ -10323,11 +10323,11 @@
       "own": 1
     },
     "store.forkBranch": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "core/store.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 1
     },
     "store.load": {
@@ -10355,11 +10355,11 @@
       "own": 1
     },
     "store.releaseResourceLease": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "core/store.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 1
     },
     "store.staleSinceExternal": {
@@ -12083,27 +12083,27 @@
       "own": 1
     },
     "worldSingularity.reset": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/world-singularity.js 内部自用、外部零引用（过度导出）",
       "src": "engines/world-singularity.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 3,
       "own": 3
     },
     "worldSingularity.shiftEpoch": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/world-singularity.js 内部自用、外部零引用（过度导出）",
       "src": "engines/world-singularity.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "worldSingularity.triggerConvergenceEvent": {
-      "reason": "self-only",
+      "reason": "test-only",
       "detail": "engines/world-singularity.js 内部自用、外部零引用（过度导出）",
       "src": "engines/world-singularity.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 3
     },
     "worldSnapshot.capacity": {

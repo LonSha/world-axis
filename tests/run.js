@@ -22415,6 +22415,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./scenario-v59-betrothal-dowry-feud.js');
     await runScript('./scenario-v60-cartography-ambush.js');
     await runScript('./scenario-v61-v22-grand-convergence.js');
+    // v2.408.0（V23 超级史诗）：EXV23-1~9 与 OPV23-1~9 贯通专锁（场景 62～67）
+    //   为什么必须进本清单：tests/test-surface-gate.js 把「磁盘有、从不执行、未豁免」
+    //   的测试文件判为 unregistered-orphan；不登记则本锁从未在全量里跑过，
+    //   且 segment-extract-v2400 的 C4b/C4e 会被拉红（与 V22 八引擎专锁同一纪律）。
+    await runScript('./scenario-v62-v23-epic-grand-causality.js');
     // v2.400.0 OPV22-1: 总线六层声明面与实现面逐字对齐
     await runScript('./cascade-six-layer-v2400.js');
     await runScript('./bus-topology-v2400.js');
