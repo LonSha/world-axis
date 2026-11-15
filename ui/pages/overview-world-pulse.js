@@ -1,5 +1,5 @@
 /**
- * WorldAxis ui/pages/overview-world-pulse.js (v2.413.0) — 概览页「世界脉搏」聚合块（OPV24-1）
+ * WorldAxis ui/pages/overview-world-pulse.js (v2.414.0) — 概览页「世界脉搏」聚合块（OPV24-1）
  *
  * ── 它治什么 ────────────────────────────────────────────────────
  *   全开策略（v2.412.0）之后，116 个机制全部运转，但玩家在概览页只能看到
@@ -63,6 +63,22 @@
         const ttl = f.title || f.text || f.name || f.summary || '';
         if (ttl) out += sub(ttl + '（' + f.status + '）');
       });
+      // 回收时机提示（OPV25-T2-1）：check() 是引擎的**只读**扫描口（panel.js 已有同款消费，
+      //   内部只动模块内 stat 计数、不写世界）。逾期行给「超阈值未推进 N 条 + 最久一条」人话，
+      //   阈值从返回值读（thresholdMs），不在此硬编码——口径单一真源。
+      try {
+        if (typeof WA.foreshadow.check === 'function') {
+          const ck = WA.foreshadow.check();
+          if (ck && ck.ok && ck.count) {
+            const hr = (ck.thresholdMs >= 3600000)
+              ? Math.round(ck.thresholdMs / 3600000) + '小时'
+              : Math.max(1, Math.round(ck.thresholdMs / 60000)) + '分钟';
+            const r0 = ck.rows[0] || {};
+            out += '<div class="wa-dim" style="opacity:0.75;font-size:11px;">回收时机：' + esc(ck.count)
+              + ' 条超 ' + esc(hr) + ' 未推进，最久「' + esc(String(r0.content || '').slice(0, 24)) + '」</div>';
+          }
+        }
+      } catch (e) { /* 扫描缺席不打紧，主行已成立 */ }
       return out;
     });
   }
@@ -147,13 +163,27 @@
         let opts = [];
         try {
           const rv = (typeof WA.storyChoice.review === 'function') ? WA.storyChoice.review(pt.id) : null;
-          opts = (rv && rv.ok && rv.options) ? rv.options.filter(function (o) { return o && o.label && o.allowed !== false; }).slice(0, 4) : [];
+          // OPV25-T2-2a：不再滤掉 allowed:false——预演未过的选项**可见但不可点**（见下）。
+          opts = (rv && rv.ok && rv.options) ? rv.options.filter(function (o) { return o && o.label; }).slice(0, 4) : [];
         } catch (e) { opts = []; }
         out += '<div class="wa-dim" style="opacity:0.75;font-size:11px;margin-top:2px;">· ' + esc(String(pt.prompt || pt.id || '').slice(0, 40)) + '</div>';
         opts.forEach(function (o) {
+          // 预演未过（present 阶段 rehearsal.preview 校验失败）⇒ 纯文本展示，不给按钮——
+          //   点了也必被 confirm 拒收（preview-rejected），如实标注走不通比诱导点击诚实。
+          if (o.allowed === false || (o.preview && o.preview.ok === false)) {
+            out += '<div style="font-size:10px;margin:2px 0 2px 8px;opacity:0.5;">· ' + esc(String(o.label).slice(0, 18)) + (o.costs ? '（' + esc(String(o.costs).slice(0, 12)) + '）' : '') + '〔预演未过，走不通〕</div>';
+            return;
+          }
           out += ' <button type="button" data-sc-id="' + esc(pt.id || '') + '" data-sc-opt="' + esc(o.label) + '" style="font-size:10px;padding:0 6px;margin:2px 4px 2px 8px;cursor:pointer;">' + esc(String(o.label).slice(0, 18)) + (o.costs ? '（' + esc(String(o.costs).slice(0, 12)) + '）' : '') + '</button>';
         });
       });
+      // 分支树计数行（OPV25-T2-2b）：已决/未决一眼看清——玩家知道自己的选择都被记着账。
+      try {
+        if (WA.branchTree && typeof WA.branchTree.stat === 'function') {
+          const bs = WA.branchTree.stat();
+          if (bs && bs.nodes) out += sub('分支树：' + bs.nodes + ' 个节点（已决 ' + (bs.withChoice || 0) + '·根 ' + (bs.roots || 0) + '）');
+        }
+      } catch (e) { /* 树统计缺席不打紧，主行已成立 */ }
       return out;
     });
   }
@@ -219,10 +249,10 @@
   const API = {
     worldPulseBlock: worldPulseBlock,
     bind: bind,
-    ver: '2.413.0'
+    ver: '2.414.0'
   };
   WA.panelWorldPulse = API;
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('ui/pages/overview-world-pulse.js', { kind: 'ui', ver: '2.413.0' });
+    WA.registerModule('ui/pages/overview-world-pulse.js', { kind: 'ui', ver: '2.414.0' });
   }
 })();
