@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.411.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.411.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.416.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.416.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -410,6 +410,38 @@
       "tref": 0,
       "own": 6
     },
+    "anniversaryRites.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/anniversary-rites.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "anniversaryRites.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/anniversary-rites.js",
+      "refs": 0,
+      "tref": 4,
+      "own": 3
+    },
+    "anniversaryRites.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/anniversary-rites.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "anniversaryRites.view": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/anniversary-rites.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
     "anomalyMutation.getAnomalyProfile": {
       "reason": "self-only",
       "detail": "engines/anomaly-mutation.js 内部自用、外部零引用（过度导出）",
@@ -672,6 +704,46 @@
       "src": "engines/backstage.js",
       "refs": 0,
       "tref": 1,
+      "own": 3
+    },
+    "bathhouseLaundry.bandOf": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/bathhouse-laundry.js",
+      "refs": 0,
+      "tref": 5,
+      "own": 3
+    },
+    "bathhouseLaundry.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/bathhouse-laundry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "bathhouseLaundry.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/bathhouse-laundry.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "bathhouseLaundry.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/bathhouse-laundry.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "bathhouseLaundry.view": {
+      "reason": "self-only",
+      "detail": "engines/bathhouse-laundry.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/bathhouse-laundry.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "beastBond.bond": {
@@ -3274,6 +3346,38 @@
       "tref": 0,
       "own": 22
     },
+    "diceDen.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/dice-den.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "diceDen.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/dice-den.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "diceDen.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/dice-den.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "diceDen.view": {
+      "reason": "self-only",
+      "detail": "engines/dice-den.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dice-den.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "difficulty.actionCost": {
       "reason": "self-only",
       "detail": "engines/difficulty.js 内部自用、外部零引用（过度导出）",
@@ -3953,14 +4057,6 @@
       "refs": 0,
       "tref": 13,
       "own": 1
-    },
-    "enigma.stat": {
-      "reason": "self-only",
-      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/enigma.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 14
     },
     "enigma.unmark": {
       "reason": "test-only",
@@ -6530,6 +6626,38 @@
       "tref": 0,
       "own": 3
     },
+    "lostFound.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/lost-and-found.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "lostFound.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/lost-and-found.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "lostFound.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/lost-and-found.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "lostFound.view": {
+      "reason": "self-only",
+      "detail": "engines/lost-and-found.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/lost-and-found.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "marginal.cool": {
       "reason": "test-only",
       "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
@@ -6822,6 +6950,46 @@
       "reason": "self-only",
       "detail": "engines/microclimate-phase.js 内部自用、外部零引用（过度导出）",
       "src": "engines/microclimate-phase.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "militaryLevy.discharge": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/military-levy.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "militaryLevy.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/military-levy.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "militaryLevy.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/military-levy.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "militaryLevy.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/military-levy.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "militaryLevy.view": {
+      "reason": "self-only",
+      "detail": "engines/military-levy.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/military-levy.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -7210,6 +7378,38 @@
       "tref": 0,
       "own": 5
     },
+    "nursingCare.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/nursing-care.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "nursingCare.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/nursing-care.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "nursingCare.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/nursing-care.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "nursingCare.view": {
+      "reason": "self-only",
+      "detail": "engines/nursing-care.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/nursing-care.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "observationProjection.merge": {
       "reason": "self-only",
       "detail": "engines/observation-projection.js 内部自用、外部零引用（过度导出）",
@@ -7338,14 +7538,6 @@
       "tref": 1,
       "own": 3
     },
-    "opportunity.respond": {
-      "reason": "self-only",
-      "detail": "engines/opportunity.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/opportunity.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "opportunity.setSettings": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -7433,6 +7625,38 @@
       "refs": 0,
       "tref": 0,
       "own": 12
+    },
+    "outsiderIntegration.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/outsider-integration.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "outsiderIntegration.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/outsider-integration.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "outsiderIntegration.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/outsider-integration.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "outsiderIntegration.view": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/outsider-integration.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
     },
     "panelFold.collapseAll": {
       "reason": "test-only",
@@ -7934,6 +8158,38 @@
       "reason": "self-only",
       "detail": "engines/perspective-lock.js 内部自用、外部零引用（过度导出）",
       "src": "engines/perspective-lock.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "pilgrimFlow.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/pilgrim-flow.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "pilgrimFlow.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/pilgrim-flow.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 3
+    },
+    "pilgrimFlow.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/pilgrim-flow.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "pilgrimFlow.view": {
+      "reason": "self-only",
+      "detail": "engines/pilgrim-flow.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/pilgrim-flow.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -10530,14 +10786,6 @@
       "tref": 0,
       "own": 7
     },
-    "stagePresence.stat": {
-      "reason": "self-only",
-      "detail": "engines/stage-presence.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/stage-presence.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 12
-    },
     "stageSession.buildBlock": {
       "reason": "self-only",
       "detail": "engines/stage-session.js 内部自用、外部零引用（过度导出）",
@@ -11241,6 +11489,38 @@
       "refs": 0,
       "tref": 0,
       "own": 10
+    },
+    "tenancyRent.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/tenancy-rent.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "tenancyRent.reset": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/tenancy-rent.js",
+      "refs": 0,
+      "tref": 3,
+      "own": 3
+    },
+    "tenancyRent.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/tenancy-rent.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "tenancyRent.view": {
+      "reason": "self-only",
+      "detail": "engines/tenancy-rent.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/tenancy-rent.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "themeSwitch.close": {
       "reason": "unwired",

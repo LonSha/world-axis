@@ -664,6 +664,106 @@
       + '而本块<b>只负责读数，不替你锁定、也不替你删除</b>。<br>'
       + '「休眠」是开关关着（设置页可开），「未装载」是模块本身不在场 —— 两件事分开写。</div></div>', bad);
   }
+
+  // v2.416.0（EXV24 十项同屏）：V24 民生日志聚合块。与 v23StitchBlock 同一条契约逐字同源：
+  //   ① 只读零动作：只调 stat()，绝不触 register/observe/lease/settle 等任何写口
+  //      ——「看民情」不该顺手替世界收租、开饷、还愿；
+  //   ② 缺席即缺席：任一引擎不在场就如实写「未装载」，不补默认读数、不假装 0；
+  //   ③ 不新增控件：零交互元素，不触碰 UI 绑定守卫。
+  //   ── 直写 `WA.<ns>.stat()` 而不做 `WA[ns].stat()` 动态取 ──
+  //   与 v22/v23 块的教训逐字相同：死子面门禁的读面是静态正则，只认
+  //   `WA.<ns>.<mem>` 字面形态；表驱动写成 `WA[sp.ns].stat()` 是假消费点。
+  function v24CivilBlock() {
+    const rows = [];
+    let bad = false;
+    const READERS = [
+      { label: '忌日祭仪', ns: 'anniversaryRites', read: function () { return WA.anniversaryRites.stat(); } },
+      { label: '外乡人', ns: 'outsiderIntegration', read: function () { return WA.outsiderIntegration.stat(); } },
+      { label: '租佃田租', ns: 'tenancyRent', read: function () { return WA.tenancyRent.stat(); } },
+      { label: '兵籍军饷', ns: 'militaryLevy', read: function () { return WA.militaryLevy.stat(); } },
+      { label: '乳母育儿', ns: 'nursingCare', read: function () { return WA.nursingCare.stat(); } },
+      { label: '失物招领', ns: 'lostFound', read: function () { return WA.lostFound.stat(); } },
+      { label: '朝圣香火', ns: 'pilgrimFlow', read: function () { return WA.pilgrimFlow.stat(); } },
+      { label: '赌坊骰局', ns: 'diceDen', read: function () { return WA.diceDen.stat(); } },
+      { label: '浴堂浆洗', ns: 'bathhouseLaundry', read: function () { return WA.bathhouseLaundry.stat(); } }
+    ];
+    // 每行怎么从 stat() 的读数里说一句话。取不到就如实写「未…」，不编。
+    const FORMAT = {
+      anniversaryRites: function (s) {
+        if (!s.rites) return { sum: '无祭档', note: '还没有 register 过忌日' };
+        return { sum: '祭档 ' + s.rites + ' 档 · 到期 ' + s.dueNow,
+          note: '已祭访 ' + s.observed + ' · 拒收 ' + s.refused };
+      },
+      outsiderIntegration: function (s) {
+        if (!s.people) return { sum: '无外乡人', note: '还没有 arrive 过' };
+        return { sum: '在册 ' + s.people + ' 人',
+          note: '入乡 ' + s.arrivals + ' · 见证 ' + s.witnesses + ' · 拒收 ' + s.refused };
+      },
+      tenancyRent: function (s) {
+        if (!s.active && !s.closed) return { sum: '无租佃', note: '还没有 lease 过' };
+        return { sum: '在租 ' + s.active + ' 户',
+          note: '累计立约 ' + s.leased + ' · 收租 ' + s.collected + ' · 逼佃逐出 ' + s.evicted };
+      },
+      militaryLevy: function (s) {
+        if (!s.serving) return { sum: '无兵籍', note: '还没有 register 过兵员' };
+        return { sum: '在册 ' + s.serving + ' 名',
+          note: '发饷 ' + s.paid + ' · 退役 ' + s.discharged + '（哗变风险只读数亮灯，不自动触发）' };
+      },
+      nursingCare: function (s) {
+        if (!s.serving) return { sum: '无乳母', note: '还没有 hire 过' };
+        return { sum: '乳母 ' + s.serving + ' 人 · 带娃 ' + s.babies,
+          note: '受雇 ' + s.hired + ' · 断奶 ' + s.weaned + ' · 一人上限 2' };
+      },
+      lostFound: function (s) {
+        if (!s.open) return { sum: '无未结', note: '招领簿上没有未结的件' };
+        return { sum: '未结 ' + s.open + ' 件',
+          note: '报失 ' + s.reported + ' · 认领 ' + s.claimed + ' · 私吞 ' + s.pocketed };
+      },
+      pilgrimFlow: function (s) {
+        if (!s.temples) return { sum: '无香火', note: '还没有香客 arrive 过任何庙' };
+        return { sum: '庙 ' + s.temples + ' 座 · 未还愿 ' + s.openVows,
+          note: '许愿 ' + s.vowed + ' · 已还 ' + s.fulfilled + '（还愿须凭据一致，硬门禁）' };
+      },
+      diceDen: function (s) {
+        if (!s.tables) return { sum: '无骰局', note: '还没有 openTable 过' };
+        return { sum: '开桌 ' + s.openTables + ' / 共 ' + s.tables,
+          note: '下注 ' + s.bets + ' · 已开 ' + s.settled + ' · 出千未遂 ' + s.cheats };
+      },
+      bathhouseLaundry: function (s) {
+        if (!s.tracked) return { sum: '无浆洗档', note: '还没有 openBath / washGarments 过' };
+        return { sum: '在洗 ' + s.tracked + ' 人档',
+          note: '沐浴 ' + s.baths + ' · 浆洗 ' + s.washed + ' · 洁净档按故事时间衰减' };
+      }
+    };
+    READERS.forEach(function (sp) {
+      let sum = '未装载';
+      let note = 'WA.' + sp.ns + ' 不在场：本块如实写缺席，不补默认读数';
+      try {
+        const s = sp.read();
+        const r = FORMAT[sp.ns](s);
+        sum = r.sum; note = r.note;
+      } catch (e) {
+        bad = true;
+        sum = '读取失败';
+        note = esc(e && e.message ? e.message : String(e));
+      }
+      const cls = /未|无/.test(sum) ? 'wa-dim' : '';
+      rows.push('<div class="wa-kv"><span>' + esc(sp.label) + '</span>'
+        + '<span class="' + cls + '">' + esc(sum) + '</span></div>'
+        + '<div class="wa-dim" style="font-size:11px;margin:-2px 0 4px 0;">' + note + '</div>');
+    });
+    return foldCard('V24 民生日志', rows.length + ' 项 <span class="wa-dim">（九引擎同屏 · 只读）</span>',
+      '<div class="wa-card"><div class="wa-card-h">V24 民生日志：九引擎读数（只读）</div>'
+      + rows.join('')
+      + '<div class="wa-hint">九件事各答一个民生问题：<b>谁家的忌日到了</b>（周年祭仪）、'
+      + '<b>外乡人融进来了没有</b>、<b>田租收到没有</b>、<b>兵饷发下去没有</b>、'
+      + '<b>娃娃谁在带</b>、<b>丢的东西找回来没有</b>、<b>许的愿还了没有</b>、'
+      + '<b>骰局谁在赢</b>、<b>身上馊了没有</b>。<br>'
+      + '两条同款硬边界：<b>本块只读数，绝不触发任何写口</b>（祭访、收租、开饷、还愿、开骰'
+      + '一律走 action-desk 显式路由）；「未装载」是模块不在场，如实写缺席、不补默认读数。<br>'
+      + '浮世绘底线：引擎只记账与拒收（欠满两季才许逼佃、还愿须凭据一致、认领须物证），'
+      + '<b>不替世界做道德裁决</b> —— 好坏留给故事。</div></div>', bad);
+  }
   // ══ 段体结束 ══
   //   v2.400.0（V22 后续修正）：EXV22-9 当初把本块写在了段体标记**之外**，
   //   后果是重组面（panelSource() 还原的「假如没拆」的 panel.js）里挂载行
@@ -680,11 +780,12 @@
     heartbeatBlock: heartbeatBlock,
     v22OmensBlock: v22OmensBlock,
     v23StitchBlock: v23StitchBlock,
+    v24CivilBlock: v24CivilBlock,
     bind: bind,
-    ver: '2.400.0'
+    ver: '2.416.0'
   };
   WA.panelOverviewBlocks = API;
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('ui/pages/overview-blocks.js', { kind: 'ui', ver: '2.400.0' });
+    WA.registerModule('ui/pages/overview-blocks.js', { kind: 'ui', ver: '2.416.0' });
   }
 })();

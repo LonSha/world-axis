@@ -36,6 +36,7 @@
   let v23StitchBlock = function () { return ''; };
   // v2.413.0（OPV24-1）：世界脉搏聚合块转发。同一条契约：缺席返回空串。
   let worldPulseBlock = function () { return ''; };
+  let v24CivilBlock = function () { return ''; };
   /**
    * 注入外部符号。**幂等**；返回 API 本身，便于链式调用。
    *   只接受函数形态的注入 —— 传进来一个非函数就等于没接上，此处不静默兜住。
@@ -52,6 +53,7 @@
     if (typeof ctx.v22OmensBlock === 'function') v22OmensBlock = ctx.v22OmensBlock;
     if (typeof ctx.v23StitchBlock === 'function') v23StitchBlock = ctx.v23StitchBlock;
     if (typeof ctx.worldPulseBlock === 'function') worldPulseBlock = ctx.worldPulseBlock;
+    if (typeof ctx.v24CivilBlock === 'function') v24CivilBlock = ctx.v24CivilBlock;
     return API;
   }
   // ══ 段体开始（原 ui/panel.js 563-1155 行，逐字搬迁，一个字符未改）══
@@ -672,7 +674,7 @@
           ${visLine}
         </div>
       </details>
-      <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}${v23StitchBlock()}</div>
+      <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}${v23StitchBlock()}${v24CivilBlock()}</div>
       <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
         <summary style="cursor:pointer;opacity:0.75;font-size:12px;">⚡ 工作流节点开关（${nodes.length}）</summary>
         <div class="wa-sec" style="margin-top:4px;">工作流节点开关</div>

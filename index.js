@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.415.0';
+  const VERSION = '2.416.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1371,6 +1371,15 @@
     'engines/postal-relay.js',         // EXV22-2 驿传网络 / 换马耗时 / 驿路断毁
     'engines/levy-corvee.js',          // EXV22-3 税制徭役 / 征发额度 / 逃户流亡
     'engines/mortuary-rites.js',       // EXV22-4 丧葬儀式 / 服丧禁令 / 遗产清算
+    'engines/anniversary-rites.js',    // EXV24-1 忌日周年 / 祭访提醒 / 过期不自动消账
+    'engines/outsider-integration.js', // EXV24-2 外乡人融入 / 见证定档 / 排外留痕
+    'engines/tenancy-rent.js',         // EXV24-3 租佃田租 / 欠租累计 / 逼佃两季门禁
+    'engines/military-levy.js',        // EXV24-4 兵籍军饷 / 拖饷记档 / 哗变风险只报不触
+    'engines/nursing-care.js',         // EXV24-5 乳母雇佣 / 哺育分派 / 断奶结工
+    'engines/lost-and-found.js',       // EXV24-6 失物招领 / 上交私吞两途 / 认领凭据
+    'engines/pilgrim-flow.js',         // EXV24-7 香客香火 / 还愿凭据硬门禁
+    'engines/dice-den.js',             // EXV24-8 赌坊骰局 / 决策流开骰 / 出千留痕
+    'engines/bathhouse-laundry.js',    // EXV24-9 浴堂浆洗 / 洁净档按故事时间衰减
     'engines/sartorial-regalia.js',    // EXV22-5 服饰规制 / 僭越风险 / 身份识别
     'engines/betrothal-alliance.js',   // EXV22-6 婚约聘娶 / 妆匛议价 / 门第联姻
     'engines/cartography-survey.js',   // EXV22-7 舆图测绘 / 精度分层 / 迷雾认知

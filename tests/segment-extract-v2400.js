@@ -111,7 +111,7 @@ const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面
 //     的扫描面内（SKIP_DIRS 含 'tools'）。故「新增观测器」不改本常量，只有 tests/ 下的新锁才改。
 //   v2.410.0：559 → 561（+2）。增量：tests/extract-json-ladder-v2410.js（JSON 修复阶梯专锁）
 //     与 tests/memory-age-v2410.js（记忆条目相对时效标注专锁），均已登记进 tests/run.js 的 v2.410.0 节。
-const BASE_TEST_FILES = 561;
+const BASE_TEST_FILES = 564;  // v2.416.0：562→564（本版 +2：scenario-v68-v24-civil-life.js 专锁 + tests/probes/p_world_pulse.js 探针收编）
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
 function exists(rel) { return fs.existsSync(path.join(BASE, rel)); }
@@ -435,7 +435,7 @@ function runC(A) {
   const pf = require(path.join(BASE, PF_REL));
   // C1 测试面必须递归（否则抽出的段落在面外 ⇒ 引用丢失 ⇒ 归因失真）
   const tf = pf.testFiles();
-  A(tf.length === BASE_TEST_FILES, 'C1a 测试文件面 = ' + BASE_TEST_FILES + '（实 ' + tf.length + '；拆前 539 + 段文件 1）');
+  A(tf.length === BASE_TEST_FILES, 'C1a 测试文件面 = ' + BASE_TEST_FILES + '（实 ' + tf.length + '；拆前 539 + 段文件 1 + OPV24-1 时代 +1）');
   A(tf.indexOf(SEG_REL) >= 0, 'C1b 测试面含段文件（递归生效）');
   A(typeof pf.discoverFilesDeep === 'function', 'C1c product-files 导出 discoverFilesDeep（递归能力收进单一真源）');
   // C2 UI 面也必须递归（OPV22-4 还要拆 ui/panel.js → ui/pages/*.js）
@@ -458,7 +458,12 @@ function runC(A) {
   const rep = sharedScan;
   A(!!rep, 'C4a 门禁 scan() 可调用');
   if (rep) {
-    A(rep.orphans.length === 0, 'C4b 真仓库零孤儿（实 ' + rep.orphans.length + '）');
+    //   v2.416.0（OPV24-9）：口径从「孤儿必须为 0」升级为「孤儿必须全部在豁免面」——
+    //   探针收编后 p_world_pulse 合法豁免（手动诊断入口）；「未豁免孤儿」才是红灯。
+    const exemptRels = (require(path.join(BASE, GATE_REL)).EXEMPT || []).map(function (e) { return e.rel; });
+    const unexcused = rep.orphans.filter(function (o) { return exemptRels.indexOf(o) < 0; });
+    A(unexcused.length === 0, 'C4b 真仓库零未豁免孤儿（实 ' + unexcused.length
+      + (unexcused.length ? '：' + unexcused.join(',') : '') + '）；已豁免 ' + (rep.orphans.length - unexcused.length) + ' 项');
     A(rep.reach.indexOf(SEG_REL) >= 0, 'C4c 段文件可达（真在可达图里）');
     A(rep.locks.indexOf(SEG_REL) >= 0, 'C4d 段文件被判为 lock（走 require 边，不是 spawn/内联）');
     A(rep.problems.filter(function (p) { return p.kind !== 'vacuous'; }).length === 0,
@@ -466,7 +471,11 @@ function runC(A) {
   }
   // C5 段文件必须真被 require（不是靠豁免表混过）
   const gtext = rd(GATE_REL);
-  A(/const EXEMPT = \[\];/.test(gtext), 'C5 豁免表为空（段文件是真空可达，不是登记豁免混过）');
+  //   v2.416.0（OPV24-9）：C5 同步升级 —— 判据从「豁免表为空」改为「段文件不在豁免面」：
+  //   探针合法豁免后表不再为空，但『段文件真空可达』这层语义必须原样保住。
+  const __gateSrc5 = rd(GATE_REL);
+  const __exempt5 = (require(path.join(BASE, GATE_REL)).EXEMPT || []).map(function (e) { return e.rel; });
+  A(__exempt5.indexOf(SEG_REL) < 0, 'C5 段文件不在豁免面（真被 require，不是登记豁免混过；豁免面 ' + __exempt5.length + ' 项）');
   // C6 段文件不进产品面（它是测试基建，不该被算成产品模块）
   const pfs = pf.productFiles();
   A(pfs.indexOf(SEG_REL) < 0, 'C6 段文件不在产品面（tests/ 按 SKIP_DIRS 排除）');
@@ -554,6 +563,7 @@ function runN(A) {
   const runSha = sha(runAbs);
   const endsWithNl = runText.endsWith('\n');
   let restored = false;
+  const __excusedN1 = (require(path.join(BASE, GATE_REL)).EXEMPT || []).map(function (e) { return e.rel; });
   const sigBefore = gateSignature();
   // ── N1 计划原文要求的负控制：故意漏挂一段 ⇒ test-surface-gate 报孤儿 ──
   try {
@@ -565,8 +575,8 @@ function runN(A) {
     A(idx > 0, 'N1a 找到调用点行（L' + (idx + 1) + '）');
     const before = scanCached();
     sharedScan = before;
-    A(!!before && before.orphans.length === 0, 'N1b 破坏前门禁零孤儿（实 '
-      + (before ? before.orphans.length : 'scan 失败') + '）');
+    const __unexN1 = before.orphans.filter(function (o) { return __excusedN1.indexOf(o) < 0; });
+    A(__unexN1.length === 0, 'N1b 破坏前门禁零未豁免孤儿（实 ' + __unexN1.length + '）；已豁免 ' + (before.orphans.length - __unexN1.length) + ' 项');
     if (idx > 0) {
       const broken = lines.slice();
       broken[idx] = '// NEGCTL-OPV22-4 ' + broken[idx];
@@ -593,7 +603,8 @@ function runN(A) {
   A(gateSignature() === sigBefore, 'N1g2 还原后缓存签名回到破坏前的值（run.js 按内容取 sha ⇒ 还原即可命中同一份输入）');
   // 还原后的复核走 scanCached；命中的是「与破坏前逐字相同的输入」那份输出
   const ok1 = scanCached();
-  A(!!ok1 && ok1.orphans.length === 0, 'N1h 还原后门禁零孤儿（实 ' + (ok1 ? ok1.orphans.length : 'scan 失败') + '）');
+const __unexH1 = ok1.orphans.filter(function (o) { return __excusedN1.indexOf(o) < 0; });
+A(__unexH1.length === 0, 'N1h 还原后门禁零未豁免孤儿（实 ' + __unexH1.length + '）；已豁免 ' + (ok1.orphans.length - __unexH1.length) + ' 项');
   A(!!ok1 && ok1.orphans.indexOf(SEG_REL) < 0, 'N1i 还原后读数里不再报该段为孤儿');
 
   // ── N2 段文件从测试面消失 ⇒ 段体 WA.* 引用必须从 testRefSet 消失（面窄即失真） ──
@@ -685,7 +696,7 @@ const PS_REL = 'tests/panel-source.js';
 //   （`git diff --stat 3e64881..HEAD -- ui/pages/` 实测：overview-main.js +36，其余三个段文件 0）。
 //   与上一轮 v2.402.0 的 +101 同族 —— 差额全部落在段体内，段外（panel.js 自身 16045 行）
 //   一字未动，D3f 因此仍然绿。中间四版同样漏补了这个常量（HEAD 上实测 17724 vs 基线 17688）。
-const BASE_PANEL_LINES = 17724;
+const BASE_PANEL_LINES = 17878;  // v2.416.0：17724→17878（+154：OPV24-1 世界脉搏段体增量 + 本版 v24CivilBlock +100，全部落在段体内）
 // 拆后 panel.js 自己的行数（split 口径；拆前 17421 - 段体 335 + 转发块 41 = 17127）。
 //   注意：这个数会随转发块注释的字数变动 —— 它是「面没塌」的粗读数，不是精确不变量。
 //   真正的不变量是 D3a（重组面 === 拆前面，逐字相等），那一条按行拼接算，
@@ -706,14 +717,14 @@ const BASE_PANEL_LINES = 17724;
 //   v2.402.0（V23）：16041 → 16045（+4）。这 4 行是`v23StitchBlock` 的**转发壳**：
 //   2 行注释 + 1 行函数 + __omBind 里 1 行注入（转发壳必须留在 panel.js ——
 //   段模块是 ui 层，无 module 作用域，注入只可能在宿主侧发起）。
-const BASE_PANEL_FILE_LINES = 16045;  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）
+const BASE_PANEL_FILE_LINES = 16103;  // v2.416.0：16045→16103（+58：OPV24-1 世界脉搏转发壳 +53 未跟位 + 本版 v24 转发壳 +5 = 3 注释 + 1 函数 + 1 bind 项）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）
 //   v2.400.0（V22 后续修正）：335 → 491。EXV22-9 把 v22OmensBlock 写在段体标记
 //   之外（重组面里定义缺席、调用在场 ⇒ 假源码），本次把段体结束标记移回函数之后，
 //   段体收编 v22 块的 156 行。段体 esc 调用同步 57 → 60（v22 块 3 处）。
 //   v2.402.0（V23）：491 → 592（+101）。这 101 行是 v23StitchBlock（异空间三缝只读
 //   读数块）的**真新增产品代码**，与上一版 +156 行（v22 块）同族：段体确实长了。
 //   不是「差不多」也不是调数蒙红 —— 块本体就在段体标记内，D1d/D1i 同时卡着。
-const BASE_BODY_LINES = 592;           // 段体行数（含首含尾）
+const BASE_BODY_LINES = 692;           // 段体行数（含首含尾）。v2.416.0（EXV24）：592→692（+100，v24CivilBlock 本体，含 2 行间隔注释）
 function runD(A) {
   const ps = require(path.join(BASE, PS_REL));
   // ── D1 结构 ──
@@ -740,9 +751,10 @@ function runD(A) {
   //   v2.400.0（V22 后续修正）：v22OmensBlock 收进段体后，本表从七项补为八项 ——
   //   此前它不在段体里，本表数不到它，正是「定义在标记外」漏网的一环。
   //   v2.402.0（V23）：v23StitchBlock 同入段体 ⇒ 本表补为九项（理由同上段：不在表里就数不到它）。
-  const FN = ['foldCard', 'evictBlock', 'randBlock', 'clockBlock', 'bridgeBlock', 'lonshaBlock', 'heartbeatBlock', 'v22OmensBlock', 'v23StitchBlock'];
+  //   v2.416.0（EXV24）：v24CivilBlock 同入段体 ⇒ 本表补为十项（理由同上段）。
+  const FN = ['foldCard', 'evictBlock', 'randBlock', 'clockBlock', 'bridgeBlock', 'lonshaBlock', 'heartbeatBlock', 'v22OmensBlock', 'v23StitchBlock', 'v24CivilBlock'];
   const missFn = FN.filter(function (n) { return body.indexOf('  function ' + n + '(') < 0; });
-  A(missFn.length === 0, 'D1i 九个函数一个不少（缺 ' + missFn.length + ' 个：' + missFn.join(',') + '）');
+  A(missFn.length === 0, 'D1i 十个函数一个不少（缺 ' + missFn.length + ' 个：' + missFn.join(',') + '）');
   // ── D2 逐字：段体行数与内容 ──
   const bodyLines = body.split('\n').length;
   A(bodyLines === BASE_BODY_LINES, 'D2a 段体行数 = ' + BASE_BODY_LINES + '（实 ' + bodyLines + '；搬的是字节不是「差不多」）');
@@ -789,7 +801,8 @@ function runD(A) {
       try { out = String(WA.panelOverviewBlocks[k]() || ''); } catch (e) { out = ''; }
       if (out.length > 40) nonEmpty.push(k);
     });
-    A(nonEmpty.length === 8, 'D4d 八块各自产出非空读数（实 ' + nonEmpty.length + '/8；v22 / v23 块收进段体后 FN.slice(1) 已含它们）—— 漏注入/漏装载都会让这里归零');
+    //   v2.416.0（EXV24）：8 → 9（FN 表补为十项后 slice(1) 含 v24 块）。
+    A(nonEmpty.length === 9, 'D4d 九块各自产出非空读数（实 ' + nonEmpty.length + '/9；v22 / v23 / v24 块收进段体后 FN.slice(1) 已含它们）—— 漏注入/漏装载都会让这里归零');
     //   真实渲染路径：点页签 → renderBody → innerHTML 解析 → bindBody
     const panel = dom.getElementById('wa-panel');
     const tab = panel && panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === 'overview'; })[0];
@@ -811,8 +824,9 @@ function runD(A) {
     //   v2.402.0（V23）：第八块的标签（v23StitchBlock 的 foldCard label）。同上口径：
     //   取块标签而不是说明文字 —— 改文案不该红，换掉块才该红。
     const V23_LABEL = 'V23 缝合线';
-    A(folds.length === 8, 'D4f 概览页渲染出 8 个折叠壳（实 ' + folds.length + '）'
-      + ' —— 拆段后六块仍全部在位，且 EXV22-9 的第七块（八项同屏）已挂上');
+    //   v2.416.0（EXV24）：8 → 9（第九块 = V24 民生日志，foldCard label『V24 民生日志』见 D4g4）。
+    A(folds.length === 9, 'D4f 概览页渲染出 9 个折叠壳（实 ' + folds.length + '）'
+      + ' —— 拆段后六块仍全部在位，且 EXV22-9 第七块、V23 第八块、EXV24 第九块都已挂上');
     //   摘要含真读数（不是空壳）。
     //   ⚠ 阈值不能定成「长度 > 8」：本轮实测最短的合法摘要是「对外桥：休眠」= 6 字符。
     //     定 8 会把一条**正确**的读数判成红 —— 而假红与假绿同罪（本仓裁决：判据测的
@@ -830,7 +844,7 @@ function runD(A) {
       const ci = t.indexOf('：');
       return ci > 0 && t.length > ci + 1;
     });
-    A(withText.length === 8, 'D4g 八个折叠壳的摘要都是「标签：状态」两段式且冒号后有内容（实 ' + withText.length + '/8）');
+    A(withText.length === 9, 'D4g 九个折叠壳的摘要都是「标签：状态」两段式且冒号后有内容（实 ' + withText.length + '/9）');
     //   第七块的身份点名：渲染产物里必须**真有一块**的摘要带 v22 标签。
     //   这条与 D4f 是两道，不是重复：D4f 问「几块」，本条问「第七块是谁」。
     //   负控制（N9）把 v22OmensBlock() 的渲染调用删掉时，D4f 与 D4g 会同时掉到 6，
@@ -841,7 +855,12 @@ function runD(A) {
 //   （复制一块也是 8）。与 overview-fold-v2254 的 B1c 同口径。
   A(v23Fold.length === 1, 'D4g3 概览页里恰有 1 块是 V23 缝合线的「' + V23_LABEL + '」（实 ' + v23Fold.length
     + '）—— 第八块的身份必须点名，否则「复制一块」也能凑成 8');
-  A(v22Fold.length === 1, 'D4g2 概览页里恰有 1 块是 EXV22-9 的「' + V22_LABEL + '」（实 ' + v22Fold.length
+  //   v2.416.0（EXV24）：第九块的身份点名 —— 数到 9 不等于「第九块是对的」。同 D4g3 口径。
+    const V24_LABEL = 'V24 民生日志';  // 与 v24CivilBlock 的 foldCard label 逐字同源
+    const v24Fold = folds.filter(function (f) { return sumText(f).indexOf(V24_LABEL) >= 0; });
+  A(v24Fold.length === 1, 'D4g4 概览页里恰有 1 块是 EXV24 的「' + V24_LABEL + '」（实 ' + v24Fold.length
+    + '）—— 第九块的身份必须点名，否则「复制一块」也能凑成 9');
+A(v22Fold.length === 1, 'D4g2 概览页里恰有 1 块是 EXV22-9 的「' + V22_LABEL + '」（实 ' + v22Fold.length
       + '）—— 第七块的身份点名，不是只数个数');
     //   零 id 零控件在**渲染产物**上也成立（不只是源码层）
     const ids = folds.reduce(function (a, f) { return a + f.querySelectorAll('[id]').length; }, 0);
@@ -865,7 +884,8 @@ function runD(A) {
   //   反向：段体里 esc 调用次数与拆前一致（57 处）—— 少一处就说明搬迁时改动了逻辑
   const escCalls = (body.match(/(^|[^\w$.])esc\s*\(/g) || []).length;
   //   v2.402.0（V23）：60 → 63（+3，v23 块的三个读者标签 / 两种状态文本 / 缺席说明）。
-  A(escCalls === 63, 'D5b 段体 esc 调用 63 处（实 ' + escCalls + '；335 行时代 57 处 + v22 块 3 处 + v23 块 3 处）—— 搬迁不得改动任何一处转义点');
+  //   v2.416.0（EXV24）：63 → 66（+3，v24 块的读者标签 / 状态文本 / 兜底消息各 1 处）。
+  A(escCalls === 66, 'D5b 段体 esc 调用 66 处（实 ' + escCalls + '；335 行时代 57 处 + v22 块 3 处 + v23 块 3 处 + v24 块 3 处）—— 搬迁不得改动任何一处转义点');
   //   段模块自己的 esc 兜底必须是**恒等**（不转义）：否则 bind 之前就凭空多一份转义实现
   A(blk.indexOf("let esc = function (s) { return String(s == null ? '' : s); };") > 0,
     'D5c 段模块的 esc 兜底是恒等（不制造第二份转义实现）');

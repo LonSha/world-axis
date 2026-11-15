@@ -48,10 +48,36 @@ s3Files.forEach(function (f) {
     '升级版本时请把 ' + V + ' 加进本测试的版本白名单');
   // VERSION 正则交替段：形如 |411|412) 的 minor 段必须含当前 minor（仅在有该形态时查）
   const minor = V.split('.')[1];
-  const m = src.match(/\|(4\d\d)\)/);
+  //   交替段任意位置含 |416 即算跟位（历史写法有 '|416|415)' 与 '|415|416)' 两种拼序，
+  //   不能只看结尾 —— 否则「明明加了却判红」的假红会让下一次真漂移淹没在噪声里。
+  const m = src.match(/\|4(\d\d)(?=[|)])/);
   if (m) ok(f + ' VERSION 正则含当前 minor ' + minor,
-    new RegExp('\\|' + minor + '\\)').test(src),
+    new RegExp('\\|' + minor + '(?=[|)])').test(src),
     '升级版本时请把 |' + minor + ' 加进本测试的版本正则交替段');
 });
-console.log('\n版本锚点一致性：' + (fail ? '失败 ' + fail : '通过 ') + pass + ' 项' + (fail ? '' : ' \u2014 全部锚点与 manifest 同步'));
+// ⑤ run.js 入口版本钉版（OPV24-7）：__wantPin293 必须等于当前版本。
+//   病史：v2.411~v2.415 五个版本只升 VERSION 不跟钉版，run.js:22839 停在 2.410.0 ——
+//   全量没跑时锚点漂移无人察觉。本条把「升版只改一处」的注释口径变成机器判据。
+const runSrc = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
+const pin = (runSrc.match(/const __wantPin293 = '([\d.]+)';/) || [])[1];
+ok('tests/run.js 入口钉版 __wantPin293 与 manifest 一致', pin === V,
+  'run.js 钉版=' + pin + '，当前=' + V + ' —— 升版时请同步修改 run.js 的 __wantPin293');
+// ⑥ BUILD_ID 与 VERSION 同批推进（OPV24-7）：入口纪律的机器化。
+//   病史：index.js:1484 的 BUILD_ID 停在 v2.411.0 提交，此后 4 个版本未跟 ——
+//   「同版容灾」实际取的是旧代码。本条不验 40 位内容本身（那是 git 的职责），
+//   只验「换版必换 BUILD_ID」这一条同批纪律：BUILD_ID 变更时间不得早于 VERSION 变更时间。
+const bid = (idx.match(/const BUILD_ID = '([0-9a-f]{40})';/) || [])[1];
+ok('index.js BUILD_ID 形态合法（40 位十六进制）', !!bid, '找不到 const BUILD_ID = <40hex>');
+if (bid) {
+  try {
+    const { execSync } = require('child_process');
+    const bidDate = execSync('git log -1 --format=%cI ' + bid, { cwd: BASE, encoding: 'utf8' }).trim();
+    const verDate = execSync("git log -1 --format=%cI -S'const VERSION = \"" + V + "\"' -- index.js", { cwd: BASE, encoding: 'utf8' }).trim();
+    if (bidDate && verDate) {
+      ok('index.js BUILD_ID 提交不早于当前 VERSION 提交（同批推进）', bidDate >= verDate,
+        'BUILD_ID 提交 ' + bidDate + ' 早于 VERSION=' + V + ' 的提交 ' + verDate + ' —— 回退源取的是旧代码');
+    }
+  } catch (e) { console.log('  · BUILD_ID git 核对跳过（无 git 或非仓库环境）：' + e.message.split('\n')[0]); }
+}
+console.log('\n版本锚点一致性：' + (fail ? '失败 ' + fail + ' / 通过 ' + pass : '通过 ' + pass) + ' 项' + (fail ? '' : ' \u2014 全部锚点与 manifest 同步'));
 process.exit(fail ? 1 : 0);

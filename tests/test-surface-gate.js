@@ -42,7 +42,12 @@ const RUN_REL = 'tests/run.js';
 // 豁免表：确实没有自己的执行入口、但已确认可从其他入口覆盖的测试文件。
 //   当前为空 —— 两个不可达者各自的入口都是自解释的（export-contract 由 run.js spawn、
 //   ui-gate 的案例已被内联），判据能自己认出来，不需要人工白名单。
-const EXEMPT = [];
+const EXEMPT = [
+  // v2.416.0（OPV24-9）：p_world_pulse 自 /home/user/probes/ 收编进仓库（22 断言，手动复跑）。
+  //   探针的本质属性就是「手动诊断入口」，不该有也不需要有自动 spawn 入口 ——
+  //   与豁免表头两条注释同口径：登记的是事实（探针不进自动面），不是放过缺陷。
+  { rel: 'tests/probes/p_world_pulse.js', why: 'OPV24-9 探针收编：手动诊断入口，22 断言可单独 node 复跑，不占自动执行面' }
+];
 
 const MIN_FILES = 30;
 const MIN_LOCKS = 20;

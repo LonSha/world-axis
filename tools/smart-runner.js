@@ -71,7 +71,7 @@ const RUNNER_REL = 'tools/isolated-run.js';
  */
 const TIERS = {
 '0': { name: 'L0 门禁层', budgetMs: 90000, what: '静态契约门禁（逐条 spawn，退出码即结论）',
-gates: ['tests/dup-decl-gate.js', 'tests/field-liveness-gate.js'] },
+gates: ['tests/dup-decl-gate.js', 'tests/field-liveness-gate.js', 'tools/version-consistency.js'] },
 '1': { name: 'L1 快档层', budgetMs: 300000, what: 'tools/smoke.js 快档集（单一真源在它自己内部）' },
 '2': { name: 'L2 增量层', budgetMs: 600000, what: 'git 改动面 → 归属表自包含节 → 隔离器定向真跑' },
 '3': { name: 'L3 全量层', budgetMs: null, what: '隔离器整趟 tests/run.js（计划门控，默认拒绝）' }

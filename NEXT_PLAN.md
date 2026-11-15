@@ -1,8 +1,21 @@
-# WorldAxis 当前计划：V12 超级版本“活世界操作系统”
+# WorldAxis 当前计划：V24 民生日志双九项（EXV24-1～9 + OPV24-1～9）
+> **当前入口（2026-11-15）**：基线 `v2.415.0` / `eb94a6a`，目标版本 `v2.416.0`。
+> **现行计划为 [V24 主计划](plans/V24_MASTER_PLAN.md)** —— 命题是「世界底层的民生有没有人记账」：
+> 拓展线九台民生引擎（忌日祭仪 / 外乡人融入 / 租佃田租 / 兵籍军饷 / 乳母育儿 / 失物招领 / 朝圣香火 / 赌坊骰局 / 浴堂浆洗）
+> + 优化线九项治理（钉版字面量、BUILD_ID 回填、export-contract 冻结跟位、sync-hardcoded 真写、
+> NEXT_PLAN 反事实重写、version-consistency 纳入 L0、校验面补 BUILD_ID/run.js 钉版、接线四件套、探针收编）。
+>
+> **进度**：9 引擎已创建并接线四件套完成（装载 / LOAD / MODULE_EXPORTS / action-desk 26 条路由）；
+> 周年判据语义修复（ceil→floor）已复验；场景 68 专锁 `tests/scenario-v68-v24-civil-life.js` 149 项全绿；
+> 概览页 `v24CivilBlock` 已挂载且拆段锁 127 项全绿；export-contract 已重冻结（ns=438/members=2849）；
+> sync-hardcoded 已真写跟位。**双计划全部收口前严禁执行全量回归。**
+# WorldAxis 历史入口：V12 超级版本「活世界操作系统」（总体设计，已被 V13～V24 多轮迭代覆盖）
+> **历史快照（2026-11-15 归档）**：V12 是总体设计文档，不是待办清单。V13 之后的每个版本批次
+> 都在 V12 的底盘上真交付了 18 项（最新为 V24），「尚未实施」的反事实表述不再成立。
+> 设计文档保留在 [V12_MASTER_PLAN.md](plans/V12_MASTER_PLAN.md) 供追溯；全文件覆盖
+> [V12_ENGINE_COVERAGE.md](plans/V12_ENGINE_COVERAGE.md) 同为历史面。
 
-现行设计入口：[V12_MASTER_PLAN.md](plans/V12_MASTER_PLAN.md)；全文件覆盖：[V12_ENGINE_COVERAGE.md](plans/V12_ENGINE_COVERAGE.md)。状态为总体设计，尚未实施。常规门禁与验收是默认责任，不占项目名额。下方为历史入口，未完成验收仍按真实证据继续补齐。
-
-# WorldAxis 当前计划：V11 纲领「真空面、驱动面与读面失真治理」（OPV11-1～9 + EXV11-1～9）
+# WorldAxis 历史入口：V11 纲领「真空面、驱动面与读面失真治理」（OPV11-1～9 + EXV11-1～9）
 > **当前入口（2026-11-05）**：基线 `v2.296.0` / `5b7f991`。V10 全景双九项 18/18 已交付并推送远端。
 > **现行计划为 [V11 纲领](plans/V11_MASTER_PLAN.md)** —— 命题从「机制通不通」转向「通了以后读数说不说实话」：空世界快照 0 长度、主路径 items=0 而宿主槽位 573 字、35 台 L3 只驱动 7 台、49 个推进 API 产品侧零调用、`unifiedPending` 0/0 三态同形、5 个多写者字段无写权声明，合计 18 项（优化九项 + 拓展九项）。
 >

@@ -566,6 +566,9 @@
   // v2.402.0（V23 缝合线）：三缝只读读数块。同上，直写 `WA.panelOverviewBlocks.<mem>`
   //   字面形态（死子面门禁的引用正则只认这个形态），且模块缺席时返回空串。
   function v23StitchBlock() { return __obBind() ? WA.panelOverviewBlocks.v23StitchBlock() : ''; }
+  // v2.416.0（EXV24）：V24 民生日志九引擎只读块。同上，直写 `WA.panelOverviewBlocks.<mem>`
+  //   字面形态（死子面门禁的引用正则只认这个形态），且模块缺席时返回空串。
+  function v24CivilBlock() { return __obBind() ? WA.panelOverviewBlocks.v24CivilBlock() : ''; }
   // <<<OPV22-4 OVERVIEW-BLOCKS END>>>
   // <<<OPV24-1 WORLD-PULSE BEGIN>>>
   // ══ OPV24-1（2.413.0）：世界脉搏聚合块 ══
@@ -601,7 +604,8 @@
         heartbeatBlock: heartbeatBlock,
         v22OmensBlock: v22OmensBlock,
         v23StitchBlock: v23StitchBlock,
-        worldPulseBlock: worldPulseBlock
+        worldPulseBlock: worldPulseBlock,
+        v24CivilBlock: v24CivilBlock
       });
     }
     return true;
