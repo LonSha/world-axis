@@ -334,8 +334,8 @@ function runD(a) {
   S.EB.setSettings({ maxEdges: 40, maxCases: 6 });
   // ④ 预览是进程态交互物：存档里没有 stamp 键
   const b = S.EB.board(S.cid, { facts: FA });
-  a(typeof b.stamp === 'string' && snap(S.WA).indexOf('stamp') < 0,
-    'n4/D5: 图谱 stamp 只在返回体、**不落盘**（进程态交互物）');
+  a(typeof b.stamp === 'string' && snap(S.WA).indexOf('"stamp"') < 0,
+    'n4/D5: 图谱 stamp 只在返回体、**不落盘**（进程态交互物；键形态锚定——v2.410.0 批 mobStampede._stats.stampedeIncidents 落存档后裸子串会把 "stampede…" 误当 "stamp"，故锚词加 JSON 引号定界）');
   // ⑤ 分栏计数：「共有几条边」与「其中几条只是转述」分列（合成一栏就答不出「几条是独立的」）
   const st = S.EB.stat();
   a(typeof st.edges === 'number' && typeof st.independent === 'number' && typeof st.relayed === 'number'

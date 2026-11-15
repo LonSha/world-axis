@@ -27,6 +27,7 @@
   const LS_KEY = 'worldaxis_fact_continuity_settings_v1';
   const DEF = { enabled: false, maxFindings: 8, maxBlockChars: 900, includeEconomy: true, includeInfoBoundary: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'factContinuity' };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const __stat = { diagnoses: 0, blocks: 0, lastFindings: 0, lastAt: 0, faults: {} };
 
   function settings() {

@@ -15,7 +15,10 @@ const {uiFiles,auditWire}=require('./ui-wire-audit');
 //      不属于任何 page 组（塞进某页 ids 会在别的页被判缺失 —— 判据方向反了）。
 //      H2 侧早就有 EXEMPT_H 豁免它们，本侧没有 ⇒ 同样是一件语义两个答案。
 //      豁免表**只收骨架**，且必须与 tests/run.js 的 EXEMPT_H 逐字同集（下条断言钉住）。
-const SKELETON_IDS = ['wa-panel', 'wa-orb', 'wa-search-bar'];
+const SKELETON_IDS = ['wa-panel', 'wa-orb', 'wa-search-bar', 'wa-overview-absent', 'wa-tools-absent'];
+//   v2.410.0 收口：与 tests/run.js 的 EXEMPT_H（v2.380.0 起 wa-search-bar、
+//   v2.401.0 OPV23 起 wa-overview-absent / wa-tools-absent，共五员）逐字同批——
+//   此前 H2 侧两次扩员本侧都没跟，被 v8-desk-ui-2294 的 H2/coverage 同集判据当场抓出。
 function audit(options){
  const o=options||{},groups=o.groups||load().toolDiag.UI_BINDINGS,registered=new Set();
  for(const g of groups)for(const layer of ['ids','cond','dynamic','player'])for(const e of g[layer]||[])registered.add(typeof e==='string'?e:e.id);

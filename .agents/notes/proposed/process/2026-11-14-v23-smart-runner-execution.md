@@ -10,6 +10,10 @@ L2 and L3 currently execute smoke, so neither incremental coverage nor isolated 
 
 Keep smoke as L1 and existing static gates as L0. L2 derives changed paths from Git, walks literal test dependencies and namespace consumers, and maps matching evidence files to selectable sections from test-layers. Uncovered JavaScript changes, empty selection and shared-context selection refuse with nonzero status. Explicit --only-v-section is a declared targeted subset rather than a claim of complete change coverage. --plan prints the concrete workload without execution. L2 and L3 invoke isolated-runner.launch in a child process with explicit selection arguments; inherited WA_ONLY_SECTION is removed so L3 always remains full. Preserve the existing isolated runner's candidate-copy, source-digest, lock and summary contract. Report time budgets as limits, not measured speed guarantees. Move only the V23 scenario into its own section and register the scheduler regression there.
 
+## Decision
+
+Adopt dependency-walking selection (literal test deps + namespace consumers, host files excluded by an exact list) over handwritten engine-to-test lists, smoke reuse, or mention-everything matching. L2 refuses empty / uncovered / wide-impact selections with nonzero status; explicit --only-v-section is a declared targeted subset, never a coverage claim. L3 always delegates to isolated-runner.launch in a child process without inherited selection. The fast set is derived from tools/smoke.js rel: entries rather than hard-coded.
+
 ## Scope and gate
 
 Staged fix limited to tools/smart-runner.js, tests/smart-runner-v2408.js and the V23 section in tests/run.js, plus this note. Budget 400 changed lines. Baseline 46ce63d: L2/L3 point to smoke; unknown tiers fall through to the same path. Verification uses real temporary Git repositories, actual child execution probes, CLI refusal and in-memory source mutations. L3 is verified through its invocation contract only until all 18 items satisfy the plan. Never launch an unselected tests/run.js during this stage. Stop on source pollution, missing selected-work evidence, or regression in the existing layer gate.
@@ -17,6 +21,10 @@ Staged fix limited to tools/smart-runner.js, tests/smart-runner-v2408.js and the
 ## Alternatives considered
 
 A new handwritten list of engine-to-test assignments is cheap to start but drifts whenever tests move. Reusing smoke avoids new mapping but repeats the false coverage problem. Running every test that mentions store provides conservative coverage but can take full-regression time; L2 therefore reports selected sections and enforces a bounded budget, while unresolved coverage requires L3 at final acceptance.
+
+## Consequences
+
+Each tier now produces distinct execution evidence, and mutating a tier target to smoke or suppressing L2 selection makes the same assertions fail. Static dependency matching still cannot prove dynamic consumers: L2 is bounded incremental evidence, never a substitute for final full regression. The measured structural floor stands — pruner wrapUnsafe: 14 / markedLines: 3785 keeps a targeted run above the old 3-minute budget, so the tier budget is an upper bound (600000ms), not a speed claim, and closing that floor belongs to the pruning tool (deliberately untouched; see the cross-reference stitch batch). Isolated regression and tools/smoke.js must not run concurrently on this machine: memory pressure alone made segment-extract fail 4 assertions that pass 126/126 alone. An interrupted run leaves a stale regression lock; recoverLock is the documented recovery path.
 
 ## Acceptance criteria
 

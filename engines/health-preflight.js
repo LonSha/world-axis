@@ -761,9 +761,12 @@
     //   ⚠ unknown 排在最前：三面里任一面读不到，后面三个结论都无从谈起。
     //     把它排在 blocked 之后会让「机制面缺席 + 预算面卡死」报成 blocked ——
     //     那是拿一半读数替全体下判断。
-    if (!mechOk || !g || nums.absent > 0) state = 'unknown';
-    else if (simErr) state = 'unknown';
-    else if (simBad) state = 'blocked';
+    //   v2.410.0 收口（first-run-v2263 的 A4/K1/A5.3 三锚当场抓出）：v2.403.0 加推演面时
+    //     把 simErr 并成了独立分支、且丢了 `nums.blocked > 0` 判定 —— 预算把内容挤掉
+    //     （dropped>0）会被误报成 thin（「太少了」），而「卡死」与「太少」是两件事。
+    //     此处恢复：unknown 收单分支（simErr 并入入参面），blocked 恢复为单赋值。
+    if (!mechOk || !g || nums.absent > 0 || simErr) state = 'unknown';
+    else if (simBad || nums.blocked > 0) state = 'blocked';
     // ⚠ thin 只认 threeGates 的 degraded —— 门槛②已按「≥半数 pass / 不足半数 degraded」判过，
     //   这里再算一遍 sourcesOn/sources 就是同一条规则的第二份真源（两处阈值必然漂移）。
     else if (nums.degraded > 0) state = 'thin';

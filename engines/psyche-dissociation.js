@@ -26,6 +26,7 @@
   };
 
   const __REG = {
+    module: 'psycheDissociation',
     key: 'psycheDissociation',
     name: '心智解离与虚构记忆 (EXV23-3)',
     desc: '深度精神创伤、闪回应激与偏执虚构记忆动力学',
@@ -36,6 +37,7 @@
       paranoiaThreshold: { type: 'number', default: 50 }
     }
   };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   let STATE = null;
 

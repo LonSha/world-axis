@@ -97,7 +97,7 @@ const BREAK = {
   reachScope: 'return true;',
   selfCallSkip: 'if (false) continue;   // 自己文件调自己',
   cacheSig: 'if (__scan) return __scan;',
-  blindCount: 'diagOnlyOrphanCount: b.diagOnlyOrphans.slice(0, 2).length,\n      blindOrphans: b.blindOrphans.slice(0, 10),\n      blindOrphanCount: b.blindOrphans.slice(0, 10).length,',
+  blindCount: 'diagOnlyOrphanCount: b.diagOnlyOrphans.slice(0, 2).length,\n      blindOrphans: b.blindOrphans.slice(0, 2),\n      blindOrphanCount: b.blindOrphans.slice(0, 2).length,',
   diagFace: "return 'other';",
   l2eGate: "else if ((reached[ns] === 'call' || reached[ns] === 'entry') && false) { layer = 'L2e'; driver = 'engine'; }",
   panelGate: 'else if (panelM.length && false) { layer = \'L2p\'; driver = \'panel\'; }',
@@ -585,25 +585,27 @@ function runNegative(assertFn) {
     O.WA.driverLedger.setSettings({ maxList: 10 });
     const vo = O.WA.driverLedger.view();
     a(vo.blindOrphanCount === vo.counts.L3b, 'N6a（正面）：原版计数 = 真实条数');
-    // 【v2.294.0（V8 OPV8-4）】被截断档从 L3b 换成 L3a：
-    //   OPV8-4 修完两处假阴性后 L3b 真实归零（5 台进 L2e、survival 进 L2e、4 台留 L3a），
-    //   原前提「真实 L3b > 上限」结构性消失。这里改用仍有真实样本的 L3a，
-    //   并把上限压到 2 —— 判据语义不变（计数必须是真实条数，不是 slice 后长度）。
-    //   不选「往 L3b 塞假引擎」：那是拿锁给假读数背书。
+    // 【v2.410.0 再跟位】注释剥离修复（driver-ledger 幻影 def 真缺陷）让两档都回到
+    //   真实读数：L3a=1（floorSnapshot 回档）、L3b=3。v2.294.0（V8 OPV8-4）把靶标
+    //   从 L3b 换到 L3a 是因为当时 L3b 真实归零；本轮修复后前提「真实 L3a > 上限 2」
+    //   结构性消失（实 1），改用样本充足的 L3b（实 3）。判据语义不变：
+    //   计数必须是真实条数，不是 slice 后长度。
+    //   不选「往档里塞假引擎」：那是拿锁给假读数背书。
     const lim = 2;
     const P = boot(broken('blindCount'));
     setPrefetch(P.WA, null);
     P.WA.driverLedger.setSettings({ maxList: lim });
     const vp = P.WA.driverLedger.view();
-    a(vp.diagOnlyOrphanCount <= lim,
-      'N6c（现形）：计数退化成截断长度（' + vp.diagOnlyOrphanCount
-      + ' vs 真实 ' + vp.counts.L3a + '）—— 少报的 ' + (vp.counts.L3a - vp.diagOnlyOrphanCount)
+    a(vp.blindOrphanCount < vp.counts.L3b,
+      'N6c（现形）：计数退化成截断长度（' + vp.blindOrphanCount
+      + ' vs 真实 ' + vp.counts.L3b + '）—— 少报的 ' + (vp.counts.L3b - vp.blindOrphanCount)
       + ' 台从此看不见');
     // 前提必须独立成立：真实条数确实超过上限，否则上面那条会因「本来就小于上限」而恒真。
-    a(vp.counts.L3a > lim, 'N6b（前提）：真实 L3a 超过清单上限 ' + lim + '（实 ' + vp.counts.L3a + '）');
-    // L3b 侧补一条：真实为 0 时计数也必须报 0，不许编数。
-    a(vp.counts.L3b === 0 ? vp.blindOrphanCount === 0 : vp.blindOrphanCount === vp.counts.L3b,
-      'N6d：L3b 计数与真实条数一致（' + vp.blindOrphanCount + ' vs ' + vp.counts.L3b + '）');
+    a(vp.counts.L3b > lim, 'N6b（前提）：真实 L3b 超过清单上限 ' + lim + '（实 ' + vp.counts.L3b + '）');
+    // 原版两档计数都必须与真实条数一致（不许编数；破坏版计数已被破坏，不在此判）。
+    a(vo.diagOnlyOrphanCount === vo.counts.L3a && vo.blindOrphanCount === vo.counts.L3b,
+      'N6d：原版两档计数都与真实条数一致（' + vo.diagOnlyOrphanCount + ' / ' + vo.blindOrphanCount
+      + ' vs ' + vo.counts.L3a + ' / ' + vo.counts.L3b + '）');
   }
 
   // N7 破坏「诊断面按文件认」⇒ L3a 与 L3b 分不开（只诊断读被折进「没人碰」）

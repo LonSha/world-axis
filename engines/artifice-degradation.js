@@ -26,6 +26,7 @@
   };
 
   const __REG = {
+    module: 'artificeDegradation',
     key: 'artificeDegradation',
     name: '器械损耗与材料疲劳 (EXV23-6)',
     desc: '冷兵器、蒸汽构装体物理应力疲劳、机械卡死与炸膛碎裂模型',
@@ -36,6 +37,7 @@
       jamThreshold: { type: 'number', default: 70 }
     }
   };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   let STATE = null;
 

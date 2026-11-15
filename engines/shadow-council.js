@@ -25,6 +25,7 @@
   };
 
   const __REG = {
+    module: 'shadowCouncil',
     key: 'shadowCouncil',
     name: '影子潜伏与双面谍报 (EXV23-7)',
     desc: '双重效忠、死信箱异步暗号与潜伏自毁灭口契约',
@@ -34,6 +35,7 @@
       exposureThreshold: { type: 'number', default: 80 }
     }
   };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   let STATE = null;
 

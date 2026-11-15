@@ -47,8 +47,14 @@ const PANEL = 'ui/panel.js';
 const RUNJ = 'tests/run.js';
 const IDX = 'index.js';
 const SELF_REL = 'tests/vis-default-v2260.js';
+// v2.410.0（OPV22-4/OPV23-1 拆段遗留红·同族再添一笔）：面板源码面改走 tests/panel-source.js
+//   的**重组面**——静默分叉（A1d）与提示行（D3/D4）的锚点已随段体搬到 ui/pages/overview-*.js，
+//   在 ui/panel.js 单文件上命中 0 次（判据的输入面比事实窄；此前 A1d 直接 FATAL）。
+//   panelSource() 按原位置把段体拼回标记处，结果与拆段前的 ui/panel.js 逐字相等，
+//   故全部断言一条不改；ov（srcOverride 负控的内存副本注入）分支原样保留，语义不变。
 function rd(rel, ov) {
   if (ov && ov[rel] !== undefined) return ov[rel];
+  if (rel === PANEL) return require('./panel-source.js').panelSource();
   return fs.readFileSync(path.join(BASE, rel), 'utf8');
 }
 function cnt(s, n) { return String(s).split(n).length - 1; }

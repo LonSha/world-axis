@@ -88,8 +88,10 @@ const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8'
 //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
 const PANEL_SRC = require('./panel-source.js').panelSource();
 // ── 锚点：字面量在此声明一次，判据区只引用变量（H5 判据纯度）──
-const A_ORDER_UNKNOWN = "if (!mechOk || !g || nums.absent > 0) state = 'unknown';";
-const A_ORDER_BLOCKED = "else if (nums.blocked > 0) state = 'blocked';";
+//   v2.410.0 跟位：v2.403.0 推演面进场后，simErr 并入 unknown 入参面、blocked 恢复
+//     `simBad || nums.blocked > 0` 双条件单赋值（v2.403.0 曾丢 blocked 判定，被 K2 抓出）。
+const A_ORDER_UNKNOWN = "if (!mechOk || !g || nums.absent > 0 || simErr) state = 'unknown';";
+const A_ORDER_BLOCKED = "else if (simBad || nums.blocked > 0) state = 'blocked';";
 // thin 判据：只认 threeGates 的 degraded（比例已由门槛②算过，不再算第二遍）
 const A_THIN = "else if (nums.degraded > 0) state = 'thin';";
 const A_DORMANT = "? WA.capabilityAudit.dormantMechanisms().length";

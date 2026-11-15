@@ -255,8 +255,8 @@ function runD(a) {
   WA.supplyChain.setSettings({ maxStages: 8, maxRows: 24 });
   // ④ 预览是进程态交互物：存档里没有 stamp 键
   const p = WA.supplyChain.plan(order());
-  a(typeof p.stamp === 'string' && snap(WA).indexOf('stamp') < 0,
-    'n3/D5: 预览 stamp 只在返回体、**不落盘**（进程态交互物）');
+  a(typeof p.stamp === 'string' && snap(WA).indexOf('"stamp"') < 0,
+    'n3/D5: 预览 stamp 只在返回体、**不落盘**（进程态交互物；键形态锚定——v2.410.0 批 mobStampede._stats.stampedeIncidents 落存档后裸子串会把 "stampede…" 误当 "stamp"，故锚词加 JSON 引号定界）');
   // ⑤ 分栏计数：plans / commits / partials 各自成栏
   const st = WA.supplyChain.stat();
   a(typeof st.plans === 'number' && typeof st.commits === 'number' && typeof st.partials === 'number',

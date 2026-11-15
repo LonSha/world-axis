@@ -25,6 +25,7 @@
   };
 
   const __REG = {
+    module: 'dynasticLineage',
     key: 'dynasticLineage',
     name: '门阀世系与夺嫡立嗣 (EXV23-8)',
     desc: '三代族谱、门荫特权、遗传隐疾与宗族承袭政变模型',
@@ -34,6 +35,7 @@
       privilegePrestigeCost: { type: 'number', default: 30 }
     }
   };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   let STATE = null;
 

@@ -30,7 +30,16 @@ const DIAG_REL = 'engines/tool-diag.js';
 const IDX_REL = 'index.js';
 const RUN_REL = 'tests/run.js';
 const SELF_REL = 'tests/day-route-ui-v2266.js';
-function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+// v2.410.0（OPV22-4/OPV23-1 拆段遗留红·同族再添一笔）：面板源码面改走 tests/panel-source.js
+//   的**重组面**。OPV22-4/OPV23-1 把 ui/panel.js 的概览段体搬到了 ui/pages/overview-*.js，
+//   本锁对「面板源码」的文本锚点（blockDef / blockUse 等）在单文件上命中 0 次 ——
+//   红的原因不是产品坏了，是**判据的输入面比事实窄**（本仓已多次裁决同族）。
+//   panelSource() 按原位置把段体拼回标记处，结果与拆段前的 ui/panel.js 逐字相等，
+//   故全部断言一条不改；srcOverride 负控分支（freshEnv 的内存副本注入）语义不变。
+function rd(rel) {
+  if (rel === PANEL_REL) return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+}
 function cnt(s, n) { return s.split(n).length - 1; }
 function j(x) { return JSON.stringify(x); }
 

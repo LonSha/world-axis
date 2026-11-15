@@ -52,7 +52,15 @@ const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const gate = require('./ui-gate-sync.js');
 
-function readPanel() { return fs.readFileSync(path.join(BASE, PANEL_REL), 'utf8'); }
+// v2.410.0（OPV22-4/OPV23-1 拆段遗留红·同族再添一笔）：面板源码面改走 tests/panel-source.js
+//   的**重组面**——C2/N1/N7 等对「面板源码」的文本锚点已随概览/工具段体搬到
+//   ui/pages/overview-*.js，在 ui/panel.js 单文件上命中 0 次（判据的输入面比事实窄）。
+//   panelSource() 按原位置把段体拼回标记处，结果与拆段前的 ui/panel.js 逐字相等，
+//   故全部断言一条不改；srcOverride 负控（N2/N4/N7 的内存副本注入）语义不变。
+function readPanel() {
+  if (PANEL_REL === 'ui/panel.js') return require('./panel-source.js').panelSource();
+  return fs.readFileSync(path.join(BASE, PANEL_REL), 'utf8');
+}
 
 /** 打开工具页并返回该页 body 的渲染产物 */
 function toolsHtml(env) {

@@ -29,6 +29,7 @@
   };
 
   const __REG = {
+    module: 'commodityCirculation',
     key: 'commodityCirculation',
     name: '物资流转与债务清算 (EXV23-1)',
     desc: '物资实物库存、商路损耗运输与商业信用借据违约清算',
@@ -40,6 +41,7 @@
       maxActiveDebts: { type: 'number', default: 50 }
     }
   };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   let STATE = null;
 

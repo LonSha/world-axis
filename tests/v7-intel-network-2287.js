@@ -14,7 +14,11 @@ const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
 const RUN_SRC = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
 const INTEL_SRC = fs.readFileSync(path.join(BASE, INTEL_REL), 'utf8');
-const PANEL_SRC = fs.readFileSync(path.join(BASE, PANEL_REL), 'utf8');
+// v2.410.0（OPV22-4/OPV23-1 拆段遗留红·同族再添一笔）：PANEL_SRC 改走 tests/panel-source.js
+//   的**重组面**——情报网络块的锚点已随段体搬到 ui/pages/overview-*.js，在 ui/panel.js
+//   单文件上命中 0 次（判据的输入面比事实窄）。panelSource() 与拆段前逐字相等，
+//   断言一条不改；本锁负控打的是 engines/intel.js，不受影响。
+const PANEL_SRC = require('./panel-source.js').panelSource();
 const DIAG_SRC = fs.readFileSync(path.join(BASE, DIAG_REL), 'utf8');
 const A_EXPORT = 'network: network, networkStat: networkStat,';
 const A_HORIZON = "remainingRounds: exp === null ? null : Math.max(0, Math.floor(exp - nowRound))";

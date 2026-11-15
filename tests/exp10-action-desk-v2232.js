@@ -100,7 +100,8 @@ async function runAll(a, ov) {
   // v2.381.0：**改掉硬编码的成员数断言**。
   //   原断言是 `Object.keys(W.actionDesk).length === 14`。V21 一批扩展给 actionDesk
   //   加了 lifecycle / recoverAction / sceneFlow / actFromScene / boardMulti / planMulti
-  //   六个成员，真源（engines/action-desk.js:3383）自带 `EXPORT_COUNT = 16` 的自校验，
+  //   十七个成员（v2.408.0 V23 批加了第 17 个导出后引擎自校验已同步为 EXPORT_COUNT=17），
+  //   真源自带 `EXPORT_COUNT = 17` 的自校验，
   //   于是这条测试从此**恒假**——它红的原因不是"API 没装载"，而是"数字过期"。
   //   硬编码计数是错的判据：它把「接口面扩大」误报成「接口坏了」，而真正想守的是
   //   「本测试要用到的成员都在、且是可调用/可读的类型」。故改为逐项点名。
@@ -115,7 +116,7 @@ async function runAll(a, ov) {
   a(missFns.length === 0 && missArr.length === 0,
     'API loaded' + (missFns.concat(missArr).length ? '（缺/类型错：' + missFns.concat(missArr).join(',') + '）' : ''));
   // 枚举面必须与引擎自校验口径一致，防止「加了成员忘了改 EXPORT_COUNT」或反之。
-  a(Object.keys(W.actionDesk).length === 16, 'enumerable export count matches engine EXPORT_COUNT=16');
+  a(Object.keys(W.actionDesk).length === 17, 'enumerable export count matches engine EXPORT_COUNT=17');
   a(W.actionDesk.getSettings().enabled === true, 'settings roundtrip');
   a(!W.actionDesk.board({}).ok, 'missing person refused');
   a(W.actionDesk.board({ person: '不存在' }).reason === 'unknown-person', 'unknown person refused (no person created)');

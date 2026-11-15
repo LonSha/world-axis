@@ -25,6 +25,7 @@
   };
 
   const __REG = {
+    module: 'worldSingularity',
     key: 'worldSingularity',
     name: '世界奇点与纪元跃迁 (EXV23-9)',
     desc: '宏观文明张力时钟、大结局奇点收敛与纪元跃迁重塑引擎',
@@ -34,6 +35,7 @@
       singularityThreshold: { type: 'number', default: 80 }
     }
   };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   let STATE = null;
 

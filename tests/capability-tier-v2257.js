@@ -107,13 +107,21 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //     B4b 38 → 39（74 − 35 已开）；B5c 41 → 44（34 白名单 + 10 出厂）；
 //     C3c 69 → 70（109 机制 vs 208 开关）；C7 64 → 65（99 − 34）；
 //     D2b 63 → 64（74 − 10）；B6b/C3/C4d/C6 改读常量，不再写第二份数字。
-const BASE_ON = 39;         // 本测试面：出厂就开着的带 enabled 引擎数
-const MECH = 109;           // 有注入面的机制数
-const DORMANT = 99;         // 关着但有注入面的
+// v2.410.0（V23 收口 · 基线跟位）：V23 批（6a2379d）9 个拓展引擎进场后五个基线常量按恒等式跟位：
+//     · BASE_ON   39 → 48：EXV23 九引擎（commodity-circulation / somatic-trauma / psyche-dissociation /
+//       mob-stampede / geophysical-reshaping / artifice-degradation / shadow-council /
+//       dynastic-lineage / world-singularity）出厂全开且都无注入面（+9）
+//     · MECH     109 → 115：另有 6 个有 buildBlock（有注入面）的机制进场（+6）
+//     · DORMANT   99 → 105：那 6 个出厂是关的（115 − 10 = 105，恒等式成立）
+//     · RUNNING0  10 不变：9 个新出厂开的全无注入面，不进这一桶
+//     · FULL_MECH 74 → 80：= MECH − 35（L3_EXCLUDES 悬空名单未变，115 − 35 = 80）
+const BASE_ON = 48;         // 本测试面：出厂就开着的带 enabled 引擎数
+const MECH = 115;           // 有注入面的机制数
+const DORMANT = 105;        // 关着但有注入面的
 const RUNNING0 = 10;        // 出厂开 且 有注入面的
 // full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
 // v2.294.0：= MECH(103) − L3_EXCLUDES(35)。排除名单本身未变，变的只有 MECH。
-const FULL_MECH = 74; // OPV7-8 下调排除 35 个悬空机制后为 65 → v2.294.0 随 MECH 到 68 → v2.381.0 随 MECH 到 74
+const FULL_MECH = 80; // OPV7-8 下调排除 35 个悬空机制后为 65 → v2.294.0 随 MECH 到 68 → v2.381.0 到 74 → v2.410.0 随 MECH 到 80
 const FULL_RUNNING = FULL_MECH + (BASE_ON - RUNNING0);
 
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
@@ -265,7 +273,7 @@ function runB(a) {
   // B4 full：本次新开 38 个（70 个 full 机制 − 其中已开 32 个）
   const r3 = T.applyTier('full');
   a(r3.ok === true, 'B4: 切 full 成功');
-  a(r3.turnedOn.length === 39, 'B4b: full 本次新开 39 个（74 − 35 已开，实 ' + r3.turnedOn.length + '）');
+  a(r3.turnedOn.length === 45, 'B4b: full 本次新开 45 个（80 − 35 已开，实 ' + r3.turnedOn.length + '）');
   const vf = T.view();
   a(vf.running === FULL_MECH, 'B4c: full 后 ' + FULL_MECH + ' 个机制在跑（OPV7-8 下调排除 35 悬空，实 ' + vf.running + '）');
   a(vf.dormant === 35, 'B4d: full 后休眠机制为 35 个（OPV7-8 排除的悬空机制，实 ' + vf.dormant + '）');
@@ -273,7 +281,7 @@ function runB(a) {
   const r4 = T.rollback();
   a(r4.ok === true, 'B5: 回滚成功');
   a(r4.tier === 'standard', 'B5b: 回滚回到 standard（实 ' + r4.tier + '）');
-  a(T.view().running === 44, 'B5c: 回到 standard 的 44 个（34 白名单 + 10 出厂，实 ' + T.view().running + '）');
+  a(T.view().running === 44, 'B5c: 回到 standard 的 44 个（34 白名单 + 10 出厂带注入面的，实 ' + T.view().running + '）—— 新增 9 引擎无注入面，不进本计数');
   // B6 **本版最要紧的一条**：full → lite 后出厂机制一个不少（初版缺陷在此）
   const r5 = T.applyTier('lite');
   a(r5.ok === true, 'B6: 切回 lite 成功');
@@ -334,7 +342,7 @@ function runC(a) {
   // C3 出厂态：defaultOff 95 / userOff 0 / noBuilder 66（与探针逐字同数）
   a(au.byReason.defaultOff === DORMANT, 'C3: 出厂关（有注入面）' + DORMANT + ' 个（实 ' + au.byReason.defaultOff + '）');
   a(au.byReason.userOff === 0, 'C3b: 出厂态玩家关掉 0 个（干净盘上没有表态）');
-  a(au.byReason.noBuilder === 70, 'C3c: 没有注入面 70 个（实 ' + au.byReason.noBuilder + '，109 机制 vs 208 开关）');
+  a(au.byReason.noBuilder === 80, 'C3c: 没有注入面 80 个（实 ' + au.byReason.noBuilder + '，115 机制 vs 218 开关）');
   // C4 玩家手动关掉一个默认开的 ⇒ 归因变 user-off（不是 default-off）
   const onRow = au.runningRows.filter(function (r) { return r.hasBuild; })[0];
   a(!!onRow, 'C4: 找一个出厂开着的世界机制做样本（' + (onRow ? onRow.ns : '无') + '）');
@@ -360,7 +368,7 @@ function runC(a) {
   // C7 档位与归因交叉：applyTier('standard') 后 defaultOff 应降到 61
   T.applyTier('standard');
   const a4 = A.audit();
-  a(a4.byReason.defaultOff === 65, 'C7: standard 后出厂关剩 65 个（99−34，实 ' + a4.byReason.defaultOff + '）—— 两个模块读的是同一个现场');
+  a(a4.byReason.defaultOff === 71, 'C7: standard 后出厂关剩 71 个（105−34，实 ' + a4.byReason.defaultOff + '）—— 两个模块读的是同一个现场');
 }
 
 // ═══ D 面：边界与不变量 ═════════════════════════════════════════════
@@ -393,7 +401,7 @@ function runD(a) {
   a(T2.view().granted.length === 0, 'D2: 出厂 granted 为空（出厂机制不进 granted，实 ' + T2.view().granted.length + '）');
   T2.applyTier('full');
   const g = T2.view().granted;
-  a(g.length === 64, 'D2b: full 后 granted 恰好是本次真开的 64 个（实 ' + g.length + '，不含出厂 10 个，OPV7-8 下调后）');
+  a(g.length === 70, 'D2b: full 后 granted 恰好是本次真开的 70 个（实 ' + g.length + '，不含出厂 16 个，OPV7-8 下调后）');
   a(g.indexOf('livingWorld') < 0, 'D2c: 出厂就开着的 livingWorld 不在 granted 里 —— 它不该被档位收回');
   // D3 回滚栈只装启用面（不装世界键、不装引擎设置副本）
   const cfg = T2.getSettings();

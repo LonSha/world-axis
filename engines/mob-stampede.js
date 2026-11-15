@@ -26,6 +26,7 @@
   };
 
   const __REG = {
+    module: 'mobStampede',
     key: 'mobStampede',
     name: '群体狂乱与暴民踩踏 (EXV23-4)',
     desc: '谣言裂变、从众恐慌临界与城市暴乱踩踏毁伤动力学',
@@ -36,6 +37,7 @@
       stampedeCasualtyFactor: { type: 'number', default: 0.15 }
     }
   };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   let STATE = null;
 

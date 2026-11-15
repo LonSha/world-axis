@@ -25,6 +25,7 @@
   };
 
   const __REG = {
+    module: 'geophysicalReshaping',
     key: 'geophysicalReshaping',
     name: '地质重塑与道路熔断 (EXV23-5)',
     desc: '水文侵蚀、山体滑坡与道路拓扑物理熔断重塑引擎',
@@ -34,6 +35,7 @@
       ruptureThreshold: { type: 'number', default: 65 }
     }
   };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   let STATE = null;
 

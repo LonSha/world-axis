@@ -7110,3 +7110,18 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 
 
 
+
+## R250（v2.410.0 · 全量回归 98 红逐簇修绿）
+
+- **背景**：KycAUi 全量回归终态 25334 通过 / 98 失败（`stopping: timeout`——尾段被时间预算揄断，连带假红如 v8-seed-volume-2294 现工作树复跑即绿，不逐条追）。98 红逐簇定性（全部走干净 HEAD /tmp/wa-clean-o8 e9390b9 复跑程序区分预存/新引入），分四类处置：真产品缺陷修产品、判据输入面变窄换面、基线漂移跟位、前提翻转重靶。
+- **真产品缺陷（修产品，不是改锁）**：
+  1. **13 模块设置口从未接线**：9 个 EXV23 引擎 + summarizerAdapter/chatRecycle/director/branchContinuity/factContinuity 的 `__REG` 定义齐全但漏了 `WA.__settingsRegs` concat 接线行（9 个还缺 `module` 字段），设置键从未进总线、面板永远渲染不出。补线后 O8 38/0。踩坑记录：接线行必须插在 `__REG` 对象字面量 `};` 之后，插进字面量内部即语法错误（脚本踩过、立即纠正）。
+  2. **first-run 四态判定链缺口**：v2.403.0 给 health-preflight 加推演面时丢了 `nums.blocked > 0` 判定（预算挤掉内容被误报 thin）且 unknown 分支赋值 2 处（违反 A5 封闭集）。恢复判定链（simErr 并入 unknown 入参面收单分支），锁锚点同批跟位。修后 92/0。
+  3. **driver-ledger 幻影 def（本批最大收获）**：`buildGraph` 的 defs 正则对全文扫描，tool-diag.js:4106（v2.409.0 加的登记注释）里的示例文本 `WA.worldReader = {` 被当成真定义；director.js 真调 worldReader.snapshot ⇒ 幻影 def 可达 ⇒ tool-diag.js 几百条诊断转发调用全被当成引擎互调边扩散：L2e 5→66、L3a 6→0、L3b 33→28，floorSnapshot 被洗进 L2e（via=worldReader.bindings）。修法：`codeTextOf()` 行级注释剥离（行注释/块注释延续行/块注释内整行不进扫描文本，行尾注释保留）后再扫 defs/calls/entry 三面。修后现场读数 L2e=54、L3a=10（floorSnapshot 回档）、L3b=30；v7-driver-ledger-2275 102/0、v8-driver-l3-2294 33/0。
+- **判据输入面变窄（换面不改断言，沿 overview-fold-v2254 先例·同族第十+一笔）**：UI 接线锁 9 文件（day-route-ui-v2266/relation-temp-ui-v2267/undercurrent-calendar-ui-v2268/round-cost-ui-v2269/save-health-ui-v2270/capability-ui-v2257/three-gates-v2259/v7-intel-network-2287/vis-default-v2260）读 `ui/panel.js` 单文件的锚点在 OPV22-4/OPV23-1 拆段后命中 0 次——rd/readPanel 改走 `panel-source.js` 重组面（与拆段前逐字相等），断言一条不改；srcOverride 负控在内存副本上注入重组面破坏版，运行期 pages 模块在 panel.js 之后装载、转发惰性读，负控语义不变。修后 81/29/35/48/64/61/76/20/81 全绿。
+- **判据精度修复（锚定收紧，语义不放宽）**：N3/N4 的 `indexOf('stamp')` 裸子串锚被 mobStampede 的 `stampedeIncidents` 误中——改 `"stamp"` JSON 键形态定界。修后 80/0、127/0。
+- **基线跟位（只动登记值不动判据形态）**：capability-tier-v2257 五常量 + 六条连带判据跟位 EXV23 九引擎进场（BASE_ON=48/MECH=115/DORMANT=105/FULL_MECH=80 等），修后 89/0；ui-binding-coverage.js SKELETON_IDS 补 EXEMPT_H 五员（wa-search-bar/wa-overview-absent/wa-tools-absent），修后 6/0；exp10-action-desk-v2232 EXPORT_COUNT 16→17（引擎自校验已同步），修后 36/0。
+- **前提翻转重靶（现场读数复算后换靶，判据语义不变）**：v7-driver-ledger-2275 N6 「计数不许是截断长度」的靶标自 v2.294.0 起钉在 L3a（当时 L3b 真实归零）；幻影 def 修复后 L3a=1/L3b=3，前提「真实 L3a>2」结构性消失，改用样本充足的 L3b（3>2），破坏锚 blindCount 的 slice(0,10)→slice(0,2) 与 lim 对齐。
+- **O8/U4 消费者账本**：28 条 none 档新登记（cascade 2 + 设置口 16 + stats/track 7 + version 3，shape 用 CT.shapeOf 现场复算值、C6 要求真注册过）+ 240 条旧登记 reviewAfter 统一刷 2.416.0（=2.410.0+窗口 6）+ ledger version 2.410.0。修后 O8 38/0、U4 30 pass。
+- **门禁复验**：settings-bus-api-gate / member-surface-gate / capability-ui 61/0 / three-gates 76/0 / v7-intel 20 pass 全绿；引擎改动后无 require 装载面残留红。
+- **未做（如实登记）**：全量回归待本批 commit 后起（收口门槛，最终裁决面）；BUILD_ID 待首笔提交后随惯例补。下一批（R251）候选：角色空间/左右映射/人体纠正约束面缝入（素材已评审：左右镜像反转 + 内侧相邻 + 单一锚点三条判据，取可判定层缝成注入块；NPC 调度/时间推进类世界书与既有 clock/entry-router 分工重叠，不缝，防第二真源）。

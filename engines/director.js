@@ -60,6 +60,7 @@
   const DEF = { enabled: false, maxItems: 6, minGap: 1, includeBlocked: true,
     cooldownRounds: 2, landWindow: true, forcedOverdue: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'director' };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const __stat = { agendas: 0, blocks: 0, lastPicked: 0, lastSuppressed: 0, lastAt: 0, faults: {} };
 
   function settings() {

@@ -188,12 +188,52 @@
    *   【命名空间归属由源码自己声明】`WA.xxx = {` 就是它定义了 xxx ——
    *   不用文件名反推（实测反推有错配：perspective 反推不到任何文件）。
    */
+  /**
+   * v2.410.0（真缺陷修复）：互调图扫描前先剔掉注释行。
+   *
+   *   【为什么需要（现场立据）】v2.409.0 在 engines/tool-diag.js 的模块登记表注释里
+   *   写了示例文本 `WA.worldReader = {`（「ns 名取自该文件」那句），defs 正则对全文
+   *   扫描把它当成了「tool-diag.js 定义了 worldReader」的**幻影 def**；随后
+   *   engines/director.js 真调 `WA.worldReader.snapshot(...)` ⇒ 幻影 def 可达 ⇒
+   *   tool-diag.js 里几百条「诊断转发调用」（`WA.floorSnapshot.bindings()` 等读口）
+   *   全被当成引擎互调边扩散出去。实测读数漂移：L2e 5→66、L3a 6→0、L3b 33→28，
+   *   floorSnapshot 被洗进 L2e（via=worldReader.bindings）——「只被诊断面读」的
+   *   引擎整档归零，正是 v8-driver-l3-2294 P3 所挡的「洗白」形态。
+   *
+   *   【剔法】行级剔除：整行以 `//`、`/*`、`*`（块注释延续行）开头、或已处于块注释
+   *   内的行不进扫描文本；行内代码后的行尾注释不动（那半截是代码，本就该扫）。
+   *   图扫描只认 `WA.x = {` / `WA.x.y(` 形态，不需要注释内容；换行连接保留，
+   *   不影响任何行号语义。
+   */
+  function codeTextOf(src) {
+    const lines = String(src).split('\n');
+    const out = [];
+    let inBlock = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (inBlock) {
+        if (line.indexOf('*/') >= 0) inBlock = false;   // 块注释在本行收口
+        continue;                                       // 块注释内的行整行不扫
+      }
+      const t = line.trim();
+      if (t.indexOf('//') === 0 || t.indexOf('*') === 0) continue;   // 行注释 / 块注释延续行
+      if (t.indexOf('/*') === 0) {
+        // 同行收口的单行块注释（/** ... */）整行跳过；跨行的进入块注释态
+        if (t.indexOf('*/') === -1) inBlock = true;
+        continue;
+      }
+      out.push(line);
+    }
+    return out.join('\n');
+  }
+
   function buildGraph(byNs, src, rel) {
+    const text = codeTextOf(src);   // v2.410.0：先剔注释再扫（幻影 def 防线）
     const g = __graph || (__graph = { files: {} });
     const f = g.files[rel] || (g.files[rel] = { defs: [], calls: [] });
     const dRe = /WA\.([A-Za-z_$][\w$]*)\s*=\s*\{/g;
     let m;
-    while ((m = dRe.exec(src)) !== null) {
+    while ((m = dRe.exec(text)) !== null) {
       if (f.defs.indexOf(m[1]) < 0) f.defs.push(m[1]);
     }
     // 【v2.294.0（V8 OPV8-4）宿主钩子入口】SillyTavern 直接调用的边界函数不挂在 WA 上：
@@ -201,12 +241,12 @@
     //   它不是引擎、没有 buildBlock、也不进盘点表，但它发出的调用边是**外部真在驱动**。
     //   只认这一种形状（window.<name> = function），不认 `WA.x.y = function`：
     //   后者是模块内部挂成员，扩散本来就是靠它的 defs 走的。
-    if (/window\.[A-Za-z_$][\w$]*\s*=\s*(async\s+)?function/.test(src)) f.entry = true;
+    if (/window\.[A-Za-z_$][\w$]*\s*=\s*(async\s+)?function/.test(text)) f.entry = true;
     const cRe = /WA\.([A-Za-z_$][\w$]*)\s*\.\s*([A-Za-z_$][\w$]*)\s*\(/g;
-    while ((m = cRe.exec(src)) !== null) f.calls.push([m[1], m[2]]);
-    if (rel === 'engines/round-drivers.js' && src.indexOf('eng[d.method]') >= 0) {
+    while ((m = cRe.exec(text)) !== null) f.calls.push([m[1], m[2]]);
+    if (rel === 'engines/round-drivers.js' && text.indexOf('eng[d.method]') >= 0) {
       const re = /\{ engine: '([^']+)', method: '([^']+)' \}/g;
-      while ((m = re.exec(src)) !== null) f.calls.push([m[1], m[2]]);
+      while ((m = re.exec(text)) !== null) f.calls.push([m[1], m[2]]);
     }
     return f;
   }

@@ -26,6 +26,7 @@
   };
 
   const __REG = {
+    module: 'somaticTrauma',
     key: 'somaticTrauma',
     name: '具身创伤与知觉剥夺 (EXV23-2)',
     desc: '解剖部位分层创伤、出血代谢与感官知觉盲区模型',
@@ -36,6 +37,7 @@
       bloodLossFaintThreshold: { type: 'number', default: 60 }
     }
   };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   const ZONES = ['head', 'torso', 'mainHand', 'offHand', 'legs'];
   const SEVERITIES = ['minor', 'laceration', 'fracture', 'arterialBleed', 'severed'];

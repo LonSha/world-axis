@@ -12,6 +12,10 @@ Reuse store.transact for synchronous owner operations. A store-owned helper pass
 
 Broadcast uses dispatchEvent with internal three-level reentry tracking, accurate delivery/error reports and finally cleanup. Health reports subscription coverage, not a fictional all-engine wiring guarantee. Product auto-causality remains a separate unfinished stage.
 
+## Decision
+
+Adopt the store-owned transaction helper (single authority for draft + detached reads) over outer-transact wrapping, per-module wrappers, or whole-module snapshot/restore. ActionDesk admits only audited synchronous V23 routes to atomic batches; unsupported routes are refused before any action, never silently broadened. Broadcast goes through dispatchEvent with internal reentry tracking; health reports subscription coverage only.
+
 ## Scope and gate
 
 Local fixes to cascade-bus, store ownership, the nine V23 modules, ActionDesk, evict capacity registry and the existing V23 scenario lock. No dependency, unrelated engine or version changes. Budget: 900 changed lines for this cross-owner stage, split by state boundary. Baseline 46ce63d; broadcast witness fails at constant health, atomic witness fails at tension 5 rather than 0. Verify detached reads, failed batch byte equality, candidate read-your-writes, source mutation, capacity rejection, existing cascade locks and smoke. Roll back a stage if existing owner semantics regress; never silently broaden atomic support to unaudited routes.
@@ -19,6 +23,10 @@ Local fixes to cascade-bus, store ownership, the nine V23 modules, ActionDesk, e
 ## Alternatives considered
 
 An outer transact around existing routes is smaller, but cannot roll back closure state or external writes. Snapshotting every module and restoring afterward preserves APIs, but creates another state authority, misses inaccessible internals and cannot undo effects. Per-module transaction wrappers follow existing human-realism practice but duplicate draft and result plumbing nine times; the shared store helper keeps transaction ownership with the existing store.
+
+## Consequences
+
+All migrated owner writes enter the store draft and roll back together on failure; denied operations leave no residue. Reads and returned results are detached snapshots, so callers cannot mutate live state through them. Capacity registries now cover nested growing maps and arrays: exceeding a write capacity rejects the candidate instead of evicting active obligations. Persistence can still fail after memory apply under the existing store contract — that gap is inherited, not widened. The stage does not complete all 18 V23 items; product auto-causality remains unfinished.
 
 ## Acceptance criteria
 

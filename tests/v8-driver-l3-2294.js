@@ -203,7 +203,7 @@ function runNegative(assertFn) {
 
   // ── N1 破坏「宿主入口播种」⇒ 五台轮边界引擎退回 L3（回到修复前的假阴性） ──
   {
-    const bad = must1(src, "if (/window\\.[A-Za-z_$][\\w$]*\\s*=\\s*(async\\s+)?function/.test(src)) f.entry = true;",
+    const bad = must1(src, "if (/window\\.[A-Za-z_$][\\w$]*\\s*=\\s*(async\\s+)?function/.test(text)) f.entry = true;",
       'if (false) f.entry = true;');
     const W = setPrefetch(load({ [ENG_REL]: bad }));
     const v = W.driverLedger.view();
