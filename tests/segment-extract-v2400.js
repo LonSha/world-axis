@@ -71,7 +71,7 @@ const SEG_TITLE = 'engines/tool-diag v0.9.2';
 //     B1 守的是「拆段前后 section 总数不变」—— 段体本轮完全未拆动，新增的是另一件事
 //     （新专锁的挂载点）。故补基线，不动判据口径。
 //     读数：node -e 裸计数 446，本题去注释口径 444（差值 2 = 本注释里提到的两处 `section(`）。
-const BASE_SECTION_CC = 444;  // 拆前 run.js 的 section( 计数（去注释面）
+const BASE_SECTION_CC = 446;  // v2.410.0 +2（extractJson 专锁节 + memory-age 专锁节）；拆前 run.js 的 section( 计数（去注释面）
 const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面）
 // 测试文件面的绝对基线。它**刻意不是**「动态算出来再跟自己比」——那会变成自证空转。
 //   但它是「会长的集合」：每新增一把锁，这个数就必须跟着改一次。本轮 V22 已改三次：
@@ -109,7 +109,9 @@ const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面
 //     —— 跨参照物缝合批专锁，且已按同一纪律登记进 tests/run.js 的 v2.409.0 节（runScript）。
 //     同批新增的 tools/run-observer.js **不计入**本面：tools/ 不在 product-files.testFiles()
 //     的扫描面内（SKIP_DIRS 含 'tools'）。故「新增观测器」不改本常量，只有 tests/ 下的新锁才改。
-const BASE_TEST_FILES = 559;
+//   v2.410.0：559 → 561（+2）。增量：tests/extract-json-ladder-v2410.js（JSON 修复阶梯专锁）
+//     与 tests/memory-age-v2410.js（记忆条目相对时效标注专锁），均已登记进 tests/run.js 的 v2.410.0 节。
+const BASE_TEST_FILES = 561;
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
 function exists(rel) { return fs.existsSync(path.join(BASE, rel)); }

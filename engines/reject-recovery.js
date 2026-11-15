@@ -453,6 +453,9 @@
     //   调 plan() 本身返回 ok:true，被点名的文件也还没被删。故 out:true 而非给档 ——
     //   给它配恢复动作等于教玩家去「修」一件本就没坏的事（与 after-reply / compact 同一条边界）。
     'earliest-unlocked': { out: true, why: '回收清单里被选中项的排序依据（最早移入且未锁定），plan 本身返回 ok:true，不是一次拒收' },
+    // ── v2.410.0：elapsed-evidence 的证据定位两态（与 NEUTRAL_FACE 同批，键集逐字同）。
+    'no-evidence': { out: true, why: '时间证据定位读数的「没给证据」态（elapsed-evidence:213，对象只报 found:false），不是调用被拒' },
+    'not-in-text': { out: true, why: '时间证据定位读数的「证据不在正文」内部态（elapsed-evidence:165，出口拼成 evidence-not-in-text 面世），不是调用被拒' },
   };
 /* 拒收面冻结快照（v2.203.0 现场实测 740 条）：至少在 `ok:false` 对象里出现过 ——
    *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。
@@ -1061,6 +1064,13 @@
     //   （那是 victims 数组的一行，不是调用返回体）⇒ 现场面判不出，按契约逐条登记。
     //   键集必须与 NEUTRAL_REVIEW 逐字相同（A7 咬这一条），故下方登记表同批补入。
     'earliest-unlocked',
+    // ── v2.410.0：engines/elapsed-evidence.js 的证据定位两态（现场对账漏同步，本版补齐）──
+    //   `no-evidence`（:213 autoMinutes 出口，模型没给 timeEvidence）/ `not-in-text`（:165
+    //   locate() 内部定位码，出口拼成 evidence-not-in-text 再面世）—— 两条都出现在
+    //   **不带 ok 的定位读数对象**里（`{ found:false, clause:'', reason:'…' }`），
+    //   语义是「证据找不到」这一事实记录，不是调用被拒 ⇒ 判不出面（与 cascade_bus_tick 同规）。
+    //   这两条在 v2.409.0 跨参照物批带出后未同步进快照（clean HEAD 复跑同红，非本版引入）。
+    'no-evidence', 'not-in-text',
   ];
   /** 三快照查表 → 面。未命中即 `unknown`（**判不出就是判不出**，不拿规则表兜）。 */
   function frozenFace(c) {

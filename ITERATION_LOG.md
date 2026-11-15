@@ -7082,5 +7082,27 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 
 - **BUILD_ID** → `99274cbccab1f5e16506c7f94b07cdc712b168e8`（首笔 `v2.406.0: 世界脉搏统一卡完整排版——卡片壳/徽章体系/quiet态修正（R247）`，25 文件 +356/−151）。q1 复验通过。
 
+## R248（v2.410.0 · JSON 修复阶梯：TavernOS HUD 机制缝入）
+
+- **病灶**：`core/api-router.js` `extractJson` 旧版只有两试（原样 parse / 裸控制字符整段换空格），模型输出轻微畸形（单引号、裸键、截断、缺逗号）即整条 `json:true` 链路（12 文件）降级失败。
+- **上游**：TavernOS HUD（`alewwi/HUD`，**AGPL-3.0**，NOTICE 要求保留声明署名）。读其 `hud-parser.js` 修复函数族后定形：**机制重写、零逐字代码**——候选阶梯思想缝入，全部实现为独立 O(n) 单趟扫描（HUD 自己记录过 O(n²) 旧路教训）。
+- **产品面（core/api-router.js extractJson，签名不变 → 契约串/死导出账本零波动）**：字符串态感知扫描（stringMap）打底；修复① 字符串内裸控制字符→合法转义（保真，不换空格）；② 未闭合字符串收口（尾随反斜杠先转义自身）；③ 截断收尾（删尾孤 `"key":`/尾逗号、按栈补 `}`/`]`，栈交叉判失败不硬凑）；④ 方言（单引号串含 `\'` 回落裸撇号 / 裸键加引号，裸键限长 256 防回溯）；⑤ 缺逗号补齐（开口引号也参与判定——专锁 A6a 实测逮住的盲区）。9 条候选惰性求值、破坏性递增；第 1/第 9 候选逐字等价旧版两试 ⇒ **只多不少**。
+- **专锁 tests/extract-json-ladder-v2410.js 28/0**：A 面 9 组正控（旧语义不变 / 五修复 / 组合 / 确定性边界 / 锚点唯一）；B 面 srcOverride 内存破坏两向（破坏阶梯 ⇒ 新能力全翻假、旧语义仍在 ⇒ 只多不少可证伪、原版恢复成绿）。修口径教训（登记）：截断样本不能含中途闭合 `}`（会被旧版预截断提前救回，两向口径写进注释）；测试输入里的 `\n` 曾写成字面反斜杠（B1c 逮住）。
+- **attribution（docs/attribution.md）**：表 #19 新增 TavernOS HUD（状态 `已读许可`——LICENSE/NOTICE 已读，衍生范围留人工裁决）；**修三处口径**：正文「行数=17（13 上游）」→ 19 行/14 上游，与 README「14 个」对齐；形态声明精确化（保留 alewwi 署名）。注意 `Copyright`/`GNU` 现以引用形式出现在 attribution.md 文档面（非产品源码）——原自述「全库零命中」的核对面是产品源码，口径未破。
+- **顺手修绿（clean HEAD 复跑同红，非本批引入）**：`engines/reject-recovery.js` 判不出面补 `no-evidence`/`not-in-text` 两态（v2.409.0 跨参照物批漏同步），reject-recovery 对账恢复逐条一致；`tests/segment-extract-v2400.js` 基线跟位（测试文件面 559→560、section 守恒 444→445）。
+- **版本面**：VERSION/manifest → 2.410.0；严格钉版 `__wantPin293`；白名单 widen（14 文件 31 站点：alt + arr，注意 tx3~tx9 数组为**双引号**形态，单/双引号两种都要补）；version-surface-gate 14/14；三账本 --update（version=2.410.0）；evidence-index --write；q9 67/0；dead-export ✓；module-registry 455 文件 pass；cross-ref 105/0。
+- **快档**：`tools/smoke.js` **14/0 全绿**。v2.409.0 收口提交（e9390b9）之后启动的旧源全量回归（xb7d9n）实测死于 worker OOM（3GB 堆，EXP-7 节 72 分钟处 SIGABRT）——与收口无关，下一趟全量收口时给外壳显式带 `--max-old-space-size=4096`。
+- **未做（如实登记）**：全量回归未跑（收口门槛，须等本批 commit 后统一跑）；HUD 的 `memory-age.js`（记忆条目相对时效标注）在本批内继续并入（R249）；BUILD_ID 待首笔提交后随惯例补。
+
+## R249（v2.410.0 · 记忆条目相对时效标注：TavernOS HUD memory-age 机制缝入）
+
+- **病灶**：记忆块条目无时效，模型把半年前的旧事叫「昨天」（HUD 头注所谓「昨日诅咒」）。
+- **上游**：同 R248，TavernOS HUD `memory-age.js`（AGPL-3.0，署名 alewwi）。机制重写、零逐字代码：HUD 条目无时间戳，靠「首见日志 + 词根模糊匹配」从历史楼层重建日期；**本仓条目自带决策时间戳**（`clockNow('memory')` 写入的 `t`/`at`），差值直取即可，无需重造日志面——上游方案的两个复杂度大头（首见日志持久化、词根相似匹配）在本仓不适用、整体不缝。
+- **产品面（engines/memory.js `buildMemoryBlock`，模块内闭包，零新增导出 → 契约串/死导出零波动）**：分级措辞「今天/昨天/N 天前（<14）/N 周前（<60）/N 个月前（<365）/一年前/N 年前」；四段全覆盖（l3 主题 `t` / facts `at` / l1 回顾 `t` / 发展中伏笔 `at`）；措辞只进注入块（模型快照），不写存档、不回改条目。基准时间走 `now('memory.age')` 而非 `wallNow()`——被比较的 `t`/`at` 全是决策时间，冻结回放下 wallNow 会让差值永远失真；**诚实边界**沿 agency/freight「毫秒在冻结下给出相等读数」裁决口径：差值非有限或为负（未来时间戳）不标注、缺时间戳字段不标注，不猜。pmem 的 `time` 是模型给的**绝对故事时间文本**（提取规则明令禁止相对时间），非时间戳、无法算差值——不覆盖，如实留账。
+- **专锁 tests/memory-age-v2410.js 20/0**：A 面正控（0/1/5/20/100/400/900 天全档位 + 四段全覆盖 + 条目原文不回写 + 负差/缺字段不标注 + 锚点唯一）；B 面 srcOverride 破坏 `ageTag` 返回 ⇒ 标注全消失、分段渲染照旧（附加元数据口径）、原版恢复成绿。
+- **挂载与登记**：tests/run.js v2.410.0 节新增专锁节；segment-extract 基线跟位（测试文件面 560→561、section 守恒 445→446）；attribution 表 #19 补第二机制面与两把专锁路径；三账本 --update/--write（version=2.410.0）；version-surface 14/14、dead-export ✓、module-registry pass、export-contract 零波动、cross-ref 105/0、reject-recovery-lock 201 pass。
+- **门禁跟位与顺手清账**：q9 B10g 曾 14>12 假红——其 R 段解析正则只认 v2.400.0 前的旧标题格式 `### Rn · 日期 · vX`（225 条），R239 起的 `## Rn（vX · …）` 新格式（8 条）全被并进最后旧段，本批两把专锁的提及被错误归属；修法是**解析面跟上日志格式演进**（两种标题都开段、判据语义不变），非塞阈值。q1 N6 清掉三个历史遗留 `tests/*.bak`（gitignore 已列、非 git 跟踪、16:09 升版脚本备份，非本批产物）。修后 q9 67/0、q1 64/0、smoke 14/0。
+- **未做（如实登记）**：全量回归未跑（与 R248 同批，收口门槛）；BUILD_ID 待首笔提交后随惯例补。
+
 
 

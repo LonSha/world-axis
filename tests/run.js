@@ -22579,6 +22579,21 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runScript('./cross-ref-stitch-v2409.js');
   }
+  // ── v2.410.0：JSON 修复阶梯专锁（HUD 机制缝合）────────────────────────────
+  //   core/api-router.js extractJson 的候选阶梯（控制字符保真 / 截断收尾 / 方言 / 缺逗号），
+  //   出处声明在 api-router.js 头注与 docs/attribution.md（TavernOS HUD，AGPL-3.0）。
+  section('v2.410.0: extractJson 修复阶梯专锁（正/负控两向）');
+  {
+    await runScript('./extract-json-ladder-v2410.js');
+  }
+  // ── v2.410.0（HUD 机制第二批）：记忆条目相对时效标注 ──────────────────────
+  //   engines/memory.js buildMemoryBlock 的分级时效措辞（治「昨日诅咒」），出处
+  //   TavernOS HUD memory-age.js（AGPL-3.0），机制重写落地：本仓条目自带决策时间戳，
+  //   差值直取、无需 HUD 的首见日志面；措辞只进注入块、不回写存档。
+  section('v2.410.0: 记忆条目相对时效标注专锁（正/负控两向）');
+  {
+    await runScript('./memory-age-v2410.js');
+  }
   // ── v2.300.0（V11 OPV11-6）：多写者字段写权声明 ──────────────────────────
   //   5 个字段（worldFacts/people/evolution/customLax/economy）的写者清单与冲突登记。
   //   核心判据是「声明 vs 现场静态扫描」双向对账 —— 不做对账，声明表只是文档。
@@ -22807,7 +22822,9 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     const __verPin293 = (fs.readFileSync(path.join(BASE, 'index.js'), 'utf8')
       .match(/const VERSION = '([\d.]+)'/) || [])[1];
-    const __wantPin293 = '2.409.0';
+    //   ⚠ 锚点断言须改文：本段原钉「入口 VERSION === 2.409.0」，v2.410.0 升版后锚点随版；
+  //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
+  const __wantPin293 = '2.410.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

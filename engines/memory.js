@@ -218,16 +218,46 @@ const memory = WA.memory = {
 
     /** 供注入的记忆块（L3主题+L1回顾+facts+发展中伏笔） */
     buildMemoryBlock() {
+      // v2.410.0: 记忆条目相对时效标注（缝合自 TavernOS HUD memory-age.js 机制，重写落地）。
+      //   出处：TavernOS HUD © 2026 alewwi, https://github.com/alewwi/HUD （AGPL-3.0）。
+      //   HUD 治「昨日诅咒」：记忆条目没有日期，模型把半年前的旧事叫「昨天」。
+      //   HUD 靠「首见日志 + 词根模糊匹配」从历史楼层重建条目日期，因为它的条目无时间戳；
+      //   本仓条目自带决策时间戳（clockNow('memory') 写入的 t/at），差值直取即可，无需重造日志面。
+      //   措辞只进注入块（模型快照），不写存档、不回改条目。
+      //   冻结时钟口径（沿 agency/freight「毫秒在冻结下会给出相等读数」裁决的诚实边界）：
+      //     差值非有限或为负 ⇒ 不标注（不猜）；基准时间走 now() 而非 wallNow()——
+      //     被比较的 t/at 全是决策时间，冻结回放下 wallNow 会让「昨天」永远算不出。
+      const DAY_MS = 864e5;
+      const ageWord = function (days) {
+        if (!Number.isFinite(days) || days < 0) return '';
+        if (days === 0) return '今天';
+        if (days === 1) return '昨天';
+        if (days < 14) return days + ' 天前';
+        if (days < 60) return Math.round(days / 7) + ' 周前';
+        if (days < 365) return Math.round(days / 30) + ' 个月前';
+        const y = Math.round(days / 365);
+        return y === 1 ? '一年前' : y + ' 年前';
+      };
+      const ageTag = function (ts, nowMs) {
+        const d = (Number(nowMs) - Number(ts)) / DAY_MS;
+        if (!Number.isFinite(d) || d < 0) return '';
+        const w = ageWord(Math.round(d));
+        return w ? '[' + w + ']' : '';
+      };
+      const nowMs = clockNow('memory.age');
       const s = WA.store.get();
       const parts = [];
       const l3 = (s.memory.l3 || []).slice(-1)[0];
-      if (l3) parts.push('【长线主题】' + l3.theme + (l3.worldShift ? ' / ' + l3.worldShift : ''));
+      if (l3) {
+        const a3 = ageTag(l3.t, nowMs);
+        parts.push('【长线主题】' + (a3 ? a3 + ' ' : '') + l3.theme + (l3.worldShift ? ' / ' + l3.worldShift : ''));
+      }
       const fs = (s.memory.facts || []).filter(f => f.active).slice(-10);
-      if (fs.length) parts.push('【长期事实】' + fs.map(f => f.key + '=' + f.value).join('；'));
+      if (fs.length) parts.push('【长期事实】' + fs.map(f => { const a = ageTag(f.at, nowMs); return (a ? a + ' ' : '') + f.key + '=' + f.value; }).join('；'));
       const l1 = (s.memory.l1 || []).slice(-3);
-      if (l1.length) parts.push('【阶段回顾】' + l1.map(x => x.s).join(' / '));
+      if (l1.length) parts.push('【阶段回顾】' + l1.map(x => { const a = ageTag(x.t, nowMs); return (a ? a + ' ' : '') + x.s; }).join(' / '));
       const fsw = (s.memory.foreshadows || []).filter(f => f.status === 'developing');
-      if (fsw.length) parts.push('【发展中的伏笔】' + fsw.map(f => f.content).join('；'));
+      if (fsw.length) parts.push('【发展中的伏笔】' + fsw.map(f => { const a = ageTag(f.at, nowMs); return (a ? a + ' ' : '') + f.content; }).join('；'));
       if (!parts.length) return '';
       return '<world_axis_memory>\n' + parts.join('\n') + '\n</world_axis_memory>';
     }

@@ -193,7 +193,14 @@
     },
     resetCallStats() { callLedger.clear(); },
 
-    // 确定性JSON提取：去尾逗号、转义裸控制字符；截断不猜测补全
+    // 确定性JSON修复阶梯（v2.410.0，机制重写）：
+    //   出处声明——「候选阶梯 + 分阶段确定性修复」的机制思想缝合自 TavernOS HUD
+    //   （github.com/alewwi/HUD，AGPL-3.0）hud-parser.js 的 JSON 修复函数族；
+    //   本实现为独立重写：函数名、结构与表达式均未复制上游逐字代码，
+    //   许可与出处登记见 docs/attribution.md。纪律沿本仓旧约：只做确定性修复、
+    //   不猜测补全语义；全部修复为 O(n) 单趟扫描（HUD 记录过按冒号扫全尾 O(n²) 旧路的教训）。
+    //   语义变化面：旧版两试全部保留（阶梯第 1 候选与第 9 候选逐字等价旧版两试），
+    //   新增候选只会「多救回」原本解析失败的输入，不会改变原本成功输入的返回值。
     extractJson(text) {
       if (!text) return null;
       let s = String(text).trim();
@@ -207,9 +214,179 @@
       const last = Math.max(lastObj, lastArr);
       if (last > 0) s = s.slice(0, last + 1);
       s = s.replace(/,\s*([}\]])/g, '$1'); // 尾逗号
-      try { return JSON.parse(s); } catch (e) {}
-      // 裸控制字符转义后重试
-      try { return JSON.parse(s.replace(/[\u0000-\u001F]+/g, ' ')); } catch (e) { return null; }
+
+      // 字符串态感知扫描：标出每个位置是否处于 "…" 字面量内、扫描到 EOF 时字符串是否仍开着
+      const stringMap = function (src) {
+        const inStr = new Array(src.length);
+        let inString = false, esc = false;
+        for (let i = 0; i < src.length; i++) {
+          const code = src.charCodeAt(i);
+          if (inString) {
+            inStr[i] = true;
+            if (esc) esc = false;
+            else if (code === 0x5C) esc = true;       // 反斜杠
+            else if (code === 0x22) inString = false; // 引号
+          } else {
+            inStr[i] = false;
+            if (code === 0x22) { inString = true; inStr[i] = true; }
+          }
+        }
+        return { inStr: inStr, open: inString, escTail: esc };
+      };
+      // 修复①：字符串字面量内的裸控制字符转义为合法转义序列（比旧版「整段换空格」更保真）
+      const repairCtrl = function (src) {
+        const m = stringMap(src);
+        let out = '', changed = false;
+        for (let i = 0; i < src.length; i++) {
+          const code = src.charCodeAt(i);
+          if (code < 0x20 && m.inStr[i]) {
+            changed = true;
+            const c = src[i];
+            out += c === '\n' ? '\\n' : c === '\r' ? '\\r' : c === '\t' ? '\\t'
+              : c === '\b' ? '\\b' : c === '\f' ? '\\f'
+              : '\\u' + code.toString(16).padStart(4, '0');
+          } else out += src[i];
+        }
+        return changed ? out : null;
+      };
+      // 修复②：真开着的未闭合字符串补一个收尾引号（尾随反斜杠先转义自身，否则会吃掉新引号）
+      const repairUnterminated = function (src) {
+        const m = stringMap(src);
+        if (!m.open) return null;
+        return (m.escTail ? src + '\\' : src) + '"';
+      };
+      // 修复③：截断收尾——删尾孤 "key": 与尾逗号、按栈补齐 }/]（两遍；栈交叉判失败不硬凑）
+      const repairTruncated = function (src) {
+        let t = src;
+        for (let pass = 0; pass < 2; pass++) {
+          t = t.replace(/,\s*$/, '');
+          t = t.replace(/"[^"\n]*"\s*:\s*$/, '');
+          const m = stringMap(t);
+          if (m.open) t = (m.escTail ? t + '\\' : t) + '"';
+        }
+        const m = stringMap(t);
+        if (m.open) return null;
+        const st = [];
+        for (let i = 0; i < t.length; i++) {
+          if (m.inStr[i]) continue;
+          const c = t[i];
+          if (c === '{') st.push('}');
+          else if (c === '[') st.push(']');
+          else if (c === '}' || c === ']') {
+            if (!st.length || st[st.length - 1] !== c) return null;
+            st.pop();
+          }
+        }
+        while (st.length) t += st.pop();
+        return t === src ? null : t;
+      };
+      // 修复④：常见 JSON 方言——单引号串转双引号、无引号裸键加引号（单趟，字面量态外；
+      //   裸键匹配限长 256 防超长无键文本上的正则回溯开销）
+      const repairDialect = function (src) {
+        let out = '', i = 0, changed = false;
+        const n = src.length;
+        while (i < n) {
+          const c = src[i];
+          if (c === '"') {
+            let j = i + 1;
+            while (j < n) {
+              if (src[j] === '\\') j += 2;
+              else if (src[j] === '"') { j++; break; }
+              else j++;
+            }
+            out += src.slice(i, Math.min(j, n)); i = Math.min(j, n);
+          } else if (c === "'") {
+            changed = true;
+            let j = i + 1, buf = '';
+            while (j < n) {
+              if (src[j] === '\\' && j + 1 < n) {
+                const nx = src[j + 1];
+                buf += nx === "'" ? "'" : (nx === '"' ? '\\"' : '\\' + nx);
+                j += 2;
+              } else if (src[j] === "'") { j++; break; }
+              else { buf += src[j] === '"' ? '\\"' : src[j]; j++; }
+            }
+            out += '"' + buf + '"'; i = j;
+          } else if (c === '{' || c === ',') {
+            out += c; i++;
+            let k = i;
+            while (k < n && (src[k] === ' ' || src[k] === '\t' || src[k] === '\n' || src[k] === '\r')) k++;
+            const km = /^[A-Za-z_$][A-Za-z0-9_$-]*\s*:/.exec(src.slice(k, k + 256));
+            if (km) {
+              changed = true;
+              out += src.slice(i, k) + '"' + km[0].slice(0, km[0].length - 1).replace(/\s+$/, '') + '":';
+              i = k + km[0].length;
+            }
+          } else { out += c; i++; }
+        }
+        return changed ? out : null;
+      };
+      // 修复⑤：缺逗号——值结尾（} ] " 数字 true/false/null 尾）后紧跟值开头（{ [ " 裸词）处补 ,
+      //   （键位后面跟着冒号不算值结尾：闭口引号预读下一字符区分键/值；开口引号视为
+      //   新值起点参与补逗号判定——v2.410.0 专锁 A6a 实测逮住的盲区）
+      const repairMissingComma = function (src) {
+        const m = stringMap(src);
+        const isWS = function (c) { return c === ' ' || c === '\t' || c === '\n' || c === '\r'; };
+        const valEnd = function (c) {
+          return c === '}' || c === ']' || c === '"' || (c >= '0' && c <= '9') || c === 'e' || c === 'l';
+        };
+        const valStart = function (c) { return c === '{' || c === '[' || c === '"' || /[A-Za-z0-9_$-]/.test(c); };
+        let out = '', lastSig = '', changed = false;
+        const commaIfNeeded = function (nextC) {
+          if (lastSig && lastSig !== ':' && lastSig !== '{' && lastSig !== '[' && lastSig !== ','
+            && valEnd(lastSig) && valStart(nextC)) { out += ','; changed = true; }
+        };
+        for (let i = 0; i < src.length; i++) {
+          const c = src[i];
+          if (m.inStr[i]) {
+            const isOpen = i === 0 || !m.inStr[i - 1];
+            if (c === '"' && isOpen) {
+              commaIfNeeded(c);                       // 开口引号 = 新值/新键的开始，先补逗号
+              out += c;
+              let k = i + 1;
+              while (k < src.length) {
+                if (src[k] === '\\') { k += 2; continue; }
+                if (src[k] === '"') break;
+                k++;
+              }
+              if (k < src.length) {
+                out += src.slice(i + 1, k + 1);
+                i = k;
+                let q = i + 1;                        // 闭口引号：后随冒号是键，否则是值
+                while (q < src.length && isWS(src[q])) q++;
+                lastSig = src[q] === ':' ? ':' : '"';
+              }
+              continue;
+            }
+            out += c;
+            continue;
+          }
+          if (isWS(c)) { out += c; continue; }
+          commaIfNeeded(c);
+          out += c; lastSig = c;
+        }
+        return changed ? out : null;
+      };
+
+      // 候选阶梯：惰性求值、破坏性递增；parse 成功即返回（对象/数组均可，本仓消费方有数组顶层面）
+      const ladder = [
+        function () { return s; },                                                     // 原样（= 旧版第一试）
+        function () { return repairCtrl(s) || s; },                                     // 字符串内控制字符转义
+        function () { return repairMissingComma(repairCtrl(s) || s); },                 // + 缺逗号补齐
+        function () { return repairDialect(repairCtrl(s) || s); },                      // + 方言（单引号/裸键）
+        function () { return repairUnterminated(repairCtrl(s) || s); },                 // + 未闭合字符串收口
+        function () { return repairTruncated(repairCtrl(s) || s); },                    // + 截断收尾（栈补闭合）
+        function () { const a = repairDialect(repairCtrl(s) || s); return a ? repairTruncated(a) : null; },
+        function () { const a = repairMissingComma(repairCtrl(s) || s); return a ? repairTruncated(a) : null; },
+        function () { return s.replace(/[\u0000-\u001F]+/g, ' '); }                     // 旧版第二试保底（逐字保留）
+      ];
+      for (let li = 0; li < ladder.length; li++) {
+        let cand;
+        try { cand = ladder[li](); } catch (e) { cand = null; }
+        if (typeof cand !== 'string' || !cand) continue;
+        try { return JSON.parse(cand); } catch (e) {}
+      }
+      return null;
     },
 
     async fetchModels(channel) {

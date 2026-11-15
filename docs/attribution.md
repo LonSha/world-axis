@@ -57,9 +57,13 @@ README 末行那句「各源项目机制参考已获原作者授权（非商业�
 | 16 | `DlSNlGHT/World`（memory-timeline） | 来源身份 / FNV 双哈希 / 引用审计 | 已声明 | `未核对` | 同 #2 |
 | 17 | `DlSNlGHT/World`（entity memory） | 四类实体记忆库 / 别名索引 / 防重复创建 | 已声明 | `未核对` | 同 #2 |
 | 18 | `Julian-adv/OpenMMO`（`stall`） | 摊主离摊照卖 / 挂量锁货 / 整数分币抽税 / 走远就地收摊（leash 与 6m 距离在本仓简化为 location 相等） | 已声明（`engines/stall.js` 头注逐条标出 `stall.rs` / `offline.rs` / `buy_orders.rs` 的对应） | `未核对` | 读其 LICENSE（该仓为 Rust 服务端，判是否要求保留声明） |
+| 19 | `TavernOS HUD`（`alewwi/HUD`） | 模型近似 JSON 的**确定性修复阶梯**（候选逐级尝试 / 字符串态感知 / 截断按栈收口 / 常见方言单引号与裸键 / 缺逗号补齐；O(n) 单趟，不猜测补全语义）＋记忆条目的**相对时效标注**（治「昨日诅咒」；分级措辞「今天/昨天/N 天前/N 周前/N 个月前/N 年前」，只进注入块不回写存档——本仓条目自带决策时间戳，差值直取，无需上游的首见日志与词根模糊匹配） | 已声明（`core/api-router.js` `extractJson` 头注 + `engines/memory.js` `buildMemoryBlock` 头注 + 专锁 `tests/extract-json-ladder-v2410.js` / `tests/memory-age-v2410.js`） | `已读许可`（上游 `LICENSE` = **GNU AGPL-3.0**，`NOTICE.md` 要求保留声明并署名 alewwi；本仓以**机制重写**落地、零逐字代码，义务档位仍待人对 AGPL 衍生范围做最终判断） | 人为裁决 AGPL 衍生范围；若判为衍生作品，按 AGPL-3.0 §13 提供对应源码路径 |
 
-**行数 = 17**（13 个上游，其中 `DlSNlGHT/World` 贡献 5 个附加机制面，逐面单列 ——
+**行数 = 19**（14 个上游：`DlSNlGHT/World` 贡献 5 个附加机制面逐面单列、
+`TavernOS HUD` 于 v2.410.0 新增一行 ——
 「能不能只引用它的一部分」与「引用整个仓库」在读数上是两件事，故不合并）。
+> v2.410.0 修口径：此前正文写「行数 = 17（13 个上游）」而表格实际 18 行、README 写「14 个」，
+> 三处互不一致且 `tools/attribution-gate.js` 已退役无人守 —— 本版把正文对齐表格实况（19 行 / 14 上游）。
 
 ## 缝合的**形态**（这一条决定义务轻重，故逐字写明）
 
@@ -68,6 +72,11 @@ README 末行那句「各源项目机制参考已获原作者授权（非商业�
 - 全部产品源码（`core/ engines/ ui/ actors/ direction/ render/ compat/ index.js`）里
   **没有任何一处上游的逐字代码**、**没有任何上游的版权头**（现场核：全库 `Copyright` /
   `MIT License` / `GNU` / `Affero` 零命中）。
+  - v2.410.0 精确化：`TavernOS HUD`（AGPL-3.0）一行的落地形态同为**机制重写**——
+    `core/api-router.js` 的修复阶梯为独立实现（函数名 / 结构 / 表达式均未复制上游），
+    但「修复阶梯」这一**机制思想**缝合自 HUD，且其 `NOTICE.md` 明确要求保留声明并署名
+    —— 故除源码内出处声明外，在本页单独登记（表 #19）并**保留其 NOTICE 署名要求**：
+    TavernOS HUD, Copyright (C) 2026 alewwi, https://github.com/alewwi/HUD （AGPL-3.0）。
 - 上游名只出现在**注释里的出处声明**（例：`engines/rules.js` 头注「缝合来源：DlSNlGHT World
   —— world-engine-rules-loader.js（忠实压缩，保留全部硬约束）」）。
 - 因此本仓对上游的义务**大概率**落在「保留出处声明」这一档；但**这只是推断，不是核对**

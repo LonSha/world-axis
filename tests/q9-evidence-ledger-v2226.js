@@ -238,8 +238,12 @@ function runB(a) {
   a(anchorAsVer.length === 0, 'B10f: fileAnchor 原样保留、不再反解成 version(实 '
     + anchorAsVer.length + ' 条相等)');
   // 与第三方(ITERATION_LOG 的 R 条目段)交叉:标题自述版**在**该文件被提及的版本集里
+  //   v2.410.0: 日志标题自 R239 起改用「## Rn（vX · 标题）」格式（v2.400.0 前 225 条仍为
+  //   「### Rn · 日期 · vX」）。旧正则只认前者 ⇒ 新条目（含 v2.410.0 两把专锁的提及）全被
+  //   并进最后一个 ### 段，B10g 以 14>12 假红。两种标题格式**都**开段，段界仍取「下一个
+  //   任一格式标题」——判据语义不变，只是解析面跟上日志的真实格式演进。
   const logSrc = RD('ITERATION_LOG.md');
-  const segRe = /^### R\d+ · \d{4}-\d{2}-\d{2} · v(\d+\.\d+\.\d+)/gm;
+  const segRe = /^(?:### R\d+ · \d{4}-\d{2}-\d{2} · v|## R\d+（v)(\d+\.\d+\.\d+)/gm;
   const segs = [];
   let mm2;
   while ((mm2 = segRe.exec(logSrc)) !== null) segs.push({ pos: mm2.index, ver: mm2[1] });

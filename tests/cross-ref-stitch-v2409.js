@@ -336,8 +336,8 @@ function runAll(assertFn) {
   ['elapsedEvidence', 'sourceReconcile', 'planRoster'].forEach(function (ns, i) {
     a(td.indexOf("'" + ns + "'") >= 0, 'T5-' + (i + 4) + ' tool-diag 守卫登记 ' + ns);
   });
-  a(src('index.js').indexOf("const VERSION = '2.409.0'") >= 0, 'T5-7 版本面已升 2.409.0');
-  a(JSON.parse(src('manifest.json')).version === '2.409.0', 'T5-8 manifest 同源 2.409.0');
+  a(src('index.js').indexOf("const VERSION = '2.410.0'") >= 0, 'T5-7 版本面已升 2.410.0');
+  a(JSON.parse(src('manifest.json')).version === '2.410.0', 'T5-8 manifest 同源 2.410.0');
 
   // O6 门禁 N5 负控制：本批**不得**改 prune-sections.js / run.js 的裁剪相关段
   a(src('tools/prune-sections.js').indexOf('labelUnits') < 0,
