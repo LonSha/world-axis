@@ -8,7 +8,12 @@
 > **进度**：9 引擎已创建并接线四件套完成（装载 / LOAD / MODULE_EXPORTS / action-desk 26 条路由）；
 > 周年判据语义修复（ceil→floor）已复验；场景 68 专锁 `tests/scenario-v68-v24-civil-life.js` 149 项全绿；
 > 概览页 `v24CivilBlock` 已挂载且拆段锁 127 项全绿；export-contract 已重冻结（ns=438/members=2849）；
-> sync-hardcoded 已真写跟位。**双计划全部收口前严禁执行全量回归。**
+> sync-hardcoded 已真写跟位。
+>
+> **状态：已收口（2026-11-15）**。v2.416.0 收尾提交 `56f5199`，BUILD_ID 已回填该 hash，
+> version-consistency 28 项、dead-export-gate、场景 68 专锁 149 项、探针 22 项、
+> 概览块冒烟 6 项、拆段锁 127 项、export-contract 冻结复跑，全部通过。
+> **收口纪律已解除：下一趟应执行完整 `node tests/run.js` 全量回归**（留足 30+ 分钟窗口）。
 # WorldAxis 历史入口：V12 超级版本「活世界操作系统」（总体设计，已被 V13～V24 多轮迭代覆盖）
 > **历史快照（2026-11-15 归档）**：V12 是总体设计文档，不是待办清单。V13 之后的每个版本批次
 > 都在 V12 的底盘上真交付了 18 项（最新为 V24），「尚未实施」的反事实表述不再成立。
