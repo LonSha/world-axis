@@ -257,7 +257,7 @@ function probePanelSediment(WA, dom) {
   const el = body.querySelector('#wa-sed-enabled');
   let wrote = null;
   if (el) {
-    el.checked = true;
+    el.checked = !before; // v2.413.0：拨到现场值的反面（出厂 true→拨 false），与出厂值无关地观测写入路径
     if (typeof el.onchange === 'function') el.onchange({ target: el });
     wrote = WA.sediment.getSettings().enabled;
   }
@@ -356,8 +356,11 @@ function judge(a) {
   const ps = probePanelSediment(WX, envX.dom);
   a(ps.present === ps.want && ps.want === 10,
     'v2149: [X1-6] 沉积页十枚控件渲染成树（实 ' + ps.present + '/' + ps.want + '）');
-  a(ps.before === false && ps.wrote === true,
-    'v2149: [X1-6b] 面板总开关真能写进设置层（起点 ' + ps.before + ' → 点后 ' + ps.wrote + '）');
+  // v2.413.0（全开策略跟位）：出厂 enabled:true 后，「删键置假再点开」的构造不再成立——
+  //   改为**从现场值反向拨动**：记 before，勾选框切到 !before，断言 wrote === !before。
+  //   这比原判据更强：写入路径真通时值必然翻转，且与出厂值无关。
+  a(ps.wrote === !ps.before,
+    'v2149: [X1-6b] 面板总开关真能写进设置层（起点 ' + ps.before + ' → 点后 ' + ps.wrote + '，应翻转）');
 }
 
 // ══════════════ 负控制 ══════════════
@@ -426,8 +429,10 @@ function runNegative(a) {
       + bOmni.beforeLen + '→' + bOmni.afterLen + '）');
 
   const bWrite = probeWith(byKey.writeset, probePanelSediment);
-  a(bWrite.before === false && bWrite.wrote !== true,
-    'v2149: [N1h] 导出面把 setSettings 改名 ⇒ 面板总开关点了没反应（起点 ' + bWrite.before + ' → 点后 ' + bWrite.wrote + '）');
+  // v2.413.0（全开策略跟位）：同 X1-6b —— 出厂 true 后「点了没反应」的观测改为「翻转与否」：
+  //   写入路径被破坏 ⇒ 勾选后值不变（wrote === before）⇒ 判据挂在翻转缺失上。
+  a(bWrite.wrote === bWrite.before,
+    'v2149: [N1h] 导出面把 setSettings 改名 ⇒ 面板总开关点了没反应（起点 ' + bWrite.before + ' → 点后 ' + bWrite.wrote + '，未翻转即写入路径已断）');
 
   // N2 原版两向自证
   const cViews = probeClean(probeViews);
@@ -446,8 +451,8 @@ function runNegative(a) {
   a(cPanel.before >= 1 && cPanel.after === 0 && cPanel.restored >= 1,
     'v2149: [N2e] 原版源码上面板视角切换端到端全绿');
   const cSed = probeClean(probePanelSediment);
-  a(cSed.present === 10 && cSed.wrote === true,
-    'v2149: [N2f] 原版源码上沉积页十控件与总开关写入全绿');
+  a(cSed.present === 10 && cSed.wrote === !cSed.before,
+    'v2149: [N2f] 原版源码上沉积页十控件与总开关写入全绿（起点 ' + cSed.before + ' → 点后 ' + cSed.wrote + '，应翻转）');
 
   // N3 逐锚敏感
   const x1 = probeWith(byKey.viewgate, probeApplyView);

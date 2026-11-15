@@ -567,6 +567,18 @@
   //   字面形态（死子面门禁的引用正则只认这个形态），且模块缺席时返回空串。
   function v23StitchBlock() { return __obBind() ? WA.panelOverviewBlocks.v23StitchBlock() : ''; }
   // <<<OPV22-4 OVERVIEW-BLOCKS END>>>
+  // <<<OPV24-1 WORLD-PULSE BEGIN>>>
+  // ══ OPV24-1（2.413.0）：世界脉搏聚合块 ══
+  //   数据段在 ui/pages/overview-world-pulse.js（自挂 WA.panelWorldPulse），与上面六块同一条契约：
+  //   运行期惰性 bind + 转发，缺模块返回空串（缺席好于假值，不制造停摆点）。
+  //   ⚠ 直写 `WA.panelWorldPulse.<mem>` 字面形态，不经中间变量 —— 死子面门禁的引用正则只认这一种。
+  function __wpBind() {
+    if (!WA.panelWorldPulse) return false;
+    if (typeof WA.panelWorldPulse.bind === 'function') WA.panelWorldPulse.bind({ esc: esc });
+    return true;
+  }
+  function worldPulseBlock() { return __wpBind() ? WA.panelWorldPulse.worldPulseBlock() : ''; }
+  // <<<OPV24-1 WORLD-PULSE END>>>
   // <<<OPV23-1 OVERVIEW-MAIN BEGIN>>>
   // ══ OPV23-1（2.401.0）：概览页主线已抽到 ui/pages/overview-main.js ══
   //   段体（原 563-1155 行，593 行）**逐字未改**，只是搬了文件。
@@ -588,7 +600,8 @@
         lonshaBlock: lonshaBlock,
         heartbeatBlock: heartbeatBlock,
         v22OmensBlock: v22OmensBlock,
-        v23StitchBlock: v23StitchBlock
+        v23StitchBlock: v23StitchBlock,
+        worldPulseBlock: worldPulseBlock
       });
     }
     return true;

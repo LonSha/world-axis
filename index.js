@@ -1445,6 +1445,11 @@
     //   （而 renderOverview 的 try/catch 不会报错，症状是「概览页那几块突然没内容了」）。
     //   本模块零世界写、零落盘、零控件、零 id（只拼 HTML 字符串）。
     'ui/pages/overview-blocks.js',
+    // v2.413.0（OPV24-1）：世界脉搏聚合块。**必须排在 ui/panel.js 之后、overview-main.js 之前**：
+    //   panel.js 的 worldPulseBlock 转发在运行期惰性读 WA.panelWorldPulse，overview-main 的段体
+    //   经 bind 注入消费它。先装/后装都成立（首次渲染前 bind 到即可），但排这里最稳。
+    //   零世界写、零落盘、零控件、零 id（只拼 HTML 字符串）。
+    'ui/pages/overview-world-pulse.js',
     // v2.401.0（OPV23-1~3）：三段拆分 —— 概览主线 / 工具页 / 四大盘。**必须排在 ui/panel.js 之后**：
     //   panel.js 的转发函数在运行期惰性读 WA.panelOverviewMain / WA.panelToolsPage /
     //   WA.uiDashboards，先装会让首次渲染读到 undefined（缺席降级行）。零世界写、零落盘。

@@ -34,6 +34,8 @@
   let v22OmensBlock = function () { return ''; };
   // v2.402.0（V23 缝合线）：三缝只读读数块。与上面七块同一条契约 —— 模块缺席时返回空串，绝不在这里兜底造读数。
   let v23StitchBlock = function () { return ''; };
+  // v2.413.0（OPV24-1）：世界脉搏聚合块转发。同一条契约：缺席返回空串。
+  let worldPulseBlock = function () { return ''; };
   /**
    * 注入外部符号。**幂等**；返回 API 本身，便于链式调用。
    *   只接受函数形态的注入 —— 传进来一个非函数就等于没接上，此处不静默兜住。
@@ -49,6 +51,7 @@
     if (typeof ctx.heartbeatBlock === 'function') heartbeatBlock = ctx.heartbeatBlock;
     if (typeof ctx.v22OmensBlock === 'function') v22OmensBlock = ctx.v22OmensBlock;
     if (typeof ctx.v23StitchBlock === 'function') v23StitchBlock = ctx.v23StitchBlock;
+    if (typeof ctx.worldPulseBlock === 'function') worldPulseBlock = ctx.worldPulseBlock;
     return API;
   }
   // ══ 段体开始（原 ui/panel.js 563-1155 行，逐字搬迁，一个字符未改）══
@@ -660,6 +663,7 @@
       ${v19FoldBlock}
       ${v20HolomapBlock}
       ${v21CivEcoBlock}
+      ${worldPulseBlock()}
       <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
         <summary style="cursor:pointer;opacity:0.75;font-size:12px;">🛠️ 引擎自检与底层读数</summary>
         <div style="padding-top:6px;">
