@@ -2314,9 +2314,9 @@
       } catch (e) {
         clone = Object.assign({}, live || {});
       }
-      clone.__forkId = branchId || ('fork_' + Math.random().toString(36).slice(2, 9));
+      clone.__forkId = branchId || (WA.rand ? WA.rand.id('fork_', 7, 'id') : 'fork_0000000');
       clone.__isShadowFork = true;
-      clone.__forkedAt = Date.now();
+      clone.__forkedAt = clockNow('store.fork');
       return {
         ok: true,
         forkId: clone.__forkId,
@@ -2356,14 +2356,14 @@
         existing.active = false;
       }
 
-      const token = 'lease_' + Math.random().toString(36).slice(2, 9);
+      const token = WA.rand ? WA.rand.id('lease_', 7, 'id') : 'lease_0000000';
       window.__WA_RESOURCE_LEASES[uri] = {
         token: token,
         resourceUri: uri,
         amount: amount,
         priority: prio,
         active: true,
-        at: Date.now()
+        at: clockNow('store.lease')
       };
       return { ok: true, leaseToken: token, resourceUri: uri, amount: amount, priority: prio };
     },

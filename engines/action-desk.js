@@ -3809,7 +3809,7 @@ let ckpt = null;
         }
       });
       if (!tx.ok) return Object.assign(failure || { ok: false, refusal: tx.reason || 'batch-transaction-aborted' }, { rolledBack: true, persisted: false });
-      return { ok: true, count: results.length, results: results, persisted: tx.persisted, deferred: !!tx.deferred, at: Date.now() };
+      return { ok: true, count: results.length, results: results, persisted: tx.persisted, deferred: !!tx.deferred, at: clockNow('action-desk.settle') };
     },
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(patch); },

@@ -497,7 +497,18 @@ function heavyKeysFromChatcache() {
  */
 function probeExemptNarrow(WA) {
   const out = [];
-  const ub = function () { return (WA.store.sizeAudit().unbounded || []); };
+  // v2.409.0 收口：读数必须取**完整扫描**的结论，不能用默认预算的单趟结果。
+  //   默认 sizeAudit() 是 maxNodes=800 的单趟 DFS，触顶即停（truncated=true）——
+  //   全量上下文里前序节留下的巨型容器会耗尽预算，探针容器根本没进 arrays，
+  //   于是「没读到」被误判成「被豁免」（与 probeExemptKeepsArrays 的 topN=12 是同一类混淆）。
+  //   sizeAuditFull 以 800 节点/趟接力直到扫完（maxChunks 64 上限防卡死），
+  //   complete=false（触顶）时如实报错，绝不把「没扫到」当「窄豁免」通过。
+  const ub = function () {
+    const a = WA.store.sizeAuditFull({ maxChunks: 128 });
+    if (!a || a.error) throw new Error('sizeAuditFull 不可用: ' + (a && a.error));
+    if (!a.complete) throw new Error('sizeAuditFull 未扫完（chunks=' + a.chunks + ' stalled=' + a.stalled + '），unbounded 不可当全量结论');
+    return a.unbounded || [];
+  };
   WA.store.transact(function (d) { d.__probeUnbounded2820 = { rows: [{ a: 1 }, { a: 2 }] }; });
   const realCaught = ub().indexOf('__probeUnbounded2820.rows') >= 0;
   WA.store.transact(function (d) { delete d.__probeUnbounded2820; });
@@ -535,7 +546,14 @@ function probeExemptKeepsArrays(WA) {
   return ok ? 'kept' : 'dropped';
 }
 function probeSizeAudit(WA) {
-  const a = WA.store.sizeAudit ? WA.store.sizeAudit() : null;
+  // v2.409.0 收口：与 probeExemptNarrow 同口径——unbounded 结论必须取**完整扫描**。
+  //   默认单趟（maxNodes=800）在全量上下文里触顶截断，「没扫到」会让本判据空洞通过
+  //   （真容量洞也看不见），与「体检通过」和「体检没跑」不可分是同一类病（v2.78.0）。
+  //   触顶（complete=false）时显式失败，绝不把「没扫完」当「clean」通过。
+  if (!WA.store.sizeAuditFull) return 'sizeAuditFull 不在场';
+  const a = WA.store.sizeAuditFull({ maxChunks: 128 });
+  if (a && a.error) return 'sizeAuditFull error: ' + a.error;
+  if (a && !a.complete) return 'sizeAuditFull 未扫完（chunks=' + a.chunks + ' stalled=' + a.stalled + '），clean 不可信';
   const ub = (a && a.unbounded) || [];
   // 失败时把**路径**带出来：只说 'unbounded:1' 无法归因（哪条容器、谁写进去的都不知道）
   return ub.length

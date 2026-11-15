@@ -32,6 +32,11 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  /** v2.409.0: 时钟守卫（既有写法：声明与 fallback 同行共现）。
+   *  旧实现在多处直接裸调 `Date.now()`（id 尾缀 / 票据时刻 / 诊断 lastAt），
+   *  裸调绕过冻结 ⇒ 同一份存档重放两次写下的时间戳必然不同，"可复现"只成立一半。 */
+  function clockNow(site) { try { return WA.clock.now(site || 'reading-bookmark'); } catch (e) { return Date.now(); } }
+
   const LS_KEY = 'worldaxis_reading_bookmark_settings_v1';
   const DEF = { enabled: false, maxCatchupFloors: 12 };
   const __REG = { key: LS_KEY, def: DEF, module: 'readingBookmark' };
@@ -92,7 +97,7 @@
         out = { ok: true, outcome: 'advanced', mark: row };
       } else {
         const row = { branch: fam, idx: anchor.idx, swipe: anchor.swipe || 0, at: anchor.hash || '',
-          lastAnchorKey: atKey, setAt: (WA.clock && WA.clock.now ? WA.clock.now('reading-bookmark') : Date.now()) };
+          lastAnchorKey: atKey, setAt: clockNow('reading-bookmark') };
         draft.reading.marks.push(row);
         if (WA.evict) WA.evict.array(draft.reading.marks, 'reading.marks');
         out = { ok: true, outcome: 'new', mark: row };

@@ -38,8 +38,13 @@ const VICTIM_REL = 'engines/courier-dispatch.js';
 const PROBE_NS = '__negCtlProbeNs2400';
 /** 分类法五类（与账本 _classes 必须逐字一致）。 */
 const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfwitness'];
-/** 零读 ns 的既有基数（v2.380.0 基线读数；变化必须显式改这里并写清原因）。 */
-const BASE_DEAD_NS = 35;
+/** 零读 ns 的既有基数（v2.380.0 基线读数；变化必须显式改这里并写清原因）。
+ *  v2.409.0 跟位：35 → 38。v2.407.0「三缝 + 七主线」新增引擎（director / fact-continuity /
+ *  branch-continuity / summarizer-adapter / reading-bookmark / stage-session / memory-relay 等）
+ *  带来 3 个新的「产品源面零读」ns（stage / summarizerAdapter / readingBookmark 等，
+ *  由 module-cycle-gate 现场 deadNs 实测 38 条），账本 entries 已逐条定性补登；
+ *  与门禁 deadNs 双向一致已由 B 组判据复核。 */
+const BASE_DEAD_NS = 38;
 
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
@@ -128,7 +133,8 @@ function runA(A) {
   //   用 provider 面反查，同一个 ns 不可能有两个 provider 字段）。
   A(new Set(keys).size === keys.length, 'A9 键名无重复');
 
-  A(L.version === '2.400.0', 'A10 账本 version === 2.400.0（实 ' + L.version + '）');
+  // v2.409.0 跟位：账本已随批次升版（entries 35→38），断言跟位到 2.409.0。
+  A(L.version === '2.409.0', 'A10 账本 version === 2.409.0（实 ' + L.version + '）');
 }
 
 // ────────────────────────────── B 运行时一致性 ──────────────────────────────

@@ -44,6 +44,11 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  /** v2.409.0: 时钟守卫（既有写法：声明与 fallback 同行共现）。
+   *  旧实现在多处直接裸调 `Date.now()`（id 尾缀 / 票据时刻 / 诊断 lastAt），
+   *  裸调绕过冻结 ⇒ 同一份存档重放两次写下的时间戳必然不同，"可复现"只成立一半。 */
+  function clockNow(site) { try { return WA.clock.now(site || 'summarizer-adapter'); } catch (e) { return Date.now(); } }
+
   const LS_KEY = 'worldaxis_summarizer_adapter_settings_v1';
   const FORMAT_V = 1;
   const DEF = { enabled: false, maxDigestChars: 1200, maxEntries: 40 };
@@ -59,7 +64,7 @@
   function note(reason) {
     __stat.refused++;
     __stat.lastReason = reason;
-    __stat.lastAt = (WA.clock && WA.clock.now ? WA.clock.now('summarizer-adapter') : Date.now());
+    __stat.lastAt = clockNow('summarizer-adapter');
   }
   // ── ① exportDigest：把本插件的两级摘要导成标准格式（纯只读） ──
   // 只读 store.memory 两张表，不改一个字段。tier：'big'（阶段史）/ 'small'（近期纪要）。
@@ -100,7 +105,7 @@
     const kept = dropped > 0 ? entries.slice(0, lim) : entries;
     const out = {
       v: FORMAT_V,
-      at: (WA.clock && WA.clock.now ? WA.clock.now('summarizer-adapter') : Date.now()),
+      at: clockNow('summarizer-adapter'),
       rounds: typeof o.rounds === 'number' ? o.rounds : 0,
       source: String(o.source || 'WorldAxis'),
       entries: kept
@@ -164,7 +169,7 @@
       return { ok: false, reason: rsn, composed: composed, attached: attached };
     }
     __stat.imported++;
-    __stat.lastAt = (WA.clock && WA.clock.now ? WA.clock.now('summarizer-adapter') : Date.now());
+    __stat.lastAt = clockNow('summarizer-adapter');
     return { ok: true, count: accepted.length, truncated: truncated, composed: composed, attached: attached };
   }
 

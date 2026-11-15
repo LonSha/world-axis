@@ -35,7 +35,17 @@
     catch (e) { return Object.assign({}, DEF); }
   }
   function fault(face, e) { __stat.faults[face] = String(e && e.message || e).slice(0, 120); }
-  function now() { return WA.clock && WA.clock.now ? WA.clock.now('fact-continuity') : Date.now(); }
+  function now() { try { return WA.clock.now('fact-continuity'); } catch (e) { return Date.now(); } }
+
+  /** v2.409.0: 轮次读口——唯一真源 WA.evolution.roundOf（未加载时兜底 evolution.round）。
+   *  diagnose({}) 不传 round 时旧实现读**顶层 state.round**，而骨架里没有该字段
+   *  ⇒ 诊断包 round 恒 0，与 inject-inspector/tool-diag 那两处是同一族幽灵读点
+   *  （v2.39.0 收口时的漏跟，只在全量回归的 v2390 静态口径里现形）。 */
+  function roundOfSafe(state) {
+    try { if (WA.evolution && typeof WA.evolution.roundOf === 'function') return WA.evolution.roundOf(state); } catch (e) {}
+    try { const s2 = state || WA.store.get(); if (s2 && s2.evolution && typeof s2.evolution.round === 'number') return s2.evolution.round; } catch (e) {}
+    return 0;
+  }
 
   // ── A：事实分层（稳定事实 / 当前配置 / 临时状态）────────────────────
   // 只做只读归类与「无事件不漂移」的判据，不改任何字段、不迁移容器。
@@ -170,7 +180,7 @@
     const visible = findings.slice(0, cap);
     const suppressed = findings.slice(cap).map(function (f) { return Object.assign({}, f, { suppressedBecause: 'fact-continuity-capacity-' + cap }); });
     const diag = {
-      ok: true, at: now(), round: typeof o.round === 'number' ? o.round : (typeof s.round === 'number' ? s.round : 0),
+      ok: true, at: now(), round: typeof o.round === 'number' ? o.round : roundOfSafe(s),
       layers: L, info: I, economy: E, signature: signature(s, { layers: L, info: I, economy: E }),
       findings: visible, suppressed: suppressed, total: findings.length, capacity: cap,
       faults: Object.assign({}, __stat.faults),

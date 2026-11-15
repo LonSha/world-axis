@@ -58,10 +58,13 @@
       : Object.assign({}, DEF, raw || {});
   }
 
-  function clockNow() {
-    if (WA.clock && typeof WA.clock.now === 'function') return WA.clock.now();
-    return Date.now();
-  }
+  /** v2.409.0: 时钟守卫（**单行式**，声明与 fallback 同行共现）。
+   *  旧写法是跨四行的 `if (WA.clock && ...) return WA.clock.now(); return Date.now();` ——
+   *  语义对（兜底不裸调），但右侧不在**同一行**，v2.22.0 的静态判据只认「同行有 WA.clock.」
+   *  这一事实（守卫 vs 绕过的区别正在于它），于是 9 个模块的合法兜底全被归到裸调。
+   *  改成本仓既有的单行式（intel/life/coop 等 12 个引擎同款），并补站点名 —— 站点名让
+   *  「冻结之后时间还从哪漏」能定位到具体引擎。 */
+  function clockNow(site) { try { return WA.clock.now(site || 'commodity-circulation'); } catch (e) { return Date.now(); } }
 
   function setStockpile(nodeId, commodity, amount) {
     if (!nodeId || !commodity) return false;
@@ -132,7 +135,7 @@
       return { ok: false, refusal: 'commodity-circulation-disabled' };
     }
     const o = spec || {};
-    const debtId = o.debtId || ('debt_' + Math.random().toString(36).slice(2, 9));
+    const debtId = o.debtId || (WA.rand ? WA.rand.id('debt_', 7, 'id') : 'debt_0000000');
     const issuer = o.issuerId, holder = o.holderId;
     const principal = Number(o.principal) || 0;
     if (!issuer || !holder || principal <= 0) {

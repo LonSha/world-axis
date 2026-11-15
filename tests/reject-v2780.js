@@ -11,6 +11,22 @@
 //   存在但跑不到的码，要么把它变可达，要么明记为不可达并钉住它为何不可达。
 //   不能静默留着——从未被观察过的码，下一次被改成别的意思也没人知道。
 const DEAD = {
+  // v2.409.0（跨参照物缝合批）：`not-in-text` —— **内部定位码，不是产品面出口码**。
+  //   实测（tmp-probe：装载真 LOAD 后直接调 autoMinutes）：
+  //     证据串不在原文里 ⇒ 返回 reason: 'evidence-not-in-text'（不是 not-in-text）；
+  //     证据串为空       ⇒ 返回 reason: 'no-evidence'（也不是 not-in-text）。
+  //   为什么：engines/elapsed-evidence.js:165 的 locate() 返回 not-in-text，但 autoMinutes
+  //   在把它交出去之前做了 `out.reason = 'evidence-' + loc.reason`（同一处把 no-evidence
+  //   拼成 evidence-no-evidence —— 而 no-evidence 能被见证到，是因为它在 :213 还有一条
+  //   **独立的**直接赋值路径，那条不经过 locate()）。
+  //   于是「产品面上 not-in-text 会不会出现」这个问题有确定答案：不会。按本表纪律，
+  //   已证不可达的码**不删、只登记并钉住前提**；若哪天 locate() 的返回被直接透传出去，
+  //   它的 anchor 就会消失，门禁会以 deadLeak 把它叫醒。
+  'not-in-text': {
+    anchor: "return { found: false, clause: '', reason: 'not-in-text' };",
+    why: 'locate() 的内部定位码；autoMinutes 出口把它拼成 evidence-not-in-text，故产品面不可达'
+  },
+
   // v2.119.0（拓展⑧/⑨）备查：`store-absent` 在**产品层**结构不可观测 ——
   //   它由三处 mutate 在「存储面没有 transact」时构造（world.js 的 mutate、causal /
   //   phone-bridge / act / liaison / coop 的同名出口），但**没有任何一个调用方透传这个返回值**：
@@ -8851,6 +8867,37 @@ function runWitness(WA) {
       //   无条件还原（不拿「跑通了」当还原的理由）
       if (CR) { try { CR.reset(); if (keepC) CR.setSettings({ enabled: !!keepC.enabled, limit: keepC.limit, purgeLocked: !!keepC.purgeLocked }); } catch (e) {} }
       if (BK && keepB) { try { BK.setSettings({ autoSimulate: !!keepB.autoSimulate, simulationMode: keepB.simulationMode }); } catch (e) {} }
+    }
+  }
+  // ── v2.409.0（跨参照物缝合批）：engines/elapsed-evidence.js 的准入拒收码 ──────────
+  //   为什么它必须进来：autoMinutes 是「模型声称的时长能不能采信」唯一的硬闸，
+  //   它拒收的路里最容易静默失效的正是「模型压根没给证据原文」——
+  //   若哪天被改成「反正给个默认值」，这个码会在没有任何红灯的情况下消失。
+  //   走**公开 API**（autoMinutes），不碰内部函数：门禁要的是「产品面真能吐出这个码」。
+  //   （同批的 not-in-text 不进见证：它在产品面上被包装成 evidence-not-in-text 后才出现，
+  //    见 tests/reject-v2780.js 的 DEAD 表该条 —— 直接测它测到的是恒不变的空串。）
+  {
+    const EE = WA.elapsedEvidence;
+    const keepE = EE ? EE.settings() : null;
+    try {
+      if (EE) {
+        // 前置：把门槛降到最低，排除 low-confidence 抢先把这次调用拦掉（否则测到的不是本条）。
+        EE.saveSettings({ minConfidence: 0, maxMinutes: 100000 });
+        const SRC = '他说：「三十分钟后回来」。';
+        want('no-evidence', '时间证据：模型声称时长却没有给出证据原文 ⇒ 拒收（不是补默认值）');
+        trip('no-evidence', function () {
+          const r = EE.autoMinutes({ timeConfidence: 1, timeEvidence: '   ', deltaMinutes: 30 }, SRC);
+          return r && r.reason;
+        });
+        // 反证：同一原文、证据串真在原文里时不得再报 no-evidence ——
+        //   否则上面那条测到的只是「恒报」。
+        const good = EE.autoMinutes({ timeConfidence: 1, timeEvidence: '三十分钟后回来', deltaMinutes: 30 }, SRC);
+        if (good && good.reason === 'no-evidence') {
+          throw new Error('见证自检失败：证据非空却仍报 no-evidence（该码变成恒报，见证无意义）');
+        }
+      }
+    } finally {
+      if (EE && keepE) { try { EE.saveSettings({ minConfidence: keepE.minConfidence, maxMinutes: keepE.maxMinutes }); } catch (e) {} }
     }
   }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });

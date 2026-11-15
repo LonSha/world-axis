@@ -40,6 +40,11 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  /** v2.409.0: 时钟守卫（既有写法：声明与 fallback 同行共现）。
+   *  旧实现在多处直接裸调 `Date.now()`（id 尾缀 / 票据时刻 / 诊断 lastAt），
+   *  裸调绕过冻结 ⇒ 同一份存档重放两次写下的时间戳必然不同，"可复现"只成立一半。 */
+  function clockNow(site) { try { return WA.clock.now(site || 'stage-session'); } catch (e) { return Date.now(); } }
+
 
   const LS_KEY = 'worldaxis_stage_session_settings_v1';
   const DEF = {
@@ -98,7 +103,7 @@
     const blocks = num(s.blocks);
     serial += 1;
     const sess = {
-      id: 'ss-' + Date.now().toString(36) + '-' + serial,
+      id: 'ss-' + clockNow('stage-session').toString(36) + '-' + serial,
       stageId: stageId,
       title: title,
       blocks: blocks === null ? 0 : blocks,
@@ -140,10 +145,16 @@
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled', '小剧场会话账本默认关闭');
     const s = spec && typeof spec === 'object' ? spec : {};
-    const policy = str(s.policy, 20).trim();
+    let policy = str(s.policy, 20).trim();
+    // 边界 ③：不默认保存也不默认丢弃。
+    //   v2.409.0：defaultExitPolicy 此前是**声明了却零消费**的死键（D6 死键扫描当场报出）。
+    //   它被定义成 'ask'，本意正是「必须由调用方显式指定」—— 消费点就该在这里：
+    //   缺省时**不猜策略**，而是把登记表里那一档读出来当口径（'ask' ⇒ 仍然拒收）。
+    //   这样键既非死键，语义也没变：默认值不是「问一下」，是「必须问」。
     if (!policy) {
-      // 边界 ③：不默认保存也不默认丢弃。
-      return refuse('missing-policy', 'missing-policy：退出必须显式给 policy（archive / discard / cancel），本模块不替用户选');
+      const ask = str(cfg.defaultExitPolicy, 20).trim();
+      if (ask && ask !== 'ask') policy = ask;
+      else return refuse('missing-policy', 'missing-policy：退出必须显式给 policy（archive / discard / cancel），本模块不替用户选');
     }
     if (['archive', 'discard', 'cancel'].indexOf(policy) < 0) {
       return refuse('unknown-policy', 'unknown-policy：' + policy + ' 不在 archive / discard / cancel 三档内');

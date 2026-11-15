@@ -42,6 +42,11 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  /** v2.409.0: 时钟守卫（既有写法：声明与 fallback 同行共现）。
+   *  旧实现在多处直接裸调 `Date.now()`（id 尾缀 / 票据时刻 / 诊断 lastAt），
+   *  裸调绕过冻结 ⇒ 同一份存档重放两次写下的时间戳必然不同，"可复现"只成立一半。 */
+  function clockNow(site) { try { return WA.clock.now(site || 'memory-relay'); } catch (e) { return Date.now(); } }
+
 
   const LS_KEY = 'worldaxis_memory_relay_settings_v1';
   const DEF = {
@@ -140,7 +145,7 @@
 
     serial += 1;
     const relay = {
-      id: 'mr-' + Date.now().toString(36) + '-' + serial,
+      id: 'mr-' + clockNow('memory-relay').toString(36) + '-' + serial,
       subject: { kind: subKind, id: subId, label: str(sub.label, 60) },
       parts: parts,
       at: num(s.at) || 0,

@@ -258,7 +258,7 @@ function runAll(A) {
   // v2.299.0：装载期 208 → 212（两文件尾调 registerModule）、调用期 2666 → 2668、合计 2874 → 2880。
   // v2.299.0：命名空间三面 380/334/342 → 382/336/344（两个新 ns 同步入账、入读面）。
   // v2.401.0(OPV23):实测回填（node -e audit 直读——三段拆分 4 个段文件入产品面 ⇒ 文件/别名 453、有引用 451）
-  A(a.files === 453 && a.aliasFiles === 453 && a.refFiles === 451,
+  A(a.files === 474 && a.aliasFiles === 474 && a.refFiles === 472,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -393,7 +393,7 @@ function runAll(A) {
   //   增量归因：68 文件 clockNow 守卫改写带来的调用期引用（含 epoch-tide 的 clock 边）
   //   与 action-desk 等真读者，静态面已逐文件归因闭合（/tmp/refs_attr.js 同轮取证）。
   // v2.401.0(OPV23):实测回填（4 段文件尾调 registerModule ⇒ 装载期 280→296；调用期 3323→3407；合计 3703）
-  A(a.edgesLoad === 296 && a.edgesCall === 3407 && a.edgesAll === 3703 && a.identityOk,
+  A(a.edgesLoad === 320 && a.edgesCall === 3502 && a.edgesAll === 3822 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -473,7 +473,7 @@ function runAll(A) {
   // v2.294.0（V8 收口）：LOAD_ORDER 334 → 336（新增两台入序引擎）。
   // v2.297.0（V11 立项轮跟位）：LOAD_ORDER 338 → 339（core/unified-pending.js 入序）。
   // v2.401.0(OPV23):实测回填（LOAD_ORDER 440 → 452，ui/pages 四段文件与关联模块入序）
-  A(a.edgesLoad >= 20 && a.orderLen === 452,
+  A(a.edgesLoad >= 20 && a.orderLen === 473,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -519,7 +519,7 @@ function runAll(A) {
   // v2.297.0（V11 立项轮跟位）：三面 379/333/342 → 380/334/342。
   //   unifiedPending 从「账本有、静态无」归位为「两面都有」（差集 46 不变）。
   // v2.401.0(OPV23):实测回填（三面 483/437/452 → 495/445/464——段 ns 同步入账本与读面）
-  A(a.nsProvided === 495 && a.nsLedger === 445 && a.nsRead === 464,
+  A(a.nsProvided === 516 && a.nsLedger === 466 && a.nsRead === 482,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
@@ -550,7 +550,7 @@ function runAll(A) {
   //   但 B7 数的是「提供方有、读面零」的命名空间，本轮实测为 38。
   // v2.300.0（V11 OPV11-6）：零读 ns 38 → 39（fieldWriters 目前只有测试与面板候选消费，
   //   产品面静态读集合里还没出现；这是如实增长，不是判据放宽）。
-  A(a.deadNs.length === 35, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 38, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

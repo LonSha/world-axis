@@ -254,7 +254,16 @@
       }) : false;
       if (present) add('player');
     }
-    return out;
+    // v2.409.0 收尾：sharedEventCap 此前是**声明了却零消费**的死键（死键扫描当场报出）。
+    //   本意是「一个事件能共享给多少人」的上限 —— 知情面不是越大越好：把人名册全塞进
+    //   knownBy 等于取消了「谁该知道」这条判据（UNMENTIONED ≠ ABSENT 的另一面：
+    //   全体知情也是没有信息量）。消费点在出口处截断，且**保留 player 优先**。
+    const cap = Number(settings().sharedEventCap);
+    const limit = Number.isFinite(cap) && cap >= 0 ? cap : 12;
+    if (out.length <= limit) return out;
+    const kept = out.slice(0, limit);
+    if (kept.indexOf('player') < 0 && out.indexOf('player') >= 0) kept[kept.length - 1] = 'player';
+    return kept;
   }
 
   /** 小活动判定：是否是白名单动作，且可以被当作「做一点、做一会儿」。 */

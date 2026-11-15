@@ -35,7 +35,7 @@
     try { return WA.settingsBus.normalize(__REG, Object.assign({}, DEF, WA.settingsBus.read(__REG) || {})); }
     catch (e) { return Object.assign({}, DEF); }
   }
-  function now() { return WA.clock && WA.clock.now ? WA.clock.now('branch-continuity') : Date.now(); }
+  function now() { try { return WA.clock.now('branch-continuity'); } catch (e) { return Date.now(); } }
 
   // ── 证据分级（AVS uid306 的 WorldAxis 版）────────────────────────────
   // 优先级：explicit > canon > context > designed > entailed > unknown。

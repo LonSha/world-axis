@@ -14,6 +14,11 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  /** v2.409.0: 时钟守卫（既有写法：声明与 fallback 同行共现）。
+   *  旧实现在多处直接裸调 `Date.now()`（id 尾缀 / 票据时刻 / 诊断 lastAt），
+   *  裸调绕过冻结 ⇒ 同一份存档重放两次写下的时间戳必然不同，"可复现"只成立一半。 */
+  function clockNow(site) { try { return WA.clock.now(site || 'world-reader'); } catch (e) { return Date.now(); } }
+
   if (WA.worldReader) return; // 幂等装载
 
   const STAGE_TEXT = {
@@ -138,7 +143,7 @@
     };
 
     return {
-      ok: true, ver: '2.406.0', at: Date.now(),
+      ok: true, ver: '2.406.0', at: clockNow('world-reader'),
       clock: (s.clock && s.clock.label) ? txt(s.clock.label, 60) : '',
       people: people, currents: currents, facts: facts,
       choices: choices, foreshadows: foreshadows,

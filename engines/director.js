@@ -44,6 +44,11 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  /** v2.409.0: 时钟守卫（既有写法：声明与 fallback 同行共现）。
+   *  旧实现在多处直接裸调 `Date.now()`（id 尾缀 / 票据时刻 / 诊断 lastAt），
+   *  裸调绕过冻结 ⇒ 同一份存档重放两次写下的时间戳必然不同，"可复现"只成立一半。 */
+  function clockNow(site) { try { return WA.clock.now(site || 'director'); } catch (e) { return Date.now(); } }
+
   const LS_KEY = 'worldaxis_director_settings_v1';
   // v2.407.0 主线D（GM调度引擎1.98 的 WorldAxis 版）：事件桶/冷却/落地窗口/顺延。
   // 只借「调度纪律」，不搬事件池内容、不做随机抽签、不写任何状态。
@@ -67,6 +72,18 @@
     __stat.faults[face] = String(e && e.message || e).slice(0, 120);
   }
 
+  /** v2.409.0: 轮次读口——唯一真源 WA.evolution.roundOf（未加载时兜底 evolution.round）。
+   *  为什么必须走这里：`agenda({})` 不传 round 时旧实现读**顶层 state.round**，
+   *  而缓存骨架里根本没有该字段（v2.36.0 起真源只有 evolution.round）——
+   *  于是「暗流已过期 / 伏笔该回收」的 urgency 恒按第 0 轮算，全部塌成 overdue。
+   *  这与 v2.39.0 收口的 proactive/chatcache/inject-inspector 是同一族幽灵读点，
+   *  本模块落地时漏跟（只在全量回归的 v2390 静态口径里现形）。 */
+  function roundOfSafe(state) {
+    try { if (WA.evolution && typeof WA.evolution.roundOf === 'function') return WA.evolution.roundOf(state); } catch (e) {}
+    try { const s2 = state || WA.store.get(); if (s2 && s2.evolution && typeof s2.evolution.round === 'number') return s2.evolution.round; } catch (e) {}
+    return 0;
+  }
+
   // ── ① agenda：六面归一成候选条目（纯只读、零模型） ──
   // urgency 四档：overdue（已过期/已该回收）/ due（本刻到期）/ soon（临近）/
   // idle（只是「有事可做」，没有时点压力）。
@@ -74,8 +91,8 @@
     const o = opt || {};
     if (!settings().enabled) return { ok: false, reason: 'disabled' };
     const s = (function () { try { return WA.store.get() || {}; } catch (e) { fault('store', e); return {}; } })();
-    const round = typeof o.round === 'number' ? o.round
-      : (typeof s.round === 'number' ? s.round : 0);
+    // v2.409.0：显式入参优先；缺席时走单一真源，不再读不存在的顶层 s.round。
+    const round = typeof o.round === 'number' ? o.round : roundOfSafe(s);
     const items = [];
     const faces = {};
 
@@ -169,7 +186,7 @@
     } catch (e) { fault('world', e); faces.world = 'error'; }
 
     __stat.agendas++;
-    __stat.lastAt = (WA.clock && WA.clock.now ? WA.clock.now('director') : Date.now());
+    __stat.lastAt = clockNow('director');
     return { ok: true, round: round, items: items, faces: faces, faults: Object.assign({}, __stat.faults) };
   }
 

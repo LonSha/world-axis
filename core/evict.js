@@ -942,7 +942,7 @@
       d.worldFacts = d.worldFacts.filter(function (f) { return f && f.key && !f.__orphan; });
       prunedCount += (initialLen - d.worldFacts.length);
     }
-    return { ok: true, prunedCount: prunedCount, timestamp: Date.now() };
+    return { ok: true, prunedCount: prunedCount, timestamp: now() };
   }
 
   WA.evict = {

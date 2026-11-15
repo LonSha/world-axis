@@ -52,6 +52,11 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  /** v2.409.0: 时钟守卫（既有写法：声明与 fallback 同行共现）。
+   *  旧实现在多处直接裸调 `Date.now()`（id 尾缀 / 票据时刻 / 诊断 lastAt），
+   *  裸调绕过冻结 ⇒ 同一份存档重放两次写下的时间戳必然不同，"可复现"只成立一半。 */
+  function clockNow(site) { try { return WA.clock.now(site || 'source-reconcile'); } catch (e) { return Date.now(); } }
+
 
   const LS_KEY = 'worldaxis_source_reconcile_settings_v1';
   const DEF = { enabled: false, keepRevokedCap: 50, baselineDeltaCap: 5000 };
@@ -97,6 +102,15 @@
   function firstDrift(baseline, current) {
     const b = Array.isArray(baseline) ? baseline : [];
     const c = Array.isArray(current) ? current : [];
+    // v2.409.0 收尾：baselineDeltaCap 此前是**声明了却零消费**的死键（死键扫描当场报出）。
+    //   本意是「基线规模差超过多少就不再逐位比对」—— 逐位比对只在两侧规模接近时才有意义：
+    //   基线 3 位、现状 500 位时，第一个差异位之后的逐位比对全是噪声，且会把
+    //   「整篇换过」误报成「第 0 位被改了」。消费点就该在逐位循环的入口。
+    const cap = Number(settings().baselineDeltaCap);
+    const scale = Number.isFinite(cap) && cap > 0 ? cap : 5000;
+    if (Math.abs(c.length - b.length) > scale) {
+      return { index: 0, kind: 'scale-drift', blocking: true, expected: b.length, actual: c.length };
+    }
     const n = Math.min(b.length, c.length);
     for (let i = 0; i < n; i++) {
       if (b[i].key !== c[i].key) return { index: i, kind: 'switched', blocking: true, expected: b[i].key, actual: c[i].key };
@@ -199,7 +213,7 @@
   /** 开一张票：把「这一刻的世界凭据」压成一个可逐项比对的记录。 */
   function capture(spec) {
     const s = spec || {};
-    const t = { at: Date.now(), epoch: Number.isFinite(Number(s.epoch)) ? Number(s.epoch) : 0 };
+    const t = { at: clockNow('source-reconcile'), epoch: Number.isFinite(Number(s.epoch)) ? Number(s.epoch) : 0 };
     for (const f of TICKET_FIELDS) t[f] = s[f] === undefined ? null : s[f];
     t.sourcesDigest = fnv(JSON.stringify(normalizeSources(s.sources)));
     t.sourcesCount = normalizeSources(s.sources).length;

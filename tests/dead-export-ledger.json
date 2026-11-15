@@ -3682,6 +3682,102 @@
       "tref": 1,
       "own": 3
     },
+    "elapsedEvidence.autoMinutes": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "elapsedEvidence.clauses": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "elapsedEvidence.locate": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "elapsedEvidence.parse": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "elapsedEvidence.parseNum": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "elapsedEvidence.parseTracked": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "elapsedEvidence.resetStats": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "elapsedEvidence.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "elapsedEvidence.settings": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "elapsedEvidence.stats": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "elapsedEvidence.verify": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "elapsedEvidence.verifyTracked": {
+      "reason": "self-only",
+      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/elapsed-evidence.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "engineeringBlueprint.diagnose": {
       "reason": "self-only",
       "detail": "engines/engineering-blueprint.js 内部自用、外部零引用（过度导出）",
@@ -7810,6 +7906,110 @@
       "tref": 0,
       "own": 15
     },
+    "planRoster.admit": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "planRoster.completionEvent": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "planRoster.findLocation": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "planRoster.findNpc": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "planRoster.findRoute": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "planRoster.isNeutral": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "planRoster.knownBy": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "planRoster.memberProblem": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "planRoster.pick": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "planRoster.resetStats": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "planRoster.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "planRoster.settings": {
+      "reason": "self-only",
+      "detail": "engines/plan-roster.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "planRoster.stats": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/plan-roster.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
     "plotGauge.reset": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -9937,6 +10137,126 @@
       "refs": 0,
       "tref": 1,
       "own": 3
+    },
+    "sourceReconcile.capture": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sourceReconcile.current": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
+    },
+    "sourceReconcile.discardReason": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sourceReconcile.firstDrift": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "sourceReconcile.fnv": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "sourceReconcile.normalizeSources": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
+    },
+    "sourceReconcile.reconcile": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sourceReconcile.resetStats": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "sourceReconcile.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "sourceReconcile.settings": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "sourceReconcile.snapshot": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "sourceReconcile.stats": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "sourceReconcile.trackReconcile": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "sourceReconcile.turnReach": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "sourceReconcile.undoFrom": {
+      "reason": "self-only",
+      "detail": "engines/source-reconcile.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/source-reconcile.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
     },
     "spatialConflict.advanceChokepointQueue": {
       "reason": "self-only",
@@ -12074,6 +12394,22 @@
       "tref": 2,
       "own": 3
     },
+    "worldReader.renderHolographicGeoMap": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-reader.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "worldReader.streamCascadeEvents": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-reader.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
     "worldSingularity.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -12326,6 +12662,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 646
+    "dataOnly": 659
   }
 }

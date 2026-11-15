@@ -4099,7 +4099,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.409.0：跨参照物缝合批三个引擎。ns 名取自各文件 `WA.<ns> = {`。
     'engines/elapsed-evidence.js': 'elapsedEvidence',
     'engines/source-reconcile.js': 'sourceReconcile',
-    'engines/plan-roster.js': 'planRoster'
+    'engines/plan-roster.js': 'planRoster',
+    // v2.409.0 收尾：补登 world-reader.js（v2.405.0 R246 引入时漏登记本表）。
+    //   后果与上段同病：secModules 把它报成 missing（「真缺席」），
+    //   export-contract 的 OWNER 不认 worldReader ⇒ 调用点被静默跳过。
+    //   ns 名取自该文件 `WA.worldReader = {`。
+    'engines/world-reader.js': 'worldReader'
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
   // v2.152.0：新增 ui 模块（ui/render-perf.js）同步进本名单 —— 漏登记的后果不是「少一行字」，
@@ -5255,7 +5260,13 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       // v2.405.0：`wa-world-pulse-card` 登 cond 层 —— 世界读数通道缺席或异常时
       //   统一卡静默不渲染（diaryBlock 口径：失败不占屏）。它缺失是依赖态，
       //   不是断裂；渲染了但 id 写错照样被咬到。
-      cond: ['wa-first-block', 'wa-wc-line', 'wa-brief-block', 'wa-intent-block', 'wa-world-pulse-card'] },
+      cond: ['wa-first-block', 'wa-wc-line', 'wa-brief-block', 'wa-intent-block'],
+      // v2.409.0 收尾：`wa-world-pulse-card` 从 cond 迁到 dynamic 层 —— 不是放宽，是**归位**。
+      //   它由 engines/world-reader.js 的 renderCard 产出，而守卫表的静态渲染面采集的是
+      //   ui/*.js（product-files.js 的 uiFiles）——引擎侧渲染的 id 在那一面上**天然看不到**。
+      //   留在 cond 的后果是恒红：cond 档按静态渲染面判在场，而生成点在引擎文件里。
+      //   dynamic 档的判据是「调用点存在」（下面按 "<id>" 在源码里找），正好对上引擎侧生成点。
+      dynamic: ['wa-world-pulse-card'] },
     { page: 'sediment', ids: ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text', 'wa-sed-settle', 'wa-sed-feel', 'wa-sed-block', 'wa-sed-stat',
       // v2.290.0（EXV7-6）：跨地点沉积台账出口。三件齐做（渲染 + 绑定 + 守卫登记）——
       //   理由与 v2.149.0 那批一致：只加按钮不加登记，「渲染了但绑定 id 写错」在本出口上永不可见。
