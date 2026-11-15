@@ -117,7 +117,7 @@
     });
   }
 
-  /** ── 幕后生活段：stagePresence 在场/退场读数 ── */
+  /** ── 幕后生活段：stagePresence 在场/退场读数 + offstageLife 落点名册 ── */
   function stageSect() {
     if (!WA.stagePresence || typeof WA.stagePresence.stat !== 'function') return '';
     return sect(function () {
@@ -127,7 +127,18 @@
       const ticks = st.offstageTicks || 0;
       const reu = st.reunionsAwakened || 0;
       if (!on && !ticks && !reu) return DIM0 + '幕后生活：暂无退场角色在积累生活</div>';
-      return '<div>幕后生活：在场 ' + esc(on) + ' 人，退场推进 ' + esc(ticks) + ' 轮次，重逢唤醒 ' + esc(reu) + ' 次</div>';
+      let out = '<div>幕后生活：在场 ' + esc(on) + ' 人，退场推进 ' + esc(ticks) + ' 轮次，重逢唤醒 ' + esc(reu) + ' 次</div>';
+      // 退场落点名册（OPV25 续）：offstageLife.roster() 只读投影——退场角色正在哪、
+      //   做什么、离场几轮。最久的排前（最该被想起的排最前），超 3 条折叠。
+      try {
+        if (WA.offstageLife && typeof WA.offstageLife.roster === 'function') {
+          const rows = (WA.offstageLife.roster() || []).slice(0, 3);
+          rows.forEach(function (r) {
+            out += sub(r.name + '：' + (r.place || '地点不明') + '，' + (r.doing || '行踪未详') + '（离场 ' + (r.roundsAway || 0) + ' 轮）');
+          });
+        }
+      } catch (e) { /* 名册缺席不打紧，主行已成立 */ }
+      return out;
     });
   }
 

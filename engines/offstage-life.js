@@ -130,6 +130,24 @@
     if (!b || !b.characters) return null;
     return b.characters[w] ? JSON.parse(JSON.stringify(b.characters[w])) : null;
   }
+  /**
+   * 只读名册（v2.414.0 OPV25 续）：全部退场档案的「谁·在哪·在做什么·离场多久」一览。
+   *   getOffstageCard 是单卡点名，面板聚合面（世界脉搏）需要的是整本名册——
+   *   此前只能逐个猜名字去点，等于没有读口。纯读：store.get 快照上的投影，
+   *   零世界写、零事务。按离场轮次降序（最久未登场的排最前——最该被想起的排最前）。
+   */
+  function roster() {
+    if (!WA.store || !WA.store.get) return [];
+    const st = WA.store.get() || {};
+    const b = st.offstageLife;
+    if (!b || !b.characters) return [];
+    return Object.keys(b.characters).map(function (k) {
+      const c = b.characters[k] || {};
+      return { name: c.name || k, place: c.place || '', doing: c.doing || '',
+        roundsAway: c.roundsAway || 0, genre: c.genre || '', role: c.role || '',
+        factStatus: c.factStatus || '' };
+    }).sort(function (x, y) { return (y.roundsAway || 0) - (x.roundsAway || 0); });
+  }
 
   /**
    * 角色退场登记
@@ -387,6 +405,7 @@
     progressOffstage: transactional(progressOffstage),
     reunionSnap: transactional(reunionSnap),
     getOffstageCard: getOffstageCard,
+    roster: roster,
     buildBlock: buildBlock
   };
 
