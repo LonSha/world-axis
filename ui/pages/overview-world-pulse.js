@@ -1,5 +1,5 @@
 /**
- * WorldAxis ui/pages/overview-world-pulse.js (v2.414.0) — 概览页「世界脉搏」聚合块（OPV24-1）
+ * WorldAxis ui/pages/overview-world-pulse.js (v2.415.0) — 概览页「世界脉搏」聚合块（OPV24-1）
  *
  * ── 它治什么 ────────────────────────────────────────────────────
  *   全开策略（v2.412.0）之后，116 个机制全部运转，但玩家在概览页只能看到
@@ -238,7 +238,18 @@
       if (v.dropped) parts.push('丢弃 ' + v.dropped);
       if (v.kept) parts.push('保留 ' + v.kept);
       if (!parts.length) return DIM0 + '本轮注入：暂无裁决读数（世界还没开口）</div>';
-      return '<div>本轮注入：' + esc(parts.join('·')) + '</div>';
+      let out = '<div>本轮注入：' + esc(parts.join('·')) + '</div>';
+      // token 一眼读数（OPV26-O1）：总量 + 共享池余量 + 最大消耗源。rows 是 volumeView
+      //   的逐源对照（panel 预算板已有详表），这里只给「钱花哪了」的一句话答案。
+      try {
+        if (v.tokens) {
+          const top = (v.rows || []).slice().sort(function (a, b) { return (b.tokens || 0) - (a.tokens || 0); })[0];
+          out += sub('共 ' + v.tokens + ' token'
+            + (v.poolRemain != null ? '（池余 ' + v.poolRemain + '）' : '')
+            + (top && top.tokens ? '，大头：' + top.source + ' ' + top.tokens + 't' : ''));
+        }
+      } catch (e) { /* token 读数缺席不打紧，主行已成立 */ }
+      return out;
     });
   }
 
@@ -260,10 +271,10 @@
   const API = {
     worldPulseBlock: worldPulseBlock,
     bind: bind,
-    ver: '2.414.0'
+    ver: '2.415.0'
   };
   WA.panelWorldPulse = API;
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('ui/pages/overview-world-pulse.js', { kind: 'ui', ver: '2.414.0' });
+    WA.registerModule('ui/pages/overview-world-pulse.js', { kind: 'ui', ver: '2.415.0' });
   }
 })();
