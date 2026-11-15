@@ -7125,3 +7125,7 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - **O8/U4 消费者账本**：28 条 none 档新登记（cascade 2 + 设置口 16 + stats/track 7 + version 3，shape 用 CT.shapeOf 现场复算值、C6 要求真注册过）+ 240 条旧登记 reviewAfter 统一刷 2.416.0（=2.410.0+窗口 6）+ ledger version 2.410.0。修后 O8 38/0、U4 30 pass。
 - **门禁复验**：settings-bus-api-gate / member-surface-gate / capability-ui 61/0 / three-gates 76/0 / v7-intel 20 pass 全绿；引擎改动后无 require 装载面残留红。
 - **未做（如实登记）**：全量回归待本批 commit 后起（收口门槛，最终裁决面）；BUILD_ID 待首笔提交后随惯例补。下一批（R251）候选：角色空间/左右映射/人体纠正约束面缝入（素材已评审：左右镜像反转 + 内侧相邻 + 单一锚点三条判据，取可判定层缝成注入块；NPC 调度/时间推进类世界书与既有 clock/entry-router 分工重叠，不缝，防第二真源）。
+
+## R250（v2.410.0 · 收尾读数）
+
+- **BUILD_ID** → `acd16d586342a4d474b613b3ee183fd2cd8a4eca`（首笔 `v2.410.0 收口：全量回归 98 红逐簇修绿——幻影 def 注释剥离（driver-ledger 真缺陷）+ 13 模块设置口接线（真缺陷）+ first-run 四态判定链修复（真缺陷）+ UI 接线锁 9 文件换 panel-source 重组面 + stamp 锚定收紧 + capability-tier 基线跟位 + O8/U4 账本 268 条（R250）`，41 文件 +706/−295）。已推送 872293a..acd16d5。全量回归随即起跑（干净 HEAD 上的最终裁决面）。
