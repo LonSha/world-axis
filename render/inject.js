@@ -202,6 +202,9 @@
     'chrono',
     // v2.360.0 (V20 OPV20-1): V19 活世界 9 大深层物理/病理/谍报机制全域接入
     'covertEspionage', 'epidemicContagion', 'surgicalTriage', 'maritimeNavigation', 'blackmarketUsury', 'stealthInfiltration', 'alchemyToxicology', 'covenantSanction', 'humanRealism',
+    // v2.411.0 (R251 缝合批)：人体结构契约。与源表/def/VIS_NAMES/分支同批登记，
+    //   只加分支不加源表 = 开关点了零效果；只加源表不加分支 = 声明了没人消费。
+    'bodyAnatomy',
     // v2.380.0 (V21 OPV21-2): V20 三源 + V21 八源全域接入注入链。
     //   三处同批（SOURCES / 默认值 / VIS_NAMES）+ 注入分支，任一处单边增长都是静默缺口：
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
@@ -323,6 +326,8 @@ style: false,
         //   故注入面取默认 true，不给老用户凭空多出约束（必开时关掉的是模块本身）。
         epochalTransition: true, cataclysmHazard: true, financialContagion: true,
         theologyCult: true, regimentTactics: true, incarcerationJailbreak: true, bloodlineHeritage: true,
+        // v2.411.0 (R251 缝合批)：人体结构契约。模块总开关默认为关，注入面取默认 true。
+        bodyAnatomy: true,
         engineeringBlueprint: true, dungeonHazardMesh: true, ecosystemCascade: true, courtIntrigue: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
@@ -589,6 +594,8 @@ style: false,
     covertEspionage: '谍报暗网', epidemicContagion: '疫病检疫', surgicalTriage: '战地救护',
     maritimeNavigation: '航海水文', blackmarketUsury: '黑市金融', stealthInfiltration: '潜伏暗杀',
     alchemyToxicology: '毒理病理', covenantSanction: '铁律盟约', humanRealism: '具身生理',
+    // v2.411.0 (R251 缝合批)：人体结构契约显示名（与注入项 source 名、panel VIS_NAMES 同批）。
+    bodyAnatomy: '人体结构',
     // v2.380.0: V20/V21 显示名（用户看得懂的名字，与注入项 source 名同批）
     epochalTransition: '纪元跃迁', cataclysmHazard: '天灾地貌', financialContagion: '金融连环',
     theologyCult: '神权教派', regimentTactics: '军团阵战',
@@ -792,6 +799,7 @@ style: false,
     ecosystemCascade: 'worldaxis_ecosystem_cascade_settings_v1',
     courtIntrigue: 'worldaxis_court_intrigue_settings_v1',
 humanRealism: 'worldaxis_human_realism_settings_v1',
+    bodyAnatomy: 'worldaxis_body_anatomy_settings_v1',
   };
   /**
    * 模块级总开关三态读：true（明确开着）/ false（明确关着）/ null（不可判定）。
@@ -1741,6 +1749,12 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.humanRealism && WA.humanRealism) {
         const hrb = engineCall('humanRealism', function () { return WA.humanRealism.buildBlock(); });
         if (hrb) items.push({ source: '具身生理', content: hrb });
+      }
+      // ── v2.411.0 (R251 缝合批)：人体结构契约注入分支 ──
+      //   模块缺席 / 可见性关 / 无内容 ⇒ buildBlock 返回空串，静默不出块、零 token 占用。
+      if (vis.bodyAnatomy && WA.bodyAnatomy) {
+        const bab = engineCall('bodyAnatomy', function () { return WA.bodyAnatomy.buildBlock(); });
+        if (bab) items.push({ source: '人体结构', content: bab });
       }
 
       // ── v2.380.0 (V21 OPV21-2): V20 纪元突变大系 + V21 文明盛衰/生态政变大系注入分支 ──

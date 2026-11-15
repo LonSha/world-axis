@@ -686,6 +686,8 @@ const LOAD = [
   'engines/era-cycle.js', 'engines/survival.js', 'engines/warrant.js', 'engines/beast-bond.js',
   // v2.69.0：外貌分级契约 / 原型阶梯。位置与 index.js LOAD_ORDER 同序（都早于 render/inject.js 消费点）。
   'engines/appearance.js', 'engines/ladder.js',
+  // v2.411.0 (R251 缝合批)：人体结构契约。与 index.js LOAD_ORDER 同序（早于 render/inject.js 消费点）。
+  'engines/body-anatomy.js',
   'engines/scene-slice.js', 'engines/gauge.js', 'engines/rivalry.js',
   // v2.71.0：叙事纪律四件套。位置与 index.js LOAD_ORDER 同序（都早于 render/inject.js 消费点）。
   'engines/enigma.js', 'engines/tempo.js', 'engines/quota.js', 'engines/spotlight.js',
@@ -22619,6 +22621,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./choice-board-v2325.js');
     await runScript('./engines-ns-gate.js');
     await runScript('./gates.js');
+    await runScript('./body-anatomy-v2411-regression.js');
     await runScript('./human-realism-transaction-regression.js');
     await runScript('./intake-goal-idempotency.js');
     await runScript('./life-boundary-batch-regression.js');

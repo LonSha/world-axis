@@ -187,7 +187,11 @@
         epochalTransition: '纪元跃迁', cataclysmHazard: '天灾地貌', financialContagion: '金融连环',
         theologyCult: '神权教派', regimentTactics: '军团阵战', incarcerationJailbreak: '刑狱越狱',
         bloodlineHeritage: '血脉宗法', engineeringBlueprint: '工程器械', dungeonHazardMesh: '地牢机关',
-        ecosystemCascade: '生态级联', courtIntrigue: '宫廷内斗' };
+        ecosystemCascade: '生态级联', courtIntrigue: '宫廷内斗',
+        // v2.411.0 (R251 缝合批)：人体结构契约显示名。与 render/inject.js 的
+        //   SOURCES / SRC_NAME 逐字同批登记 —— 只加源表不加显示名 ⇒ 注入页/导演页
+        //   裸露英文键，而那是玩家唯一能开关它的地方。
+        bodyAnatomy: '人体结构' };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {

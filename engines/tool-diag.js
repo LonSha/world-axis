@@ -3646,6 +3646,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/beast-bond.js': 'beastBond',
     // v2.69.0：外貌分级契约 / 原型阶梯（与 index.js LOAD_ORDER 同批登记）
     'engines/appearance.js': 'appearance',
+    'engines/body-anatomy.js': 'bodyAnatomy',
     'engines/ladder.js': 'ladder',
     'engines/scene-slice.js': 'sceneSlice',
     'engines/gauge.js': 'gauge',
