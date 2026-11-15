@@ -47,7 +47,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_gear_settings_v1';
-  const DEF = { enabled: false, maxItems: 96, maxSlots: 8, maxUses: 1000, maxDurability: 100 };
+  const DEF = { enabled: true, maxItems: 96, maxSlots: 8, maxUses: 1000, maxDurability: 100 };
   const __REG = { key: LS_KEY, def: DEF, module: 'gear',
     bounds: { maxItems: [8, 400], maxSlots: [1, 24], maxUses: [10, 100000], maxDurability: [1, 10000] } };
   function settings() {

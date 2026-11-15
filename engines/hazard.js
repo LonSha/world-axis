@@ -56,7 +56,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_hazard_settings_v1';
-  const DEF = { enabled: false, maxRows: 16, baseTarget: 10, floorTarget: 4, revealDelay: 3,
+  const DEF = { enabled: true, maxRows: 16, baseTarget: 10, floorTarget: 4, revealDelay: 3,
     // v2.138.0（E7）：天气→灾害反向联动。默认关闭；阈值 2 = only storm/snow 这一档。
     weatherLink: false, triggerFactor: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'hazard',

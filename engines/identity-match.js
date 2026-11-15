@@ -43,7 +43,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_identitymatch_settings_v1';
-  const DEF = { enabled: false, floor: 0.6, margin: 0.035, floorGap: 0.12, hardGapRatio: 0.25, maxCandidates: 12 };
+  const DEF = { enabled: true, floor: 0.6, margin: 0.035, floorGap: 0.12, hardGapRatio: 0.25, maxCandidates: 12 };
   const __REG = { key: LS_KEY, def: DEF, module: 'identityMatch',
     bounds: { floor: [10, 95], margin: [0, 20], floorGap: [2, 40], hardGapRatio: [5, 60], maxCandidates: [2, 32] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

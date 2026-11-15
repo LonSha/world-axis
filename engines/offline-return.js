@@ -54,7 +54,7 @@
 
   const LS_KEY = 'worldaxis_offline_return_v1';
   const DEF = {
-    enabled: false,       // 默认关：本模块**写世界**，不许默认替用户改
+    enabled: true,       // 默认关：本模块**写世界**，不许默认替用户改
     deferMs: 0            // >0 时把编排推迟到下一拍（留给宿主先完成切聊天的重载）
   };
   const __REG = { key: LS_KEY, def: DEF, module: 'offlineReturn',

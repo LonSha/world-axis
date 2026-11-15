@@ -29,7 +29,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_narrative_lens_settings_v1';
-  const DEF = { enabled: false, know: 'off', charm: 'off', userName: '' };
+  const DEF = { enabled: true, know: 'off', charm: 'off', userName: '' };
   const TIERS = ['off', 'lite', 'full'];
   const __REG = {
     key: LS_KEY, def: DEF, module: 'narrativeLens',

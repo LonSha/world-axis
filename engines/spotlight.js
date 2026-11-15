@@ -31,7 +31,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_spotlight_settings_v1';
-  const DEF = { enabled: false, idleThreshold: 5, hotStreak: 6, maxRows: 32 };
+  const DEF = { enabled: true, idleThreshold: 5, hotStreak: 6, maxRows: 32 };
   const __REG = { key: LS_KEY, def: DEF, module: 'spotlight',
     bounds: { idleThreshold: [2, 20], hotStreak: [2, 30], maxRows: [8, 64] } };
   function settings() {

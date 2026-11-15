@@ -39,7 +39,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_memory_tiers_settings_v1';
-  const DEF = { enabled: false, maxShallow: 24, maxMiddle: 32, maxDeep: 16, deepKeepRefs: 2 };
+  const DEF = { enabled: true, maxShallow: 24, maxMiddle: 32, maxDeep: 16, deepKeepRefs: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'memoryTiers',
     bounds: { maxShallow: [2, 128], maxMiddle: [2, 128], maxDeep: [1, 64], deepKeepRefs: [1, 8] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

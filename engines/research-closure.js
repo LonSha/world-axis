@@ -21,7 +21,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_research_closure_settings_v1';
-  const DEF = { enabled: false, strictPrereqs: true };
+  const DEF = { enabled: true, strictPrereqs: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'researchClosure', bounds: {} };
 
   function settings() {

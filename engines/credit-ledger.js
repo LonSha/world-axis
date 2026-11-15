@@ -40,7 +40,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_creditledger_settings_v1';
-  const DEF = { enabled: false, maxRows: 24, maxOpenPerBorrower: 3, defaultDays: 7, defaultRate: 100000 };
+  const DEF = { enabled: true, maxRows: 24, maxOpenPerBorrower: 3, defaultDays: 7, defaultRate: 100000 };
   // v2.253.0（收口）：`pays`（还款幂等键台账）此前**只 push、从不裁剪** —— 每笔带 key 的
   //   还款都会往里追加一条，而借据行可以长期存活（repaid 后仍留档备查），于是它无界增长。
   //   sizeAudit 把它报成 unbounded（`creditLedger.<id>.pays`），这是**真缺陷**不是误判：

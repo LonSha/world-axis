@@ -71,7 +71,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_research_settings_v1';
-  const DEF = { enabled: false, maxProjects: 24, maxPhases: 12, maxClues: 32 };
+  const DEF = { enabled: true, maxProjects: 24, maxPhases: 12, maxClues: 32 };
   const __REG = { key: LS_KEY, def: DEF, module: 'research',
     bounds: { maxProjects: [4, 100], maxPhases: [2, 30], maxClues: [4, 64] } };
   function settings() {

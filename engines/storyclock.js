@@ -38,7 +38,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_storyclock_settings_v1';
-  const DEF = { enabled: false, maxScan: 40, driftWarn: 2 };
+  const DEF = { enabled: true, maxScan: 40, driftWarn: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'storyclock', bounds: { maxScan: [4, 200], driftWarn: [0, 30] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

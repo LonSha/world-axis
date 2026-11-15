@@ -37,7 +37,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_rewriter_settings_v1';
   const CHANNEL = 'rewrite';
-  const DEF = { enabled: false, temperature: 40, maxTokens: 1200, timeoutMs: 30000 };
+  const DEF = { enabled: true, temperature: 40, maxTokens: 1200, timeoutMs: 30000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'rewriter',
     bounds: { temperature: [0, 100], maxTokens: [128, 8000], timeoutMs: [5000, 120000] } };
   function settings() {

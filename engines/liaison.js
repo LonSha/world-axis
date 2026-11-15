@@ -40,7 +40,7 @@
   };
   const LS_KEY = 'worldaxis_liaison_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     // 关系后果默认**关闭**：界面动作不无条件造成关系变化（B8 原文点名）
     affectsRelation: false,
     // 一轮最多结算几个到期约定（防「一开就把整局未结算的全结算掉」）

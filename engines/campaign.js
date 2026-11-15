@@ -31,7 +31,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_campaign_settings_v1';
-  const DEF = { enabled: false, stageCap: 12, logCap: 24, planCap: 6 };
+  const DEF = { enabled: true, stageCap: 12, logCap: 24, planCap: 6 };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'campaign',
     bounds: { stageCap: [3, 24], logCap: [4, 64], planCap: [1, 12] }

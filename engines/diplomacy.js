@@ -45,7 +45,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_diplomacy_settings_v1';
-  const DEF = { enabled: false, maxPairs: 24, maxTerms: 6, maxProposals: 16 };
+  const DEF = { enabled: true, maxPairs: 24, maxTerms: 6, maxProposals: 16 };
   const __REG = { key: LS_KEY, def: DEF, module: 'diplomacy',
     bounds: { maxPairs: [2, 64], maxTerms: [1, 16], maxProposals: [2, 32] } };
   function settings() {

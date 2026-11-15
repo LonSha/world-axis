@@ -71,7 +71,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_outline_inject_settings_v1';
-  const DEF = { enabled: false, tag: 'outline', bookSuffix: '剧情指导', position: 'at_depth_as_system',
+  const DEF = { enabled: true, tag: 'outline', bookSuffix: '剧情指导', position: 'at_depth_as_system',
     depth: 4, order: 9999, preventRecursion: true, maxOutline: 20000, maxEntries: 64 };
   const __REG = { key: LS_KEY, def: DEF, module: 'outlineInject',
     bounds: { depth: [0, 32], order: [0, 99999], maxOutline: [100, 200000], maxEntries: [1, 512] } };

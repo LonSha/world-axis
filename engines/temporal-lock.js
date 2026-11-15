@@ -25,7 +25,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_temporal_settings_v1';
-  const DEF = { enabled: false, maxMinutes: 10 };
+  const DEF = { enabled: true, maxMinutes: 10 };
   const __REG = { key: LS_KEY, def: DEF, module: 'temporalLock', bounds: { maxMinutes: [1, 240] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

@@ -58,7 +58,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const VERSION = '2.227.0';
   const LS_KEY = 'worldaxis_story_loop_v1';
-  const DEF = { enabled: false, windowMs: 6 * 60 * 60 * 1000 };
+  const DEF = { enabled: true, windowMs: 6 * 60 * 60 * 1000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'storyLoop',
     bounds: { windowMs: [60 * 1000, 30 * 24 * 60 * 60 * 1000] } };
   function settings() {

@@ -56,7 +56,7 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   // ── 设置（同一格偏好键；不是世界事实，按本仓先例走 settingsBus）──
   const LS_KEY = 'worldaxis_supply_chain_settings_v1';
-  const DEF = { enabled: false, maxStages: 8, maxRows: 24 };
+  const DEF = { enabled: true, maxStages: 8, maxRows: 24 };
   const __REG = { key: LS_KEY, def: DEF, module: 'supplyChain',
     bounds: { maxStages: [2, 12], maxRows: [4, 48] } };
   function settings() {

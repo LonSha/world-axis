@@ -28,7 +28,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_warrant_settings_v1';
-  const DEF = { enabled: false, maxRows: 16 };
+  const DEF = { enabled: true, maxRows: 16 };
   const __REG = { key: LS_KEY, def: DEF, module: 'warrant', bounds: { maxRows: [4, 32] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

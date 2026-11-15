@@ -34,7 +34,7 @@
 
   const LS_KEY = 'worldaxis_one_shot_mod_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     maxPending: 6,          // 队列硬上界（满了如实拒收）
     defaultTtl: 1,          // 默认存活轮数（1 = 只活到下一次生成）
     maxTtl: 5,

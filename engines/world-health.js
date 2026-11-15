@@ -48,7 +48,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_world_health_settings_v1';
   // maxRows 逐栏上限（一屏）；nearRatio 近满阈值；maxFaultModules 阻塞栏最多几个模块。
-  const DEF = { enabled: false, maxRows: 6, nearRatio: 0.8, maxFaultModules: 6 };
+  const DEF = { enabled: true, maxRows: 6, nearRatio: 0.8, maxFaultModules: 6 };
   const __REG = { key: LS_KEY, def: DEF, module: 'worldHealth',
     bounds: { maxRows: [2, 24], nearRatio: [0.5, 1], maxFaultModules: [1, 24] } };
   function getSettings() {

@@ -37,7 +37,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_refine_settings_v1';
-  const DEF = { enabled: false, maxLen: 120, keepTail: false };
+  const DEF = { enabled: true, maxLen: 120, keepTail: false };
   const __REG = { key: LS_KEY, def: DEF, module: 'refine', bounds: { maxLen: [8, 2000] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

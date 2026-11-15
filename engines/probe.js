@@ -38,7 +38,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_probe_settings_v1';
-  const DEF = { enabled: false, maxCases: 8, maxEvidence: 24, minSupport: 2 };
+  const DEF = { enabled: true, maxCases: 8, maxEvidence: 24, minSupport: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'probe',
     bounds: { maxCases: [2, 24], maxEvidence: [4, 48], minSupport: [1, 4] } };
   function settings() {

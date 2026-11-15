@@ -40,7 +40,7 @@
   /** v2.230.0：决策时间统一出口（裸调 Date.now 会绕过冻结，回放对不上时只能全库通读）。 */
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_community_note_settings_v1';
-  const DEF = { enabled: false, maxNotes: 48, maxBody: 2000 };
+  const DEF = { enabled: true, maxNotes: 48, maxBody: 2000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'communityNote',
     bounds: { maxNotes: [4, 400], maxBody: [40, 20000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

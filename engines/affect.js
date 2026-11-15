@@ -17,7 +17,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_affect_settings_v1';
-  const DEF = { enabled: false, maxOpen: 3 };
+  const DEF = { enabled: true, maxOpen: 3 };
   const __REG = { key: LS_KEY, def: DEF, module: 'affect', bounds: { maxOpen: [1, 3] } };
   const WORDS = ['愤怒', '悲伤', '喜悦', '恐惧', '厌恶', '焦虑', '绝望', '崩溃', '开心', '难过', '生气', '害怕'];
   const LOADS = ['fatigue', 'hunger', 'pain', 'social'];

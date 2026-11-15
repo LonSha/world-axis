@@ -25,7 +25,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_shadow_settings_v1';
-  const DEF = { enabled: false, maxRows: 12, maxExp: 8 };
+  const DEF = { enabled: true, maxRows: 12, maxExp: 8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'shadow',
     bounds: { maxRows: [1, 48], maxExp: [1, 20] } };
   const SHADOW_KINDS = ['crime', 'debt', 'love', 'blood', 'shame', 'compact'];

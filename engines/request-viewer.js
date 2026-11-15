@@ -46,7 +46,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_requestviewer_settings_v1';
-  const DEF = { enabled: false, maxKeep: 8, maskKey: true };
+  const DEF = { enabled: true, maxKeep: 8, maskKey: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'requestViewer', bounds: { maxKeep: [1, 32] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

@@ -32,7 +32,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_appearance_settings_v1';
-  const DEF = { enabled: false, maxRows: 24 };
+  const DEF = { enabled: true, maxRows: 24 };
   const __REG = { key: LS_KEY, def: DEF, module: 'appearance', bounds: { maxRows: [4, 48] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

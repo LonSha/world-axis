@@ -42,7 +42,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockWall = function (site) { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_preflight_settings_v1';
-  const DEF = { enabled: false, maxChecks: 400 };
+  const DEF = { enabled: true, maxChecks: 400 };
   const __REG = { key: LS_KEY, def: DEF, module: 'preflight', bounds: { maxChecks: [16, 2000] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

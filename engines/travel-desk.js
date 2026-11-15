@@ -60,7 +60,7 @@
 
   // ── 设置（同一格偏好键；不是世界事实，按本仓先例走 settingsBus）──
   const LS_KEY = 'worldaxis_travel_desk_settings_v1';
-  const DEF = { enabled: false, maxRows: 24, maxPlanRows: 32,
+  const DEF = { enabled: true, maxRows: 24, maxPlanRows: 32,
     // ── v2.219.0（拓展 N5）：多站旅程与会合的两格参数 ──
     //   `maxLegs`：途经点段数上限（**不静默截断** —— 超限一律 `route-too-long`）；
     //   `meetWindowMs`：会合时窗的默认宽度（缺省一小时）。

@@ -42,7 +42,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_solo_voice_settings_v1';
-  const DEF = { enabled: false, maxChars: 400, maxQuestions: 1, labelRatio: 0.3, maxCast: 32 };
+  const DEF = { enabled: true, maxChars: 400, maxQuestions: 1, labelRatio: 0.3, maxCast: 32 };
   const __REG = { key: LS_KEY, def: DEF, module: 'soloVoice',
     bounds: { maxChars: [40, 8000], maxQuestions: [0, 8], maxCast: [0, 512] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

@@ -40,7 +40,7 @@
 
   const LS_KEY = 'worldaxis_canon_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     // 一段的目标字符数（切分粒度，越小幕越密）
     segChars: 1200,
     // 一个剧情点至少多少字（低于此则并入上一个点 → 避免碎片化）

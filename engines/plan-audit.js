@@ -59,7 +59,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_plan_audit_settings_v1';
-  const DEF = { enabled: false, maxItems: 24, evidenceCap: 6 };
+  const DEF = { enabled: true, maxItems: 24, evidenceCap: 6 };
   const __REG = { key: LS_KEY, def: DEF, module: 'planAudit', bounds: { maxItems: [4, 64], evidenceCap: [2, 12] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

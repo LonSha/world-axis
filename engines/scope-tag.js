@@ -38,7 +38,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_scope_tag_settings_v1';
-  const DEF = { enabled: false, tags: ['say', 'narr', 'sys', 'quote', 'meta', 'state'], maxDepth: 8, maxSpans: 256 };
+  const DEF = { enabled: true, tags: ['say', 'narr', 'sys', 'quote', 'meta', 'state'], maxDepth: 8, maxSpans: 256 };
   const __REG = { key: LS_KEY, def: DEF, module: 'scopeTag',
     bounds: { maxDepth: [1, 32], maxSpans: [1, 2000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

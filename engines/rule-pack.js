@@ -45,7 +45,7 @@
   const LS_KEY = 'worldaxis_rule_pack_settings_v1';
   // v2.203.0（Y8）：新增 `history`（回滚栈，**只装规则面键值**）—— 它不是包清单的副本，
   //   而是「上一次切换之前长什么样」的一串快照；`note` 是当前活跃包的说明（人读的那一行）。
-  const DEF = { enabled: false, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,
+  const DEF = { enabled: true, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,
     note: '', history: [] };
   /** 回滚栈上限（**内部常量**，不进 bounds）：栈是「反悔一分钟」的东西，不是档案库。 */
   const MAX_HISTORY = 12;

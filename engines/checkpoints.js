@@ -26,7 +26,7 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_PREFIX = 'worldaxis_ckpt_v1_';
   const LS_KEY = 'worldaxis_ckpt_settings_v1';
-  const DEF = { enabled: false, maxSlots: 12, autoEvery: 0, autoSlots: 4 };
+  const DEF = { enabled: true, maxSlots: 12, autoEvery: 0, autoSlots: 4 };
   const __REG = { key: LS_KEY, def: DEF, module: 'checkpoints',
     bounds: { maxSlots: [1, 24], autoEvery: [0, 100], autoSlots: [0, 12] } };
   function settings() {

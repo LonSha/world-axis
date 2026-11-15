@@ -54,7 +54,7 @@
   const MAX_OPS = 40;
   const __REG = {
     key: LS_KEY,
-    def: { enabled: false, linkCausal: true },
+    def: { enabled: true, linkCausal: true },
     module: 'phoneBridge'
   };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

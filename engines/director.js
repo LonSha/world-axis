@@ -57,7 +57,7 @@
   //  · landWindow  只标「此刻是否适合落地」，不改条目、不替引擎推进
   //  · deferred    被冷却/窗口顺延的条目进 deferred（=压下项，必须可见）
   //  · forced      urgency=overdue 且带 due 的条目可越过冷却（强制注入，但仍只建议）
-  const DEF = { enabled: false, maxItems: 6, minGap: 1, includeBlocked: true,
+  const DEF = { enabled: true, maxItems: 6, minGap: 1, includeBlocked: true,
     cooldownRounds: 2, landWindow: true, forcedOverdue: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'director' };
   if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

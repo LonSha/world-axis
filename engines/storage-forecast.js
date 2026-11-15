@@ -35,7 +35,7 @@
 
   const LS_KEY = 'worldaxis_storage_forecast_v1';
   const __REG = { key: LS_KEY,
-    def: { enabled: false, lsQuotaMB: 5, minSamples: 6 },
+    def: { enabled: true, lsQuotaMB: 5, minSamples: 6 },
     module: 'storageForecast',
     bounds: { lsQuotaMB: [1, 50], minSamples: [3, 40] } };
 

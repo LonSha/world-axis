@@ -28,7 +28,7 @@
 
   const LS_KEY = 'worldaxis_celestial_omens_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 旧历每年与真年的差（日）。0.2422 是儒略历式的粗口径，刻意可配。 */
     driftDaysPerYear: 0.2422,
     /** 连续漂移多少日算「农时已经错了一旬」的界线。 */

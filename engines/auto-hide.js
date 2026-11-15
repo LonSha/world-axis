@@ -38,7 +38,7 @@
   /** v2.230.0：决策时间统一出口（裸调 Date.now 会绕过冻结，回放对不上时只能全库通读）。 */
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_auto_hide_settings_v1';
-  const DEF = { enabled: false, keepRecent: 5, minKeepRecent: 0, maxKeepRecent: 100, maxLedger: 400 };
+  const DEF = { enabled: true, keepRecent: 5, minKeepRecent: 0, maxKeepRecent: 100, maxLedger: 400 };
   const __REG = { key: LS_KEY, def: DEF, module: 'autoHide',
     bounds: { keepRecent: [0, 100], maxLedger: [8, 4000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

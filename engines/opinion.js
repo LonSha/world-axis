@@ -14,7 +14,7 @@
   // v2.7.0（收口）: 区间声明上收到登记表——此前「每N轮」的合法范围只写在设置页的
   //   `min="1" max="10"` 上，库里没有任何一处承认它是契约：读路径只夹了下界、写路径落原值。
   //   （本版正向审计扫出的同型缺陷之一；声明在此后，界面与引擎都取同一份。）
-  const __REG = { key: LS_KEY, def: { enabled: false, sandboxEnabled: false, everyNRounds: 3 },
+  const __REG = { key: LS_KEY, def: { enabled: true, sandboxEnabled: false, everyNRounds: 3 },
     bounds: { everyNRounds: [1, 10] }, module: 'opinion' };
   // v2.3.0: 读路径统一走 settingsBus（写路径 v0.2.0 已迁移）——此前本键 JSON 损坏会静默重置
   //   为默认（无隔离留痕），legacy 旧键迁移规则也完全不生效。

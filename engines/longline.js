@@ -18,7 +18,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_longline_settings_v1';
-  const DEF = { enabled: false, graceMs: 600000, maxItems: 4 };
+  const DEF = { enabled: true, graceMs: 600000, maxItems: 4 };
   const __REG = { key: LS_KEY, def: DEF, module: 'longline', bounds: { graceMs: [0, 86400000], maxItems: [1, 8] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

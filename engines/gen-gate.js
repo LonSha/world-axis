@@ -69,7 +69,7 @@
   const DATA_KEY = 'worldaxis_gen_gate_data_v1';
   /** 四个生成面（与上游四道闸门一一对应，不自造第五个）。 */
   const KINDS = ['thread', 'interlude', 'chapter', 'interlude-chapter'];
-  const DEF = { enabled: false, minGap: 3, chapterGap: 4, quietRounds: 3, interludeGap: 3, maxEntries: 24 };
+  const DEF = { enabled: true, minGap: 3, chapterGap: 4, quietRounds: 3, interludeGap: 3, maxEntries: 24 };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'genGate',
     bounds: {

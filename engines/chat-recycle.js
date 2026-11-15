@@ -51,7 +51,7 @@
 
   const LS_KEY = 'worldaxis_chat_recycle_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 回收站上限。原文口径固定 10，这里可配但默认逐字取 10。 */
     limit: 10,
     /** 锁定的项是否参与清理。**默认 false，且不建议改** —— 见边界 ③。 */

@@ -48,7 +48,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_world_lab_settings_v1';
-  const DEF = { enabled: false, maxSteps: 6, armA: '', armB: '' };
+  const DEF = { enabled: true, maxSteps: 6, armA: '', armB: '' };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'worldLab',
     bounds: { maxSteps: [1, 12] }

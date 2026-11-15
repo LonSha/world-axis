@@ -24,7 +24,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_action_methods_settings_v1';
-  const DEF = { enabled: false, maxMethods: 64, maxPathsPerTask: 8, defaultWear: 1 };
+  const DEF = { enabled: true, maxMethods: 64, maxPathsPerTask: 8, defaultWear: 1 };
   const __REG = { key: LS_KEY, def: DEF, module: 'actionMethods',
     bounds: { maxMethods: [8, 200], maxPathsPerTask: [2, 16], defaultWear: [0, 10] } };
 

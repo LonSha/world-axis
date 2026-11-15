@@ -71,7 +71,7 @@
   //   理由：因果链是**历史**（挤掉最旧的仍答得出「发生过什么」），排期是**待办**
   //   （挤掉最旧的就是把那件事悄悄取消了，而调用方会以为它还在队列里）。
   //   `cancel()` 是唯一合法的取消入口——「世界没发生这件事」必须说得出口。
-  const DEF = { enabled: false, autoFulfill: false, maxRows: 24, maxRuns: 12, maxFails: 12, retryDelayMs: 1000, maxRetries: 2,
+  const DEF = { enabled: true, autoFulfill: false, maxRows: 24, maxRuns: 12, maxFails: 12, retryDelayMs: 1000, maxRetries: 2,
     maxClaims: 24, leaseMs: 0 };
   const __REG = { key: LS_KEY, def: DEF, module: 'events',
     bounds: { maxRows: [1, 24], maxRuns: [1, 60], maxFails: [1, 24], retryDelayMs: [0, 600000], maxRetries: [0, 5],

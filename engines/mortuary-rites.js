@@ -25,7 +25,7 @@
 
   const LS_KEY = 'worldaxis_mortuary_rites_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 三年之丧按 27 个月折算成天（本仓用日做统一时间尺）。 */
     daysPerMonth: 30,
     /** 期服（一年）的天数；用于齐衰/大功等亲等的阶梯。 */

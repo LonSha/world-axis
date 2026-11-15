@@ -22,7 +22,7 @@
   const RESISTANCE = ['easy', 'normal', 'hard'];
   const STANCE = ['hostile', 'neutral', 'friendly'];
   const PACE = ['slow', 'normal', 'fast'];
-  const DEF = { enabled: false, resistance: 'normal', stance: 'neutral', pace: 'normal' };
+  const DEF = { enabled: true, resistance: 'normal', stance: 'neutral', pace: 'normal' };
   const __REG = { key: LS_KEY, def: DEF, module: 'difficulty',
     enums: { resistance: RESISTANCE, stance: STANCE, pace: PACE } };
   const COST = { easy: 0.5, normal: 1, hard: 2 };

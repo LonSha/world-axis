@@ -41,7 +41,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_stage_settings_v1';
-  const DEF = { enabled: false, maxMetrics: 24, maxTransitions: 12 };
+  const DEF = { enabled: true, maxMetrics: 24, maxTransitions: 12 };
   const __REG = { key: LS_KEY, def: DEF, module: 'stage',
     bounds: { maxMetrics: [4, 48], maxTransitions: [2, 24] } };
   function settings() {

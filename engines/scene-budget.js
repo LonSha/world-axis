@@ -38,7 +38,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_scenebudget_settings_v1';
-  const DEF = { enabled: false, stallFrom: 3, maxFactor: 8, holdFrom: 6, stepFactor: 0.5, maxRows: 24 };
+  const DEF = { enabled: true, stallFrom: 3, maxFactor: 8, holdFrom: 6, stepFactor: 0.5, maxRows: 24 };
   const __REG = { key: LS_KEY, def: DEF, module: 'sceneBudget',
     bounds: { stallFrom: [1, 12], maxFactor: [2, 30], holdFrom: [1, 24], stepFactor: [10, 100], maxRows: [4, 64] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

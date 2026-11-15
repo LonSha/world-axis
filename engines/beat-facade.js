@@ -45,7 +45,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_beat_facade_settings_v1';
   /** 门面自身开关。**默认关**（承本仓「新能力默认关」纪律）：关着时四个引擎现状一字不变。 */
-  const DEF = { enabled: false };
+  const DEF = { enabled: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'beatFacade', bounds: {} };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

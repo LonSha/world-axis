@@ -59,7 +59,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_lifeline_settings_v1';
-  const DEF = { enabled: false, maxRows: 12 };
+  const DEF = { enabled: true, maxRows: 12 };
   const __REG = { key: LS_KEY, def: DEF, module: 'lifeline', bounds: { maxRows: [2, 24] } };
   // ── 四张具名表（本模块的**全部词表**，其余一律拒收）──────────────────
   //   为什么必须成表：自造限制等于自造判定 —— 不成表的限制，下一手（感知面、注入面、

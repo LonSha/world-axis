@@ -138,7 +138,7 @@
   }
   // ── 设置 ──
   const LS_KEY = 'worldaxis_agency_settings_v1';
-  const DEF = { enabled: false, maxSchedulePerTurn: 4, maxReceiptsPerTurn: 8, autoPlanExpand: true };
+  const DEF = { enabled: true, maxSchedulePerTurn: 4, maxReceiptsPerTurn: 8, autoPlanExpand: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'agency',
     bounds: { maxSchedulePerTurn: [1, 12], maxReceiptsPerTurn: [1, 24] } };
   function settings() {

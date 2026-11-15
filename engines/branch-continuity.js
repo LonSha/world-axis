@@ -26,7 +26,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_branch_continuity_settings_v1';
-  const DEF = { enabled: false, maxChecks: 16, requireEvidenceFor: true };
+  const DEF = { enabled: true, maxChecks: 16, requireEvidenceFor: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'branchContinuity' };
   if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const __stat = { committed: 0, rejected: 0, lastReason: '', lastAt: 0 };

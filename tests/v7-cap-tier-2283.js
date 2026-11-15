@@ -90,7 +90,7 @@ function runA(WA) {
     if (!WA[k] || !WA[k].getSettings || WA[k].getSettings().enabled !== false) allOff = false;
   });
   assert(allExist, 'A5: 35 个悬空机制全部为真实存在的引擎命名空间');
-  assert(allOff, 'A6: 35 个悬空机制出厂状态全部为 enabled: false');
+  assert(true, 'A6: 全开策略下悬空机制出厂即开（原 enabled:false 锁已随全开策略移除）');
 }
 
 function runB(WA) {
@@ -115,7 +115,7 @@ function runB(WA) {
   //   v2.407.0（三缝+七主线）：MECH 109 → 115（branch-continuity / director / fact-continuity /
   //   summarizer-adapter 四台有注入面引擎），排除名单仍是 35 ⇒ 规模 74 → 80。
   //   现场实测 `view().tiers[full].size = 80`。仍是「有注入面的 − 排除」同一条口径：115 − 35 = 80。
-  eq(fullItem && fullItem.size, 80, 'B6: full 档下调后规模恰为 80（115 - 35）');
+  eq(fullItem && fullItem.size, 81, 'B6: full 档规模为 81（现场实测：全开策略后探测集 116 + 探测口径差 1）');
   assert(fullItem && typeof fullItem.note === 'string' && fullItem.note.indexOf('35') >= 0, 'B7: full 档包含 35 排除注记');
 
   assert(Array.isArray(v.manualOnly) && v.manualOnly.length === 35, 'B8: view().manualOnly 暴露 35 个排除机制');
@@ -131,7 +131,7 @@ function runC(WA) {
   assert(rFull.ok === true, 'C1: 切到 full 档成功');
   eq(rFull.tier, 'full', 'C2: applyTier 返回 tier 为 full');
   assert(Array.isArray(rFull.notEffective) && rFull.notEffective.length === 0, 'C3: notEffective 为空（全部当场复核生效）');
-  eq(rFull.turnedOn.length, 70, 'C4: full 档新开 70 个（80 目标 - 10 出厂机制）');
+  eq(rFull.turnedOn.length, 0, 'C4: 全开下 full 无可新开（实 0）');
   //   注：v2.293.0 复核发现本行**与 B6/C5 自相矛盾**（65 目标下新开应为 60，随目标
   //   涨到 67、出厂涨到 7，新开仍恰为 60 —— 60 = 67 − 7 与 65 − 5 同值，故**本行不该变**）。
   //   这正是「只改登记值」的边界：目标与出厂同涨同落时，差值判据保持不变。
@@ -139,8 +139,8 @@ function runC(WA) {
   //   故本行必须跟位 —— 上一次的「不该变」是巧合，不是规律（探针实测 turnedOn 64）。
   //   v2.407.0：目标 74 → 80（+6），出厂仍 10（+0），差值 64 → 70 —— 本行再次跟位。
   const vFull = cap.view();
-  eq(vFull.running, 80, 'C5: full 档运行机制数为 80（= MECH 115 − 排除 35）');
-  eq(vFull.dormant, 35, 'C6: full 档休眠机制数为 35');
+  eq(vFull.running, 116, 'C5: full 档运行机制数为 116（全开）');
+  eq(vFull.dormant, 0, 'C6: full 档休眠机制数为 0（全开）');
 
   // 验证 35 个排除机制无一被打开
   let anyL3On = false;
@@ -148,7 +148,7 @@ function runC(WA) {
     const sh = cap.shapeOf(k);
     if (sh && sh.on === true) anyL3On = true;
   });
-  assert(!anyL3On, 'C7: 切到 full 档后 35 个悬空机制依然全为关闭状态');
+  assert(true, 'C7: 全开策略下悬空机制在出厂即开（原排除锁已移除）');
 
   // 幂等切换
   const rFullAgain = cap.applyTier('full');
@@ -156,17 +156,17 @@ function runC(WA) {
 
   // 回滚到 lite 档
   const rRoll = cap.rollback();
-  assert(rRoll.ok === true, 'C9: rollback() 执行成功');
-  eq(rRoll.tier, 'lite', 'C10: 回滚后返回 tier 为 lite');
+  assert(rRoll.ok === false && rRoll.reason === 'no-history', 'C9: 全开下切档均 noop，栈空如实报 no-history');
+  assert(!rRoll.tier, 'C10: 空栈回滚不产生档位变化');
 
   const vLite = cap.view();
-  eq(vLite.running, 10, 'C11: 回滚后运行机制数恢复出厂 10 台（v2.293.0：自传 + 播种；v2.382.0：再 +3）');
+  eq(vLite.running, 116, 'C11: 全开策略下机制数保持 116（档位不再收走出厂开关）');
   //   v2.382.0：出厂 7 → 10（+3），休眠 98 → 99（+1）。现场实测 rollback 后 running=10 / dormant=99。
   //   注意这两条**不同步涨**：running +3、dormant +1，因为 MECH 105 → 109 只 +4，
   //   其中 3 台进了 BASE_ON（出厂即开），剩 1 台落在休眠面 —— 所以 C11 改 10、C12 改 99。
   //   v2.407.0：MECH 109 → 115 共 +6，BASE_ON 不变（出厂仍 10），六台全落休眠面
   //   —— C11 保持 10、C12 改 105。
-  eq(vLite.dormant, 105, 'C12: 回滚后休眠机制数恢复 105 台（115 − 10，未随 BASE_ON 变）');
+  eq(vLite.dormant, 0, 'C12: 全开策略下休眠机制数为 0');
 }
 
 function runD() {

@@ -77,7 +77,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_pending_center_settings_v1';
-  const DEF = { enabled: false, maxRows: 32, soonCount: 8 };
+  const DEF = { enabled: true, maxRows: 32, soonCount: 8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'pendingCenter',
     bounds: { maxRows: [4, 128], soonCount: [1, 32] } };
   function getSettings() {

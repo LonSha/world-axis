@@ -35,7 +35,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_archivehide_settings_v1';
-  const DEF = { enabled: false, keepRecent: 5, minCovered: 1 };
+  const DEF = { enabled: true, keepRecent: 5, minCovered: 1 };
   const __REG = { key: LS_KEY, def: DEF, module: 'archiveHide', bounds: { keepRecent: [0, 60], minCovered: [1, 20] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

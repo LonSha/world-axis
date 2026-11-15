@@ -42,7 +42,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_inst_settings_v1';
-  const DEF = { enabled: false, maxOrgs: 8, maxPending: 12, maxBreaches: 12 };
+  const DEF = { enabled: true, maxOrgs: 8, maxPending: 12, maxBreaches: 12 };
   const __REG = { key: LS_KEY, def: DEF, module: 'inst',
     bounds: { maxOrgs: [2, 24], maxPending: [4, 32], maxBreaches: [4, 32] } };
   function settings() {

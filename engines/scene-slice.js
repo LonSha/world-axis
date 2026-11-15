@@ -7,7 +7,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_scene_slice_settings_v1';
-  const DEF = { enabled: false, maxRows: 20 };
+  const DEF = { enabled: true, maxRows: 20 };
   const __REG = { key: LS_KEY, def: DEF, module: 'sceneSlice', bounds: { maxRows: [4, 40] } };
 
   function settings() {

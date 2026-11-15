@@ -51,7 +51,7 @@
 
   const LS_KEY = 'worldaxis_summarizer_adapter_settings_v1';
   const FORMAT_V = 1;
-  const DEF = { enabled: false, maxDigestChars: 1200, maxEntries: 40 };
+  const DEF = { enabled: true, maxDigestChars: 1200, maxEntries: 40 };
   const __REG = { key: LS_KEY, def: DEF, module: 'summarizerAdapter' };
   if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const __stat = { exported: 0, imported: 0, refused: 0, lastReason: '', lastAt: 0 };

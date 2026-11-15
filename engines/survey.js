@@ -64,7 +64,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_survey_settings_v1';
-  const DEF = { enabled: false, maxSpots: 48, maxViews: 192, maxDays: 30, viewer: '' };
+  const DEF = { enabled: true, maxSpots: 48, maxViews: 192, maxDays: 30, viewer: '' };
   const __REG = { key: LS_KEY, def: DEF, module: 'survey',
     bounds: { maxSpots: [4, 200], maxViews: [16, 600], maxDays: [1, 120] } };
   function settings() {

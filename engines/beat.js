@@ -27,7 +27,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_beat_settings_v1';
-  const DEF = { enabled: false, maxRepair: 20, clampColor: true, categoryStrict: true };
+  const DEF = { enabled: true, maxRepair: 20, clampColor: true, categoryStrict: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'beat',
     bounds: { maxRepair: [1, 64] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

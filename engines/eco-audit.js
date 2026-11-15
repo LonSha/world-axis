@@ -54,7 +54,7 @@
 
   const LS_KEY = 'worldaxis_eco_audit_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     timelineEnabled: true,   // 时间线自洽（含排期面）
     spaceEnabled: true,      // 空间自洽
     cognitionEnabled: true,  // 认知自洽

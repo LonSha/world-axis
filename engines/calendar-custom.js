@@ -36,7 +36,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_calendarplan_settings_v1';
-  const DEF = { enabled: false, maxMonths: 48 };
+  const DEF = { enabled: true, maxMonths: 48 };
   const __REG = { key: LS_KEY, def: DEF, module: 'calendarPlan', bounds: { maxMonths: [1, 128] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

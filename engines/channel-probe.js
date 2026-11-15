@@ -24,7 +24,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_channel_probe_settings_v1';
-  const DEF = { enabled: false, itemsPerProbe: 8, passLine: 0.75, maxLedger: 40 };
+  const DEF = { enabled: true, itemsPerProbe: 8, passLine: 0.75, maxLedger: 40 };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'channelProbe',
     enums: {}, bounds: { itemsPerProbe: [4, 12], passLine: [0.1, 1], maxLedger: [5, 200] }

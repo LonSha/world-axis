@@ -42,7 +42,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_action_desk_settings_v1';
-  const DEF = { enabled: false, maxRows: 32, maxPerGroup: 8 };
+  const DEF = { enabled: true, maxRows: 32, maxPerGroup: 8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'actionDesk',
     bounds: { maxRows: [4, 96], maxPerGroup: [1, 24] } };
   function settings() {

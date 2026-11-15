@@ -35,7 +35,7 @@
   const WA = G.WorldAxis = G.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_round_drivers_settings_v1';
-  const DEF = { enabled: false };
+  const DEF = { enabled: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'roundDrivers', bounds: {} };
 
   function settings() {

@@ -47,7 +47,7 @@
   // 数据键与设置键分开：设置是「怎么用」，数据是「用户写了什么」。
   //   混在一把键里会让「一次保存失败」同时毁掉设置与手稿（两件事，两个键）。
   const DATA_KEY = 'worldaxis_presetworld_data_v1';
-  const DEF = { enabled: false, maxRows: 24 };
+  const DEF = { enabled: true, maxRows: 24 };
   const __REG = { key: LS_KEY, def: DEF, module: 'presetWorld', bounds: { maxRows: [1, 64] } };
   const __DATA = { key: DATA_KEY, def: null, module: 'presetWorld', optional: true };
   const SCHEMA = 1;

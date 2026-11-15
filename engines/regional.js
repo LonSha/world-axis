@@ -28,7 +28,7 @@
   //   保留死键会让设置页/登记表显示一组拨了没反应的旋钮）。
   const MIN_CHANCE_PCT = 1, MAX_CHANCE_PCT = 100;
   const MIN_DURATION = 1, MAX_DURATION = 20;
-  const REG_DEF = { enabled: false, chancePercent: 15, durationRounds: 3 };
+  const REG_DEF = { enabled: true, chancePercent: 15, durationRounds: 3 };
   // v2.7.0: 区间声明上收到登记表（唯一真源）。此前 MIN_/MAX_ 常量虽在本文件，但
   //   「谁是契约」这件事没有任何声明面——UI 侧另有一份硬编码，跨文件消费方无法取用。
   const REG_BOUNDS = { chancePercent: [MIN_CHANCE_PCT, MAX_CHANCE_PCT],

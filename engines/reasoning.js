@@ -39,7 +39,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_reasoning_settings_v1';
   const EFFORTS = ['off', 'low', 'medium', 'high'];
-  const DEF = { enabled: false, effort: 'low', minBodyChars: 120 };
+  const DEF = { enabled: true, effort: 'low', minBodyChars: 120 };
   const __REG = { key: LS_KEY, def: DEF, module: 'reasoning', bounds: { minBodyChars: [0, 4000] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

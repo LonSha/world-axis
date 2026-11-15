@@ -41,7 +41,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_world_clock_settings_v1';
-  const DEF = { enabled: false, scanLimit: 100, maxFields: 24, requireWeekday: true, requireTime: true };
+  const DEF = { enabled: true, scanLimit: 100, maxFields: 24, requireWeekday: true, requireTime: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'worldClock',
     bounds: { scanLimit: [1, 1000], maxFields: [2, 200] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

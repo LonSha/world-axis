@@ -46,7 +46,7 @@
 
   const LS_KEY = 'worldaxis_sediment_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     traceWindowMs: 86400000,   // 一档衰减所需时间（默认一天一档）
     maxItems: 4,               // 注入块最多念几条
     capPlaces: 24,             // 地点数上限

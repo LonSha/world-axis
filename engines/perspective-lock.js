@@ -81,7 +81,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_perspective_settings_v1';
-  const DEF = { enabled: false, maxScenes: 12, strictInterior: true, maxLeaks: 8, view: 'omniscient' };
+  const DEF = { enabled: true, maxScenes: 12, strictInterior: true, maxLeaks: 8, view: 'omniscient' };
   const __REG = { key: LS_KEY, def: DEF, module: 'perspective',
     bounds: { maxScenes: [2, 24], maxLeaks: [1, 32] } };
 

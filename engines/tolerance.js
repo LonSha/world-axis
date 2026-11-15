@@ -30,7 +30,7 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_tolerance_settings_v1';
   const KINDS = ['line', 'gesture', 'prop', 'address'];
-  const DEF = { enabled: false, maxRows: 24, window: 3, maxRepeat: 3, decay: 50 };
+  const DEF = { enabled: true, maxRows: 24, window: 3, maxRepeat: 3, decay: 50 };
   // decay 是「百分比整数」（50 = 0.5），与 clampNum 的整数夹取兼容。
   const __REG = { key: LS_KEY, def: DEF, module: 'tolerance',
     bounds: { maxRows: [4, 64], window: [1, 10], maxRepeat: [1, 6], decay: [10, 90] } };

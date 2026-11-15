@@ -51,7 +51,7 @@
 
   const LS_KEY = 'worldaxis_offline_tick_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     stepMs: 3600000,      // 离线一步 = 一小时（轮数 = 时长 / 这一步）
     maxRounds: 12,        // 一次跨会话最多结算几轮（防长时间离线后世界天翻地覆）
     minGapMs: 60000,      // 低于这一步长的间隔不算「离开」（刷新页面不是离线）

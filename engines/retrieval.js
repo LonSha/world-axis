@@ -86,7 +86,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const VERSION = '2.228.0';
   const LS_KEY = 'worldaxis_retrieval_v1';
-  const DEF = { enabled: false, windowMs: 30 * 24 * 60 * 60 * 1000, maxRows: 24, maxChars: 6000 };
+  const DEF = { enabled: true, windowMs: 30 * 24 * 60 * 60 * 1000, maxRows: 24, maxChars: 6000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'retrieval',
     bounds: { windowMs: [60 * 1000, 365 * 24 * 60 * 60 * 1000], maxRows: [4, 200], maxChars: [500, 40000] } };
   function settings() {

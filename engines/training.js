@@ -46,7 +46,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_training_settings_v1';
-  const DEF = { enabled: false, maxAbilities: 48, maxRows: 96, maxStageNames: 6, pointsCap: 1000 };
+  const DEF = { enabled: true, maxAbilities: 48, maxRows: 96, maxStageNames: 6, pointsCap: 1000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'training',
     bounds: { maxAbilities: [4, 200], maxRows: [8, 400], maxStageNames: [2, 12], pointsCap: [10, 100000] } };
   function settings() {

@@ -15,7 +15,7 @@
     try { return WA.clock.now(site); } catch (e) { return Date.now(); }
   };
   const LS_KEY = 'worldaxis_life_settings_v1';
-  const DEF = { enabled: false, maxPeople: 4, maxItems: 2 };
+  const DEF = { enabled: true, maxPeople: 4, maxItems: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'life', bounds: { maxPeople: [1, 8], maxItems: [1, 4] } };
   const COMMITMENTS = ['promise', 'debt', 'secret', 'cooperation', 'boundary'];
 

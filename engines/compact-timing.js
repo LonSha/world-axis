@@ -45,7 +45,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_compacttiming_settings_v1';
-  const DEF = { enabled: false, ttlMs: 300000, foldableTrigger: 8000, warmHoldMaxTokens: 40000, warmHoldBudgetRatio: 80, minMessages: 10, tailTokens: 5000 };
+  const DEF = { enabled: true, ttlMs: 300000, foldableTrigger: 8000, warmHoldMaxTokens: 40000, warmHoldBudgetRatio: 80, minMessages: 10, tailTokens: 5000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'compactTiming',
     bounds: { ttlMs: [30000, 7200000], foldableTrigger: [500, 200000], warmHoldMaxTokens: [1000, 400000], warmHoldBudgetRatio: [10, 100], minMessages: [2, 100], tailTokens: [200, 60000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

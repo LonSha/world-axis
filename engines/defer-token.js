@@ -39,7 +39,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_defertoken_settings_v1';
-  const DEF = { enabled: false, minDelayMs: 0, maxSlots: 32, maxQueue: 16 };
+  const DEF = { enabled: true, minDelayMs: 0, maxSlots: 32, maxQueue: 16 };
   const __REG = { key: LS_KEY, def: DEF, module: 'deferToken',
     bounds: { minDelayMs: [0, 60000], maxSlots: [4, 128], maxQueue: [1, 64] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

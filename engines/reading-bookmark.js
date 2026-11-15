@@ -38,7 +38,7 @@
   function clockNow(site) { try { return WA.clock.now(site || 'reading-bookmark'); } catch (e) { return Date.now(); } }
 
   const LS_KEY = 'worldaxis_reading_bookmark_settings_v1';
-  const DEF = { enabled: false, maxCatchupFloors: 12 };
+  const DEF = { enabled: true, maxCatchupFloors: 12 };
   const __REG = { key: LS_KEY, def: DEF, module: 'readingBookmark' };
 
   function settings() {

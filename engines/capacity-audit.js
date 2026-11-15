@@ -46,7 +46,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_capacity_audit_settings_v1';
-  const DEF = { enabled: false, maxRows: 24, nearRatio: 0.8 };
+  const DEF = { enabled: true, maxRows: 24, nearRatio: 0.8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'capacityAudit',
     bounds: { maxRows: [4, 96], nearRatio: [0.5, 1] } };
   function getSettings() {

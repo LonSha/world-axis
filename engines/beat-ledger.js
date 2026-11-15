@@ -46,7 +46,7 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_beat_ledger_settings_v1';
   const STATUSES = ['pending', 'landed'];
-  const DEF = { enabled: false, maxRows: 32 };
+  const DEF = { enabled: true, maxRows: 32 };
   const __REG = { key: LS_KEY, def: DEF, module: 'beatLedger', bounds: { maxRows: [8, 64] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

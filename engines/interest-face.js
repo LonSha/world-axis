@@ -43,7 +43,7 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_interestface_settings_v1';
-  const DEF = { enabled: false, radius: 2, budget: 4, maxPending: 8, maxObservers: 32 };
+  const DEF = { enabled: true, radius: 2, budget: 4, maxPending: 8, maxObservers: 32 };
   const __REG = { key: LS_KEY, def: DEF, module: 'interestFace',
     bounds: { radius: [0, 16], budget: [1, 16], maxPending: [1, 32], maxObservers: [4, 64] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

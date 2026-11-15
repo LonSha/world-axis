@@ -21,7 +21,7 @@
   const INJECT_MODULE_SHOW = 5;  // 注入块事件条数上限
   const AUTO_MODES = ['manual', 'per_turn', 'every_n', 'dice'];
   const LS_KEY = 'worldaxis_parallel_settings_v1';
-  const PW_DEF = { enabled: false, autoMode: 'manual', autoInterval: 5, diceEnabled: false, detailLevel: 'normal' };
+  const PW_DEF = { enabled: true, autoMode: 'manual', autoInterval: 5, diceEnabled: false, detailLevel: 'normal' };
   const PW_BOUNDS = { autoInterval: [1, 50] };
   const __PWR = { key: LS_KEY, def: PW_DEF, bounds: PW_BOUNDS, module: 'parallelWorld' };
 

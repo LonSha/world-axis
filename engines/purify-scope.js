@@ -35,7 +35,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_purifyscope_settings_v1';
-  const DEF = { enabled: false, maxBlocks: 64 };
+  const DEF = { enabled: true, maxBlocks: 64 };
   const __REG = { key: LS_KEY, def: DEF, module: 'purifyScope', bounds: { maxBlocks: [1, 256] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

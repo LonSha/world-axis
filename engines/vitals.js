@@ -50,7 +50,7 @@
   /** v2.230.0：决策时间统一出口（裸调 Date.now 会绕过冻结，回放对不上时只能全库通读）。 */
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_vitals_settings_v1';
-  const DEF = { enabled: false, maxRows: 24, cycleMin: 21, cycleMax: 35, gestDays: 280, lactDays: 180 };
+  const DEF = { enabled: true, maxRows: 24, cycleMin: 21, cycleMax: 35, gestDays: 280, lactDays: 180 };
   const __REG = { key: LS_KEY, def: DEF, module: 'vitals',
     bounds: { maxRows: [4, 48], cycleMin: [18, 30], cycleMax: [28, 45], gestDays: [200, 320], lactDays: [30, 720] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

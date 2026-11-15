@@ -25,7 +25,7 @@
 
   const LS_KEY = 'worldaxis_betrothal_alliance_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 门第差每差一级，需要的妆匛倍率增加多少。 */
     dowryPerRankGap: 0.25,
     /** 门第差超过这个级数，议成的可能性归零（如实报议不成）。 */

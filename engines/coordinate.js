@@ -31,7 +31,7 @@
   /** v2.230.0：决策时间统一出口（裸调 Date.now 会绕过冻结，回放对不上时只能全库通读）。 */
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_coordinate_settings_v1';
-  const DEF = { enabled: false, maxAnchors: 64, maxRows: 64, captureFloors: 6, bridge: true };
+  const DEF = { enabled: true, maxAnchors: 64, maxRows: 64, captureFloors: 6, bridge: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'coordinate',
     bounds: { maxAnchors: [8, 256], maxRows: [8, 256], captureFloors: [2, 24] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

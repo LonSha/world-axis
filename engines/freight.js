@@ -37,7 +37,7 @@
   var MS_PER_DAY = 86400000;
   // ── 设置 ──
   var LS_KEY = 'worldaxis_freight_settings_v1';
-  var DEF = { enabled: false, maxShipments: 32 };
+  var DEF = { enabled: true, maxShipments: 32 };
   var __REG = { key: LS_KEY, def: DEF, module: 'freight',
     bounds: { maxShipments: [4, 64] } };
   function settings() {

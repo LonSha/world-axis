@@ -28,7 +28,7 @@
   /** v2.230.0：决策时间统一出口（裸调 Date.now 会绕过冻结，回放对不上时只能全库通读）。 */
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_dream_settings_v1';
-  const DEF = { enabled: false, maxThreads: 24, maxDeviations: 24, maxVolumes: 40, maxVolumeKB: 512 };
+  const DEF = { enabled: true, maxThreads: 24, maxDeviations: 24, maxVolumes: 40, maxVolumeKB: 512 };
   const __REG = { key: LS_KEY, def: DEF, module: 'dream',
     bounds: { maxThreads: [4, 96], maxDeviations: [4, 96], maxVolumes: [4, 200], maxVolumeKB: [16, 4096] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

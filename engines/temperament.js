@@ -21,7 +21,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_temperament_settings_v1';
-  const DEF = { enabled: false, maxRows: 12, maxTriggers: 8 };
+  const DEF = { enabled: true, maxRows: 12, maxTriggers: 8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'temperament', bounds: { maxRows: [2, 24], maxTriggers: [2, 16] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

@@ -36,7 +36,7 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_rhythm_settings_v1';
   const PHASES = ['Inhale', 'Hold', 'Exhale', 'Pause'];
-  const DEF = { enabled: false, coolRounds: 3, maxDevices: 24 };
+  const DEF = { enabled: true, coolRounds: 3, maxDevices: 24 };
   const __REG = { key: LS_KEY, def: DEF, module: 'rhythmLoop', bounds: { coolRounds: [1, 12], maxDevices: [4, 64] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

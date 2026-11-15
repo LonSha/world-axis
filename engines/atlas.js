@@ -34,7 +34,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_atlas_settings_v1';
-  const DEF = { enabled: false, maxPlaces: 32, maxEdges: 64, showFacts: true };
+  const DEF = { enabled: true, maxPlaces: 32, maxEdges: 64, showFacts: true };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'atlas',
     bounds: { maxPlaces: [4, 128], maxEdges: [4, 256] }

@@ -67,7 +67,7 @@
 
   const LS_KEY = 'worldaxis_farfield_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     // v2.151.0 实测自纠：**取整数天**。设置总线的 `clampNum` 对声明区间内的数一律
     //   `Math.round`（全库同一处实现），故 0.5 天这种声明落盘后会变成 1 天 ——
     //   声明与生效不一致比少一个档位更坏（用户看到的不是引擎用的）。故本键以**整数天**为口径。

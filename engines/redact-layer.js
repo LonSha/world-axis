@@ -43,7 +43,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_redact_layer_settings_v1';
-  const DEF = { enabled: false, maxDepth: 8, maxString: 20000, placeholder: '[REDACTED]' };
+  const DEF = { enabled: true, maxDepth: 8, maxString: 20000, placeholder: '[REDACTED]' };
   const __REG = { key: LS_KEY, def: DEF, module: 'redactLayer',
     bounds: { maxDepth: [1, 32], maxString: [100, 400000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

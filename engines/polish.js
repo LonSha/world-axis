@@ -36,7 +36,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_polish_settings_v1';
   const CHANNEL = 'rewrite';
-  const DEF = { enabled: false, count: 3, temperature: 70, maxTokens: 800, timeoutMs: 30000 };
+  const DEF = { enabled: true, count: 3, temperature: 70, maxTokens: 800, timeoutMs: 30000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'polish',
     bounds: { count: [2, 5], temperature: [0, 100], maxTokens: [128, 4000], timeoutMs: [5000, 120000] } };
   function settings() {

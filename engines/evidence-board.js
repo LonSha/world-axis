@@ -64,7 +64,7 @@
   function num(v) { return (typeof v === 'number' && isFinite(v)) ? v : null; }
   // ── 设置（同一格偏好键；不是世界事实，按本仓先例走 settingsBus）──
   const LS_KEY = 'worldaxis_evidence_board_settings_v1';
-  const DEF = { enabled: false, maxEdges: 40, maxCases: 6 };
+  const DEF = { enabled: true, maxEdges: 40, maxCases: 6 };
   const __REG = { key: LS_KEY, def: DEF, module: 'evidenceBoard',
     bounds: { maxEdges: [4, 96], maxCases: [1, 16] } };
   function settings() {

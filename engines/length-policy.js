@@ -39,7 +39,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_length_policy_settings_v1';
-  const DEF = { enabled: false, minTarget: 100, maxInstructionChars: 4000, stagedRenderThreshold: 5000, longFormSplitThreshold: 8000 };
+  const DEF = { enabled: true, minTarget: 100, maxInstructionChars: 4000, stagedRenderThreshold: 5000, longFormSplitThreshold: 8000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'lengthPolicy',
     bounds: { minTarget: [10, 10000], maxInstructionChars: [100, 100000], stagedRenderThreshold: [500, 50000], longFormSplitThreshold: [500, 100000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

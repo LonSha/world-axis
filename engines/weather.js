@@ -17,7 +17,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_weather_settings_v1';
-  const DEF = { enabled: false, maxItems: 4 };
+  const DEF = { enabled: true, maxItems: 4 };
   const __REG = { key: LS_KEY, def: DEF, module: 'weather', bounds: { maxItems: [1, 8] } };
   const WEATHERS = ['clear', 'rain', 'storm', 'snow', 'heat', 'fog'];
   const SEASONS = ['spring', 'summer', 'autumn', 'winter'];

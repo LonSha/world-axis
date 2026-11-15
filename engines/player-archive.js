@@ -3,7 +3,7 @@
  'use strict';
  const WA=window.WorldAxis=window.WorldAxis||{};
  const LS_KEY='worldaxis_player_archive_settings_v1';
- const DEF={enabled:false,every:5,maxWorks:12};
+ const DEF={enabled: true,every:5,maxWorks:12};
  const __REG={key:LS_KEY,module:'playerArchive',def:DEF,bounds:{every:[1,50],maxWorks:[1,24]}};
  WA.__settingsRegs=(WA.__settingsRegs||[]).filter(r=>r&&r.key!==__REG.key).concat([__REG]);
  function settings(){return WA.settingsBus.normalize(__REG,Object.assign({},__REG.def,WA.settingsBus.read(__REG)||{}));}

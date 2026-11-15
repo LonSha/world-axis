@@ -48,7 +48,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_mend_settings_v1';
-  const DEF = { enabled: false, maxRows: 12, minProgress: 2, maxSteps: 3 };
+  const DEF = { enabled: true, maxRows: 12, minProgress: 2, maxSteps: 3 };
   const __REG = { key: LS_KEY, def: DEF, module: 'mend',
     bounds: { maxRows: [4, 32], minProgress: [1, 3], maxSteps: [1, 4] } };
   function settings() {

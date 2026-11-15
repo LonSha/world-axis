@@ -49,7 +49,7 @@
 
   const LS_KEY = 'worldaxis_world_bridge_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     worldTitle: '',     // 世界观 ID（空 = 读宿主的角色名 / 聊天名）
     playerName: '',     // 玩家 ID（空 = 读宿主的 name1）
     maxLegends: 24,     // 收进来的传说环

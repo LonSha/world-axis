@@ -60,7 +60,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_production_settings_v1';
-  const DEF = { enabled: false, maxJobs: 48, maxFacilities: 12, maxCrew: 8, maxDays: 90 };
+  const DEF = { enabled: true, maxJobs: 48, maxFacilities: 12, maxCrew: 8, maxDays: 90 };
   const __REG = { key: LS_KEY, def: DEF, module: 'production',
     bounds: { maxJobs: [4, 200], maxFacilities: [1, 48], maxCrew: [1, 24], maxDays: [1, 365] } };
   function settings() {

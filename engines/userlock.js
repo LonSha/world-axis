@@ -39,7 +39,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_userlock_settings_v1';
-  const DEF = { enabled: false, maxRows: 200 };
+  const DEF = { enabled: true, maxRows: 200 };
   const __REG = { key: LS_KEY, def: DEF, module: 'userlock', bounds: { maxRows: [8, 512] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

@@ -48,7 +48,7 @@
   // 上限只影响**外供投影**的大小，不剪除任何世界状态（本文件全程只读，零写世界）。
   const __REG = {
     key: LS_KEY,
-    def: { enabled: false, includeHidden: false, presumeUnknown: 'hidden', maxCurrents: 20, maxEchoes: 12, maxOpinion: 8, debounceMs: 400 },
+    def: { enabled: true, includeHidden: false, presumeUnknown: 'hidden', maxCurrents: 20, maxEchoes: 12, maxOpinion: 8, debounceMs: 400 },
     bounds: { maxCurrents: [1, 80], maxEchoes: [1, 50], maxOpinion: [1, 30], debounceMs: [0, 5000] },
     // 枚举白名单：presumeUnknown 是**口径**，不是数值——非法值必须退回保守档（def），
     //   交给 bounds 的数值夹取管不了它（实测：无 enums 声明时 'wild' 会原样落盘 → 投影层的

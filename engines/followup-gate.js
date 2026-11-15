@@ -44,7 +44,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_followupgate_settings_v1';
-  const DEF = { enabled: false, idleThreshold: 300, hoursFrom: 12, hoursTo: 23, perDayCap: 2, maxItems: 24, dnd: false };
+  const DEF = { enabled: true, idleThreshold: 300, hoursFrom: 12, hoursTo: 23, perDayCap: 2, maxItems: 24, dnd: false };
   const __REG = { key: LS_KEY, def: DEF, module: 'followupGate',
     bounds: { idleThreshold: [10, 4320], hoursFrom: [0, 23], hoursTo: [0, 24], perDayCap: [1, 12], maxItems: [4, 64] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

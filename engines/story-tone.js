@@ -43,7 +43,7 @@
     conflict: '总体倾向偏向冲突：矛盾要真、代价要付，允许愈演愈烈，不得提前和稀泥。',
     tragic: '总体倾向偏向悲剧：好事不反悔，代价不可逆，允许失去与错过成为主调。'
   };
-  const DEF = { enabled: false, maxRows: 64 };
+  const DEF = { enabled: true, maxRows: 64 };
   const __REG = { key: LS_KEY, def: DEF, module: 'storyTone', bounds: { maxRows: [4, 256] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

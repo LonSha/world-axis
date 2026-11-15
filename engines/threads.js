@@ -25,7 +25,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_threads_settings_v1';
-  const DEF = { enabled: false, maxThreads: 6, maxLeads: 5 };
+  const DEF = { enabled: true, maxThreads: 6, maxLeads: 5 };
   const __REG = { key: LS_KEY, def: DEF, module: 'threads',
     bounds: { maxThreads: [1, 16], maxLeads: [1, 12] } };
   const RELIABILITY = ['hearsay', 'trace', 'document', 'testimony', 'physical'];

@@ -52,7 +52,7 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_economy_settings_v1';
   // spreadPct：定价带宽（base 上下各 spreadPct%）。带宽是「这笔价还算不算这件货的价」的界限。
-  const DEF = { enabled: false, maxGoods: 16, maxOrders: 12, maxRoutes: 8, spreadPct: 30 };
+  const DEF = { enabled: true, maxGoods: 16, maxOrders: 12, maxRoutes: 8, spreadPct: 30 };
   const __REG = { key: LS_KEY, def: DEF, module: 'economy',
     bounds: { maxGoods: [4, 48], maxOrders: [4, 32], maxRoutes: [2, 16], spreadPct: [5, 100] } };
   function settings() {

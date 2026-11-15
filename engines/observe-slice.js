@@ -41,7 +41,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_observe_slice_settings_v1';
-  const DEF = { enabled: false, maxCast: 32, maxSlices: 64, requireAction: true, requireMicroScene: true };
+  const DEF = { enabled: true, maxCast: 32, maxSlices: 64, requireAction: true, requireMicroScene: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'observeSlice',
     bounds: { maxCast: [1, 512], maxSlices: [1, 512] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

@@ -39,7 +39,7 @@
   // maxDrill 在 v2.182.0 落盘时已删：entry() 每次只下钻**一条**（ref 单值），
   //   没有「每次最多下钻几条」这个量 —— 声明它等于长出一个「点了没效果的开关」。
   //   死键扫描（v2.3.0 D6）正是为这类声明而设：要么有消费点，要么别声明。
-  const DEF = { enabled: false, maxRows: 48 };
+  const DEF = { enabled: true, maxRows: 48 };
   const __REG = { key: LS_KEY, def: DEF, module: 'chronicleView',
     bounds: { maxRows: [8, 256] } };
   function getSettings() {

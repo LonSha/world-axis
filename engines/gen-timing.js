@@ -41,7 +41,7 @@
 
   const LS_KEY = 'worldaxis_gen_timing_settings_v1';
   const DEF = {
-    enabled: false,                  // 总开关默认关闭（与仓内其余引擎同规）
+    enabled: true,                  // 总开关默认关闭（与仓内其余引擎同规）
     lambdaRate: 0.15,                // 基础渴望率（每 tick 命中的基准密度）
     growthFactor: 0.08,              // 未命中时渴望的累积系数
     maxProbability: 0.95,            // 渴望封顶

@@ -44,7 +44,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_dep_check_settings_v1';
-  const DEF = { enabled: false, maxDeps: 24, maxDegrade: 16 };
+  const DEF = { enabled: true, maxDeps: 24, maxDegrade: 16 };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'depCheck',
     bounds: { maxDeps: [4, 64], maxDegrade: [4, 48] }

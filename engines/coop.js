@@ -50,7 +50,7 @@
   };
   const LS_KEY = 'worldaxis_coop_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     // 形状容忍（0 = 严格）。非 0 时：内容面顶层键数与长度都一致即视为同一状态
     //   （留给「同一批操作内先后提交」的余地）；指纹不等仍只在形状一致时才放过。
     //   默认 0：指纹不等即 stale，不做任何「尽力应用」。世界改过就是改过。

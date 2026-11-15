@@ -27,7 +27,7 @@
 
   const LS_KEY = 'worldaxis_cartography_survey_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 测绘者水平（0..1）：1 = 老练测工，0 = 路人随手画。 */
     defaultSkill: 0.6,
     /** 传闻点相对亲见点的确定性打几折。 */

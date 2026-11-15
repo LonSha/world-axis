@@ -50,7 +50,7 @@
   /** v2.230.0：决策时间统一出口（裸调 Date.now 会绕过冻结，回放对不上时只能全库通读）。 */
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_elsewhere_settings_v1';
-  const DEF = { enabled: false, maxRows: 48, maxLedger: 12, maxRecent: 3, strictCore: true };
+  const DEF = { enabled: true, maxRows: 48, maxLedger: 12, maxRecent: 3, strictCore: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'elsewhere',
     bounds: { maxRows: [8, 96], maxLedger: [2, 32], maxRecent: [1, 6] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

@@ -73,7 +73,7 @@
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const LS_KEY = 'worldaxis_faction_graph_settings_v1';
-  const DEF = { enabled: false, allyIdx: 1, maxNodes: 16, hostileIdx: 5 };
+  const DEF = { enabled: true, allyIdx: 1, maxNodes: 16, hostileIdx: 5 };
   const __REG = { key: LS_KEY, def: DEF, module: 'factionGraph',
     bounds: { allyIdx: [0, 3], maxNodes: [2, 16], hostileIdx: [4, 6] } };
 

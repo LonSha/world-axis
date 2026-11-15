@@ -34,7 +34,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_successgrade_settings_v1';
-  const DEF = { enabled: false, extremeDiv: 5, hardDiv: 2, lowTargetCut: 50,
+  const DEF = { enabled: true, extremeDiv: 5, hardDiv: 2, lowTargetCut: 50,
     fumbleHighMin: 96, fumbleAt: 100 };
   const __REG = { key: LS_KEY, def: DEF, module: 'successGrade',
     bounds: { extremeDiv: [2, 20], hardDiv: [2, 10], lowTargetCut: [1, 100], fumbleHighMin: [90, 100], fumbleAt: [95, 100] } };

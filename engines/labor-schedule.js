@@ -20,7 +20,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_labor_schedule_settings_v1';
-  const DEF = { enabled: false, maxBookingsPerDay: 48, defaultSlotsPerDay: 3 };
+  const DEF = { enabled: true, maxBookingsPerDay: 48, defaultSlotsPerDay: 3 };
   const __REG = { key: LS_KEY, def: DEF, module: 'laborSchedule',
     bounds: { maxBookingsPerDay: [6, 120], defaultSlotsPerDay: [1, 6] } };
 

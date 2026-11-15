@@ -28,7 +28,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_compare_settings_v1';
-  const DEF = { enabled: false, maxLines: 4000, maxChars: 400000, maxVariants: 96, strip: true };
+  const DEF = { enabled: true, maxLines: 4000, maxChars: 400000, maxVariants: 96, strip: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'compare',
     bounds: { maxLines: [64, 40000], maxChars: [4096, 4000000], maxVariants: [8, 512] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

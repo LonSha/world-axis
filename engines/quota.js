@@ -32,7 +32,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_quota_settings_v1';
-  const DEF = { enabled: false, shortCap: 4, longCap: 2, shortAge: 30, longAge: 50 };
+  const DEF = { enabled: true, shortCap: 4, longCap: 2, shortAge: 30, longAge: 50 };
   const __REG = { key: LS_KEY, def: DEF, module: 'quota',
     bounds: { shortCap: [1, 8], longCap: [1, 4], shortAge: [5, 60], longAge: [10, 120] } };
   function settings() {

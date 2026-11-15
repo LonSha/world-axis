@@ -36,7 +36,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_poweranchor_settings_v1';
-  const DEF = { enabled: false, maxRows: 32, band: 1 };
+  const DEF = { enabled: true, maxRows: 32, band: 1 };
   const __REG = { key: LS_KEY, def: DEF, module: 'powerAnchor', bounds: { maxRows: [4, 128], band: [0, 5] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

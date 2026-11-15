@@ -38,7 +38,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_ephemeralscrub_settings_v1';
-  const DEF = { enabled: false, maxEntries: 24, minLen: 6, tidyBlanks: true };
+  const DEF = { enabled: true, maxEntries: 24, minLen: 6, tidyBlanks: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'ephemeralScrub', bounds: { maxEntries: [4, 128], minLen: [1, 200] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function settings() {

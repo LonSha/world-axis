@@ -37,7 +37,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_rumor_settings_v1';
-  const DEF = { enabled: false, maxChains: 8, maxHops: 6, maxSuppressed: 4 };
+  const DEF = { enabled: true, maxChains: 8, maxHops: 6, maxSuppressed: 4 };
   const __REG = { key: LS_KEY, def: DEF, module: 'rumor',
     bounds: { maxChains: [1, 16], maxHops: [1, 12], maxSuppressed: [1, 8] } };
   // 四层单一真源。数组顺序即「可信度序」：只许向下走，不许向上走。

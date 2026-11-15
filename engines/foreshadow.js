@@ -48,7 +48,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_foreshadow_settings_v1';
-  const DEF = { enabled: false, staleMs: 3600000, maxItems: 5, cap: 30 };
+  const DEF = { enabled: true, staleMs: 3600000, maxItems: 5, cap: 30 };
   const __REG = { key: LS_KEY, def: DEF, module: 'foreshadow', bounds: { staleMs: [60000, 86400000], maxItems: [1, 12], cap: [1, 60] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

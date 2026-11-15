@@ -34,7 +34,7 @@
 
   const LS_KEY = 'worldaxis_mood_glide_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     halfLifeMinutes: 180,     // 半衰期：默认三小时，一次闹脾气到天黑就淡了
     longingRate: 0.06,        // 分离每分钟的思念增量（封顶见 longingCap）
     longingCap: 1.0,

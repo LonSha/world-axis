@@ -47,7 +47,7 @@
   /** v2.230.0：决策时间统一出口（裸调 Date.now 会绕过冻结，回放对不上时只能全库通读）。 */
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_relation_graph_settings_v1';
-  const DEF = { enabled: false, maxEdges: 128, defaultWeight: 5, maxLabel: 40 };
+  const DEF = { enabled: true, maxEdges: 128, defaultWeight: 5, maxLabel: 40 };
   const __REG = { key: LS_KEY, def: DEF, module: 'relationGraph',
     bounds: { maxEdges: [4, 2000], defaultWeight: [0, 10], maxLabel: [4, 80] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

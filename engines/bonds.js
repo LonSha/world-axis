@@ -19,7 +19,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_bonds_settings_v1';
-  const DEF = { enabled: false, maxRows: 12 };
+  const DEF = { enabled: true, maxRows: 12 };
   const __REG = { key: LS_KEY, def: DEF, module: 'bonds', bounds: { maxRows: [4, 24] } };
   const TYPES = ['替身', '寄生拯救', '主权让渡', '利益同盟', '平行共存', '对手共生'];
   function settings() {

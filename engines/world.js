@@ -36,7 +36,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_world_settings_v1';
-  const DEF = { enabled: false, maxPlaces: 8, maxEvents: 4, maxItems: 3, maxJourneys: 4 };
+  const DEF = { enabled: true, maxPlaces: 8, maxEvents: 4, maxItems: 3, maxJourneys: 4 };
   const __REG = { key: LS_KEY, def: DEF, module: 'world',
     bounds: { maxPlaces: [1, 24], maxEvents: [1, 12], maxItems: [1, 6] } };
   const PLACE_KINDS = ['home', 'work', 'market', 'public', 'wild', 'sacred'];

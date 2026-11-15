@@ -26,7 +26,7 @@
 
   const LS_KEY = 'worldaxis_lingua_broker_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 双方方言距离（0=同语，1=毫不相通）折算成误译的基础概率系数。 */
     misreadPerDistance: 0.55,
     /** 有掮客时误译概率打折（掮客水平越高折越狠）。 */

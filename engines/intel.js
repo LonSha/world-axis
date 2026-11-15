@@ -17,7 +17,7 @@
     try { return WA.clock.now(site); } catch (e) { return Date.now(); }
   };
   const LS_KEY = 'worldaxis_intel_settings_v1';
-  const DEF = { enabled: false, maxLinks: 4, maxItems: 2 };
+  const DEF = { enabled: true, maxLinks: 4, maxItems: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'intel', bounds: { maxLinks: [1, 8], maxItems: [1, 4] } };
   const LEVELS = ['rumor', 'report', 'witness', 'record'];
   const CONF = { rumor: 25, report: 55, witness: 75, record: 90 };

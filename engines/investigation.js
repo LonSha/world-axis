@@ -37,7 +37,7 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_investigation_settings_v1';
-  var DEF = { enabled: false, maxClues: 32, maxEvidence: 64 };
+  var DEF = { enabled: true, maxClues: 32, maxEvidence: 64 };
   var __REG = { key: LS_KEY, def: DEF, module: 'investigation',
     bounds: { maxClues: [4, 128], maxEvidence: [8, 256] } };
   function getSettings() {

@@ -25,7 +25,7 @@
     try { return WA.clock.now(site); } catch (e) { return Date.now(); }
   };
   const LS_KEY = 'worldaxis_causal_settings_v1';
-  const DEF = { enabled: false, maxChains: 4, maxItems: 2 };
+  const DEF = { enabled: true, maxChains: 4, maxItems: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'causal', bounds: { maxChains: [1, 8], maxItems: [1, 4] } };
   // 阶段：原因待定 → 条件未足 → 已行动 → 直接后果落地 → 延迟后果在途 → 终态
   const STAGES = ['open', 'pending', 'acted', 'immediate', 'delayed'];

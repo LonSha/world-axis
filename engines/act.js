@@ -61,7 +61,7 @@
   //   逐字等价：整条表达式同被本 try/catch 包住。
   const clockNow = function (site) { try { return exec() ? exec().now(site || 'act', function () { return WA.clock ? WA.clock.now(site || 'act') : Date.now(); }) : (WA.clock ? WA.clock.now(site || 'act') : Date.now()); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_act_settings_v1';
-  const DEF = { enabled: false, maxActs: 8, maxRun: 4, defaultDurationMs: 60000 };
+  const DEF = { enabled: true, maxActs: 8, maxRun: 4, defaultDurationMs: 60000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'act',
     bounds: { maxActs: [1, 24], maxRun: [1, 12], defaultDurationMs: [1000, 3600000] } };
   function settings() {

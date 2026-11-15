@@ -27,7 +27,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_aftermath_settings_v1';
-  var DEF = { enabled: false, maxEffects: 48 };
+  var DEF = { enabled: true, maxEffects: 48 };
   var __REG = { key: LS_KEY, def: DEF, module: 'aftermath',
     bounds: { maxEffects: [4, 128] } };
   function getSettings() {

@@ -46,7 +46,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_perf_baseline_settings_v1';
-  const DEF = { enabled: false, nearRatio: 0.8 };
+  const DEF = { enabled: true, nearRatio: 0.8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'perfBaseline',
     bounds: { nearRatio: [0.5, 1] } };
   function getSettings() {

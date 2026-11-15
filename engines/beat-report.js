@@ -55,7 +55,7 @@
   const LS_KEY = 'worldaxis_beat_report_settings_v1';
   /** 四值白名单（表外一律拒收，绝不降级）。 */
   const VERDICTS = ['pass', 'adjust', 'setup', 'reject'];
-  const DEF = { enabled: false, strikesPerChapter: 3, redesignPerChapter: 1, minGapRounds: 3, maxLog: 24 };
+  const DEF = { enabled: true, strikesPerChapter: 3, redesignPerChapter: 1, minGapRounds: 3, maxLog: 24 };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'beatReport',
     bounds: {

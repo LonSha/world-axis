@@ -47,7 +47,7 @@
   const LS_KEY = 'worldaxis_plan_settings_v1';
   // N2（v2.220.0）：新增两格——`autoAdopt`（自动采用开关，**默认关**）与 `adoptBudget`（每轮自动
   //   采用的预算上限）。「默认只建议」是 N2 的第一条边界：不开这一格，candidates 永远只读。
-  const DEF = { enabled: false, maxSteps: 4, maxPlans: 12, maxTries: 3, autoAdopt: false, adoptBudget: 2 };
+  const DEF = { enabled: true, maxSteps: 4, maxPlans: 12, maxTries: 3, autoAdopt: false, adoptBudget: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'plan',
     bounds: { maxSteps: [1, 8], maxPlans: [1, 24], maxTries: [1, 6], adoptBudget: [0, 8] } };
   function settings() {

@@ -59,7 +59,7 @@
 
 
   const LS_KEY = 'worldaxis_source_reconcile_settings_v1';
-  const DEF = { enabled: false, keepRevokedCap: 50, baselineDeltaCap: 5000 };
+  const DEF = { enabled: true, keepRevokedCap: 50, baselineDeltaCap: 5000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'sourceReconcile',
     bounds: { keepRevokedCap: [0, 200], baselineDeltaCap: [100, 100000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

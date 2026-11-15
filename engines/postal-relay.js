@@ -26,7 +26,7 @@
 
   const LS_KEY = 'worldaxis_postal_relay_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 每站换马与交接的固定耗时（小时）。0 会让「接力」变成「不接力」。 */
     relayHoursPerStation: 0.5,
     /** 驿马常规速度（公里/小时）。 */

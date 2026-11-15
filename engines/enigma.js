@@ -27,7 +27,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_enigma_settings_v1';
-  const DEF = { enabled: false, maxRows: 24, maxKnowers: 8 };
+  const DEF = { enabled: true, maxRows: 24, maxKnowers: 8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'enigma', bounds: { maxRows: [4, 64], maxKnowers: [1, 16] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

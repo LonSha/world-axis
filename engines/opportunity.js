@@ -55,7 +55,7 @@
   const LS_KEY = 'worldaxis_opportunity_settings_v1';
   // defaultWindowMs 的语义是**本模块给机会的默认宽限**（源未记期限时用它），
   //   不是「源记录的期限」——故凡是用了它的行，windowBasis 一律报 'default'。
-  const DEF = { enabled: false, maxOpen: 4, defaultWindowMs: 86400000 };
+  const DEF = { enabled: true, maxOpen: 4, defaultWindowMs: 86400000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'opportunity',
     bounds: { maxOpen: [1, 12], defaultWindowMs: [60000, 604800000] } };
   function settings() {

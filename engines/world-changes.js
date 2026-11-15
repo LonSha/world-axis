@@ -2,7 +2,7 @@
 (function(){
  'use strict';
  const WA=window.WorldAxis=window.WorldAxis||{};
- const REG={key:'worldaxis_world_changes_settings_v1',module:'worldChanges',def:{enabled:false}};
+ const REG={key:'worldaxis_world_changes_settings_v1',module:'worldChanges',def:{enabled: true}};
  WA.__settingsRegs=(WA.__settingsRegs||[]).concat([REG]);
  function settings(){return WA.settingsBus.normalize(REG,Object.assign({},REG.def,WA.settingsBus.read(REG)||{}));}
  let last=null;

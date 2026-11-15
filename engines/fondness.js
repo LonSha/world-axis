@@ -55,7 +55,7 @@
   const LS_KEY = 'worldaxis_fondness_settings_v1';
   // v2.77.0: staged / mode / locked 三项为阶段授权与结算纪律的新增设置。
   //   默认值即「与 v2.76.0 逐字等价」：staged=false、mode='auto'、locked=false。
-  const DEF = { enabled: false, maxRows: 16, staged: false, mode: 'auto', locked: false };
+  const DEF = { enabled: true, maxRows: 16, staged: false, mode: 'auto', locked: false };
   const __REG = { key: LS_KEY, def: DEF, module: 'fondness', bounds: { maxRows: [2, 32] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

@@ -28,7 +28,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_era_settings_v1';
-  const DEF = { enabled: false, maxRows: 8 };
+  const DEF = { enabled: true, maxRows: 8 };
   const __REG = { key: LS_KEY, def: DEF, module: 'eraCycle', bounds: { maxRows: [2, 16] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

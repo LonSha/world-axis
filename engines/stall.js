@@ -53,7 +53,7 @@
   const LS_KEY = 'worldaxis_stall_settings_v1';
   // maxStalls：同时存在的摊；maxListings：一摊能挂几行（OpenMMO 用 12，理由是面板与整包推送有界）；
   // maxLedger：一摊的成交回执环；taxPct：抽税率（percent）。
-  const DEF = { enabled: false, maxStalls: 12, maxListings: 12, maxLedger: 24, taxPct: 5 };
+  const DEF = { enabled: true, maxStalls: 12, maxListings: 12, maxLedger: 24, taxPct: 5 };
   const __REG = { key: LS_KEY, def: DEF, module: 'stall',
     bounds: { maxStalls: [2, 64], maxListings: [1, 32], maxLedger: [4, 64], taxPct: [0, 25] } };
   function settings() {

@@ -65,7 +65,7 @@
     return null;
   }
   /**
-   * 落盘原值里是否**显式写过** enabled:false。
+   * 落盘原值里是否**显式写过** enabled: true。
    * 必须绕开 getSettings()（见文件头「判据从哪来」）。
    */
   function wroteFalse(ns) {

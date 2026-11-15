@@ -27,7 +27,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_operations_settings_v1';
-  var DEF = { enabled: false, maxProjects: 32 };
+  var DEF = { enabled: true, maxProjects: 32 };
   var __REG = { key: LS_KEY, def: DEF, module: 'operations',
     bounds: { maxProjects: [4, 128] } };
   function getSettings() {

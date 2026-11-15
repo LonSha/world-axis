@@ -33,7 +33,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_commission_settings_v1';
-  var DEF = { enabled: false, maxContracts: 24, maxStages: 8 };
+  var DEF = { enabled: true, maxContracts: 24, maxStages: 8 };
   var __REG = { key: LS_KEY, def: DEF, module: 'commission',
     bounds: { maxContracts: [2, 64], maxStages: [2, 16] } };
   function getSettings() {

@@ -37,7 +37,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_beatmask_settings_v1';
-  const DEF = { enabled: false, maxRows: 80, lead: 2 };
+  const DEF = { enabled: true, maxRows: 80, lead: 2 };
   const __REG = { key: LS_KEY, def: DEF, module: 'beatMask', bounds: { maxRows: [8, 200], lead: [0, 8] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

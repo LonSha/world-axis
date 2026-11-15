@@ -43,7 +43,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_dreamsettle_settings_v1';
-  const DEF = { enabled: false, minChars: 80, stampMark: '（这是睡着时做的梦，不是现实事件。）' };
+  const DEF = { enabled: true, minChars: 80, stampMark: '（这是睡着时做的梦，不是现实事件。）' };
   const __REG = { key: LS_KEY, def: DEF, module: 'dreamSettle', bounds: { minChars: [10, 2000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function settings() {

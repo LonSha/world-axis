@@ -35,7 +35,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_wordbudget_settings_v1';
-  const DEF = { enabled: false, targetChars: 800, ratio: 0.9 };
+  const DEF = { enabled: true, targetChars: 800, ratio: 0.9 };
   const __REG = { key: LS_KEY, def: DEF, module: 'wordBudget', bounds: { targetChars: [0, 20000], ratio: [0.1, 1] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

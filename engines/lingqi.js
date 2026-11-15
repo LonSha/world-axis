@@ -41,7 +41,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_lingqi_settings_v1';
-  const DEF = { enabled: false, maxSkills: 64, maxListRows: 32, requireConfirmForHigh: true };
+  const DEF = { enabled: true, maxSkills: 64, maxListRows: 32, requireConfirmForHigh: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'lingqi',
     bounds: { maxSkills: [1, 256], maxListRows: [4, 128] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

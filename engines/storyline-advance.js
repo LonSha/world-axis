@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
-  const REG = {key:'worldaxis_storyline_advance_settings_v1',module:'storylineAdvance',def:{enabled:false,turnsPerStage:3},bounds:{turnsPerStage:[1,30]}};
+  const REG = {key:'worldaxis_storyline_advance_settings_v1',module:'storylineAdvance',def:{enabled: true,turnsPerStage:3},bounds:{turnsPerStage:[1,30]}};
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([REG]);
   function settings(){return WA.settingsBus.normalize(REG,Object.assign({},REG.def,WA.settingsBus.read(REG)));}
   const stats={runs:0,moved:0,skipped:0,failed:0};

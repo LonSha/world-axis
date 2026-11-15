@@ -35,7 +35,7 @@
 
   const LS_KEY = 'worldaxis_collab_settings_v1';
   // v2.139.0（E10）：协作任务两枚上界。任务表与三张旧表各自夹 —— 上限不是同一条。
-  const DEF = { enabled: false, maxSessions: 32, maxQueue: 128, maxConflicts: 64, maxActor: 60,
+  const DEF = { enabled: true, maxSessions: 32, maxQueue: 128, maxConflicts: 64, maxActor: 60,
     maxTasks: 24, maxPartners: 8 };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'collab',

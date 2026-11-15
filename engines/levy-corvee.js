@@ -25,7 +25,7 @@
 
   const LS_KEY = 'worldaxis_levy_corvee_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 一户一年能承担的「役」折算（同一把尺子，不分实物/力役）。 */
     perHouseholdCapacity: 10,
     /** 征发超过这个比例（相对户承受力）就开始逼出逃户。 */

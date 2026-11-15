@@ -76,7 +76,7 @@
   // 管辖名单与国库账用**文本**（逗号分隔 / 空串）而不是数组：settingsBus 的默认值
   //   走的是深拷贝与类型校验，数组默认在部分路径上会被规整成字符串 —— 与其猜它，
   //   不如自己定成文本再解析（「制度可配置」要求它必须能被面板直接编辑）。
-  const DEF = { enabled: false, maxCases: 24, maxExhibits: 96, maxRulings: 48, maxPenalties: 48,
+  const DEF = { enabled: true, maxCases: 24, maxExhibits: 96, maxRulings: 48, maxPenalties: 48,
     minGrounds: 1, jurisdictions: '', treasury: '', viewer: '' };
   const __REG = { key: LS_KEY, def: DEF, module: 'ruling',
     bounds: { maxCases: [2, 96], maxExhibits: [4, 240], maxRulings: [2, 120], maxPenalties: [2, 120],

@@ -42,7 +42,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_elapsed_evidence_settings_v1';
-  const DEF = { enabled: false, minConfidence: 0.9, maxMinutes: 10080 };
+  const DEF = { enabled: true, minConfidence: 0.9, maxMinutes: 10080 };
   const __REG = { key: LS_KEY, def: DEF, module: 'elapsedEvidence',
     bounds: { minConfidence: [0.5, 1], maxMinutes: [60, 525600] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

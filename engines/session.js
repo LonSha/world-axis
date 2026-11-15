@@ -43,7 +43,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_session_settings_v1';
-  const DEF = { enabled: false, maxSeats: 8, maxLog: 64, windowMs: 3600000 };
+  const DEF = { enabled: true, maxSeats: 8, maxLog: 64, windowMs: 3600000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'session',
     bounds: { maxSeats: [2, 16], maxLog: [16, 256], windowMs: [300000, 86400000] } };
   function settings() {

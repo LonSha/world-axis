@@ -55,7 +55,7 @@
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   const LS_KEY = 'worldaxis_ensemble_settings_v1';
-  const DEF = { enabled: false, strategy: 'first', maxModels: 3, blendChannel: 'judge', timeoutMs: 60000 };
+  const DEF = { enabled: true, strategy: 'first', maxModels: 3, blendChannel: 'judge', timeoutMs: 60000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'ensemble',
     bounds: { maxModels: [2, 6], timeoutMs: [5000, 300000] } };
   const STRATEGIES = ['first', 'vote', 'blend'];

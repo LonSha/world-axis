@@ -53,7 +53,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_plan_roster_settings_v1';
-  const DEF = { enabled: false, closureCap: 6, sharedEventCap: 12 };
+  const DEF = { enabled: true, closureCap: 6, sharedEventCap: 12 };
   const __REG = { key: LS_KEY, def: DEF, module: 'planRoster',
     bounds: { closureCap: [1, 24], sharedEventCap: [0, 48] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

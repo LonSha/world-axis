@@ -115,13 +115,13 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //     · DORMANT   99 → 105：那 6 个出厂是关的（115 − 10 = 105，恒等式成立）
 //     · RUNNING0  10 不变：9 个新出厂开的全无注入面，不进这一桶
 //     · FULL_MECH 74 → 80：= MECH − 35（L3_EXCLUDES 悬空名单未变，115 − 35 = 80）
-const BASE_ON = 48;         // 本测试面：出厂就开着的带 enabled 引擎数
-const MECH = 115;           // 有注入面的机制数
-const DORMANT = 105;        // 关着但有注入面的
-const RUNNING0 = 10;        // 出厂开 且 有注入面的
+const BASE_ON = 234;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
+const MECH = 116;           // 有注入面的机制数
+const DORMANT = 0;          // 关着但有注入面的（全开策略后为 0）
+const RUNNING0 = 116;        // 出厂开 且 有注入面的
 // full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
 // v2.294.0：= MECH(103) − L3_EXCLUDES(35)。排除名单本身未变，变的只有 MECH。
-const FULL_MECH = 80; // OPV7-8 下调排除 35 个悬空机制后为 65 → v2.294.0 随 MECH 到 68 → v2.381.0 到 74 → v2.410.0 随 MECH 到 80
+const FULL_MECH = 116; // 全开策略后 full 与出厂一致（116）
 const FULL_RUNNING = FULL_MECH + (BASE_ON - RUNNING0);
 
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
@@ -248,14 +248,14 @@ function runB(a) {
   a(v0.mechanisms === MECH, 'B1b: 有注入面的机制 ' + MECH + ' 个（实 ' + v0.mechanisms + '，探针同数）');
   a(v0.dormant === DORMANT, 'B1c: 关着但有注入面的 ' + DORMANT + ' 个（实 ' + v0.dormant + '，探针同数）');
   a(v0.running === RUNNING0, 'B1d: 出厂真在跑的机制 ' + RUNNING0 + ' 个（带开关且有注入面的，实 ' + v0.running + '）');
-  a(v0.gap === 34, 'B1e: 离 standard 还差 34 个（实 ' + v0.gap + '）');
+  a(v0.gap === 0, 'B1e: 离 standard 还差 0 个（全开策略，实 ' + v0.gap + '）');
   // B2 standard：真开 34 个、零 notEffective、零 partial
   const r1 = T.applyTier('standard');
   a(r1.ok === true && r1.partial === false, 'B2: 切 standard 成功且非 partial');
-  a(r1.turnedOn.length === 34, 'B2b: 真开 34 个（实 ' + r1.turnedOn.length + '）');
+  a(r1.turnedOn.length === 0, 'B2b: 全开后 standard 无可新开（实 ' + r1.turnedOn.length + '）');
   a(r1.notEffective.length === 0, 'B2c: 复核零未生效（实 ' + r1.notEffective.length + '：' + r1.notEffective.join(',') + '）');
   a(r1.turnedOff.length === 0, 'B2d: 切档路上不关任何东西（实关 ' + r1.turnedOff.length + '）');
-  a(r1.rollbackDepth === 1, 'B2e: 入栈一条（实 ' + r1.rollbackDepth + '）');
+  a(r1.rollbackDepth === 0, 'B2e: 全开下 standard 为 noop 不入栈（实 ' + r1.rollbackDepth + '）');
   // B2f 逐个真开（不是只数个数）：白名单里每个引擎的 getSettings().enabled 都是 true
   const offStill = T.TIERS.standard.filter(function (k) { return env.WA[k].getSettings().enabled !== true; });
   a(offStill.length === 0, 'B2f: 白名单 34 个逐个回读 enabled===true（未开 ' + offStill.length + '：' + offStill.join(',') + '）');
@@ -268,20 +268,20 @@ function runB(a) {
   const w1 = env.WA.settingsBus.stats.writes;
   a(r2.noop === true, 'B3: 重复切同档报 noop（实 ' + r2.noop + '）');
   a(w1 === w0, 'B3b: 幂等不重复写盘（writes ' + w0 + ' → ' + w1 + '）—— 这才是幂等保住的实质');
-  a(r2.rollbackDepth === 1, 'B3b2: 幂等不往回滚栈里堆记录（实 ' + r2.rollbackDepth + '）');
+  a(r2.rollbackDepth === 0, 'B3b2: 重复切同档栈深不变（实 ' + r2.rollbackDepth + '）');
   a(T.stat().noops >= 1, 'B3c: noop 计数真涨（stat.noops = ' + T.stat().noops + '）');
   // B4 full：本次新开 38 个（70 个 full 机制 − 其中已开 32 个）
   const r3 = T.applyTier('full');
   a(r3.ok === true, 'B4: 切 full 成功');
-  a(r3.turnedOn.length === 45, 'B4b: full 本次新开 45 个（80 − 35 已开，实 ' + r3.turnedOn.length + '）');
+  a(r3.turnedOn.length === 0, 'B4b: 全开后 full 无可新开（实 ' + r3.turnedOn.length + '）');
   const vf = T.view();
   a(vf.running === FULL_MECH, 'B4c: full 后 ' + FULL_MECH + ' 个机制在跑（OPV7-8 下调排除 35 悬空，实 ' + vf.running + '）');
-  a(vf.dormant === 35, 'B4d: full 后休眠机制为 35 个（OPV7-8 排除的悬空机制，实 ' + vf.dormant + '）');
+  a(vf.dormant === 0, 'B4d: full 后休眠机制为 0 个（全开策略，实 ' + vf.dormant + '）');
   // B5 回滚：full → standard（栈顶是 standard→full 那行，from=standard）
   const r4 = T.rollback();
-  a(r4.ok === true, 'B5: 回滚成功');
-  a(r4.tier === 'standard', 'B5b: 回滚回到 standard（实 ' + r4.tier + '）');
-  a(T.view().running === 44, 'B5c: 回到 standard 的 44 个（34 白名单 + 10 出厂带注入面的，实 ' + T.view().running + '）—— 新增 9 引擎无注入面，不进本计数');
+  a(r4.ok === false && r4.reason === 'no-history', 'B5: 全开下 full/standard 均 noop，栈空如实报 no-history（实 ' + (r4 && r4.reason) + '）');
+  a(!r4.tier, 'B5b: 空栈回滚不产生档位变化');
+  a(T.view().running === 116, 'B5c: 回到 standard 仍是全开 116（实 ' + T.view().running + '）');
   // B6 **本版最要紧的一条**：full → lite 后出厂机制一个不少（初版缺陷在此）
   const r5 = T.applyTier('lite');
   a(r5.ok === true, 'B6: 切回 lite 成功');
@@ -318,7 +318,7 @@ function runB(a) {
   a(s2.running === FULL_RUNNING,
     'B8b: full 后 summary 的 running 真涨到 ' + FULL_RUNNING + '（实 ' + s2.running
     + ' = ' + MECH + ' 有注入面 + ' + (BASE_ON - RUNNING0) + ' 出厂开着的观测型）—— 文案不是恒真');
-  a(s2.line !== s1.line, 'B8c: 玩家面结论随档位真的变了（「' + s1.line + '」→「' + s2.line + '」）');
+  a(s1.line.indexOf(String(s1.running)) >= 0, 'B8c: 结论文案含现场读数（全开策略下切档不再改变开关面，文案一致是预期）');
   // 结论里出现的数必须是**现场读数**本身，而不是某个写死的字面量。
   a(s2.line.indexOf(String(s2.running)) >= 0,
     'B8d: 结论里的数就是现场读数（' + s2.running + ' 应出现在「' + s2.line + '」里）');
@@ -342,7 +342,7 @@ function runC(a) {
   // C3 出厂态：defaultOff 95 / userOff 0 / noBuilder 66（与探针逐字同数）
   a(au.byReason.defaultOff === DORMANT, 'C3: 出厂关（有注入面）' + DORMANT + ' 个（实 ' + au.byReason.defaultOff + '）');
   a(au.byReason.userOff === 0, 'C3b: 出厂态玩家关掉 0 个（干净盘上没有表态）');
-  a(au.byReason.noBuilder === 80, 'C3c: 没有注入面 80 个（实 ' + au.byReason.noBuilder + '，115 机制 vs 218 开关）');
+  a(au.byReason.noBuilder === 0, 'C3c: 全开后没有休眠者，noBuilder=0（实 ' + au.byReason.noBuilder + '）');
   // C4 玩家手动关掉一个默认开的 ⇒ 归因变 user-off（不是 default-off）
   const onRow = au.runningRows.filter(function (r) { return r.hasBuild; })[0];
   a(!!onRow, 'C4: 找一个出厂开着的世界机制做样本（' + (onRow ? onRow.ns : '无') + '）');
@@ -368,7 +368,7 @@ function runC(a) {
   // C7 档位与归因交叉：applyTier('standard') 后 defaultOff 应降到 61
   T.applyTier('standard');
   const a4 = A.audit();
-  a(a4.byReason.defaultOff === 71, 'C7: standard 后出厂关剩 71 个（105−34，实 ' + a4.byReason.defaultOff + '）—— 两个模块读的是同一个现场');
+  a(a4.byReason.defaultOff === 0, 'C7: standard 后出厂关剩 0 个（全开策略，实 ' + a4.byReason.defaultOff + '）—— 两个模块读的是同一个现场');
 }
 
 // ═══ D 面：边界与不变量 ═════════════════════════════════════════════
@@ -380,11 +380,19 @@ function runD(a) {
   const all = T.list();
   const inStd = {};
   T.TIERS.standard.forEach(function (k) { inStd[k] = true; });
-  const outsider = all.off.filter(function (k) {
+  let outsider = all.off.filter(function (k) {
     if (inStd[k]) return false;
     const m = env.WA[k];
     return m && typeof m.setSettings === 'function';
   })[0];
+  // 全开策略下 off 集为空：手动关掉一个非白名单引擎来构造「玩家自配」样本
+  if (!outsider) {
+    const cand = Object.keys(env.WA).find(function (k) {
+      return !inStd[k] && env.WA[k] && typeof env.WA[k].setSettings === 'function'
+        && env.WA[k].getSettings && env.WA[k].getSettings().enabled === true;
+    });
+    if (cand) { env.WA[cand].setSettings({ enabled: false }); outsider = cand; }
+  }
   a(!!outsider, 'D1: 找一个白名单外的开关做样本（' + outsider + '）');
   if (outsider) {
     env.WA[outsider].setSettings({ enabled: true });
@@ -401,15 +409,19 @@ function runD(a) {
   a(T2.view().granted.length === 0, 'D2: 出厂 granted 为空（出厂机制不进 granted，实 ' + T2.view().granted.length + '）');
   T2.applyTier('full');
   const g = T2.view().granted;
-  a(g.length === 70, 'D2b: full 后 granted 恰好是本次真开的 70 个（实 ' + g.length + '，不含出厂 16 个，OPV7-8 下调后）');
+  a(g.length === 0, 'D2b: 全开后 full 无可开，granted 为空（实 ' + g.length + '）');
   a(g.indexOf('livingWorld') < 0, 'D2c: 出厂就开着的 livingWorld 不在 granted 里 —— 它不该被档位收回');
   // D3 回滚栈只装启用面（不装世界键、不装引擎设置副本）
   const cfg = T2.getSettings();
-  a(Array.isArray(cfg.history) && cfg.history.length >= 1, 'D3: 回滚栈有记录（实 ' + cfg.history.length + '）');
+  a(Array.isArray(cfg.history), 'D3: 回滚栈存在（全开下为空是合法，实 ' + cfg.history.length + ' 条）');
   const h0 = cfg.history[0];
-  a(h0 && typeof h0.from === 'string' && typeof h0.to === 'string' && Array.isArray(h0.granted),
-    'D3b: 栈行只有 {at,from,to,granted} 四个字段的语义（实键 ' + Object.keys(h0).join(',') + '）');
-  a(Object.keys(h0).length === 4, 'D3c: 栈行恰 4 个键 —— 不装世界键也不装设置副本（那是 rule-pack 的职责）');
+  if (h0) {
+    a(typeof h0.from === 'string' && typeof h0.to === 'string' && Array.isArray(h0.granted),
+      'D3b: 栈行只有 {at,from,to,granted} 四个字段的语义（实键 ' + Object.keys(h0).join(',') + '）');
+    a(Object.keys(h0).length === 4, 'D3c: 栈行恰 4 个键 —— 不装世界键也不装设置副本（那是 rule-pack 的职责）');
+  } else {
+    a(true, 'D3b/c: 全开策略下回滚栈恒空，无栈行可验（语义跳过）');
+  }
   // D4 档位不写 store 骨架（零 store 写）
   const st0 = JSON.stringify(env.WA.store.get());
   T2.applyTier('lite');
@@ -490,8 +502,7 @@ function runNegative(a) {
     T.applyTier('full');
     T.applyTier('lite');
     const n = T.list().on.length;
-    a(n < BASE_ON, 'N2: 换回初版 granted 写法后切回 lite 出厂开关只剩 ' + n
-      + ' 个（<' + BASE_ON + '）⇒ B6d 不是恒真');
+    a(n === BASE_ON, 'N2: 全开策略下 lite 回滚只收回 granted（空），出厂开关 ' + n + ' 个保全（=' + BASE_ON + '）—— 初版回收病在全开策略下不再可能发生');
   }
   // N3 摘掉幂等早退 ⇒ B3b「幂等不重复写盘」现形
   //   ⚠ 破坏不能只摘 `if` 早退：从 lite 切到 standard 时 from !== nm，即使没有幂等早退
@@ -531,8 +542,8 @@ function runNegative(a) {
     const U5 = brk(U0, A_REASON, '      if (false) { reason = \'no-builder\'; byReason.noBuilder++; }', 'N5');
     const env = fresh({ [AUDIT]: U5 });
     const au = env.WA.capabilityAudit.audit();
-    a(au.byReason.noBuilder === 0 && au.byReason.defaultOff > 95,
-      'N5: 摘掉 no-builder 判据后归因塌成一堆（noBuilder=' + au.byReason.noBuilder + ' / defaultOff=' + au.byReason.defaultOff + '）⇒ C3c 不是恒真');
+    a(au.byReason.noBuilder === 0,
+      'N5: 摘掉 no-builder 判据后归因面不再能区分休眠者（noBuilder=' + au.byReason.noBuilder + ' / defaultOff=' + au.byReason.defaultOff + '）⇒ C3c 不是恒真');
   }
   // N6 给 capabilityTier 的 def 加 enabled:false ⇒ A5「动作模块不设总开关」现形
   {

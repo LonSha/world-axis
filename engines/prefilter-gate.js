@@ -38,7 +38,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_prefilter_gate_settings_v1';
-  const DEF = { enabled: false, roleplayCap: 6, maxRoster: 512, maxAlias: 512 };
+  const DEF = { enabled: true, roleplayCap: 6, maxRoster: 512, maxAlias: 512 };
   const __REG = { key: LS_KEY, def: DEF, module: 'prefilterGate',
     bounds: { roleplayCap: [1, 64], maxRoster: [1, 4096], maxAlias: [0, 4096] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

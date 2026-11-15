@@ -85,7 +85,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_activity_settings_v1';
-  const DEF = { enabled: false, maxActivities: 24, maxSignups: 96, maxRounds: 12,
+  const DEF = { enabled: true, maxActivities: 24, maxSignups: 96, maxRounds: 12,
     maxResults: 96, maxAwards: 48, treasury: '', viewer: '' };
   const __REG = { key: LS_KEY, def: DEF, module: 'activity',
     bounds: { maxActivities: [2, 96], maxSignups: [4, 480], maxRounds: [1, 40],

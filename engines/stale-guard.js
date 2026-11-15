@@ -41,7 +41,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockWall = function (site) { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_staleguard_settings_v1';
-  const DEF = { enabled: false, maxTickets: 64, ttlMs: 600000 };
+  const DEF = { enabled: true, maxTickets: 64, ttlMs: 600000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'staleGuard', bounds: { maxTickets: [4, 256], ttlMs: [10000, 3600000] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

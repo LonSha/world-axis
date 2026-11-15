@@ -50,7 +50,7 @@
 
   const LS_KEY = 'worldaxis_memory_relay_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 一次互通最多几个次体（0 = 不限）。上限存在的理由：注入面是有预算的。 */
     maxObjects: 4,
     /** 一条摘要最多多少字（超出截断并如实报 `truncated`）。 */

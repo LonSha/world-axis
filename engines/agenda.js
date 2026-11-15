@@ -41,7 +41,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_agenda_settings_v1';
-  const DEF = { enabled: false, maxRows: 24, soonCount: 6 };
+  const DEF = { enabled: true, maxRows: 24, soonCount: 6 };
   const __REG = { key: LS_KEY, def: DEF, module: 'agenda',
     bounds: { maxRows: [4, 96], soonCount: [1, 24] } };
   function getSettings() {

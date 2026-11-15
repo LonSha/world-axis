@@ -39,7 +39,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_region_settings_v1';
-  const DEF = { enabled: false, maxEvents: 24, maxRoutes: 8, stalenessMs: 86400000 };
+  const DEF = { enabled: true, maxEvents: 24, maxRoutes: 8, stalenessMs: 86400000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'region',
     bounds: { maxEvents: [4, 64], maxRoutes: [2, 16], stalenessMs: [3600000, 604800000] } };
   function settings() {

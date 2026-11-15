@@ -30,7 +30,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_marginal_settings_v1';
-  const DEF = { enabled: false, maxRows: 16, ratio: 80, floorRatio: 20, idleRounds: 5, coolRounds: 3 };
+  const DEF = { enabled: true, maxRows: 16, ratio: 80, floorRatio: 20, idleRounds: 5, coolRounds: 3 };
   // ratio / floorRatio 都是「百分比整数」（80 = 0.8），与 clampNum 的整数夹取兼容。
   const __REG = { key: LS_KEY, def: DEF, module: 'marginal',
     bounds: { maxRows: [4, 32], ratio: [50, 100], floorRatio: [5, 50], idleRounds: [2, 12], coolRounds: [1, 10] } };

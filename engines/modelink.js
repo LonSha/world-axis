@@ -29,7 +29,7 @@
   /** v2.230.0：决策时间统一出口（裸调 Date.now 会绕过冻结，回放对不上时只能全库通读）。 */
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_modelink_settings_v1';
-  const DEF = { enabled: false, maxDrafts: 20, maxDraftKB: 512, strip: true };
+  const DEF = { enabled: true, maxDrafts: 20, maxDraftKB: 512, strip: true };
   const __REG = { key: LS_KEY, def: DEF, module: 'modelink',
     bounds: { maxDrafts: [2, 80], maxDraftKB: [16, 4096] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

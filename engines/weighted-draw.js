@@ -37,7 +37,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_weighteddraw_settings_v1';
   // ranks 是“阶名 → 基重”，按从低到高给；阶次由它在表里的位置决定。
-  const DEF = { enabled: false, softPity: 4, luckCap: 0.3, ranks: { N: 100, R: 35, SR: 10, SSR: 2.5 } };
+  const DEF = { enabled: true, softPity: 4, luckCap: 0.3, ranks: { N: 100, R: 35, SR: 10, SSR: 2.5 } };
   const __REG = { key: LS_KEY, def: DEF, module: 'weightedDraw',
     bounds: { softPity: [1, 20], luckCap: [0, 3] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

@@ -25,7 +25,7 @@
 
   const LS_KEY = 'worldaxis_sartorial_regalia_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 城门这类盘查点的默认识破力（0..1）。0 = 谁都能过，不叫盘查。 */
     gateScrutiny: 0.45,
     /** 每高一等级，风险加成（等级差 × 该值）。 */

@@ -122,7 +122,7 @@
   // v2.143.0（F4）：`dutyEnabled` 是**在岗闸门**的总开关，与 `timeEnabled`（时点）/
   //   `rangeEnabled`（空间）并列成第三轴。三者各自可关：关掉一轴不是「放宽纪律」，
   //   而是**如实报这一轴缺席**（`duty-off` / `range-off`），与「查不到」严格分开。
-  const DEF = { enabled: false, rangeEnabled: true, timeEnabled: true, dutyEnabled: true,
+  const DEF = { enabled: true, rangeEnabled: true, timeEnabled: true, dutyEnabled: true,
     // v2.144.0（F5）：`fidelityEnabled` 是**记忆失真面**的第四轴（与空间 / 时点 / 在岗并列）。
     //   关掉一轴不是「放宽纪律」，而是**如实报这一轴缺席**（`fidelity-off`）。
     fidelityEnabled: true, maxLeaks: 8 };

@@ -36,7 +36,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_chrono_settings_v1';
-  const DEF = { enabled: false, maxLayers: 64, maxDepth: 8, maxText: 200, maxDiff: 64 };
+  const DEF = { enabled: true, maxLayers: 64, maxDepth: 8, maxText: 200, maxDiff: 64 };
   const __REG = {
     key: LS_KEY, def: DEF, module: 'chrono',
     bounds: { maxLayers: [8, 512], maxDepth: [1, 32], maxText: [16, 2000], maxDiff: [1, 256] }

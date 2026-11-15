@@ -6,11 +6,11 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
-  const DEF = { enabled: false, maxItems: 4, maxChars: 2400, maxTokens: 0 };
+  const DEF = { enabled: true, maxItems: 4, maxChars: 2400, maxTokens: 0 };
   const REG = { key: 'worldaxis_inject_collector_settings_v1', def: DEF,
     module: 'injectCollector', bounds: { maxItems: [1, 12], maxChars: [400, 12000], maxTokens: [0, 12000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([REG]);
-  let last = { enabled: false, selected: 0, folded: 0, chars: 0, rows: [], faults: [] };
+  let last = { enabled: true, selected: 0, folded: 0, chars: 0, rows: [], faults: [] };
   // V8 EXV8-1：场景来源留痕。为什么要单独一格而不是塞进 last：
   //   「场景换了但选的一样」有两种完全不同的原因 —— ①场景输入根本没到（from='none'）；
   //   ②到了但这几条候选恰好不含在场人（relevance 全是 0）。两者修法相反，

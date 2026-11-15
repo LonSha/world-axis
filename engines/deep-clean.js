@@ -40,7 +40,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_deep_clean_settings_v1';
-  const DEF = { enabled: false, maxSpans: 64, maxCandidates: 200, maxTextChars: 200000 };
+  const DEF = { enabled: true, maxSpans: 64, maxCandidates: 200, maxTextChars: 200000 };
   const __REG = { key: LS_KEY, def: DEF, module: 'deepClean',
     bounds: { maxSpans: [1, 512], maxCandidates: [1, 2000], maxTextChars: [1000, 2000000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

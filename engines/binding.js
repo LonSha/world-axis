@@ -39,7 +39,7 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_binding_settings_v1';
   const SCOPES = ['chat', 'char', 'default'];
-  const DEF = { enabled: false, maxKeys: 200 };
+  const DEF = { enabled: true, maxKeys: 200 };
   const __REG = { key: LS_KEY, def: DEF, module: 'binding', bounds: { maxKeys: [8, 1000] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

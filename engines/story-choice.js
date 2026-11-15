@@ -38,7 +38,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_story_choice_settings_v1';
-  var DEF = { enabled: false, maxPending: 16, maxOptions: 6 };
+  var DEF = { enabled: true, maxPending: 16, maxOptions: 6 };
   var __REG = { key: LS_KEY, def: DEF, module: 'storyChoice',
     bounds: { maxPending: [2, 64], maxOptions: [2, 12] } };
   function getSettings() {

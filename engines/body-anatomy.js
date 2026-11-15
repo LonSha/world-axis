@@ -28,7 +28,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_body_anatomy_settings_v1';
-  const DEF = { enabled: false, maxRows: 24 };
+  const DEF = { enabled: true, maxRows: 24 };
   const __REG = { key: LS_KEY, def: DEF, module: 'bodyAnatomy', bounds: { maxRows: [4, 48] } };
   function settings() {
     return WA.settingsBus.normalize(__REG, Object.assign({}, DEF, WA.settingsBus.read(__REG)));

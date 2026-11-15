@@ -70,7 +70,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_contest_settings_v1';
-  const DEF = { enabled: false, maxScenes: 24, maxStages: 12, maxRounds: 20, maxRolls: 240, viewer: '' };
+  const DEF = { enabled: true, maxScenes: 24, maxStages: 12, maxRounds: 20, maxRolls: 240, viewer: '' };
   const __REG = { key: LS_KEY, def: DEF, module: 'contest',
     bounds: { maxScenes: [2, 96], maxStages: [2, 40], maxRounds: [1, 60], maxRolls: [24, 960] } };
   function settings() {

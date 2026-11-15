@@ -52,7 +52,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_branch_diff_v1';
-  const DEF = { enabled: false, includeHistory: false, maxRows: 200 };
+  const DEF = { enabled: true, includeHistory: false, maxRows: 200 };
   const __REG = { key: LS_KEY, def: DEF, module: 'branchDiff',
     bounds: { maxRows: [10, 1000] } };
   function settings() {

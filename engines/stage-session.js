@@ -48,7 +48,7 @@
 
   const LS_KEY = 'worldaxis_stage_session_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     /** 退出策略缺省**不给默认值**：'ask' 表示「必须由调用方显式指定」，不是「默认问一下」。 */
     defaultExitPolicy: 'ask',
     /** 块数低于此值视为空会话（异空间原文用的是「聊天条数 < 2」这一档）。 */

@@ -22,7 +22,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_pevents_settings_v1';
-  const DEF = { enabled: false, maxActive: 3 };
+  const DEF = { enabled: true, maxActive: 3 };
   const __REG = { key: LS_KEY, def: DEF, module: 'parallelEvents', bounds: { maxActive: [1, 5] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;

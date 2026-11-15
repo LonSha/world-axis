@@ -48,7 +48,7 @@
   const WA = G.WorldAxis = G.WorldAxis || {};
 
   const LS_KEY = 'worldaxis_intake_settings_v1';
-  const DEF = { enabled: false, maxPerSection: 6, goalMaxLen: 80 };
+  const DEF = { enabled: true, maxPerSection: 6, goalMaxLen: 80 };
   // v2.282.0：goalMaxLen 从「死键」变成真消费点后必须补区间声明 ——
   //   它此前不在 bounds 里，因为没有读者（未声明 = 原样透传）；现在它真截断文本，
   //   无区间就等于允许 maxLen=1e9 把整段意图写进 goal.text。

@@ -48,7 +48,7 @@
 
   const LS_KEY = 'worldaxis_rehearsal_settings_v1';
   const DEF = {
-    enabled: false,
+    enabled: true,
     // 一次试演最多推进几步（B7 原文：「先支持限定步数」）
     maxSteps: 4,
     // 保留多少条预览记录（环形，防长局只增不减）
