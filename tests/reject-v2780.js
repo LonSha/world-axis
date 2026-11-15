@@ -8900,6 +8900,96 @@ function runWitness(WA) {
       if (EE && keepE) { try { EE.saveSettings({ minConfidence: keepE.minConfidence, maxMinutes: keepE.maxMinutes }); } catch (e) {} }
     }
   }
+  // ── v2.411.0（R251 缝合批）：engines/body-anatomy.js 的人体结构契约码 ──────────────
+  //   为什么必须**真跑**而不是列死表：11 条里 9 条是「玩家或模型写了一具站不住的身体」
+  //     的正常拒收路径 —— 会真发生，且发生时调用方要拿到「哪里写错了」而不是静默接受。
+  //   两条是成功面（mapped / registered），按本仓口径同样进面快照：否则 explain() 会给
+  //     「镜像算好了」「登记成功了」配一个恢复动作（= 教玩家去修一件本就没坏的事）。
+  //   见证手法：**只走公开 API**（mirror / register），不碰内部函数；世界面用 JSON 快照
+  //     还原（bodyAnatomy.rows 是环形容器，塞进去的行不能留给后面）。
+  //   两条负控制（与上面容量段同纪律）：给了 turn 时不许再报 facing-contradiction、
+  //     给了 move 时不许再报 multi-anchor —— 否则测到的只是「恒报」（该码无意义）。
+  {
+    const BA = WA.bodyAnatomy;
+    if (BA && typeof BA.register === 'function') {
+      const keepBA = (typeof BA.getSettings === 'function') ? BA.getSettings() : null;
+      // 世界面快照：没这个键就记 undefined，还原时删键（不是塞个空对象冒充原状）。
+      const snapBA = (function () {
+        const s = WA.store.get() || {};
+        return s.bodyAnatomy === undefined ? undefined : JSON.parse(JSON.stringify(s.bodyAnatomy));
+      })();
+      try {
+        // 默认总开关是关的；见证跑的是「开着时的判定」，故先真开、finally 里还原现场值。
+        if (typeof BA.setSettings === 'function') BA.setSettings({ enabled: true });
+        // ── 成功面 ──
+        want('mapped', '左右映射：合法朝向 + 合法画面侧 ⇒ 给出角色自身侧（不是只回个 true）');
+        trip('mapped', function () { return BA.mirror('front', 'left').reason; });
+        want('registered', '人体契约：首次登记一具身体 ⇒ registered（真落账，不是只过校验）');
+        trip('registered', function () {
+          return BA.register('witness_body_a', { anchor: 'witness_spot', facing: 'front' }).reason;
+        });
+        // ── 拒收面 ──
+        want('bad-facing', '朝向不在四表中（写错或拼错）⇒ bad-facing');
+        trip('bad-facing', function () { return BA.mirror('sideways', 'left').reason; });
+        want('bad-side', '画面侧只有左/右两种（写「中心」之类）⇒ bad-side');
+        trip('bad-side', function () { return BA.mirror('front', 'center').reason; });
+        want('bad-turn', '换向理由码不在 turn 表里 ⇒ bad-turn');
+        trip('bad-turn', function () {
+          return BA.register('witness_body_a', { anchor: 'witness_spot', facing: 'back', turn: 'spin' }).reason;
+        });
+        // 负控制①：给了合法 turn ⇒ 同样的换向必须放行（否则 facing-contradiction 是恒报）
+        {
+          const okTurn = BA.register('witness_body_a', { anchor: 'witness_spot', facing: 'back', turn: 'about' });
+          if (!okTurn || okTurn.reason === 'facing-contradiction') {
+            throw new Error('见证自检失败：显式 turn 后仍报 facing-contradiction（该码变成恒报，见证无意义）');
+          }
+        }
+        want('facing-contradiction', '同场同人换朝向却不给 turn ⇒ facing-contradiction（不许两边都算对）');
+        trip('facing-contradiction', function () {
+          return BA.register('witness_body_a', { anchor: 'witness_spot', facing: 'front' }).reason;
+        });
+        // ⚠ 此刻 witness_body_a 的现场朝向是 back（上一条被拒收，未落账；再上一条负控制落的是 back）。
+        //   故换锚点必须照样给 facing:'back'，否则先被 facing-contradiction 拦掉，测到的不是本条。
+        want('multi-anchor', '同场同人换锚点却不给 move ⇒ multi-anchor');
+        trip('multi-anchor', function () {
+          return BA.register('witness_body_a', { anchor: 'witness_spot_2', facing: 'back' }).reason;
+        });
+        // 负控制②：给了 move ⇒ 同样的换位必须放行
+        {
+          const okMove = BA.register('witness_body_a', { anchor: 'witness_spot_2', facing: 'back', move: 'to-spot-2' });
+          if (!okMove || okMove.reason === 'multi-anchor') {
+            throw new Error('见证自检失败：显式 move 后仍报 multi-anchor（该码变成恒报，见证无意义）');
+          }
+        }
+        want('head-count', '头数不为 1 ⇒ head-count（多头与无头都写不成立）');
+        trip('head-count', function () {
+          return BA.register('witness_body_b', { anchor: 'witness_spot', heads: 2 }).reason;
+        });
+        want('no-support', '无足站不住 ⇒ no-support（腿数为 0 不许登记）');
+        trip('no-support', function () {
+          return BA.register('witness_body_b', { anchor: 'witness_spot', legs: 0 }).reason;
+        });
+        want('over-capacity', '持物件数超过手臂数 ⇒ over-capacity（不是「先记着回头再说」）');
+        trip('over-capacity', function () {
+          return BA.register('witness_body_b', { anchor: 'witness_spot', arms: 2, holding: ['剑', '盾', '灯'] }).reason;
+        });
+        want('veto-hit', '描写触碰该档体型禁令词 ⇒ veto-hit（禁写层单独成立，不被正面词库抵消）');
+        trip('veto-hit', function () {
+          return BA.register('witness_body_b', { anchor: 'witness_spot', tier: 'tiny', claims: ['单手提起马车'] }).reason;
+        });
+      } finally {
+        // 无条件还原：世界面逐字回快照（原本没这个键就删键），开关回现场值。
+        //   不拿「跑通了」当还原的理由 —— 见证往世界面塞过行，留着就是给后面留残局。
+        WA.store.transact(function (d) {
+          if (snapBA === undefined) { try { delete d.bodyAnatomy; } catch (e) {} } else { d.bodyAnatomy = snapBA; }
+        }, 'witness:body-anatomy-restore');
+        if (typeof BA.setSettings === 'function' && keepBA) {
+          try { BA.setSettings({ enabled: !!keepBA.enabled, maxRows: keepBA.maxRows }); } catch (e) {}
+        }
+      }
+    }
+  }
+
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

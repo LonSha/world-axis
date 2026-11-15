@@ -313,6 +313,16 @@
     //   那批 out:true 条目同尾），于是 explain 仍走规则表、探针读数照旧是 permanent-reject。
     //   这与文件下方 v2.380.0 段已记过的「插错数组、读数翻倍」是同一个坑，第二次踩到。
     'mourning-prohibited': { kind: 'retry-same-input', why: '服丧期内禁婚娶/宴饮/出仕：期满后同一动作即可放行（不是永久禁止，别换做法）' },
+    // ── v2.411.0（R251 缝合批）：body-anatomy 三条**规则表判不出档**的码（逐条显式登记）──
+    //   为什么判不出：分词 token contradiction / anchor / veto 一个都不在六档词表里，
+    //   规则表收到 difference 兜底档 —— 而兜底档**不是档**（B6 会如实报「无档」）。
+    //   ⚠ 我此前在面快照段写「9 条全部由规则表收住」是**未跑探针的臆断**，实测三条无档；
+    //   注释已同批改正，不留一句与现场不符的话。
+    //   三条的处置方向都是**改输入**：给的是两套朝向 / 两套锚点 / 触碰了该档禁写词，
+    //   改的是这一次的输入，重试与补前置都不是解法。
+    'facing-contradiction': { kind: 'adjust-input', why: '同场同人给了两个朝向：补一次显式 turn（或改回原朝向）再提交，不是换做法' },
+    'multi-anchor': { kind: 'adjust-input', why: '同场同人给了两个锚点：补一次显式 move（或改回原锚点）再提交，别指望两边都对' },
+    'veto-hit': { kind: 'adjust-input', why: '描写触了该档体型的禁写词：改写这一句（换掉禁令词），不是换个引擎绕过去' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -982,6 +992,14 @@
     'evidence-no-source', 'lower-priority-overrides-canonical', 'missing-anchor',
     'missing-provenance', 'missing-signature', 'no-established-state', 'relay-absent',
     'relay-threw', 'rewind-denied', 'store-unreadable', 'transact-no-output', 'whole-reject',
+    // ── v2.411.0（R251 缝合批）：engines/body-anatomy.js 的 9 条拒收码 ──
+    //   同一形态本仓已栽过八次（v2.203.0 的 17 条一路数到 v2.407.0 的 2 条）。本版按现场
+    //   复算一次收敛：6 条由规则表收住（探针实测 via:'rule'，故不重复登记 —— 会让 A8 与
+    //   规则表打架）；另 3 条（facing-contradiction / multi-anchor / veto-hit）分词都不在
+    //   六档词表里，实测落到 difference 兜底档 ⇒ **无档**，已在 OVERRIDES 逐条显式登记。
+    //   两条成功面（mapped / registered）已同批进 SUCCESS_FACE。
+    'bad-facing', 'bad-side', 'bad-turn', 'facing-contradiction', 'head-count',
+    'multi-anchor', 'no-support', 'over-capacity', 'veto-hit',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1028,6 +1046,11 @@
     'foreshadow-erupted', 'good-standing', 'memory-transplanted', 'no-characters', 'no-idiosyncrasies', 'occluded-in-secret-pocket-or-hidden-layer',
     'out-of-earshot', 'overdue-present', 'pending-dispatched', 'projected', 'reform-enacted', 'room-empty-or-quiet',
     'routine-disrupted-sheltered', 'rupture-enacted', 'scramble-completed', 'threshold-not-met', 'too-many-open',
+    // ── v2.411.0（R251 缝合批）：engines/body-anatomy.js 的两条**成功面** ──
+    //   为什么成功面也要进快照：这两条都返回 ok:true（镜像算好了 / 首次登记落账了）。
+    //   快照缺了它们，explain() 只能答 unknown，面板会给「做成了」配一个恢复动作
+    //   —— 正是本面存在要挡住的那类教玩家修没坏的东西（与 built / quiet 同一条边界）。
+    'mapped', 'registered',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',

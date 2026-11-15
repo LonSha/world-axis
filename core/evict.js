@@ -375,6 +375,9 @@
     // ── v2.69.0 外貌分级契约 / 原型阶梯（appearance.js / ladder.js）──
     'appearance.rows': { path: 'appearance.rows', cap: 24, why: '外貌契约环形（分级/覆盖/异化档位/场景排他，每人一行）' },
     'ladder.rows': { path: 'ladder.rows', cap: 16, why: '原型阶梯环形（档位表 + 当前档，升级必须带事件）' },
+    // v2.411.0（R251 缝合批）：人体结构契约（body-anatomy.js）——左右映射四朝向/朝向一致/单一锚点/
+    //   头数/肢体容量/体型禁令/可及半径，每人一行；与 core/store.js __BOUNDED_CAPS 逐字同值（G18 双向核对）。
+    'bodyAnatomy.rows': { path: 'bodyAnatomy.rows', cap: 24, why: '人体结构契约环形（左右映射/朝向/锚点/肢体容量/体型禁令，每人一行）' },
     // ── v2.70.0 情境切片 / 阻尼量规 / 竞争焦点（scene-slice.js / gauge.js / rivalry.js）──
     'sceneSlice.rows': { path: 'sceneSlice.rows', cap: 20, why: '情境切片环形（地点空间属性/恶劣天气挂起/七档自然时间段）' },
     'gauge.rows': { path: 'gauge.rows', cap: 16, why: '阻尼量规环形（0..100百分比/单步阻尼限幅/四大里程碑事件）' },

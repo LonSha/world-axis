@@ -418,6 +418,9 @@
       // v2.69.0 外貌分级契约 / 原型阶梯。登记了容量却不在骨架里，冷启动直写会炸事务。
       appearance: { rows: [] },
       ladder: { rows: [] },
+      // v2.411.0（R251 缝合批）：人体结构契约（body-anatomy.js）。登记了容量却不在骨架里，
+      //   registryParity 会报「未在骨架物化」，冷启动直写会炸事务——登记不等于物化，两件事都要做。
+      bodyAnatomy: { rows: [] },
       sceneSlice: { rows: [] },
       gauge: { rows: [] },
       rivalry: { rows: [] },
@@ -1979,6 +1982,9 @@
     // v2.69.0 外貌分级契约 / 原型阶梯。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
     'appearance.rows': { cap: 24, site: 'appearance.js WA.evict.array(appearance.rows)' },
     'ladder.rows': { cap: 16, site: 'ladder.js WA.evict.array(ladder.rows)' },
+    // v2.411.0（R251 缝合批）：人体结构契约环形（左右映射/朝向/锚点/容量/禁令，每人一行）。
+    //   cap 与 evict.SITES 同源（G18 双向门禁核对）；不登记会被 sizeAudit 报 unbounded。
+    'bodyAnatomy.rows': { cap: 24, site: 'body-anatomy.js WA.evict.array(bodyAnatomy.rows)' },
     // v2.70.0 情境切片 / 阻尼量规 / 竞争焦点
     'sceneSlice.rows': { cap: 20, site: 'scene-slice.js WA.evict.array(sceneSlice.rows)' },
     'gauge.rows': { cap: 16, site: 'gauge.js WA.evict.array(gauge.rows)' },

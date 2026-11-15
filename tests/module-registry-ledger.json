@@ -1,13 +1,13 @@
 {
- "version": "2.410.0",
- "loadOrderCount": 473,
- "loadedCount": 455,
+ "version": "2.411.0",
+ "loadOrderCount": 474,
+ "loadedCount": 456,
  "uiCount": 18,
- "nsCount": 466,
+ "nsCount": 467,
  "totals": {
-  "loadEdges": 320,
+  "loadEdges": 334,
   "hardEdges": 0,
-  "callRefs": 553,
+  "callRefs": 555,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -58,6 +58,7 @@
     "engines/betrothal-alliance.js",
     "engines/binding.js",
     "engines/blackmarket-usury.js",
+    "engines/body-anatomy.js",
     "engines/branch-continuity.js",
     "engines/branch-diff.js",
     "engines/branch-tree.js",
@@ -404,8 +405,10 @@
     "engines/action-desk.js",
     "engines/action-methods.js",
     "engines/agency.js",
+    "engines/artifice-degradation.js",
     "engines/backstage.js",
     "engines/betrothal-alliance.js",
+    "engines/branch-continuity.js",
     "engines/branch-transplant.js",
     "engines/bridge.js",
     "engines/calendar.js",
@@ -416,11 +419,14 @@
     "engines/chat-recycle.js",
     "engines/cognitive-poisoning.js",
     "engines/collateral-rupture.js",
+    "engines/commodity-circulation.js",
     "engines/coordinate.js",
     "engines/counterfactual-echo.js",
     "engines/courier-dispatch.js",
     "engines/dilemma-bargain.js",
     "engines/direct-event.js",
+    "engines/director.js",
+    "engines/dynastic-lineage.js",
     "engines/eccentric-threads.js",
     "engines/elsewhere.js",
     "engines/enemies.js",
@@ -428,9 +434,11 @@
     "engines/environment-interference.js",
     "engines/events.js",
     "engines/evolution.js",
+    "engines/fact-continuity.js",
     "engines/faction-schism.js",
     "engines/farfield.js",
     "engines/foreshadow-germination.js",
+    "engines/geophysical-reshaping.js",
     "engines/hazard.js",
     "engines/human-realism.js",
     "engines/institutional-schism.js",
@@ -443,6 +451,7 @@
     "engines/memory-relay.js",
     "engines/memory.js",
     "engines/metabolism-clock.js",
+    "engines/mob-stampede.js",
     "engines/mortuary-rites.js",
     "engines/offline-return.js",
     "engines/offstage-life.js",
@@ -452,19 +461,24 @@
     "engines/pmem.js",
     "engines/postal-relay.js",
     "engines/proactive.js",
+    "engines/psyche-dissociation.js",
     "engines/regional.js",
     "engines/research-closure.js",
     "engines/routine-pacing.js",
     "engines/rumor-cognition.js",
     "engines/sanctuary-scramble.js",
     "engines/sartorial-regalia.js",
+    "engines/shadow-council.js",
+    "engines/somatic-trauma.js",
     "engines/stage-presence.js",
     "engines/stage-session.js",
+    "engines/summarizer-adapter.js",
     "engines/summarizer.js",
     "engines/supply-choke.js",
     "engines/vitals.js",
     "engines/wb-inject.js",
     "engines/whisper-backchannel.js",
+    "engines/world-singularity.js",
     "render/purifier.js"
    ]
   },
@@ -509,6 +523,7 @@
     "engines/betrothal-alliance.js",
     "engines/binding.js",
     "engines/blackmarket-usury.js",
+    "engines/body-anatomy.js",
     "engines/branch-continuity.js",
     "engines/branch-diff.js",
     "engines/branch-tree.js",
@@ -4842,6 +4857,27 @@
    ],
    "consumedBy": []
   },
+  "engines/body-anatomy.js": {
+   "ns": [
+    "bodyAnatomy"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_body_anatomy_settings_v1"
+   ],
+   "consumedBy": []
+  },
   "engines/scene-slice.js": {
    "ns": [
     "sceneSlice"
@@ -8390,10 +8426,12 @@
     "commodityCirculation"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8401,7 +8439,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "commodityCirculation"
+   ],
    "consumedBy": []
   },
   "engines/somatic-trauma.js": {
@@ -8409,10 +8449,12 @@
     "somaticTrauma"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8420,7 +8462,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "somaticTrauma"
+   ],
    "consumedBy": []
   },
   "engines/psyche-dissociation.js": {
@@ -8428,10 +8472,12 @@
     "psycheDissociation"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8439,7 +8485,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "psycheDissociation"
+   ],
    "consumedBy": []
   },
   "engines/mob-stampede.js": {
@@ -8447,10 +8495,12 @@
     "mobStampede"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8458,7 +8508,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "mobStampede"
+   ],
    "consumedBy": []
   },
   "engines/geophysical-reshaping.js": {
@@ -8466,10 +8518,12 @@
     "geophysicalReshaping"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8477,7 +8531,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "geophysicalReshaping"
+   ],
    "consumedBy": []
   },
   "engines/artifice-degradation.js": {
@@ -8485,10 +8541,12 @@
     "artificeDegradation"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8496,7 +8554,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "artificeDegradation"
+   ],
    "consumedBy": []
   },
   "engines/shadow-council.js": {
@@ -8504,10 +8564,12 @@
     "shadowCouncil"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8515,7 +8577,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "shadowCouncil"
+   ],
    "consumedBy": []
   },
   "engines/dynastic-lineage.js": {
@@ -8523,10 +8587,12 @@
     "dynasticLineage"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8534,7 +8600,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "dynasticLineage"
+   ],
    "consumedBy": []
   },
   "engines/world-singularity.js": {
@@ -8542,10 +8610,12 @@
     "worldSingularity"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8553,7 +8623,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "worldSingularity"
+   ],
    "consumedBy": []
   },
   "engines/stage-session.js": {
@@ -8607,10 +8679,12 @@
     "summarizerAdapter"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8618,7 +8692,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "worldaxis_summarizer_adapter_settings_v1"
+   ],
    "consumedBy": []
   },
   "engines/chat-recycle.js": {
@@ -8687,10 +8763,12 @@
     "director"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8698,7 +8776,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "worldaxis_director_settings_v1"
+   ],
    "consumedBy": []
   },
   "engines/branch-continuity.js": {
@@ -8706,10 +8786,12 @@
     "branchContinuity"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8717,7 +8799,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "worldaxis_branch_continuity_settings_v1"
+   ],
    "consumedBy": []
   },
   "engines/fact-continuity.js": {
@@ -8725,10 +8809,12 @@
     "factContinuity"
    ],
    "requires": [
-    "registerModule"
+    "registerModule",
+    "settingsBus"
    ],
    "requiresFiles": [
-    "core/store.js"
+    "core/store.js",
+    "core/settings-bus.js"
    ],
    "providerOrderOk": true,
    "callRefs": [
@@ -8736,7 +8822,9 @@
     "modules"
    ],
    "ghostRefs": [],
-   "stateKeys": [],
+   "stateKeys": [
+    "worldaxis_fact_continuity_settings_v1"
+   ],
    "consumedBy": []
   },
   "engines/elapsed-evidence.js": {
