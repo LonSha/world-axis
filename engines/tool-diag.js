@@ -5227,6 +5227,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   头部选择器挂到 'overview' 组：它在任何页都在场，任选一组都成立；
     //   挂 overview 是因为那是默认页（首次打开即校验，不需要用户先切页）。
     { page: 'overview', ids: ['wa-view-sel', 'wa-view-out',
+      // v2.413.0（OPV24-2）：世界脉搏的机会应答结果回显行。常在容器（块在场即渲染），
+      //   按「输出区，面板回显不是控件」先例登 ids 层 —— 与 wa-first-out 同规格。
+      'wa-pulse-res',
       // v2.210.0（收口）：面板导航的**常驻头部**（跳转读数 + 返回）。它渲染在布局壳里、
       //   不属任何单页，故归概览组 —— 同 v2.209.0 的 ui/panel-nav.js 一样，这两个控件
       //   「渲染了但绑定写错 id」这类断裂只有登记过才会被发现（本表的全部意义）。

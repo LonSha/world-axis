@@ -72,11 +72,17 @@ function uiFiles(dir) {
   //   必须在**同一个面**上对账，否则 panel.js 的引用会全部被误判成幽灵（渲染提及搬走了）。
   //   故 panel.js 一项返回 panelSource() 重组面（= 拆前面，逐字等价）；其余文件照读磁盘。
   const panelSrcWire = require('./panel-source.js').panelSource();
+  // v2.413.0(OPV24-2):panel.js 还会读写 ui/pages/overview-world-pulse.js 渲染的
+  //   `wa-pulse-res`（世界脉搏的结果回显行）。该文件不是拆段（无 OPV 标记、不进
+  //   panelSource 重组基线），但「引用面 → 渲染面」必须在同一面对账 —— 把它的源码
+  //   追加到 panel 对账面的尾部（append-only，不影响重组基线的逐字校验）。
+  const PULSE_REL = 'ui/pages/overview-world-pulse.js';
+  const panelSrcWireFull = panelSrcWire + '\n' + fs.readFileSync(path.join(BASE, PULSE_REL), 'utf8');
   return discoverUIFiles(d).map(function (rel) {
     //   rel 形如 `ui/pages/overview-blocks.js`；剥掉前缀得到 d 内的相对路径。
     //   不用 path.basename（它会把子目录丢掉 —— 见上面的 ENOENT 记录）。
     const inner = rel.indexOf(UI_PREFIX + '/') === 0 ? rel.slice(UI_PREFIX.length + 1) : rel;
-    return { rel: rel, src: (inner === 'panel.js') ? panelSrcWire : fs.readFileSync(path.join(d, inner), 'utf8') };
+    return { rel: rel, src: (inner === 'panel.js') ? panelSrcWireFull : fs.readFileSync(path.join(d, inner), 'utf8') };
   });
 }
 

@@ -4651,6 +4651,43 @@ ${emptyDrill}
       };
     });
     const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
+    // v2.413.0（OPV24-2）：世界脉搏·机会应答。委托绑定 [data-op-act]（缓办/放弃）——
+    //   写口只有 opportunity.respond（defer 需显式窗口 by，1 天 = 86400000ms；decline 原样）。
+    //   take 不在此处：respond('take') 需要真实行动者与目标（act.add 在正文侧排队），
+    //   面板凭空编人等于替世界伪造行动。结果回显写 #wa-pulse-res（块内常在容器）。
+    //   绑定走 data 属性而非静态 id：卡片按在途机会动态生成，静态登记会漏（与 desk-act 同规）。
+    panelEl.querySelectorAll('[data-op-act]').forEach(function (btn) {
+      if (typeof btn.onclick === 'function') return; // 幂等：重入不叠处理器
+      btn.onclick = function () {
+        const act = btn.getAttribute('data-op-act');
+        const id = btn.getAttribute('data-op-id');
+        const res = panelEl.querySelector('#wa-pulse-res');
+        const setRes = function (t) { if (res) res.textContent = t; };
+        if (!WA.opportunity || typeof WA.opportunity.respond !== 'function') return setRes('未记录：module-missing（engines/opportunity.js 缺席）');
+        const r = (act === 'defer') ? WA.opportunity.respond(id, 'defer', { by: 86400000 }) : WA.opportunity.respond(id, act);
+        if (!r || r.ok === false) return setRes('未记录：' + String((r && r.reason) || '未知原因') + (r && r.choices ? '（可选：' + r.choices.join('/') + '）' : ''));
+        setRes('已' + (r.choice === 'defer' ? '缓办（窗口延长 1 天）' : '放弃') + ' · ' + String(r.id || '') + (r.source ? '（来源 ' + r.source + '）' : ''));
+        renderBody();
+      };
+    });
+    // v2.413.0（OPV24-2）：世界脉搏·选择点应答。委托绑定 [data-sc-id]——唯一落选择口子是
+    //   storyChoice.confirm（经 branchTree 记账 + commit 兑现），与 choice-board.choose 同一条
+    //   管线、不绕行。拒收原因原样转出（preview-rejected / already-confirmed / bad-value）。
+    panelEl.querySelectorAll('[data-sc-id]').forEach(function (btn) {
+      if (typeof btn.onclick === 'function') return; // 幂等
+      btn.onclick = function () {
+        const id = btn.getAttribute('data-sc-id');
+        const opt = btn.getAttribute('data-sc-opt');
+        const res = panelEl.querySelector('#wa-pulse-res');
+        const setRes = function (t) { if (res) res.textContent = t; };
+        if (!WA.storyChoice || typeof WA.storyChoice.confirm !== 'function') return setRes('未记录：module-missing（engines/story-choice.js 缺席）');
+        let r = null;
+        try { r = WA.storyChoice.confirm(id, opt); } catch (e) { return setRes('未记录：confirm-threw（' + String((e && e.message) || e).slice(0, 60) + '）'); }
+        if (!r || r.ok === false) return setRes('未采纳：' + String((r && r.reason) || '未知原因') + (r && r.rejects ? '（预演拒收 ' + r.rejects.length + ' 条）' : ''));
+        setRes('已选择「' + String(r.option || opt || '') + '」' + (r.applied ? '（后果已兑现' + (r.receipt ? ' · 收据 ' + r.receipt : '') + '）' : '（已记账，兑现看正文）'));
+        renderBody();
+      };
+    });
     // v2.231.0（优化 OP-1）/ v2.233.0（优化 OPV4-2）：行动桌的读面与路由面。
     //   读只走 board()/lifecycle()，写只走 plan()/recoverAction() —— 两者都由引擎负责，
     //   本处不重算判据、不写第二套状态（与引擎 boundary 1/7 同规）。

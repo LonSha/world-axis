@@ -74,6 +74,23 @@
       const ts = WA.threads.threadStat();
       if (!ts || !ts.cases) return DIM0 + '暗线：暂无悬案</div>';
       let out = '<div>暗线：悬案 <b>' + esc(ts.open) + '</b> / 停滞 ' + esc(ts.stalled) + '（已收口 ' + esc(ts.resolved) + '·弃 ' + esc(ts.abandoned) + '），线索共 ' + esc(ts.leads) + ' 条</div>';
+      // 只读明细：逐案一行「问题[状态]：最新线索」。只读，无控件（details 不在本仓控件判据内，
+      //   与 overview-main 的两个折叠壳同款）。openCase/resolve 等写口仍归引擎与正文侧。
+      try {
+        if (typeof WA.threads.list === 'function') {
+          const live = (WA.threads.list() || []).filter(function (x) { return x && (x.status === 'open' || x.status === 'stalled'); }).slice(0, 5);
+          if (live.length) {
+            let rows = '';
+            live.forEach(function (t) {
+              const ls = (Array.isArray(t.leads) ? t.leads : []);
+              const last = ls.length ? ls[ls.length - 1] : null;
+              rows += '<div style="opacity:0.7;font-size:11px;">· ' + esc(String(t.question || t.title || t.id || '').slice(0, 36)) + '[' + esc(t.status) + ']：'
+                + esc(last ? (String(last.claim || '') + '（' + String(last.source || '') + '／' + String(last.reliability || '') + '）').slice(0, 50) : '尚无线索') + '</div>';
+            });
+            out += '<details class="wa-details" style="margin:2px 0 4px;"><summary style="cursor:pointer;opacity:0.7;font-size:11px;">展开逐案明细（' + live.length + '）</summary>' + rows + '</details>';
+          }
+        }
+      } catch (e) { /* 明细缺席不打紧，主行已成立 */ }
       try {
         if (typeof WA.enigma !== 'undefined' && WA.enigma && typeof WA.enigma.stat === 'function') {
           const es = WA.enigma.stat();
@@ -98,7 +115,7 @@
     });
   }
 
-  /** ── 机会动向段：opportunity 在途卡片，标题 + 来源 ── */
+  /** ── 机会动向段：可应答卡片（take/defer/decline 三键，panel 委托绑定，本模块零控件契约不变）── */
   function opportunitySect() {
     if (!WA.opportunity || typeof WA.opportunity.list !== 'function') return '';
     return sect(function () {
@@ -108,7 +125,34 @@
       rows.forEach(function (v) {
         const ttl = v.title || v.text || v.name || v.summary || v.id || '';
         if (!ttl) return;
-        out += sub(ttl + (v.stage ? '（' + v.stage + '）' : ''));
+        out += '<div class="wa-dim" style="opacity:0.75;font-size:11px;margin-top:2px;">· ' + esc(String(ttl).slice(0, 40)) + (v.stage ? '（' + esc(v.stage) + '）' : '')
+          + ' <button type="button" data-op-act="defer" data-op-id="' + esc(v.id || '') + '" style="font-size:10px;padding:0 6px;margin-left:4px;cursor:pointer;">缓办（1天）</button>'
+          + ' <button type="button" data-op-act="decline" data-op-id="' + esc(v.id || '') + '" style="font-size:10px;padding:0 6px;cursor:pointer;">放弃</button></div>';
+      });
+      // 「接下」不放这里：respond('take') 需要真实行动者与目标（act.add 在正文侧排队），
+      //   面板凭空编人等于替世界伪造行动 —— 接下请在正文里回应，模型会看到机会块并替行动者处理。
+      return out + '<div class="wa-dim" style="opacity:0.55;font-size:10px;">接下请在正文里回应（世界按行动者排队）；此处只做缓办与放弃。</div>';
+    });
+  }
+
+  /** ── 故事分支段：待决选择点 + 选项按钮（走 storyChoice.confirm，panel 委托绑定）── */
+  function storySect() {
+    if (!WA.storyChoice || typeof WA.storyChoice.pending !== 'function') return '';
+    return sect(function () {
+      let pts = [];
+      try { const p = WA.storyChoice.pending(); pts = (p && p.ok && p.points) ? p.points : []; } catch (e) { pts = []; }
+      if (!pts.length) return '';
+      let out = '<div>故事分支：待决 <b>' + esc(pts.length) + '</b> 处</div>';
+      pts.slice(0, 3).forEach(function (pt) {
+        let opts = [];
+        try {
+          const rv = (typeof WA.storyChoice.review === 'function') ? WA.storyChoice.review(pt.id) : null;
+          opts = (rv && rv.ok && rv.options) ? rv.options.filter(function (o) { return o && o.label && o.allowed !== false; }).slice(0, 4) : [];
+        } catch (e) { opts = []; }
+        out += '<div class="wa-dim" style="opacity:0.75;font-size:11px;margin-top:2px;">· ' + esc(String(pt.prompt || pt.id || '').slice(0, 40)) + '</div>';
+        opts.forEach(function (o) {
+          out += ' <button type="button" data-sc-id="' + esc(pt.id || '') + '" data-sc-opt="' + esc(o.label) + '" style="font-size:10px;padding:0 6px;margin:2px 4px 2px 8px;cursor:pointer;">' + esc(String(o.label).slice(0, 18)) + (o.costs ? '（' + esc(String(o.costs).slice(0, 12)) + '）' : '') + '</button>';
+        });
       });
       return out;
     });
@@ -162,10 +206,14 @@
    * 全部段都为空时返回空串——本块整体缺席，不给面板留空白框。
    */
   function worldPulseBlock() {
-    const body = foreshadowSect() + threadsSect() + stageSect() + opportunitySect() + longlineSect() + budgetSect();
+    const body = foreshadowSect() + threadsSect() + stageSect() + storySect() + opportunitySect() + longlineSect() + budgetSect();
     if (!body) return '';
+    // wa-pulse-res：机会应答的结果回显行。常在场（登记 ids 层的理由：它是「块渲染了但
+    //   id 写错」这类断裂的观测点，与 wa-first-out 的先例同规格——面板回显，不是控件）。
+    //   值由 panel.js 的委托绑定写入（opportunity.respond 的结果原文），本模块只留位置。
     return '<div class="wa-sec">世界脉搏<span class="wa-dim">（世界这轮动了什么，一眼读完）</span></div>'
-      + '<div style="margin:4px 0 8px;">' + body + '</div>';
+      + '<div style="margin:4px 0 8px;">' + body
+      + '<div id="wa-pulse-res" class="wa-dim" style="opacity:0.8;font-size:11px;min-height:14px;"></div></div>';
   }
 
   const API = {
