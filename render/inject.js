@@ -177,7 +177,7 @@
     // v2.230.0（拓展 N12）：六条新注入源。与注入分支**同批**登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
     //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**。
-     'elsewhere', 'livingWorld', 'geoTracker', 'spatialTopology', 'transitScheduler', 'environmentalOcclusion', 'spatialTrace', 'personalInventory', 'metabolismClock', 'healthPreflight', 'antiOmniscience', 'personaAnchor', 'vitals', 'coordinate', 'dream', 'backstageTone',
+     'elsewhere', 'livingWorld', 'geoTracker', 'spatialTopology', 'transitScheduler', 'environmentalOcclusion', 'spatialTrace', 'personalInventory', 'metabolismClock', 'healthPreflight', 'antiOmniscience', 'personaAnchor', 'vitals', 'coordinate', 'dream', 'backstageTone', 'storyWindow',
     // v2.250.0（拓展）：四条新注入源。与注入分支**同批**登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果
     //   （v2.38.0 的 echoes 原样复刻）。同样插在 chrono 行**之前**。
@@ -308,7 +308,7 @@ style: false,
         //   retrieval 的 DEF.enabled=false,未开时 buildBlock 返回空串),不给老用户凭空多出约束。
         // v2.230.0（拓展 N12）：六条新源。取默认 true（同四条理由——其模块总开关
         //   默认为关，未开时 buildBlock 返回空串），不给老用户凭空多出约束。
-        elsewhere: true, livingWorld: true, geoTracker: true, spatialTopology: true, transitScheduler: true, environmentalOcclusion: true, spatialTrace: true, personalInventory: true, metabolismClock: true, healthPreflight: true, antiOmniscience: true, personaAnchor: true, vitals: true, coordinate: true, dream: true, backstageTone: true,
+        elsewhere: true, livingWorld: true, geoTracker: true, spatialTopology: true, transitScheduler: true, environmentalOcclusion: true, spatialTrace: true, personalInventory: true, metabolismClock: true, healthPreflight: true, antiOmniscience: true, personaAnchor: true, vitals: true, coordinate: true, dream: true, backstageTone: true, storyWindow: true,
         // v2.250.0（拓展）：四条新源。取默认 true（同四条理由——其模块总开关默认为关：
         //   genTiming / oneShotMod / moodGlide 的 DEF.enabled=false，未开时 buildBlock 返回空串；
         //   outputGuard 虽默认开，但它的块是一句规矩文案、不产生读数，给了也不占额度），
@@ -578,6 +578,10 @@ style: false,
     coordinate: '坐标台账',
     dream: '长梦',
     backstageTone: '幕后风物',
+    // v2.518.0（故事优先纵向切片）：第 18 个注入源的显示名。与 SOURCES（键）、
+    //   注入分支的 `source:` 名、ui/panel.js 的面板名三处**逐字同批**登记 ——
+    //   缺这一项时失败台账（SRC_NAME）会把英文键名 `storyWindow` 直接写给用户看。
+    storyWindow: '故事回应窗口',
     // v2.230.0（拓展 N12 续批）：三条新源的显示名。取名口径同上（答「这一段是什么」）。
     floorSnapshot: '楼层快照',
     memoryTiers: '三层记忆',
@@ -1582,6 +1586,15 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.coordinate && WA.coordinate) { const cb = engineCall('coordinate', function () { return WA.coordinate.buildBlock(); }); if (cb) items.push({ source: '坐标台账', content: cb }); }
       if (vis.dream && WA.dream) { const db = engineCall('dream', function () { return WA.dream.buildBlock(); }); if (db) items.push({ source: '长梦', content: db }); }
       if (vis.backstageTone && WA.backstageTone) { const bt = engineCall('backstageTone', function () { return WA.backstageTone.buildBlock(); }); if (bt) items.push({ source: '幕后风物', content: bt }); }
+      // v2.518.0：故事优先纵向切片。回应窗口只投影当前可见痕迹与待处理入口，
+      // 不复制世界事实；选择后的真实写入仍由 world/act/investigation/storyChoice 负责。
+      //   ⚠ 身份闸**不在这里**：一是本函数内 `c` 可能为 null（`c.name1` 会当场抛
+      //   TypeError），二是身份与可见性本来就是窗口自己的契约（visibleTraces 与
+      //   buildBlock 都会解析 viewer，解析不到就返回空串）。注入点只负责「开就调、空就不加」。
+      if (vis.storyWindow && WA.storyWindow) {
+        const swb = engineCall('storyWindow', function () { return WA.storyWindow.buildBlock({}); });
+        if (swb) items.push({ source: '故事回应窗口', content: swb });
+      }
       //   （modelink 不在此链：无 buildBlock，不进正文，故不入 SOURCES。）
       // v2.230.0（拓展 N12 续批）：三条新源的分支消费点（同批口径，缺模块静默不出块）。
       if (vis.floorSnapshot && WA.floorSnapshot) { const fs = engineCall('floorSnapshot', function () { return WA.floorSnapshot.buildBlock(); }); if (fs) items.push({ source: '楼层快照', content: fs }); }

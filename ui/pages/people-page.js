@@ -3,7 +3,7 @@
  *
  * 玩家先看到「这个人是谁、你们现在是什么感觉」，而不是 affinity/trust/bond
  * 三个内部数值。数值仍由旧人物页保留，开发者模式继续走 panel.js 的完整工作台。
- * 本模块只读 store 与既有语义出口，不写世界、不落盘、不新增导航页。
+ * 本模块渲染既有语义出口；介入委托 storyWindow，不直接写世界或新增导航页。
  */
 (function () {
   'use strict';
@@ -72,6 +72,62 @@
     if (bond) lines.push(bond);
     return lines.join('。') + (lines.length ? '。' : '');
   }
+  // v2.518.0（EX-9）：人物页直接介入正文。
+  //   三个入口都委托既有 owner（world 消息 / world 行程 / act 等待），
+  //   窗口侧只负责「把玩家意图带进上下文」与「如实回报阶段」。
+  //   不要求用户编辑 JSON，也不引入后台模拟器式输入框。
+  function windowId() {
+    return safe(function () {
+      const cur = WA.storyWindow && typeof WA.storyWindow.current === 'function'
+        ? WA.storyWindow.current() : null;
+      return cur && cur.id ? cur.id : '';
+    }, '');
+  }
+  /** 记一次「按下但没成立」的介入（与窗口侧同一本账，供审计「按了没反应」）。 */
+  function noteAttempt(wid, info) {
+    safe(function () { WA.storyWindow.respond(wid, info || {}); });
+  }
+  /** 统一的失败返回：留账 + 明确可重试（按钮不置灰，玩家可以再来一次）。 */
+  function fail(wid, reason, choice) {
+    noteAttempt(wid, { choice: choice, reason: reason, owner: 'peoplePage' });
+    return { ok: false, reason: reason, retryable: true };
+  }
+  function act(name, person, clueId) {
+    const wid = windowId();
+    if (!wid) return { ok: false, reason: 'no-window' };
+    const host = WA.mainWin || window;
+    const player = safe(function () {
+      const c = host.SillyTavern && host.SillyTavern.getContext();
+      return c && c.name1 ? String(c.name1).trim() : '';
+    }, '');
+    if (!player) return fail(wid, 'player-unknown', name);
+    const st = store() || {}, ps = st.people || {};
+    const target = Object.keys(ps).map(function (k) { return ps[k]; })
+      .filter(function (p) { return p && p.name === person; })[0];
+    const ctx = { person: player, player: player, viewer: player,
+      to: name === 'ask' ? person : ((target && (target.location || (target.life && target.life.place))) || ''),
+      message: '关于' + person + '最近动向的询问' };
+    if (clueId) {
+      const visible = safe(function () { return WA.storyWindow.visibleTraces({ viewer: player, player: player }); }, []);
+      // 页面渲染后线索可能已经变得不可见（窗口刷新、知情面变化、线索被旁人收走）。
+      //   此处**以窗口的可见痕迹为准**重校一次，不允许「看得见的按钮提交看不见的线索」。
+      if (!Array.isArray(visible) || !visible.some(function (t) { return t.kind === 'clue' && t.id === clueId; }))
+        return fail(wid, 'clue-not-visible', name);
+      const clue = safe(function () { return WA.investigation.view(clueId); }, null);
+      if (!clue || clue.ok !== true) return fail(wid, 'clue-unavailable', name);
+      ctx.clueId = clueId; ctx.target = clue.location || ''; ctx.note = '线索：' + clue.title;
+      if (name === 'verify') {
+        if (!clue.witness) return fail(wid, 'witness-unknown', name);
+        ctx.from = player; ctx.to = clue.witness; ctx.message = '请核实：' + clue.title;
+      }
+    }
+    const out = safe(function () { return WA.storyWindow.choose(wid, name, ctx); },
+      { ok: false, reason: 'owner-threw' });
+    // 窗口侧只在 owner 拒收时记一次（并标 retryable）。抛错这条路径窗口没记到，这里补上，
+    //   否则「页面点了、什么也没发生」在两边都没有账。
+    if (out && out.ok === false && out.retryable !== true) noteAttempt(wid, { choice: name, reason: out.reason || 'unknown', owner: 'peoplePage' });
+    return out;
+  }
   function personCard(person, key, index, recKey) {
     const p = person || {};
     const name = p.name || key || ('人物 ' + (index + 1));
@@ -83,12 +139,35 @@
         return '<span class="wa-people-tag">' + esc(tag) + '</span>';
       }).join('') + '</div>' : '';
     const line = relationLine(p);
+    const actHtml = '<div class="wa-people-acts">'
+      + '<button class="wa-btn wa-mini" data-wa-sw-act="ask" data-wa-sw-person="' + esc(name) + '">询问</button>'
+      + '<button class="wa-btn wa-mini" data-wa-sw-act="follow" data-wa-sw-person="' + esc(name) + '">跟随</button>'
+      + '<button class="wa-btn wa-mini" data-wa-sw-act="wait" data-wa-sw-person="' + esc(name) + '">等待</button>'
+      + '</div>';
     return '<article class="wa-people-card"' + recAttr + '>'
       + '<div class="wa-people-card-head"><h3>' + esc(name) + '</h3>'
       + (tags.length ? '<span class="wa-people-tag-count">' + tags.length + ' 个印象</span>' : '') + '</div>'
       + (line ? '<p class="wa-people-relation">' + esc(line) + '</p>' : '<p class="wa-people-relation is-quiet">还没有足够的相处记录。</p>')
       + tagHtml
+      + actHtml
       + '</article>';
+  }
+  function renderClues() {
+    const player = safe(function () {
+      const host = WA.mainWin || window;
+      const c = host.SillyTavern.getContext();
+      return c && c.name1 ? String(c.name1).trim() : '';
+    }, '');
+    if (!player) return '';
+    const traces = safe(function () { return WA.storyWindow.visibleTraces({ viewer: player, player: player }); }, []);
+    const clues = (Array.isArray(traces) ? traces : []).filter(function (t) { return t.kind === 'clue'; });
+    if (!clues.length) return '';
+    return '<section class="wa-story-clues"><h3>当前线索</h3>' + clues.map(function (t) {
+      return '<article><p>' + esc(t.summary) + '</p>' + ['find', 'verify', 'defer'].map(function (kind) {
+        return '<button class="wa-btn" data-wa-sw-act="' + kind + '" data-wa-sw-clue="' + esc(t.id) + '">'
+          + ({ find: '寻找', verify: '请人核实', defer: '暂不处理' })[kind] + '</button>';
+      }).join('') + '</article>';
+    }).join('') + '</section>';
   }
   function empty() {
     return '<section class="wa-people-empty">'
@@ -123,6 +202,7 @@
       + '<header class="wa-people-hero"><div class="wa-people-kicker">人物</div>'
       + '<h2>故事里的人</h2><p>他们如何靠近你，取决于你们一起经历过什么。</p></header>'
       + (cards || empty())
+      + renderClues()
       + (hasNetwork ? '<details class="wa-details wa-people-network"><summary>关系正在发生变化</summary><div class="wa-people-network-body">'
         + relation.rows.slice(0, 4).map(function (row) {
           return '<p><b>' + esc(row.a) + ' ↔ ' + esc(row.b) + '</b>'
@@ -130,7 +210,27 @@
         }).join('') + '</div></details>' : '')
       + '</div>';
   }
-  function bind() {}
+  function bind(root, onAccepted) {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    const btns = root.querySelectorAll('[data-wa-sw-act]');
+    for (let i = 0; i < btns.length; i++) {
+      const btn = btns[i];
+      if (!btn || typeof btn.addEventListener !== 'function' || btn.__waStoryBound) continue;
+      btn.__waStoryBound = true;
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        const kind = btn.getAttribute('data-wa-sw-act') || '';
+        const person = btn.getAttribute('data-wa-sw-person') || '';
+        const r = act(kind, person, btn.getAttribute('data-wa-sw-clue') || '');
+        btn.setAttribute('title', r && r.ok
+          ? '已交由故事回应窗口处理（' + ((r.window && r.window.choiceOutcome && r.window.choiceOutcome.phase) || 'ok') + '）'
+          : '未能介入：' + ((r && r.reason) || 'unknown'));
+        btn.disabled = !!(r && r.ok);
+        btn.textContent = r && r.ok ? '已提交，等待故事回应' : '未能介入：' + ((r && r.reason) || 'unknown');
+        if (r && r.ok && typeof onAccepted === 'function') onAccepted(r);
+      });
+    }
+  }
   WA.panelPeoplePage = { render: render, bind: bind, ver: '2.518.0' };
   if (typeof WA.registerModule === 'function') {
     WA.registerModule('ui/pages/people-page.js', { kind: 'ui', ver: '2.518.0' });

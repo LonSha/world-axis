@@ -161,6 +161,8 @@
     //   SOURCES 每一项在本表里都要有显示名，且本表不得有超出 SOURCES 的键）。
     genTiming: '主动的时机', oneShotMod: '只这一轮的临时调制', moodGlide: '情绪惯性', outputGuard: '别替玩家说话',
     dream: '长梦', backstageTone: '幕后风物',
+    // v2.518.0：与 render/inject.js 的 SOURCES / SRC_NAME、注入分支 source 名逐字同批。
+    storyWindow: '故事回应窗口',
     // v2.230.0（修存量红）：`retrieval` 在 v2.228.0 进了 render/inject.js 的 SOURCES，
     //   却没进本表 —— 实测坐实：inject-sources-v2560 的 D 判据与 v2.22.0 那条
     //   renderDirector 键集判据都当场报「源表每项都有面板显示名（缺: retrieval）」
@@ -4579,6 +4581,18 @@ ${emptyDrill}
         } catch (e) { /* 宿主没有输入框：只关面板，不报错 */ }
       };
     })();
+    // UI-P1 / EX-9（v2.518.0）：人物页的介入按钮（询问/跟随/等待）在这里绑。
+    //   页模块只出 HTML，行为统一由宿主面板绑 —— 与「此刻」页同一口径。
+    //   幂等：页模块的 bind 自己跳过已绑过的节点（DOM 每次重绘都是新节点，天然不叠）。
+    try {
+      if (currentPage === 'people' && WA.panelPeoplePage && typeof WA.panelPeoplePage.bind === 'function') {
+        WA.panelPeoplePage.bind(panelEl, function () {
+          toggle(false);
+          const ta = mainDoc.querySelector('#send_textarea');
+          if (ta && typeof ta.focus === 'function') ta.focus();
+        });
+      }
+    } catch (e) { /* 页面缺席或宿主查询失败：如实不绑，不假装可用 */ }
     // v2.271.0（V6 EXV6-7）：开局引导「去做」按钮的点击实现。
     //   出口来自引擎 next()（面板不自己编动作）；本处置的是「点了之后该去哪」：
     //     · openConnect ⇒ 切到 API 页（唯一能填 Base URL / API Key / 模型的页）；

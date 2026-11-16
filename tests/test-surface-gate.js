@@ -46,7 +46,12 @@ const EXEMPT = [
   // v2.416.0（OPV24-9）：p_world_pulse 自 /home/user/probes/ 收编进仓库（22 断言，手动复跑）。
   //   探针的本质属性就是「手动诊断入口」，不该有也不需要有自动 spawn 入口 ——
   //   与豁免表头两条注释同口径：登记的是事实（探针不进自动面），不是放过缺陷。
-  { rel: 'tests/probes/p_world_pulse.js', why: 'OPV24-9 探针收编：手动诊断入口，22 断言可单独 node 复跑，不占自动执行面' }
+  { rel: 'tests/probes/p_world_pulse.js', why: 'OPV24-9 探针收编：手动诊断入口，22 断言可单独 node 复跑，不占自动执行面' },
+  // v2.518.0（故事优先纵向切片）：ruby-card-profile 是**外部验收卡的只读画像器**。
+  //   它必须由人传 RUBY_CARD=<卡路径> 才能跑（卡是外部不可变输入，不进仓库、
+  //   不进自动面）：缺路径即 exitCode=2。给它加自动 spawn 入口既无意义也会红。
+  //   登记的是事实（外部手动作业入口），不是放过缺陷。
+  { rel: 'tests/ruby-card-profile.js', why: 'v2.518.0 外部验收卡画像器：需 RUBY_CARD=<外部卡路径> 手动执行，只读不写卡，不占自动执行面' }
 ];
 
 const MIN_FILES = 30;

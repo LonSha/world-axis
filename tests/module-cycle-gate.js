@@ -213,6 +213,16 @@ const UI_NS = {
   panelWorldPulse: 'UI 世界脉搏聚合块(ui/pages/overview-world-pulse.js)',
   panelToolsPage: 'UI 工具页(ui/pages/tools-page.js)',
   uiDashboards: 'UI 四个大盘(ui/pages/dashboards.js)',
+  // v2.518.0（故事优先纵向切片）：第 12/13 个 UI 层命名空间。
+  //   两个都由 ui/pages/ 子目录文件提供，而读者在 ui/panel.js（'people' 页转发
+  //   renderPeoplePlayerAware 与 4586 行的 bind）与 ui/pages/overview-main.js（652 行的
+  //   「此刻」页转发）—— 与前三条 panelOverviewBlocks / panelOverviewMain / panelWorldPulse
+  //   **完全同型**：本门禁的提供方集合从模块文件的赋值形态取，ui/ 子目录的提供方静态看不见。
+  //   漏在本表的后果同前几条：被判「未登记的一对一差（static-only）」，而它们明明是 UI 层。
+  //   people 那个还带一层非 devMode 才渲染的开关（dev 模式仍走旧工作台），但那是运行期
+  //   分支，不影响「谁提供这个 ns」这件静态事实。
+  panelPeoplePage: 'UI 玩家面人物页(ui/pages/people-page.js)',
+  panelNowPage: 'UI 玩家面此刻页(ui/pages/now-page.js)',
 };
 
 /**

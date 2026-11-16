@@ -178,6 +178,17 @@
                 //   必须在 workflow.run('after') **之后**：链里才是真正的结算发生地；
                 //   也必须在 settleGuard.commit 之后（被跳过的轮不进这里，故不会记空账）。
                 try { if (WA.floorSettle) WA.floorSettle.endRound(); } catch (e) { WA.log('warn', '楼层结算记账失败', e); }
+                // v2.518.0：正文成功推进后只开启一次可追踪故事回应窗口。
+                // 只在 after 链完成且楼层结算提交后调用；重复通知由 storyWindow 自身幂等守卫拒绝。
+                try {
+                  if (WA.storyWindow && typeof WA.storyWindow.open === 'function') {
+                    const replyText = tailMsg && typeof tailMsg.mes === 'string' ? tailMsg.mes : '';
+                    const chatLen = chatArr.length;
+                    const replyId = chatLen + ':' + (tailMsg && tailMsg.swipe_id != null ? tailMsg.swipe_id : 0) + ':' + replyText.length;
+                    WA.storyWindow.open({ id: replyId, text: replyText, chatLength: chatLen,
+                      source: 'interceptor.after', evidence: 'after-chain-committed' });
+                  }
+                } catch (eSW) { WA.log('warn', '故事回应窗口开启失败', eSW); }
               };
               if (WA.store && WA.store.batch) await WA.store.batch(runAfter); else await runAfter();
             }

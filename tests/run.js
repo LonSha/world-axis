@@ -801,6 +801,8 @@ const LOAD = [
   //   都在同一 vm 上下文里跑,装载面没给它模块,锚点核对与负向探针就整段静默跳过。
   'engines/retrieval.js',
   'engines/inject-collector.js',
+  // v2.518.0：正文后故事回应窗口；与 index.js LOAD_ORDER 同序，须早于 render/inject.js。
+  'engines/story-window.js',
   'render/inject.js', 'render/theater.js', 'render/purifier.js',
   // v2.246.0 (MAP-2): SVG 画布平滑飞行漫游、动态避让与同地聚类引擎
   'render/map-viewport.js',
@@ -22592,6 +22594,22 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   （纯脚本体、顶层跑完即退；真调六个 V26 引擎 API 真消费 + api-router 真调用驱动
     //   一条跨引擎链 + ActionDesk 23 条路由真打通 + 六条真源码负控制）。
     await runScript('./scenario-v70-v26-observability.js');
+    // v2.518.0：故事优先第一阶段 —— 故事回应窗口的两把锁。
+    //   · tests/story-window-v2518.js：纯单元锁（自建 mock，只测窗口自身行为）。
+    //   · tests/story-window-integration-v2518.js：端到端集成锁（走 ui-gate-sync 的
+    //     **全产品装载面**，真调 world.sendMessage / tickCourier / storyChoice.present /
+    //     investigation.register，并断言「在途≠已确认」「呈现≠已移动」「登记≠已核实」）。
+    //   形态：两者都是**纯脚本体**（顶层跑完即退、无 runAll 导出）⇒ 走 runScript 档，
+    //   与 scenario 家族同层。runScript 是全仓唯一 spawn 站点，预算沿用统一值，
+    //   不新增武装项。
+    //   ⚠ 不登记 ⇒ tests/test-surface-gate.js 判 unregistered-orphan（孤儿文件面），
+    //     且这两把锁**从未在全量里跑过** —— 正是本模块治的病（「声明了但没人执行」）。
+    await runScript('./story-window-v2518.js');
+    await runScript('./story-window-integration-v2518.js');
+    //   · tests/story-window-people-v2518.js：玩家面人物页的介入锁（vm 装载页面脚本 +
+    //     假按钮桩，验幂等绑定、三个入口的收件人语义、线索可见性重校、以及
+    //     「按下但没成」必须留账且按钮保持可重试）。不登记 ⇒ test-surface-gate 判孤儿。
+    await runScript('./story-window-people-v2518.js');
     // v2.408.0（OPV23-9）：分层回归调度器专锁 —— 四级金字塔「每档真跑它声称的那件事」。
     //   为什么必须登记：不登记 ⇒ tests/test-surface-gate.js 判 unregistered-orphan、
     //   segment-extract-v2400 的 C4b/C4e 同红，且本锁**从未在全量里跑过**。
@@ -22873,6 +22891,25 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');
+  }
+  // ── v2.518.0（故事优先第一阶段）：正文推进后的故事回应窗口 ──────────────
+  //   两个锁分工：story-window-v2518.js 用自建 mock 验窗口自身契约（幂等 / 可见性 /
+  //   状态机 / 六个入口的委托）；story-window-integration-v2518.js 用真实装载面
+  //   （tests/ui-gate-sync.js 的 fresh，装全部产品模块）验**它与既有 owner 的真实链路**：
+  //   world.sendMessage → tickCourier → 抵达后才可被投影；storyChoice.present 只算
+  //   「已呈现待确认」；investigation.register → investigate → checkEvidence 的回执口径；
+  //   resolvePlace 回落到 world.where 真实反查。
+  //   单跑口与登记口缺一不可：只登记不单跑则「跑过」无从证明，反之则全量回归看不见它。
+  section('v2.518.0(故事优先第一阶段): 故事回应窗口专锁与端到端集成锁');
+  {
+    const rSW2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-v2518.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
+    assert(rSW2518.status === 0, 'story-window focused lock exit 0');
+    const rSWI2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-integration-v2518.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
+    assert(rSWI2518.status === 0, 'story-window integration lock exit 0');
+    //   第三把：玩家面人物页。它测的是 ui/pages/people-page.js 这一层的委托与留账，
+    //   与上面两把不重叠（窗口自身契约 / 既有 owner 真实链路），所以单独成锁。
+    const rSWP2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-people-v2518.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
+    assert(rSWP2518.status === 0, 'story-window people lock exit 0');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

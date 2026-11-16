@@ -992,6 +992,9 @@
     // v2.294.0（V8 OPV8-1）：正文注面汇流器。位置须早于 render/inject.js（注入落地时读
     //   injectCollector.buildBlock()）；零 store 写、只读五台结构化引擎的既有读口。
     'engines/inject-collector.js',
+    // v2.518.0：正文后故事回应窗口。位置在结构汇流之后、render/inject 之前；
+    // 只读既有 world/livingWorld/messages，写入自己的编排账，不替代事实 owner。
+    'engines/story-window.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

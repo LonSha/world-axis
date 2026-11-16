@@ -1879,6 +1879,19 @@
       checks: d.checks, version: d.version,
       stat: sc.stat() };
   }
+  function secStoryWindow() {
+    // v2.518.0（EX-1/OP-6）：故事回应窗口的诊断面。
+    //   答三问：窗口开了几次、当前挂的是哪一条、玩家那一笔落到哪个 owner 的哪个阶段。
+    //   **不读世界事实、不重算痕迹** —— 只读窗口自己记下的账，避免诊断面变成第二个真源。
+    var sw = WA.storyWindow;
+    if (!sw) return { error: 'storyWindow 模块未装载', closedLoop: false };
+    var d = sw.diagnose();
+    return { module: 'storyWindow', loaded: true, closedLoop: d.closedLoop,
+      checks: d.checks, version: d.version,
+      // 投影故障自证位：哪个 owner 的数据形状让投影块抛错了，在这里看得见。
+      projection: d.projection || null,
+      stat: d.stat };
+  }
   function secCommission() {
     var cm = WA.commission;
     if (!cm) return { error: 'commission 模块未装载', closedLoop: false };
@@ -3833,6 +3846,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   「货运读数缺席」本身，不该被静默兜住。
     'engines/freight.js': 'freight',
     'engines/story-choice.js': 'storyChoice',
+    // v2.518.0：故事回应窗口。登记为必载 — 面板故事段、render/inject 注入分支与
+    //   本文件的 secStoryWindow 都读它，缺席就是「玩家介入入口消失」本身，
+    //   不该被静默兜住。
+    'engines/story-window.js': 'storyWindow',
     // v2.325.0：待选按钮。登记为必载 — 面板剧情段与本模块的 secChoice 都读它，
     //   缺席就是「按钮挂不上」本身，不该被静默兜住。
     'engines/choice-board.js': 'choiceBoard',
@@ -6598,6 +6615,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       agency: secAgency(),
       freight: secFreight(),
       storyChoice: secStoryChoice(),
+      // v2.518.0：故事回应窗口的诊断节。与 storyChoice 分列不合并 ——
+      //   一个答「有哪些分支可选」，一个答「正文推进后世界回应了什么、玩家介入落到哪」。
+      storyWindow: secStoryWindow(),
       commission: secCommission(),
       investigation: secInvestigation(),
       aftermath: secAftermath(),

@@ -1,13 +1,13 @@
 {
  "version": "2.517.0",
- "loadOrderCount": 501,
- "loadedCount": 482,
- "uiCount": 19,
- "nsCount": 493,
+ "loadOrderCount": 504,
+ "loadedCount": 483,
+ "uiCount": 21,
+ "nsCount": 494,
  "totals": {
-  "loadEdges": 360,
+  "loadEdges": 361,
   "hardEdges": 0,
-  "callRefs": 607,
+  "callRefs": 609,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -285,6 +285,7 @@
     "engines/story-choice.js",
     "engines/story-loop.js",
     "engines/story-tone.js",
+    "engines/story-window.js",
     "engines/storyclock.js",
     "engines/storyline-advance.js",
     "engines/subtext-tension.js",
@@ -757,6 +758,7 @@
     "engines/story-choice.js",
     "engines/story-loop.js",
     "engines/story-tone.js",
+    "engines/story-window.js",
     "engines/storyclock.js",
     "engines/storyline-advance.js",
     "engines/subtext-tension.js",
@@ -6504,6 +6506,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_inject_collector_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/story-window.js": {
+   "ns": [
+    "storyWindow"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_story_window_v1"
    ],
    "consumedBy": []
   },

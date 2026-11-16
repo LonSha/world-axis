@@ -262,6 +262,9 @@
       commonsGovernance: { assets: [], reservations: [], maintenanceDuties: [], disputes: [] },
       demographicFlow: { migrations: [], seasonalRecords: [], pendingObligations: [], placeCapacities: {} },
       institutionalInertia: { charters: [], handovers: [], successionRecords: [] },
+      // v2.518.0（故事优先第一阶段）：正文推进后的单次回应窗口。
+      // 这是编排账，不替代 world/livingWorld/act 的事实真源；只记录可追踪窗口、可见痕迹和玩家选择。
+      storyWindow: { windows: [], pending: null },
       // v2.234.0 (Living World V5): 真实世界自治演化与偶遇痕迹中枢
       livingWorld: {
         tick: 0,
