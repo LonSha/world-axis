@@ -3275,7 +3275,23 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       <div id="wa-wdesk-ports" class="wa-out"></div>
       <div id="wa-wdesk-out" class="wa-out"></div>`;
   }
-  const RENDERERS = { actiondesk: renderActionDesk, overview: renderOverview, world: renderWorld, people: renderPeople, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs, desk: renderWriteDesk, boot: renderBootDesk, drive: renderDriveDesk,
+  function renderPeoplePlayerAware() {
+    if (!__devMode && WA.panelPeoplePage && typeof WA.panelPeoplePage.render === 'function') {
+      try {
+        const playerView = WA.panelPeoplePage.render();
+        if (playerView) {
+          // 玩家卡承接唯一的 people:<存档键> 定位锚点；旧工作台仍保留源码与控件，
+          // 但在折叠副本中去掉重复锚点，否则导航协议会把同一人判成 rec-ambiguous。
+          const legacy = renderPeople().replace(/\sdata-rec="people:[^"]*"/g, '');
+          return playerView + '<details class="wa-details wa-people-legacy" id="wa-people-legacy">'
+            + '<summary class="wa-summary">人物档案与底层调度（给作者看，平时不用展开）</summary>'
+            + '<div class="wa-people-legacy-body">' + legacy + '</div></details>';
+        }
+      } catch (e) {}
+    }
+    return renderPeople();
+  }
+  const RENDERERS = { actiondesk: renderActionDesk, overview: renderOverview, world: renderWorld, people: renderPeoplePlayerAware, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs, desk: renderWriteDesk, boot: renderBootDesk, drive: renderDriveDesk,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -4548,6 +4564,21 @@ ${emptyDrill}
     if(collectorOn)collectorOn.onchange=()=>{WA.injectCollector.setSettings({enabled:collectorOn.checked});renderBody();};
     if(collectorCap)collectorCap.onchange=()=>{WA.injectCollector.setSettings({maxTokens:Number(collectorCap.value)});renderBody();};
     if(changesOn)changesOn.onchange=()=>{WA.worldChanges.setSettings({enabled:changesOn.checked});renderBody();};
+    // UI-P1（v2.518.0）：「此刻」卡的唯一按钮走宿主既有出口。
+    //   页模块 ui/pages/now-page.js 只拼 HTML、零宿主调用；按钮行为属于面板的事，绑在这里。
+    //   幂等：已绑过（onclick 已是函数）就跳过，重入不叠处理器。
+    //   「回到对话」= 关面板并聚焦输入框——玩家从任何页都能理解的那一个动作，不新增功能。
+    (function () {
+      const nb = $('#wa-now-back-chat');
+      if (!nb || typeof nb.onclick === 'function') return;
+      nb.onclick = function () {
+        try {
+          toggle(false);
+          const ta = mainDoc.querySelector('#send_textarea') || mainDoc.querySelector('textarea');
+          if (ta && typeof ta.focus === 'function') ta.focus();
+        } catch (e) { /* 宿主没有输入框：只关面板，不报错 */ }
+      };
+    })();
     // v2.271.0（V6 EXV6-7）：开局引导「去做」按钮的点击实现。
     //   出口来自引擎 next()（面板不自己编动作）；本处置的是「点了之后该去哪」：
     //     · openConnect ⇒ 切到 API 页（唯一能填 Base URL / API Key / 模型的页）；

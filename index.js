@@ -1487,6 +1487,13 @@
     //   panel.js 的转发函数在运行期惰性读 WA.panelOverviewMain / WA.panelToolsPage /
     //   WA.uiDashboards，先装会让首次渲染读到 undefined（缺席降级行）。零世界写、零落盘。
     'ui/pages/overview-main.js',
+    // UI-P1（v2.518.0）：玩家面「此刻」页。**排在 overview-main.js 之后**（同批装载，渲染在
+    //   面板打开时才发生，故此后装即可读到 WA.panelNowPage）；缺席时 overview-main 退回旧读数
+    //   （不渲染空卡）。零世界写、零落盘、零控件 id 冲突，只读既有出口。
+    'ui/pages/now-page.js',
+    // UI-P1（v2.518.0）：玩家面「人物」。排在 panel.js 之后，渲染期由 panel.js 惰性读取；
+    // 缺席时回退旧人物工作台，保持开发者与旧宿主兼容。
+    'ui/pages/people-page.js',
     'ui/pages/tools-page.js',
     'ui/pages/dashboards.js',
     'ui/settings.js',

@@ -640,7 +640,22 @@
       '🌐 纪元全息态势仪表大盘（V20）', WA.ui && WA.ui.renderV20HolomapDashboard);
     const v21CivEcoBlock = __dashboardBlock('renderV21CivEcoHub',
       '🏛️ 文明盛衰与生态全景控制大盘（V21）', WA.ui && WA.ui.renderV21CivEcoHub);
-    return `
+    // ══ UI-P1（v2.518.0）：玩家面首屏换成「此刻」卡，旧读数整体折叠收起 ══
+    //   为什么改在这一层而不是新增一页：`PAGES` 是 34 页的**冻结清单**（simplify-nav A9/A9b
+    //   逐字比对长度与顺序，pages[3..6] 还是 v2.33.0/v2.34.0 的硬读数锚位），新增一页即红灯；
+    //   而玩家真正抱怨的不是「页不够」，是「打开第一眼全是引擎读数」。
+    //   故：玩家模式（默认）⇒ 顶部只放叙事性的「此刻」卡，下面原样保留全部读数，但收进
+    //   一个默认折叠的 <details>；开发者模式 ⇒ 完全保持改动前的样子（一条判据都不动）。
+    //   旧读数在 DOM 里原序保留（不删、不重排），折叠只是可见性层——与 PLAYER_PAGES 同一条纪律。
+    const __devView = (WA.ui && typeof WA.ui.devMode === 'function') ? WA.ui.devMode() === true : false;
+    let __nowCard = '';
+    if (!__devView && typeof WA.panelNowPage === 'object' && WA.panelNowPage
+      && typeof WA.panelNowPage.render === 'function') {
+      __nowCard = (function () {
+        try { return WA.panelNowPage.render(); } catch (e) { return ''; }
+      })();
+    }
+    const __legacyReadings = `
       <div class="wa-stat-grid">
         <div class="wa-stat"><div class="wa-stat-v">${esc(s.clock.label || '未设定')}</div><div class="wa-stat-k">世界时间</div></div>
         <div class="wa-stat"><div class="wa-stat-v">${Object.keys(s.people).length}</div><div class="wa-stat-k">追踪人物</div></div>
@@ -686,6 +701,14 @@
           </label>`).join('')}
         </div>
       </details>`;
+    //   玩家模式：此刻卡在最前，旧读数整体收进默认折叠的 details（DOM 原序保留）；
+    //   开发者模式：原样返回旧读数，一个字节都不包（保持改动前的行为可比对）。
+    if (!__nowCard) return __legacyReadings;
+    return __nowCard
+      + '<details class="wa-details wa-legacy-readings" id="wa-legacy-readings">'
+      + '<summary class="wa-summary">引擎读数与大盘（给作者看，平时不用展开）</summary>'
+      + '<div class="wa-legacy-body">' + __legacyReadings + '</div>'
+      + '</details>';
   }
   // ══ 段体结束 ══
   const API = {

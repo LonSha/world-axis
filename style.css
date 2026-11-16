@@ -1177,3 +1177,308 @@ div.wa-dim {
   padding-top: 4px;
   border-top: 1px dashed var(--wa-border-subtle, rgba(255,255,255,0.10));
 }
+
+
+/* ==========================================================================
+   UI-P1（v2.518.0）：玩家面「此刻」页 + 旧读数折叠
+   口径：只有一层卡片、只有一条强调色（冷青 --wa-accent），没有第二套配色。
+   ========================================================================== */
+
+/* 顶部版本号：留存但退到几乎看不见 —— 玩家不需要它，作者需要时还在。 */
+#wa-panel .wa-ver {
+  opacity: 0.45;
+  font-size: 9.5px;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 0 0 4px;
+}
+
+.wa-now {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+
+.wa-now-card {
+  background: var(--wa-surface-1);
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: var(--wa-r-sm);
+  padding: 14px 14px 12px;
+  box-shadow: var(--wa-highlight-top);
+}
+
+.wa-now-card-t {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--wa-text-primary);
+  letter-spacing: 0.02em;
+}
+
+/* ── 开局前：引导卡 ── */
+.wa-now-boot .wa-now-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wa-now-step {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 2px 8px;
+  font-size: 13px;
+  color: var(--wa-text-primary);
+  line-height: 1.5;
+}
+
+.wa-now-step-mark {
+  color: var(--wa-accent);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.wa-now-step.is-done .wa-now-step-mark {
+  color: var(--wa-emerald);
+}
+
+.wa-now-step.is-done .wa-now-step-title {
+  color: var(--wa-text-secondary);
+  text-decoration: line-through;
+  text-decoration-color: var(--wa-border-regular);
+}
+
+.wa-now-step-hint {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--wa-text-secondary);
+  line-height: 1.5;
+}
+
+.wa-now-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--wa-text-secondary);
+  line-height: 1.6;
+}
+
+.wa-now-actions {
+  margin-top: 12px;
+}
+
+/* ── 开局后：场景卡 ── */
+.wa-now-scene {
+  border-color: var(--wa-accent-border);
+}
+
+.wa-now-when {
+  font-family: var(--wa-font-mono);
+  font-size: 11px;
+  color: var(--wa-accent);
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.wa-now-where {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--wa-text-primary);
+  line-height: 1.35;
+  margin-bottom: 8px;
+}
+
+.wa-now-who {
+  font-size: 13px;
+  color: var(--wa-text-secondary);
+  line-height: 1.6;
+}
+
+.wa-now-lbl {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--wa-text-dim);
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: var(--wa-r-pill);
+}
+
+/* ── 列表段：刚刚 / 值得留意 ── */
+.wa-now-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wa-now-list li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 13px;
+  color: var(--wa-text-primary);
+  line-height: 1.6;
+}
+
+.wa-now-list li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--wa-accent);
+  opacity: 0.7;
+}
+
+/* ── 空页：一句话，不列「暂无」 ── */
+.wa-now-empty .wa-now-note {
+  margin-top: 0;
+}
+
+/* ── 旧读数折叠：默认收起，展开后与原来一致 ── */
+.wa-legacy-readings {
+  margin-top: 14px;
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: var(--wa-r-sm);
+  padding: 8px 10px;
+  background: var(--wa-surface-1);
+}
+
+.wa-legacy-readings .wa-summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--wa-text-secondary);
+  line-height: 1.5;
+}
+.wa-legacy-body {
+  padding-top: 10px;
+}
+
+/* ── 玩家面人物页：先看关系，再看调度 ── */
+.wa-people-player {
+  display: grid;
+  gap: 10px;
+}
+.wa-people-hero {
+  padding: 8px 2px 12px;
+}
+.wa-people-kicker {
+  color: var(--wa-accent);
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.wa-people-hero h2 {
+  margin: 4px 0 5px;
+  color: var(--wa-text-primary);
+  font-size: 21px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+.wa-people-hero p,
+.wa-people-empty p {
+  margin: 0;
+  color: var(--wa-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.wa-people-card {
+  padding: 13px 14px;
+  border: 1px solid var(--wa-border-subtle);
+  border-left: 2px solid var(--wa-accent);
+  border-radius: var(--wa-r-sm);
+  background: var(--wa-surface-1);
+}
+.wa-people-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wa-people-card h3 {
+  margin: 0;
+  color: var(--wa-text-primary);
+  font-size: 16px;
+  line-height: 1.35;
+}
+.wa-people-tag-count {
+  color: var(--wa-text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.wa-people-relation {
+  margin: 8px 0 0;
+  color: var(--wa-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.wa-people-relation.is-quiet {
+  color: var(--wa-text-dim);
+}
+.wa-people-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+.wa-people-tag {
+  padding: 2px 7px;
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: 999px;
+  color: var(--wa-text-dim);
+  font-size: 10px;
+}
+.wa-people-empty {
+  padding: 28px 16px;
+  border: 1px dashed var(--wa-border-subtle);
+  border-radius: var(--wa-r-sm);
+  text-align: center;
+}
+.wa-people-empty-mark {
+  margin-bottom: 7px;
+  color: var(--wa-accent);
+  font-size: 28px;
+  line-height: 1;
+  opacity: .7;
+}
+.wa-people-empty h3 {
+  margin: 0 0 5px;
+  color: var(--wa-text-primary);
+  font-size: 15px;
+}
+.wa-people-network {
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: var(--wa-r-sm);
+  background: var(--wa-surface-1);
+}
+.wa-people-network > summary,
+.wa-people-legacy > summary {
+  padding: 9px 11px;
+  color: var(--wa-text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+.wa-people-network-body {
+  padding: 0 11px 8px;
+}
+.wa-people-network-body p {
+  margin: 7px 0;
+  color: var(--wa-text-dim);
+  font-size: 12px;
+}
+.wa-people-legacy {
+  margin-top: 14px;
+  border: 1px solid var(--wa-border-subtle);
+  border-radius: var(--wa-r-sm);
+  background: var(--wa-surface-1);
+}
+.wa-people-legacy-body {
+  padding: 2px 10px 10px;
+}
+
