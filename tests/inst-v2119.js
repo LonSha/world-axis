@@ -268,8 +268,8 @@ function judge(a) {
   a(pn.indexOf("inst: '组织制度'") >= 0, 'v2119/inst: [A6] 面板显示名登记');
   a(td.indexOf("'wa-inst-charter'") >= 0 && td.indexOf("'wa-inst-out'") >= 0,
     'v2119/inst: [A7] 守卫表登记控件');
-  a(src.indexOf('enabled: false, maxOrgs: 8, maxPending: 12, maxBreaches: 12') >= 0,
-    'v2119/inst: [A8] 总开关默认关');
+  a(src.indexOf('enabled: true, maxOrgs: 8, maxPending: 12, maxBreaches: 12') >= 0,
+    'v2119/inst: [A8] 总开关默认开启（v2.412.0 全开策略跟位）');
   a(src.indexOf("const PERMS = ['approve', 'grant', 'hire', 'punish'];") >= 0,
     'v2119/inst: [A9] 权限是具名表（不成表的权力不许存在）');
   a(src.indexOf("const REASONS = ['resigned', 'dismissed', 'succeeded'];") >= 0,

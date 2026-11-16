@@ -26,8 +26,8 @@ const ANCHORS = {
   noWrite: { rel: 'engines/foreshadow.js', txt: "stat.stale = rows.length;" },
   // ④ 三桶互斥：active / resolved / closed 三桶由两个集合的补集构成
   buckets: { rel: 'engines/foreshadow.js', txt: "const closed = arr.filter(isTerminal);" },
-  // ⑤ 默认关闭：总开关 false
-  gate: { rel: 'engines/foreshadow.js', txt: "enabled: false, staleMs: 3600000" },
+  // ⑤ 默认开启（v2.412.0 全开策略跟位）：总开关 true
+  gate: { rel: 'engines/foreshadow.js', txt: "enabled: true, staleMs: 3600000" },  // v2.412.0 全开策略跟位：DEF 出厂即 true
   // ⑥ 拒收码：终态门（锚点取**带注释的两行组** —— 现场实测裸 if 行在 develop/resolve/recycle 三处同形，
   //    破坏不唯一即不可观测；带注释后全文件恰中 1 次）
   termCheck: { rel: 'engines/foreshadow.js', txt: "      // resolve 的终态门：兑现不可二次 —— 二次兑现会覆写 eventId 与耗时，让「何时兑现」失去唯一答。\n      if (isTerminal(f)) { out = { ok: false, reason: 'already-terminal', id: id, status: f.status }; return false; }" },
@@ -63,7 +63,7 @@ function runAll(a) {
     return { memory: { foreshadows: [] } };
   }
   function load(code, store, opts) {
-    let cfg = { enabled: false, staleMs: 3600000, maxItems: 5, cap: 30 };
+    let cfg = { enabled: true, staleMs: 3600000, maxItems: 5, cap: 30 };  // v2.412.0 全开策略跟位：宿主面初值与引擎 DEF 同源
     const WA = {
       clock: { now() { return NOW; } },
       store: {
@@ -104,7 +104,8 @@ function runAll(a) {
   const F = L.api;
 
   // 1 默认关闭：一律拒收，且注入块为空
-  assert.ok(F.getSettings().enabled === false, '默认关闭');
+  assert.ok(F.getSettings().enabled === true, '默认开启（v2.412.0 全开策略跟位）');
+  F.setSettings({ enabled: false });
   assert.ok(F.track('fs1', '蒙面人身份成谜').reason === 'disabled', '关闭时 track 拒收 disabled');
   assert.ok(F.resolve('fs1', 'ev1').reason === 'disabled', '关闭时 resolve 拒收 disabled');
   assert.ok(F.check().ok === true, '关闭时 check 仍可读（只报不改，不做拦门）');
@@ -285,19 +286,20 @@ function runAll(a) {
     assert.ok(stn.total !== stn.active + stn.closed, 'N4 破坏可观测：互斥恒等式当场不成立（实 ' + stn.total + ' vs ' + (stn.active + stn.closed) + '）');
   }
 
-  // N5 破坏「默认关闭」：DEF.enabled 改成 true ⇒ **无宿主设置面**时默认为开启（可观测）
+  // N5 破坏「默认开启」（v2.412.0 全开策略跟位，方向反转）：DEF.enabled 改成 false ⇒
+  // **无宿主设置面**时默认为关闭（可观测：拒收）。原「改成 true 破坏」在全开下不可现形。
   {
-    const code = wreck('gate', "enabled: true, staleMs: 3600000");
+    const code = wreck('gate', "enabled: false, staleMs: 3600000");
     const c = caseOn(code, null, { noBus: true });
-    assert.ok(c.api.getSettings().enabled === true, 'N5 破坏可观测：无宿主设置面时默认为开启（实 ' + c.api.getSettings().enabled + '）');
+    assert.ok(c.api.getSettings().enabled === false, 'N5 破坏可观测：无宿主设置面时默认为关闭（实 ' + c.api.getSettings().enabled + '）');
     // 且「关着就一律拒收」随之失效 —— 真行为变化，不是换了个读数的名字
-    assert.ok(c.api.track('h1', '甲').ok === true, 'N5 破坏可观测：关闭门随之失效（默认态就能写）');
+    assert.ok(c.api.track('h1', '甲').reason === 'disabled', 'N5 破坏可观测：开启门随之失效（默认态拒收）');
   }
   // N5 正控：**原版**在同一路径下必须仍拒收（证明该判据在未破坏时是绿的，不是恒绿）
   {
     const c = caseOn(src, null, { noBus: true });
-    assert.ok(c.api.getSettings().enabled === false, 'N5 正控：原版在无宿主设置面时默认关闭（实 ' + c.api.getSettings().enabled + '）');
-    assert.ok(c.api.track('h1', '甲').reason === 'disabled', 'N5 正控：原版默认态一律拒收 disabled');
+    assert.ok(c.api.getSettings().enabled === true, 'N5 正控：原版在无宿主设置面时默认开启（实 ' + c.api.getSettings().enabled + '）');
+    assert.ok(c.api.track('h1', '甲').ok === true, 'N5 正控：原版默认态照常写入（v2.412.0 全开跟位）');
   }
 
   // N6 破坏「终态门」：去掉 already-terminal 检查 ⇒ 终态复活判据必红

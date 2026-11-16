@@ -186,8 +186,8 @@ function judge(a) {
   a(pn.indexOf("region: '远方'") >= 0, 'v2119/region: [A6] 面板显示名登记');
   a(td.indexOf("'wa-rg-register'") >= 0 && td.indexOf("'wa-rg-out'") >= 0,
     'v2119/region: [A7] 守卫表登记控件');
-  a(src.indexOf('enabled: false, maxEvents: 24, maxRoutes: 8, stalenessMs: 86400000') >= 0,
-    'v2119/region: [A8] 总开关默认关');
+  a(src.indexOf('enabled: true, maxEvents: 24, maxRoutes: 8, stalenessMs: 86400000') >= 0,
+    'v2119/region: [A8] 总开关默认开启（v2.412.0 全开策略跟位）');
   a(src.indexOf("const LANES = { road: 120, river: 300, rail: 600, word: 40 };") >= 0,
     'v2119/region: [A9] 渠道带速率（没有速率就没有延迟）');
   a(src.indexOf('WA.registerModule(') >= 0 && src.indexOf('engines/region.js') >= 0,

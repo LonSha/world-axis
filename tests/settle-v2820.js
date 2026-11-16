@@ -702,8 +702,12 @@ function judge(a) {
   const vis = WA.render.getVisibility();
   a(vis.checkpoints === true, 'v2820/cp: [11] 可见性默认 true（模块总开关默认为关，与既有裁决一致）');
   LS.clear(); WA.store.init();
-  a(WA.checkpoints.getSettings().enabled === false, 'v2820/cp: [11] 总开关默认关闭（不改变老用户行为）');
+  // v2.412.0 全开策略跟位（V26 修欠账）：出厂默认 enabled:true；拒收语义显式关闭后保留。
+  a(WA.checkpoints.getSettings().enabled === true, 'v2820/cp: [11] 总开关默认开启（v2.412.0 全开策略跟位）');
+  WA.checkpoints.setSettings({ enabled: false });
+  a(WA.checkpoints.getSettings().enabled === false, 'v2820/cp: [11] 显式关闭生效');
   a(WA.checkpoints.save('x', {}).reason === 'disabled', 'v2820/cp: [11] 关闭时不存档（disabled 拒收）');
+  WA.checkpoints.setSettings({ enabled: true });
 }
 // ── 负向自证（只在内存副本上破坏，零文件改写）──
 function runNegative(a) {

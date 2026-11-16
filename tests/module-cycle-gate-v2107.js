@@ -258,7 +258,7 @@ function runAll(A) {
   // v2.299.0：装载期 208 → 212（两文件尾调 registerModule）、调用期 2666 → 2668、合计 2874 → 2880。
   // v2.299.0：命名空间三面 380/334/342 → 382/336/344（两个新 ns 同步入账、入读面）。
   // v2.401.0(OPV23):实测回填（node -e audit 直读——三段拆分 4 个段文件入产品面 ⇒ 文件/别名 453、有引用 451）
-  A(a.files === 474 && a.aliasFiles === 474 && a.refFiles === 472,
+  A(a.files === 502 && a.aliasFiles === 502 && a.refFiles === 500,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -393,7 +393,7 @@ function runAll(A) {
   //   增量归因：68 文件 clockNow 守卫改写带来的调用期引用（含 epoch-tide 的 clock 边）
   //   与 action-desk 等真读者，静态面已逐文件归因闭合（/tmp/refs_attr.js 同轮取证）。
   // v2.401.0(OPV23):实测回填（4 段文件尾调 registerModule ⇒ 装载期 280→296；调用期 3323→3407；合计 3703）
-  A(a.edgesLoad === 320 && a.edgesCall === 3502 && a.edgesAll === 3822 && a.identityOk,
+  A(a.edgesLoad === 360 && a.edgesCall === 3638 && a.edgesAll === 3998 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -473,7 +473,7 @@ function runAll(A) {
   // v2.294.0（V8 收口）：LOAD_ORDER 334 → 336（新增两台入序引擎）。
   // v2.297.0（V11 立项轮跟位）：LOAD_ORDER 338 → 339（core/unified-pending.js 入序）。
   // v2.401.0(OPV23):实测回填（LOAD_ORDER 440 → 452，ui/pages 四段文件与关联模块入序）
-  A(a.edgesLoad >= 20 && a.orderLen === 473,
+  A(a.edgesLoad >= 20 && a.orderLen === 501,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -519,7 +519,7 @@ function runAll(A) {
   // v2.297.0（V11 立项轮跟位）：三面 379/333/342 → 380/334/342。
   //   unifiedPending 从「账本有、静态无」归位为「两面都有」（差集 46 不变）。
   // v2.401.0(OPV23):实测回填（三面 483/437/452 → 495/445/464——段 ns 同步入账本与读面）
-  A(a.nsProvided === 516 && a.nsLedger === 466 && a.nsRead === 482,
+  A(a.nsProvided === 544 && a.nsLedger === 493 && a.nsRead === 510,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
@@ -532,7 +532,7 @@ function runAll(A) {
   // v2.194.0（U2 批次④）：差**仍为 39**（与批次③持平）—— 本轮一度写成 41（照抄批次③
   //   的自证槽增量），但两个自证槽实测不可达已撤除 ⇒ 静态提供方没涨，差自然也不涨。
   // v2.401.0(OPV23):实测回填（差 46 → 50——静态提供方 +12 / 账本 +8，差额仍全有登记理由：入口/UI/内部前缀）
-  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 50,
+  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 51,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
   // v2.153.0（RX5+RX6）：零读 ns 22 → 21（plotGauge 与 branchTree 都被 tool-diag 与面板真读，
   //   从零读名单里离场）。
@@ -566,12 +566,12 @@ function runAll(A) {
   //   新增第六个 UI 层命名空间 panelFold(ui/panel-fold.js),它**有真读者**
   //   (ui/panel.js 的 foldSec() 直写 `WA.panelFold.isCollapsed(...)`),故计入「在用」而非零读。
   // v2.401.0(OPV23):实测回填（28/35 → 32/39——panelOverviewMain/panelToolsPage/uiDashboards 三段 ns 接上真读者）
-  A(a.registeredUsed === 32 && a.registeredTotal === 39,
+  A(a.registeredUsed === 33 && a.registeredTotal === 40,
     'B10 登记面在用 ' + a.registeredUsed + '/' + a.registeredTotal
     + '（未在用的 5 个是取数型入口 ns，只在 index.js 内部自用；v2.181.0：UI 主题层 9 个 ns 全部接上真读者）');
   // v2.153.0（RX5+RX6）：两个新引擎进账本 ⇒ 账本缺项文件面收缩，缺项 5 不变（UI 层仍 4 文件）。
   // v2.401.0(OPV23):实测回填（缺项 15 → 19——ui/pages 四段文件入账本外文件面）
-  A(a.runtimeMissing === 19 && a.ledgerAvailable,
+  A(a.runtimeMissing === 20 && a.ledgerAvailable,
     'B11 账本缺项文件 ' + a.runtimeMissing + ' 个（入口 + 十二个 ui 文件，如实报出）');
   // 次序判据方向的两向自证（用假产品面，不碰真文件）
   const fakeOk = M.audit({

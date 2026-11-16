@@ -54,6 +54,13 @@
     // v2.117.0（计划二 B1）：人物行动。与注入分支同批登记 ——
     //   只加源表不加分支 = 声明了没人消费；只加分支不加源表 = 开关点了零效果。
     'events', 'checkpoints', 'rumor', 'canon', 'act',
+    // v2.417.0（V25 柏宝书缝入批）：四个产出文案的新注入源。与注入分支/VIS_NAME/vis 默认值
+    //   **逐字同批**登记（只加分支不加源表 = 开关点了零效果；只加源表不加分支 = 声明了没人消费）。
+    //   sourceHints 不进本表：它扫描的是「送进摘要/材料的段落」，注入链上没有待扫材料
+    //   （不给材料就恒以 missing-sources 拒答，进注入链就是死分支）——
+    //   它的消费方是 action-desk 路由（由 summarizer/backstage 管线按需调用）。
+    //   OPV25 六个执行链引擎（幂等闸/让路/推演/批量读/节流/来源身份）同为机器面，不产注入文案。
+    'playerKnowledge', 'affectionDual', 'lifeProfile', 'suspenseLedger',
     // v2.294.0（V8 OPV8-1）：正文注面汇流器。与注入分支同批登记 ——
     //   只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻）。
     'injectCollector',
@@ -228,6 +235,8 @@ style: false,
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
         // v2.117.0：人物行动。同一条理由 —— 其模块总开关默认为关闭。
         rumor: true, canon: true, act: true,
+        // v2.417.0（V25）：四个新注入源默认 true（同四条理由——其模块总开关默认为关）。
+        playerKnowledge: true, affectionDual: true, lifeProfile: true, suspenseLedger: true,
         // v2.119.0：人物多步计划 / 关系修复。同一条理由——其模块总开关默认为关，
         //   故注入面取默认 true 不给老用户凭空多出约束。
         plan: true, mend: true,
@@ -472,6 +481,10 @@ style: false,
     //   本版实测被 switch-matrix-v2910 的 C2 与 explain-v2900 的 A4/C1 抓出 ——
     //   B1 期只给 ui/panel.js 的 VIS_NAMES 加了名，漏了这里。
     act: '人物行动',
+    // v2.417.0（V25）：四个新注入源的显示名。与 SOURCES 同批登记
+    //   （不加显示名 ⇒ 失败台账报英文键名，用户看不懂）。
+    playerKnowledge: '对主角了解', affectionDual: '内外双轴', lifeProfile: '生活小档',
+    suspenseLedger: '悬念簿',
     // v2.119.0（拓展计划 ①–⑧）：八个新引擎的显示名。缺名 ⇒ 失败台账与开关两面会裸露英文键
     //   （v2.119.0 实测被 switch-matrix-v2910 的 C2、explain-v2900 的 A4/C1、cost-v2880 的 B7/C1 抓出）。
     //   名字必须与注入项的 `source` 逐字同名——同一源两套名字的代价已由 v2.88.0 O1 付过一次。
@@ -1502,6 +1515,13 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       // v2.82.0 快照与分支。本块只报「存在哪些存档」，**不报当前世界是否已保存**——
       //   列表非空 ≠ 当前进度有档，若不说清，模型会把「有存档」读成「随时能回来」。
       if (vis.checkpoints && WA.checkpoints) { const cp = engineCall('checkpoints', function () { return WA.checkpoints.buildBlock(); }); if (cp) items.push({ source: '快照与分支', content: cp }); }
+      // v2.417.0（V25 柏宝书缝入批）：五个新注入源。引擎自身无 buildBlock，
+      //   分支内联拼装：全部真读引擎 view()/read()/build() 的现算读数，不摆空架子。
+      //   「各自总开关关 ⇒ view 等拒答/空账 ⇒ 拼出空串 ⇒ 不入 items」，零 token。
+      if (vis.playerKnowledge && WA.playerKnowledge) { const pk = engineCall('playerKnowledge', function () { const v = WA.playerKnowledge.view(); if (!v || !v.count) return ''; const rows = v.rows.slice(0, 8).map(function (r) { return '· ' + r.who + (r.about ? '（' + r.about + '）' : '') + '：' + r.text; }).join('\n'); return '【角色对主角的了解】只按已记录的说话，没记的就是不知道：\n' + rows; }); if (pk) items.push({ source: '对主角了解', content: pk }); }
+      if (vis.affectionDual && WA.affectionDual) { const ad = engineCall('affectionDual', function () { const v = WA.affectionDual.view(); if (!v || !v.count) return ''; const rows = v.rows.filter(function (r) { return !r.unknown; }).slice(0, 8).map(function (r) { return '· ' + r.who + '：内心' + (r.inner || '未知') + '／外在' + (r.outer || '未知'); }).join('\n'); return rows ? '【内外双轴】未知不是中性，缺的那轴别拿另一轴顶替：\n' + rows : ''; }); if (ad) items.push({ source: '内外双轴', content: ad }); }
+      if (vis.lifeProfile && WA.lifeProfile) { const lp = engineCall('lifeProfile', function () { const v = WA.lifeProfile.view(); if (!v || !v.count) return ''; const rows = v.rows.slice(0, 8).map(function (r) { return '· ' + r.subject + '：' + r.text; }).join('\n'); return '【生活小档案】按人分账，不跨人合并：\n' + rows; }); if (lp) items.push({ source: '生活小档', content: lp }); }
+      if (vis.suspenseLedger && WA.suspenseLedger) { const sl = engineCall('suspenseLedger', function () { const v = WA.suspenseLedger.view({ status: 'open' }); if (!v || !v.count) return ''; const rows = v.rows.slice(0, 8).map(function (r) { return '· ' + r.who + '：' + r.what + '（未销）'; }).join('\n'); return '【悬念簿】办完的事要销账，别反复提：\n' + rows; }); if (sl) items.push({ source: '悬念簿', content: sl }); }
       // v2.96.0（X3）传播与辟谣。**本块只出 fact / witness 两层**——转述与流言不进正文，
       //   否则模型会把「听说」当成既成事实写下去，而那正是本模块要防的那件事。
       //   四层全貌只在诊断的 fullView 里（作者看得见，模型看不见）。

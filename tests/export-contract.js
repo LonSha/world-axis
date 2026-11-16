@@ -40,6 +40,9 @@ const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf',
   'panelOverviewMain',
   'panelToolsPage',
   'uiDashboards',
+  // v2.517.0（V26 收口）：世界脉搏聚合块 —— 与 engines/tool-diag.js 的可选清单成对。
+  //   无头环境里 ui/pages/*.js 不装载，故可选缺席（与 panelOverviewBlocks 同款）。
+  'panelWorldPulse',
   // v2.181.0：赛博朋克 UI 主题层 9 个 ns（与 tests/run.js 的 UI_NS2800 同口径）。
   'cyberUI',
   'cyberDashboard',

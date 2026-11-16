@@ -52,13 +52,7 @@
         + '（已回收 ' + esc(st.triggered || 0) + '·终局 ' + esc(st.closed || 0) + '）'
         + (st.stale ? '<span style="opacity:0.7;">，' + esc(st.stale) + ' 条已搁置过久</span>' : '') + '</div>';
       let rows = [];
-      try {
-        if (typeof WA.foreshadow.list === 'function') {
-          rows = (WA.foreshadow.list() || []).filter(function (f) {
-            return f && f.status && WA.foreshadow.ACTIVE && WA.foreshadow.ACTIVE.indexOf(f.status) >= 0;
-          }).sort(function (a, b) { return (a.updatedAt || a.at || 0) - (b.updatedAt || b.at || 0); }).slice(0, 3);
-        }
-      } catch (e) { rows = []; }
+      //  引擎零 list 导出（纪律：零消费能力当场删）——只读 stat 聚合，不猜明细
       rows.forEach(function (f) {
         const ttl = f.title || f.text || f.name || f.summary || '';
         if (ttl) out += sub(ttl + '（' + f.status + '）');
@@ -92,21 +86,7 @@
       let out = '<div>暗线：悬案 <b>' + esc(ts.open) + '</b> / 停滞 ' + esc(ts.stalled) + '（已收口 ' + esc(ts.resolved) + '·弃 ' + esc(ts.abandoned) + '），线索共 ' + esc(ts.leads) + ' 条</div>';
       // 只读明细：逐案一行「问题[状态]：最新线索」。只读，无控件（details 不在本仓控件判据内，
       //   与 overview-main 的两个折叠壳同款）。openCase/resolve 等写口仍归引擎与正文侧。
-      try {
-        if (typeof WA.threads.list === 'function') {
-          const live = (WA.threads.list() || []).filter(function (x) { return x && (x.status === 'open' || x.status === 'stalled'); }).slice(0, 5);
-          if (live.length) {
-            let rows = '';
-            live.forEach(function (t) {
-              const ls = (Array.isArray(t.leads) ? t.leads : []);
-              const last = ls.length ? ls[ls.length - 1] : null;
-              rows += '<div style="opacity:0.7;font-size:11px;">· ' + esc(String(t.question || t.title || t.id || '').slice(0, 36)) + '[' + esc(t.status) + ']：'
-                + esc(last ? (String(last.claim || '') + '（' + String(last.source || '') + '／' + String(last.reliability || '') + '）').slice(0, 50) : '尚无线索') + '</div>';
-            });
-            out += '<details class="wa-details" style="margin:2px 0 4px;"><summary style="cursor:pointer;opacity:0.7;font-size:11px;">展开逐案明细（' + live.length + '）</summary>' + rows + '</details>';
-          }
-        }
-      } catch (e) { /* 明细缺席不打紧，主行已成立 */ }
+      //  引擎零 list 导出（纪律：零消费能力当场删）——逐案明细不猜，只报主行计数
       try {
         if (typeof WA.enigma !== 'undefined' && WA.enigma && typeof WA.enigma.stat === 'function') {
           const es = WA.enigma.stat();

@@ -77,8 +77,11 @@ function runAll(assertFn) {
 
   // ── A 概览页四态 ──────────────────────────────────────────────────────
   {
-    // 出厂态：两个上游都关 ⇒ 「读不全（不等于健康）」
+    // 「读不全（不等于健康）」态：v2.412.0 全开策略下出厂三引擎全开，缺面现场改为
+    //   显式关掉两个上游构造（趋势/水位双缺席 ⇒ no-data ⇒ quiet），判据一字不削。
     const env = freshEnv();
+    env.WA.storageForecast.setSettings({ enabled: false });
+    env.WA.capacityAudit.setSettings({ enabled: false });
     const r = pageHtml(env, 'overview');
     a(r.html.indexOf('id="wa-save-block"') >= 0, 'v2270ui/A1: 概览页包含 #wa-save-block');
     a(r.html.indexOf('wa-save-quiet') >= 0, 'v2270ui/A2: 缺面态带 wa-save-quiet class');
@@ -178,6 +181,9 @@ function runAll(assertFn) {
   // ── C 诊断节读数 ──────────────────────────────────────────────────────
   {
     const env = freshEnv();
+    // v2.412.0 全开策略跟位：缺面读数（disabled/不可用）用显式关上游构造。
+    env.WA.storageForecast.setSettings({ enabled: false });
+    env.WA.capacityAudit.setSettings({ enabled: false });
     const rep = env.WA.toolDiag.collect();
     a(!!rep.saveHealth, 'v2270ui/C1: toolDiag 包含 saveHealth');
     a(rep.saveHealth.enabled === true, 'v2270ui/C2: saveHealth enabled 为 true');
@@ -224,6 +230,8 @@ function runAll(assertFn) {
     const r = pageHtml(env, 'overview');
     a(r.html.indexOf('id="wa-save-block"') < 0, 'v2270ui/N6b: 破坏副本上概览页不再出这一格');
     const envOk = freshEnv();
+    envOk.WA.storageForecast.setSettings({ enabled: false });
+    envOk.WA.capacityAudit.setSettings({ enabled: false });
     a(pageHtml(envOk, 'overview').html.indexOf('id="wa-save-block"') >= 0,
       'v2270ui/N6c: 原版上同款判据为真（两向自证成立）');
   }
@@ -240,6 +248,8 @@ function runAll(assertFn) {
     a(r.html.indexOf('wa-save-live') >= 0,
       'v2270ui/N7c: 破坏副本上缺面被当成 live 正常态渲染（不再降级提示）');
     const envOk = freshEnv();
+    envOk.WA.storageForecast.setSettings({ enabled: false });
+    envOk.WA.capacityAudit.setSettings({ enabled: false });
     const rOk = pageHtml(envOk, 'overview');
     a(rOk.html.indexOf('wa-save-quiet') >= 0 && rOk.html.indexOf('wa-save-live') < 0,
       'v2270ui/N7d: 原版两向自证成立（quiet 在场、live 不在场）');
@@ -258,6 +268,8 @@ function runAll(assertFn) {
     const WAe = env.WA;
     a(WAe.saveHealth.getSettings().warnRounds === 40, 'v2270ui/N8b: 破坏副本上体检设置未写入');
     const envOk = freshEnv();
+    envOk.WA.storageForecast.setSettings({ enabled: false });
+    envOk.WA.capacityAudit.setSettings({ enabled: false });
     pageHtml(envOk, 'settings');
     const domOk = envOk.dom;
     const wrOk = domOk.getElementById('wa-sh-warn');
@@ -275,6 +287,8 @@ function runAll(assertFn) {
     const rep = env.WA.toolDiag.collect();
     a(rep.saveHealth && rep.saveHealth.state === undefined, 'v2270ui/N9b: 破坏副本上 state 读数缺席');
     const envOk = freshEnv();
+    envOk.WA.storageForecast.setSettings({ enabled: false });
+    envOk.WA.capacityAudit.setSettings({ enabled: false });
     a(typeof envOk.WA.toolDiag.collect().saveHealth.state === 'string',
       'v2270ui/N9c: 原版上 state 在场（两向自证成立）');
   }

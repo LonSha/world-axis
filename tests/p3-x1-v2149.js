@@ -73,8 +73,11 @@ const BROKEN = [
     // v2.402.0（V23）：from/to 同步补上第八块 `${v23StitchBlock()}` —— 与上一次（V22
     //   加第七块时本锚停在六块、from 作为子串部分命中而变成半破坏）逐字同族。
     //   修法是扩输入面（锚点跟现场走），不是削判据。
-    from: "      <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}${v23StitchBlock()}</div>\n",
-    to:   "      <div>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}${v23StitchBlock()}</div>\n" },
+        // v2.517.0（V26 修欠账）：from/to 同步补上第九块 `${v24CivilBlock()}` —— V24 加块
+    //   时本锚停在八块形态，from 作为子串仍部分命中而变成半破坏（omni 命中 0）。
+    //   修法同前两笔：扩输入面（锚点跟现场走），不是削判据。
+from: "      <div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}${v23StitchBlock()}${v24CivilBlock()}</div>\n",
+    to:   "      <div>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}${v23StitchBlock()}${v24CivilBlock()}</div>\n" },
   { key: 'writeset', rel: 'engines/sediment.js',
     from: "    setSettings: saveSettings,\n",
     to:   "    setSettingsX: saveSettings,\n" }

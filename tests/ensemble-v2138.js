@@ -22,7 +22,7 @@
 /** 锚点表（单一真源；判据别处只引用，不再写字面量）。 */
 const ANCHORS = {
   // ① 「默认关闭」：总开关 false（无宿主设置面时读的就是它）
-  gate: { rel: 'engines/ensemble.js', txt: "enabled: false, strategy: 'first', maxModels: 3, blendChannel: 'judge', timeoutMs: 60000" },
+  gate: { rel: 'engines/ensemble.js', txt: "enabled: true, strategy: 'first', maxModels: 3, blendChannel: 'judge', timeoutMs: 60000" },  // v2.412.0 全开策略跟位：DEF 出厂即 true
   // ② 「关闭时零调用」：闸门在分发之前
   gateCall: { rel: 'engines/ensemble.js', txt: "if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }" },
   // ③ 通道名去重（同通道同模型只调一次）
@@ -324,23 +324,24 @@ async function runAll(a) {
   assert.ok(regs[0].key === 'worldaxis_ensemble_settings_v1', '设置键留痕（实 ' + regs[0].key + '）');
   // 18a 无宿主设置面时读的是模块自己的 DEF（默认关闭的真实测试路径）
   const HB = makeHost({ reply: defReply, noBus: true });
-  assert.ok(HB.api.getSettings().enabled === false, '无设置面时默认关闭（读 DEF）');
+  assert.ok(HB.api.getSettings().enabled === true, '无设置面时默认开启（v2.412.0 全开策略跟位，读 DEF）');
 
   // ══════════════ 逆向：真源码破坏 → 装载副本 → 副本上重跑同款真判据 ══════════════
-  // N1 破坏「默认关闭」：DEF.enabled 置真 ⇒ **无宿主设置面**时默认为开启（可观测）
+  // N1 破坏「默认开启」（v2.412.0 全开策略跟位，方向反转）：DEF.enabled 置假 ⇒
+  //   **无宿主设置面**时默认为关闭（可观测：零调用）。原「置真破坏」在全开下不可现形。
   {
-    const code = wreck('gate', "enabled: true, strategy: 'first', maxModels: 3, blendChannel: 'judge', timeoutMs: 60000");
+    const code = wreck('gate', "enabled: false, strategy: 'first', maxModels: 3, blendChannel: 'judge', timeoutMs: 60000");
     const h = makeHost({ reply: defReply, noBus: true, code: code });
-    assert.ok(h.api.getSettings().enabled === true, 'N1 破坏可观测：无设置面时默认为开启（实 ' + h.api.getSettings().enabled + '）');
+    assert.ok(h.api.getSettings().enabled === false, 'N1 破坏可观测：无设置面时默认为关闭（实 ' + h.api.getSettings().enabled + '）');
     // 且「关着就零调用」随之失效 —— 真行为变化，不是换了个读数的名字
     const rr = await h.api.run(['a', 'b'], Q);
-    assert.ok(rr.ok === true && h.calls.length === 2, 'N1 破坏可观测：关闭门失效（默认态就发调用，实 ' + h.calls.length + ' 次）');
+    assert.ok(rr.reason === 'disabled' && h.calls.length === 0, 'N1 破坏可观测：开启门失效（默认态零调用，实 ' + h.calls.length + ' 次）');
   }
   // N1 正控：**原版**在同路径下必须仍零调用（证明该判据未破坏时是绿的，不是恒绿）
   {
     const h = makeHost({ reply: defReply, noBus: true });
     const rr = await h.api.run(['a', 'b'], Q);
-    assert.ok(rr.reason === 'disabled' && h.calls.length === 0, 'N1 正控：原版无设置面时零调用（实 ' + h.calls.length + '）');
+    assert.ok(rr.ok === true && h.calls.length === 2, 'N1 正控：原版无设置面时默认开启照常发调用（实 ' + h.calls.length + '）');
   }
 
   // N2 破坏「关闭时零调用」：闸门条件置假（关闭态照常往下走）⇒ 零调用判据必红

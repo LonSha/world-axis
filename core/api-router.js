@@ -161,6 +161,21 @@
           throw err;
         }
         const data = await res.json();
+        // v2.517.0（OPV26-2）：响应回执喂账。此前 data.model 与 data.usage 在这里被直接丢弃，
+        //   「响应侧实际回了哪个模型 / 花了多少 token / 多快」全库答不出（V26 主计划既有事实②③）。
+        //   与上方 requestViewer.capture 同纪律：观测面故障绝不拖垮真调用 ⇒ try/catch 收住。
+        //   喂账点在 finish_reason 判定**之前**：即使随后抛 output-limit，这笔回执也已经入账。
+        try {
+          const __respModel = data && data.model ? String(data.model) : '';
+          const __usage = data && data.usage ? data.usage : null;
+          const __ms = clockWall() - t0;
+          if (WA.modelReceipt && typeof WA.modelReceipt.record === 'function') {
+            WA.modelReceipt.record({ channel, reqModel: cfg.model, respModel: __respModel, ms: __ms, usage: __usage, finish: (data.choices && data.choices[0] && data.choices[0].finish_reason) || '' });
+          }
+          if (WA.tokenBudget && typeof WA.tokenBudget.observe === 'function' && __usage) {
+            WA.tokenBudget.observe({ channel, model: __respModel || cfg.model, ms: __ms, promptTokens: __usage.prompt_tokens, completionTokens: __usage.completion_tokens });
+          }
+        } catch (e) { /* 观测面故障不阻断调用 */ }
         const content = data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '';
         const finish = data.choices && data.choices[0] ? data.choices[0].finish_reason : '';
         if (finish === 'length') { const e = new Error('输出截断(max_tokens)'); e.kind = 'output-limit'; e.partial = content; throw e; }

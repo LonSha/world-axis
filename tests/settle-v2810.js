@@ -305,12 +305,16 @@ function judge(a) {
   const rp11 = WA.store.registryParity();
   a(rp11.ok === true && rp11.missing.length === 0, 'v2810/ev: [11] registryParity 绿（登记 ↔ 骨架一致）');
   a((rp11.checkedKeys || []).indexOf('events.rows') >= 0 && (rp11.checkedKeys || []).indexOf('events.failQueue') >= 0, 'v2810/ev: [11] 两容器进 registryParity 精确键');
-  // 默认零行为变更：总开关默认关闭（须先清 LS——同一 WA 实例跨段共享，前段已把 enabled 写 true）
+  // v2.412.0 全开策略跟位（V26 修欠账）：出厂默认 enabled:true（总开关默认开启）。
+  //   拒收语义保留：显式关掉后 disabled 拒收与不注入逐字不变。
   LS.clear();
   WA.store.init();
-  a(WA.events.getSettings().enabled === false, 'v2810/ev: [11] 总开关默认关闭');
+  a(WA.events.getSettings().enabled === true, 'v2810/ev: [11] 总开关默认开启（v2.412.0 全开策略跟位）');
+  WA.events.setSettings({ enabled: false });
+  a(WA.events.getSettings().enabled === false, 'v2810/ev: [11] 显式关闭生效');
   a(WA.events.schedule({ id: 'q', title: 't', kind: 'once' }).reason === 'disabled', 'v2810/ev: [11] 关闭时不排期（disabled 拒收）');
   a(WA.events.buildBlock() === '', 'v2810/ev: [11] 关闭时不注入（不产空块）');
+  WA.events.setSettings({ enabled: true });
 }
 
 // ── 负向自证（只在内存副本上破坏，零文件改写）──

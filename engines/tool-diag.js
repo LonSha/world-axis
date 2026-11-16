@@ -3872,6 +3872,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'ui/pages/overview-main.js': 'panelOverviewMain',
     'ui/pages/tools-page.js': 'panelToolsPage',
     'ui/pages/dashboards.js': 'uiDashboards',
+    // v2.517.0（V26 收口）：世界脉搏聚合块补登记（v2.415.0 引入时漏登，inventory 一直报
+    //   「未登记模块」—— 面板转发在运行期惰性读它，缺席=整块降级，与 overview-blocks 同款）。
+    'ui/pages/overview-world-pulse.js': 'panelWorldPulse',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -4114,7 +4117,27 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     //   后果与上段同病：secModules 把它报成 missing（「真缺席」），
     //   export-contract 的 OWNER 不认 worldReader ⇒ 调用点被静默跳过。
     //   ns 名取自该文件 `WA.worldReader = {`。
-    'engines/world-reader.js': 'worldReader'
+    'engines/world-reader.js': 'worldReader',
+    // v2.417.0（V25 柏宝书+数据库缝入批）：11 引擎。ns 名取自各文件 `WA.<ns> = {`。
+    //   漏登的后果与 world-reader 同病：export-contract OWNER 不认 ⇒ 调用点静默跳过。
+    'engines/player-knowledge.js': 'playerKnowledge',
+    'engines/affection-dual-axis.js': 'affectionDual',
+    'engines/life-profile.js': 'lifeProfile',
+    'engines/suspense-ledger.js': 'suspenseLedger',
+    'engines/source-hints.js': 'sourceHints',
+    'engines/advance-idempotence.js': 'advanceIdem',
+    'engines/takeover-yield.js': 'takeoverYield',
+    'engines/sim-rehearsal.js': 'simRehearsal',
+    'engines/history-batch-read.js': 'historyBatch',
+    'engines/save-throttle.js': 'saveThrottle',
+    'engines/history-provenance.js': 'historyProv',
+    // v2.517.0（V26）：六引擎可选导出（无头环境缺 settingsBus 时走 shadow 回退，仍可加载）
+    'engines/model-receipt.js': 'modelReceipt',
+    'engines/token-budget.js': 'tokenBudget',
+    'engines/model-pin.js': 'modelPin',
+    'engines/call-timeline.js': 'callTimeline',
+    'engines/model-catalog.js': 'modelCatalog',
+    'engines/degrade-audit.js': 'degradeAudit'
   };
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
   // v2.152.0：新增 ui 模块（ui/render-perf.js）同步进本名单 —— 漏登记的后果不是「少一行字」，
@@ -4144,6 +4167,8 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'uiDashboards',
       // v2.401.0(OPV23-4): ui/pages/overview-blocks.js 同款补登记（OPV22-4 拆出的第四段）。
       'panelOverviewBlocks',
+      // v2.517.0（V26 收口）：世界脉搏聚合块同款（无头环境不装载 → optionalMissing）。
+      'panelWorldPulse',
     ];
   function secModules() {
     const missing = [], loaded = [], optionalMissing = [];

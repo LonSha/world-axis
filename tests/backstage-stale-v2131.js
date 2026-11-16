@@ -81,7 +81,8 @@ function runB(a) {
   a(!!G && typeof G.begin === 'function' && typeof G.verdict === 'function',
     'v2131/B: stale-guard 装载后两面就位（begin/verdict）');
   // ① 关（默认）：不开票、对任何票放行 —— 「没开开关」不得丢结果
-  a(G.getSettings().enabled === false, 'v2131/B: 默认关闭（现场实 ' + G.getSettings().enabled + '）');
+  a(G.getSettings().enabled === true, 'v2131/B: 默认开启（v2.412.0 全开策略跟位，现场实 ' + G.getSettings().enabled + '）');
+  G.setSettings({ enabled: false });
   const offBegin = G.begin('t');
   a(offBegin && offBegin.ok === false && offBegin.reason === 'disabled',
     'v2131/B: 关闭时 begin 不开票（实 ' + JSON.stringify(offBegin) + '）');

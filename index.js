@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.416.0';
+  const VERSION = '2.517.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1423,6 +1423,30 @@
     'engines/elapsed-evidence.js',     // 时间流逝的证据解析：四层拒绝 + 模型分钟数双重校验
     'engines/source-reconcile.js',     // 来源编辑 → 依赖后缀撤销 + 复合票据（十项比对）
     'engines/plan-roster.js',          // 计划准入：同行闭包 / 角色游标 / 封闭动作白名单
+    // ══ v2.417.0（V25 柏宝书 + 数据库 缝入批，EXV25-1～5 / OPV25-1～6）：11 引擎 ══
+    //   审计依据 plans/V25_MASTER_PLAN.md R0：11 项真缺口成立，4 个同名异义已排除。
+    //   全部调用期读 WA 命名空间，装载期零上游读；仅 shadow 进程账 + settingsBus，
+    //   不写 store、不落盘 ⇒ 不入 evict SITES（无站点无登记）。
+    //   位置：全部既有引擎之后、ui/panel.js 之前，与 world-reader/director 同层。
+    'engines/player-knowledge.js',     // EXV25-1 角色对主角的了解清单 / 没记=不知道
+    'engines/affection-dual-axis.js',  // EXV25-2 内心好感×外在态度 双轴五档 / 未知≠中性
+    'engines/life-profile.js',         // EXV25-3 生活小档案按人分账 / 不跨人合并
+    'engines/suspense-ledger.js',      // EXV25-4 悬念核销簿 / close 必给凭据 / 逾期不自动消账
+    'engines/source-hints.js',         // EXV25-5 易漏原文提醒 / 整段副本不截断 / 未命中≠没有
+    'engines/advance-idempotence.js',  // OPV25-1 剧情推进幂等闸 / 同键只放行一次
+    'engines/takeover-yield.js',       // OPV25-2 接管让路 / 可见提示 + 非阻塞回执
+    'engines/sim-rehearsal.js',        // OPV25-3 整轮推演执行链 / 占位符缺值不猜
+    'engines/history-batch-read.js',   // OPV25-4 历史批量读 / 快照续放 + 无帧跳段
+    'engines/save-throttle.js',        // OPV25-5 存盘节流 / 窗口合并 + 尾随补存
+    'engines/history-provenance.js',   // OPV25-6 历史读数来源身份 / patched≠drifted
+    // v2.517.0（V26 模型可观测性批）：六引擎全部只读调用台账 + settingsBus，
+    //   装载期零上游读、不写 store、不落盘 ⇒ 不入 evict SITES。排位沿用 V25 段之后、ui/panel.js 之前。
+    'engines/model-receipt.js',        // OPV26-1 模型响应回执账 / req≠resp 漂移计数 + TPS
+    'engines/token-budget.js',         // OPV26-3 用量延迟分位视图 / p50/p95 + 债务点名
+    'engines/model-pin.js',            // OPV26-3b 模型钉版守卫 / 未钉不判 / 回执缺席不判
+    'engines/call-timeline.js',        // OPV26-4 单轮调用时间线 / 关键渠道占比
+    'engines/model-catalog.js',        // OPV26-5 模型清单拉取与在册核对 / ingest 纯收账
+    'engines/degrade-audit.js',        // OPV26-6 降智行为面审计 / 样本不足不给结论
     'ui/panel.js',
     // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
     //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；

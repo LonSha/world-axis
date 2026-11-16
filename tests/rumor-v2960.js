@@ -305,8 +305,9 @@ function runAll(a) {
 
   // ── B 运行时面 ──
   const W = env();
-  // B18 默认关闭：**读源码常量**（夹具已把开关写进宿主 localStorage，运行期读不到默认值）
-  a(rSrc.indexOf('const DEF = { enabled: false,') > 0, 'v2960: [B18] 总开关默认关闭写在 DEF 里（不是「看起来关了」）');
+  // B18 总开关默认值：**读源码常量**（夹具已把开关写进宿主 localStorage，运行期读不到默认值）。
+  //   v2.412.0 全开策略跟位（V26 修欠账）：DEF.enabled 出厂即 true；关闭态拒收判据在下方照旧。
+  a(rSrc.indexOf('const DEF = { enabled: true,') > 0, 'v2960: [B18] 总开关默认开启写在 DEF 里（v2.412.0 全开策略跟位）');
   // 关闭态在**另一个实例**上验；验完必须把 W 开回来——设置落在宿主 localStorage 上、跨实例共享，
   //   一处关掉，后面所有用 W 的块都会读到关闭态（本轮实测：B1/B2/B17 集体返回 disabled）。
   const WD = env();

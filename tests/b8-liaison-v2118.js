@@ -486,9 +486,9 @@ function judge(a) {
   // 关系后果只走既有单一出口，不自造关系模型
   a(src.indexOf('const F = WA.fondness;') >= 0 && src.indexOf('WA.relation') < 0,
     'v2118/b8: [A9] 关系后果走 fondness 单一出口（不另造关系模型）');
-  // 总开关默认关
-  a(/enabled: false,/.test(src) && /affectsRelation: false,/.test(src),
-    'v2118/b8: [A10] 总开关与关系后果默认关');
+  // 总开关默认值（v2.412.0 全开策略跟位：出厂 enabled:true；关系后果仍默认关）
+  a(/enabled: true,/.test(src) && /affectsRelation: false,/.test(src),
+    'v2118/b8: [A10] 总开关默认开启（全开策略跟位）、关系后果默认关');
   // 终态复检**两道门**同时存在（外层快路径 + 事务内复检）。
   //   为什么不设破坏项：两道门互为冗余 —— 单独拆掉任一道，另一道会补上，
   //   行为不变（第一批实测两条都不可现形）。诚实的做法是钉住「两道都在」，

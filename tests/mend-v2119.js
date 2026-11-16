@@ -333,8 +333,8 @@ function judge(a) {
   a(pn.indexOf("mend: '关系修复'") >= 0, 'v2119/mend: [A6] 面板显示名登记');
   a(td.indexOf("'wa-mend-mark'") >= 0 && td.indexOf("'wa-mend-guarantor'") >= 0,
     'v2119/mend: [A7] 守卫表登记控件');
-  a(src.indexOf('enabled: false, maxRows: 12, minProgress: 2, maxSteps: 3') >= 0,
-    'v2119/mend: [A8] 总开关默认关');
+  a(src.indexOf('enabled: true, maxRows: 12, minProgress: 2, maxSteps: 3') >= 0,
+    'v2119/mend: [A8] 总开关默认开启（v2.412.0 全开策略跟位）');
   a(src.indexOf("const ACTS = ['apology', 'restitution', 'keeping', 'guarantee'];\n".trim().replace(/\n\s+/g, ' ')) >= 0 ||
     src.indexOf("const ACTS = ['apology', 'restitution', 'keeping', 'guarantee'];") >= 0,
     'v2119/mend: [A9] 四种手段是具名常量');

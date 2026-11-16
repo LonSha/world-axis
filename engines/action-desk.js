@@ -657,6 +657,96 @@
     'diceDen.cheatAttempt': function (o) { return WA.diceDen.cheatAttempt(o.id, o.spec || o); },
     'bathhouseLaundry.openBath': function (o) { return WA.bathhouseLaundry.openBath(o.spec || o); },
     'bathhouseLaundry.washGarments': function (o) { return WA.bathhouseLaundry.washGarments(o.spec || o); },
+    // ══ v2.417.0（V25 柏宝书+数据库缝入批）：11 引擎路由。键名 = ns.方法，与各引擎导出面逐字对齐 ══
+    // EXV25-1 对主角了解清单：写 add/correct/forget，读 knows/view/unknownFor
+    'playerKnowledge.add': function (o) { return WA.playerKnowledge.add(o.spec || o); },
+    'playerKnowledge.correct': function (o) { return WA.playerKnowledge.correct(o.id, o.spec || o); },
+    'playerKnowledge.forget': function (o) { return WA.playerKnowledge.forget(o.id, o.reason); },
+    'playerKnowledge.knows': function (o) { return WA.playerKnowledge.knows(o.spec || o); },
+    'playerKnowledge.view': function (o) { return WA.playerKnowledge.view(o.spec || o); },
+    'playerKnowledge.unknownFor': function (o) { return WA.playerKnowledge.unknownFor(o.spec || o); },
+    // EXV25-2 内外双轴：写 observe/clear，读 read/view
+    'affectionDual.observe': function (o) { return WA.affectionDual.observe(o.spec || o); },
+    'affectionDual.read': function (o) { return WA.affectionDual.read(o.spec || o); },
+    'affectionDual.clear': function (o) { return WA.affectionDual.clear(o.spec || o); },
+    'affectionDual.view': function (o) { return WA.affectionDual.view(o.spec || o); },
+    // EXV25-3 生活小档案：写 record/update/remove，读 about/view
+    'lifeProfile.record': function (o) { return WA.lifeProfile.record(o.spec || o); },
+    'lifeProfile.update': function (o) { return WA.lifeProfile.update(o.id, o.spec || o); },
+    'lifeProfile.remove': function (o) { return WA.lifeProfile.remove(o.id, o.reason); },
+    'lifeProfile.about': function (o) { return WA.lifeProfile.about(o.spec || o); },
+    'lifeProfile.view': function (o) { return WA.lifeProfile.view(o.spec || o); },
+    // EXV25-4 悬念簿：写 open/close/reopen，读 overdue/view
+    'suspenseLedger.open': function (o) { return WA.suspenseLedger.open(o.spec || o); },
+    'suspenseLedger.close': function (o) { return WA.suspenseLedger.close(o.spec || o); },
+    'suspenseLedger.reopen': function (o) { return WA.suspenseLedger.reopen(o.spec || o); },
+    'suspenseLedger.overdue': function (o) { return WA.suspenseLedger.overdue(o.spec || o); },
+    'suspenseLedger.view': function (o) { return WA.suspenseLedger.view(o.spec || o); },
+    // EXV25-5 易漏提醒：机器面，扫描口路由（summarizer/backstage 管线按需调用）
+    'sourceHints.scan': function (o) { return WA.sourceHints.scan(o.spec || o); },
+    'sourceHints.build': function (o) { return WA.sourceHints.build(o.spec || o); },
+    // OPV25-1 幂等闸：写 begin/commit/abort，读 probe/view
+    'advanceIdem.begin': function (o) { return WA.advanceIdem.begin(o.spec || o); },
+    'advanceIdem.claim': function (o) { return WA.advanceIdem.claim(o.spec || o); },
+    'advanceIdem.commit': function (o) { return WA.advanceIdem.commit(o.spec || o); },
+    'advanceIdem.abort': function (o) { return WA.advanceIdem.abort(o.spec || o); },
+    'advanceIdem.probe': function (o) { return WA.advanceIdem.probe(o.spec || o); },
+    'advanceIdem.view': function (o) { return WA.advanceIdem.view(o.spec || o); },
+    // OPV25-2 让路：写 yieldFor/release，读 holds
+    'takeoverYield.yieldFor': function (o) { return WA.takeoverYield.yieldFor(o.spec || o); },
+    'takeoverYield.release': function (o) { return WA.takeoverYield.release(o.spec || o); },
+    'takeoverYield.holds': function (o) { return WA.takeoverYield.holds(o.spec || o); },
+    // OPV25-3 推演链：写 plan/step/commit/abort/fill，读 view
+    'simRehearsal.plan': function (o) { return WA.simRehearsal.plan(o.spec || o); },
+    'simRehearsal.step': function (o) { return WA.simRehearsal.step(o.spec || o); },
+    'simRehearsal.commit': function (o) { return WA.simRehearsal.commit(o.spec || o); },
+    'simRehearsal.abort': function (o) { return WA.simRehearsal.abort(o.spec || o); },
+    'simRehearsal.fill': function (o) { return WA.simRehearsal.fill(o.spec || o); },
+    'simRehearsal.view': function (o) { return WA.simRehearsal.view(o.spec || o); },
+    // OPV25-4 批量读：读口路由 index/read/consume
+    'historyBatch.index': function (o) { return WA.historyBatch.index(o.spec || o); },
+    'historyBatch.read': function (o) { return WA.historyBatch.read(o.spec || o); },
+    'historyBatch.consume': function (o) { return WA.historyBatch.consume(o.spec || o); },
+    // OPV25-5 节流：写 note，读 due/flush/trailing/view
+    'saveThrottle.note': function (o) { return WA.saveThrottle.note(o.spec || o); },
+    'saveThrottle.due': function (o) { return WA.saveThrottle.due(o.spec || o); },
+    'saveThrottle.flush': function (o) { return WA.saveThrottle.flush(o.spec || o); },
+    'saveThrottle.trailing': function (o) { return WA.saveThrottle.trailing(o.spec || o); },
+    // OPV25-6 来源身份：写 stamp，读 verify/audit
+    'historyProv.stamp': function (o) { return WA.historyProv.stamp(o.spec || o); },
+    'historyProv.verify': function (o) { return WA.historyProv.verify(o.spec || o); },
+    'historyProv.audit': function (o) { return WA.historyProv.audit(o.spec || o); },
+    // ── v2.517.0（V26 模型可观测性批）：六引擎路由。写口统一收拢 ActionDesk，
+    //   UI 只读引擎；观测面动作天然只读，不触碰存档。
+    // OPV26-1 回执账：写 record（喂账），读 list/stats/drifters
+    'modelReceipt.record': function (o) { return WA.modelReceipt.record(o.spec || o); },
+    'modelReceipt.list': function (o) { return WA.modelReceipt.list(o.spec || o); },
+    'modelReceipt.stats': function (o) { return WA.modelReceipt.stats(o.spec || o); },
+    'modelReceipt.drifters': function (o) { return WA.modelReceipt.drifters(o.spec || o); },
+    // OPV26-3 用量分位：写 observe，读 view/debt
+    'tokenBudget.observe': function (o) { return WA.tokenBudget.observe(o.spec || o); },
+    'tokenBudget.view': function (o) { return WA.tokenBudget.view(o.spec || o); },
+    'tokenBudget.debt': function (o) { return WA.tokenBudget.debt(); },
+    // OPV26-3b 钉版守卫：写 pin/unpin，读 check/audit/pins
+    'modelPin.pin': function (o) { return WA.modelPin.pin(o.spec || o); },
+    'modelPin.unpin': function (o) { return WA.modelPin.unpin(o.spec || o); },
+    'modelPin.check': function (o) { return WA.modelPin.check(o.spec || o); },
+    'modelPin.audit': function (o) { return WA.modelPin.audit(o.spec || o); },
+    'modelPin.pins': function (o) { return WA.modelPin.pins(); },
+    // OPV26-4 时间线：写 begin/mark/end，读 view
+    'callTimeline.begin': function (o) { return WA.callTimeline.begin(o.spec || o); },
+    'callTimeline.mark': function (o) { return WA.callTimeline.mark(o.spec || o); },
+    'callTimeline.end': function (o) { return WA.callTimeline.end(o.spec || o); },
+    'callTimeline.view': function (o) { return WA.callTimeline.view(o.spec || o); },
+    // OPV26-5 清单：写 ingest（纯收账），读 list/check/audit
+    'modelCatalog.ingest': function (o) { return WA.modelCatalog.ingest(o.spec || o); },
+    'modelCatalog.list': function (o) { return WA.modelCatalog.list(o.spec || o); },
+    'modelCatalog.check': function (o) { return WA.modelCatalog.check(o.spec || o); },
+    'modelCatalog.audit': function (o) { return WA.modelCatalog.audit(o.spec || o); },
+    // OPV26-6 降智审计：写 baseline，读 audit/baselines
+    'degradeAudit.baseline': function (o) { return WA.degradeAudit.baseline(o.spec || o); },
+    'degradeAudit.audit': function (o) { return WA.degradeAudit.audit(o.spec || o); },
+    'degradeAudit.baselines': function (o) { return WA.degradeAudit.baselines(); },
     'finance.ruptureCollateral': function (o) {
       if (WA.collateralRupture && typeof WA.collateralRupture.ruptureCollateral === 'function') {
         return WA.collateralRupture.ruptureCollateral(o);

@@ -93,7 +93,7 @@ const ANCHOR = {
   simFace: 'simCap: MAX_ROUNDS, simDefault: DEF_SIM_ROUNDS,',
   writesSingle: "writesSingle: 'adopt',                  // 唯一写世界口",
   lskey: "const LS_KEY = 'worldaxis_world_lab_settings_v1';",
-  def: "const DEF = { enabled: false, maxSteps: 6, armA: '', armB: '' };",
+  def: "const DEF = { enabled: true, maxSteps: 6, armA: '', armB: '' };",  // v2.412.0 全开策略跟位
   statFace: 'hasSim: !!_sim, simRows: _sim ? _sim.rows.length : 0,',
   exportsFace: 'diagnose: diagnose, stat: statOf',
   note: '       <div class="wa-dim">v2.203.0（Y9）四件事：',

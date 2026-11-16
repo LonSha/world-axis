@@ -105,7 +105,11 @@ function runAll(assertFn) {
     const env = freshEnv();
     const WA = env.WA;
     WA.apiRouter.setChannel('default', { baseUrl: 'https://x/v1', apiKey: 'k', model: 'm' });
-    WA.capabilityTier.applyTier('standard');
+    // v2.412.0 全开策略跟位（V26 修欠账）：全开下 applyTier 无事可做（noop 不写盘），
+    //   「选过档位」的构造改为 settingsBus 直写档位设置（玩家手动切档写盘的同款现场）。
+    WA.settingsBus.saveOrThrow(
+      { key: 'worldaxis_capability_tier_settings_v1', def: { tier: 'lite', granted: [], history: [] }, module: 'capabilityTier', bounds: {} },
+      { tier: 'standard', granted: [], history: [] });
     WA.store.transact(function (d) { d.lastInjection = { at: 1, injected: true, len: 5, round: 1, sources: [] }; });
     const r = pageHtml(env, 'overview');
     a(r.html.indexOf('id="wa-first-block"') < 0, 'v2271ui/A8: 三步做完且未要求保留 ⇒ 不渲染（不占屏）');

@@ -221,8 +221,8 @@ function judge(a) {
   a(inj.indexOf("'stage', 'session'") >= 0 && inj.indexOf('vis.session && WA.session') >= 0
     && inj.indexOf("'多人场'") >= 0, 'v2119/session: [A5] 注入源表与注入分支同批登记');
   a(pn.indexOf("session: '多人场'") >= 0, 'v2119/session: [A6] 面板显示名登记');
-  a(src.indexOf('enabled: false, maxSeats: 8, maxLog: 64, windowMs: 3600000') >= 0,
-    'v2119/session: [A7] 总开关默认关');
+  a(src.indexOf('enabled: true, maxSeats: 8, maxLog: 64, windowMs: 3600000') >= 0,
+    'v2119/session: [A7] 总开关默认开启（v2.412.0 全开策略跟位）');
   a(src.indexOf("const SEAT_PERMS = ['post', 'advance', 'decide', 'invite'];") >= 0,
     'v2119/session: [A8] 座位权限具名表');
   a(src.indexOf('WA.registerModule(') >= 0 && src.indexOf('engines/session.js') >= 0,

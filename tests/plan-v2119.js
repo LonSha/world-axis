@@ -293,8 +293,8 @@ function judge(a) {
   a(pn.indexOf("plan: '人物计划'") >= 0, 'v2119/plan: [A6] 面板显示名登记');
   a(td.indexOf("'wa-plan-enabled'") >= 0 && td.indexOf("'wa-plan-abandon'") >= 0,
     'v2119/plan: [A7] 守卫表登记控件');
-  a(src.indexOf('enabled: false, maxSteps: 4, maxPlans: 12, maxTries: 3') >= 0,
-    'v2119/plan: [A8] 总开关默认关');
+  a(src.indexOf('enabled: true, maxSteps: 4, maxPlans: 12, maxTries: 3') >= 0,
+    'v2119/plan: [A8] 总开关默认开启（v2.412.0 全开策略跟位）');
   a(src.indexOf("const STATUS = ['active', 'blocked', 'done', 'abandoned'];") >= 0
     && src.indexOf("const FINAL = ['done', 'abandoned'];") >= 0,
     'v2119/plan: [A9] 状态与终态是具名常量');

@@ -66,6 +66,9 @@
     //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 `act`，
     //   而那是用户唯一能开关它的地方（本版实测被 inject-sources-v2560 的 D 判据抓出）。
     act: '人物行动',
+    // v2.417.0（V25 柏宝书缝入批）：四个新注入源的显示名。与 render/inject.js 的
+    //   SOURCES/VIS_NAMES、注入分支 source 名**逐字同批**登记（不加显示名 ⇒ 面板裸露英文键名）。
+    playerKnowledge: '对主角了解', affectionDual: '内外双轴', lifeProfile: '生活小档', suspenseLedger: '悬念簿',
     // v2.66.0: 情绪通道 / 关系六型 / 假面。与 SOURCES 同批登记（不加显示名 ⇒ 面板裸露英文键名）。
     affect: '情绪通道', bonds: '关系六型', masks: '假面', temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', parallelEvents: '场外事件',
     eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉', beastBond: '驯兽',
@@ -2822,8 +2825,21 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           <div class="wa-chan-head"><b>${c.name}</b> ${c.cfg ? '<span class="wa-badge wa-on">已配置</span>' : '<span class="wa-badge">默认</span>'}</div>
           <input class="wa-input wa-ch-base" placeholder="Base URL（如 https://api.openai.com/v1）" value="${esc((c.cfg || {}).baseUrl || '')}"/>
           <input class="wa-input wa-ch-key" type="password" placeholder="API Key" value="${esc((c.cfg || {}).apiKey || '')}"/>
-          <input class="wa-input wa-ch-model" placeholder="模型名" value="${esc((c.cfg || {}).model || '')}"/>
-          <button class="wa-btn wa-mini wa-ch-save">保存</button>
+          <input class="wa-input wa-ch-model" placeholder="模型名（手打或从下方清单选）" value="${esc((c.cfg || {}).model || '')}"/>
+          ${(() => {
+            // v2.517.0（OPV26-5 UI 面）：模型清单候选下拉。UI 只读引擎（modelCatalog.list），不自算。
+            //   清单未拉取/过期（no-cache）时如实展示，不拿空清单冒充事实。
+            const cat = (WA.modelCatalog && WA.modelCatalog.list) ? WA.modelCatalog.list({ channel: c.name }) : null;
+            if (!cat || !cat.ok) return '<div class="wa-dim wa-cat-hint">清单未拉取：点「拉取清单」从服务端获取候选，或直接手打模型名</div>';
+            const ms = cat.models || [];
+            return '<div class="wa-row"><select class="wa-input wa-ch-cands"><option value="">— 从清单选择（共 ' + ms.length + ' 个）—</option>'
+              + ms.map(m => '<option value="' + esc(m) + '">' + esc(m) + '</option>').join('')
+              + '</select></div><div class="wa-dim wa-cat-hint">清单来自服务端 /models（缓存窗口内复用），选中只回填输入框，仍需点「保存」</div>';
+          })()}
+          <div class="wa-row">
+            <button class="wa-btn wa-mini wa-ch-fetch">拉取清单</button>
+            <button class="wa-btn wa-mini wa-ch-save">保存</button>
+          </div>
         </div>`).join('')}
       <div class="wa-sec">并发上限：<b id="wa-conc-v">${WA.apiRouter.getConcurrency()}</b>（队列 ${WA.apiRouter.queueLength()}）</div>
       <input type="range" min="1" max="10" value="${WA.apiRouter.getConcurrency()}" id="wa-conc" class="wa-range" title="同时进行的 AI 请求上限（调高会更快，但可能触发供应商限流）"/>
@@ -13030,6 +13046,29 @@ on('#wa-desk-show', showDesk);
       box.querySelector('.wa-ch-save').onclick = () => {
         WA.apiRouter.setChannel(box.dataset.chan, { baseUrl: box.querySelector('.wa-ch-base').value.trim(), apiKey: box.querySelector('.wa-ch-key').value.trim(), model: box.querySelector('.wa-ch-model').value.trim() });
         renderBody();
+      };
+      // v2.517.0（OPV26-5 UI 面）：拉取清单按钮 —— 调引擎 refresh（网络壳），只读渲染回执。
+      //   fetch-failed 时把引擎带回的 stale 旧清单如实展示，不拿空清单冒充事实。
+      const fetchBtn = box.querySelector('.wa-ch-fetch');
+      if (fetchBtn) fetchBtn.onclick = async () => {
+        fetchBtn.disabled = true;
+        try {
+          const r = await WA.modelCatalog.refresh({ channel: box.dataset.chan });
+          if (r && r.ok) { renderBody(); return; }
+          const hintEl = box.querySelector('.wa-cat-hint');
+          if (hintEl) hintEl.textContent = (r && r.hint) ? r.hint : 'fetch-failed：拉取失败';
+          if (r && r.stale && r.stale.length) {
+            hintEl && (hintEl.innerHTML = esc('拉取失败，窗口内旧清单仍可用（' + r.stale.length + ' 个）') + '<br/><select class="wa-input wa-ch-cands"><option value="">— 旧清单 —</option>'
+              + r.stale.map(m => '<option value="' + esc(m) + '">' + esc(m) + '</option>').join('') + '</select>');
+          }
+        } catch (e) { /* 引擎层故障不拖垮面板 */ }
+        fetchBtn.disabled = false;
+      };
+      // v2.517.0：候选下拉 change → 只回填输入框（保存仍走既有 .wa-ch-save 路径，setChannel 白名单不被污染）。
+      const cands = box.querySelector('.wa-ch-cands');
+      if (cands) cands.onchange = () => {
+        if (!cands.value) return;
+        box.querySelector('.wa-ch-model').value = cands.value;
       };
     });
 

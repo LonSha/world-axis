@@ -73,7 +73,7 @@ const ANCHOR = {
   rollbackNote: "rollback: '",
   composeNote: "compose: '",
   lskey: "const LS_KEY = 'worldaxis_rule_pack_settings_v1';",
-  def: "const DEF = { enabled: false, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,",
+  def: "const DEF = { enabled: true, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,",  // v2.412.0 全开策略跟位
   exportsFace: 'diagnose: diagnose, stat: statOf',
   note: "       <div class=\"wa-dim\">v2.203.0（Y8）四件事：",
   out: "       <div id=\"wa-rp-out\" class=\"wa-out\"></div>"

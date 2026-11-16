@@ -215,8 +215,8 @@ function judge(a) {
   a(pn.indexOf("stage: '玩法进度'") >= 0, 'v2119/stage: [A6] 面板显示名登记');
   a(td.indexOf("'wa-st-adopt'") >= 0 && td.indexOf("'wa-st-out'") >= 0,
     'v2119/stage: [A7] 守卫表登记控件');
-  a(src.indexOf('enabled: false, maxMetrics: 24, maxTransitions: 12') >= 0,
-    'v2119/stage: [A8] 总开关默认关');
+  a(src.indexOf('enabled: true, maxMetrics: 24, maxTransitions: 12') >= 0,
+    'v2119/stage: [A8] 总开关默认开启（v2.412.0 全开策略跟位）');
   a(src.indexOf('const PACKS = {') >= 0 && src.indexOf('unknown-pack') >= 0,
     'v2119/stage: [A9] 玩法包具名（不能凭空发明一套玩法）');
   a(src.indexOf('WA.registerModule(') >= 0 && src.indexOf('engines/stage.js') >= 0,

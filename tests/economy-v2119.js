@@ -241,8 +241,8 @@ function judge(a) {
   a(pn.indexOf("economy: '供需与商路'") >= 0, 'v2119/economy: [A6] 面板显示名登记');
   a(td.indexOf("'wa-eco-enabled'") >= 0 && td.indexOf("'wa-eco-out'") >= 0,
     'v2119/economy: [A7] 守卫表登记控件');
-  a(src.indexOf('enabled: false, maxGoods: 16, maxOrders: 12, maxRoutes: 8, spreadPct: 30') >= 0,
-    'v2119/economy: [A8] 总开关默认关');
+  a(src.indexOf('enabled: true, maxGoods: 16, maxOrders: 12, maxRoutes: 8, spreadPct: 30') >= 0,
+    'v2119/economy: [A8] 总开关默认开启（v2.412.0 全开策略跟位）');
   // v2.231.7（回归收口）：OPT-8 之后配方真源迁到 engines/recipe.js 的 `const RECIPES = {`，
   //   economy 只保留「未声明题材时沿用旧常量」的默认面 `RECIPES_DEF`。
   //   判据原先只认前者，于是**产品语义未变、名字变了**就被报成红灯。

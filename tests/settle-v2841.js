@@ -37,6 +37,12 @@ const SNAPSHOT_SOURCES = { clock: 'TOKCLOCK', pulse: 'TOKPULSE', background: 'TO
 //   任何「非快照源在表里找不到可用方法」都不许静默 return，直接判红并点名。
 const ITEM_METHOD = { memory: 'buildMemoryBlock', opinion: 'buildOpinionBlock', ledger: 'buildLedgerText',
   personalInventory: 'buildInventoryFeed', metabolismClock: 'buildVitalsFeed' };
+// v2.517.0（V25 四源补登）：playerKnowledge / affectionDual / lifeProfile / suspenseLedger
+//   是「view 返回对象、render/inject.js 分支内联拼装」形态（引擎无 buildBlock）——
+//   哨兵不能像 buildBlock 那样直接换字符串：分支里 `v.count`/`v.rows` 解引用会拼出空串。
+//   此处用**包壳哨兵**：替换后的 view 返回 { count:1, rows:[{…SENT…}] } 形态，
+//   分支照常拼装 ⇒ 哨兵文本随 rows.text 进产物，判的就是「开关 ⇒ 分支真的走没走」。
+const ITEM_WRAP = ['playerKnowledge', 'affectionDual', 'lifeProfile', 'suspenseLedger'];
 /** 稳定种子的配对抽样：同一份源码任何时候都抽样到同一批配对（结果可复现） */
 function pairsOf(list, max) {
   const out = [];
@@ -81,9 +87,25 @@ function armAll(WA) {
     // 装不上哨兵不许静默跳过：一旦跳过，tags 里已有 k ⇒ [前题]/[B]/[C] 会以
     // 「缺/误伤/漏」的形式误报到那个源头上，看起来像引擎缺陷，其实是判据表漏登记。
     // 这里把「装不上」单独收集起来，runAll 里作为独立判据判红并点名（可自证、可定位）。
+    if (ITEM_WRAP.indexOf(k) >= 0) {
+      // 包壳形态：view 返回对象，分支内联拼装。哨兵藏在 rows[0].text 里。
+      if (!mod || typeof mod.view !== 'function') { unarmed.push(k + '→view(包装)'); return; }
+      const keep2 = mod.view;
+      mod.view = function () {
+        //  包壳形态要兼容三个分支的不同拼装面：
+        //   · playerKnowledge / lifeProfile 读 v.count + rows[].text
+        //   · affectionDual 只读 rows[].who/inner/outer（不输出 text！）—— tag 必须进 who
+        //   · suspenseLedger 读 rows[].what（view({status:'open'}) 带参也返回同形态）
+        return { ok: true, count: 1,
+          rows: [{ who: tag, about: tag, text: tag, status: 'open', kind: 'S',
+            unknown: false, inner: tag, outer: tag, what: tag }] };
+      };
+      restores.push(function () { mod.view = keep2; });
+      return;
+    }
     if (!mod || typeof mod[method] !== 'function') { unarmed.push(k + '→' + method); return; }
     const keep = mod[method];
-    mod[method] = function () { return tag; };
+mod[method] = function () { return tag; };
     restores.push(function () { mod[method] = keep; });
   });
   return { tags: tags, unarmed: unarmed, restore: function () { restores.forEach(function (f) { f(); }); } };
