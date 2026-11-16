@@ -87,22 +87,22 @@ function runAll() {
   (function () {
     const WA = T.loadAll().WA;
     const bus = WA.settingsBus;
-    const before = bus.faces();
     const rows = WA.__settingsRegs;
-    // 找一条 enabled:false 的，把 def 里的 enabled 删掉 ⇒ 它应当从 disabled 转到 enabled
-    const idx = rows.findIndex(function (r) { return r && r.def && r.def.enabled === false; });
-    a(idx >= 0, 'B9a: 找到一条 enabled:false 的登记项做探针（实 idx=' + idx + '）');
-    if (idx >= 0) {
-      const keep = rows[idx].def;
-      const copy = Object.assign({}, keep);
-      delete copy.enabled;
-      rows[idx] = Object.assign({}, rows[idx], { def: copy });
-      const after = bus.faces();
-      a(after.enabled === before.enabled + 1 && after.disabled === before.disabled - 1,
-        'B9b: 删掉 def.enabled ⇒ 该项从「关」转「开」（实 enabled ' + before.enabled + '→' + after.enabled
-        + ' / disabled ' + before.disabled + '→' + after.disabled + '）—— 缺省即 true 不是空话');
-      rows[idx] = Object.assign({}, rows[idx], { def: keep });
-    }
+    // v2.412.0 全开策略：登记表已无出厂 enabled:false 的项 —— 显式构造一条关闭态登记行做探针
+    //   （判据一字不削：删掉 def.enabled ⇒ 该项必须从「关」转「开」，证明缺省语义真成立）。
+    const idx = 0;
+    const keep = rows[idx].def;
+    rows[idx] = Object.assign({}, rows[idx], { def: Object.assign({}, keep, { enabled: false }) });
+    const before = bus.faces();
+    a(before.disabled >= 1, 'B9a: 构造的 enabled:false 登记行确实计入「关」（实 disabled=' + before.disabled + '）');
+    const copy = Object.assign({}, rows[idx].def);
+    delete copy.enabled;
+    rows[idx] = Object.assign({}, rows[idx], { def: copy });
+    const after = bus.faces();
+    a(after.enabled === before.enabled + 1 && after.disabled === before.disabled - 1,
+      'B9b: 删掉 def.enabled ⇒ 该项从「关」转「开」（实 enabled ' + before.enabled + '→' + after.enabled
+      + ' / disabled ' + before.disabled + '→' + after.disabled + '）—— 缺省即 true 不是空话');
+    rows[idx] = Object.assign({}, rows[idx], { def: keep });
   })();
   // --json 与文本同源
   (function () {

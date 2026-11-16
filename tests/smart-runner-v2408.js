@@ -90,8 +90,10 @@ function runAll(assertFn) {
   a(ch.ok === true && ch.files.length > 0, 'A13 改动面是真 git 读数（现场实测非空）');
   const PF = require(path.join(BASE, 'tests/product-files.js'));
   const sp = SR.classify(ch.files, PF.SKIP_DIRS);
-  a(sp.others.indexOf('tools/smart-runner.js') >= 0 || sp.others.indexOf('tools/isolated-run.js') >= 0,
-    'A14 `tools/` 归 others（它不是产品面，也不是测试面）');
+  // A14 v2.412.0 跟位：不再依赖现场 diff 恰好含 tools/ 改动 —— 用合成输入判定分类行为本身
+  const spSyn = SR.classify([{ path: 'tools/smart-runner.js', code: ' M' }, { path: 'tests/x.js', code: ' M' }, { path: 'engines/y.js', code: ' M' }], PF.SKIP_DIRS);
+  a(spSyn.others.indexOf('tools/smart-runner.js') >= 0 && spSyn.test.length === 1 && (spSyn.product || spSyn.prod || []).length === 1,
+    'A14 `tools/` 归 others（它不是产品面，也不是测试面）——合成输入三面各归各位');
   a(sp.test.every(function (f) { return f.indexOf('tests/') === 0; }), 'A15 测试面只收 tests/ 下的 .js');
   // 选面判据：认**驼峰命名空间**（本批现场缺陷的判据化）
   const fake = [{ name: 'T', selfContained: true, evidence: ['fake-evi.js'] }];

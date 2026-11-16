@@ -156,7 +156,17 @@ function runA(a) {
 //   V7 的 intentBoard / worldAutobiography 等出厂即开）。
 //   本文件此前写死 7（v2.257.0 的读数），在 V7 交付后既没跟上、也没人发现 ——
 //   正是本仓点过名的「陈旧常量：写死一种形态 = 给其它形态发通行证」。
-const FACTORY_RUNNING = 10;
+// v2.412.0 全开策略跟位：出厂 203 引擎全开，有注入面且真在跑的读数实测 116
+// （旧读数 10 是「默认关」时代的残账；本常量必须跟现场实测走，不许写死旧形态）
+// helper: turn OFF every tier-theme engine (rebuilds the pre-all-on factory scene)
+function turnOffTierEngines(WA) {
+  const tables = WA.theme.THEME_ENGINES || {};
+  Object.keys(tables).forEach(function (t) { (tables[t] || []).forEach(function (k) {
+    try { if (WA[k] && WA[k].getSettings().enabled === true) WA[k].setSettings({ enabled: false }); } catch (e) {}
+  }); });
+}
+
+const FACTORY_RUNNING = 116;
 function runB(a) {
   const env = fresh();
   const WA = env.WA;
@@ -166,19 +176,22 @@ function runB(a) {
   a(WA.theme.statView().themes.length === 0, 'B1: 出厂无题材');
   const r0 = T.view().running;
   a(r0 === FACTORY_RUNNING, 'B1b: 出厂真在跑的机制 ' + FACTORY_RUNNING + ' 个（实 ' + r0 + '）');
+  // v2.412.0 all-on policy: construct tier-engine-OFF scene (factory is all-on now)
+  turnOffTierEngines(WA);
+  const sceneRunning = T.view().running;
   // B2 预览答得出「会开几个机制」，且**不落设置**（预览不覆盖）
   const pv = Th.preview(['urban']);
   a(pv.previewOnly === true && pv.engineCount > 0 && pv.engineWillOn === pv.engineCount,
     'B2: 预览答出机制面（将开 ' + pv.engineWillOn + '/' + pv.engineCount + '）');
-  a(T.view().running === FACTORY_RUNNING, 'B2b: 预览不改任何引擎（running 仍 ' + T.view().running + '）—— 预览不覆盖');
+  a(T.view().running === sceneRunning, 'B2b: 预览不改任何引擎（running 仍 ' + T.view().running + '）—— 预览不覆盖');
   a(WA.theme.statView().themes.length === 0, 'B2c: 预览不落设置');
   // B3 选都市真开机制（本版最要紧的一条：不再是「只改顺序」）
   const r1 = Th.apply(['urban']);
   a(r1.ok === true && r1.noop !== true, 'B3: 应用都市成功且非 noop');
   a(r1.enginesOn.length > 0, 'B3b: 真开了机制（实 ' + r1.enginesOn.length + ' 个）');
   const running1 = T.view().running;
-  a(running1 === r0 + r1.enginesOn.length,
-    'B3c: running 真涨了等量（' + r0 + ' + ' + r1.enginesOn.length + ' = ' + running1 + '）—— 不是只写设置');
+  a(running1 === sceneRunning + r1.enginesOn.length,
+    'B3c: running 真涨了等量（' + sceneRunning + ' + ' + r1.enginesOn.length + ' = ' + running1 + '）—— 不是只写设置');
   // B3d 逐个回读：enginesOn 里每个 getSettings().enabled 都是 true
   const offStill = r1.enginesOn.filter(function (k) { return WA[k].getSettings().enabled !== true; });
   a(offStill.length === 0, 'B3d: 逐个回读 enabled===true（未读回 ' + offStill.length + '：' + offStill.join(',') + '）');
@@ -204,6 +217,7 @@ function runB(a) {
   //     tools/v6probes/p_manual_engine.js 现场筛出（35 个候选），这里取 plan。
   const env2 = fresh();
   const W2 = env2.WA;
+  turnOffTierEngines(W2);
   W2.plan.setSettings({ enabled: true });              // 玩家手动开（plan 不在任何题材表内）
   const manualBefore = W2.plan.getSettings().enabled;
   W2.theme.apply(['urban']);
@@ -214,6 +228,8 @@ function runB(a) {
   // B7 叠加为并集
   const env3 = fresh();
   const W3 = env3.WA;
+  turnOffTierEngines(W3);
+  turnOffTierEngines(W3);
   const uOnly = W3.theme.apply(['urban']);
   const uCount = uOnly.enginesOn.length;
   const um = W3.theme.apply(['urban', 'mystery']);
@@ -223,6 +239,8 @@ function runB(a) {
   // B8 清空真收回（连自己开的一起收）
   const env4 = fresh();
   const W4 = env4.WA;
+  turnOffTierEngines(W4);
+  const base4 = W4.capabilityTier.view().running;
   const on4 = W4.theme.apply(['urban']);
   const n4 = on4.enginesOn.length;
   const clear = W4.theme.apply([]);
@@ -232,10 +250,11 @@ function runB(a) {
   a(clear.enginesGranted.length === 0 && leak.length === 0,
     'B8b: 清空后 granted 名单为空且无残留（实 ' + JSON.stringify(clear.enginesGranted) + '）');
   const back = W4.capabilityTier.view().running;
-  a(back === FACTORY_RUNNING, 'B8c: 清空后 running 回到出厂 ' + FACTORY_RUNNING + ' 个（实 ' + back + '）—— 收回是真收回');
+  a(back === base4, 'B8c: 清空后 running 回到现场基线 ' + base4 + ' 个（实 ' + back + '）—— 收回是真收回');
   // B9 engineFace 读数与现场一致
   const env5 = fresh();
   const W5 = env5.WA;
+  turnOffTierEngines(W5);
   W5.theme.apply(['mystery']);
   const f = W5.theme.engineFace();
   const realRunning = f.want.filter(function (k) { return W5[k].getSettings().enabled === true; });
@@ -255,6 +274,7 @@ function runC(a) {
   a(broken !== T, 'C1: 破坏副本构造成功');
   const env = fresh({ 'engines/theme.js': broken });
   const WA = env.WA;
+  turnOffTierEngines(WA);
   const r = WA.theme.apply(['urban']);
   a(r.ok === true, 'C1b: 应用仍成功（表有坏名不该让整个题材失败）');
   a(r.notInjected.indexOf('zz-not-such-engine') >= 0,
@@ -264,6 +284,7 @@ function runC(a) {
   a(WA.theme.statView().partials > 0, 'C1e: partials 计数真涨（实 ' + WA.theme.statView().partials + '）');
   // C2 正常表下 partial=false（不是恒真）
   const env2 = fresh();
+  turnOffTierEngines(env2.WA);
   const r2 = env2.WA.theme.apply(['urban']);
   a(r2.partial === false && r2.partialReason === '',
     'C2: 正常表下 partial=false（实 ' + r2.partial + '）—— partial 不是恒真');
@@ -292,6 +313,7 @@ function runD(a) {
   // D1 诊断节：secWorldLexicon 的 theme 节点带 engines 读数
   const env = fresh();
   const WA = env.WA;
+  turnOffTierEngines(WA);
   WA.theme.apply(['urban']);
   const col = WA.toolDiag.collect();
   // ⚠ worldLexicon 是 collect() 的**顶层键**（与 worldBlueprint / capability 并列），
@@ -312,6 +334,7 @@ function runD(a) {
   // D2 recipe.apply 透传机制面 + partial
   const env2 = fresh();
   const W2 = env2.WA;
+  turnOffTierEngines(W2);
   const rp = W2.recipe.apply('urban');
   a(rp.ok === true, 'D2: recipe.apply(urban) 成功');
   a(!!rp.themeApplied && Array.isArray(rp.themeApplied.enginesOn),

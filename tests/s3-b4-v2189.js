@@ -71,15 +71,15 @@ function runA(A) {
   const WA = hostWith('beatReport');
   A(WA.beatReport && WA.beatReport.VERDICTS.join(',') === 'pass,adjust,setup,reject',
     'A1 VERDICTS 是四值白名单（pass/adjust/setup/reject）');
-  A(WA.beatReport.getSettings().enabled === false, 'A1b beat-report 默认关');
+  A(WA.beatReport.getSettings().enabled === true, 'A1b beat-report 默认开（全开策略跟位）');
   A(typeof WA.beatReport.buildBlock === 'function', 'A1c beat-report 出注入块（把「按住的那一拍」交给正文）');
   const WL = hostWith('beatLedger');
   A(WL.beatLedger && WL.beatLedger.STATUSES.join(',') === 'pending,landed', 'A2 拍账两态（pending/landed）');
-  A(WL.beatLedger.getSettings().enabled === false, 'A2b beat-ledger 默认关');
+  A(WL.beatLedger.getSettings().enabled === true, 'A2b beat-ledger 默认开（全开策略跟位）');
   A(typeof WL.beatLedger.claim === 'function' && typeof WL.beatLedger.transition === 'function',
     'A2c 拍账四口齐（plan/land/claim/transition）');
   const PA = hostWith('planAudit');
-  A(PA.planAudit.getSettings().enabled === false, 'A3 plan-audit 默认关');
+  A(PA.planAudit.getSettings().enabled === true, 'A3 plan-audit 默认开（全开策略跟位）');
   A(typeof PA.planAudit.buildBlock !== 'function',
     'A3b plan-audit **没有** buildBlock（它不注入正文，只给面板与门禁读）');
   A(PA.planAudit.DISASTER_WORDS.indexOf('突然') >= 0 && PA.planAudit.PLACE_WORDS.indexOf('车站') >= 0,
@@ -87,7 +87,7 @@ function runA(A) {
   const GG = hostWith('genGate');
   A(GG.genGate.KINDS.join(',') === 'thread,interlude,chapter,interlude-chapter',
     'A4 四档与上游四道闸门一一对应（不自造第五个）');
-  A(GG.genGate.getSettings().enabled === false, 'A4b gen-gate 默认关');
+  A(GG.genGate.getSettings().enabled === true, 'A4b gen-gate 默认开（全开策略跟位）');
   A(typeof GG.genGate.antiRepeat.add === 'function' && typeof GG.genGate.antiRepeat.build === 'function',
     'A4c 防重复名单四口齐（add/remove/list/clear）');
   // 三表登记：LOAD / SOURCES / tool-diag（漏登即静默黑盒）

@@ -118,7 +118,7 @@ function runA(a) {
   a(body.length > 0, 'e6/A1: 能从真源码取出 WA.atlas 的对象字面量体');
   KEYS.forEach(function (k) { a(body.indexOf(k + ':') > 0, 'e6/A2: 导出面含 ' + k); });
   MUST_BE_ABSENT.forEach(function (k) { a(body.indexOf(k + ':') < 0, 'e6/A3: 导出面**没有** ' + k); });
-  a(/const DEF = \{ enabled: false, maxPlaces: 32, maxEdges: 64, showFacts: true \}/.test(src),
+  a(/const DEF = \{ enabled: true, maxPlaces: 32, maxEdges: 64, showFacts: true \}/.test(src),
     'e6/A4: 默认关 + 三项参数声明');
   a(/bounds: \{ maxPlaces: \[4, 128\], maxEdges: \[4, 256\] \}/.test(src), 'e6/A5: 区间声明逐字在位');
   a(/LS_KEY = 'worldaxis_atlas_settings_v1'/.test(src), 'e6/A6: 设置键是单一真源');
@@ -187,7 +187,8 @@ function runB(a) {
   const WA = boot.WA;
   a(typeof WA.atlas === 'object', 'e6/B1: 模块装载');
   a(KEYS.every(function (k) { return typeof WA.atlas[k] === 'function'; }), 'e6/B2: 全部导出可调用');
-  a(WA.atlas.getSettings().enabled === false, 'e6/B3: 默认关');
+  a(WA.atlas.getSettings().enabled === true, 'e6/B3: 默认开（全开策略跟位）');
+  WA.atlas.setSettings({ enabled: false });
   a(WA.atlas.view().reason === 'disabled', 'e6/B4: 关闭时 view 拒收 disabled');
   WA.atlas.setSettings({ enabled: true });
   // 空态与读不到**可分**：

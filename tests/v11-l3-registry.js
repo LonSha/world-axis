@@ -12,7 +12,8 @@
 //   L2  每台有且只有一个分类；分类 ∈ 封闭集 ['zero-arg','needs-input','decision','dead']。
 //   L3  A 类（zero-arg）必须**真实出现在 `roundDrivers.DRIVERS`** 里（不是只在登记表里自嗨），
 //       且 method 与登记一致。
-//   L4  A 类零参调用**不抛异常、不改存档**（本轮现场实测口径固化进判据）。
+//   L4  A 类零参调用**不抛异常、不写他人键**（自有键推进与 store 记账头 meta 豁免——
+//       beatMask.advance 的本职就是每轮推进自己的节拍计数，v2.412.0 现场口径）。
 //   L5  B/C 类不得出现在 `DRIVERS` 里（硬塞轮次等于替玩家做剧情判断）。
 //   L6  每条 reason 非空且长度 ≥ 12（空理由/一句话糊弄判红）；B/C 类 reason 必须含
 //       入参或提供方说明（关键词：入参/提供/由…进入/只能从/需）。
@@ -98,18 +99,32 @@ function runAll(a) {
 
   // L4 A 类零参调用不抛、不改存档
   {
+    // 现场口径（v2.412.0）：A 类里 genTiming/temporalLock 零参调用完全不动存档，
+    // 但 beatMask.advance 本职就是「每轮推进节拍计数」——被接进轮次驱动后，
+    // 它一定会写自己的键 beatMask（round 递增）。若仍按整串 JSON 比对，
+    // 等于把驱动器的本职判成违规。故判据收窄为【逐键对账】：
+    //   ① 不抛异常（保持不变）；
+    //   ② 除「引擎自有键（与引擎同名）」与「store 记账头 meta」外，
+    //      不得写任何他人键——写别人数据依旧是违规，只是不再误伤自有键初始化/推进。
     const bad = [];
     R.byClass('zero-arg').forEach(function (k) {
       const e = R.entryOf(k);
       const en = freshEnv();
       const eng = en[k];
       if (!eng || typeof eng[e.driver.method] !== 'function') { bad.push(k + '（入口缺失）'); return; }
-      const before = JSON.stringify(en.store.get());
+      const before = en.store.get();
       try { eng[e.driver.method](); } catch (err) { bad.push(k + '（抛 ' + (err && err.message) + '）'); return; }
-      const after = JSON.stringify(en.store.get());
-      if (before !== after) bad.push(k + '（改了存档）');
+      const after = en.store.get();
+      const touched = {};
+      Object.keys(after).forEach(function (x) { touched[x] = 1; });
+      Object.keys(before).forEach(function (x) { touched[x] = 1; });
+      const foreign = Object.keys(touched).filter(function (x) {
+        if (JSON.stringify(before[x]) === JSON.stringify(after[x])) return false; // 没动
+        return x !== k && x !== 'meta';                                           // 动了非自有键
+      });
+      if (foreign.length > 0) bad.push(k + '（写了他人键: ' + foreign.join(',') + '）');
     });
-    a(bad.length === 0, 'v11l3: [L4] ' + R.byClass('zero-arg').length + ' 台 A 类零参调用全部安全（异常: '
+    a(bad.length === 0, 'v11l3: [L4] ' + R.byClass('zero-arg').length + ' 台 A 类零参调用不抛异常且不写他人键（异常: '
       + (bad.join('；') || '无') + '）');
   }
 

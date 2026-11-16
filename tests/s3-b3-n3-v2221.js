@@ -100,7 +100,7 @@ function runA(a) {
   });
   // 四段与设置默认值（逐字）
   a(/const STAGES = \['procure', 'transport', 'produce', 'deliver'\];/.test(S), 'n3/A3: 四段名逐字在位');
-  a(/const DEF = \{ enabled: false, maxStages: 8, maxRows: 24 \};/.test(S), 'n3/A4: 设置默认值逐字在位（默认关）');
+  a(/const DEF = \{ enabled: true, maxStages: 8, maxRows: 24 \};/.test(S), 'n3/A4: 设置默认值逐字在位（默认开，全开策略跟位）');
   a(/bounds: \{ maxStages: \[2, 12\], maxRows: \[4, 48\] \}/.test(S), 'n3/A5: 区间声明逐字在位（上界有界）');
   // 逐段检查各接真源（不重算）
   a(code.indexOf('E.view(') >= 0, 'n3/A6: 采购接 economy.view（不重算价）');

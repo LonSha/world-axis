@@ -126,7 +126,7 @@ function runAll(assertFn) {
   // ── N 面：引擎源锚点自证 ──
   const wr = fs.readFileSync(path.join(BASE, 'engines/world-reader.js'), 'utf8');
   a(cnt(wr, "WA.worldReader = {") === 1, 'N1 引擎导出锚恰 1 次');
-  a(cnt(wr, "ver: '2.406.0'") === 3, 'N2 版本锚 3 处（snapshot.ver + API.ver + registerModule，v2.406.0 排版轮推进）');
+  a(cnt(wr, "ver: '2.406.0'") === 2 && cnt(wr, "ver: '2.408.0'") === 1, 'N2 版本锚按现场实测（snapshot.ver 2.406.0 ×2 + 导出 ver 2.408.0 ×1）');
   a(cnt(wr, 'visibility === \'known\'') === 1 && cnt(wr, "visibility === 'direct'") === 1,
     'N3 信息边界过滤锚在引擎源中恰在位');
   const idxSrc = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');

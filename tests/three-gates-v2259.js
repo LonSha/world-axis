@@ -295,7 +295,25 @@ function runC(a) {
       'C4: partial 时 nextAction 指名是哪道门槛（实「' + r.nextAction + '」）');
     a(deg.fix !== null, 'C4b: degraded 的门槛必须给得出动作（实 ' + (deg.fix ? deg.fix.do : 'null') + '）');
   } else {
-    a(false, 'C4 前提失效：现场没有 degraded 门槛（verdict 实 ' + r.verdict + '）—— 判据要改靶标，不许静默跳过');
+    // v2.412.0 全开策略跟位：出厂 107 源全 on（没有现成 degraded），显式构造现场 ——
+    // 关掉过半注入源的可见性，让 visibility 门槛如实落到 degraded，判据一字不削。
+    const SOURCES_N = gv.nums.sources;
+    const turnOff = Math.floor(SOURCES_N * 0.7);
+    const srcKeys = (WA.render.visibilityStat().faceAudit || [])
+      .filter(function (x) { return x.face === 'on'; }).slice(0, turnOff);
+    srcKeys.forEach(function (x) { WA.render.setVisibility(x.key, false); });
+    const rDeg = hp.threeGates();
+    const gvDeg = gateOf(rDeg, 'visibility');
+    if (rDeg.degraded > 0) {
+      const deg = (rDeg.gates || []).filter(function (g) { return g.state === 'degraded'; })[0];
+      a(rDeg.nextAction.indexOf(deg.label) >= 0,
+        'C4: partial 时 nextAction 指名是哪道门槛（实「' + rDeg.nextAction + '」）');
+      a(deg.fix !== null, 'C4b: degraded 的门槛必须给得出动作（实 ' + (deg.fix ? deg.fix.do : 'null') + '）');
+    } else {
+      a(false, 'C4 构造失败：关掉 ' + srcKeys.length + ' 个源后仍无 degraded（实 ' + gvDeg.state + '）');
+    }
+    // 恢复现场（不影响后续段）
+    srcKeys.forEach(function (x) { WA.render.setVisibility(x.key, true); });
   }
   // C5 lastReason 随情形变化（不是写死一句）
   const line1 = hp.threeGatesLine();
@@ -317,11 +335,15 @@ function runD(a) {
   const badG = ((h && h.gates) || []).filter(function (g) { return !g.id || !g.state; });
   a(badG.length === 0, 'D1e: 逐条门槛都有 id 与 state（缺 ' + badG.length + '）');
   a(!!h && typeof h.line === 'string' && h.line.length > 0, 'D1f: health 节带整句 line（面板与诊断同一份措辞）');
-  a(!!h && typeof h.note === 'string' && h.note.length > 0,
-    'D1g: health 节 reserves 人话 note（partial 时不折成「健康」，实「' + (h && h.note) + '」）');
-  // D2 诊断节的 note 与 verdict 一致（不许 partial 却写「一切正常」）
-  a(!!h && (h.verdict === 'partial' ? h.note.indexOf('一部分') >= 0 : true),
+  // v2.412.0 全开策略跟位：出厂 verdict=running（note 为空是如实读数），构造 degraded 现场再验 note 语义
+  const auditD = (WA.render.visibilityStat().faceAudit || []).filter(function (x) { return x.face === 'on'; });
+  auditD.slice(0, Math.floor(auditD.length * 0.7)).forEach(function (x) { WA.render.setVisibility(x.key, false); });
+  const hDeg = WA.toolDiag.collect().health;
+  a(!!hDeg && typeof hDeg.note === 'string' && hDeg.note.length > 0,
+    'D1g: health 节 reserves 人话 note（partial 时不折成「健康」，实「' + (hDeg && hDeg.note) + '」）');
+  a(!!hDeg && (hDeg.verdict === 'partial' ? hDeg.note.indexOf('一部分') >= 0 : true),
     'D2: partial 时 note 明说「只过了一部分」');
+  auditD.forEach(function (x) { WA.render.setVisibility(x.key, true); });
   // D3 面板体检块：通过时不占屏（running ⇒ 整块不出现）
   const P = rd(PANEL);
   a(cnt(P, "if (!r || r.verdict === 'running') return '';") === 1,
@@ -348,21 +370,36 @@ function runNegative(a) {
     must1(H, A_RATIO, 'N1');
     const broken = H.replace(A_RATIO, A_RATIO_BAD);
     a(broken !== H, 'N1a: 破坏副本真改了字节（判据退回 on>0 ⇒ pass）');
-    const r0 = fresh().WA.healthPreflight.threeGates();
-    const r1 = fresh({ 'engines/health-preflight.js': broken }).WA.healthPreflight.threeGates();
+    // v2.412.0 全开策略跟位：出厂 107 源全通（正版必 pass），按本条自带的上限条款改靶标 ——
+    // 构造「部分通」现场（关 70% 源可见性）再对比两版判据，负控制语义不变。
+    const mkPartial = function (ov) {
+      const envP = fresh(ov);
+      const WAP = envP.WA;
+      const aud = (WAP.render.visibilityStat().faceAudit || []).filter(function (x) { return x.face === 'on'; });
+      aud.slice(0, Math.floor(aud.length * 0.7)).forEach(function (x) { WAP.render.setVisibility(x.key, false); });
+      return WAP.healthPreflight.threeGates();
+    };
+    const r0 = mkPartial();
+    const r1 = mkPartial({ 'engines/health-preflight.js': broken });
     const g0 = gateOf(r0, 'visibility'), g1 = gateOf(r1, 'visibility');
     a(g1.state === 'pass', 'N1b: 首版判据下部分通也报 pass（实 ' + g1.state + '，源 '
       + g1.nums.on + '/' + g1.nums.sources + '）');
     a(g1.state !== g0.state, 'N1c: 破坏后状态与正版不同（正 ' + g0.state + ' / 破 ' + g1.state
-      + '）—— 相同说明现场已全通，本负控制失效，须改靶标');
+      + '）—— 相同说明构造失败，本负控制失效，须改靶标');
   }
+
   // N2 破坏②：摘掉 degraded ⇒ partial ⇒ 只过一半也报 running
   {
     must1(H, A_DEG, 'N2');
     const broken = H.replace(A_DEG, A_DEG_OFF);
     a(broken !== H, 'N2a: 破坏副本真改了字节（degraded 不再折成 partial）');
-    const r0 = fresh().WA.healthPreflight.threeGates();
-    a(r0.degraded > 0, 'N2 前提：现场有 degraded 门槛（实 ' + r0.degraded + '）—— 没有就测不出这条');
+    // v2.412.0 全开策略跟位：出厂无 degraded，显式构造（关 70% 注入源可见性）
+    const envDeg = fresh();
+    const WAD = envDeg.WA;
+    const audit = (WAD.render.visibilityStat().faceAudit || []).filter(function (x) { return x.face === 'on'; });
+    audit.slice(0, Math.floor(audit.length * 0.7)).forEach(function (x) { WAD.render.setVisibility(x.key, false); });
+    const r0 = envDeg.WA.healthPreflight.threeGates();
+    a(r0.degraded > 0, 'N2 前提：现场有 degraded 门槛（构造后实 ' + r0.degraded + '）—— 没有就测不出这条');
     const r1 = fresh({ 'engines/health-preflight.js': broken }).WA.healthPreflight.threeGates();
     a(r0.verdict === 'partial', 'N2b: 正版 partial（实 ' + r0.verdict + '）');
     a(r1.verdict === 'running', 'N2c: 摘掉 degraded 分支后同款判据必现形（实 ' + r1.verdict
@@ -390,8 +427,16 @@ function runNegative(a) {
     must1(H, A_FIRST, 'N4');
     const broken = H.replace(A_FIRST, 'const first = blocked[0] || null;');
     a(broken !== H, 'N4a: 破坏副本真改了字节（first 不再含 degraded）');
-    const r0 = fresh().WA.healthPreflight.threeGates();
-    const r1 = fresh({ 'engines/health-preflight.js': broken }).WA.healthPreflight.threeGates();
+    // v2.412.0 全开策略跟位：出厂全 pass（无 degraded），显式构造 partial 现场再对比两版
+    const mkDeg = function (ov) {
+      const envQ = fresh(ov);
+      const WAQ = envQ.WA;
+      const audQ = (WAQ.render.visibilityStat().faceAudit || []).filter(function (x) { return x.face === 'on'; });
+      audQ.slice(0, Math.floor(audQ.length * 0.7)).forEach(function (x) { WAQ.render.setVisibility(x.key, false); });
+      return WAQ.healthPreflight.threeGates();
+    };
+    const r0 = mkDeg();
+    const r1 = mkDeg({ 'engines/health-preflight.js': broken });
     const gd = (r0.gates || []).filter(function (g) { return g.state === 'degraded'; })[0];
     a(!!gd && r0.nextAction.indexOf(gd.label) >= 0,
       'N4b: 正版 partial 时 nextAction 指名门槛（实「' + r0.nextAction + '」）');

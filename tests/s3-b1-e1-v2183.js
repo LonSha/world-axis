@@ -88,7 +88,7 @@ function runA(a) {
   // v2.206.0：9 → 10（新增 act）。改这里必须同时改模块里的自证串，否则装载即抛。
   a(/EXPORT_COUNT\s*=\s*11/.test(src), 'e1v2183/A4: EXPORT_COUNT = 11（v2.208.0 起另含待办×期限面 timeline）');
   a(/pendingCenter: export count mismatch/.test(src), 'e1v2183/A5: 自证串在位（导出面变动必须有人确认过）');
-  a(/const DEF = \{ enabled: false, maxRows: 32, soonCount: 8 \}/.test(src), 'e1v2183/A6: 默认关 + 两项参数声明');
+  a(/const DEF = \{ enabled: true, maxRows: 32, soonCount: 8 \}/.test(src), 'e1v2183/A6: 默认开（v2.412.0 全开策略跟位）+ 两项参数声明');
   a(/bounds: \{ maxRows: \[4, 128\], soonCount: \[1, 32\] \}/.test(src), 'e1v2183/A7: 区间声明逐字在位');
   a(/LS_KEY = 'worldaxis_pending_center_settings_v1'/.test(src), 'e1v2183/A8: 设置键是单一真源');
   // 三旗标 + 可达性读数：**并排**写在返回体里（少一个就是「承诺悄悄缩水」）
@@ -149,22 +149,35 @@ function runB(a) {
   const WA = boot.WA;
   a(typeof WA.pendingCenter === 'object', 'e1v2183/B1: 模块装载');
   a(KEYS.every(function (k) { return typeof WA.pendingCenter[k] === 'function'; }), 'e1v2183/B2: 10 口全部可调用');
-  a(WA.pendingCenter.getSettings().enabled === false, 'e1v2183/B3: 默认关');
+  a(WA.pendingCenter.getSettings().enabled === true, 'e1v2183/B3: 默认开（全开策略跟位）');
+  // 全开策略跟位：关闭现场改为显式构造（不再依赖出厂默认关）
+  WA.pendingCenter.setSettings({ enabled: false });
+  WA.aftermath.setSettings({ enabled: false });
   a(WA.pendingCenter.items().reason === 'disabled' && WA.pendingCenter.soon().reason === 'disabled'
     && WA.pendingCenter.describe('commission').reason === 'disabled',
     'e1v2183/B4: 关闭时三面**都**拒算（不是只拒一个）');
   WA.pendingCenter.setSettings({ enabled: true });
+  WA.aftermath.setSettings({ enabled: true });
   a(WA.pendingCenter.getSettings().enabled === true, 'e1v2183/B5: 开关是活的');
   // ── 三态可分（本节核心）──
   const r0 = WA.pendingCenter.items();
   a(r0.ok === true, 'e1v2183/B6: 开启后可读');
   a(r0.rows.length === 0 && r0.unavailable === false && r0.allClear === true && r0.emptyAll === false,
     'e1v2183/B7: 现版本常态是 allClear（有源在读、此刻没有待办）——实 allClear=' + r0.allClear);
-  a(r0.sourceCount >= 1 && r0.skipped.length >= 1, 'e1v2183/B8: 在场源与跳过源分别计数（实 '
+  // 全开策略跟位：出厂 8 源全在场（sourceCount=8 / skipped=0 是现行语义的真实读数），
+  // skipped 语义改为显式构造「关掉 aftermath」现场验证 —— 判据方向不变：关掉的源不许静默消失。
+  a(r0.sourceCount === 8 && r0.skipped.length === 0, 'e1v2183/B8: 出厂 8 源全在场（实 '
     + r0.sourceCount + ' / ' + r0.skipped.length + '）');
-  a(r0.skipped.every(function (s) { return typeof s.source === 'string' && typeof s.reason === 'string'; }),
-    'e1v2183/B9: skipped 逐条带来源与原因');
-  a(r0.skipped.some(function (s) { return s.reason === 'disabled'; }), 'e1v2183/B10: 关掉的模块进 skipped 且原因就是 disabled');
+  WA.aftermath.setSettings({ enabled: false });
+  const r0b = WA.pendingCenter.items();
+  WA.aftermath.setSettings({ enabled: true });
+  a(r0b.sourceCount === 7 && r0b.skipped.length === 1
+    && r0b.skipped[0].source === 'aftermath' && r0b.skipped[0].reason === 'disabled',
+    'e1v2183/B9: 显式关掉一个源 ⇒ skipped 记名记因（实 '
+    + r0b.sourceCount + ' / ' + r0b.skipped.length + '）');
+  a(r0b.skipped.every(function (s) { return typeof s.source === 'string' && typeof s.reason === 'string'; }),
+    'e1v2183/B9b: skipped 逐条带来源与原因');
+  a(r0b.skipped.some(function (s) { return s.reason === 'disabled'; }), 'e1v2183/B10: 关掉的模块进 skipped 且原因就是 disabled');
   a(r0.perSource && Object.keys(r0.perSource).length === 8, 'e1v2183/B11: perSource 逐源有账（8 源全覆盖）');
   a(Object.keys(r0.perSource).every(function (k) {
     return typeof r0.perSource[k].ok === 'boolean' && typeof r0.perSource[k].count === 'number';

@@ -54,17 +54,29 @@ function runAll(assertFn) {
     a(src(f).indexOf("registerModule('" + f + "'") >= 0 || src(f).indexOf('registerModule("' + f + '"') >= 0,
       'T1 ' + ns + ' 注册锚在位');
   });
-  a(WA.readingBookmark.getSettings().enabled === false, 'T1a 书签默认关闭');
-  a(WA.summarizerAdapter.getSettings().enabled === false, 'T1b 适配层默认关闭');
-  a(WA.director.getSettings().enabled === false, 'T1c 导演默认关闭');
-  a(WA.branchContinuity.getSettings().enabled === false, 'T1d 分支判据默认关闭');
-  a(WA.factContinuity.getSettings().enabled === false, 'T1e 事实判据默认关闭');
-  // 关闭态：注入面必须空串、写面不动作（零 token / 零副作用）。
+  // v2.412.0 全开策略跟位：出厂默认开（现行语义）
+  a(WA.readingBookmark.getSettings().enabled === true, 'T1a 书签默认开（全开策略跟位）');
+  a(WA.summarizerAdapter.getSettings().enabled === true, 'T1b 适配层默认开（全开策略跟位）');
+  a(WA.director.getSettings().enabled === true, 'T1c 导演默认开（全开策略跟位）');
+  a(WA.branchContinuity.getSettings().enabled === true, 'T1d 分支判据默认开（全开策略跟位）');
+  a(WA.factContinuity.getSettings().enabled === true, 'T1e 事实判据默认开（全开策略跟位）');
+  // 关闭态：注入面必须空串、写面不动作（零 token / 零副作用）—— 关闭现场显式构造。
+  WA.readingBookmark.setSettings({ enabled: false });
+  WA.summarizerAdapter.setSettings({ enabled: false });
+  WA.director.setSettings({ enabled: false });
+  WA.branchContinuity.setSettings({ enabled: false });
+  WA.factContinuity.setSettings({ enabled: false });
   a(WA.readingBookmark.catchUpBlock({ idx: 5, swipe: 0 }) === '', 'T1f 关闭时补读块空串');
   a(WA.summarizerAdapter.buildBlock('current') === '', 'T1g 关闭时摘要块空串');
   a(WA.director.buildBlock() === '', 'T1h 关闭时排期块空串');
   a(WA.branchContinuity.buildBlock() === '', 'T1i 关闭时连续性块空串');
   a(WA.factContinuity.buildBlock() === '', 'T1j 关闭时事实纪律块空串');
+  // 恢复开启（后续节不再依赖关闭现场）
+  WA.readingBookmark.setSettings({ enabled: true });
+  WA.summarizerAdapter.setSettings({ enabled: true });
+  WA.director.setSettings({ enabled: true });
+  WA.branchContinuity.setSettings({ enabled: true });
+  WA.factContinuity.setSettings({ enabled: true });
   // 只读引擎不得出现真实 store.transact 调用（注释里的「零 store 写」字样不算）。
   const transactCall = /\bWA\.store\.transact\s*\(|\bstore\.transact\s*\(/;
   a(!transactCall.test(src('engines/director.js')), 'T1k 导演零 store 写');

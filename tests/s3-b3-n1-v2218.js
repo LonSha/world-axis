@@ -99,6 +99,8 @@ function runB(a) {
   const WA = hostWith(srcOf());
   BLUEPRINT(WA);
   a(WA.campaign.getSettings().planCap === 6, 'n1/B1: 默认 planCap = 6');
+  // v2.412.0 全开策略跟位：出厂默认开，「关闭时拒收」断言前须显式构造关闭现场，断言后恢复
+  WA.campaign.setSettings({ enabled: false });
   a(WA.campaign.planSave(dayPlan('p', [stage('s1', 1)])).reason === 'disabled', 'n1/B2: 关闭时 planSave 拒收 disabled');
   WA.campaign.setSettings({ enabled: true });
   // 合法保存

@@ -68,7 +68,8 @@ function runB() {
   const P = WA.pendingCenter;
   a(typeof P === 'object' && typeof P.act === 'function', 'B1: 模块装载且 act 可调用');
   a(Object.keys(P).length === 11, 'B2: 导出面 11 个（实 ' + Object.keys(P).length + '）');
-  // 关闭时：走 reason，不落 fault
+  // 关闭时：走 reason，不落 fault（全开策略跟位：关闭现场显式构造）
+  P.setSettings({ enabled: false });
   let r = P.act('commission', 'cancel', 'x');
   a(r.ok === false && r.reason === 'disabled' && r.fault === null, 'B3: 关闭时拒收走 reason、fault 为 null');
   P.setSettings({ enabled: true });

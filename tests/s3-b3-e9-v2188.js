@@ -160,7 +160,7 @@ function runA(a) {
     const re = new RegExp('\\b' + k + '\\s*:');
     a(!re.test(body), 'e9/A3: 导出面**没有** ' + k + '（反事实不回溯覆盖存档 / 不倒带）');
   });
-  a(/const DEF = \{ enabled: false, maxSteps: 6, armA: '', armB: '' \}/.test(src),
+  a(/const DEF = \{ enabled: true, maxSteps: 6, armA: '', armB: '' \}/.test(src),
     'e9/A4: 默认关 + 步数上限 + 两条路径槽声明逐字在位');
   a(/bounds: \{ maxSteps: \[1, 12\] \}/.test(src), 'e9/A5: 步数区间声明逐字在位');
   a(/LS_KEY = 'worldaxis_world_lab_settings_v1'/.test(src), 'e9/A6: 设置键是单一真源');
@@ -313,7 +313,8 @@ function runB(a) {
   const H = hostWith(src, LAB());
   a(!!H.worldLab && typeof H.worldLab === 'object', 'e9/B1: 模块装载');
   a(KEYS.every(function (k) { return typeof H.worldLab[k] === 'function'; }), 'e9/B2: 全部导出可调用');
-  a(H.worldLab.getSettings().enabled === false, 'e9/B3: 默认关');
+  a(H.worldLab.getSettings().enabled === true, 'e9/B3: 默认开（全开策略跟位）');
+  H.worldLab.setSettings({ enabled: false });
   a(H.worldLab.run({ a: 'wait|A|1', b: 'wait|B|1' }).reason === 'disabled', 'e9/B4: 关闭时 run 拒收 disabled');
   a(H.worldLab.exportAs('blueprint').reason === 'disabled', 'e9/B4b: 关闭时 exportAs 拒收 disabled');
   a(H.worldLab.arms().reason === 'no-lab', 'e9/B4c: 没跑过实验时 arms 报 no-lab（不是空数组冒充）');
@@ -620,11 +621,11 @@ function runC(a) {
 function runN(a) {
   const SRC = srcOf();
   const CASES = [
-    { n: 1, why: 'N1: 默认关被翻成开 ⇒ 「我没开它」与「它一直在跑实验」两件事合一',
-      from: "  const DEF = { enabled: false, maxSteps: 6, armA: '', armB: '' };",
-      to: "  const DEF = { enabled: true, maxSteps: 6, armA: '', armB: '' };",
+    { n: 1, why: 'N1: 默认开被翻成关 ⇒ 出厂即缺一面（v2.412.0 全开策略跟位：方向反转）',
+      from: "  const DEF = { enabled: true, maxSteps: 6, armA: '', armB: '' };",
+      to: "  const DEF = { enabled: false, maxSteps: 6, armA: '', armB: '' };",
       probe: function (__src) { const WA = hostWith(__src, LAB()); return WA.worldLab.getSettings().enabled; },
-      want: false },
+      want: true },
     { n: 2, why: 'N2: 关闭时让 run「静默成功」⇒ 关着它也在跑（就是这么来的）',
       from: "    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }\n    if (!WA.rehearsal",
       to: "    if (!WA.rehearsal",

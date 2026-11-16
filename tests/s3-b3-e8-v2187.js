@@ -120,7 +120,7 @@ function runA(a) {
   a(body.length > 0, 'e8/A1: 能从真源码取出 WA.depCheck 的对象字面量体');
   KEYS.forEach(function (k) { a(body.indexOf(k + ':') > 0 || body.indexOf(k + ': ') > 0, 'e8/A2: 导出面含 ' + k); });
   MUST_BE_ABSENT.forEach(function (k) { a(body.indexOf(k + ':') < 0, 'e8/A3: 导出面**没有** ' + k); });
-  a(/const DEF = \{ enabled: false, maxDeps: 24, maxDegrade: 16 \}/.test(src),
+  a(/const DEF = \{ enabled: true, maxDeps: 24, maxDegrade: 16 \}/.test(src),
     'e8/A4: 默认关 + 两项参数声明');
   a(/bounds: \{ maxDeps: \[4, 64\], maxDegrade: \[4, 48\] \}/.test(src), 'e8/A5: 区间声明逐字在位');
   a(/LS_KEY = 'worldaxis_dep_check_settings_v1'/.test(src), 'e8/A6: 设置键是单一真源');
@@ -214,7 +214,8 @@ function runB(a) {
   const WA = boot.WA;
   a(typeof WA.depCheck === 'object', 'e8/B1: 模块装载');
   a(KEYS.every(function (k) { return typeof WA.depCheck[k] === 'function'; }), 'e8/B2: 全部导出可调用');
-  a(WA.depCheck.getSettings().enabled === false, 'e8/B3: 默认关');
+  a(WA.depCheck.getSettings().enabled === true, 'e8/B3: 默认开（全开策略跟位）');
+  WA.depCheck.setSettings({ enabled: false });
   a(WA.depCheck.check(BP()).reason === 'disabled', 'e8/B4: 关闭时 check 拒收 disabled');
   WA.depCheck.setSettings({ enabled: true });
   const c = WA.depCheck.catalog();

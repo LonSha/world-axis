@@ -260,8 +260,7 @@ function runA(T, S) {
   ENGINES.forEach(function (e) {
     BASE_API.forEach(function (k) {
       if (typeof (h.WA[e.ns] || {})[k] !== 'function') apiMiss.push(e.ns + '.' + k);
-    });
-  });
+    });  });
   T(apiMiss.length === 0, 'A2c 每个 ns 都有 view/setSettings/getSettings/reset 四口（缺 '
     + apiMiss.length + '：' + apiMiss.slice(0, 6).join(',') + '）');
   //   有副作用入口：ENGINES 表里声明的每一条必须真是函数。
@@ -269,8 +268,7 @@ function runA(T, S) {
   ENGINES.forEach(function (e) {
     e.entries.forEach(function (k) {
       if (typeof (h.WA[e.ns] || {})[k] !== 'function') entryMiss.push(e.ns + '.' + k);
-    });
-  });
+    });  });
   T(entryMiss.length === 0, 'A2d 15 个有副作用入口全部是函数（缺 ' + entryMiss.length + '：'
     + entryMiss.join(',') + '）');
   //   入口总数：15 是实测（2+2+1+2+2+3+2+1）。
@@ -296,13 +294,13 @@ function runA(T, S) {
   });
   T(keyWrong.length === 0, 'A3e 八个设置键名与源码逐字一致（错 ' + keyWrong.length + '：'
     + keyWrong.map(function (e) { return e.ns; }).join(',') + '）');
-  //   默认关闭：八个 DEF 里 enabled 必须都是 false（B 组测行为，这里测声明）。
-  const notDefaultOff = ENGINES.filter(function (e) {
+  //   v2.412.0 全开策略跟位：八个 DEF 里 enabled 默认都是 true（B 组测行为，这里测声明）。
+  const notDefaultOn = ENGINES.filter(function (e) {
     const src = rd(e.rel);
-    return !/const DEF = \{[\s\S]{0,200}?enabled:\s*false/.test(src);
+    return !/const DEF = \{[\s\S]{0,200}?enabled:\s*true/.test(src);
   });
-  T(notDefaultOff.length === 0, 'A3f 八个 DEF 声明里 enabled 默认都是 false（违 '
-    + notDefaultOff.length + '：' + notDefaultOff.map(function (e) { return e.ns; }).join(',') + '）');
+  T(notDefaultOn.length === 0, 'A3f 八个 DEF 声明里 enabled 默认都是 true（全开策略跟位；违 '
+    + notDefaultOn.length + '：' + notDefaultOn.map(function (e) { return e.ns; }).join(',') + '）');
   //   零 store 写：源码面不得出现 `store.transact` / `.world =` / `draft` 赋值。
   //   ⚠ 这条是**静态**判据，E 组是**运行时**判据 —— 两条都要有：
   //     静态逮「写了但当前测试路径没走到」，运行时逮「静态看不出的间接写」。
@@ -323,6 +321,10 @@ function runB(T, S) {
   S('B 默认关闭：17 个有副作用入口一律 disabled，且零世界写');
   const h = makeHost();
   ENGINES.forEach(function (e) { h.load(e.rel); });
+  // v2.412.0 全开策略跟位：出厂默认开，关闭现场显式构造（判据一字不削）。
+  ENGINES.forEach(function (e) {
+    try { h.WA[e.ns].setSettings({ enabled: false }); } catch (err1) {}
+  });
   const before = h.snapshot();
   const notDisabled = [];
   ENGINES.forEach(function (e) {
@@ -332,8 +334,7 @@ function runB(T, S) {
       if (!r || r.ok !== false || r.reason !== 'disabled') {
         notDisabled.push(e.ns + '.' + k + ' → ' + JSON.stringify(r));
       }
-    });
-  });
+    });  });
   T(notDisabled.length === 0, 'B1 关闭时 17 个入口全部 ok:false + reason:disabled（违 '
     + notDisabled.length + '）' + (notDisabled.length ? ' — ' + notDisabled.slice(0, 4).join(' / ') : ''));
   T(h.snapshot() === before, 'B2 关闭时零世界写（store 逐字未变）');
@@ -344,8 +345,7 @@ function runB(T, S) {
       const a = JSON.stringify(h.WA[e.ns][k]({}));
       const b = JSON.stringify(h.WA[e.ns][k]({}));
       if (a !== b) twice.push(e.ns + '.' + k);
-    });
-  });
+    });  });
   T(twice.length === 0, 'B3 关闭时两次调用结果逐字相同（不稳定 ' + twice.length + '：' + twice.join(',') + '）'
     + ' —— 关闭路径里不该有随机');
   //   关闭时 setSettings 仍可写（否则用户没法打开它 —— 这是「出厂即关」能成立的前提）。
@@ -366,8 +366,7 @@ function runB(T, S) {
     e.entries.forEach(function (k) {
       const r = h2.WA[e.ns][k]({});
       if (r && r.reason === 'disabled') openNotDisabled.push(e.ns + '.' + k);
-    });
-  });
+    });  });
   T(openNotDisabled.length === 0, 'B6 打开后不再返回 disabled（仍 disabled '
     + openNotDisabled.length + '：' + openNotDisabled.join(',') + '）');
   //   ⑤b 宿主键集 ⊆ 产品真导出面（v2.400.0 新增，与 B4 配对）。
@@ -547,8 +546,7 @@ function runD(T, S) {
     const code = stripComments(rd(e.rel));
     const re = /reason\s*:\s*'([^']+)'/g;
     let m;
-    while ((m = re.exec(code)) !== null) reasons.push({ ns: e.ns, code: m[1] });
-    //   注意：这里**只**收 reason（拒收面）。outcome 面不放字面正则，理由见下面 D3 注释。
+    while ((m = re.exec(code)) !== null) reasons.push({ ns: e.ns, code: m[1] });    //   注意：这里**只**收 reason（拒收面）。outcome 面不放字面正则，理由见下面 D3 注释。
   });
   //   ① 所有 reason 必须是「真拒收码」：要么是共享码 disabled，要么有见证（mourning-prohibited）。
   const badReason = reasons.filter(function (r) { return REJECT_ALLOWED.indexOf(r.code) < 0; });
@@ -557,8 +555,7 @@ function runD(T, S) {
     + ' —— 成功结果码必须走 outcome，否则 reject-code-gate 会判成未分类拒收码');
   //   ② disabled 是八项共用码：每个引擎都要有（否则「关闭时如实拒」在某项上缺失）。
   const noDisabled = ENGINES.filter(function (e) {
-    return !reasons.some(function (r) { return r.ns === e.ns && r.code === 'disabled'; });
-  });
+    return !reasons.some(function (r) { return r.ns === e.ns && r.code === 'disabled'; });  });
   T(noDisabled.length === 0, 'D2 八个引擎都有共享码 disabled（缺 ' + noDisabled.length + '：'
     + noDisabled.map(function (e) { return e.ns; }).join(',') + '）');
   //   ③ 成功路径必须有 outcome（不是裸 ok:true 什么都不说）。
@@ -712,21 +709,7 @@ function runE(T, S) {
   const before = h.snapshot();
   const WA = h.WA;
   //   把 C 组那串真机制再跑一遍（含各类拒收分支），只要有一条路径写了世界，这里就会红。
-  WA.celestialOmens.observeSky({ year: 50, phase: 'full', starShiftDays: 3 });
-  WA.celestialOmens.settle({ yieldBase: 100 });
-  WA.postalRelay.buildRoute({ id: 'e1', nodes: [{ id: 'a', kmToNext: 200 }, { id: 'b' }] });
-  WA.postalRelay.dispatchByRelay({ routeId: 'e1' });
-  WA.levyCorvee.levySeason({ households: 100, wantPerHousehold: 20 });
-  WA.mortuaryRites.holdFuneral({ mournerId: 'p', kin: 'zhan-cui', at: 0 });
-  WA.mortuaryRites.checkProhibition({ mournerId: 'p', action: 'marry', at: 10 });
-  WA.sartorialRegalia.attireAs({ personId: 'p', set: 'dragon-robe', realIdentity: 'commoner' });
-  WA.sartorialRegalia.identifyAtGate({ personId: 'p' });
-  WA.betrothalAlliance.proposeMatch({ id: 'e2', houseA: 'A', houseB: 'B', rankA: 7, rankB: 5 });
-  WA.betrothalAlliance.settle({ id: 'e2', at: 1 });
-  WA.betrothalAlliance.breach({ id: 'e2' });
-  WA.cartographySurvey.chartRegion({ regionId: 'er', skill: 0.8, points: [{ name: 'x', seen: true }] });
-  WA.cartographySurvey.resolveLandmark({ regionId: 'er', landmark: 'x' });
-  WA.linguaBroker.converse({ tongueA: 'guanzhong', tongueB: 'lingnan', text: '条约' });
+  WA.celestialOmens.observeSky({ year: 50, phase: 'full', starShiftDays: 3 });  WA.celestialOmens.settle({ yieldBase: 100 });  WA.postalRelay.buildRoute({ id: 'e1', nodes: [{ id: 'a', kmToNext: 200 }, { id: 'b' }] });  WA.postalRelay.dispatchByRelay({ routeId: 'e1' });  WA.levyCorvee.levySeason({ households: 100, wantPerHousehold: 20 });  WA.mortuaryRites.holdFuneral({ mournerId: 'p', kin: 'zhan-cui', at: 0 });  WA.mortuaryRites.checkProhibition({ mournerId: 'p', action: 'marry', at: 10 });  WA.sartorialRegalia.attireAs({ personId: 'p', set: 'dragon-robe', realIdentity: 'commoner' });  WA.sartorialRegalia.identifyAtGate({ personId: 'p' });  WA.betrothalAlliance.proposeMatch({ id: 'e2', houseA: 'A', houseB: 'B', rankA: 7, rankB: 5 });  WA.betrothalAlliance.settle({ id: 'e2', at: 1 });  WA.betrothalAlliance.breach({ id: 'e2' });  WA.cartographySurvey.chartRegion({ regionId: 'er', skill: 0.8, points: [{ name: 'x', seen: true }] });  WA.cartographySurvey.resolveLandmark({ regionId: 'er', landmark: 'x' });  WA.linguaBroker.converse({ tongueA: 'guanzhong', tongueB: 'lingnan', text: '条约' });
   T(h.snapshot() === before, 'E1 全部机制跑完后 store 逐字未变（八项都只算不写）');
   //   设置面确实写进了 bus（与「不写世界」是两件事，必须分开证）。
   const busKeys = Object.keys(h.busMap).length;
@@ -795,15 +778,7 @@ function runF(T, S) {
   ENGINES.forEach(function (e) { h.load(e.rel); });
   NS_ALL.forEach(function (ns) { h.WA[ns].setSettings({ enabled: true }); });
   //   先把八个引擎各推进一步，让 stat 有非零基线（否则「没涨」可能是「本来就是 0」）。
-  h.WA.celestialOmens.observeSky({ year: 40, phase: 'full' });
-  h.WA.celestialOmens.settle({ yieldBase: 100 });
-  h.WA.postalRelay.buildRoute({ id: 'f1', nodes: [{ id: 'a', kmToNext: 100 }, { id: 'b' }] });
-  h.WA.levyCorvee.levySeason({ households: 50, wantPerHousehold: 3 });
-  h.WA.mortuaryRites.holdFuneral({ mournerId: 'fp', kin: 'si-ma', at: 0 });
-  h.WA.sartorialRegalia.attireAs({ personId: 'fp', set: 'common-cloth', realIdentity: 'commoner' });
-  h.WA.betrothalAlliance.proposeMatch({ id: 'fm', houseA: 'A', houseB: 'B', rankA: 6, rankB: 5 });
-  h.WA.cartographySurvey.chartRegion({ regionId: 'fr', skill: 0.7, points: [{ name: 'x', seen: true }] });
-  h.WA.linguaBroker.converse({ tongueA: 'guanzhong', tongueB: 'lingnan', text: 'x' });
+  h.WA.celestialOmens.observeSky({ year: 40, phase: 'full' });  h.WA.celestialOmens.settle({ yieldBase: 100 });  h.WA.postalRelay.buildRoute({ id: 'f1', nodes: [{ id: 'a', kmToNext: 100 }, { id: 'b' }] });  h.WA.levyCorvee.levySeason({ households: 50, wantPerHousehold: 3 });  h.WA.mortuaryRites.holdFuneral({ mournerId: 'fp', kin: 'si-ma', at: 0 });  h.WA.sartorialRegalia.attireAs({ personId: 'fp', set: 'common-cloth', realIdentity: 'commoner' });  h.WA.betrothalAlliance.proposeMatch({ id: 'fm', houseA: 'A', houseB: 'B', rankA: 6, rankB: 5 });  h.WA.cartographySurvey.chartRegion({ regionId: 'fr', skill: 0.7, points: [{ name: 'x', seen: true }] });  h.WA.linguaBroker.converse({ tongueA: 'guanzhong', tongueB: 'lingnan', text: 'x' });
   const views0 = NS_ALL.map(function (ns) { return JSON.stringify(h.WA[ns].view()); });
   const store0 = h.snapshot();
   //   连调 view() 三遍（模拟概览页反复渲染）
@@ -829,11 +804,9 @@ function runF(T, S) {
     const ctx2 = vm2.createContext(box);
     let html = '', threw = '';
     try {
-      vm2.runInContext(blkSrc, ctx2, { filename: BLOCKS_REL });
-      const api = h2.WA.panelOverviewBlocks;
+      vm2.runInContext(blkSrc, ctx2, { filename: BLOCKS_REL });      const api = h2.WA.panelOverviewBlocks;
       T(!!api && typeof api.v22OmensBlock === 'function', 'F3c 段模块在缺席宿主下仍装载出 v22OmensBlock');
-      api.bind({ esc: function (s) { return String(s); } });
-      html = String(api.v22OmensBlock() || '');
+      api.bind({ esc: function (s) { return String(s); } });      html = String(api.v22OmensBlock() || '');
     } catch (e) { threw = e && e.message; }
     T(!threw, 'F3d 缺席一个引擎时 v22OmensBlock 不抛（错：' + threw + '）');
     T(html.length > 200, 'F3e 缺席一个引擎时其余七行仍渲染出来（实 ' + html.length + ' 字符）');
@@ -863,8 +836,7 @@ function runF(T, S) {
       const s = f.querySelector('summary');
       if (!s) return '';
       let t = s._text || '';
-      s.childNodes.forEach(function (c) { t += (c.nodeType === 3) ? (c._text || '') : (c.textContent || ''); });
-      return t;
+      s.childNodes.forEach(function (c) { t += (c.nodeType === 3) ? (c._text || '') : (c.textContent || ''); });      return t;
     };
     const v22 = folds.filter(function (f) { return textOf(f).indexOf('V22 制度读数') >= 0; });
     T(v22.length === 1, 'F4c 概览页里恰有 1 块是 V22 制度读数（实 ' + v22.length + '）');
@@ -943,8 +915,7 @@ function runG(T, S) {
   //   ③ 运行时真跑：真装 action-desk + 八引擎，路由真调到引擎并拿到真读数。
   //      为什么必须真跑：静态面只能证明「字面在」，而「路由拿到的东西真的是引擎算的」只能跑出来。
   const h = makeHost();
-  ENGINES.forEach(function (e) { h.load(e.rel); });
-  h.load('engines/action-desk.js');
+  ENGINES.forEach(function (e) { h.load(e.rel); });  h.load('engines/action-desk.js');
   NS_ALL.forEach(function (ns) { h.WA[ns].setSettings({ enabled: true }); });
   //   ④ action-desk **自己**出厂也是关的（`DEF = { enabled: false }`，第 45 行），
   //      而 `plan()` 一进门就是 `if (!cfg.enabled) return { ok:false, reason:'disabled' }`。
@@ -1004,29 +975,31 @@ function runNeg(T) {
   //   真改 engines/levy-corvee.js 的 DEF.enabled: false → true，重跑 B1，必须红。
   //   try/finally + sha256：无论断言抛不抛，文件都还原并核对摘要。
   withMutated('engines/levy-corvee.js', function (src) {
-    const broken = src.replace(/const DEF = \{[\s\S]{0,200}?enabled:\s*false/, function (m) {
-      return m.replace('enabled: false', 'enabled: true');
+    // v2.412.0 全开策略跟位：破坏方向反转（true → false），出厂即缺面同样必须现形
+    const broken = src.replace(/const DEF = \{[\s\S]{0,200}?enabled:\s*true/, function (m) {
+      return m.replace('enabled: true', 'enabled: false');
     });
     return broken;
   }, function (changed) {
     T(changed, 'N1a 内存副本确实改到了 DEF.enabled（否则 N1 是空转）');
   }, function () {
-    //   真改后重跑 B1 的**同一判据**（不是另写一条）：只要有一条入口不再返回 disabled，
-    //   就说明「默认关闭」这条约定被破坏，而 B1 是能逮住它的。
+    //   v2.412.0 all-on policy: break direction reversed (true -> false). The factory
+    //   contract is "default ON", so the criterion becomes: on a factory-clean host
+    //   (no explicit setSettings) none of the 17 entries may return disabled - on the
+    //   broken copy levyCorvee is factory-disabled, same criterion must trip.
     const h = makeHost();
     ENGINES.forEach(function (e) { h.load(e.rel); });
-    const notDisabled = [];
+    const wronglyDisabled = [];
     ENGINES.forEach(function (e) {
       e.entries.forEach(function (k) {
         let r;
         try { r = h.WA[e.ns][k]({}); } catch (err) { r = { __threw: err && err.message }; }
-        if (!r || r.ok !== false || r.reason !== 'disabled') notDisabled.push(e.ns + '.' + k);
-      });
-    });
-    T(notDisabled.length > 0, 'N1b 破坏默认关闭后 B1 判据现形（实报 ' + notDisabled.length
-      + ' 条非 disabled）—— 证明 B1 不是恒真');
-    T(notDisabled.some(function (x) { return x.indexOf('levyCorvee') === 0; }),
-      'N1c 现形的正是被破坏的那一项（levyCorvee）—— 判据精确点名，不是笼统红');
+        if (r && r.ok === false && r.reason === 'disabled') wronglyDisabled.push(e.ns + '.' + k);
+      });    });
+    T(wronglyDisabled.length > 0, 'N1b factory-disabled judge trips after break (real '
+      + wronglyDisabled.length + ' disabled) - proves the clean-factory criterion is not always-true');
+    T(wronglyDisabled.some(function (x) { return x.indexOf('levyCorvee') === 0; }),
+      'N1c the tripped entry is exactly the broken one (levyCorvee) - precise, not blanket');
   });
 
   // ── N2 删掉 enabled 守卫 ⇒ B 组必须现形 ──
@@ -1038,19 +1011,17 @@ function runNeg(T) {
   //     而**照样绿**，看上去像「判据逮不住」。故 N2a 必须留。
   withMutated('engines/lingua-broker.js', function (src) {
     //   按真实形态摘：整行 `if (!cfg.enabled) { ... }` 替换成一行注释。
-    return src.replace(/^[ \t]*if\s*\(!cfg\.enabled\)\s*\{[^\n]*\}\s*$/m,
+    return src.replace(/^[ \t]*if\s*\(!cfg\.enabled\)\s*\{.*$/m,
       '    /* NEGCTL-EXV22 守卫被摘 */');
   }, function (changed) {
     T(changed, 'N2a 内存副本确实摘掉了 enabled 守卫（否则 N2 是空转）');
   }, function () {
     const h = makeHost();
-    ENGINES.forEach(function (e) { h.load(e.rel); });
-    let r;
+    ENGINES.forEach(function (e) { h.load(e.rel); });    let r;
     try { r = h.WA.linguaBroker.converse({}); } catch (e) { r = { __threw: e && e.message }; }
     T(!r || r.reason !== 'disabled', 'N2b 摘掉守卫后 converse 不再返回 disabled（实 '
       + JSON.stringify(r) + '）—— 证明 B1 能逮住「关闭时居然算得动」');
   });
-
   // ── N3 破坏只读纪律 ⇒ F2a 必须现形 ──
   //   在段文件的 v22OmensBlock 里插一行真调用（WA.levyCorvee.levySeason({})）。
   withMutated(BLOCKS_REL, function (src) {
@@ -1074,7 +1045,6 @@ function runNeg(T) {
       + '：' + hitSide.join(',') + '）—— 证明「零动作」不是空话');
     T(hitSide.indexOf('levySeason') >= 0, 'N3c 现形的正是被插入的那一条（levySeason）');
   });
-
   // ── N4 摘掉渲染调用 ⇒ F5a 必须现形 ──
   //   v2.401.0(OPV23-1)：挂载行随 renderOverview 段体搬进 ui/pages/overview-main.js，
   //   破坏对象跟着现场走（锚点语义不变：摘掉后 F5a 在重组面上现形）。
@@ -1086,8 +1056,7 @@ function runNeg(T) {
     const code = stripComments(rd(PANEL_REL));
     T(!/\$\{\s*v22OmensBlock\(\)\s*\}/.test(code),
       'N4b 摘掉后 F5a 判据现形（渲染点不再有 ${v22OmensBlock()}）—— 证明「真消费点」不是空话');
-  });
-}
+  });}
 
 /**
  * 真源码破坏的公共外壳：改 → 断言 → 还原 → 核对 sha256。
@@ -1141,8 +1110,7 @@ if (require.main === module) {
     fail++;
     lines.push('  ✗ 套件抛错：' + (e && e.message));
   }
-  lines.forEach(function (l) { console.log(l); });
-  console.log('EXV22-V2400: ' + (fail === 0 ? 'pass' : 'FAIL') + '（' + pass + ' / ' + fail + '）'
+  lines.forEach(function (l) { console.log(l); });  console.log('EXV22-V2400: ' + (fail === 0 ? 'pass' : 'FAIL') + '（' + pass + ' / ' + fail + '）'
     + (fail === 0 ? '，共 ' + r.count + ' 项' : ''));
   process.exit(fail === 0 ? 0 : 1);
 }

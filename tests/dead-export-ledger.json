@@ -1347,11 +1347,11 @@
       "own": 4
     },
     "branchContinuity.setSettings": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/branch-continuity.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 1
     },
     "branchContinuity.stat": {
@@ -3571,11 +3571,11 @@
       "own": 4
     },
     "director.setSettings": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/director.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 1
     },
     "director.stat": {
@@ -4723,11 +4723,11 @@
       "own": 1
     },
     "factContinuity.setSettings": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/fact-continuity.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 1
     },
     "factContinuity.stat": {
@@ -11715,11 +11715,11 @@
       "own": 3
     },
     "summarizerAdapter.setSettings": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/summarizer-adapter.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 1
     },
     "summarizerAdapter.stat": {
@@ -12735,7 +12735,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/travel-desk.js",
       "refs": 0,
-      "tref": 7,
+      "tref": 8,
       "own": 1
     },
     "uiDashboards.bind": {

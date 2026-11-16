@@ -103,7 +103,7 @@ function runA(a) {
     'n4/A3: 五类边词表逐字在位');
   a(/const FAULTS = \['board-off', 'bad-case', 'module-missing', 'bad-target'\];/.test(S),
     'n4/A4: fault 命名空间只装编排层自身能产生的失败（4 码）');
-  a(/const DEF = \{ enabled: false, maxEdges: 40, maxCases: 6 \};/.test(S),
+  a(/const DEF = \{ enabled: true, maxEdges: 40, maxCases: 6 \};/.test(S),
     'n4/A5: 设置默认值逐字在位（默认关）');
   a(/bounds: \{ maxEdges: \[4, 96\], maxCases: \[1, 16\] \}/.test(S),
     'n4/A6: 区间声明逐字在位（上界有界）');

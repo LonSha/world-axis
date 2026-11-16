@@ -98,22 +98,21 @@ function runAll() {
     'A4: 三个引擎各自登记了一个设置面（实 ' + h0.WA.__settingsRegs.length + '）');
   const keys = h0.WA.__settingsRegs.map(function (r) { return r.key; }).sort();
   a(new Set(keys).size === 3, 'A5: 三个设置键互不重复（实 ' + keys.join(' / ') + '）');
-  // 默认全关（本仓纪律：新引擎出厂即关）
-  a(h0.WA[NS.ss].getSettings().enabled === false
-    && h0.WA[NS.mr].getSettings().enabled === false
-    && h0.WA[NS.cr].getSettings().enabled === false,
-    'A6: 三缝默认全部关闭（出厂即关，不是出厂即开）');
+  // v2.412.0 全开策略跟位：出厂默认开（引擎现状即现行语义），「关闭拒收」断言须显式构造关闭现场
+  a(h0.WA[NS.ss].getSettings().enabled === true
+    && h0.WA[NS.mr].getSettings().enabled === true
+    && h0.WA[NS.cr].getSettings().enabled === true,
+    'A6: 三缝默认全部开启（全开策略跟位，不是出厂即关）');
 
   // ══════════════════════════════════════════════════════════════════
   console.log('\nB stageSession：会话生命周期与退出三选');
   // ══════════════════════════════════════════════════════════════════
   {
     const h = loadAll(); const S = h.WA[NS.ss];
-
-    // B1 关闭时写口一律 disabled
+    // B1 关闭时写口一律 disabled —— v2.412.0 全开策略：出厂默认开，先显式构造关闭现场
+    S.setSettings({ enabled: false });
     const off = S.begin({ stageId: 'st1', title: '测试' });
     a(off.ok === false && off.reason === 'disabled', 'B1: 关闭时 begin 拒收 disabled（实 ' + off.reason + '）');
-
     S.setSettings({ enabled: true });
     a(S.getSettings().enabled === true, 'B2: setSettings 真把开关打开（写后回读）');
 
@@ -213,7 +212,7 @@ function runAll() {
   // ══════════════════════════════════════════════════════════════════
   {
     const h = loadAll(); const M = h.WA[NS.mr];
-
+    M.setSettings({ enabled: false });
     a(M.compose({}).reason === 'disabled', 'C1: 关闭时 compose 拒收 disabled');
     M.setSettings({ enabled: true });
 
@@ -301,7 +300,7 @@ function runAll() {
   // ══════════════════════════════════════════════════════════════════
   {
     const h = loadAll(); const R = h.WA[NS.cr];
-
+    R.setSettings({ enabled: false });
     a(R.hide({ file: 'a.jsonl' }).reason === 'disabled', 'D1: 关闭时 hide 拒收 disabled');
     R.setSettings({ enabled: true });
     a(R.getSettings().limit === 10, 'D2: 默认上限逐字取原文的 10（实 ' + R.getSettings().limit + '）');

@@ -97,7 +97,7 @@ function runAll(assertFn) {
   EE.resetStats();
   EE.parseTracked('三个小时后'); EE.parseTracked('大约三天');
   a(EE.stats().accepted === 1 && EE.stats().refused === 1, 'EE-23 追踪计数 accepted/refused 分离');
-  a(EE.settings().enabled === false, 'EE-24 默认关闭');
+  a(EE.settings().enabled === true, 'EE-24 默认开（v2.412.0 全开策略跟位）');
   a(src('engines/elapsed-evidence.js').indexOf('transact') < 0, 'EE-25 零 store 写（无 transact）');
 
   // ══ ② source-reconcile ══════════════════════════════════════════
@@ -336,8 +336,8 @@ function runAll(assertFn) {
   ['elapsedEvidence', 'sourceReconcile', 'planRoster'].forEach(function (ns, i) {
     a(td.indexOf("'" + ns + "'") >= 0, 'T5-' + (i + 4) + ' tool-diag 守卫登记 ' + ns);
   });
-  a(src('index.js').indexOf("const VERSION = '2.410.0'") >= 0, 'T5-7 版本面已升 2.410.0');
-  a(JSON.parse(src('manifest.json')).version === '2.410.0', 'T5-8 manifest 同源 2.410.0');
+  a(src('index.js').indexOf("const VERSION = '2.517.0'") >= 0, 'T5-7 版本面已升 2.517.0');
+  a(JSON.parse(src('manifest.json')).version === '2.517.0', 'T5-8 manifest 同源 2.517.0');
 
   // O6 门禁 N5 负控制：本批**不得**改 prune-sections.js / run.js 的裁剪相关段
   a(src('tools/prune-sections.js').indexOf('labelUnits') < 0,

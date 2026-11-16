@@ -323,6 +323,10 @@
     'facing-contradiction': { kind: 'adjust-input', why: '同场同人给了两个朝向：补一次显式 turn（或改回原朝向）再提交，不是换做法' },
     'multi-anchor': { kind: 'adjust-input', why: '同场同人给了两个锚点：补一次显式 move（或改回原锚点）再提交，别指望两边都对' },
     'veto-hit': { kind: 'adjust-input', why: '描写触了该档体型的禁写词：改写这一句（换掉禁令词），不是换个引擎绕过去' },
+    // v2.517.0（V26 批）：分词精确匹配收不住的两条（'rejected'≠'reject' / 'duplicated'≠'duplicate'），
+    //   按现场 hint 逐字登记：失主说不通 → 交给叙事（人工复核）；重复回合 → 换滑动才是新回合（改输入）。
+    'claim-rejected': { kind: 'manual-review', why: '登记的失主与认领人对不上：凭据已留痕、交给叙事裁定，机器不代判' },
+    'duplicated': { kind: 'adjust-input', why: '这一回合已经走过（同签名重放）：换一次新的滑动/输入才是新回合，不是原地重放' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -1000,6 +1004,21 @@
     //   两条成功面（mapped / registered）已同批进 SUCCESS_FACE。
     'bad-facing', 'bad-side', 'bad-turn', 'facing-contradiction', 'head-count',
     'multi-anchor', 'no-support', 'over-capacity', 'veto-hit',
+    // ── v2.517.0（V26 全开策略批）：模型调用链五引擎（model-receipt / model-pin /
+    //   call-timeline / model-catalog / player-knowledge）+ lost-and-found /
+    //   advance-idempotence 的 10 条现场新码，快照欠账一次收敛（第 9 次，v2.203.0 起）。
+    //   全部由规则表收住（探针实测 via:'rule'，故不写 OVERRIDES —— 会让 A8 打架）：
+    //     · missing-channel/missing-model → request-setup（missing/no 分词）
+    //     · unknown-round → request-setup（unknown 分词；'round' 在 adjust-input 但
+    //       首段优先级在前，实测裁决 request-setup，与 unknown-step 同档）
+    //     · bad-sample → adjust-input（bad 分词）
+    //     · not-pinned → request-setup（not 分词）
+    //     · model-drift → rollback（drift 分词）
+    //     · no-cache/fetch-failed → request-setup（no） / retry-same-input（failed）
+    //     · claim-rejected → permanent-reject（rejected 分词）
+    //     · duplicated → adjust-input（duplicate 分词）
+    'bad-sample', 'claim-rejected', 'duplicated', 'fetch-failed', 'missing-channel',
+    'missing-model', 'model-drift', 'no-cache', 'not-pinned', 'unknown-round',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1010,6 +1029,9 @@
     'not-in-table', 'ok', 'omniscient', 'out-of-lens', 'pass',
     'player-view', 'premature', 'range-off', 'reuse', 'same-day', 'trigger-fired', 'triggered',
     'unlocked', 'within-lock',
+    // v2.517.0（V26 批）：engines/player-knowledge.js 的新成功返回（known:false + reason:'not-recorded'，
+    //   ok:true 侧），同批迁入成功面；'recorded' 分词在 adjust-input 词表，但成功面快照优先裁决。
+    'not-recorded',
     // v2.209.0（优化 6）：ui/assistant.js 的 `no-terms`（未检索到词条时如实返回 ok:false 之外
     //   的成功面返回）—— 现场实测 success 35 / 快照 34 ⇒ 差 1，属 E1 批既有欠债。
     'no-terms',

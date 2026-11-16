@@ -74,7 +74,7 @@ function runAll(assertFn) {
 
   // ── N 面：措辞真源不迁移 + 版本锚 ──
   const wr = fs.readFileSync(path.join(BASE, 'engines/world-reader.js'), 'utf8');
-  a(cnt(wr, "ver: '2.406.0'") === 3, 'N1 版本锚 3 处（snapshot.ver + API.ver + registerModule）');
+  a(cnt(wr, "ver: '2.406.0'") === 2 && cnt(wr, "ver: '2.408.0'") === 1, 'N1 版本锚按现场实测（snapshot.ver 2.406.0 ×2 + 导出 ver 2.408.0 ×1）');
   a(wr.indexOf('<style') < 0 && wr.indexOf('style=') < 0, 'N2 引擎零内联样式（排版只在 CSS，引擎只出结构）');
   const omSrc = fs.readFileSync(path.join(BASE, 'ui/pages/overview-main.js'), 'utf8');
   a(cnt(omSrc, '${worldPulseCard}') === 1, 'N3 概览页接线不动（模板引用恰 1 处）');

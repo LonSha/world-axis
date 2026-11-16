@@ -77,7 +77,11 @@ function runAll() {
   const WA = boot();
   const S = WA.stall;
   assert.ok(S && typeof S.lay === 'function', 'stall 命名空间在（engines/stall.js 已装载）');
-  assert.strictEqual(S.getSettings().enabled, false, '默认关闭（没开就不该有摊）');
+  // v2.412.0 全开策略跟位：出厂默认开（现行语义），关闭现场改为显式构造
+  assert.strictEqual(S.getSettings().enabled, true, '出厂默认开（全开策略）');
+  S.setSettings({ enabled: false });
+  assert.strictEqual(S.lay('解甲', '码头').reason, 'disabled', '关闭时 lay 拒收 disabled（没开就不该有摊）');
+  S.setSettings({ enabled: true });
   seed(WA);
 
   // ── A 摆摊的当场边界 ──

@@ -80,7 +80,7 @@ function runA(a) {
   a(body.length > 0, 'e4/A1: 能从真源码取出 WA.campaign 的对象字面量体');
   KEYS.forEach(function (k) { a(body.indexOf(k + ':') > 0, 'e4/A2: 导出面含 ' + k); });
   MUST_BE_ABSENT.forEach(function (k) { a(body.indexOf(k + ':') < 0, 'e4/A3: 导出面**没有** ' + k); });
-  a(/const DEF = \{ enabled: false, stageCap: 12, logCap: 24, planCap: 6 \}/.test(src), 'e4/A4: 默认关 + 三项参数声明（v2.218.0 起含 planCap）');
+  a(/const DEF = \{ enabled: true, stageCap: 12, logCap: 24, planCap: 6 \}/.test(src), 'e4/A4: 默认开（全开策略跟位）+ 三项参数声明（v2.218.0 起含 planCap）');
   a(/bounds: \{ stageCap: \[3, 24\], logCap: \[4, 64\], planCap: \[1, 12\] \}/.test(src), 'e4/A5: 区间声明逐字在位（v2.218.0 起含 planCap）');
   a(/LS_KEY = 'worldaxis_campaign_settings_v1'/.test(src), 'e4/A6: 设置键是单一真源');
   a(/module: 'campaign'/.test(src), 'e4/A7: 设置登记 module 为 campaign（settings-registry-only 档的存在性前提）');
@@ -133,7 +133,8 @@ function runB(a) {
   const WA = boot.WA;
   a(typeof WA.campaign === 'object', 'e4/B1: 模块装载');
   a(KEYS.every(function (k) { return typeof WA.campaign[k] === 'function'; }), 'e4/B2: 全部导出可调用');
-  a(WA.campaign.getSettings().enabled === false, 'e4/B3: 默认关');
+  a(WA.campaign.getSettings().enabled === true, 'e4/B3: 默认开（全开策略跟位）');
+  WA.campaign.setSettings({ enabled: false });
   a(WA.campaign.start('blank').reason === 'disabled', 'e4/B4: 关闭时 start 拒收 disabled');
   a(WA.campaign.advance().reason === 'disabled', 'e4/B5: 关闭时 advance 拒收 disabled');
   WA.campaign.setSettings({ enabled: true });

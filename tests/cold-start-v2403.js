@@ -86,8 +86,12 @@ function runAll(assertFn) {
   a(cnt(HP, 'simState') >= 2, 'C1 health-preflight 推演面已接入（simState 字面≥2，实 ' + cnt(HP, 'simState') + '）');
   a(HP.indexOf('WA.backstage.simHealth()') >= 0, 'C2 firstRunView 走引擎单源（不另拼状态）');
   a(HP.indexOf('simHealthLine()') >= 0, 'C3 firstRunView 措辞走引擎真源');
-  a(HP.indexOf("else if (simErr) state = 'unknown'") >= 0, 'C4 读不到 → unknown（不假称通过）');
-  a(HP.indexOf("else if (simBad) state = 'blocked'") >= 0, 'C5 推演没跑 → blocked（不冒充健康）');
+  // v2.410.0 收口跟位：unknown 收单分支（读不到 + simErr 并入），blocked 恢复单赋值
+  //   （simBad 与 nums.blocked>0 两因）—— 语义强度不减：unknown 仍排最前，simBad 仍进 blocked。
+  a(HP.indexOf("if (!mechOk || !g || nums.absent > 0 || simErr) state = 'unknown';") >= 0,
+    'C4 读不到（含推演面异常 simErr）→ unknown（不假称通过）');
+  a(HP.indexOf("else if (simBad || nums.blocked > 0) state = 'blocked';") >= 0,
+    'C5 推演没跑（simBad）或预算卡死（blocked>0）→ blocked（不冒充健康）');
   a(OM.indexOf('id="wa-sim-health-line"') >= 0, 'C6 概览页 wa-sim-health-line 在位');
   a(OM.indexOf('WA.backstage.simHealthLine()') >= 0, 'C7 概览页措辞走引擎真源');
   a(OM.indexOf('${simHealthLine}') >= 0, 'C8 概览页模板注入');

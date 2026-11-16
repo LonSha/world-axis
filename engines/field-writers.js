@@ -16,7 +16,7 @@
  *
  * 【实测依据】2026-11-05 静态扫描（写形态：`d.X =` / `d.X[k] =` / `d.X.push|splice|unshift|sort|forEach(`，
  *   `d`/`draft`/`root`/`doc`/`state` 五种事务形参名）：
- *     worldFacts 5 台 · people 12 台 · evolution 9 台 · customLax 3 台 · economy 3 台
+ *     worldFacts 6 台（2026-11-16 增补 core/evict.js 收缩式清理） · people 12 台 · evolution 9 台 · customLax 3 台 · economy 3 台
  */
 (function () {
   'use strict';
@@ -42,7 +42,11 @@
         { file: 'engines/inline-tags.js', mode: 'merge' },
         { file: 'engines/living-world.js', mode: 'merge' },
         { file: 'engines/world-bridge.js', mode: 'merge' },
-        { file: 'engines/world-lab.js', mode: 'overwrite' }
+        { file: 'engines/world-lab.js', mode: 'overwrite' },
+        // core/evict.js 的孤儿清理：对事务形参上取 worldFacts 键后 filter 再重赋，
+        // 但语义是【收缩式清理】——只剔除 __orphan 断开引用，保留其余全部写者的贡献，
+        // 不吃任何人的账，故按贡献语义归 merge 而非 overwrite（v2.412.0 增补登记）。
+        { file: 'core/evict.js', mode: 'merge' }
       ],
       conflict: 'none',
       note: '\u4e8b\u5b9e\u53f0\u8d26\u4ee5\u8ffd\u52a0\u4e3a\u4e3b\uff1bworld-lab \u662f**\u552f\u4e00\u8986\u76d6\u578b**\u5199\u8005\uff08\u5b9e\u9a8c\u9762\u5168\u91cf\u91cd\u5efa\uff09\uff0c\u5df2\u5728\u6b64\u58f0\u660e\u3002\u4e0b\u6e38\u4fee\u6539 world-lab \u7684\u5199\u6cd5\u65f6\u5fc5\u987b\u56de\u5230\u672c\u8868\u6539 mode\u3002' },

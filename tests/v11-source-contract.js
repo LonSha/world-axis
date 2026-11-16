@@ -145,7 +145,13 @@ const SOURCE_WITHOUT_BUILDBLOCK = {
   // v2.382.0 补登记：两处取数口调用都在 applyInjections 内（render/inject.js 1541 / 1542），
   //   judge 的 ownBuilder 会逐字验证 vis.<k> 与 WA.<k>.<builder>( 同时在场，非凭空登记。
   personalInventory: { verify: 'ownBuilder', builder: 'buildInventoryFeed', reason: '随身行囊：源走自有的 buildInventoryFeed 取数口，同一 ns 上不放两个 builder 名' },
-  metabolismClock: { verify: 'ownBuilder', builder: 'buildVitalsFeed', reason: '生理代谢：源走自有的 buildVitalsFeed 取数口，同一 ns 上不放两个 builder 名' }
+  metabolismClock: { verify: 'ownBuilder', builder: 'buildVitalsFeed', reason: '生理代谢：源走自有的 buildVitalsFeed 取数口，同一 ns 上不放两个 builder 名' },
+  // v2.517.0（V26 批）补登记：认知面四源（角色档案四联）—— 均在 applyInjections 内联成行
+  //   （render/inject.js 逐源 .view() 拼行，无独立 buildBlock、无自有 builder 名），verify:'inline'。
+  playerKnowledge: { verify: 'applyInline', reason: '对主角了解：applyInjections 内联读 WA.playerKnowledge.view() 成行（1521 行），无独立块' },
+  affectionDual: { verify: 'applyInline', reason: '内外双轴：applyInjections 内联读 WA.affectionDual.view() 成行（1522 行），无独立块' },
+  lifeProfile: { verify: 'applyInline', reason: '生活小档：applyInjections 内联读 WA.lifeProfile.view() 成行（1523 行），无独立块' },
+  suspenseLedger: { verify: 'applyInline', reason: '悬念簿：applyInjections 内联读 WA.suspenseLedger.view() 成行（1524 行），无独立块' }
 };
 // ─────────────────────────────────────────────────────────────────────────────
 // 源码切片工具
@@ -314,6 +320,11 @@ function judge(opts) {
     if (w.verify === 'inline') {
       ok = (new RegExp('vis\\.' + k + '\\b')).test(snap);
       why = ok ? 'buildWorldSnapshot 内联分支在场' : 'buildWorldSnapshot 里找不到 vis.' + k + ' 分支';
+    } else if (w.verify === 'applyInline') {
+      // v2.517.0（V26 批）：认知面四源的内联分支在 applyInjections（不在 buildWorldSnapshot），
+      //   证据判据同样是真代码面（剥注释面）里的 vis.<k> 分支，与 inline 同强度。
+      ok = (new RegExp('vis\\.' + k + '\\b')).test(apply);
+      why = ok ? 'applyInjections 内联分支在场' : 'applyInjections 里找不到 vis.' + k + ' 分支';
     } else if (w.verify === 'ownBuilder') {
       ok = (new RegExp('vis\\.' + k + '\\b')).test(apply)
         && (new RegExp('WA\\.' + k + '\\.' + w.builder + '\\s*\\(')).test(apply);
@@ -400,11 +411,11 @@ function runAll(a) {
   // v2.382.0（幽灵引用治理批次⑦）：立项基线 115 / 114 被 v2.360.0 之后新增的注入源与
   //   buildBlock 顶过期；现场复算 SOURCES 144、runtimeKeys 144。与 checked 187→185、
   //   cap-tier 70→74 同属「表跟位」，改前改后均以本脚本 N0~N6 双向自证验收。
-  a(j.sources.length === 144, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.382.0 现场基线 144；立项 115）');
+  a(j.sources.length === 149, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.517.0 现场基线 149；v2.382.0 曾 144，V26 批新增认知面四源+1）');
   //   v2.407.0 跟位：runtimeKeys 144 → 150（memoryRelay/stageSession 为 v2.402.0 V10 新增，
   //   summarizerAdapter/director/branchContinuity/factContinuity 为 v2.407.0 三缝新增）；
   //   SOURCES 仍 144 —— 六台都没有 def/VIS_NAMES/vis.X 注入契约，走白名单 A 归属。
-  a(j.runtimeKeys.length === 150, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.407.0 现场基线 150；v2.382.0 为 144）');
+  a(j.runtimeKeys.length === 151, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.517.0 现场基线 151；v2.407.0 为 150，V26 批新增 healthPreflight）');
   a(j.missingDef.length === 0, 'v11src: [T2] 源表每项在 def 有默认值（缺: ' + (j.missingDef.join(',') || '无') + '）');
   a(j.missingName.length === 0, 'v11src: [T3] 源表每项有面板显示名（缺: ' + (j.missingName.join(',') || '无') + '）');
   a(j.missingVis.length === 0, 'v11src: [T4] 源表每项有 vis 读取点（缺: ' + (j.missingVis.join(',') || '无') + '）');

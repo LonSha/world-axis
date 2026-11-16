@@ -191,9 +191,10 @@ function runA(a) {
 function runB(a) {
   const WA = env0().WA;
   a(typeof WA.travelDesk === 'object', 'e8v2210/B1: 模块已装载');
-  a(j(WA.travelDesk.getSettings()) === j({ enabled: false, maxRows: 24, maxPlanRows: 32, maxLegs: 6, meetWindowMs: 3600000 }),
-    'e8v2210/B2: 默认全关（实 ' + j(WA.travelDesk.getSettings()) + '）—— 全关即零存在的前提');
-  // ① 全关即零存在：三个口一律拒 desk-off（而不是静默返回空）
+  a(j(WA.travelDesk.getSettings()) === j({ enabled: true, maxRows: 24, maxPlanRows: 32, maxLegs: 6, meetWindowMs: 3600000 }),
+    'e8v2210/B2: 出厂设置逐字在位（实 ' + j(WA.travelDesk.getSettings()) + '；v2.412.0 全开策略跟位：默认开）');
+  // ① 全关即零存在：三个口一律拒 desk-off（而不是静默返回空）—— 关闭现场显式构造
+  WA.travelDesk.setSettings({ enabled: false });
   ['plan', 'ledger'].forEach(function (fn) {
     const r = WA.travelDesk[fn]({ channel: 'person', from: '甲镇', to: '丙镇' });
     a(r.ok === false && r.fault === 'desk-off', 'e8v2210/B3: 关闭时 ' + fn + ' 拒 desk-off（实 ' + j(r.fault) + '）');
