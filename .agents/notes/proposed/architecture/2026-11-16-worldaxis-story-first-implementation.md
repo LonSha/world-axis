@@ -4,9 +4,12 @@
 - Plan sources: `plans/WORLDAXIS_STORY_EXPANSION_9.md`（EX-1~EX-9）+ `plans/WORLDAXIS_STORY_OPTIMIZATION_9.md`（OP-1~OP-9），合计严格 18 项。
 - Implementation evidence: `engines/story-window.js`、`engines/tool-diag.js`、`core/store.js`、`core/interceptor.js`、`render/inject.js`、`engines/inject-budget.js`、`index.js`、`tests/run.js`、`tests/story-window-v2518.js`
 - Current test evidence: focused Node regression `story-window: ok`；全量 `node tests/run.js` 52 通过 / 0 失败（source-changed 状态下取得，改动后须重跑取干净结果）；改动文件语法编译全部通过。
-- Remaining: 真实 SillyTavern + Ruby 卡宿主验收（唯一未做的验收）；全量 `node tests/run.js` 回归。
+- Remaining: 真实 SillyTavern + Ruby 卡宿主验收（唯一未做的产品验收）。全量回归已解除门控并启动
+  （`node tools/isolated-run.js`，隔离树整趟）；L0/L1 已全绿，L2 诚实拒收 `wide-impact`。
 - Coverage: 18 项**全部有代码落点与专项断言**，其中 OP-7/OP-8/OP-9 为只读证据面（不改 owner 实现）。
   已无「依赖既有 owner」的悬空项。「有落点」不等于「产品验收通过」。
+  本批另把 L1 快档的五支红全部修绿（含 `tools/test-layers.js` 与 `tools/smart-runner.js` 两个
+  调度侧真缺陷），并把五条段提取绝对基线逐条补账 —— 详见下方「第四批」。
 - Date: 2026-11-16
 
 ## 决策
@@ -121,6 +124,55 @@ OP-2 的第一步不新建第二套时钟或位置真源：在行动/世界回�
 `ns-consumer-ledger-v2400`、`registry-identity-v2620`、`budget-headroom-v2261`、
 `version-surface-gate-v2185`、`settings-bus-api-gate`、`switch-matrix-v2910`。
 **仍不是全量回归**；真实宿主验收同样未执行。
+### 第四批：把 L1 快档从红修到绿（并修好调度器自己）
+`352e252` 之后第一次跑 `node tools/smoke.js` 得到 5 支红。**先做因果分离再动手**：
+`git stash push -u` 收走全部改动后重跑，五支在基线（`352e252`）上同样红 ⇒ 它们是上一次提交留下的
+登记欠账，不是本轮新改动引入。这决定了方向是「补账」，不是「回退」。
+- `tests/reject-code-gate.js`：三个未分类码。`already-chosen` / `window-missing` 出现在 `ok:false`
+  返回体里 ⇒ 归 `REJECT_FACE`；`waiting-window-held` 出现在 `ok:true` 返回体里（`wait` 入口无写口可
+  委托时把窗口挂在 `deferred` 上，不产生任何完成事实）⇒ 归 `SUCCESS_FACE`。**注意 `already-chosen`
+  不能靠 `'already-'` 前缀命中** —— 快照比对是逐字相等，`'already-'` 是它自己那条码。三码各配真实
+  见证（`settle` 不存在的窗 / 真开窗+真 defer 再 find / 临时摘掉 `WA.act` 后 `choose('wait')`），
+  见证面 841 → 844。
+- `tools/reject-recovery.js --check`：差额 3 → **0**，承诺与现场逐条一致。
+- `tests/dead-export-gate.js`：6 项 storyWindow 死导出。修法一律是**让引用可见**而不是改判据：
+  `tool-diag` 把 `sw.diagnose()` / `d.stat` 改成 `WA.storyWindow.diagnose()` / `WA.storyWindow.stat()`
+  全名调用（死子面清册 `REF_RE` 只认 `WA<sep>ns<sep>mem` 形态，别名在产品面里是看不见的消费），
+  并把 `settle` 真接进 `core/interceptor.js` 的 after 链：新正文推进前若旧窗仍是 pending，先以
+  `evidence:'superseded-by-next-reply'` 结算它。**「被新正文取代」与「玩家处理完了」在台账里必须可
+  区分** —— 前者是系统行为，后者是玩家行为。另补 `render/inject.js` 的 `SRC_MOD_SETTING` 登记与
+  `ui/panel.js` 的「故事回应窗口」面板节（复选框 + 两个数字框 + 两个只读按钮 + bind 项）。
+  账本重冻结：dead 1694 → 1688，证据复核 1695 条。
+- `tests/segment-extract-v2400.js`：五条绝对基线（B1 447 / B2 5267 / C1a 571 / D3a 18038 / D3f 16240）。
+  **逐常量手改、逐条写来历**，产地用 `git worktree` 各挂一棵只读树按 commit 实测：
+  `BASE_SECTION_CC` 446→447 是 v2.518.0 的 story-window 专锁节（段体文件 `tool-diag-v092.js`
+  本轮**一字未动**，段内 section 仍是 1 ⇒ 这是新挂载点，不是拆段漂移）；
+  `BASE_ASSERT_CC` 5263→5267 是三把窗口锁 + 第四把证据锁的 spawn 收尾断言；
+  `BASE_TEST_FILES` 564→571 是七个真新增测试文件（V25 缝合 / V26 可观测 / 四把 story-window 锁 /
+  `ruby-card-profile`），中间四版连续没跟位，与 v2.403~v2.406 那次同族；
+  `BASE_PANEL_LINES` 17878→18038 与 `BASE_PANEL_FILE_LINES` 16103→16240 是四个 commit 里落在
+  **段体外**的 UI 面增量。**关键自证**：段体读数 692 行一字未变 —— 「段外长了」与「段体长了」
+  在读数上是两件可分辨的事。**拒绝用 `>=` 下界了事**：下界对「面塌了」是瞎的，而那正是 C1a 要钉的。
+- `tools/repo-hygiene.js`：`.git/objects` 下 50.79 MiB garbage / 27.38 MiB loose。按门禁自己给的
+  非破坏性修法 `--gc`（`git gc --prune=now`）回收 ⇒ 0.00 / 0.00，pack 15.38 MiB，`git fsck` 干净。
+  **没有用 `git filter-repo`**：病灶不在历史里，重写历史换不来体积、只会让所有 hash 变。
+- `tools/smart-runner.js`（L2 层）与 `tools/test-layers.js`：两个真缺陷。① `tests/reject-v2780.js`
+  被判 `uncovered-change`，可它**真的在 L1 里执行** —— `tests/reject-code-gate.js`（smoke 成员）
+  `require` 它跑见证表。新增 `fastDeps()`：从 smoke 清单派生**一跳** `require` 依赖（不递归 ——
+  递归会让「快档跑过」这句话不再指明任何东西）。② `test-layers.js` 把注释里的 `ui-gate-sync` 当成
+  共享上下文原语，于是 v2.408.0 节被判 `selfContained=false`、选区永远征不动它，
+  `smart-runner-v2408` 的 B3b 因此必然红。修法取**去注释面**（`locks`/`requires` 仍取原文面：
+  它们是正则捕获的调用形态）。这两条都不是放宽判据：真原语写在代码里照样命中。
+  该锁从基线 25/4 提升到 **29/0**。
+### 本轮最终分层读数（如实分层，不合并成一句「全绿」）
+- L0 门禁层：`dup-decl-gate` / `field-liveness-gate` / `version-consistency` 三支**全绿**。
+- L1 快档层：`node tools/smoke.js` **14/14 全绿**（41.1s）。
+- 四支 story-window 专锁 + `smart-runner-v2408`：单跑全绿（后者 29/0）。
+- L2 增量层：**诚实拒收 `wide-impact`**（选中 56 节，上限 10）。原因是 `ui/panel.js` 被大量节的
+  证据面直引 —— 这不是缺陷，是「定向确实不可信」的正确结论。**不许把它读成通过**。
+- L3 全量层：`plans/V23_MASTER_PLAN.md` 的双计划门控在 18 项全部交付后解除，转由
+  `node tools/isolated-run.js` 在隔离树里整趟跑。**这是本轮唯一能覆盖 `ui/panel.js` 那 56 节水位的
+  验收方式**，故必须跑，且结论以它的机器读数（`WA-ISOLATED-RESULT`）为准。
 
 ## 窗口契约（当前实现）
 
