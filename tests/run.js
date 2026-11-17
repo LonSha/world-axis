@@ -2356,7 +2356,15 @@ const __ctxGuard = require('./context-guard.js').boundary();
   global.localStorage.setItem('worldaxis_opinion_settings_v1', '{broken-json');
   const opReg200 = regs200.filter(function (r) { return r.key === 'worldaxis_opinion_settings_v1'; })[0];
   const op200 = WA.settingsBus.read(opReg200);
-  assert(op200 && op200.enabled === false && op200.sandboxEnabled === false, '损坏 opinion 键 → 重置默认（enabled=false）');
+  // v2.518.0 收口补账：「损坏 ⇒ 重置默认」钉的是 reset-to-default 这件行为，不是
+  //   「默认值必须为 false」——v2.412.0 全开策略把 opinion.enabled 的出厂默认改成了 true，
+  //   继续拿 false 当基准等于把「默认是多少」写死在判据里。
+  //   改为与**登记表里的 def 逐字比对**：默认是哪个值都行，但必须真回到那个值。
+  const opDef200 = (opReg200 && opReg200.def) || {};
+  assert(op200 && op200.enabled === opDef200.enabled && op200.sandboxEnabled === opDef200.sandboxEnabled,
+    '损坏 opinion 键 → 重置默认（与登记表 def 逐字一致：enabled=' + opDef200.enabled
+    + ' / sandboxEnabled=' + opDef200.sandboxEnabled + '，实 ' + (op200 && op200.enabled)
+    + '/' + (op200 && op200.sandboxEnabled) + '）');
   const corruptOp200 = global.localStorage.getItem('worldaxis_opinion_settings_v1_corrupt_' + Date.now().toString().slice(0, 8));
   const anyCorruptOp200 = (function () { const ks = []; for (let i = 0; i < global.localStorage.length; i++) { const k = global.localStorage.key(i); if (k && k.indexOf('worldaxis_opinion_settings_v1_corrupt_') === 0) ks.push(k); } return ks; })();
   assert(anyCorruptOp200.length >= 1, '损坏 opinion 键已隔离为 corrupt_<ts> 键');
@@ -6499,12 +6507,18 @@ const __ctxGuard = require('./context-guard.js').boundary();
     });
 
     // A2. 行为实证：损坏 → 隔离 + 重置默认 + error 留痕（旧实现静默吞掉、无痕迹）
+    // v2.518.0：坏键隔离后要验的是「真回到登记表里的默认」，故基准从登记表现取（不写死）。
+    const defOf2300 = function (key) {
+      const r = (WA.__settingsRegs || []).filter(function (x) { return x && x.key === key; })[0];
+      return (r && r.def) || {};
+    };
     const CASES2300 = [
-      { key: 'worldaxis_opinion_settings_v1', mod: 'opinion', probe: function () { return WA.opinion.getSettings().enabled === false; } },
+      // v2.518.0：同上——钉 reset-to-default，基准取登记表 def（默认是哪个值都成立，但必须真回到它）。
+      { key: 'worldaxis_opinion_settings_v1', mod: 'opinion', probe: function () { const d = defOf2300('worldaxis_opinion_settings_v1'); return WA.opinion.getSettings().enabled === d.enabled; } },
       { key: 'worldaxis_inject_visibility_v1', mod: 'inject', probe: function () { return WA.render.getVisibility().clock === true; } },
       { key: 'worldaxis_workflow_v1', mod: 'workflow', probe: function () { WA.workflow.register({ id: '__probe2300_wf__', chain: 'after', order: 999 }); const n = WA.workflow.list().length > 0; WA.workflow.unregister('__probe2300_wf__'); return n; } },
       { key: 'worldaxis_api_channels_v1', mod: 'apiRouter', probe: function () { return WA.apiRouter.listChannels().length > 0; } },
-      { key: 'worldaxis_regional_settings_v1', mod: 'regional', probe: function () { return WA.regional.getSettings().enabled === false; } },
+      { key: 'worldaxis_regional_settings_v1', mod: 'regional', probe: function () { const d = defOf2300('worldaxis_regional_settings_v1'); return WA.regional.getSettings().enabled === d.enabled; } },
       { key: 'worldaxis_custom_presets', mod: 'preset', probe: function () { return Array.isArray(WA.preset.getAllPresets()); } }
     ];
     CASES2300.forEach(function (c) {
@@ -11889,6 +11903,9 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     });
     assert(writerNames.length === 1 && writerNames[0] === 'setSettings',
       '桥上唯一的「set*」是 setSettings（改的是本桥开闸配置，不是世界状态），实 ' + JSON.stringify(writerNames));
+    // v2.518.0 收口补账：本节钉的是「休眠时外部读到 null 且可归因」，休眠是夹具责任——
+    //   v2.412.0 起出厂默认 enabled:true，故这里显式关闸再验（判据本身一个字未改）。
+    B.setSettings({ enabled: false });
     const cfgBeforeRO = B.settings();
     assert(cfgBeforeRO && cfgBeforeRO.enabled === false && cfgBeforeRO.presumeUnknown === 'hidden'
       && cfgBeforeRO.maxCurrents === 20 && cfgBeforeRO.maxEchoes === 12 && cfgBeforeRO.maxOpinion === 8
@@ -13931,8 +13948,11 @@ assert(r2900.dead.length === 1688 && r2900.uiDead.length === 7 && r2900.dataOnly
     assert(PW.INJECT_MIN_IMPACT === 'high', 'v2340: 注入门槛 high（低影响只存档不进主线）');
     assert(PW.CAP_NPCS === 24 && PW.CAP_MODULES === 80 && PW.CAP_RELATIONS === 120, 'v2340: 三容器容量常量');
     assert(typeof PW.buildPrompt === 'function' && typeof PW.buildParallelBlock === 'function' && typeof PW.advance === 'function', 'v2340: 核心函数在场');
+    // v2.518.0 收口补账：v2.412.0 全开策略把出厂默认改成 true，本节钉的是「关着 + 手动，
+    //   防意外触网」这条配置语义，故夹具显式关闸再验（判据未改）。
+    PW.setSettings({ enabled: false });
     const pCfg0 = PW.effectiveSettings();
-    assert(pCfg0.enabled === false && pCfg0.autoMode === 'manual', 'v2340: 默认关闭 + 手动（防意外触网）');
+    assert(pCfg0.enabled === false && pCfg0.autoMode === 'manual', 'v2340: 关闭 + 手动（防意外触网）');
     // state：store 骨架已物化 parallelWorld（登记 cap + 参与 registryParity），故 state() 恒为对象；
     //   判「无数据」看容器为空，而非 state===null（null 只会出现在未装载/异常路径）。
     const pSt0 = PW.state();
