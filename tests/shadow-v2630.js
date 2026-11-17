@@ -104,6 +104,11 @@ function judge(a) {
   const WA = fresh();
   const s = shadowOf(WA);
   resetShadow(WA);
+  // v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true，
+  //   于是「总开关默认关闭」这句前提消失（实测已是 true）。本节钉的是**关着的时候
+  //   会发生什么**（注入块为空 / tick 归因 disabled / 被拒的不落盘），
+  //   不是「出厂默认必须是关」——故夹具先显式关闸再验同一批判据，判据一个字未改。
+  s.setSettings({ enabled: false });
 
   // ── 1 总开关默认关闭 ──
   const cfg0 = s.getSettings();

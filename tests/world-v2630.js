@@ -115,6 +115,11 @@ function judge(a) {
   const w = worldOf(WA);
   // 清场（上一批判据可能留下同名地点/道路；本锁自治，不依赖运行顺序）
   WA.store.transact(function (d) { d.world = { places: [], roads: [], events: [] }; }, TAG + 'reset');
+  // v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true，
+  //   于是「总开关默认关闭」这句前提消失（实测已是 true）。本节钉的是**关着的时候
+  //   会发生什么**（注入块为空 / tick 归因 disabled / 被拒的不落盘），
+  //   不是「出厂默认必须是关」——故夹具先显式关闸再验同一批判据，判据一个字未改。
+  w.setSettings({ enabled: false });
 
   // ── 1 总开关默认关闭 ──
   const cfg0 = w.getSettings();
