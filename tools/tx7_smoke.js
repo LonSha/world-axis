@@ -7,6 +7,12 @@ function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log('FAIL
 var boot = sync.fresh({});
 var WA = boot.WA;
 ok('1: 装载', typeof WA.investigation === 'object');
+// v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true
+//   （玩家装好即见全量世界），而本冒烟钉的是「闸关着时的行为」（下面几条 disabled
+//   拒收判据）。断言「出厂默认是关」等于把一条已经不存在的口径钉下去 —— 保留它
+//   只会让整条冒烟恒红，而真正的判据（关了就拒）反而没人看了。改为**显式关闸**
+//   再验拒收：判据本身一个字未改，改的只是「谁来关」。
+WA.investigation.setSettings({ enabled: false });
 ok('2: 默认关', WA.investigation.getSettings().enabled === false);
 WA.investigation.setSettings({ enabled: true });
 ok('3: 开启', WA.investigation.getSettings().enabled === true);

@@ -18,6 +18,12 @@ ok("S1: perfBaseline loaded", typeof WA.perfBaseline === "object");
 ok("S2: 10 exports", ["getSettings", "setSettings", "bands", "budget", "readings", "gap",
   "sources", "diagnose", "stat", "reset"]
   .every(function (k) { return typeof WA.perfBaseline[k] === "function"; }));
+// v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true
+//   （玩家装好即见全量世界），而本冒烟钉的是「闸关着时的行为」（下面几条 disabled
+//   拒收判据）。断言「出厂默认是关」等于把一条已经不存在的口径钉下去 —— 保留它
+//   只会让整条冒烟恒红，而真正的判据（关了就拒）反而没人看了。改为**显式关闸**
+//   再验拒收：判据本身一个字未改，改的只是「谁来关」。
+WA.perfBaseline.setSettings({ enabled: false });
 ok("S3: default off", WA.perfBaseline.getSettings().enabled === false);
 
 // 关闭时逐面拒算（四个读面都要拒）

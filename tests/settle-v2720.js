@@ -71,6 +71,15 @@ function resetWorld(WA) {
     d.marginal = { rows: [] };
     d.tolerance = { round: 0, rows: [] };
   }, TAG + 'reset');
+  // v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true
+  //   （玩家装好即见全量世界），而本锁钉的全部是「闸关着时的行为」。闸开着时那些
+  //   `disabled` 归因断言永远不会成立（会先撞上 missing / bad-* / 真 profile）——
+  //   这不是判据错了，是夹具没把闸关上。故每份夹具显式关闸（与 b2-travel-v2117 的
+  //   seed 同款做法），判据本身一个字未改；用例内部要开的照旧显式打开。
+  WA.hazard.setSettings({ enabled: false });
+  WA.karma.setSettings({ enabled: false });
+  WA.marginal.setSettings({ enabled: false });
+  WA.tolerance.setSettings({ enabled: false });
 }
 function snapshotLS() {
   const out = {};

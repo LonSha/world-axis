@@ -337,7 +337,11 @@
     let out = null;
     WA.store.transact(function (d) {
       const r = rows(d).filter(function (x) { return x && x.id === target; })[0];
-      if (!r) { out = { ok: false, reason: 'window-missing' }; return; }
+      // v2.518.0：拒收分支必须**中止事务**，不能裸 return。
+      //   这里一个字都没写（只给局部 `out` 赋值），裸 return 会让 transact 正常返回并提交，
+      //   于是一次「什么也没发生」的调用仍然推进了状态序号。外层 `return out || {...}`
+      //   已经带好了拒收读数，故 `return false` 对调用方语义不变，只是不再白推一格 rev。
+      if (!r) { out = { ok: false, reason: 'window-missing' }; return false; }
       r.responseCount = (Number(r.responseCount) || 0) + 1;
       r.lastResponse = { at: now('story-window.respond'), choice: clean(i.choice, 20),
         owner: clean(i.owner, 80), reason: clean(i.reason, 120),
@@ -459,8 +463,8 @@
     WA.store.transact(function (d) {
       const list = d.storyWindow && Array.isArray(d.storyWindow.windows) ? d.storyWindow.windows : [];
       const r = list.filter(function (x) { return x && x.id === cur.id; })[0];
-      if (!r) { out = { ok: false, reason: 'window-missing' }; return; }
-      if (r.choice && r.choice.id) { out = { ok: false, reason: 'already-chosen', choice: r.choice }; return; }
+      if (!r) { out = { ok: false, reason: 'window-missing' }; return false; }
+      if (r.choice && r.choice.id) { out = { ok: false, reason: 'already-chosen', choice: r.choice }; return false; }
       r.choice = { id: c, at: now('story-window.choice'), context: clean(ctx.note, 180) };
       // 只有 owner 明确返回 applied 才进入 intervening；presented / planned / in-transit / registered 均仍是 awaiting。
       r.status = c === 'defer' ? 'deferred' : (phase === 'accepted' ? 'intervening' : 'awaiting');
@@ -483,8 +487,8 @@
     let out = null;
     WA.store.transact(function (d) {
       const r = (d.storyWindow.windows || []).filter(function (x) { return x && x.id === target; })[0];
-      if (!r) { out = { ok: false, reason: 'window-missing' }; return; }
-      if (r.status === 'settled' || r.status === 'failed') { out = { ok: false, reason: 'already-settled', status: r.status, window: r }; return; }
+      if (!r) { out = { ok: false, reason: 'window-missing' }; return false; }
+      if (r.status === 'settled' || r.status === 'failed') { out = { ok: false, reason: 'already-settled', status: r.status, window: r }; return false; }
       const at = now('story-window.settle');
       r.status = wanted;
       r.settlement = { at: at, evidence: clean((result || {}).evidence, 180),

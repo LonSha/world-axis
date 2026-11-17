@@ -23,6 +23,12 @@ function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log("FAIL
 ok("S1: pendingCenter loaded", typeof WA.pendingCenter === "object");
 ok("S2: 11 exports", ["getSettings", "setSettings", "items", "soon", "bySource", "describe", "diagnose", "timeline", "stat", "reset", "act"]
   .every(function (k) { return typeof WA.pendingCenter[k] === "function"; }));
+// v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true
+//   （玩家装好即见全量世界），而本冒烟钉的是「闸关着时的行为」（下面几条 disabled
+//   拒收判据）。断言「出厂默认是关」等于把一条已经不存在的口径钉下去 —— 保留它
+//   只会让整条冒烟恒红，而真正的判据（关了就拒）反而没人看了。改为**显式关闸**
+//   再验拒收：判据本身一个字未改，改的只是「谁来关」。
+WA.pendingCenter.setSettings({ enabled: false });
 ok("S3: default off", WA.pendingCenter.getSettings().enabled === false);
 ok("S4a: disabled reject items", WA.pendingCenter.items().ok === false && WA.pendingCenter.items().reason === "disabled");
 ok("S4b: disabled reject soon", WA.pendingCenter.soon().ok === false);
@@ -39,6 +45,15 @@ ok("S9: 常态是 allClear 而非 unavailable", r0.unavailable === false && r0.e
 ok("S10: 三旗标 + 可达性读数齐备", typeof r0.emptyAll === "boolean" && typeof r0.allClear === "boolean"
   && typeof r0.unavailable === "boolean" && typeof r0.emptyReported === "number");
 ok("S11: note 明写「不可区分」", r0.note.indexOf("不可区分") >= 0);
+// v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true，
+//   于是「关掉的模块如实进 disabled / skipped」这条判据失去了前提（一条都没关）。
+//   本节钉的是**关了就如实登记**，不是「出厂默认是关」——故夹具显式关掉若干源，
+//   再把同一条判据跑一遍。判据本身一个字未改。
+WA.commission.setSettings({ enabled: false });
+WA.investigation.setSettings({ enabled: false });
+WA.operations.setSettings({ enabled: false });
+// 同上：r0 是关闸前的快照，读读数必须重取。
+r0 = WA.pendingCenter.items();
 ok("S12: skipped 逐条带来源与原因", r0.skipped.length >= 1 && r0.skipped.every(function (s) {
   return typeof s.source === "string" && typeof s.reason === "string"; }));
 ok("S13: 关掉的模块进 skipped（原因 disabled）", r0.skipped.some(function (s) { return s.reason === "disabled"; }));

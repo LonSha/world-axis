@@ -69,6 +69,14 @@ function resetWorld(WA) {
     d.people = {};
     d.clock = { dayIndex: 10 };
   }, TAG + 'reset');
+  // v2.518.0 收口补账：v2.412.0 全开策略把三处闸的**出厂默认**改成 true（203 引擎
+  //   装好即见全量世界），而本锁钉的是「闸关着时的行为」。闸开着时那几条 `disabled`
+  //   归因断言永远不会成立（depart 会先撞 unknown-place、weather.effect 会撞 missing、
+  //   difficulty 会给出真 profile）—— 这不是判据错了，是夹具没把闸关上。
+  //   故每份夹具显式关闸（与 b2-travel-v2117 的 seed 同款做法），判据本身一个字未改。
+  WA.world.setSettings({ enabled: false });
+  WA.weather.setSettings({ enabled: false });
+  WA.difficulty.setSettings({ enabled: false });
 }
 function layRoad(WA) {
   const w = WA.world;
@@ -115,7 +123,7 @@ function judge(a) {
 
   // 4 weather
   const wx = WA.weather;
-  a(wx.getSettings().enabled === false, 'v2650/settle: [4] weather defaults off');
+  a(wx.getSettings().enabled === false, 'v2650/settle: [4] weather gate is closed before probing (v2.412.0 出厂默认全开，本锁显式关闸)');
   const miss = wx.weatherOf('码头');
   a(miss.ok === false && miss.reason === 'missing', 'v2650/settle: [4] unset weather is missing, not clear');
   const offE = wx.effect('码头');

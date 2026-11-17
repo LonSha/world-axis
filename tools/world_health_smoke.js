@@ -17,6 +17,12 @@ function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log("FAIL
 ok("S1: worldHealth loaded", typeof WA.worldHealth === "object");
 ok("S2: 8 exports", ["getSettings", "setSettings", "summary", "drill", "sources", "diagnose", "stat", "reset"]
   .every(function (k) { return typeof WA.worldHealth[k] === "function"; }));
+// v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true
+//   （玩家装好即见全量世界），而本冒烟钉的是「闸关着时的行为」（下面几条 disabled
+//   拒收判据）。断言「出厂默认是关」等于把一条已经不存在的口径钉下去 —— 保留它
+//   只会让整条冒烟恒红，而真正的判据（关了就拒）反而没人看了。改为**显式关闸**
+//   再验拒收：判据本身一个字未改，改的只是「谁来关」。
+WA.worldHealth.setSettings({ enabled: false });
 ok("S3: default off", WA.worldHealth.getSettings().enabled === false);
 
 // 关闭时拒算
@@ -39,6 +45,19 @@ var tb = sm.bars.todo;
 ok("S11: todo bar shape", typeof tb.total === "number" && Array.isArray(tb.rows));
 ok("S12: todo scans 6 sources", Object.keys(tb.perSource).length + tb.skipped.length === 6);
 // 边界 5：六个源全关 ⇒ empty 真、allClear 假（不能报成「一切正常」）
+// v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true，
+//   于是「关掉的模块如实进 disabled / skipped」这条判据失去了前提（一条都没关）。
+//   本节钉的是**关了就如实登记**，不是「出厂默认是关」——故夹具显式关掉若干源，
+//   再把同一条判据跑一遍。判据本身一个字未改。
+WA.commission.setSettings({ enabled: false });
+WA.operations.setSettings({ enabled: false });
+WA.aftermath.setSettings({ enabled: false });
+WA.investigation.setSettings({ enabled: false });
+WA.storyChoice.setSettings({ enabled: false });
+WA.agency.setSettings({ enabled: false });
+// 同上：sm/tb 是关闸前的快照，读数必须重取（否则验的是旧世界）。
+sm = WA.worldHealth.summary();
+tb = sm.bars.todo;
 ok("S13: empty vs allClear distinct (all off)", tb.total === 0 && tb.empty === true && tb.allClear === false);
 ok("S14: skipped names the reason", tb.skipped.length >= 1 && tb.skipped.every(function (s) { return typeof s.key === "string" && typeof s.why === "string"; }));
 ok("S15: disabled reasons present", tb.skipped.some(function (s) { return s.why === "disabled"; }));
