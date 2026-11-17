@@ -4,7 +4,9 @@
 - Plan sources: `plans/WORLDAXIS_STORY_EXPANSION_9.md`（EX-1~EX-9）+ `plans/WORLDAXIS_STORY_OPTIMIZATION_9.md`（OP-1~OP-9），合计严格 18 项。
 - Implementation evidence: `engines/story-window.js`、`engines/tool-diag.js`、`core/store.js`、`core/interceptor.js`、`render/inject.js`、`engines/inject-budget.js`、`index.js`、`tests/run.js`、`tests/story-window-v2518.js`
 - Current test evidence: focused Node regression `story-window: ok`；全量 `node tests/run.js` 52 通过 / 0 失败（source-changed 状态下取得，改动后须重跑取干净结果）；改动文件语法编译全部通过。
-- Remaining: 真实 SillyTavern + Ruby 卡宿主验收；最终提交/推送与远端凭据轮换。
+- Remaining: 真实 SillyTavern + Ruby 卡宿主验收（唯一未做的验收）；全量 `node tests/run.js` 回归。
+- Coverage: 18 项**全部有代码落点与专项断言**，其中 OP-7/OP-8/OP-9 为只读证据面（不改 owner 实现）。
+  已无「依赖既有 owner」的悬空项。「有落点」不等于「产品验收通过」。
 - Date: 2026-11-16
 
 ## 决策
@@ -50,9 +52,9 @@ OP-2 的第一步不新建第二套时钟或位置真源：在行动/世界回�
 | OP-4 动作身体与物品连续性 | 投影已接线 | act / personal-inventory / gear / body-anatomy | 进行中行动只报状态不报结果；已结算回执（`acts.res`）带证据来源 |
 | OP-5 注入减负与当前事实优先 | 已接线 | inject-budget / inject-collector / inject-slot-audit | 注入块按可靠度分组为「已确认的事实」与「尚未确认」两栏；截断按可靠度分层保留 |
 | OP-6 聚合破甲与提示词调试 | 已接线 | tool-diag / inject-inspector / tool-analyzer / output-guard | 新增 `tool-diag` 的 `storyWindow` 诊断节（`secStoryWindow`），答「窗口开了几次、当前挂哪条、玩家那一笔落到哪个 owner 的哪个阶段」 |
-| OP-7 反截断与稳妥续写 | 依赖既有 owner | reasoning-strip / reject-recovery / reply-guard / advance-idempotence | 本轮未改 owner；窗口自身用稳定 replyId 保证幂等，不重复推进 |
-| OP-8 查降智改为证据诊断 | 依赖既有 owner | degrade-audit / fact-continuity / model-receipt | 本轮未改 owner |
-| OP-9 模型路由与调用过程可视化 | 依赖既有 owner | model-receipt / token-budget / call-timeline / model-pin / perf-trace | 本轮未改 owner |
+| OP-7 反截断与稳妥续写 | 只读证据面已接线 | reasoning-strip / reject-recovery / reply-guard / advance-idempotence | `evidence().stability`：读 `reasoningStrip.held/blocked`（截断痕迹）、`replyGuard.diagnose().status`（冷却中）、`rejectRecovery.unknown`（认不出的拒答码）、`advanceIdem.aborts/dups`。**dups 是「拦下来的重复推进」= 幂等闸在工作，故记为健康证据而非不稳**；窗口自身仍用稳定 replyId 保证幂等，并新增 `checks.idempotent` 自证位 |
+| OP-8 查降智改为证据诊断 | 只读证据面已接线 | degrade-audit / fact-continuity / model-receipt | `evidence().health`：行为面（`degradeAudit.tpsDrops/tokenDrops`）与身份面（`modelReceipt.drifters().total`）**分开报、互不覆盖**，另加 `factContinuity.stat().faults`。缺席即 `unknown`，不判 ok |
+| OP-9 模型路由与调用过程可视化 | 只读证据面已接线 | model-receipt / token-budget / call-timeline / model-pin / perf-trace | `evidence().routing`：`modelReceipt.stats().channels[].lastRespModel` 答「谁应答了这一轮」、`modelPin.audit()` 答「钉版对不对得上」、`callTimeline.view().rounds[0].criticalChannel/longestMs` 答「卡在哪一段」、`tokenBudget.view().channels[].p95Ms` 给延迟分位。perf-trace 本轮未消费（它读的是渲染分层，与「调用路由」不同面，不硬凑） |
 
 「已接线」= 本轮有代码落点并有专项断言；「投影已接线」= 该项的写口仍属既有 owner，本轮只把它的**已提交事实**接进窗口投影并加断言（不改 owner 实现）。**没有任何一项声明为已完成产品验收**——真实宿主验收仍未执行。
 
@@ -85,6 +87,41 @@ OP-2 的第一步不新建第二套时钟或位置真源：在行动/世界回�
 `module-registry-gate`、`member-surface-gate`、`ns-consumer-ledger-v2400`、`registry-identity-v2620`、
 `budget-headroom-v2261`、`version-surface-gate-v2185`、`settings-bus-api-gate`。
 
+### 第三批：OP-7 / OP-8 / OP-9 只读证据面
+
+18 项里最后三项此前一直挂在「依赖既有 owner」，意思是「声明了、但窗口侧没有任何消费点」。
+本批把它们接成**只读投影**：窗口不复制、不缓存、不写回任何上游账。
+
+- 新增三组读数（`storyWindow.evidence()`）：
+  - `stability`（OP-7）：`reasoningStrip` 的 `held/blocked`（截断与清洗痕迹）、`replyGuard` 的 `cooling`
+    状态、`rejectRecovery.unknown`（认不出的拒答码）、`advanceIdem` 的 `aborts`/`dups`。
+  - `health`（OP-8）：行为面 `degradeAudit.tpsDrops/tokenDrops` 与身份面 `modelReceipt.drifters().total`
+    **分开列、互不覆盖**，外加 `factContinuity.stat().faults`。
+  - `routing`（OP-9）：`modelReceipt.stats()` 的 `lastRespModel`（谁应答）、`modelPin.audit()`（钉版对否）、
+    `callTimeline.view()` 的 `criticalChannel/longestMs`（卡在哪段）、`tokenBudget.view()` 的 `p95Ms`。
+- 核心口径：**读不到一律 `unknown`，绝不读成 `clean`**。上游全缺席时 `stability/health/routing` 三组
+  都是 `unknown` 且 `reasons` 为空；正文块也**不加注记**（未知不加戏）。
+- 真有迹象时**必须自己说出来**：`buildBlock` 末尾追加一句
+  「本轮上游有中断或降智迹象：……。上列内容可能不完整，未知仍按未知处理。」
+  只报原因，**不删已确认的事实** —— 上游不稳不是抹掉痕迹的理由。
+- `snap()` 包装每个 owner 的读数：单个 owner 抛错只进该组的 `faults`，同组其它 owner 照常读，
+  不是「一错全空」；故障同时暴露在 `diagnose().evidence.*.faults` 与 `tool-diag` 的 `secStoryWindow.evidence`。
+- 新增 `checks.idempotent`（OP-7 自证位）：同一稳定 `replyId` 在台账里只应有一条。
+- 一处语义辨析：`advanceIdem.dups` 是**被拦下来的**重复推进 —— 幂等闸在工作，是健康证据，
+  记进 `sources` 而不是 `reasons`。把「拦住了」读成「出事了」会把守门人当成事故。
+
+本批新增第四把专锁 `tests/story-window-evidence-v2518.js`（已同时登记 `runScript` 档与 `spawnSync`
+单跑档，否则 `test-surface-gate` 判 `unregistered-orphan`）。它锁的是「怎么如实转述上游的坏消息」：
+① 上游全缺席 ⇒ 三组 `unknown` 且不加注记；② 上游健康 ⇒ `stable/clean/aligned` 且不加注记；
+③ 上游真有截断/降智/漂移 ⇒ 原因逐条进读数与正文块，且措辞是「可能不完整」而非「失败」；
+④ 单个 owner 抛错 ⇒ 其余照常 + 故障入 `faults`；⑤ 幂等自证；⑥ 畸形读数不炸且不编造原因。
+
+本批跑通的单跑面（12 支）：四支 story-window 专锁、`test-surface-gate`、`module-cycle-gate`、
+`module-registry-gate`、`member-surface-gate`、`inject-vis-v2580`、`inject-sources-v2560`、
+`ns-consumer-ledger-v2400`、`registry-identity-v2620`、`budget-headroom-v2261`、
+`version-surface-gate-v2185`、`settings-bus-api-gate`、`switch-matrix-v2910`。
+**仍不是全量回归**；真实宿主验收同样未执行。
+
 ## 窗口契约（当前实现）
 
 - 状态机：`opened → awaiting / deferred / intervening → settled / failed`。只有 owner 明确 `applied` 才是 `intervening`。
@@ -101,3 +138,4 @@ OP-2 的第一步不新建第二套时钟或位置真源：在行动/世界回�
 - 痕迹只在玩家可见条件满足时进入默认正文注入，后台台账可解释来源但不强迫用户管理。
 - 三个入口最终改变不同的真实状态或待处理状态；「暂不处理」不产生伪完成。
 - Node mock 回归通过后，另行在真实 SillyTavern + Ruby 卡宿主验收；无宿主时明确记录未执行而非通过。
+- 上游读数缺席时证据面必须是 `unknown`；把「读不到」报成 `clean` 视为缺陷（`tests/story-window-evidence-v2518.js` 锁住这条）。

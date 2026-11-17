@@ -71,8 +71,25 @@ const SEG_TITLE = 'engines/tool-diag v0.9.2';
 //     B1 守的是「拆段前后 section 总数不变」—— 段体本轮完全未拆动，新增的是另一件事
 //     （新专锁的挂载点）。故补基线，不动判据口径。
 //     读数：node -e 裸计数 446，本题去注释口径 444（差值 2 = 本注释里提到的两处 `section(`）。
-const BASE_SECTION_CC = 446;  // v2.410.0 +2（extractJson 专锁节 + memory-age 专锁节）；拆前 run.js 的 section( 计数（去注释面）
-const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面）
+//   v2.518.0：446 → 447（+1）。增量是 **story-window 专锁节**
+//     （tests/run.js 里 'v2.518.0(故事优先第一阶段): 故事回应窗口专锁与端到端集成锁'）。
+//     为什么是「补基线」而不是「判据破功」：B1 守的是「拆段前后 section 总数不变」，
+//     而**段体（tests/segments/tool-diag-v092.js）本轮一字未动** —— 段内 section 仍是 1，
+//     新增的那一节是挂在 run.js 上的新专锁，与拆段这件事无关。故补基线、不动判据口径。
+//     复核：本批第二次提交（evidence lock）只往**已存在的 447 那一节里**加 awaits，
+//     section 数不变 ⇒ 本常量不再动。这正是 B1 与 B2 的分工：B1 数节，B2 数断言。
+//     出处（同 countCalls 口径逐 commit 实测，git worktree 各挂一棵只读树）：
+//       56f5199 / 22f7ca5：446  →  ae7ba1c / 5012162 / 9c10dce：446  →  HEAD(352e252)：447
+const BASE_SECTION_CC = 447;  // v2.518.0 +1（story-window 专锁节（run.js），段体未拆动）；拆前 run.js 的 section( 计数（去注释面）（extractJson 专锁节 + memory-age 专锁节）；拆前 run.js 的 section( 计数（去注释面）
+//   v2.518.0：5263 → 5267（+4）。逐条来历（全部是**运行器侧的断言**，无一条是段体变动）：
+//     +3  story-window 三把专锁的 spawnSync 收尾断言（v2.518.0 节：focused / integration / people）
+//     +1  story-window evidence 专锁的 spawnSync 收尾断言（同节内追加）
+//     为什么「+1 而不是 +4 都记在第二次提交」：三把锁随 352e252 落地（HEAD 实测 run.js 4268
+//     + 段 998 = 5266），evidence 锁是本批工作区未提交的第四把（4269 + 998 = 5267）。
+//     口径未变：B2 数的是「拆前 run.js + 段文件」的 assert 总数，段文件仍 998。
+//     ⚠ 与 B1 分开看才看得出来：B1 不动（节数不变）时 B2 照样会动（节里加断言）——
+//       这正是两条绝对基线必须**各自独立**的理由，合并成一条就把「加节」与「加断言」混为一谈。
+const BASE_ASSERT_CC = 5267;  // v2.518.0 +4（三把 story-window 专锁 +1 把 evidence 专锁的收尾断言）；拆前 run.js 的 assert( 计数（去注释面）
 // 测试文件面的绝对基线。它**刻意不是**「动态算出来再跟自己比」——那会变成自证空转。
 //   但它是「会长的集合」：每新增一把锁，这个数就必须跟着改一次。本轮 V22 已改三次：
 //     539（拆前）→ 541（+段文件 tests/segments/tool-diag-v092.js +本锁）
@@ -111,7 +128,20 @@ const BASE_ASSERT_CC = 5263;  // 拆前 run.js 的 assert( 计数（去注释面
 //     的扫描面内（SKIP_DIRS 含 'tools'）。故「新增观测器」不改本常量，只有 tests/ 下的新锁才改。
 //   v2.410.0：559 → 561（+2）。增量：tests/extract-json-ladder-v2410.js（JSON 修复阶梯专锁）
 //     与 tests/memory-age-v2410.js（记忆条目相对时效标注专锁），均已登记进 tests/run.js 的 v2.410.0 节。
-const BASE_TEST_FILES = 564;  // v2.416.0：562→564（本版 +2：scenario-v68-v24-civil-life.js 专锁 + tests/probes/p_world_pulse.js 探针收编）
+//   v2.418.0 ~ v2.518.0：564 → 571（+7）。逐条来历（**每一把都是真新增的测试文件**，无一条是面塌）：
+//     +1 tests/scenario-v69-v25-stitch.js                （v2.417.0 V25 缝合批专锁）
+//     +1 tests/scenario-v70-v26-observability.js         （v2.418.0 V26 可观测性专锁）
+//     +3 tests/story-window-v2518.js / story-window-integration-v2518.js /
+//        story-window-people-v2518.js                    （v2.518.0 三把窗口专锁，353e252 落地）
+//     +1 tests/story-window-evidence-v2518.js            （v2.518.0 第四把：只读证据面专锁，本批）
+//     +1 tests/ruby-card-profile.js                      （9c10dce：Ruby 外部验收卡档位）
+//     逐 commit 实测（git worktree 只读树，同 testFiles() 口径）：
+//       56f5199 / 22f7ca5：564 → ae7ba1c：566 → 5012162：566 → 9c10dce：567 → HEAD：570 → 本批：571
+//     ⚠ 中间四版又连续没跟位（与 v2.403~v2.406 那次同族）：锁登记了、文件也在，
+//       唯独这条「面本身没有意外增减」的绝对基线没人补。本批一次补齐，不改判据口径。
+//     为什么仍然不用「>= 564」了事：下界判据对「面塌了」是瞎的（见上段原文）。代价是每加一把锁
+//     就要动这个常量 —— 而那正是它的价值：动它的人必须亲手确认「我确实新增了一个测试文件」。
+const BASE_TEST_FILES = 571;  // v2.518.0：564→571（+7：V25 缝合 + V26 可观测 + 四把 story-window 专锁 + ruby-card-profile）（本版 +2：scenario-v68-v24-civil-life.js 专锁 + tests/probes/p_world_pulse.js 探针收编）
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
 function exists(rel) { return fs.existsSync(path.join(BASE, rel)); }
@@ -696,7 +726,18 @@ const PS_REL = 'tests/panel-source.js';
 //   （`git diff --stat 3e64881..HEAD -- ui/pages/` 实测：overview-main.js +36，其余三个段文件 0）。
 //   与上一轮 v2.402.0 的 +101 同族 —— 差额全部落在段体内，段外（panel.js 自身 16045 行）
 //   一字未动，D3f 因此仍然绿。中间四版同样漏补了这个常量（HEAD 上实测 17724 vs 基线 17688）。
-const BASE_PANEL_LINES = 17878;  // v2.416.0：17724→17878（+154：OPV24-1 世界脉搏段体增量 + 本版 v24CivilBlock +100，全部落在段体内）
+//   v2.418.0 ~ v2.518.0：17878 → 18038（+160）。D3a 的语义是「重组面 === 拆前面」，
+//     读数只能跟着现场走；这 160 行**全部落在段体外**（panel.js 自身的 UI 面），
+//     所以 D3f 同步 +137，而 D1d/D2a 的段体读数（692 行）**一字未变** —— 这是本批的关键自证：
+//       「段外长了」与「段体长了」在读数上是两件可分辨的事，不是一句「差不多」。
+//     逐 commit 实测（同 panelSource().split('\n').length 口径）：
+//       ae7ba1c  +39  （V26 收口：全开策略跟位 + 概览九块锚扩面）
+//       5012162  +54  （玩家面 people-page 接入 + 概览转发壳跟位）
+//       352e252  +14  （v2.518.0 story-window 接入：盾牌/痕迹转发壳）
+//       本批     +53  （「故事回应窗口」面板节：复选框 + 两个数字框 + 两个只读按钮 + bind 项）
+//       17878 → 17917 → 17971 → 17985 → 18038
+//     ⚠ 依旧保持**精确等于**，不写 `<=` 或区间：这条的价值就是对「又悄悄加了 50 行」失明与否。
+const BASE_PANEL_LINES = 18038;  // v2.518.0：17878→18038（+160：V26 +39 / people-page +54 / story-window 壳 +14 / 故事回应窗口面板节 +53，全部落在段体外）（+154：OPV24-1 世界脉搏段体增量 + 本版 v24CivilBlock +100，全部落在段体内）
 // 拆后 panel.js 自己的行数（split 口径；拆前 17421 - 段体 335 + 转发块 41 = 17127）。
 //   注意：这个数会随转发块注释的字数变动 —— 它是「面没塌」的粗读数，不是精确不变量。
 //   真正的不变量是 D3a（重组面 === 拆前面，逐字相等），那一条按行拼接算，
@@ -717,7 +758,15 @@ const BASE_PANEL_LINES = 17878;  // v2.416.0：17724→17878（+154：OPV24-1 �
 //   v2.402.0（V23）：16041 → 16045（+4）。这 4 行是`v23StitchBlock` 的**转发壳**：
 //   2 行注释 + 1 行函数 + __omBind 里 1 行注入（转发壳必须留在 panel.js ——
 //   段模块是 ui 层，无 module 作用域，注入只可能在宿主侧发起）。
-const BASE_PANEL_FILE_LINES = 16103;  // v2.416.0：16045→16103（+58：OPV24-1 世界脉搏转发壳 +53 未跟位 + 本版 v24 转发壳 +5 = 3 注释 + 1 函数 + 1 bind 项）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）
+//   v2.418.0 ~ v2.518.0：16103 → 16240（+137）。与 BASE_PANEL_LINES 同源同批，逐 commit：
+//       ae7ba1c  +39 → 16142
+//       5012162  +31 → 16173
+//       352e252  +13 → 16186
+//       本批     +53 → 16239（split 口径 16240，含尾行）
+//     ⚠ 两数的差额（18038 - 16240 = 1798）就是「拆走并留在段模块里的字节」的净额；
+//       本批两条同步 +53/+54 说明新增几乎全在 panel.js 自身，段模块只多了一行尾换行 ——
+//       若哪天两者差额跳变，那就是段体被搬进/搬出 panel.js 了，D3 这一族必须当场复核。
+const BASE_PANEL_FILE_LINES = 16240;  // v2.518.0：16103→16240（+137，与 BASE_PANEL_LINES 同批同源）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）（+58：OPV24-1 世界脉搏转发壳 +53 未跟位 + 本版 v24 转发壳 +5 = 3 注释 + 1 函数 + 1 bind 项）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）
 //   v2.400.0（V22 后续修正）：335 → 491。EXV22-9 把 v22OmensBlock 写在段体标记
 //   之外（重组面里定义缺席、调用在场 ⇒ 假源码），本次把段体结束标记移回函数之后，
 //   段体收编 v22 块的 156 行。段体 esc 调用同步 57 → 60（v22 块 3 处）。

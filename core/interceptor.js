@@ -182,6 +182,18 @@
                 // 只在 after 链完成且楼层结算提交后调用；重复通知由 storyWindow 自身幂等守卫拒绝。
                 try {
                   if (WA.storyWindow && typeof WA.storyWindow.open === 'function') {
+                    // 新的一轮正文推进 ⇒ 上一窗口的介入期已经过去：把它如实结算掉。
+                    //   为什么必须结算而不是留着：窗口的 pending 只应有一条「当前可介入」的，
+                    //   留着旧窗会让玩家页永远挂着一个早已翻篇的入口（历史上表现为
+                    //   「页面上还摆着三章前的那件事」）。结算证据说明是**被新正文推进取代**的，
+                    //   不是「玩家处理完了」——两件事在台账里必须可区分。
+                    try {
+                      const prev = WA.storyWindow.current();
+                      if (prev && prev.id && prev.status !== 'settled' && prev.status !== 'failed') {
+                        WA.storyWindow.settle(prev.id, { status: 'settled', owner: 'core/interceptor',
+                          evidence: 'superseded-by-next-reply' });
+                      }
+                    } catch (eSettle) { WA.log('warn', '上一故事回应窗口结算失败', eSettle); }
                     const replyText = tailMsg && typeof tailMsg.mes === 'string' ? tailMsg.mes : '';
                     const chatLen = chatArr.length;
                     const replyId = chatLen + ':' + (tailMsg && tailMsg.swipe_id != null ? tailMsg.swipe_id : 0) + ':' + replyText.length;

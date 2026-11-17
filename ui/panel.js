@@ -1464,6 +1464,22 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           //   跳过来时清单已在场，锚点才可能命中。
         })()}
       </div>
+      <div class="wa-sec">故事回应窗口</div>
+      <div class="wa-item">
+        <div class="wa-dim">正文成功推进后，把<b>既有 owner 已提交的事实</b>投影成一次可介入的窗口（寻找 / 请人核实 / 暂不处理）。它<b>不建第二套时钟、人物状态或库存</b>：痕迹只读 livingWorld / world / acts / investigation / opportunity / threads / plan 等的已提交事实，读不到就报未知，<b>绝不把未知写成已完成</b>。</div>
+        ${(() => {
+          const SW = WA.storyWindow;
+          if (!SW) return '<div class="wa-dim">故事回应窗口未加载</div>';
+          const swCfg = (typeof SW.getSettings === 'function') ? SW.getSettings() : {};
+          const swOn = !!swCfg.enabled;
+          return '<div data-omniscient><div class="wa-row"><label class="wa-row"><input id="wa-sw-enabled" type="checkbox" ' + (swOn ? 'checked' : '') + '/> 启用故事回应窗口</label>'
+            + '<label>保留窗口数 <input type="number" id="wa-sw-capacity" aria-label="保留窗口数" min="1" max="48" value="' + (swCfg.maxWindows || 12) + '"/></label>'
+            + '<label>痕迹上限 <input type="number" id="wa-sw-traces" aria-label="痕迹上限" min="1" max="24" value="' + (swCfg.maxTraces || 16) + '"/></label></div><div class="wa-row">'
+            + '<button class="wa-btn wa-mini" id="wa-sw-view" aria-label="当前窗口" title="当前窗口（只读）：现在挂的是哪一条、它落在哪个 owner 的哪个阶段、上游有没有中断或降智迹象">当前窗口</button>'
+            + '<button class="wa-btn wa-mini" id="wa-sw-evidence" aria-label="证据面" title="证据面（只读）：稳定性（截断/重试/中止）、健康（降智行为面 + 身份面）、路由（谁应答、钉版对否、卡在哪段）。读不到一律 unknown，不报 clean">证据面</button>'
+            + '</div><div id="wa-sw-out" class="wa-out wa-dim" data-nav-out="1"></div>';
+        })()}
+      </div>
       <div class="wa-sec">委托履约（分期交付）</div>
       <div class="wa-item">
         <div class="wa-dim">委托是<b>分阶段</b>的：每阶段有独立的交付物、验收规则与报酬。阶段推进<b>必须凭回执</b>（同一回执不得重复用），报酬按已完成阶段结算并经 org.transfer 支付。<b>本模块不写库存</b>——钱走 org 的唯一真源。</div>
@@ -10175,6 +10191,43 @@ on('#wa-desk-show', showDesk);
         if (!WA.storyChoice) return out('#wa-sc-out', '未记录：module-missing');
         WA.storyChoice.setSettings({ enabled: !!(this.checked) });
         out('#wa-sc-out', '已记录 ' + (this.checked ? 'enabled' : 'disabled'));
+      });
+      // ── v2.518.0 故事回应窗口 ──
+      //   与剧情选择同款形态：开关走模块自己的 setSettings（单一真源是 __settingsRegs），
+      //   容量走同一口；两个只读按钮只转述窗口自己的读数，不重算世界事实。
+      sw('#wa-sw-enabled', function () {
+        if (!WA.storyWindow) return out('#wa-sw-out', '未记录：module-missing');
+        WA.storyWindow.setSettings({ enabled: !!(this.checked) });
+        out('#wa-sw-out', '已记录 ' + (this.checked ? 'enabled' : 'disabled'));
+      });
+      ['wa-sw-capacity', 'wa-sw-traces'].forEach(function (id) {
+        const el = $('#' + id); if (!el) return;
+        el.onchange = function () {
+          if (!WA.storyWindow) return;
+          const patch = {};
+          patch[id === 'wa-sw-capacity' ? 'maxWindows' : 'maxTraces'] = Number(this.value);
+          WA.storyWindow.setSettings(patch);
+          const c = WA.storyWindow.getSettings();
+          out('#wa-sw-out', '已记录 窗口 ' + c.maxWindows + ' / 痕迹 ' + c.maxTraces);
+          renderBody();
+        };
+      });
+      act('#wa-sw-view', function () {
+        if (!WA.storyWindow) return out('#wa-sw-out', '未记录：module-missing');
+        const cur = WA.storyWindow.current();
+        if (!cur) return out('#wa-sw-out', '还没有窗口（正文推进后才会开一个）');
+        const ph = (cur.choiceOutcome && cur.choiceOutcome.phase) || '未介入';
+        const ow = (cur.choiceOutcome && cur.choiceOutcome.owner) || '-';
+        out('#wa-sw-out', cur.status + ' · 停在 ' + ow + ' 的 ' + ph + ' · 痕迹 ' + ((cur.traces || []).length)
+          + (cur.responseCount ? ' · 按过但没成 ' + cur.responseCount + ' 次' : ''));
+      });
+      act('#wa-sw-evidence', function () {
+        if (!WA.storyWindow) return out('#wa-sw-out', '未记录：module-missing');
+        const ev = WA.storyWindow.evidence();
+        const part = function (label, g) {
+          return label + '：' + g.verdict + (g.reasons && g.reasons.length ? '（' + g.reasons.join('；') + '）' : '');
+        };
+        out('#wa-sw-out', part('稳定性', ev.stability) + ' · ' + part('健康', ev.health) + ' · ' + part('路由', ev.routing));
       });
       act('#wa-sc-present', function () {
         if (!WA.storyChoice) return out('#wa-sc-out', '剧情选择未加载');

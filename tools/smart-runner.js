@@ -121,6 +121,32 @@ function fastFace(root) {
     return out;
   } catch (e) { return []; }
 }
+/**
+ * 快档成员的**一跳 require 依赖**（同样是从 smoke 派生，不硬编码）。
+ *   治的病：`tests/reject-v2780.js` 是见证表 —— 它自己不作为 smoke 成员单跑（它是被 require 的模块），
+ *   也不住进任何自包含节的 `evidence`（那些节在 L2 里因共享上下文不可独跑）。
+ *   于是改它一行，L2 就报 `uncovered-change`。可它**真的在 L1 里被执行**：
+ *   `tests/reject-code-gate.js`（smoke 成员）第 121 行 `require('./reject-v2780.js')` 逐条跑它的见证表。
+ *   判「未被覆盖」与事实不符 —— 输入面窄于事实，正是本仓点名过的那半个错。
+ *   口径：只爬**一跳**、只认 `require('./x.js')` / `require('../tests/x.js')` 形态、只收 `tests/` 下真实存在的文件。
+ *   不递归：递归会把整棵依赖树都算成「快档面」，那时候「快档跑过」这句话就不再指明任何东西。
+ */
+function fastDeps(root) {
+  const out = [];
+  fastFace(root).forEach(function (rel) {
+    let t = '';
+    try { t = fs.readFileSync(path.join(root, rel), 'utf8'); } catch (e) { return; }
+    const re = /require\(\s*'\.{1,2}\/(?:tests\/)?([A-Za-z0-9_.-]+\.js)'\s*\)/g;
+    let m;
+    while ((m = re.exec(t)) !== null) {
+      const cand = 'tests/' + m[1];
+      if (out.indexOf(cand) >= 0) continue;
+      try { if (!fs.statSync(path.join(root, cand)).isFile()) continue; } catch (e) { continue; }
+      out.push(cand);
+    }
+  });
+  return out;
+}
 function parseArgs(argv) {
   const o = { tier: '1', tierSource: 'default', plan: false, allowFull: false, only: [], runner: RUNNER_REL, unknown: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -242,6 +268,12 @@ function mapSections(ctx) {
     if (!arr || !arr.length) {
       // 归属表征不动它、但它**真在 L1 快档里跑**（清单从 smoke 派生）⇒ 验证面是 L1，如实登记。
       if (fast.indexOf(rel) >= 0) { selfFace.push(rel + '（L1 快档成员，归属节为共享上下文）'); return; }
+      //   被某个 L1 成员**真 require 进来执行**的：验证面是 L1，如实登记（同样派生，不是宽免）。
+      //   与上一条的区别写在读数里：上一条是「它自己就是快档成员」，这一条是「它被快档成员装载」。
+      if (fastDeps(ROOT).indexOf(rel) >= 0) {
+        selfFace.push(rel + '（被 L1 快档成员 require 装载，归属节为共享上下文）');
+        return;
+      }
       uncovered.push(rel); return;   // 归属表外的测试文件，且连快档也不跑它：不假装认识它
     }
     arr.forEach(function (n) { add(n, rel + ' 是本节的证据文件'); });

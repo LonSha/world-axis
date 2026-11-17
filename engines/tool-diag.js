@@ -1885,12 +1885,26 @@
     //   **不读世界事实、不重算痕迹** —— 只读窗口自己记下的账，避免诊断面变成第二个真源。
     var sw = WA.storyWindow;
     if (!sw) return { error: 'storyWindow 模块未装载', closedLoop: false };
-    var d = sw.diagnose();
+    // 显式走 `WA.storyWindow.diagnose()` 全名而不用局部别名 `sw.diagnose()`：
+    //   死子面清册（tests/inventory.js 的 REF_RE）认的正是 `WA <sep> ns <sep> mem` 形态，
+    //   别名调用在产品面里是**看不见的消费** —— 会被 tests/dead-export-gate.js 判成
+    //   「define 了但产品零引用」，于是逼着人把它登记成死导出。
+    //   这里不是为讨好门禁而改名：**诊断面确实消费这两个成员**，让引用可见才与事实同宽。
+    var d = WA.storyWindow.diagnose();
+    // stat 同理：诊断面确实读它（窗口累计读数），显式消费而不是让它漂成「过度导出」。
+    var swStat = WA.storyWindow.stat();
+    // evidence 也走全名：诊断面原样转出这三组读数，消费方必须看得到。
+    var swEvidence = WA.storyWindow.evidence();
     return { module: 'storyWindow', loaded: true, closedLoop: d.closedLoop,
       checks: d.checks, version: d.version,
       // 投影故障自证位：哪个 owner 的数据形状让投影块抛错了，在这里看得见。
       projection: d.projection || null,
-      stat: d.stat };
+      // v2.518.0（OP-7/OP-8/OP-9）：三组只读证据面。
+      //   stability = 有没有被截断/重试/中止；health = 有没有降智迹象（行为面 + 身份面分开报）；
+      //   routing = 谁应答了、钉版对不对、卡在哪一段。
+      //   读不到一律 unknown —— 绝不把「读不到」当「一切正常」。
+      evidence: swEvidence,
+      stat: swStat };
   }
   function secCommission() {
     var cm = WA.commission;

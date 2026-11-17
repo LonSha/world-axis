@@ -697,6 +697,14 @@ style: false,
     //   用户勾了模块总开关却看到「模块没加载」，排查方向被指错。
     //   同一类漏登记 v2.99.0 已为 rumor/canon、v2.127.0 为 chrono、v2.130.0 为 reasoning/storyTone、
     //   v2.135.0 为 foreshadow、v2.140.0（本版顺手补）为 noesis 各付过一次学费。
+    // v2.518.0（故事优先纵向切片）：故事回应窗口**确有**模块级总开关
+    //   （engines/story-window.js 的 REG.key = worldaxis_story_window_v1）。
+    //   不登记会怎样：`moduleEnabled` 查不到键就返回 null，于是对账面上本源一律落在
+    //   `unavailable`（「这个源没有模块级总开关」——而它明明有），用户勾了模块总开关
+    //   却在「开关两面一致」上看到「模块没加载」，排查方向被指错。
+    //   同一类漏登记已为 rumor/canon（v2.99.0）、chrono（v2.127.0）、reasoning/storyTone
+    //   （v2.130.0）、foreshadow（v2.135.0）、noesis（v2.141.0）、sediment（v2.149.0）各付过一次学费。
+    storyWindow: 'worldaxis_story_window_v1',
     perspective: 'worldaxis_perspective_settings_v1',
     // v2.149.0（X1）：世界沉积层**确有**模块级总开关（sediment.js 的
     //   `worldaxis_sediment_settings_v1`）。不登记会怎样：`moduleEnabled` 查不到键就返回 null，

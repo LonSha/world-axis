@@ -565,6 +565,12 @@
     'unknown-method', 'unknown-namespace', 'no-blueprint', 'seed-threw',
     'aftermath-wait', 'ahead-of-head', 'alias-cycle', 'all-rejected', 'all-steps-refused', 'already-',
     'already-abandoned', 'already-adopted', 'already-answered', 'already-arrived', 'already-closed', 'already-confirmed',
+    // ── v2.518.0：故事回应窗口（engines/story-window.js）的两条拒收码。
+    //   现场复算：两条都落在 ok:false 返回体里（choose/settle 的拒收路径）⇒ 拒收面；
+    //   不写 OVERRIDES（规则表已收），与 v2.203/209/221/222/231/292 同一处置。
+    //   ⚠ `already-chosen` 不能靠 'already-' 前缀命中：快照比对是**逐字相等**，
+    //     'already-' 是它自己那条码（见上方），不构成前缀匹配。
+    'already-chosen', 'window-missing',
     'already-covered', 'already-decided', 'already-delivered', 'already-in-transit', 'already-linked', 'already-locked',
     'already-pending', 'already-recording', 'already-resolved', 'already-revealed', 'already-settled', 'already-terminal',
     'already-there', 'already-transited', 'already-written', 'anchors-full', 'api-fail', 'apply-throw',
@@ -1024,6 +1030,9 @@
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
    *  与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对（多一条少一条都红）。 */
   const SUCCESS_FACE = ['absent', 'all-duplicates', 'already', 'already-consumed', 'already-open',
+    // v2.518.0：story-window 的 `wait` 入口在没有 act 写口可委托时，返回 ok:true 并把窗口挂在
+    //   deferred 上（不产生任何完成事实）—— 它是成功面，不是拒收面。
+    'waiting-window-held',
     'anonymous', 'applied', 'attenuated', 'checked', 'clean', 'first', 'first-baseline',
     'halted', 'interior-blocked', 'module-disabled', 'needs-real-device', 'no-elapsed', 'no-far',
     'not-in-table', 'ok', 'omniscient', 'out-of-lens', 'pass',

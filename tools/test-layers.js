@@ -50,6 +50,49 @@ const RUN = path.join(ROOT, 'tests', 'run.js');
 /** 共享上下文原语：出现任一者即视为「不能独跑」。 */
 const SHARED = ['runLock(', 'vm.', 'uiGateFresh', 'context-guard', 'synth-host', 'mock.js', 'ui-gate-sync'];
 
+/**
+ * 去注释面（保留字符串字面量）：**共享上下文判据必须看代码，不能看注释**。
+ *   现场病灶（v2.518.0 收口时逮到）：`tests/run.js` 的 v2.408.0 节里有一句写给读者看的注释
+ *   「走 ui-gate-sync 的**全产品装载面**…」并提到了 `test-surface-gate.js`。原文面上判，
+ *   这句注释就把该节判成 `shared=['ui-gate-sync']` ⇒ `selfContained=false` ⇒ 选区永远征不动它。
+ *   于是 `tests/smart-runner-v2408.js` 的 B3b（点名 v2.408.0 的定向计划）从那一刻起必然红：
+ *   它点的是一个「因注释而不可选」的节。
+ *   ⚠ 这**不是**放宽判据：真正的共享上下文原语（`vm.` / `uiGateFresh` / `runLock(`）出现在
+ *     代码里照样命中。它只把「说明文字 ≠ 执行」这件事区分出来 —— 与本仓既有的
+ *     「判据被自己的文档判红」是同一个病，同一味药（`tests/segment-extract-v2400.js`
+ *     与 `tests/test-surface-gate.js` 早年就是这么修的）。
+ *   保留字符串：`'ui-gate-sync'` 这种写在字符串里的依赖名仍算「提到」，宁可保守。
+ */
+function stripComments(src) {
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  let st = 'code';
+  while (i < n) {
+    const c = src[i], d = src[i + 1];
+    if (st === 'code') {
+      if (c === '/' && d === '/') { st = 'line'; out += '  '; i += 2; continue; }
+      if (c === '/' && d === '*') { st = 'block'; out += '  '; i += 2; continue; }
+      if (c === "'") { st = 'sq'; out += c; i += 1; continue; }
+      if (c === '"') { st = 'dq'; out += c; i += 1; continue; }
+      if (c === '`') { st = 'tpl'; out += c; i += 1; continue; }
+      out += c; i += 1; continue;
+    }
+    if (st === 'line') {
+      if (c === '\n') { st = 'code'; out += c; } else { out += ' '; }
+      i += 1; continue;
+    }
+    if (st === 'block') {
+      if (c === '*' && d === '/') { st = 'code'; out += '  '; i += 2; continue; }
+      out += (c === '\n' ? '\n' : ' '); i += 1; continue;
+    }
+    if (c === '\\') { out += c + (src[i + 1] === undefined ? '' : src[i + 1]); i += 2; continue; }
+    if ((st === 'sq' && c === "'") || (st === 'dq' && c === '"')) { st = 'code'; out += c; i += 1; continue; }
+    if (st === 'tpl' && c === '`') { st = 'code'; out += c; i += 1; continue; }
+    out += c; i += 1; continue;
+  }
+  return out;
+}
 /** 证据文件命名（与 `plans/` 侧编号一致）：批式 s3-b<N>-<o|e><n>-v2NNN.js 或语义式 <o|e><n>-…-v2NNN.js。 */
 const EVIDENCE_FORMS = [
   // 批式：`s3-b<批>-(o|e)<编号>-v<四位版本>.js`。**批号只许是数字** —— 这条正则的
@@ -98,10 +141,16 @@ function analyze(opt) {
     while ((m2 = reLock.exec(span)) !== null) locks.push(m2[1]);
     const reReq = /require\(\s*'\.\/([^']+)'/g;
     while ((m2 = reReq.exec(span)) !== null) requires.push(m2[1]);
+    //   ⚠ 两个读数都取**去注释面**（v2.518.0）：证据面读原文面会把注释里顺嘴提到的测试文件名
+    //     算成「本节证据」（本节 v2.408.0 的注释提到 test-surface-gate.js 就是这么来的）；
+    //     共享原语读原文面会把注释里的 `ui-gate-sync` 算成真依赖（同一句注释，两处误判）。
+    //     `locks` / `requires` 仍取原文面：它们是正则捕获的**调用形态**，注释里不会写出可捕获的调用
+    //     （写了也只是被去注释面同样吞掉，见下一段的 reason）。
+    const spanNC = stripComments(span);
     all.forEach(function (f) {
-      if (span.indexOf(f) >= 0 || locks.indexOf(f) >= 0 || requires.indexOf(f) >= 0) spawns.push(f);
+      if (spanNC.indexOf(f) >= 0 || locks.indexOf(f) >= 0 || requires.indexOf(f) >= 0) spawns.push(f);
     });
-    const shared = SHARED.filter(function (s) { return span.indexOf(s) >= 0; });
+    const shared = SHARED.filter(function (s) { return spanNC.indexOf(s) >= 0; });
     // 「证据」= 跨度里真出现过的 `tests/*.js` 文件（不限于 O/E 命名 —— 这一条是本工具第一版
     // 的现场缺陷：只认 O/E 编号形态，于是 TX/TP/SP 各批的 spawn 节**全部**被误判成
     // selfContained=false，可选节从几十个塌成 4 个）。`item` 只是给 plans/ 侧编号对账用的附加信息。

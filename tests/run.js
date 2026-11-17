@@ -22610,6 +22610,10 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //     假按钮桩，验幂等绑定、三个入口的收件人语义、线索可见性重校、以及
     //     「按下但没成」必须留账且按钮保持可重试）。不登记 ⇒ test-surface-gate 判孤儿。
     await runScript('./story-window-people-v2518.js');
+    //   · tests/story-window-evidence-v2518.js：OP-7 / OP-8 / OP-9 的只读证据面锁。
+    //     它锁的是「读不到 ≠ 一切正常」这条口径：上游全缺席必须 unknown（不是 clean），
+    //     真有截断/降智/漂移必须逐条说出来并进正文块，单个 owner 抛错不许一错全空。
+await runScript('./story-window-evidence-v2518.js');
     // v2.408.0（OPV23-9）：分层回归调度器专锁 —— 四级金字塔「每档真跑它声称的那件事」。
     //   为什么必须登记：不登记 ⇒ tests/test-surface-gate.js 判 unregistered-orphan、
     //   segment-extract-v2400 的 C4b/C4e 同红，且本锁**从未在全量里跑过**。
@@ -22910,6 +22914,10 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   与上面两把不重叠（窗口自身契约 / 既有 owner 真实链路），所以单独成锁。
     const rSWP2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-people-v2518.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rSWP2518.status === 0, 'story-window people lock exit 0');
+    //   第四把：OP-7/OP-8/OP-9 的只读证据面（stability / health / routing）。
+    //   与前三次不重叠：它测的是「窗口怎么如实转述上游的坏消息」。
+    const rSWE2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-evidence-v2518.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
+    assert(rSWE2518.status === 0, 'story-window evidence lock exit 0');
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

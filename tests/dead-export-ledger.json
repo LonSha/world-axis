@@ -282,14 +282,6 @@
       "tref": 0,
       "own": 1
     },
-    "advanceIdem.stat": {
-      "reason": "self-only",
-      "detail": "engines/advance-idempotence.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/advance-idempotence.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 25
-    },
     "affect.channel": {
       "reason": "test-only",
       "detail": "engines/affect.js 内部自用、外部零引用（过度导出）",
@@ -2295,7 +2287,7 @@
       "detail": "core/clock.js 内部自用、外部零引用（过度导出）",
       "src": "core/clock.js",
       "refs": 0,
-      "tref": 7,
+      "tref": 8,
       "own": 3
     },
     "clock.frozen": {
@@ -2327,7 +2319,7 @@
       "detail": "core/clock.js 内部自用、外部零引用（过度导出）",
       "src": "core/clock.js",
       "refs": 0,
-      "tref": 3,
+      "tref": 4,
       "own": 3
     },
     "clock.virtualAt": {
@@ -3457,14 +3449,6 @@
       "refs": 0,
       "tref": 0,
       "own": 1
-    },
-    "degradeAudit.stat": {
-      "reason": "self-only",
-      "detail": "engines/degrade-audit.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/degrade-audit.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 27
     },
     "diceDen.getSettings": {
       "reason": "unwired",
@@ -4729,14 +4713,6 @@
       "refs": 0,
       "tref": 2,
       "own": 1
-    },
-    "factContinuity.stat": {
-      "reason": "self-only",
-      "detail": "engines/fact-continuity.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/fact-continuity.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 2
     },
     "factContinuity.view": {
       "reason": "test-only",
@@ -9762,14 +9738,6 @@
       "tref": 0,
       "own": 4
     },
-    "rejectRecovery.stat": {
-      "reason": "self-only",
-      "detail": "engines/reject-recovery.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/reject-recovery.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 11
-    },
     "render.applySaliencyInjections": {
       "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -9792,14 +9760,6 @@
       "src": "render/inject.js",
       "refs": 0,
       "tref": 4,
-      "own": 3
-    },
-    "replyGuard.diagnose": {
-      "reason": "self-only",
-      "detail": "engines/reply-guard.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/reply-guard.js",
-      "refs": 0,
-      "tref": 0,
       "own": 3
     },
     "replyGuard.getSettings": {
@@ -13290,14 +13250,6 @@
       "tref": 0,
       "own": 6
     },
-    "world.sendMessage": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/world.js",
-      "refs": 0,
-      "tref": 6,
-      "own": 3
-    },
     "world.shipments": {
       "reason": "self-only",
       "detail": "engines/world.js 内部自用、外部零引用（过度导出）",
@@ -13319,7 +13271,7 @@
       "detail": "engines/world.js 内部自用、外部零引用（过度导出）",
       "src": "engines/world.js",
       "refs": 0,
-      "tref": 1,
+      "tref": 2,
       "own": 3
     },
     "world.waitForChannel": {

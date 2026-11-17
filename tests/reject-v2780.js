@@ -8990,6 +8990,48 @@ function runWitness(WA) {
     }
   }
 
+  // ── v2.518.0：故事回应窗口（engines/story-window.js）的三条码 ─────────────
+  //   本模块是本仓第一个**浏览器形态**的窗口引擎：它读 `window.WorldAxis`，
+  //   而见证进程把它挂在 `global.WorldAxis` 上跑（vm 上下文即 global）。
+  //   故这里必须临时补一个 `window` 并把 WorldAxis 挂上去 —— **跑完无条件还原**，
+  //   不拿「跑通了」当还原的理由（与上方 body-anatomy 段同一条纪律）。
+  //   为什么不改成 require：本文件是产品脚本，不经 CommonJS 导出（同其它引擎）。
+  if (WA.storyWindow && WA.store) {
+    const keepWin = Object.prototype.hasOwnProperty.call(global, 'window') ? global.window : undefined;
+    const snapSW = WA.store.get && WA.store.get() ? WA.store.get().storyWindow : undefined;
+    try {
+      if (typeof global.window === 'undefined') global.window = global;
+      want('window-missing', '窗口：给的 id 在台账里不存在时如实拒收（不凭空开窗）');
+      trip('window-missing', function () {
+        return WA.storyWindow.settle('witness_no_such_window', { status: 'settled' }).reason;
+      });
+      //  already-chosen 需要「先真开一窗、真选一次、再选第二次」。
+      //    这同时是幂等的反面见证：同窗第二次选择必须被拦在 owner 写口之前。
+      want('already-chosen', '窗口：同一窗口只能选一次（第二次在委托 owner 之前就拒收）');
+      trip('already-chosen', function () {
+        const opened = WA.storyWindow.open({ id: 'witness_sw_1', text: '见证正文', chatLength: 1, place: '见证地' });
+        if (!opened || !opened.ok) return 'open-failed';
+        WA.storyWindow.choose('witness_sw_1', 'defer');
+        return WA.storyWindow.choose('witness_sw_1', 'find').reason;
+      });
+      //  waiting-window-held 是**成功面**：没有 act 写口可委托时，`wait` 不伪造成已行动，
+      //    而是把窗口挂在 deferred 上返回 ok:true —— 故用 tripDeep（码在嵌套 body 里）。
+      want('waiting-window-held', '窗口：等待入口无写口可委托时挂住窗口（ok:true，不产生完成事实）');
+      tripDeep('waiting-window-held', function () {
+        const keepAct = WA.act;
+        try {
+          WA.act = undefined;   // 显式拿走写口：验的正是「没有 owner 可委托」这条路径
+          WA.storyWindow.open({ id: 'witness_sw_2', text: '见证正文二', chatLength: 2, place: '见证地' });
+          return WA.storyWindow.choose('witness_sw_2', 'wait', {});
+        } finally { WA.act = keepAct; }
+      });
+    } finally {
+      WA.store.transact(function (d) {
+        if (snapSW === undefined) { try { delete d.storyWindow; } catch (e) {} } else { d.storyWindow = snapSW; }
+      }, 'witness:story-window-restore');
+      if (keepWin === undefined) { try { delete global.window; } catch (e) {} } else { global.window = keepWin; }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

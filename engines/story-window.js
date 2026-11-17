@@ -520,6 +520,123 @@
     }
     return clean(r.playerPlace, 80);
   }
+  // ── 只读证据面（OP-7 / OP-8 / OP-9）────────────────────────────────────────
+  //   三组 owner 各自在自己家里记账（reasoning-strip / reply-guard /
+  //   reject-recovery / advance-idem / degrade-audit / fact-continuity /
+  //   model-receipt / model-pin / call-timeline / token-budget），
+  //   窗口**只读它们的读数**，不复制、不缓存、不写回。
+  //   口径：任何一组缺席或抛错，如实降级为 unknown ——
+  //   **绝不把「读不到」读成「一切正常」**（这是降智诊断最容易犯的错）。
+  function snap(fn, name, faults) {
+    try { return fn(); } catch (e) { faults.push(name + ':' + clean(e && e.message, 60)); return null; }
+  }
+
+  /** OP-7 反截断与稳妥续写：这一轮的上游有没有中断/重试/重复推进的痕迹。 */
+  function readStability() {
+    const faults = [], reasons = [], sources = [];
+    const rs = snap(function () { return WA.reasoningStrip && WA.reasoningStrip.stat(); }, 'reasoningStrip', faults);
+    if (rs) {
+      sources.push('reasoningStrip');
+      // held = 尾部半边标签被扣住（流被截断的典型痕迹）；不静默，报给玩家看。
+      const held = Number(rs.held) || 0, blocked = Number(rs.blocked) || 0;
+      if (held > 0) reasons.push('思维链尾部被扣住 ' + held + ' 次');
+      if (blocked > 0) reasons.push('思维链清洗拦下 ' + blocked + ' 次');
+    }
+    const rg = snap(function () { return WA.replyGuard && WA.replyGuard.diagnose(); }, 'replyGuard', faults);
+    if (rg) {
+      sources.push('replyGuard');
+      if (rg.status === 'cooling') reasons.push('拒答重试仍在冷却中');
+    }
+    const rr = snap(function () { return WA.rejectRecovery && WA.rejectRecovery.stat(); }, 'rejectRecovery', faults);
+    if (rr) {
+      sources.push('rejectRecovery');
+      const unknown = Number(rr.unknown) || 0;
+      if (unknown > 0) reasons.push('有 ' + unknown + ' 条拒答码没认出（恢复策略可能没走对）');
+    }
+    const ai = snap(function () { return WA.advanceIdem && WA.advanceIdem.stat(); }, 'advanceIdem', faults);
+    if (ai) {
+      sources.push('advanceIdem');
+      const dups = Number(ai.dups) || 0, aborts = Number(ai.aborts) || 0;
+      // dups 是「拦下来的重复推进」，是好事：说明幂等闸在工作，不算不稳。
+      if (aborts > 0) reasons.push('本轮推进被中止过 ' + aborts + ' 次');
+      if (dups > 0) sources.push('advanceIdem.dupBlocked=' + dups);
+    }
+    const verdict = reasons.length ? 'unstable' : (sources.length ? 'stable' : 'unknown');
+    return { verdict: verdict, reasons: reasons, sources: sources, faults: faults };
+  }
+
+  /** OP-8 查降智改为证据诊断：行为面与身份面各报各的，互不覆盖。 */
+  function readHealth() {
+    const faults = [], reasons = [], sources = [];
+    const da = snap(function () { return WA.degradeAudit && WA.degradeAudit.stat(); }, 'degradeAudit', faults);
+    if (da) {
+      sources.push('degradeAudit');
+      const tps = Number(da.tpsDrops) || 0, tok = Number(da.tokenDrops) || 0;
+      if (tps > 0) reasons.push('吐字速度比基线掉过 ' + tps + ' 次');
+      if (tok > 0) reasons.push('输出长度比基线掉过 ' + tok + ' 次');
+    }
+    const mr = snap(function () { return WA.modelReceipt && WA.modelReceipt.drifters(); }, 'modelReceipt', faults);
+    if (mr) {
+      sources.push('modelReceipt');
+      const n = Number(mr.total) || 0;
+      // 身份面漂移：请求模型与回执模型不一致 —— 与行为面是两件事，分开报。
+      if (n > 0) reasons.push('有 ' + n + ' 组请求/回执模型对不上（可能是同名降配）');
+    }
+    const fc = snap(function () { return WA.factContinuity && WA.factContinuity.stat(); }, 'factContinuity', faults);
+    if (fc) {
+      sources.push('factContinuity');
+      const f = fc.faults && typeof fc.faults === 'object' ? Object.keys(fc.faults) : [];
+      if (f.length) reasons.push('事实连续性判据报过 ' + f.join('/'));
+    }
+    const verdict = reasons.length ? 'degraded' : (sources.length ? 'clean' : 'unknown');
+    return { verdict: verdict, reasons: reasons, sources: sources, faults: faults };
+  }
+
+  /** OP-9 模型路由与调用过程：谁应答了这一轮、钉版对不对得上、卡在哪一段。 */
+  function readRouting() {
+    const faults = [], sources = [];
+    const out = { verdict: 'unknown', reasons: [], sources: sources, faults: faults,
+      models: [], pinned: null, critical: null, channels: [] };
+    const st = snap(function () { return WA.modelReceipt && WA.modelReceipt.stats(); }, 'modelReceipt', faults);
+    if (st) {
+      sources.push('modelReceipt');
+      out.models = (Array.isArray(st.channels) ? st.channels : []).slice(0, 6).map(function (c) {
+        // modelReceipt.stats() 的渠道行字段是 lastRespModel（最近一次回执的模型名）。
+        return { channel: clean(c.channel, 60), respModel: clean(c.lastRespModel || '', 80),
+          count: Number(c.count) || 0, drifts: Number(c.drifts) || 0 };
+      });
+    }
+    const pin = snap(function () { return WA.modelPin && WA.modelPin.audit(); }, 'modelPin', faults);
+    if (pin) {
+      sources.push('modelPin');
+      out.pinned = { pinned: Number(pin.pinned) || 0, clean: !!pin.clean };
+      if (!pin.clean) out.reasons.push('钉版模型与真回执不一致（' + (pin.drifters || []).length + ' 个渠道）');
+    }
+    const tl = snap(function () { return WA.callTimeline && WA.callTimeline.view(); }, 'callTimeline', faults);
+    if (tl) {
+      sources.push('callTimeline');
+      const last = (Array.isArray(tl.rounds) ? tl.rounds : [])[0] || null;
+      if (last) out.critical = { roundId: clean(last.roundId, 60), criticalChannel: clean(last.criticalChannel || '', 60),
+        totalMs: Number(last.totalMs) || 0, longestMs: Number(last.longestMs) || 0 };
+    }
+    const tb = snap(function () { return WA.tokenBudget && WA.tokenBudget.view(); }, 'tokenBudget', faults);
+    if (tb) {
+      sources.push('tokenBudget');
+      out.channels = (Array.isArray(tb.channels) ? tb.channels : []).slice(0, 4).map(function (c) {
+        return { channel: clean(c.channel, 60), p95Ms: c.p95Ms == null ? null : Number(c.p95Ms),
+          completionTokens: Number(c.completionTokens) || 0 };
+      });
+    }
+    if (out.reasons.length) out.verdict = 'drift';
+    else if (sources.length) out.verdict = 'aligned';
+    return out;
+  }
+
+  /** 三组合读：给诊断面与正文块共用同一份读数，避免两处各读一遍各说一套。 */
+  function evidence() {
+    return { stability: readStability(), health: readHealth(), routing: readRouting() };
+  }
+
   /** 宿主里的玩家名（解析不到给空串，绝不猜「主角」）。 */
   function hostPlayerName() {
     try {
@@ -559,6 +676,15 @@
     if (facts.length) { lines.push('已确认的事实：'); facts.forEach(function (x) { lines.push(x); }); }
     if (uncertain.length) { lines.push('尚未确认（可能只是传闻、在途或未结算）：'); uncertain.forEach(function (x) { lines.push(x); }); }
     if (!facts.length && !uncertain.length) lines.push('当前没有可向玩家公开的痕迹；未知保持未知。');
+    // OP-7 / OP-8：上游真有中断或降智迹象时**必须自己说出来**，
+    //   否则模型会把「被截断的半截输出」当成完整事实继续推演。
+    //   只报原因，不改痕迹内容 —— 窗口不因为上游不稳就删掉已确认的事实。
+    const ev = evidence();
+    const caveats = [].concat(ev.stability.verdict === 'unstable' ? ev.stability.reasons : [],
+      ev.health.verdict === 'degraded' ? ev.health.reasons : []);
+    if (caveats.length) {
+      lines.push('（本轮上游有中断或降智迹象：' + caveats.join('；') + '。上列内容可能不完整，未知仍按未知处理。）');
+    }
     lines.push('可选介入：寻找 / 请人核实 / 暂不处理（人物页与线索页另有询问 / 跟随 / 等待）。未知、在途和未确认信息不得写成已完成。');
     return lines.join('\n') + '\n';
   }
@@ -575,10 +701,14 @@
     return { module: 'storyWindow', loaded: true, closedLoop: closedLoop,
       version: '2.518.0',
       projection: { faults: projStat.faults, lastFault: projStat.lastFault },
+      // OP-7 / OP-8 / OP-9 的只读证据面：路由、降智、中断三组各报各的，互不覆盖。
+      evidence: evidence(),
       checks: {
         windowOpened: rs.length > 0,
         pendingResolves: !!(st.storyWindow && st.storyWindow.pending) || rs.length === 0,
         choiceRecorded: !!(cur && cur.choice && cur.choice.id),
+        // 幂等自证（OP-7）：同一稳定 replyId 在台账里只应有一条。
+        idempotent: !!cur && rs.filter(function (x) { return x && cur && x.id === cur.id; }).length === 1,
         // 未成立的介入尝试：有计数不等于玩家选过；它是「按过但没成」的证据。
         attempts: cur ? (Number(cur.responseCount) || 0) : 0,
         lastAttempt: cur && cur.lastResponse ? cur.lastResponse.reason : '',
@@ -600,6 +730,6 @@
   WA.storyWindow = { getSettings: settings, setSettings: function (p) { return WA.settingsBus.saveOrThrow(REG, WA.settingsBus.normalize(REG, Object.assign(settings(), p || {}))); },
     open: open, current: current, choose: choose, respond: respond, settle: settle,
     buildBlock: buildBlock, visibleTraces: visibleTraces,
-    diagnose: diagnose, stat: stat };
+    diagnose: diagnose, stat: stat, evidence: evidence };
   if (WA.registerModule) WA.registerModule('engines/story-window.js', { kind: 'engine', ver: '2.518.0' });
 })();
