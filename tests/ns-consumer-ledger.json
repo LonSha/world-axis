@@ -13,7 +13,7 @@
     "③ 新增零读 ns 而本账本未登记 ⇒ 门禁报『未定性』并计红（不许当成 0 条边蒙过去）。",
     "④ 本账本的键集与门禁 deadNs 读数双向一致：门禁多一个 → 未定性；账本多一个 → 过期登记。"
   ],
-  "version": "2.409.0",
+  "version": "2.523.0",
   "entries": {
     "LEAK_THRESHOLD": {
       "cls": "gate-selfwitness",
@@ -242,6 +242,60 @@
       "provider": "engines/plan-roster.js",
       "evidence": "v2.409.0 新增的计划准入器（同行闭包 / 角色游标 / 封闭动作）。产品面当前零读是**设计**：engines/plan.js 是计划本体的唯一写者，本批只提供**准入判据**，不接管它的写入链路 —— 接管需要改 plan.js 的调用面，而那属于「会改变世界推进结果」的改动，与本批「纯只读判据、零 store 写」的边界冲突。证据面：tests/cross-ref-stitch-v2409.js 的 PR-1~PR-28 真调 admit/pick/memberProblem/knownBy/completionEvent。",
       "recompute": "grep -n 'PR-' tests/cross-ref-stitch-v2409.js | head -3"
+    },
+    "pawnRedemption": {
+      "cls": "readonly-api",
+      "provider": "engines/pawn-redemption.js",
+      "evidence": "v2.523.0 EXV27-1 当票质押与赎当。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
+      "recompute": "grep -n 'pawnRedemption' tests/scenario-v71-v27-money-night-fire.js | head -2"
+    },
+    "silverAssay": {
+      "cls": "readonly-api",
+      "provider": "engines/silver-assay.js",
+      "evidence": "v2.523.0 EXV27-2 银钱成色与火耗倾煎。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
+      "recompute": "grep -n 'silverAssay' tests/scenario-v71-v27-money-night-fire.js | head -2"
+    },
+    "saltFranchise": {
+      "cls": "readonly-api",
+      "provider": "engines/salt-franchise.js",
+      "evidence": "v2.523.0 EXV27-3 盐引专卖与私盐查缉。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
+      "recompute": "grep -n 'saltFranchise' tests/scenario-v71-v27-money-night-fire.js | head -2"
+    },
+    "brokerHouse": {
+      "cls": "readonly-api",
+      "provider": "engines/broker-house.js",
+      "evidence": "v2.523.0 EXV27-4 牙行居间与抽佣。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
+      "recompute": "grep -n 'brokerHouse' tests/scenario-v71-v27-money-night-fire.js | head -2"
+    },
+    "nightWatch": {
+      "cls": "readonly-api",
+      "provider": "engines/night-watch.js",
+      "evidence": "v2.523.0 EXV27-5 更夫巡夜与夜禁。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
+      "recompute": "grep -n 'nightWatch' tests/scenario-v71-v27-money-night-fire.js | head -2"
+    },
+    "fireWatch": {
+      "cls": "readonly-api",
+      "provider": "engines/fire-watch.js",
+      "evidence": "v2.523.0 EXV27-6 火政与走水。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
+      "recompute": "grep -n 'fireWatch' tests/scenario-v71-v27-money-night-fire.js | head -2"
+    },
+    "festivalFair": {
+      "cls": "readonly-api",
+      "provider": "engines/festival-fair.js",
+      "evidence": "v2.523.0 EXV27-7 灯会庙市与纸扎。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
+      "recompute": "grep -n 'festivalFair' tests/scenario-v71-v27-money-night-fire.js | head -2"
+    },
+    "wardCompact": {
+      "cls": "readonly-api",
+      "provider": "engines/ward-compact.js",
+      "evidence": "v2.523.0 EXV27-8 保甲乡约与义仓赈济。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
+      "recompute": "grep -n 'wardCompact' tests/scenario-v71-v27-money-night-fire.js | head -2"
+    },
+    "divinationCraft": {
+      "cls": "readonly-api",
+      "provider": "engines/divination-craft.js",
+      "evidence": "v2.523.0 EXV27-9 巫觋占卜与拆字。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
+      "recompute": "grep -n 'divinationCraft' tests/scenario-v71-v27-money-night-fire.js | head -2"
     }
   }
 }

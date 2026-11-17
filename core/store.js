@@ -1715,21 +1715,31 @@
    *      （旧存档 schemaVersion 已等于当前值，根本不会走 migrate 分支）。
    * 语义：只填 undefined 的空位，绝不覆盖任何已有值；类型不符时保留原值。
    */
-  function ensureShape(target, fresh) {
+  // v2.523.0（OPV27-8）：sink/prefix 为可选第三四参——**只用于体检**，不传时行为与旧版逐字相同。
+  //   为什么要 sink：此前 ensured 补齐只回一个 filled 计数，「补了哪几个键」不可见。
+  //   老档导入时用户只能看到「载入状态缺失 N 个字段」这句总数，查不到缺的是 spatialTopology
+  //   还是 memory.l3 —— 补是补了，但补的是什么、谁该写它、补齐了会影响哪块读数，一概不可查。
+  function ensureShape(target, fresh, sink, prefix) {
     let filled = 0, conflicts = 0;
     if (!target || typeof target !== 'object' || Array.isArray(target)) return { state: target, filled: 0, conflicts: 0 };
     Object.keys(fresh || {}).forEach(function (k) {
       const dv = fresh[k], tv = target[k];
+      const path = prefix ? (prefix + '.' + k) : k;
       if (tv === undefined) {
         try { target[k] = JSON.parse(JSON.stringify(dv)); } catch (e) { target[k] = dv; }
         filled++;
+        if (sink) {
+          const dArr0 = Array.isArray(dv);
+          const dObj0 = dv !== null && typeof dv === 'object' && !dArr0;
+          sink.push({ path: path, kind: dArr0 ? 'array' : (dObj0 ? 'object' : 'value') });
+        }
         return;
       }
       const dArr = Array.isArray(dv), tArr = Array.isArray(tv);
       const dObj = dv !== null && typeof dv === 'object' && !dArr;
       const tObj = tv !== null && typeof tv === 'object' && !tArr;
       if (dObj && tObj) {
-        const sub = ensureShape(tv, dv);
+        const sub = ensureShape(tv, dv, sink, path);
         filled += sub.filled; conflicts += sub.conflicts;
         return;
       }
@@ -2661,13 +2671,20 @@
         this.save();
       }
       // v0.1.45: 结构自愈——版本号相同但字段较旧（分阶段演进的历史存档）同样补齐
-      const shapeFix = ensureShape(memCache, defaultWorldState());
+      const __shapeSink = [];
+      const shapeFix = ensureShape(memCache, defaultWorldState(), __shapeSink);
       // v0.1.45: lastFix 记录本次载入结果（议题据此报，避免状态恢复后永久挂红）；
-      // healed/shapeConflicts 为历史累计，供回溯「是否曾发生过」
-      __loadStat.lastFix = { filled: shapeFix.filled, conflicts: shapeFix.conflicts, at: clockWall() };
+      //   healed/shapeConflicts 为历史累计，供回溯「是否曾发生过」
+      __loadStat.lastFix = { filled: shapeFix.filled, conflicts: shapeFix.conflicts, at: clockWall(),
+        // v2.523.0（OPV27-8）：缺键清单——「补了哪几个键」不再只有一个总数。
+        //   上限 40 条：再多的档已经坏了，列一张几百行的清单没有用，给总数即可。
+        missing: __shapeSink.slice(0, 40), missingTotal: __shapeSink.length };
       if (shapeFix.filled > 0) {
         __loadStat.healed += shapeFix.filled;
-        WA.log('warn', '载入状态缺失 ' + shapeFix.filled + ' 个字段，已按默认值补齐（旧存档兼容）');
+        const __missBrief = __shapeSink.slice(0, 3).map(function (m) { return m.path; }).join('、');
+        WA.log('warn', '载入状态缺失 ' + shapeFix.filled + ' 个字段，已按默认值补齐（旧存档兼容）'
+          + (__missBrief ? '：' + __missBrief + (__shapeSink.length > 3 ? ' 等' : '') : '')
+          + ' —— 缺键清单/谁写/补齐影响 见 WA.store.shapeAudit()');
         this.save();
       }
       // 类型冲突不擅自改写用户数据，但必须留下可见痕迹（否则又回到静默失败）
@@ -4387,7 +4404,11 @@
       memCache = st;
       return { ok: true, bytes: byteLen(m.raw), fromChatId: from, inherited: !!(from && from !== cid) };
     },
-    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, migrateRefused: __loadStat.migrateRefused || 0, lastRefused: __loadStat.lastRefused ? { from: __loadStat.lastRefused.from, current: __loadStat.lastRefused.current, at: __loadStat.lastRefused.at } : null, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, refused: __migrateReport.refused || null, current: __migrateReport.current || null, at: __migrateReport.at } : null,
+    loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, migrateRefused: __loadStat.migrateRefused || 0, lastRefused: __loadStat.lastRefused ? { from: __loadStat.lastRefused.from, current: __loadStat.lastRefused.current, at: __loadStat.lastRefused.at } : null, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0,
+        // v2.523.0（OPV27-8）：投影里必须带上缺键清单——否则 lastFix 存了、读口却只回三个数，
+        //   「缺了哪几个键」又在出口处被抹掉一次（这正是本项要修的那种「存了但看不见」）。
+        missing: (__loadStat.lastFix && __loadStat.lastFix.missing) || [],
+        missingTotal: (__loadStat.lastFix && __loadStat.lastFix.missingTotal) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, refused: __migrateReport.refused || null, current: __migrateReport.current || null, at: __migrateReport.at } : null,
       // v2.30.0: 镜像回落三计数同域可见——「本地 miss 但镜像救回」此前在诊断上全无痕迹
       mirrorHits: __loadStat.mirrorHits, mirrorMisses: __loadStat.mirrorMisses, mirrorErrors: __loadStat.mirrorErrors,
       // v2.108.0 (plan-1 #18): repair metrics visible in the same domain (zero new exports --
@@ -5290,6 +5311,41 @@
       let node = memCache;
       for (const seg of path.split('.')) { if (node == null) return fallback; node = node[seg]; }
       return node === undefined ? fallback : node;
+    },
+    // v2.523.0（OPV27-8）：老档缺键体检——导入/续接前先能问「缺什么、谁写、补齐影响」。
+    //   刻意**不写存档、不改入参**：在 JSON 深拷贝上跑 ensureShape dry-run。
+    //   为什么必须 dry-run：体检面污染被体检对象是这条纪律里最不能犯的错——一跑就把用户档改了。
+    //   writer 取 __BOUNDED_CAPS 的 site 声明（那是产品侧唯一的「谁按什么上限裁这个容器」真源）；
+    //   查不到就如实写「未登记写方」，不编一个引擎名。
+    shapeAudit(state, opts) {
+      const o = opts || {};
+      const src = (state && typeof state === 'object' && !Array.isArray(state)) ? state : memCache;
+      let copy;
+      try { copy = JSON.parse(JSON.stringify(src || {})); }
+      catch (e) {
+        return { ok: false, reason: 'unserializable', missing: [], text: '体检失败：存档无法序列化（' + String((e && e.message) || e) + '）' };
+      }
+      const sink = [];
+      const r = ensureShape(copy, defaultWorldState(), sink);
+      const maxRows = (typeof o.maxRows === 'number' && o.maxRows > 0) ? o.maxRows : 40;
+      const rows = sink.slice(0, maxRows).map(function (m) {
+        const reg = __BOUNDED_CAPS[m.path];
+        const ev = (reg && reg.site) ? String(reg.site) : null;
+        return {
+          path: m.path, kind: m.kind, writer: ev,
+          impact: (reg && typeof reg.cap === 'number')
+            ? ('有界容器（上限 ' + reg.cap + '）：补齐后从空起，读数归 0 而不是保留旧值')
+            : ('未登记写方：补齐只给默认空值（' + (m.kind === 'array' ? '空数组' : m.kind === 'object' ? '空对象' : '默认标量')
+              + '），哪台引擎该写它体检查不出')
+        };
+      });
+      const text = r.filled
+        ? ('老档体检：缺 ' + r.filled + ' 键（列出 ' + rows.length + (sink.length > rows.length ? '/' + sink.length : '') + '）：'
+          + rows.slice(0, 3).map(function (x) { return x.path; }).join('、') + (rows.length > 3 ? ' 等' : '')
+          + (r.conflicts ? '；另 ' + r.conflicts + ' 处类型冲突（保留原值未改写）' : ''))
+        : ('老档体检：骨架完整（缺 0 键；' + (r.conflicts ? r.conflicts + ' 处类型冲突保留原值' : '零冲突') + '）');
+      return { ok: true, filled: r.filled, conflicts: r.conflicts, missing: rows,
+        missingTotal: sink.length, truncated: sink.length > rows.length, text: text, at: clockWall() };
     },
 
     // 正文锚点/分支（swipe）隔离：当前分支id

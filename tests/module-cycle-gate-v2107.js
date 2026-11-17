@@ -258,7 +258,13 @@ function runAll(A) {
   // v2.299.0：装载期 208 → 212（两文件尾调 registerModule）、调用期 2666 → 2668、合计 2874 → 2880。
   // v2.299.0：命名空间三面 380/334/342 → 382/336/344（两个新 ns 同步入账、入读面）。
   // v2.401.0(OPV23):实测回填（node -e audit 直读——三段拆分 4 个段文件入产品面 ⇒ 文件/别名 453、有引用 451）
-  A(a.files === 507 && a.aliasFiles === 507 && a.refFiles === 505,
+  // v2.523.0（V27 拓展线）：EXV27-1~9 九台引擎入场 ⇒ 文件面 507→516、别名 516、有引用 514（实测回填；
+  //   九台都尾调 registerModule 且都被 tool-diag 登记表引用，故「有引用」同步 +9）。
+  // v2.523.0（V27 优化线）：OPV27 五个新模块（inject-delta / reject-phrase / settings-index /
+  //   save-curve / narrow-consumers）入场 ⇒ 文件面 517→522、别名 522、有引用 520（实测回填）。
+  //   五个模块都被产品源面真读（render/inject.js 两处、engines/action-desk.js 一处、
+  //   engines/tool-diag.js 两处），故「有引用」同步 +5 —— 不是「新增文件但没人读」。
+  A(a.files === 522 && a.aliasFiles === 522 && a.refFiles === 520,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -393,7 +399,14 @@ function runAll(A) {
   //   增量归因：68 文件 clockNow 守卫改写带来的调用期引用（含 epoch-tide 的 clock 边）
   //   与 action-desk 等真读者，静态面已逐文件归因闭合（/tmp/refs_attr.js 同轮取证）。
   // v2.401.0(OPV23):实测回填（4 段文件尾调 registerModule ⇒ 装载期 280→296；调用期 3323→3407；合计 3703）
-  A(a.edgesLoad === 364 && a.edgesCall === 3695 && a.edgesAll === 4059 && a.identityOk,
+  // v2.523.0（V27 拓展线）：九台引擎各尾调 registerModule ⇒ 装载期 +9（364→373）；
+  //   九台在调用期读 store/clock/settingsBus/__settingsRegs/rand 且被 tool-diag 诊断节引用
+  //   ⇒ 调用期 +19（3695→3714）；合计 4059→4087，恒等式由本判据当场核对。
+  // v2.523.0（V27 优化线）：实测回填 374/3717/4091 → 384/3736/4120（装载期 +10、调用期 +19、
+  //   合计 +29）。归因口径与前几批逐字相同：新文件尾调 registerModule 计装载期边；
+  //   它们读 store / settingsBus / clock / __settingsRegs 计调用期 (file, ns) 去重边。
+  //   恒等式由本判据当场核对（不靠人算）。
+  A(a.edgesLoad === 384 && a.edgesCall === 3736 && a.edgesAll === 4120 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -473,7 +486,9 @@ function runAll(A) {
   // v2.294.0（V8 收口）：LOAD_ORDER 334 → 336（新增两台入序引擎）。
   // v2.297.0（V11 立项轮跟位）：LOAD_ORDER 338 → 339（core/unified-pending.js 入序）。
   // v2.401.0(OPV23):实测回填（LOAD_ORDER 440 → 452，ui/pages 四段文件与关联模块入序）
-  A(a.edgesLoad >= 20 && a.orderLen === 506,
+  // v2.523.0（V27 拓展线）：LOAD_ORDER 506 → 515（九台引擎入序，实测回填）。
+  // v2.523.0（V27 优化线）：LOAD_ORDER 516 → 521（本批新增的五个 OPV27 模块入序，实测回填）。
+  A(a.edgesLoad >= 20 && a.orderLen === 521,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -519,7 +534,12 @@ function runAll(A) {
   // v2.297.0（V11 立项轮跟位）：三面 379/333/342 → 380/334/342。
   //   unifiedPending 从「账本有、静态无」归位为「两面都有」（差集 46 不变）。
   // v2.401.0(OPV23):实测回填（三面 483/437/452 → 495/445/464——段 ns 同步入账本与读面）
-  A(a.nsProvided === 549 && a.nsLedger === 496 && a.nsRead === 515,
+  // v2.523.0（V27 拓展线）：九台新引擎的命名空间同步进静态提供方与账本（549/496/515 → 558/505/515）；
+  //   读面不动（515）—— 它们目前只有专锁与 tool-diag 登记表在读，产品侧消费面见 OPV27-5。
+  // v2.523.0（V27 优化线）：三面 560/506/517 → 565/511/522（实测回填）。本批五个新 ns 同时进
+  //   静态提供方、账本（module-registry-gate --update 落定）与读面 —— 读面也 +5 正是 OPV27-5
+  //   那件事的旁证：它们不再是「只有专锁在读」的零消费面。
+  A(a.nsProvided === 565 && a.nsLedger === 511 && a.nsRead === 522,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
@@ -532,7 +552,7 @@ function runAll(A) {
   // v2.194.0（U2 批次④）：差**仍为 39**（与批次③持平）—— 本轮一度写成 41（照抄批次③
   //   的自证槽增量），但两个自证槽实测不可达已撤除 ⇒ 静态提供方没涨，差自然也不涨。
   // v2.401.0(OPV23):实测回填（差 46 → 50——静态提供方 +12 / 账本 +8，差额仍全有登记理由：入口/UI/内部前缀）
-  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 53,
+  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 54,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
   // v2.153.0（RX5+RX6）：零读 ns 22 → 21（plotGauge 与 branchTree 都被 tool-diag 与面板真读，
   //   从零读名单里离场）。
@@ -550,7 +570,9 @@ function runAll(A) {
   //   但 B7 数的是「提供方有、读面零」的命名空间，本轮实测为 38。
   // v2.300.0（V11 OPV11-6）：零读 ns 38 → 39（fieldWriters 目前只有测试与面板候选消费，
   //   产品面静态读集合里还没出现；这是如实增长，不是判据放宽）。
-  A(a.deadNs.length === 38, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  // v2.523.0（V27 拓展线）：零读 ns 38 → 47（九台新引擎的命名空间目前只有专锁与 tool-diag 登记表
+  //   在读，产品面静态读集合里还没出现 —— 这是**如实增长**，不是判据放宽；消费面登记见 OPV27-5）。
+  A(a.deadNs.length === 47, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
@@ -566,7 +588,7 @@ function runAll(A) {
   //   新增第六个 UI 层命名空间 panelFold(ui/panel-fold.js),它**有真读者**
   //   (ui/panel.js 的 foldSec() 直写 `WA.panelFold.isCollapsed(...)`),故计入「在用」而非零读。
   // v2.401.0(OPV23):实测回填（28/35 → 32/39——panelOverviewMain/panelToolsPage/uiDashboards 三段 ns 接上真读者）
-  A(a.registeredUsed === 35 && a.registeredTotal === 42,
+  A(a.registeredUsed === 36 && a.registeredTotal === 43,
     'B10 登记面在用 ' + a.registeredUsed + '/' + a.registeredTotal
     + '（未在用的 5 个是取数型入口 ns，只在 index.js 内部自用；v2.181.0：UI 主题层 9 个 ns 全部接上真读者）');
   // v2.153.0（RX5+RX6）：两个新引擎进账本 ⇒ 账本缺项文件面收缩，缺项 5 不变（UI 层仍 4 文件）。

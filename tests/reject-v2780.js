@@ -9032,6 +9032,137 @@ function runWitness(WA) {
       if (keepWin === undefined) { try { delete global.window; } catch (e) {} } else { global.window = keepWin; }
     }
   }
+  // ── v2.523.0（V27 全景双九项）：本批新增/接线的读口的码 —— **必须带可执行见证** ──
+  //   为什么不塞进 base：base 的语义是「存量、暂未见证」，而下面这些是本批**新写**的
+  //   公开失败归因（「为什么没给出结果」）。塞进 base 等于让台账替我们说「不会有人跑到」，
+  //   而它们恰恰是宿主/玩家最可能撞到的那几条（空搜索、查无此组、码没话术、配额超支）。
+  //   见证一律「临时破坏 + finally 还原」；还原不拿「跑通了」当理由（与上方 story-window
+  //   段同一条纪律）。破坏的只是**本进程内的句柄**，不写存档、不改他人数据。
+  {
+    const __v27ID = WA.injectDelta;
+    if (__v27ID && WA.store) {
+      want('bad-items', 'V27 OPV27-9：信息增量账 measure() 入参不是数组 ⇒ bad-items（不把乱入参当空轮）');
+      trip('bad-items', function () { return __v27ID.measure('not-an-array').reason; });
+      want('no-source', 'V27 OPV27-9：explain() 查无此源 ⇒ no-source，原样报源名（不编「零重复」）');
+      trip('no-source', function () {
+        __v27ID.measure([{ source: '见证源', content: '这是一段见证用的正文内容，长度足够切出至少一个片段。' }]);
+        return __v27ID.explain('zzz-no-such-source').reason;
+      });
+    }
+    const __v27SI = WA.settingsIndex;
+    if (__v27SI) {
+      want('empty-query', 'V27 OPV27-6：设置搜索词为空 ⇒ empty-query（不把空串当成「全部命中」）');
+      trip('empty-query', function () { return __v27SI.search('   ').reason; });
+      want('no-such-group', 'V27 OPV27-6：entry() 查未登记组 ⇒ no-such-group（不返回一个空组糊过去）');
+      trip('no-such-group', function () { return __v27SI.entry('zzz-no-such-group').reason; });
+    }
+    const __v27RP = WA.rejectPhrase;
+    if (__v27RP) {
+      want('no-phrase', 'V27 OPV27-7：未覆盖的拒收码 ⇒ no-phrase（原样甩码，不统一兜「请重试」）');
+      trip('no-phrase', function () { return __v27RP.phraseOf('zzz-token').reason; });
+    }
+    const __v27SC = WA.saveCurve;
+    if (__v27SC && WA.store) {
+      want('too-few-samples', 'V27 OPV27-3：少于两个采样点 ⇒ too-few-samples（不拿单点编出增长曲线）');
+      trip('too-few-samples', function () {
+        if (typeof __v27SC.reset === 'function') __v27SC.reset();   // 只清进程内曲线，不碰存档
+        return __v27SC.growth().reason;
+      });
+      want('no-audit', 'V27 OPV27-3：store 没有 sizeAudit 读口 ⇒ 如实 no-audit（不报一份 0B 的假曲线）');
+      trip('no-audit', function () {
+        const keep = WA.store.sizeAudit;
+        try { WA.store.sizeAudit = undefined; return __v27SC.sample('witness:no-audit').reason; }
+        finally { WA.store.sizeAudit = keep; }
+      });
+    }
+    const __v27PB = WA.perfBaseline;
+    if (__v27PB && typeof __v27PB.boot === 'function') {
+      want('no-boot', 'V27 OPV27-2：本进程没走 index.js 装载 ⇒ 装载面如实 no-boot（不编耗时数字）');
+      trip('no-boot', function () {
+        const keep = WA.boot;
+        try { WA.boot = undefined; return __v27PB.boot().reason; }
+        finally { WA.boot = keep; }
+      });
+    }
+    const __v27BR = WA.bootReport;
+    if (__v27BR && typeof __v27BR.open === 'function' && typeof __v27BR.close === 'function') {
+      want('no-console', 'V27 OPV27-1：没有 console 可截获时开窗如实 no-console（不假装开成）');
+      trip('no-console', function () {
+        const keepC = global.console;
+        try {
+          __v27BR.close();                       // 幂等句柄会直接复用旧窗，先真关掉才走得到缺 console 那条
+          global.console = undefined;
+          const h = __v27BR.open();
+          return (h && typeof h.close === 'function') ? h.close().reason : 'no-handle';
+        } finally { global.console = keepC; }
+      });
+    }
+    const __v27SF = WA.saltFranchise;
+    if (__v27SF && typeof __v27SF.grant === 'function' && typeof __v27SF.drawSalt === 'function') {
+      want('over-quota', 'V27 EXV27-3：支盐超出引额 ⇒ over-quota（超出那部分就是私盐，不静默截断）');
+      trip('over-quota', function () {
+        if (typeof __v27SF.reset === 'function') __v27SF.reset();   // 只清本进程引额台账
+        __v27SF.grant({ merchant: '见证商', district: '见证引地', quota: 5 });
+        return __v27SF.drawSalt({ merchant: '见证商', district: '见证引地', amount: 9 }).reason;
+      });
+    }
+    if (WA.store && typeof WA.store.shapeAudit === 'function') {
+      want('unserializable', 'V27 OPV27-8：存档无法序列化时体检如实报 unserializable（不静默补键）');
+      trip('unserializable', function () {
+        const cyc = {};
+        cyc.self = cyc;
+        return WA.store.shapeAudit(cyc).reason;
+      });
+    }
+    //  ── 窄消费引擎的三个读口拒绝：只有 board() 会走到它们（readOne 不在导出面上），
+    //     故见证必须借 board() 跑，且**只临时替换那一台的句柄**、finally 立刻装回。
+    const __v27NC = WA.narrowConsumers;
+    if (__v27NC && typeof __v27NC.board === 'function' && typeof __v27NC.registry === 'function') {
+      const __v27one = (__v27NC.registry() || [])[0];
+      if (__v27one && __v27one.ns) {
+        want('not-loaded', 'V27 OPV27-5：清单里那台模块根本没装载 ⇒ not-loaded（不把它算成「有账未长」）');
+        trip('not-loaded', function () {
+          const keep = WA[__v27one.ns];
+          try {
+            WA[__v27one.ns] = undefined;
+            const b = __v27NC.board() || {};
+            const hit = (b.rows || []).filter(function (x) { return x.reason === 'not-loaded'; })[0];
+            return hit ? hit.reason : 'none';
+          } finally { WA[__v27one.ns] = keep; }
+        });
+        want('no-reader', 'V27 OPV27-5：模块在、但既无 view 也无 stat ⇒ no-reader（不编一个读数）');
+        trip('no-reader', function () {
+          const keep = WA[__v27one.ns];
+          try {
+            WA[__v27one.ns] = {};
+            const b = __v27NC.board() || {};
+            const hit = (b.rows || []).filter(function (x) { return x.reason === 'no-reader'; })[0];
+            return hit ? hit.reason : 'none';
+          } finally { WA[__v27one.ns] = keep; }
+        });
+        want('read-threw', 'V27 OPV27-5：读口自己抛错 ⇒ read-threw 并带错误摘要（不吞成「无数据」）');
+        trip('read-threw', function () {
+          const keep = WA[__v27one.ns];
+          try {
+            WA[__v27one.ns] = { view: function () { throw new Error('witness-read-threw'); } };
+            const b = __v27NC.board() || {};
+            const hit = (b.rows || []).filter(function (x) { return x.reason === 'read-threw'; })[0];
+            return hit ? hit.reason : 'none';
+          } finally { WA[__v27one.ns] = keep; }
+        });
+      }
+    }
+    //  landed 是 explain() 里 hits 的 outcome 归因（码在嵌套数组里），故用 tripDeep。
+    const __v27IB = WA.injectBudget;
+    if (__v27IB && typeof __v27IB.plan === 'function' && typeof __v27IB.explain === 'function') {
+      want('landed', 'V27 OPV27-4：explain() 对被留下的源如实归因 landed（不是含糊的「未归类」）');
+      tripDeep('landed', function () {
+        const p = __v27IB.plan([{ source: '记忆', content: '记忆正文（见证用，长度足够占一个额度单元）' }], {});
+        return __v27IB.explain(p, '记忆');
+      });
+    }
+  }
+
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

@@ -221,7 +221,13 @@
     //   钱庄为何暴雷」三件事从没到过模型手里。
     'epochalTransition', 'cataclysmHazard', 'financialContagion',
     'theologyCult', 'regimentTactics', 'incarcerationJailbreak', 'bloodlineHeritage',
-    'engineeringBlueprint', 'dungeonHazardMesh', 'ecosystemCascade', 'courtIntrigue'];
+    'engineeringBlueprint', 'dungeonHazardMesh', 'ecosystemCascade', 'courtIntrigue',
+    // v2.523.0（OPV27-5）：窄消费引擎的「在用机制」行。与源表/def/VIS_NAMES/SRC_NAME/分支
+    //   五处同批登记 —— 只加分支不加源表 = 开关点了零效果（而且**全源关闭时它照样注入**，
+    //   v0.1.29 那条「真空轮 injected=false」当场就会红）；只加源表不加分支 = 声明了没人消费。
+    //   默认 **true**：本模块只报「这局真长出了什么数」（vias / bookings / rows / tags），
+    //   空局恒返回 ''，故默认开不会给老用户凭空多出一段约束。
+    'narrowConsumers'];
   const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -337,7 +343,10 @@ style: false,
         theologyCult: true, regimentTactics: true, incarcerationJailbreak: true, bloodlineHeritage: true,
         // v2.411.0 (R251 缝合批)：人体结构契约。模块总开关默认为关，注入面取默认 true。
         bodyAnatomy: true,
-        engineeringBlueprint: true, dungeonHazardMesh: true, ecosystemCascade: true, courtIntrigue: true }, module: 'render' };
+        engineeringBlueprint: true, dungeonHazardMesh: true, ecosystemCascade: true, courtIntrigue: true,
+        // v2.523.0（OPV27-5）：窄消费引擎的「在用机制」行。取默认 true —— 它只报本局真长出的数，
+        //   空局恒 ''，不给老用户凭空多出约束。
+        narrowConsumers: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -627,7 +636,9 @@ style: false,
     //   这正是本表每一段注释都在念的同一条：显示名与 SOURCES 必须**同批登记**，
     //   否则用户唯一能看见它的地方裸露英文键名。取「叙述镜片」与注入分支的 source 字面量
     //   逐字同名（explain-v2900 的 A4 咬「不裸露英文键」、C1 咬「源表每项都有名」）。
-    narrativeLens: '叙述镜片'
+    narrativeLens: '叙述镜片',
+    // v2.523.0（OPV27-5）：窄消费引擎的「在用机制」行。与注入分支的 source 字面量逐字同名。
+    narrowConsumers: '在用机制'
   };
   // ── v2.91.0 O4：开关两面对账 ──────────────────────────────────────────
   /**
@@ -1910,6 +1921,12 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.ledger && WA.ledger) { const lb = engineCall('ledger', function () { return WA.ledger.buildLedgerText(); }); if (lb) items.push({ source: '账本', content: '[重大事件账本]\n' + lb }); }
       // v0.7: world_digest块
       if (vis.digest && WA.digest) { const db = engineCall('digest', function () { return WA.digest.buildBlock(); }); if (db) items.push({ source: '世界推演', content: db }); }
+      // v2.523.0（OPV27-5）：窄消费引擎接产品链——12 台 consumer≤3 的引擎里「这局真有数」的那几台，
+      //   在注入正文留一行 [在用机制]。空局/无产出时 buildBlock 自己返回 ''，**不输出空块**。
+      if (vis.narrowConsumers && WA.narrowConsumers) {
+        const nb = engineCall('narrowConsumers', function () { return WA.narrowConsumers.buildBlock(); });
+        if (nb) items.push({ source: '在用机制', content: nb });
+      }
       // v0.7: 近端事件一次性消费
       // v2.86.0 A5：本块既是读也是**写**（一次性消费要清 nearEvent），故整体守卫。
       //   它抛错的代价与别的源不同：消费没完成 ⇒ 同一条突发事件会**每轮重复注入**，
@@ -1949,6 +1966,15 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
           }
         }
       } catch (e) { WA.log('warn', '预算裁决失败，回退全量注入', e); planInfo = null; finalItems = items; }
+      // v2.523.0 OPV27-9：信息增量账——只读注面，逐源「唯一片段 / 总片段 / 与谁重复」。
+      //   刻意**不改** finalItems：去重会改正文，属产品行为变更，须先有读数作依据；
+      //   保留哪一份是优先级决定（世界状态块 > 叙事摘要 > 舆情），不是片段字符串能定的。
+      try {
+        if (WA.injectDelta) {
+          const __deltaInfo = WA.injectDelta.measure(finalItems);
+          if (planInfo) planInfo.delta = __deltaInfo;
+        }
+      } catch (e) { /* 读数失败不影响注入本身：账是旁证，不是通路 */ }
       // v0.1.1: 槽位路由——显式带 position 的剧情约束类走独立槽位，
       // 不与主世界状态块互相覆盖；预算裁决只作用于主槽位
       // 无 position 的注入项保持旧行为（并入主块），保证向后兼容
@@ -2156,7 +2182,7 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
             hosted: __hostedSnap,
             sources: mainItems.map(i => i.source), mainCount: mainItems.length, round: roundNow, volume: WA.injectBudget && WA.injectBudget.volumeView ? WA.injectBudget.volumeView(items, finalItems, { totalCap: planInfo ? planInfo.budget : null }) : null, decisions: decisions, hostWb: hostCk, recalc: recalc, budget: planInfo ? { used: planInfo.used, cap: planInfo.budget, source: planInfo.budgetSource, contextSize: planInfo.contextSize || null, remain: planInfo.remain, budgetMode: planInfo.budgetMode || null, headroom: planInfo.headroom ? { remain: planInfo.headroom.remain, usedPct: planInfo.headroom.usedPct, freePct: planInfo.headroom.freePct, saturated: !!planInfo.headroom.saturated, avgKeptTokens: planInfo.headroom.avgKeptTokens, spareSources: planInfo.headroom.spareSources, note: planInfo.headroom.note || '' } : null, inputTokens: planInfo.inputTokens, saved: planInfo.saved, overBudget: !!planInfo.overBudget, cost: planInfo.cost ? { measured: planInfo.cost.measured, unmeasured: planInfo.cost.unmeasured.slice(), unmeasuredCount: planInfo.cost.unmeasuredCount, subTick: planInfo.cost.subTick, totalMs: planInfo.cost.totalMs, bands: planInfo.cost.bands, slowest: planInfo.cost.slowest, accounts: planInfo.cost.accounts, unclassified: planInfo.cost.unclassified } : null, keptCount: planInfo.kept.length, folded: planInfo.folded.map(f => ({ source: f.source, reason: f.reason, from: f.from, to: f.to, remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice(), // v2.301.0（EXV11-6）：裁决当场落正文见证，读面才能做「折叠前后」对照。
 //   只截前 240 字：这是给对照看的样本，不是第二份正文仓（全文仍在 items 输入面）。
-wasChars: (function () { const it = items[f.id]; return it && typeof it.content === 'string' ? it.content.length : null; })(), wasPreview: (function () { const it = items[f.id]; return it && typeof it.content === 'string' ? it.content.slice(0, 240) : null; })(), nowChars: typeof f.content === 'string' ? f.content.length : null, nowPreview: typeof f.content === 'string' ? f.content.slice(0, 240) : null })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })) } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
+wasChars: (function () { const it = items[f.id]; return it && typeof it.content === 'string' ? it.content.length : null; })(), wasPreview: (function () { const it = items[f.id]; return it && typeof it.content === 'string' ? it.content.slice(0, 240) : null; })(), nowChars: typeof f.content === 'string' ? f.content.length : null, nowPreview: typeof f.content === 'string' ? f.content.slice(0, 240) : null })), dropped: planInfo.dropped.map(x => ({ source: x.source, reason: x.reason, tokens: x.tokens, tier: x.tier || null, savedTokens: (x.savedTokens == null ? x.tokens : x.savedTokens), remainAt: x.remainAt, blockedBy: (x.blockedBy || []).slice() })), droppedTokens: planInfo.droppedTokens } : null, slots: slotSnap, slotErrors: (slotErrors && slotErrors.length) ? slotErrors : null, trace: trace, traceSummary: traceSummary }; });
           // v2.150.0(RP4): 价值观察的唯一生产方。位置刻意——必须在预算裁决(finalItems)
           //   与槽位路由都定完之后：观察面要的是「这一轮真落地了哪些源」，拿注入前的候选集
           //   来观察，会把被折叠/丢弃的项也记成「注入过却没被引用」——那是把没发生的事判成没用。

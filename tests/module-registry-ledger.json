@@ -1,13 +1,13 @@
 {
- "version": "2.522.0",
- "loadOrderCount": 506,
- "loadedCount": 485,
+ "version": "2.523.0",
+ "loadOrderCount": 521,
+ "loadedCount": 500,
  "uiCount": 21,
- "nsCount": 496,
+ "nsCount": 511,
  "totals": {
-  "loadEdges": 364,
+  "loadEdges": 384,
   "hardEdges": 0,
-  "callRefs": 614,
+  "callRefs": 644,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -27,6 +27,7 @@
    "consumedBy": [
     "actors/monologue.js",
     "actors/profile.js",
+    "core/boot-report.js",
     "core/commit.js",
     "core/exec.js",
     "core/plugin.js",
@@ -67,6 +68,7 @@
     "engines/branch-diff.js",
     "engines/branch-tree.js",
     "engines/bridge.js",
+    "engines/broker-house.js",
     "engines/bureaucracy-ascension.js",
     "engines/calendar-custom.js",
     "engines/calendar.js",
@@ -106,6 +108,7 @@
     "engines/diplomacy.js",
     "engines/direct-event.js",
     "engines/director.js",
+    "engines/divination-craft.js",
     "engines/dream.js",
     "engines/dynastic-lineage.js",
     "engines/eccentric-threads.js",
@@ -130,8 +133,10 @@
     "engines/family.js",
     "engines/farfield.js",
     "engines/fate.js",
+    "engines/festival-fair.js",
     "engines/field-writers.js",
     "engines/financial-contagion.js",
+    "engines/fire-watch.js",
     "engines/first-run.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
@@ -151,6 +156,7 @@
     "engines/history-search.js",
     "engines/human-realism.js",
     "engines/inject-collector.js",
+    "engines/inject-delta.js",
     "engines/inject-value.js",
     "engines/inline-tags.js",
     "engines/inst.js",
@@ -190,6 +196,8 @@
     "engines/mortuary-rites.js",
     "engines/motif.js",
     "engines/narrative-lens.js",
+    "engines/narrow-consumers.js",
+    "engines/night-watch.js",
     "engines/noesis.js",
     "engines/nursing-care.js",
     "engines/observe-slice.js",
@@ -203,6 +211,7 @@
     "engines/output-guard.js",
     "engines/outsider-integration.js",
     "engines/parallel-world.js",
+    "engines/pawn-redemption.js",
     "engines/pending-center.js",
     "engines/perf-baseline.js",
     "engines/periodical-ideology.js",
@@ -242,6 +251,7 @@
     "engines/region.js",
     "engines/regional.js",
     "engines/rehearse.js",
+    "engines/reject-phrase.js",
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/relation-temp.js",
@@ -260,7 +270,9 @@
     "engines/ruin-mechanism.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
+    "engines/salt-franchise.js",
     "engines/sartorial-regalia.js",
+    "engines/save-curve.js",
     "engines/save-health.js",
     "engines/save-throttle.js",
     "engines/scene-narrative.js",
@@ -268,8 +280,10 @@
     "engines/sediment.js",
     "engines/service-network.js",
     "engines/session.js",
+    "engines/settings-index.js",
     "engines/shadow-council.js",
     "engines/siege-attrition.js",
+    "engines/silver-assay.js",
     "engines/sim-rehearsal.js",
     "engines/social-legacy.js",
     "engines/solo-voice.js",
@@ -307,6 +321,7 @@
     "engines/undercurrent-calendar.js",
     "engines/userlock.js",
     "engines/vitals.js",
+    "engines/ward-compact.js",
     "engines/wb-inject.js",
     "engines/wb-search.js",
     "engines/whisper-backchannel.js",
@@ -470,6 +485,7 @@
     "engines/geophysical-reshaping.js",
     "engines/hazard.js",
     "engines/human-realism.js",
+    "engines/inject-delta.js",
     "engines/institutional-schism.js",
     "engines/kaleidoscope.js",
     "engines/labor-schedule.js",
@@ -483,6 +499,7 @@
     "engines/metabolism-clock.js",
     "engines/mob-stampede.js",
     "engines/mortuary-rites.js",
+    "engines/narrow-consumers.js",
     "engines/offline-return.js",
     "engines/offstage-life.js",
     "engines/opinion.js",
@@ -493,11 +510,14 @@
     "engines/proactive.js",
     "engines/psyche-dissociation.js",
     "engines/regional.js",
+    "engines/reject-phrase.js",
     "engines/research-closure.js",
     "engines/routine-pacing.js",
     "engines/rumor-cognition.js",
     "engines/sanctuary-scramble.js",
     "engines/sartorial-regalia.js",
+    "engines/save-curve.js",
+    "engines/settings-index.js",
     "engines/shadow-council.js",
     "engines/somatic-trauma.js",
     "engines/stage-presence.js",
@@ -526,6 +546,7 @@
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": [
+    "core/boot-report.js",
     "core/commit.js",
     "core/exec.js",
     "core/plugin.js",
@@ -561,6 +582,7 @@
     "engines/branch-continuity.js",
     "engines/branch-diff.js",
     "engines/branch-tree.js",
+    "engines/broker-house.js",
     "engines/bureaucracy-ascension.js",
     "engines/calendar-custom.js",
     "engines/call-timeline.js",
@@ -596,6 +618,7 @@
     "engines/dice-den.js",
     "engines/diplomacy.js",
     "engines/director.js",
+    "engines/divination-craft.js",
     "engines/dream.js",
     "engines/dynastic-lineage.js",
     "engines/eccentric-threads.js",
@@ -615,8 +638,10 @@
     "engines/family.js",
     "engines/farfield.js",
     "engines/fate.js",
+    "engines/festival-fair.js",
     "engines/field-writers.js",
     "engines/financial-contagion.js",
+    "engines/fire-watch.js",
     "engines/first-run.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
@@ -635,6 +660,7 @@
     "engines/history-search.js",
     "engines/human-realism.js",
     "engines/inject-collector.js",
+    "engines/inject-delta.js",
     "engines/inject-value.js",
     "engines/inline-tags.js",
     "engines/inst.js",
@@ -671,6 +697,8 @@
     "engines/mortuary-rites.js",
     "engines/motif.js",
     "engines/narrative-lens.js",
+    "engines/narrow-consumers.js",
+    "engines/night-watch.js",
     "engines/noesis.js",
     "engines/nursing-care.js",
     "engines/observe-slice.js",
@@ -682,6 +710,7 @@
     "engines/outline-inject.js",
     "engines/output-guard.js",
     "engines/outsider-integration.js",
+    "engines/pawn-redemption.js",
     "engines/pending-center.js",
     "engines/perf-baseline.js",
     "engines/periodical-ideology.js",
@@ -718,6 +747,7 @@
     "engines/refine.js",
     "engines/region.js",
     "engines/rehearse.js",
+    "engines/reject-phrase.js",
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/relation-temp.js",
@@ -736,7 +766,9 @@
     "engines/ruin-mechanism.js",
     "engines/rule-pack.js",
     "engines/ruling.js",
+    "engines/salt-franchise.js",
     "engines/sartorial-regalia.js",
+    "engines/save-curve.js",
     "engines/save-health.js",
     "engines/save-throttle.js",
     "engines/scene-narrative.js",
@@ -744,8 +776,10 @@
     "engines/sediment.js",
     "engines/service-network.js",
     "engines/session.js",
+    "engines/settings-index.js",
     "engines/shadow-council.js",
     "engines/siege-attrition.js",
+    "engines/silver-assay.js",
     "engines/sim-rehearsal.js",
     "engines/social-legacy.js",
     "engines/solo-voice.js",
@@ -782,6 +816,7 @@
     "engines/undercurrent-calendar.js",
     "engines/userlock.js",
     "engines/vitals.js",
+    "engines/ward-compact.js",
     "engines/wb-search.js",
     "engines/whisper-backchannel.js",
     "engines/word-budget.js",
@@ -802,6 +837,25 @@
     "engines/write-desk.js",
     "render/map-viewport.js"
    ]
+  },
+  "core/boot-report.js": {
+   "ns": [
+    "bootReport"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
   },
   "core/exec.js": {
    "ns": [
@@ -8640,6 +8694,310 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_bathhouse_laundry_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/pawn-redemption.js": {
+   "ns": [
+    "pawnRedemption"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_pawn_redemption_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/silver-assay.js": {
+   "ns": [
+    "silverAssay"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_silver_assay_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/salt-franchise.js": {
+   "ns": [
+    "saltFranchise"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_salt_franchise_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/broker-house.js": {
+   "ns": [
+    "brokerHouse"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_broker_house_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/night-watch.js": {
+   "ns": [
+    "nightWatch"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_night_watch_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/fire-watch.js": {
+   "ns": [
+    "fireWatch"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_fire_watch_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/festival-fair.js": {
+   "ns": [
+    "festivalFair"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_festival_fair_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/ward-compact.js": {
+   "ns": [
+    "wardCompact"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_ward_compact_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/divination-craft.js": {
+   "ns": [
+    "divinationCraft"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_divination_craft_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/inject-delta.js": {
+   "ns": [
+    "injectDelta"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_inject_delta_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/reject-phrase.js": {
+   "ns": [
+    "rejectPhrase"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_reject_phrase_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/settings-index.js": {
+   "ns": [
+    "settingsIndex"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_settings_index_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/save-curve.js": {
+   "ns": [
+    "saveCurve"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_save_curve_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/narrow-consumers.js": {
+   "ns": [
+    "narrowConsumers"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_narrow_consumers_settings_v1"
    ],
    "consumedBy": []
   },

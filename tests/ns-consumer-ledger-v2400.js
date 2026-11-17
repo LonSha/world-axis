@@ -44,7 +44,12 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
  *  带来 3 个新的「产品源面零读」ns（stage / summarizerAdapter / readingBookmark 等，
  *  由 module-cycle-gate 现场 deadNs 实测 38 条），账本 entries 已逐条定性补登；
  *  与门禁 deadNs 双向一致已由 B 组判据复核。 */
-const BASE_DEAD_NS = 38;
+const BASE_DEAD_NS = 47;   // v2.523.0 跟位：38 → 47（+9）。
+//   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
+//   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
+//   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。
+//   差集来自 v2.409.0（38 条基线）之后若干批新增引擎的只读面至今无人消费——账本 entries 里逐条列着，
+//   本条只把「面真变了」这件事跟位到现场值，不改零读判据本身。
 
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
@@ -133,8 +138,11 @@ function runA(A) {
   //   用 provider 面反查，同一个 ns 不可能有两个 provider 字段）。
   A(new Set(keys).size === keys.length, 'A9 键名无重复');
 
-  // v2.409.0 跟位：账本已随批次升版（entries 35→38），断言跟位到 2.409.0。
-  A(L.version === '2.409.0', 'A10 账本 version === 2.409.0（实 ' + L.version + '）');
+  // v2.523.0 跟位：账本已随批次升版（entries 38→47），断言跟位到 2.523.0。
+  // 为什么这条必须跟着改而不是放宽成「大于等于」：这条断言的作用是逼每次升版时
+  // 显式确认「零读面的面真的变了、并且我写了原因」，一旦放宽成范围判断，
+  // 账本版本忘了升也能绿，这条门禁就退化成装饰。
+  A(L.version === '2.523.0', 'A10 账本 version === 2.523.0（实 ' + L.version + '）');
 }
 
 // ────────────────────────────── B 运行时一致性 ──────────────────────────────

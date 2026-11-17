@@ -339,7 +339,12 @@
     '内外双轴': { rank: 5, fold: true },
     '生活小档': { rank: 5, fold: true },
     '悬念簿': { rank: 5, fold: true },
-    '人体结构': { rank: 5, fold: true }
+    '人体结构': { rank: 5, fold: true },
+    // v2.523.0（OPV27-5）：窄消费引擎的「在用机制」行。与注入分支/ACCOUNTS 同批登记 ——
+    //   漏登记就静默落 DEFAULT_RANK(6)，「绝不静默丢弃」这条承诺对它就只是句空话。
+    //   档位取 6：它报的是「这局真长出数的那几台」的读数，缺了不至于断主链，
+    //   但没有它模型看不见「自动隐去 / 劳作排班」这些机制其实已经在算。
+    '在用机制': { rank: 6, fold: true },
   };
   const DEFAULT_RANK = 6;
 
@@ -590,7 +595,12 @@
   ['内外双轴', '人物与关系', '承载'],
   ['生活小档', '人物与关系', '承载'],
   ['悬念簿', '人物与关系', '承载'],
-  ['人体结构', '人物与关系', '承载']
+  ['人体结构', '人物与关系', '承载'],
+  // v2.523.0（OPV27-5）：窄消费引擎的「在用机制」行。与 PRIORITY 同批登记 ——
+  //   cost-v2880 的 A1/A2/B7 成类锁要求三者逐字同键集，漏登记会落「未归类」。
+  //   归「叙事推进 / 推进」：它报的是「这局真长出数的机制现在在算什么」，
+  //   是往前推的信息，不是约束也不是结算凭证。
+  ['在用机制', '叙事推进', '推进']
   ].forEach(function (r) { ACCOUNTS[r[0]] = { account: r[1], role: r[2] }; });
   const UNCLASSIFIED = '未归类';
 
@@ -826,6 +836,42 @@
     const avgKept = keptTokens.length
       ? Math.floor(keptTokens.reduce(function (acc, t) { return acc + t; }, 0) / keptTokens.length) : null;
     const spareSources = (avgKept && remainRaw > 0) ? Math.floor(remainRaw / avgKept) : 0;
+    // ── v2.523.0（OPV27-4）：被裁清单带「可替代性档位」与「省下多少」──────────
+    //   现场读数 R4：预算裁决只打一行 `注入 500/2400t`。玩家问「这轮关系块为什么没进来」，
+    //   账上只有 `no_budget` 三个字母 —— 它回答了「额度不够」，却答不出更要紧的那一问：
+    //   **丢了它，我损失了多少信息？**
+    //   故给每条被裁项贴一个档位（口径只用本轮已落地的事实推，不做二次裁决）：
+    //     · unique    —— 同科目本轮没有别的源落地 ⇒ 这条信息是真丢了；
+    //     · redundant —— 同科目另有源落地 ⇒ 丢它损失小（读者仍能看到那一科的事）；
+    //     · optional  —— 该源没有科目归类 ⇒ 说不清可替代性，**如实说说不清**。
+    //   `savedTokens` = 丢它 / 折它省下的额度（dropped 取全量，folded 取 from-to）。
+    //   纯观测：档位不参与、也不改变任何裁决结果。
+    const landedAccounts = {};
+    const selfLanded = {};
+    kept.forEach(function (k) {
+      const it = list[k.id];
+      if (it && it.account) landedAccounts[it.account] = (landedAccounts[it.account] || 0) + 1;
+      selfLanded[k.id] = true;
+    });
+    const tierOf = function (row) {
+      const it = list[row.id];
+      const acc = (it && it.account) || UNCLASSIFIED;
+      if (acc === UNCLASSIFIED) return 'optional';
+      // 计入落地源时**排除自己**：一条已被折叠保住的项，不该因为「它自己还在正文里」
+      //   就自称冗余 ——「丢它损失小」问的是「没有它，这一科还有没有人说」。
+      const others = (landedAccounts[acc] || 0) - (selfLanded[row.id] ? 1 : 0);
+      return others > 0 ? 'redundant' : 'unique';
+    };
+    let droppedTokens = 0;
+    dropped.forEach(function (d) {
+      d.tier = tierOf(d);
+      d.savedTokens = d.tokens;
+      droppedTokens += d.tokens;
+    });
+    folded.forEach(function (f) {
+      f.tier = tierOf(f);
+      f.savedTokens = Math.max(0, (f.from || 0) - (f.to || 0));
+    });
     return {
       // v2.47.0: inputCount 让 apply 能判「这份计划是不是这份输入算出来的」——长度不符时
       //   退回按 source 名匹配（旧语义），避免把位置对账用在错的计划上。
@@ -852,6 +898,10 @@
       },
       overBudget: used > budget,
       kept: kept, folded: folded, dropped: dropped,
+      // v2.523.0（OPV27-4）：本轮**因裁撤而省下的额度**（被丢项全量 + 被折项折掉的差额）。
+      //   与 `saved`（输入总量减落地量）不是一回事：saved 含折叠与丢弃，本值只算「没进正文的部分」，
+      //   同一轮两个数会有微小差，故各自命名、不互相顶替。
+      droppedTokens: droppedTokens,
       // v2.88.0 O1：**成本账**。调用方（render/inject.js）在唯一引擎调用出口上实测
       //   每一源构建花了多少 ms，按 source 名经 opts.costs 交进来；本模块只归类不测量
       //   （纯函数承诺不变：不读 store、不写配置、不落地注入）。三态如实：
@@ -1255,6 +1305,62 @@
       bytes: rows.reduce(function (n, r) { return n + r.bytes; }, 0),
       tokens: rows.reduce(function (n, r) { return n + r.tokens; }, 0) };
   }
+  /**
+   * 「这一源为什么没进来」——一句话回答（OPV27-4 的验收原文）。
+   *   只把计划里**已经记着**的事实翻成人话：结果（kept / folded / dropped）、拒因、
+   *   可替代性档位、裁决当时的余量、以及当时占着预算的源。**不重新裁决、不猜**：
+   *   查无此源就如实说「本轮没有这个源」，绝不编一个被裁理由（编出来的理由比没有更坏）。
+   * @param {object} p plan() 的返回值
+   * @param {string} source 源名（用户可见名，可能重名 ⇒ 返回全部命中项的逐条说明）
+   * @returns {{ok:boolean, source:string, hits:Array, text:string}}
+   */
+  function explain(p, source) {
+    const nm = String(source == null ? '' : source);
+    const pl = p || null;
+    if (!pl || !nm) return { ok: false, source: nm, hits: [], text: '没有可解释的计划或源名' };
+    const TIER_CN = { unique: '同科目只有它（丢了就是真丢）', redundant: '同科目另有源落地（丢它损失小）',
+      optional: '该源未归类（说不清替代性）' };
+    const REASON_CN = { no_budget: '额度不够且不可折叠', not_foldable: '额度不够，且该源不允许折叠',
+      folded_too_small: '折叠后太短，已到不可用下限', pinned_over_budget: '保底源超预算，被折到下限' };
+    const hits = [];
+    (pl.kept || []).forEach(function (k) {
+      if (k.source !== nm) return;
+      hits.push({ outcome: 'kept', reason: 'landed', tokens: k.tokens });
+    });
+    (pl.folded || []).forEach(function (f) {
+      if (f.source !== nm) return;
+      hits.push({ outcome: 'folded', reason: f.reason, from: f.from, to: f.to, tier: f.tier || null,
+        savedTokens: f.savedTokens == null ? Math.max(0, (f.from || 0) - (f.to || 0)) : f.savedTokens,
+        remainAt: f.remainAt, blockedBy: (f.blockedBy || []).slice(0, 3) });
+    });
+    (pl.dropped || []).forEach(function (d) {
+      if (d.source !== nm) return;
+      hits.push({ outcome: 'dropped', reason: d.reason, tokens: d.tokens, tier: d.tier || null,
+        savedTokens: d.savedTokens == null ? d.tokens : d.savedTokens,
+        remainAt: d.remainAt, blockedBy: (d.blockedBy || []).slice(0, 3) });
+    });
+    if (!hits.length) {
+      return { ok: false, source: nm, hits: [],
+        text: '本轮输入里没有「' + nm + '」这个源（既没进正文，也没被裁 —— 它压根没被构造出来）' };
+    }
+    const parts = hits.map(function (h) {
+      if (h.outcome === 'kept') return '「' + nm + '」进了正文（' + h.tokens + 't）';
+      if (h.outcome === 'folded') {
+        return '「' + nm + '」被折叠：' + (REASON_CN[h.reason] || h.reason)
+          + '（' + h.from + 't → ' + h.to + 't，省 ' + h.savedTokens + 't'
+          + (h.tier ? '；' + (TIER_CN[h.tier] || h.tier) : '') + '）';
+      }
+      return '「' + nm + '」没进正文：' + (REASON_CN[h.reason] || h.reason)
+        + '（原本 ' + h.tokens + 't，省 ' + h.savedTokens + 't'
+        + (h.tier ? '；' + (TIER_CN[h.tier] || h.tier) : '')
+        + (h.remainAt != null ? '；裁决时余量 ' + h.remainAt + 't' : '')
+        + (h.blockedBy && h.blockedBy.length
+          ? '；当时已占预算：' + h.blockedBy.map(function (b) { return b.source + '(' + b.tokens + 't)'; }).join('、')
+          : '') + '）';
+    });
+    return { ok: true, source: nm, hits: hits, text: parts.join(' ／ ') };
+  }
+
   WA.injectBudget = {
     DEFAULT_BUDGET, MIN_KEEP_TOKENS, FOLD_FLOOR_TOKENS, PRIORITY, AUTO_RATIO, AUTO_MIN, AUTO_MAX,
     autoBudget, resolveBudget, resolveContextSize,
@@ -1274,7 +1380,10 @@
     //     `lastInjection.recalc`，面板「本轮注入」段逐字段读出来（「重算 N 源 / 跳过 M 源」）。
     //   本口仍是纯函数（不读 store、不落盘），故不破坏本模块的纯计算承诺。
     costOf, costView,
-    incrementalCost
+    incrementalCost,
+    // v2.523.0（OPV27-4）：把被裁清单翻成一句人话——验收原文是「能回答『这轮关系块为什么没进来』」。
+    //   真消费方：engines/tool-diag.js 的诊断节（照源名查一条账）。
+    explain
   };
   if (WA.log) WA.log('info', '注入预算裁判已加载');
 })();

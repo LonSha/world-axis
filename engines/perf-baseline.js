@@ -357,6 +357,35 @@
       realDevice: 'pending' };
   }
 
+  /**
+   * 装载面（boot）：这一**次**装载的逐台读数。
+   *   [v2.523.0 / OPV27-2] R2 的读数是「空世界装载 485ms」这个**总量**，
+   *   而「485ms 花在谁身上」「哪台最慢」此前全仓无人可答 —— 没有热点读数，
+   *   「启动优化」就只能靠猜，且猜完无法证明有效。
+   *   数据源是 `WA.boot`（由 index.js 装载循环逐台实测 + core/boot-report.js 合成）：
+   *   **不在本函数里另测一遍** —— 二次测量会把「观测成本」算进被观测对象，
+   *   那两个读数就永远对不上，且谁也不知道差在哪。
+   * @returns {{ok:boolean, reason?:string, rows?:Array, top?:Array, note?:string}}
+   */
+  function boot() {
+    const b = WA.boot;
+    if (!b) {
+      noteFault('no-boot');
+      return { ok: false, reason: 'no-boot', rows: [], top: [],
+        note: '本进程没有走 index.js 的 init() 装载（测试桩逐台 eval 模块）⇒ 装载面为空是**正确结果**，不是漏做；宿主启动后才有读数' };
+    }
+    const rows = safe(function () { return typeof b.rows === 'function' ? b.rows() : []; }, []);
+    const top = safe(function () { return typeof b.slow === 'function' ? b.slow(10) : []; }, []);
+    _stat.reads++;
+    _stat.byFace.boot = (_stat.byFace.boot || 0) + 1;
+    return { ok: true, ver: b.ver, total: b.total, okN: b.ok, failed: b.failed || [],
+      engines: b.engines, elapsedMs: b.elapsedMs, p50: b.p50, p95: b.p95, max: b.max,
+      quietLines: b.quietLines,
+      rows: rows, top: top,
+      report: safe(function () { return typeof b.report === 'function' ? b.report() : ''; }, ''),
+      note: '逐台耗时是装载循环里实测的 loadScript 往返（eval + 注册），不在本函数里重测；quietLines 是被 core/boot-report.js 收口掉的自述行条数' };
+  }
+
   function stat() {
     return { reads: _stat.reads, refused: _stat.refused, lastReason: _stat.lastReason,
       faults: Object.assign({}, _stat.faults), byFace: Object.assign({}, _stat.byFace),
@@ -373,12 +402,13 @@
     budget: budget,
     readings: readings,
     gap: gap,
+    boot: boot,
     sources: sources,
     diagnose: diagnose,
     stat: stat,
     reset: reset
   };
-  var EXPORT_COUNT = 10;
+  var EXPORT_COUNT = 11;
   var _exported = Object.keys(WA.perfBaseline).length;
   if (_exported !== EXPORT_COUNT) { throw new Error('perfBaseline: export count mismatch (' + _exported + ' !== ' + EXPORT_COUNT + ')'); }
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/perf-baseline.js', { kind: 'engine', ver: '2.182.0' });

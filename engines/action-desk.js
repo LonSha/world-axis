@@ -3355,10 +3355,25 @@ return {
    * 支持 mode='preview'（纯读演练）与 mode='execute'（带幂等回执写回 owner），
    * 结果均统一携带场景上下文（viewer, place）。
    */
+  // v2.523.0（OPV27-7）：玩家面拒收挂一句人话。码本身原样保留（码是机器判据），话术另开一栏。
+  //   为什么挂在这一层而不是 workbench 内部：workbench 是路由核心，NPC 自主链与测试直接调它，
+  //   在那层塞中文字段会污染机器面；玩家真正看到结果的是 actFromScene 这一层。
+  //   未覆盖的码**不编话术**：只留 phraseUnavailable 记下「这条还没人话」，原样甩码仍是现状。
+  function withPhrase(res) {
+    if (!res || res.ok === true) return res;
+    const code = res.reason || res.refusal || null;
+    if (!code || !WA.rejectPhrase) return res;
+    try {
+      const p = WA.rejectPhrase.phraseOf(code);
+      if (p && p.ok) res.phrase = p.text;
+      else res.phraseUnavailable = code;
+    } catch (e) { /* 话术失败不影响拒收本身：话术是旁证，不是通路 */ }
+    return res;
+  }
   function actFromScene(opts) {
     const o = opts || {};
     const aid = clean(o.actionId, 60);
-    if (!aid) return { ok: false, reason: 'missing-fields', field: 'actionId' };
+    if (!aid) return withPhrase({ ok: false, reason: 'missing-fields', field: 'actionId' });
     const mode = clean(o.mode || 'execute', 20);
     const who = clean(o.who || o.person || o.viewer, 40);
     const place = clean(o.place, 60);
@@ -3370,7 +3385,7 @@ return {
 
     // 执行模式走 workbench 统一幂等和路由
     const res = workbench(Object.assign({}, o, { actionId: aid, who: who }));
-    return Object.assign({ isSceneContext: true, viewer: who, place: place }, res);
+    return withPhrase(Object.assign({ isSceneContext: true, viewer: who, place: place }, res));
   }
 
   // ══════════════════════════════════════════════════════════════════════

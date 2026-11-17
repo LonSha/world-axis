@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.522.0';
+  const VERSION = '2.523.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -341,6 +341,13 @@
     'core/audit-log.js', 'core/sanitize.js',
     'core/settings-bus.js',
     'core/store.js',
+    //   v2.523.0（OPV27-1/2）：装载汇报与逐台耗时。**为什么排在 store 之后、引擎之前**：
+    //     ① 它靠替换 `console.log` 属性来截获 182 台引擎的自述行 ⇒ 必须早于全部引擎（否则窗口外漏行）；
+    //     ② 它在装载尾声调 `WA.registerModule`，而 registerModule 在**调用期**读 WA.store ——
+    //        排在 store 之前会构成一条“供者后装”的装载期边（module-cycle B4 会当场报次序违规）；
+    //     ③ 它自己计时走 `WA.clock`，故也不能排在 clock 之前。
+    //   夹在 store 与引擎之间的唯一代价：clock 与 store 两条自述行漏在窗口外（实两行，可接受）。
+    'core/boot-report.js',
     // v2.118.0（计划二 B7）：显式执行上下文（试演的承重结构）。位置只需**早于** engines 区 ——
     //   act.js / world.js 都在**调用期**经 WA.exec 取值（装载期不读），故对次序无硬要求；
     //   放在 store 之后是刻意的：它自身不读 WA.store，但 cloneState 的入参是 WA（含 store），
@@ -1385,6 +1392,20 @@
     'engines/pilgrim-flow.js',         // EXV24-7 香客香火 / 还愿凭据硬门禁
     'engines/dice-den.js',             // EXV24-8 赌坊骰局 / 决策流开骰 / 出千留痕
     'engines/bathhouse-laundry.js',    // EXV24-9 浴堂浆洗 / 洁净档按故事时间衰减
+    'engines/pawn-redemption.js',      // EXV27-1 当票质押 / 本息结清才还物 / 绝当余款不许吞
+    'engines/silver-assay.js',         // EXV27-2 银钱成色 / 倾煎火耗 / 短陌
+    'engines/salt-franchise.js',       // EXV27-3 盐引额 / 越额即私盐 / 查缉须见证
+    'engines/broker-house.js',         // EXV27-4 牙行居间 / 抽佣上限 / 失信须告发
+    'engines/night-watch.js',          // EXV27-5 更夫夜禁 / 报事须在班 / 无见证不立
+    'engines/fire-watch.js',           // EXV27-6 火政走水 / 起火须声明 / 扑救按算术
+    'engines/festival-fair.js',        // EXV27-7 灯会庙市 / 客流分派 / 灯棚火险档
+    'engines/ward-compact.js',         // EXV27-8 保甲乡约 / 甲长连坐 / 义仓放赈
+    'engines/divination-craft.js',     // EXV27-9 巫觋占卜 / 应验不许改口 / 断语哄传
+    'engines/inject-delta.js',         // OPV27-9 注入信息增量账 / 逐源唯一片段 / 只读不改正文
+    'engines/reject-phrase.js',        // OPV27-7 拒收码五簇话术 / 覆盖率读数 / 未覆盖如实甩码
+    'engines/settings-index.js',       // OPV27-6 设置面中文索引 / 搜索 / 分组 / 关掉会怎样
+    'engines/save-curve.js',           // OPV27-3 存档体积四点曲线 / 容器增长排名 / 只读不写档
+    'engines/narrow-consumers.js',     // OPV27-5 12 台窄消费引擎接产品链 / 在用机制一行
     'engines/sartorial-regalia.js',    // EXV22-5 服饰规制 / 僭越风险 / 身份识别
     'engines/betrothal-alliance.js',   // EXV22-6 婚约聘娶 / 妆匛议价 / 门第联姻
     'engines/cartography-survey.js',   // EXV22-7 舆图测绘 / 精度分层 / 迷雾认知
@@ -1852,14 +1873,84 @@
     } catch (e) { /* 预取失败 ⇒ 退回逐个通道，不改变正确性 */ }
     // 装载**前**刷盘：记下「正在加载谁」。写在装载后只能看到「谁完成了」，
     // 而真机卡点恰恰是「那一个没完成」—— 这一字之差决定了能不能定位。
-    for (const rel of LOAD_ORDER) {
-      __flush({ phase: 'loading', at: rel });
-      const r = await loadScript(rel); // 串行保证依赖顺序
-      __prog.done++;
-      if (!r || r.ok !== true) {
-        __prog.failed.push({ rel: rel, err: (r && (r.error || r.failed)) || 'unknown' });
+    // ── v2.523.0（OPV27-1）：启动噪音收口 ·（OPV27-2）：逐台装载耗时 ────────────
+    //   【现场读数 R1】182 台引擎各打一行 `[WorldAxis] engines/xxx 已加载（ver）` ⇒ 扩展一装好
+    //     控制台就刷 182 行，真正的告警被淹掉；R2 的「空世界 485ms」只有总量读数，
+    //     **没有任何一处回答这 485ms 花在谁身上**。
+    //   【落点】收口器是独立模块 `core/boot-report.js`（可单独开窗/关窗/自证），本处只做接线：
+    //     · 只在装载窗口内截获「自述行」，其余 log/warn/error **原样放行**（告警照旧必响）；
+    //     · 每台模块实测 `loadScript` 往返耗时（eval + 注册全算），与自述版本合成逐台明细；
+    //     · 窗口**无论如何都关**（finally），再打**一条**装载汇报。
+    //   【为什么逻辑不在 init() 里】测试桩只逐台 eval 模块、从不执行 init()，
+    //     写在 init() 里等于这段代码在 591 个测试文件里一次也不会被执行。
+    //   【计时口径】走上面第 47 行的 `clockWall()`（测量时钟），不裸调 Date.now()：
+    //     裸调会绕过冻结，回放对不上时只能全库通读（tests/run.js K20 的判据）。
+    const __bootRows = [];
+    const __bootT0 = clockWall();
+    let __bootCap = null;
+    let __bootClosed = { selfLines: [], quietLines: 0 };
+    const __openCap = function () {
+      if (__bootCap) return __bootCap;
+      try {
+        if (WA.bootReport && typeof WA.bootReport.open === 'function') {
+          __bootCap = WA.bootReport.open({ ver: VERSION });
+        }
+      } catch (e) { /* 采集器起不来 ⇒ 照常装载，只是没有逐台版本与降噪；不许因为它停装 */ }
+      return __bootCap;
+    };
+    try {
+      for (const rel of LOAD_ORDER) {
+        __flush({ phase: 'loading', at: rel });
+        __openCap();  // 第一个模块装完即开窗：此后逐台自述行不再刷控制台
+        const __t0 = clockWall();
+        const r = await loadScript(rel); // 串行保证依赖顺序
+        __bootRows.push({ rel: rel, ms: Math.round((clockWall() - __t0) * 10) / 10,
+          ok: !!(r && r.ok === true), ver: '' });
+        __prog.done++;
+        if (!__bootRows[__bootRows.length - 1].ok) {
+          __prog.failed.push({ rel: rel, err: (r && (r.error || r.failed)) || 'unknown' });
+        }
+        __flush({ phase: 'loading', at: rel });
       }
-      __flush({ phase: 'loading', at: rel });
+    } finally {
+      // 采集器不许把宿主控制台改坏：装载失败也在这里还原。
+      try {
+        __bootClosed = (__bootCap && typeof __bootCap.close === 'function')
+          ? __bootCap.close() : { selfLines: [], quietLines: 0 };
+      } catch (e) { __bootClosed = { selfLines: [], quietLines: 0 }; }
+    }
+    // 版本以**引擎自述**为准（不是拿 manifest 回填）：这样「某台引擎的版本没跟上」
+    // 会直接出现在同一张逐台表里，而不是靠升版脚本另行发现。
+    const __verMap = {};
+    (__bootClosed.selfLines || []).forEach(function (x) { __verMap[x.self] = x.ver; });
+    if (!__verMap['core/boot-report.js']) {
+      __verMap['core/boot-report.js'] = (WA.bootReport && WA.bootReport.ver) || VERSION;
+    }
+    const __bootMeta = { ver: VERSION, quietLines: __bootClosed.quietLines || 0,
+      elapsedMs: Math.round(clockWall() - __bootT0), total: LOAD_ORDER.length, verMap: __verMap };
+    if (WA.bootReport && typeof WA.bootReport.summarize === 'function') {
+      WA.boot = WA.bootReport.summarize(__bootRows, __bootMeta);
+    } else {
+      // 收口器缺失（模块装载失败）⇒ **不许静默**：汇报里如实写「无逐台读数 / 未降噪」。
+      const __okN = __bootRows.filter(function (x) { return x.ok; }).length;
+      const __badN = __bootRows.filter(function (x) { return !x.ok; });
+      WA.boot = {
+        ver: VERSION, total: LOAD_ORDER.length, ok: __okN,
+        failed: __badN.map(function (x) { return x.rel; }),
+        engines: __bootRows.filter(function (x) { return x.rel.indexOf('engines/') === 0; }).length,
+        elapsedMs: __bootMeta.elapsedMs, quietLines: 0, p50: 0, p95: 0, max: 0,
+        rows: function () { return __bootRows.slice(); },
+        slow: function () { return []; },
+        report: function () {
+          return '已装载 ' + __okN + '/' + LOAD_ORDER.length + '·失败 ' + __badN.length
+            + ' · ' + __bootMeta.elapsedMs + 'ms（boot-report 缺失：无逐台版本 / 无分位 / 未降噪）';
+        }
+      };
+    }
+    // 汇报**只打一条**；失败仍逐条必响（error 级），不被降噪静默。
+    if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] ' + WA.boot.report());
+    if (WA.boot.failed.length && typeof console !== 'undefined' && console.error) {
+      console.error('[WorldAxis] 装载失败 ' + WA.boot.failed.length + ' 个：' + WA.boot.failed.join(', '));
     }
     __flush({ phase: 'modules-done' });
     __mark('modules-done');

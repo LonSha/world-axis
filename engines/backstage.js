@@ -791,12 +791,19 @@
     // ════════════════════════════════════════════════════
     // 结算器（全量入账）
     // ════════════════════════════════════════════════════
-    /** V8 scheduled archive writer. Caller owns transaction; no digest/model/network side effects. */
-    archiveScheduled(draft, title, eventId, opId) {
-      draft.chronicle.push({ id: WA.rand.id('ch', 4, 'id'), kind: 'scheduled-event', title: title,
-        summary: '', at: clockNow('backstage'), refs: [], eventId: eventId, eventOpId: opId });
-      WA.evict.array(draft.chronicle, 'backstage.chronicle');
-    },
+      // V8 scheduled archive writer. Caller owns transaction; no digest/model/network side effects.
+      // v2.523.0（OPV27-3 真裁剪·按存档曲线排名裁）：原先恒写 `summary: ''` 与 `refs: []`。
+      //   两条都是**恒空占位**，读侧全部容缺——`chronicle-view` 走 `c.summary || c.desc || ''`
+      //   与 `Array.isArray(c.refs) ? c.refs.slice(0,4) : []`（81/82 行），`ui/panel` 走
+      //   `(c.summary || '').slice(0,80)`（700 行）。空串与空数组存不存，读出来一模一样。
+      //   实测依据（/tmp/pcurve4.cjs，产品同一写口 200 次）：基线 42503B / 单条 213B，
+      //   这两枚空字段占 23B/条 ⇒ 200 条常年满仓白放 ≈4.6KB（约 10.8%）。
+      //   老档可读：旧条目的空字段原样留着，读侧本来就不依赖它们存在。
+      archiveScheduled(draft, title, eventId, opId) {
+        draft.chronicle.push({ id: WA.rand.id('ch', 4, 'id'), kind: 'scheduled-event', title: title,
+          at: clockNow('backstage'), eventId: eventId, eventOpId: opId });
+        WA.evict.array(draft.chronicle, 'backstage.chronicle');
+      },
     /** V9: explicitly enroll a current; scheduling is not inferred from calendar ETA. */
     setCurrentAdvance(id, enabled) {
       if (typeof enabled !== 'boolean') return {ok:false,reason:'bad-enabled'};

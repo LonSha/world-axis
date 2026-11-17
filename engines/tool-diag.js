@@ -3477,6 +3477,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/tactical-combat.js': 'tacticalCombat',
     'engines/populate.js': 'populate',
     'core/clock.js': 'clock',
+    'core/boot-report.js': 'bootReport',   // v2.523.0（OPV27-1/2）：装载汇报 + 逐台耗时面
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/input-guard.js': 'inputGuard', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块 —— 登记一次到位。
     //   漏登记一条的后果不是「报错」，而是「自检看不见的黑盒」（inventory 的未登记模块面）。
@@ -4121,6 +4122,20 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/pilgrim-flow.js': 'pilgrimFlow',
     'engines/dice-den.js': 'diceDen',
     'engines/bathhouse-laundry.js': 'bathhouseLaundry',
+    'engines/pawn-redemption.js': 'pawnRedemption',
+    'engines/silver-assay.js': 'silverAssay',
+    'engines/salt-franchise.js': 'saltFranchise',
+    'engines/broker-house.js': 'brokerHouse',
+    'engines/night-watch.js': 'nightWatch',
+    'engines/fire-watch.js': 'fireWatch',
+    'engines/festival-fair.js': 'festivalFair',
+    'engines/ward-compact.js': 'wardCompact',
+    'engines/divination-craft.js': 'divinationCraft',
+    'engines/inject-delta.js': 'injectDelta',
+    'engines/reject-phrase.js': 'rejectPhrase',
+    'engines/settings-index.js': 'settingsIndex',
+    'engines/save-curve.js': 'saveCurve',
+    'engines/narrow-consumers.js': 'narrowConsumers',
     'engines/sartorial-regalia.js': 'sartorialRegalia',
     'engines/betrothal-alliance.js': 'betrothalAlliance',
     'engines/cartography-survey.js': 'cartographySurvey',
@@ -4339,7 +4354,68 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         const b = li.budget;
         out.budget = { used: b.used, cap: b.cap, source: b.source, contextSize: b.contextSize || null, remain: b.remain, inputTokens: b.inputTokens, saved: b.saved, overBudget: !!b.overBudget, keptCount: b.keptCount || 0, foldedCount: (b.folded || []).length, droppedCount: (b.dropped || []).length };
         if ((b.dropped || []).length) out.budget.dropped = b.dropped;
+        // v2.523.0（OPV27-4）：**被裁清单要能一句话回答**「这轮关系块为什么没进来」。
+        //   修前诊断包里 dropped 只是 {source, reason, tokens, remainAt} 四列的原始账：
+        //   读者知道「它没进来、因为 no_budget」，却答不出「丢了它我损失了多少信息、
+        //   同一科的事还有没有别人在说」。故这里把 plan 的档位与 **explain() 的人话**
+        //   一并提到诊断面上（与面板同一判据，不各算一套）。
+        out.budget.droppedForced = (b.dropped || []).filter(function (x) { return x.tier === 'unique'; })
+          .map(function (x) { return { source: x.source, tokens: x.tokens, reason: x.reason }; });
+        out.budget.droppedExplain = (function () {
+          const first = (b.dropped || [])[0];
+          if (!first) return null;
+          if (!WA.injectBudget || typeof WA.injectBudget.explain !== 'function') return null;
+          // 用**快照里的账单**当计划喂给 explain：诊断包只能读快照（plan 已随轮次丢弃），
+          //   故 explain 只依赖 kept/folded/dropped 三张表这一事实在此处变得关键。
+          const pseudo = { kept: b.keptRaw || [], folded: b.folded || [], dropped: b.dropped || [] };
+          const ex = WA.injectBudget.explain(pseudo, first.source);
+          return { source: first.source, tier: first.tier || null, savedTokens: first.savedTokens == null ? first.tokens : first.savedTokens,
+            text: ex && ex.text ? ex.text : null, ok: !!(ex && ex.ok) };
+        })();
         out.budget.summary = WA.injectBudget && WA.injectBudget.summaryText ? WA.injectBudget.summaryText({ used: b.used, budget: b.cap, overBudget: !!b.overBudget, folded: b.folded || [], dropped: b.dropped || [], saved: b.saved, cost: b.cost || null, headroom: b.headroom || null }) : null;
+        // v2.523.0（V27 优化线剩余六项）：六张新读数一次挂进诊断包。
+        //   它们都是「玩家问一句、面板答一句」的面，没有各自的深层结构，
+        //   所以在诊断面统一成一行行 text，而不是各开一棵树（开树要各自的读口与契约，
+        //   那六棵树本轮没有消费者，就是下一个「死面」）。
+        out.v27 = (function () {
+          const r = {};
+          try {
+            if (WA.saveCurve) {
+              const sc = WA.saveCurve.report();
+              r.saveCurve = { text: sc.text,
+                points: (sc.curve && sc.curve.points) ? sc.curve.points.length : 0,
+                growthTop: (sc.growth && sc.growth.ok) ? sc.growth.rows.slice(0, 3) : [] };
+            }
+          } catch (e) { r.saveCurve = { text: '读不到：' + String(e && e.message) }; }
+          try {
+            if (WA.narrowConsumers) {
+              const nb = WA.narrowConsumers.board();
+              r.narrow = { text: nb.text, byKind: nb.byKind,
+                rows: (nb.rows || []).map(function (x) { return { zh: x.zh, kind: x.kind, text: x.text }; }) };
+            }
+          } catch (e) { r.narrow = { text: '读不到：' + String(e && e.message) }; }
+          try { if (WA.settingsIndex) r.settingsIndex = WA.settingsIndex.coverage(); }
+          catch (e) { r.settingsIndex = { text: '读不到：' + String(e && e.message) }; }
+          try { if (WA.rejectPhrase) r.rejectPhrase = WA.rejectPhrase.stat(); }
+          catch (e) { r.rejectPhrase = { text: '读不到：' + String(e && e.message) }; }
+          try {
+            if (WA.injectDelta && WA.injectDelta.last) {
+              const dl = WA.injectDelta.last();
+              r.injectDelta = dl ? { text: dl.text, dupRate: dl.dupRate, sources: dl.sources } : { text: '本轮还没有读数' };
+            }
+          } catch (e) { r.injectDelta = { text: '读不到：' + String(e && e.message) }; }
+          try {
+            if (WA.store && WA.store.loadStat) {
+              const ls = WA.store.loadStat();
+              const lf = (ls && ls.lastFix) || {};
+              r.shape = { filled: lf.filled || 0, conflicts: lf.conflicts || 0,
+                missingTotal: lf.missingTotal || 0, missing: (lf.missing || []).slice(0, 8),
+                text: (lf.missingTotal ? ('本次载入缺 ' + lf.missingTotal + ' 键（已按默认补齐，清单见上）')
+                  : '本次载入骨架完整（缺 0 键）') };
+            }
+          } catch (e) { r.shape = { text: '读不到：' + String(e && e.message) }; }
+          return r;
+        })();
         // v2.261.0（V6 OPV6-6）：**余量账**。修前诊断包里只有 `used/cap` 两个裸数——
         //   「还剩多少、算不算饱和、还能再开几个源」三问在诊断包上**无一可答**，
         //   于是「预算不够」永远是玩家的第一直觉（现场实测长局只用 43%）。
