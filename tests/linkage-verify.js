@@ -152,6 +152,8 @@ console.log('\n[3] difficulty.effective().cost —— 世界难度对体力消�
   if (!d || typeof d.effective !== 'function') F('effective 缺失');
   else {
     // 默认 enabled:false —— 那是用户开关，不是缺陷。这里显式启用后再验真值。
+    // v2.518.0 收口补账：v2.412.0 起出厂默认是 true，故夹具自己关闸（不依赖出厂值）。
+    d.setSettings({ enabled: false });
     const off = d.effective();
     if (off && off.ok && off.cost === 1 && off.reason === 'disabled') P('默认关闭时 cost=1 且 reason=disabled（开关语义正确）');
     else F('关闭态语义异常: ' + JSON.stringify(off));
@@ -217,6 +219,8 @@ console.log('\n[7] events.schedule —— 金融暴雷是否进入统一事件�
   if (!ev || typeof ev.schedule !== 'function') F('schedule 缺失');
   else {
     // 默认 enabled:false —— 用户开关，不是缺陷。
+    // v2.518.0 收口补账：v2.412.0 起出厂默认是 true，故夹具自己关闸。
+    ev.setSettings({ enabled: false });
     const off = ev.schedule({ id: '__verify_off__', title: '关闭态', kind: 'once' });
     if (off && off.ok === false && off.reason === 'disabled') P('默认关闭时排期被拒并写明 reason=disabled');
     else F('关闭态语义异常: ' + JSON.stringify(off));

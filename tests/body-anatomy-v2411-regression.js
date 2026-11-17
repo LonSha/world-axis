@@ -10,7 +10,10 @@ W.store.init();
 const B = W.bodyAnatomy;
 a(B, 'bodyAnatomy 命名空间已装载');
 
-// ── ① 总开关默认关：register 返回 disabled 不记账，buildBlock 返回空串 ──
+// ── ① 总开关关：register 返回 disabled 不记账，buildBlock 返回空串 ──
+// v2.518.0 收口补账：v2.412.0 全开策略把出厂默认改成 true，本节钉的是「关着时的行为」，
+//   故夹具显式关闸再验（判据本身一个字未改）。
+B.setSettings({ enabled: false });
 a.strictEqual(B.getSettings().enabled, false);
 const dis = B.register('甲', { anchor: '桌边' });
 a.strictEqual(dis.ok, true);

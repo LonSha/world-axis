@@ -12,6 +12,9 @@ W.store.init();
  assert(schedule.order<advance.order&&advance.order<receipts.order);
  const simulate=nodes.find(n=>n.id==='backstage.simulate');
  assert(simulate && receipts.order<simulate.order);
+ // v2.518.0 收口补账：v2.412.0 起出厂默认是 true，本条钉的是「关着时不调度」，
+ //   故夹具显式关闸（判据未改）。
+ W.agency.setSettings({enabled:false});
  assert.strictEqual((await schedule.run()).reason,'disabled');
  W.agency.setSettings({enabled:true,maxSchedulePerTurn:1});
  W.store.transact(d=>{d.people.a={name:'甲',life:{goals:[{status:'active'}]}};d.people.b={name:'乙',life:{goals:[{status:'active'}]}};});
