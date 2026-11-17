@@ -32,11 +32,20 @@
   const stat = { baths: 0, washed: 0, refused: 0, lastReason: '' };
   const FRESH = {}; // who -> {lastBathAt, lastWashAt}
   function str(v) { return String(v == null ? '' : v).trim(); }
-  function band(daysSince) {
+  // v2.518.0 收口：`decayDays` 从「登记了却无人读」变成真开关。
+  //   病象（本批全量实测）：「登记表 def 子键全部有生产消费点」当场点名
+  //   bathhouseLaundry.decayDays：def 声明了它（bounds 还给到 [1,14]），而档位分界
+  //   写死在 1/3/7。一个读不到的设置项比没有它更坏：玩家改了没反应，而面板上看得到。
+  //   现在分界由它定：清爽 ≤ floor(decayDays/3)；尚可 ≤ decayDays；
+  //   有味 ≤ decayDays*2+1；其余最重一档。
+  //   取 def=3 代入恰得 1/3/7 —— 即**默认值下与旧行为逐字等价**，老基准不被这次修复动到。
+  function band(daysSince, decayDays) {
     if (daysSince == null) return '有味';
-    if (daysSince <= 1) return '清爽';
-    if (daysSince <= 3) return '尚可';
-    if (daysSince <= 7) return '有味';
+    const d = Number(decayDays);
+    const lim = Number.isFinite(d) && d > 0 ? d : DEF.decayDays;
+    if (daysSince <= Math.floor(lim / 3)) return '清爽';
+    if (daysSince <= lim) return '尚可';
+    if (daysSince <= lim * 2 + 1) return '有味';
     return '酸馊';
   }
   function openBath(spec) {
@@ -53,7 +62,7 @@
       delete FRESH[oldest];
     }
     stat.baths++;
-    return { ok: true, who: who, band: band(0) };
+    return { ok: true, who: who, band: band(0, cfg.decayDays) };
   }
   function washGarments(spec) {
     const cfg = settings();
@@ -69,7 +78,7 @@
       delete FRESH[oldest];
     }
     stat.washed++;
-    return { ok: true, who: who, band: band(0) };
+    return { ok: true, who: who, band: band(0, cfg.decayDays) };
   }
   function bandOf(spec) {
     const s = spec && typeof spec === 'object' ? spec : {};
@@ -80,7 +89,7 @@
     const rec = FRESH[who];
     const bathDays = rec ? Math.floor((at - rec.lastBathAt) / 86400000) : null;
     const washDays = rec && rec.lastWashAt ? Math.floor((at - rec.lastWashAt) / 86400000) : null;
-    return { ok: true, who: who, bathBand: band(bathDays), washBand: band(washDays) };
+    return { ok: true, who: who, bathBand: band(bathDays, settings().decayDays), washBand: band(washDays, settings().decayDays) };
   }
   function view() { return { ok: true, rows: Object.keys(FRESH).map(function (k) { return Object.assign({ who: k }, FRESH[k]); }) }; }
   function statView() { return Object.assign({ tracked: Object.keys(FRESH).length }, stat); }

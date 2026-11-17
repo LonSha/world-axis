@@ -3906,6 +3906,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     // v2.517.0（V26 收口）：世界脉搏聚合块补登记（v2.415.0 引入时漏登，inventory 一直报
     //   「未登记模块」—— 面板转发在运行期惰性读它，缺席=整块降级，与 overview-blocks 同款）。
     'ui/pages/overview-world-pulse.js': 'panelWorldPulse',
+    // v2.518.0 收口（UI-P1）：玩家面两个页模块补登记。与 overview-world-pulse 同款：
+    //   面板在运行期惰性读它们（WA.panelNowPage / WA.panelPeoplePage），缺席时整段降级
+    //   ——那正是「看起来正常、实际没读数」那一族。不登记的后果已实测：
+    //   「诊断清单覆盖全部磁盘模块」当场报缺这两个文件。
+    'ui/pages/now-page.js': 'panelNowPage',
+    'ui/pages/people-page.js': 'panelPeoplePage',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -4200,6 +4206,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       'panelOverviewBlocks',
       // v2.517.0（V26 收口）：世界脉搏聚合块同款（无头环境不装载 → optionalMissing）。
       'panelWorldPulse',
+      // v2.518.0 收口（UI-P1）：玩家面两个页模块同款（无头环境不装载 → optionalMissing）。
+      'panelNowPage',
+      'panelPeoplePage',
     ];
   function secModules() {
     const missing = [], loaded = [], optionalMissing = [];

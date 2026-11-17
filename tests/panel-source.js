@@ -132,6 +132,36 @@ function panelSource() {
   });
   return lines.join('\n');
 }
+// -- page modules outside the split: the other half of the host wire face (v2.518.0 UI-P1) --
+//   ui/panel.js is the panel HOST face. Its rendering is split in two kinds of files:
+//     1) SEGMENTS: bodies re-inlined by panelSource(), already inside the panel face;
+//     2) page modules without OPV markers: separate files, pulled in by panel.js calling
+//        WA.panelXxx.render() (overview-world-pulse / now-page / people-page).
+//   kind 2 ids are REFERENCED in panel.js but RENDERED elsewhere -- if their sources are
+//   not part of the face, the reference-vs-render audit reports every such control as a ghost.
+//   v2.413.0 patched this for overview-world-pulse only (PULSE_REL); v2.518.0 added
+//   now-page / people-page and it broke at once: wa-now-back-chat became a ghost.
+//   A single-point fix does not grow with the repo, so this is dynamic discovery now:
+//   every ui/pages/*.js not in SEGMENTS joins the host face.
+//   This is not a pass-through: it only states WHERE something is rendered.
+const SEGMENT_RELS = SEGMENTS.map(function (s) { return s.rel; });
+function pageModuleRels(dir) {
+  const d = dir || BASE;
+  let names = [];
+  try { names = fs.readdirSync(path.join(d, 'ui/pages')); } catch (e) { return []; }
+  return names.filter(function (n) { return /\.js$/.test(n); }).sort()
+    .map(function (n) { return 'ui/pages/' + n; })
+    .filter(function (rel) { return SEGMENT_RELS.indexOf(rel) < 0; });
+}
+/** Host wire face = recombined panel face + every page module outside SEGMENTS. */
+function panelWireFace(dir) {
+  const d = dir || BASE;
+  const parts = [panelSource()];
+  pageModuleRels(d).forEach(function (rel) {
+    try { parts.push(fs.readFileSync(path.join(d, rel), 'utf8')); } catch (e) {}
+  });
+  return parts.join('\n');
+}
 /** 面板源码面的行数（拆段前 17577 行；用于「面没塌」的粗读数）。 */
 function panelSourceLines() { return panelSource().split('\n').length; }
 /** 拆段之后 panel.js 自己的行数（不含重组）。 */
@@ -147,6 +177,8 @@ BODY_OPEN: BODY_OPEN,
   SEGMENTS: SEGMENTS,
   segmentBody: segmentBody,
   overviewBlocksBody: overviewBlocksBody,
+  pageModuleRels: pageModuleRels,
+  panelWireFace: panelWireFace,
   panelSource: panelSource,
   panelSourceLines: panelSourceLines,
   panelFileLines: panelFileLines

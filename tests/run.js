@@ -4452,7 +4452,13 @@ const __ctxGuard = require('./context-guard.js').boundary();
   //   实测 200（200 条带 cap 的活键，撤下项 0 条残留），故回填为 200。
   //   为什么这次是「表长了」而不是再次撤下：这些容器都有真写点与真裁剪点（cap 在 evict 侧成对
   //   登记，G18 负控制把住），与 v2.382.0 撤下的两条「零写点死容器」性质相反。
-  assert(rpA1700.checked === 200, 'checked 精确值 185（现场实测：__BOUNDED_CAPS 精确非通配键；v2.382.0 撤除 humanRealism.log / routinePacing.history 两条零写点死容器登记 ⇒ 187→185；v2.250.0（VAC-4）新增 genTiming.ledger / oneShotMod.pending / moodGlide.moods / narrativeDeduction.timeline 四环，并把 livingWorld 八环与 geoTracker 两环改 per-call；实际集合由下一条 checkedKeys 与登记表双向核对）');
+  //   v2.411.0 第六次回填（200 → 201）：R251 缝合批新增 bodyAnatomy.rows（cap 24，人体
+  //   结构契约环形）—— core/store.js 的 __BOUNDED_CAPS、core/evict.js 的 SITES 与
+  //   骨架物化三处同批登记（G18 双向核对就是押这三处一致），
+  //   而本判据的常量没跟。第六次也是同一句话：**常量必须跟登记表走**。
+  //   实测口径（本次当场重算，不拄历史）：非通配容器 201 项 = 数组键 171 + 对象键 30，
+  //   与 registryParity().checkedKeys 集合相等（数量相等且逐项相同，由下一条双向核对担保）。
+  assert(rpA1700.checked === 201, 'checked 精确值 201（现场实测：__BOUNDED_CAPS 精确非通配键；v2.382.0 撤除 humanRealism.log / routinePacing.history 两条零写点死容器登记 ⇒ 187→185；v2.250.0（VAC-4）新增 genTiming.ledger / oneShotMod.pending / moodGlide.moods / narrativeDeduction.timeline 四环，并把 livingWorld 八环与 geoTracker 两环改 per-call；实际集合由下一条 checkedKeys 与登记表双向核对）');
   // ── B. object 键漏物化检出（v1.6.0 盲区修复）──
   fresh1700();
   WA.store.transact(d => { delete d.people; });
@@ -13887,7 +13893,10 @@ assert(r2900.dead.length === 1688 && r2900.uiDead.length === 7 && r2900.dataOnly
     // ── H. 反向自证一：幽灵绑定 = 0（引用面 → 渲染面；新页面必须先过这一关）──
     {
       // v2.401.0(OPV23):接线审计的「引用面 → 渲染面」必须在同一面上对账——改读 panelSource() 重组面（渲染模板已搬进段体，锚点跟现场走，扩输入面）
-      var wire2330 = __uiWire.auditWire(require('./panel-source.js').panelSource());
+      // v2.518.0 收口（UI-P1）：再改读 panelWireFace()——非拆段页模块（now-page / people-page /
+      //   overview-world-pulse）的渲染面不属于重组面，而 panel.js 会去绑它们渲染的 id。
+      //   只读重组面会把这些 id 当成幽灵（假红）；不改判据，只扩输入面。
+      var wire2330 = __uiWire.auditWire(require('./panel-source.js').panelWireFace());
       assert(wire2330.ghosts.length === 0, 'v2330: ui/panel.js 零幽灵绑定（实 ' + wire2330.ghosts.length + '：' + wire2330.ghosts.slice(0, 6).join(',') + '）');
     }
 
@@ -14209,10 +14218,13 @@ assert(r2900.dead.length === 1688 && r2900.uiDead.length === 7 && r2900.dataOnly
     assert(rp.ok, 'v2350: registryParity 仍绿（snapshots/ledger 已物化）');
     // v2.162.0 回填（现场实测 137）：与 v1700 段那条同源 —— 精确非通配登记键，
     //   集合面（哪个键在册）由 checkedKeys 与登记表双向核对，本处只钉精确等值。
+    //   v2.411.0 回填（200 → 201）：与 v1700 段同步同因（R251 缝合批新增
+    //   bodyAnatomy.rows 一条容量容器）。两处必须同步改，否则对同一个量
+    //   给出两个期望值——那正是「同一份真源两处手抄」。
     //   v2.382.0 回填（187 → 185）：与 v1700 段同源同因（撤除 humanRealism.log /
     //   routinePacing.history 两条零写点死容器登记）。两处必须同步改，否则本段与
     //   v1700 段会对同一个量给出两个不同的期望值 —— 那正是「同一份真源两处手抄」。
-    assert(rp.checked === 200, 'v2350: checked 精确值 200（现场实测；与 v1700 段同源，集合面由 checkedKeys 双向核对；v2.409.0 同批两组引擎登记 15 条容量容器 ⇒ 185→200）');
+    assert(rp.checked === 201, 'v2350: checked 精确值 201（现场实测；与 v1700 段同源，集合面由 checkedKeys 双向核对；v2.409.0 同批两组引擎登记 15 条容量容器 ⇒ 185→200）');
     assert((rp.checkedKeys || []).indexOf('parallelWorld.snapshots') >= 0, 'v2350: snapshots 进精确键');
     assert((rp.checkedKeys || []).indexOf('evolution.ledger') >= 0, 'v2350: ledger 进精确键');
 
@@ -14652,9 +14664,11 @@ assert(r2900.dead.length === 1688 && r2900.uiDead.length === 7 && r2900.dataOnly
     // ── D. 接线审计在**完整文件面**上仍零幽灵（不是「少扫了文件所以干净」）──
     let ghostTotal4200 = 0;
     mine4200.forEach(function (rel) {
-      // v2.401.0(OPV23):同上——审计输入面改读 panelSource() 重组面（引用与渲染同面对账）
+      // v2.401.0(OPV23):后面改读 panelSource() 重组面（引用与渲染同面对账）
+      // v2.518.0 收口（UI-P1）：再改读 panelWireFace()——非拆段页模块的渲染面在另一个文件里，
+      //   而 panel.js 会去绑它们渲染的 id。判据一字未改，只扩输入面（否则是假红）。
       const r = wire4200.auditWire(rel === 'ui/panel.js'
-        ? require('./panel-source.js').panelSource()
+        ? require('./panel-source.js').panelWireFace()
         : fs4200.readFileSync(path4200.join(BASE, rel), 'utf8'));
       ghostTotal4200 += r.ghosts.length;
     });

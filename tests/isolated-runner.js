@@ -280,8 +280,28 @@ async function launch(root, options) {
         }
       } catch (e) {
         pruneNote = 'wrap 裁剪失败（拒裁兜底，照跑原版）：' + e.message;
-        // 拒裁时恢复原版：git worktree 副本重新 checkout run.js（work 是独立 git 仓）
-        try { cp.spawnSync('git', ['-C', prepared.work, 'checkout', '--', 'tests/run.js'], { timeout: 30000 }); } catch (e2) { /* git 兜底失败则留给原文件 */ }
+        // v2.518.0 收口：拒裁兜底必须恢复**候选代码**，不是 HEAD。
+        //   旧写法是 `git checkout -- tests/run.js`，而 work 是独立 git 仓（prepare 先把 HEAD 归档成
+        //   baseline commit，再用候选树整体覆盖、并 commit 了一次）。于是 checkout 恢复的是
+        //   **那个 baseline commit**（= 仓库 HEAD）——候选工作区里的未提交改动被静默丢掉。现场后果：
+        //   定向跑一轮失败后，整趟执行的是旧代码，而日志里只有一行「拒裁兜底」，
+        //   断言红得不可思议（实侧是「你没改过」）——这正是本仓反复裁决的「判据的输入面不是要测的东西」。
+        //   修法：从**源工作区**把 tests/run.js 复制回来，并用 prepare 时录下的候选
+        //   digest 当场核对；不符就声明这趟不作数（10 号退码），而不是安静地跑错代码。
+        try {
+          fs.copyFileSync(path.join(root, 'tests/run.js'), runPath);
+          const want = prepared.before && prepared.before['tests/run.js'];
+          const got = digest(fs.readFileSync(runPath));
+          if (want && want !== got) {
+            pruneNote += ' · 恢复后与候选快照不符（期 ' + String(want).slice(0, 10) + ' / 实 ' + String(got).slice(0, 10) + '）⇒ 本趟不作数';
+            fs.writeSync(fd, pruneNote + String.fromCharCode(10));
+            throw new Error('prune fallback restored source does not match candidate snapshot');
+          }
+          pruneNote += ' · 已从候选源恢复并核对 digest';
+        } catch (e2) {
+          if (e2 && String(e2.message).indexOf('does not match candidate') >= 0) throw e2;
+          pruneNote += ' · 候选源恢复失败：' + (e2 && e2.message);
+        }
       }
       // v2.253.0：**必须走同一个 fd**。旧实现用 appendFileSync（另开一个 fd 追加到当前 EOF），
       //   而本函数的 logFd 是 'wx' 打开的、偏移还在 0 —— 父进程先写、子进程随后从偏移 0

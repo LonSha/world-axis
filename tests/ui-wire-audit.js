@@ -19,6 +19,15 @@ const path = require('path');
 const fs = require('fs');
 const BASE = path.resolve(__dirname, '..');
 const HEX = /^[0-9a-fA-F]{3,8}$/;
+// 宿主文档的 id（不是本仓渲染的，但本仓会去用）。
+//   为什么必须单独立表而不能塞进「已渲染」：
+//     `send_textarea` 是 SillyTavern 主文档的聊天输入框。WorldAxis 只对它 focus（「回到对话」
+//     按钮关面板后把光标送回输入框），从不渲染它。把它当成「已渲染」会让
+//     判据误以为本仓真的出了这个控件；而把它从引用面剔掉又会让「引用宿主的 DOM」
+//     这件事变成不可见。所以它是第三种状态：引用在本仓、渲染在宿主。
+//   只收宿主官方对外的输入面；新增一条必须同时在这里和使用处写清来源。
+const HOST_IDS = ['send_textarea'];
+
 
 function auditWire(src) {
   const L = src.split('\n');
@@ -44,9 +53,17 @@ function auditWire(src) {
   const renSet = {}, refSet = {};
   renKeys.forEach(function (k) { renSet[k] = 1; });
   refKeys.forEach(function (k) { refSet[k] = 1; });
-  const ghosts = refKeys.filter(function (k) { return !renSet[k]; }).sort();
+  // v2.518.0 收口（UI-P1）：幽灵分两档，不合并。
+  //   ① `ghosts`：本仓引用、本仓也应该渲染、但渲染面里没有——这是真失效（点了没反应）。
+  //   ② `hostRefs`：引用在本仓、渲染在宿主（HOST_IDS）——这是正常形态，但必须可见。
+  //   为什么不直接把 ② 当「已渲染」或「不存在」：前者让判据以为本仓
+  //   真出了这个控件，后者让「引用宿主 DOM」这件事彻底不可见。两者都是
+  //   「把一个事实读成另一个事实」，与本仓已裁决过的同族错法同型。
+  const rawGhosts = refKeys.filter(function (k) { return !renSet[k]; }).sort();
+  const ghosts = rawGhosts.filter(function (k) { return HOST_IDS.indexOf(k) < 0; });
+  const hostRefs = rawGhosts.filter(function (k) { return HOST_IDS.indexOf(k) >= 0; });
   const pure = renKeys.filter(function (k) { return !refSet[k]; }).sort();
-  return { referenced: referenced, rendered: rendered, ghosts: ghosts, pure: pure };
+  return { referenced: referenced, rendered: rendered, ghosts: ghosts, hostRefs: hostRefs, pure: pure };
 }
 
 // v2.42.0：UI 文件面**动态发现**（原为硬编码三文件清单）。
@@ -72,12 +89,13 @@ function uiFiles(dir) {
   //   必须在**同一个面**上对账，否则 panel.js 的引用会全部被误判成幽灵（渲染提及搬走了）。
   //   故 panel.js 一项返回 panelSource() 重组面（= 拆前面，逐字等价）；其余文件照读磁盘。
   const panelSrcWire = require('./panel-source.js').panelSource();
-  // v2.413.0(OPV24-2):panel.js 还会读写 ui/pages/overview-world-pulse.js 渲染的
-  //   `wa-pulse-res`（世界脉搏的结果回显行）。该文件不是拆段（无 OPV 标记、不进
-  //   panelSource 重组基线），但「引用面 → 渲染面」必须在同一面对账 —— 把它的源码
-  //   追加到 panel 对账面的尾部（append-only，不影响重组基线的逐字校验）。
-  const PULSE_REL = 'ui/pages/overview-world-pulse.js';
-  const panelSrcWireFull = panelSrcWire + '\n' + fs.readFileSync(path.join(BASE, PULSE_REL), 'utf8');
+  // v2.413.0(OPV24-2) 先给 overview-world-pulse 打了个单点（PULSE_REL）：
+  //   panel.js 会读写它渲染的 `wa-pulse-res`，而它不是拆段（无 OPV 标记）。
+  // v2.518.0 收口（UI-P1）：该单点不会随仓库长大——now-page / people-page 一落地，
+  //   `wa-now-back-chat` 当场被判成幽灵（引用在 panel.js，渲染在 ui/pages/now-page.js）。
+  //   故改读 panel-source.js 的 panelWireFace()：重组面 + 全部非拆段页模块（动态发现）。
+  //   口径未放宽：它只说清「谁渲染的」，没渲染的照样是幽灵。
+  const panelSrcWireFull = require('./panel-source.js').panelWireFace();
   return discoverUIFiles(d).map(function (rel) {
     //   rel 形如 `ui/pages/overview-blocks.js`；剥掉前缀得到 d 内的相对路径。
     //   不用 path.basename（它会把子目录丢掉 —— 见上面的 ENOENT 记录）。
@@ -147,7 +165,8 @@ async function main() {
   process.exit(0);
 }
 // 导出供 tests/run.js 复用同一判据（不复制、不漂移）
-module.exports = { auditWire: auditWire, uiFiles: uiFiles };
+
+module.exports = { auditWire: auditWire, uiFiles: uiFiles, HOST_IDS: HOST_IDS };
 if (require.main === module) {
   main().catch(function (e) { console.error('ui-wire-audit 运行器异常:', e); process.exit(2); });
 }

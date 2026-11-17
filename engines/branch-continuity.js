@@ -93,9 +93,19 @@
     // ① Schema：工作副本必须是对象，且 ops 是数组。
     chk('schema', r.draft && typeof r.draft === 'object' && Array.isArray(r.ops), 'draft 缺失或 ops 不是数组');
     // ② Evidence：每个变更都要可追溯（KEEP 豁免）。
+    // v2.518.0 收口：`requireEvidenceFor` 从「登记了却无人读」变成真开关。
+    //   病象（本批全量实测）：「登记表 def 子键全部有生产消费点」当场点名
+    //   branchContinuity.requireEvidenceFor：def 写的是 true，而这一段每次都强制查证据
+    //   —— 即那个开关写 true 还是 false，行为一样。它的语义是「是否把证据
+    //   当硬门槛」：关掉时保留**可见但不拒收**——证据缺失仍会写进 checks（观测不避免），
+    //   只是不再把 verdict 打成 reject。不这么做就只能把这个键从 def 里删掉，
+    //   而那是把一个真需求（某些剧本允许先落再补证）说成「不存在」。
+    //   默认 true 下与旧行为逐字等价（旧基准不被这次修复动到）。
+    const requireEv = settings().requireEvidenceFor !== false;
     let evFail = 0;
     ops.forEach(function (op) { const e = evidence(op); if (!e.ok) evFail++; });
-    chk('evidence', evFail === 0, evFail ? (evFail + ' 个变更缺证据/证据优先级不足') : '全部变更可追溯');
+    chk('evidence', !requireEv || evFail === 0, evFail ? (evFail + ' 个变更缺证据/证据优先级不足'
+      + (requireEv ? '' : '（requireEvidenceFor=false：仅记录不拒收）')) : '全部变更可追溯');
     // ③ Continuity：不得 ClearAll；目标槽位必须显式；不同族不得串写。
     let clearAll = 0, noSlot = 0, crossFamily = 0;
     const fam = familyOf(r.anchor || {});
