@@ -83,7 +83,7 @@ const A_BLOCKS = [
 //   挂载行本身逐字未动。
 //   v2.517.0（V26 修欠账）：V24 给挂载行追加了第九块 `${v24CivilBlock()}`（民生日志九引擎
 //   读数），本锁停在八块形态 ⇒ 同族漏网。修法仍是扩输入面（锚点跟现场走）。
-const A_MOUNT = '<div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}${v23StitchBlock()}${v24CivilBlock()}</div>';
+const A_MOUNT = '<div data-omniscient>${heartbeatBlock()}${evictBlock()}${randBlock()}${clockBlock()}${bridgeBlock()}${lonshaBlock()}${v22OmensBlock()}${v23StitchBlock()}${v24CivilBlock()}${localGridBlock()}</div>';
 // ⑤ 折叠壳的 CSS 三件套
 const A_CSS = '.wa-fold { border: 1px solid';
 // ⑥ 折叠体的零控件纪律写在代码注释里（判据读注释 = 证明「这条纪律是明写的」）
@@ -185,12 +185,14 @@ function runB(a) {
   //   v2.402.0（V23）：七块 → 八块（v23StitchBlock 同走折叠壳）。同上一次一样：
 //   数到 8 还不够 —— 必须点名第八块的身份（「有人复制了一块」也是 8）。
   //   v2.517.0（V26 修欠账）：八块 → 九块（v24CivilBlock 同走折叠壳）。
-a(folds.length === 9, 'B1: 概览页有 9 个折叠壳（实 ' + folds.length + '）—— 九块只读诊断全部折起');
+a(folds.length === 10, 'B1: 概览页有 10 个折叠壳（实 ' + folds.length + '）—— 十块只读诊断全部折起');
   a(!!foldByLabel(body, 'V22 制度读数'), 'B1b: 第七块是 V22 制度读数（v22OmensBlock，不是任何一块的复制品）');
     a(!!foldByLabel(body, 'V23 缝合线'), 'B1c: 第八块是 V23 缝合线（v23StitchBlock，不是任何一块的复制品）');
     a(!!foldByLabel(body, 'V24 民生日志'), 'B1d: 第九块是 V24 民生日志（v24CivilBlock，不是任何一块的复制品）');
+    //   v2.519.0（局部网格接线）：10 块。同上口径补第十块身份。
+    a(!!foldByLabel(body, '局部网格'), 'B1e: 第十块是局部网格（localGridBlock，不是任何一块的复制品）');
   // 每块都有 summary，且摘要含真读数（不是空壳）
-  const labels = ['引擎心跳', '容量收纳', '随机源', '时间源', '对外桥', '记忆桥', 'V22 制度读数', 'V23 缝合线', 'V24 民生日志'];
+  const labels = ['引擎心跳', '容量收纳', '随机源', '时间源', '对外桥', '记忆桥', 'V22 制度读数', 'V23 缝合线', 'V24 民生日志', '局部网格'];
   labels.forEach(function (lb) {
     const f = foldByLabel(body, lb);
     a(!!f, 'B2: 「' + lb + '」块在树中且带独立摘要');

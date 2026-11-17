@@ -71,7 +71,7 @@
     if (!t || t.status !== 'open') { stat.refused++; stat.lastReason = 'table-closed'; return { ok: false, hint: 'table-closed：没有这张在开的桌' }; }
     if (!t.bets.length) { stat.refused++; stat.lastReason = 'no-bets'; return { ok: false, hint: 'no-bets：空桌不开骰' }; }
     const rand = WA.rand;
-    if (!rand || typeof rand.pick !== 'function') { stat.refused++; stat.lastReason = 'rand-unavailable'; return { ok: false, reason: 'rand-unavailable', hint: 'rand-unavailable：没有可复现随机源不开骰 —— 绝不裸调 Math.random 兜底' }; }
+    if (!rand || typeof rand.pick !== 'function') { stat.refused++; stat.lastReason = 'rand-unavailable'; return { ok: false, reason: 'rand-unavailable', hint: 'rand-unavailable：没有可复现随机源不开骰 —— 绝不用未播种的壁钟随机兜底' }; }
     const roll = rand.pick(['大', '小'], 'diceDen:roll');
     const rows = t.bets.map(function (b) {
       const win = b.on === roll;

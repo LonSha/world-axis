@@ -82,6 +82,12 @@
     // v2.245.0 (MAP-1): 角色空间落位与感知流水容量
     'geoTracker.characterLocations': { path: 'geoTracker.characterLocations', kind: 'object', cap: 'per-call', why: '上限 = maxCharacters 设置；角色空间坐标与最新位置登记' },
     'geoTracker.locationHistory':    { path: 'geoTracker.locationHistory', cap: 'per-call', why: '上限 = maxHistory 设置；正文空间位置感知流水' },
+    // v2.519.0: 分形局部网格（场所/区域/地点/相邻边/求解缓存）
+    //   v2.522.0：五环**全线迁入 NON_EVICT**。它们是写入侧硬上界（registerVenue/Zone/Spot 与
+    //   link() 都在入口预检 `maxVenues/maxZones/maxSpots/maxLinks`，满即 fault 拒写，既有项一条不动），
+    //   产品源码里零 `WA.evict.*` 调用 —— 原先登记为挤出站点，evict-meta 的 A 面当场报四个悬空
+    //   （`localGrid.venues/zones/spots/solved`），那不是判据错，是登记面在说假话。
+    //   cap 与 __BOUNDED_CAPS 仍是同源的 per-call（上限 = 各自设置项）。
     'narrativeDeduction.timeline':  { path: 'narrativeDeduction.timeline', cap: 'per-call', why: '上限 = maxTimelineNodes 设置；双轨推演结论时间线（拦了哪一条、哪一轮拦的，可回溯）' },
     'elsewhere.rows':      { path: 'elsewhere.rows',      cap: 48, why: '幕后档案环形（FIFO 挤出最旧卡）' },
     'livingWorld.encounters':   { path: 'livingWorld.encounters',   cap: 'per-call', why: '上限 = maxEncounters 设置；玩家与NPC偶遇记录环形' },
@@ -577,6 +583,21 @@
     //   既有项一条不动 ⇒ 不走 evict。与 region.places 三条同款（v2.119.0 起同一口径）。
     'diplomacy.pairs': '写入侧硬上界 + 对象映射形态（满则 pairs-full 拒写，不走 evict）',
     'diplomacy.proposals': '同上：外交提案链（按提案号键；满则 proposals-full 拒写，不走 evict）',
+    // v2.522.0：分形局部网格五环（local-grid.js）。**同族迁移**（与 diplomacy 两环、region.places 同款）：
+    //   五处都在入口预检设置上界（maxVenues / maxZones / maxSpots / maxLinks），满即 fault 拒写，
+    //   既有项一条不动；产品源码零 `WA.evict.*` 调用。原先按挤出站点登记 ⇒ evict-meta A 面报悬空。
+    //   注意 links 是数组形态、其余四者是对象映射 —— 形态差异不影响本表口径（本表只声明「不走 evict」）。
+    'localGrid.venues': '写入侧硬上界 + 对象映射形态（满则 venues-full 拒写，不走 evict）',
+    'localGrid.zones': '同上：区域内独立平面清单（满则 zones-full 拒写）',
+    'localGrid.spots': '同上：地点真源（满则 spots-full 拒写）',
+    'localGrid.links': '同上：相邻边（满则 links-full 拒写；数组形态，同样不截断既有边）',
+    'localGrid.solved': '同上：平面求解缓存（按 zoneKey 覆盖写，满则 zones-full 拒写）',
+    // v2.522.0：分形空间拓扑三环（spatial-topology.js 进骨架后的容量面）。
+    //   cap 是 engine 内静态上界 MAX（nodes 512 / portals 1024 / activeScenes 64），满即拒写；
+    //   与 __BOUNDED_CAPS 三键同名同值，本表声明「不走 evict」以免出现零调用站点。
+    'spatialTopology.nodes': '写入侧硬上界 + 对象映射形态（满则 nodes-full 拒写，不走 evict）',
+    'spatialTopology.portals': '同上：门禁通道表（满则 portals-full 拒写；数组形态，不截断既有通道）',
+    'spatialTopology.activeScenes': '同上：角色所在子空间映射（满则 activeScenes-full 拒写）',
     // v2.173.0（TX4b）：TX3/TX4/TX6/TX7/TX8/TX9 六模块的七环。cap 是 per-call（各模块 DEF
     //   设置上界），写入侧走入口预检（满即拒写），产品源码零 WA.evict.* 调用。
     //   与 diplomacy 两环、region.places、stage.metrics 同族（v2.119.0 起同一口径）。

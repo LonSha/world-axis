@@ -3575,6 +3575,11 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/living-world.js': 'livingWorld',
     // v2.245.0 (MAP-1): 通用物理坐标、空间位置追踪与生活圈透镜
     'engines/geo-tracker.js': 'geoTracker',
+    // v2.522.0：两张空间表在诊断清单里的登记（漏登记 = 自检看不见的黑盒）。
+    //   local-grid 是平面求解器、spatial-bridge 是缝合层的统一入口 —— 两者都不进清单时，
+    //   tool-diag 的「诊断清单覆盖全部磁盘模块」会把它们报成缺件（判据在说真话）。
+    'engines/local-grid.js': 'localGrid',
+    'engines/spatial-bridge.js': 'spatialBridge',
     'engines/spatial-topology.js': 'spatialTopology',
     'engines/transit-scheduler.js': 'transitScheduler',
     'engines/environmental-occlusion.js': 'environmentalOcclusion',
@@ -5911,7 +5916,18 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       dynamic: ['wa-desk-out', 'wa-desk-life-out', 'wa-desk-flow-out', 'wa-desk-sched-out', 'wa-desk-epistemic-out', 'wa-desk-v14-out', 'wa-desk-v15-out', 'wa-desk-v16-out', ''] },
     { page: 'health', ids: ['wa-periodical-id', 'wa-periodical-name', 'wa-periodical-days', 'wa-periodical-profile', 'wa-periodical-enabled',
       'wa-periodical-config', 'wa-periodical-publish', 'wa-periodical-read'],
-      dynamic: ['wa-periodical-out'] }
+      dynamic: ['wa-periodical-out'] },
+    // v2.522.0（本轮补齐）：v2.517.0（世界脉搏）/ v2.518.0（UI-P1 玩家面）两批引入的页模块渲染了 8 个控件，
+    //   但从未进过本表 —— 全量回归里「panel 渲染的每个控件都在守卫表内」当场报 8 枚未覆盖
+    //   （wa-now-back-chat / wa-legacy-readings / wa-people-legacy / wa-sw-* 五枚）。
+    //   分层依据是**渲染条件**，不是想当然：一律塞进 ids 会让 secUi 在「开发者面 / 无玩家卡」
+    //   把它们报成缺失 —— 而那是**正确的缺席**（一个不该在场的控件「在场」才是漏洞）。
+    //   · wa-sw-* 五枚：panel.js renderEvents 里的静态模板（「故事回应窗口」段），无条件渲染 ⇒ events / ids；
+    //   · wa-legacy-readings：只在「有『此刻』卡」时才被包进 <details> ⇒ overview / cond；
+    //   · wa-now-back-chat / wa-people-legacy：玩家面专有（开发者面不渲染）⇒ overview / people 的 player 层。
+    { page: 'events', ids: ['wa-sw-enabled', 'wa-sw-capacity', 'wa-sw-traces', 'wa-sw-view', 'wa-sw-evidence'] },
+    { page: 'overview', ids: [], cond: ['wa-legacy-readings'], player: ['wa-now-back-chat'] },
+    { page: 'people', ids: [], player: ['wa-people-legacy'] }
   ];
   // v2.47.0 注记：「注入项去向」区块**不引入控件**（纯只读文本渲染，无 input/button），
   //   故上面 inject 组 id 不变。此处明写，以免后续把这版 UI 面误判成「漏登记」。

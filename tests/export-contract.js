@@ -43,6 +43,12 @@ const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf',
   // v2.517.0（V26 收口）：世界脉搏聚合块 —— 与 engines/tool-diag.js 的可选清单成对。
   //   无头环境里 ui/pages/*.js 不装载，故可选缺席（与 panelOverviewBlocks 同款）。
   'panelWorldPulse',
+  // v2.522.0（本轮补齐）：玩家面两个页模块 —— 与 tests/run.js 的 UI_NS2800 成对（两处同批）。
+  //   不登记的后果实测：本生成器会把 `panelNowPage:bind render|panelPeoplePage:bind render|`
+  //   写进契约串（它不知道这两个 ns 在无头环境是合法缺席），于是产物多 48 字符，
+  //   而 tests/run.js 本块永远不会收这两项 ⇒ 「产物与 FROZEN2800 逐字一致」恒假。
+  'panelNowPage',
+  'panelPeoplePage',
   // v2.181.0：赛博朋克 UI 主题层 9 个 ns（与 tests/run.js 的 UI_NS2800 同口径）。
   'cyberUI',
   'cyberDashboard',

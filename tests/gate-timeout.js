@@ -114,6 +114,14 @@ const TIMEOUT_ARMED = {
   //   它与 ui-live-2145 是**两个不同调用点**（前者读 ui-live-v2137 专锁，后者读 ui-live.js
   //   的 runLive 探针），故各占一条；新开调用点不入表正是本模块治的病。
   'ui-live-2163': { value: 1344000, mode: 'spawn', optionKey: 'timeout' },
+  // v2.522.0：v2.518.0（UI-P1 故事优先）批次的四把专锁。它们**当场就写了**
+  //   `timeout: 1344000 / killSignal: 'SIGKILL'`，只是没入这两张表 ——
+  //   A6/A13b 因此长期报「现场 88 vs 武装 84」（基线工作区同错，非本版引入）。
+  //   入表口径与其他 spawn 站点一致：预算统一 1344000ms，失败靠 killSignal 收尾。
+  'story-window-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'story-window-integration-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'story-window-people-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'story-window-evidence-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   // v2.173.0（TX4b 收尾）：TX1–TX9 批次的 14 个子进程调用点（8 个 TX 专锁 + 6 个
   //   tx*_smoke 工具）。它们此前既未声明 timeout、也未入表 —— 正是本模块治的病
   //   （「留一个没声明的调用点就是留一条静默挂起的路径」）。全量回归第二轮暴露。
@@ -489,6 +497,16 @@ const ARMED_SITES = [
     anchor: "const rV3C = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v3-c-deepening.js')]," },
   { key: 'v2232-integration-lock', mode: 'spawn', kill: true,
     anchor: "const rV2232 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/test-v2232-epistemic-director-affect.js')]," },
+  // v2.522.0：与 TIMEOUT_ARMED 同批。锚点截到 options 之前（不含预算值），
+  //   否则「预算一改先报 site-missing」，判据会把自己的守卫对象吃掉。
+  { key: 'story-window-lock', mode: 'spawn', kill: true,
+    anchor: "const rSW2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-v2518.js')]," },
+  { key: 'story-window-integration-lock', mode: 'spawn', kill: true,
+    anchor: "const rSWI2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-integration-v2518.js')]," },
+  { key: 'story-window-people-lock', mode: 'spawn', kill: true,
+    anchor: "const rSWP2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-people-v2518.js')]," },
+  { key: 'story-window-evidence-lock', mode: 'spawn', kill: true,
+    anchor: "const rSWE2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-evidence-v2518.js')]," },
 ];
 
 /**

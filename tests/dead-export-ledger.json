@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.517.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.517.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.522.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
+  "version": "2.522.0",
   "dead": {
     "actionDesk.getSettings": {
       "reason": "self-only",
@@ -5055,7 +5055,7 @@
       "detail": "engines/fondness.js 内部自用、外部零引用（过度导出）",
       "src": "engines/fondness.js",
       "refs": 0,
-      "tref": 2,
+      "tref": 3,
       "own": 3
     },
     "fondness.readAffect": {
@@ -5079,7 +5079,7 @@
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/fondness.js",
       "refs": 0,
-      "tref": 31,
+      "tref": 32,
       "own": 1
     },
     "fondness.stat": {
@@ -6802,6 +6802,158 @@
       "tref": 0,
       "own": 44
     },
+    "localGrid.buildBlock": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.getVenue": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.getZone": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "localGrid.link": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.linked": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.locateOf": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "localGrid.peekVenue": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "localGrid.preheat": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.registerSpot": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.registerVenue": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.registerZone": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.relate": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.relatePeek": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.reset": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.selfCheck": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "localGrid.settings": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 15
+    },
+    "localGrid.solveZone": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "localGrid.stats": {
+      "reason": "self-only",
+      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/local-grid.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "lonshaReader.clockDateString": {
       "reason": "self-only",
       "detail": "engines/lonsha-reader.js 内部自用、外部零引用（过度导出）",
@@ -8089,6 +8241,14 @@
       "refs": 0,
       "tref": 0,
       "own": 5
+    },
+    "panelNowPage.bind": {
+      "reason": "self-only",
+      "detail": "ui/pages/now-page.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/pages/now-page.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "parallelEvents.active": {
       "reason": "test-only",
@@ -11050,6 +11210,102 @@
       "tref": 0,
       "own": 4
     },
+    "spatialBridge.atlasSlice": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spatialBridge.buildBlock": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "spatialBridge.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spatialBridge.mirrorStatus": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "spatialBridge.mirrorVenue": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spatialBridge.nearby": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spatialBridge.resetStat": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "spatialBridge.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spatialBridge.settings": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
+    "spatialBridge.stat": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 17
+    },
+    "spatialBridge.unmirrorVenue": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "spatialBridge.whereIs": {
+      "reason": "self-only",
+      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-bridge.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "spatialConflict.advanceChokepointQueue": {
       "reason": "self-only",
       "detail": "engines/spatial-conflict.js 内部自用、外部零引用（过度导出）",
@@ -11137,6 +11393,14 @@
       "refs": 0,
       "tref": 0,
       "own": 1
+    },
+    "spatialTopology.stateSource": {
+      "reason": "self-only",
+      "detail": "engines/spatial-topology.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/spatial-topology.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "spatialTrace.sweepTraces": {
       "reason": "unwired",
@@ -13566,6 +13830,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 679
+    "dataOnly": 684
   }
 }

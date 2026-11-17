@@ -36,6 +36,20 @@ const vm = require('vm');
 const BASE = path.join(__dirname, '..');
 const RUN_REL = 'tests/run.js';
 const SEG_REL = 'tests/segments/tool-diag-v092.js';
+/**
+ * v2.522.0：tests/segments/ 下的**全部**段文件（相对仓库根的路径，按名排序）。
+ *   为什么要有这一条：B1/B2 守的是「拆段前后 section / assert 总数不变」——
+ *   只要拆段仍会发生（A11 就是逼着它继续发生），计数面就不能写死成一个文件名，
+ *   否则每抽一段，读数就少一截、判据面比现场窄（静默假红，最贵的一类债）。
+ *   口径：目录直下 .js，排除非 .js；排序只为读数稳定。
+ */
+function segFilesAll() {
+  const dir = path.join(BASE, 'tests/segments');
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch (e) { return []; }
+  return names.filter(function (n) { return /\.js$/.test(n); }).sort()
+    .map(function (n) { return 'tests/segments/' + n; });
+}
 const GATE_REL = 'tests/test-surface-gate.js';
 const PF_REL = 'tests/product-files.js';
 const SEG_TITLE = 'engines/tool-diag v0.9.2';
@@ -141,7 +155,8 @@ const BASE_ASSERT_CC = 5267;  // v2.518.0 +4（三把 story-window 专锁 +1 把
 //       唯独这条「面本身没有意外增减」的绝对基线没人补。本批一次补齐，不改判据口径。
 //     为什么仍然不用「>= 564」了事：下界判据对「面塌了」是瞎的（见上段原文）。代价是每加一把锁
 //     就要动这个常量 —— 而那正是它的价值：动它的人必须亲手确认「我确实新增了一个测试文件」。
-const BASE_TEST_FILES = 571;  // v2.518.0：564→571（+7：V25 缝合 + V26 可观测 + 四把 story-window 专锁 + ruby-card-profile）（本版 +2：scenario-v68-v24-civil-life.js 专锁 + tests/probes/p_world_pulse.js 探针收编）
+const BASE_TEST_FILES = 574;  // v2.522.0：573→574（+1：tests/segments/settings-write-v2600.js —— run.js 的 v2.6.0 整块 606 行抽出，A11 棘轮 23041→22439 行）
+                               // v2.518.0：564→571（+7：V25 缝合 + V26 可观测 + 四把 story-window 专锁 + ruby-card-profile）（本版 +2：scenario-v68-v24-civil-life.js 专锁 + tests/probes/p_world_pulse.js 探针收编）
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
 function exists(rel) { return fs.existsSync(path.join(BASE, rel)); }
@@ -383,11 +398,35 @@ function recombinedRunText() {
   if (idx < 0) return null;
   const head = lines.slice(0, idx).join('\n');
   const tail = lines.slice(idx + 1).join('\n');
-  return head + '\n' + body + '\n' + tail;
+  const once = head + '\n' + body + '\n' + tail;
+  // v2.522.0：第二段（v2.6.0 写入侧块）同样要能被塞回调用点，否则 B4b/B4c 的
+  //   「重组 === 拆开」缺一截（本版正是如此：重组 440 ≠ 拆开 447）。
+  //   边界取段文件里的块标签与块结束注释 —— 与 tool-diag 段用「首尾标记」同一手法。
+  const SEG2_REL = 'tests/segments/settings-write-v2600.js';
+  const seg2 = rd(SEG2_REL);
+  const si2 = seg2.indexOf('v2600: {');
+  const ei2 = seg2.indexOf('} // end v2.6.0 block');
+  if (si2 < 0 || ei2 < 0) return null;
+  const body2 = seg2.slice(si2, ei2 + '} // end v2.6.0 block'.length);
+  const lines2 = once.split('\n');
+  let idx2 = -1;
+  for (let i = 0; i < lines2.length; i += 1) {
+    if (/^\s*require\s*\(\s*'\.\/segments\/settings-write-v2600\.js'\s*\)/.test(lines2[i])) { idx2 = i; break; }
+  }
+  if (idx2 < 0) return null;
+  return lines2.slice(0, idx2).join('\n') + '\n' + body2 + '\n' + lines2.slice(idx2 + 1).join('\n');
 }
 function runB(A) {
   const seg = rd(SEG_REL);
   const run = rd(RUN_REL);
+  // v2.522.0：B1/B2 的**计数面**从「一个段文件」扩到「tests/segments/ 全量」。
+  //   为什么必须扩：B1/B2 守的是「拆段前后 section / assert 总数不变」，而拆段不再是只有
+  //   tool-diag 一个文件 —— 本版把 run.js 的 v2.6.0 整块 606 行抽成 settings-write-v2600.js，
+  //   若计数面仍只认 SEG_REL，读数会凭空少 7 节 / 125 条断言（run 439 + 段 1 = 440 ≠ 447）。
+  //   判据语义未变（仍是绝对守恒），变的是**判据面跟上现场**（判据面比现场窄 = 静默假红）。
+  //   A3/A4/A5/A9/A10 仍只看 SEG_REL：它们问的是「tool-diag 段本身的形态」，与段文件个数无关。
+  const segAllFace = [SEG_REL].concat(segFilesAll().filter(function (r) { return r !== SEG_REL; }))
+    .map(function (r) { return stripComments(rd(r)); }).join('\n');
   // v2.400.0 收口轮：**同一段文本只去一次注释面**。
   //   原写法 sRun/sSeg/aRun/aSeg 各调一次 countCalls（内部各去一遍注释面），
   //   重组面的 B4b/B4c 又各去一遍 1.6MB 文本 —— 四次重复计算同一个结果。
@@ -398,9 +437,9 @@ function runB(A) {
   //   注意：用 countCallsIn（去注释面）而非裸 grep，故读数比 grep -o 略小；
   //   基线取自同一口径在拆前备份上的实测值，两条口径不能混用。
   const sRun = countCallsIn(runFace, 'section');
-  const sSeg = countCallsIn(segFace, 'section');
+  const sSeg = countCallsIn(segAllFace, 'section');
   const aRun = countCallsIn(runFace, 'assert');
-  const aSeg = countCallsIn(segFace, 'assert');
+  const aSeg = countCallsIn(segAllFace, 'assert');
   A(sRun + sSeg === BASE_SECTION_CC,
     'B1 绝对守恒 section（去注释口径）：run.js ' + sRun + ' + 段 ' + sSeg + ' = ' + (sRun + sSeg)
     + '，拆前 ' + BASE_SECTION_CC + '（少一条/多一条都红）');
@@ -737,7 +776,7 @@ const PS_REL = 'tests/panel-source.js';
 //       本批     +53  （「故事回应窗口」面板节：复选框 + 两个数字框 + 两个只读按钮 + bind 项）
 //       17878 → 17917 → 17971 → 17985 → 18038
 //     ⚠ 依旧保持**精确等于**，不写 `<=` 或区间：这条的价值就是对「又悄悄加了 50 行」失明与否。
-const BASE_PANEL_LINES = 18038;  // v2.518.0：17878→18038（+160：V26 +39 / people-page +54 / story-window 壳 +14 / 故事回应窗口面板节 +53，全部落在段体外）（+154：OPV24-1 世界脉搏段体增量 + 本版 v24CivilBlock +100，全部落在段体内）
+const BASE_PANEL_LINES = 18211;  // v2.518.0：17878→18038（+160：V26 +39 / people-page +54 / story-window 壳 +14 / 故事回应窗口面板节 +53，全部落在段体外）（+154：OPV24-1 世界脉搏段体增量 + 本版 v24CivilBlock +100，全部落在段体内）
 // 拆后 panel.js 自己的行数（split 口径；拆前 17421 - 段体 335 + 转发块 41 = 17127）。
 //   注意：这个数会随转发块注释的字数变动 —— 它是「面没塌」的粗读数，不是精确不变量。
 //   真正的不变量是 D3a（重组面 === 拆前面，逐字相等），那一条按行拼接算，
@@ -766,14 +805,14 @@ const BASE_PANEL_LINES = 18038;  // v2.518.0：17878→18038（+160：V26 +39 / 
 //     ⚠ 两数的差额（18038 - 16240 = 1798）就是「拆走并留在段模块里的字节」的净额；
 //       本批两条同步 +53/+54 说明新增几乎全在 panel.js 自身，段模块只多了一行尾换行 ——
 //       若哪天两者差额跳变，那就是段体被搬进/搬出 panel.js 了，D3 这一族必须当场复核。
-const BASE_PANEL_FILE_LINES = 16240;  // v2.518.0：16103→16240（+137，与 BASE_PANEL_LINES 同批同源）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）（+58：OPV24-1 世界脉搏转发壳 +53 未跟位 + 本版 v24 转发壳 +5 = 3 注释 + 1 函数 + 1 bind 项）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）
+const BASE_PANEL_FILE_LINES = 16243;  // v2.518.0：16103→16240（+137，与 BASE_PANEL_LINES 同批同源）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）（+58：OPV24-1 世界脉搏转发壳 +53 未跟位 + 本版 v24 转发壳 +5 = 3 注释 + 1 函数 + 1 bind 项）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）
 //   v2.400.0（V22 后续修正）：335 → 491。EXV22-9 把 v22OmensBlock 写在段体标记
 //   之外（重组面里定义缺席、调用在场 ⇒ 假源码），本次把段体结束标记移回函数之后，
 //   段体收编 v22 块的 156 行。段体 esc 调用同步 57 → 60（v22 块 3 处）。
 //   v2.402.0（V23）：491 → 592（+101）。这 101 行是 v23StitchBlock（异空间三缝只读
 //   读数块）的**真新增产品代码**，与上一版 +156 行（v22 块）同族：段体确实长了。
 //   不是「差不多」也不是调数蒙红 —— 块本体就在段体标记内，D1d/D1i 同时卡着。
-const BASE_BODY_LINES = 692;           // 段体行数（含首含尾）。v2.416.0（EXV24）：592→692（+100，v24CivilBlock 本体，含 2 行间隔注释）
+const BASE_BODY_LINES = 865;           // 段体行数（含首含尾）。v2.416.0（EXV24）：592→692（+100，v24CivilBlock 本体，含 2 行间隔注释）
 function runD(A) {
   const ps = require(path.join(BASE, PS_REL));
   // ── D1 结构 ──
@@ -801,9 +840,9 @@ function runD(A) {
   //   此前它不在段体里，本表数不到它，正是「定义在标记外」漏网的一环。
   //   v2.402.0（V23）：v23StitchBlock 同入段体 ⇒ 本表补为九项（理由同上段：不在表里就数不到它）。
   //   v2.416.0（EXV24）：v24CivilBlock 同入段体 ⇒ 本表补为十项（理由同上段）。
-  const FN = ['foldCard', 'evictBlock', 'randBlock', 'clockBlock', 'bridgeBlock', 'lonshaBlock', 'heartbeatBlock', 'v22OmensBlock', 'v23StitchBlock', 'v24CivilBlock'];
+  const FN = ['foldCard', 'evictBlock', 'randBlock', 'clockBlock', 'bridgeBlock', 'lonshaBlock', 'heartbeatBlock', 'v22OmensBlock', 'v23StitchBlock', 'v24CivilBlock', 'localGridBlock', 'lgZoneSvg'];
   const missFn = FN.filter(function (n) { return body.indexOf('  function ' + n + '(') < 0; });
-  A(missFn.length === 0, 'D1i 十个函数一个不少（缺 ' + missFn.length + ' 个：' + missFn.join(',') + '）');
+  A(missFn.length === 0, 'D1i 十二个函数一个不少（缺 ' + missFn.length + ' 个：' + missFn.join(',') + '）');
   // ── D2 逐字：段体行数与内容 ──
   const bodyLines = body.split('\n').length;
   A(bodyLines === BASE_BODY_LINES, 'D2a 段体行数 = ' + BASE_BODY_LINES + '（实 ' + bodyLines + '；搬的是字节不是「差不多」）');
@@ -851,7 +890,7 @@ function runD(A) {
       if (out.length > 40) nonEmpty.push(k);
     });
     //   v2.416.0（EXV24）：8 → 9（FN 表补为十项后 slice(1) 含 v24 块）。
-    A(nonEmpty.length === 9, 'D4d 九块各自产出非空读数（实 ' + nonEmpty.length + '/9；v22 / v23 / v24 块收进段体后 FN.slice(1) 已含它们）—— 漏注入/漏装载都会让这里归零');
+    A(nonEmpty.length === 10, 'D4d 十块各自产出非空读数（实 ' + nonEmpty.length + '/10；v22 / v23 / v24 块收进段体后 FN.slice(1) 已含它们）—— 漏注入/漏装载都会让这里归零');
     //   真实渲染路径：点页签 → renderBody → innerHTML 解析 → bindBody
     const panel = dom.getElementById('wa-panel');
     const tab = panel && panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === 'overview'; })[0];
@@ -874,7 +913,7 @@ function runD(A) {
     //   取块标签而不是说明文字 —— 改文案不该红，换掉块才该红。
     const V23_LABEL = 'V23 缝合线';
     //   v2.416.0（EXV24）：8 → 9（第九块 = V24 民生日志，foldCard label『V24 民生日志』见 D4g4）。
-    A(folds.length === 9, 'D4f 概览页渲染出 9 个折叠壳（实 ' + folds.length + '）'
+    A(folds.length === 10, 'D4f 概览页渲染出 10 个折叠壳（实 ' + folds.length + '）'
       + ' —— 拆段后六块仍全部在位，且 EXV22-9 第七块、V23 第八块、EXV24 第九块都已挂上');
     //   摘要含真读数（不是空壳）。
     //   ⚠ 阈值不能定成「长度 > 8」：本轮实测最短的合法摘要是「对外桥：休眠」= 6 字符。
@@ -893,7 +932,7 @@ function runD(A) {
       const ci = t.indexOf('：');
       return ci > 0 && t.length > ci + 1;
     });
-    A(withText.length === 9, 'D4g 九个折叠壳的摘要都是「标签：状态」两段式且冒号后有内容（实 ' + withText.length + '/9）');
+    A(withText.length === 10, 'D4g 十个折叠壳的摘要都是「标签：状态」两段式且冒号后有内容（实 ' + withText.length + '/10）');
     //   第七块的身份点名：渲染产物里必须**真有一块**的摘要带 v22 标签。
     //   这条与 D4f 是两道，不是重复：D4f 问「几块」，本条问「第七块是谁」。
     //   负控制（N9）把 v22OmensBlock() 的渲染调用删掉时，D4f 与 D4g 会同时掉到 6，
@@ -909,6 +948,11 @@ function runD(A) {
     const v24Fold = folds.filter(function (f) { return sumText(f).indexOf(V24_LABEL) >= 0; });
   A(v24Fold.length === 1, 'D4g4 概览页里恰有 1 块是 EXV24 的「' + V24_LABEL + '」（实 ' + v24Fold.length
     + '）—— 第九块的身份必须点名，否则「复制一块」也能凑成 9');
+  //   v2.519.0（局部网格接线）：10 块。同口径补第十块身份 —— 数到 10 不等于第十块是对的。
+    const LG_LABEL = '局部网格';  // 与 localGridBlock 的 foldCard label 逐字同源
+    const lgFold = folds.filter(function (f) { return sumText(f).indexOf(LG_LABEL) >= 0; });
+  A(lgFold.length === 1, 'D4g5 概览页里恰有 1 块是空间引擎的「' + LG_LABEL + '」（实 ' + lgFold.length
+    + '）—— 第十块的身份必须点名，否则「复制一块」也能凑成 10');
 A(v22Fold.length === 1, 'D4g2 概览页里恰有 1 块是 EXV22-9 的「' + V22_LABEL + '」（实 ' + v22Fold.length
       + '）—— 第七块的身份点名，不是只数个数');
     //   零 id 零控件在**渲染产物**上也成立（不只是源码层）
@@ -934,7 +978,7 @@ A(v22Fold.length === 1, 'D4g2 概览页里恰有 1 块是 EXV22-9 的「' + V22_
   const escCalls = (body.match(/(^|[^\w$.])esc\s*\(/g) || []).length;
   //   v2.402.0（V23）：60 → 63（+3，v23 块的三个读者标签 / 两种状态文本 / 缺席说明）。
   //   v2.416.0（EXV24）：63 → 66（+3，v24 块的读者标签 / 状态文本 / 兜底消息各 1 处）。
-  A(escCalls === 66, 'D5b 段体 esc 调用 66 处（实 ' + escCalls + '；335 行时代 57 处 + v22 块 3 处 + v23 块 3 处 + v24 块 3 处）—— 搬迁不得改动任何一处转义点');
+  A(escCalls === 75, 'D5b 段体 esc 调用 75 处（实 ' + escCalls + '；335 行时代 57 处 + v22 块 3 处 + v23 块 3 处 + v24 块 3 处）—— 搬迁不得改动任何一处转义点');
   //   段模块自己的 esc 兜底必须是**恒等**（不转义）：否则 bind 之前就凭空多一份转义实现
   A(blk.indexOf("let esc = function (s) { return String(s == null ? '' : s); };") > 0,
     'D5c 段模块的 esc 兜底是恒等（不制造第二份转义实现）');

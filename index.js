@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.517.0';
+  const VERSION = '2.522.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -519,6 +519,8 @@
     'engines/geo-tracker.js',
     // v2.328.0 (MAP-ADVANCED): 分形空间拓扑、通勤滞留仲裁、视听阻抗遮蔽与现场物理痕迹
     'engines/spatial-topology.js',
+    'engines/local-grid.js',
+    'engines/spatial-bridge.js',
     'engines/transit-scheduler.js',
     'engines/environmental-occlusion.js',
     'engines/spatial-trace.js',

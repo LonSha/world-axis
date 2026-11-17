@@ -131,7 +131,21 @@ function judge(a) {
   a(!!WA.fondness && typeof WA.fondness.advance === 'function', 'v2770/fond: advance 已导出');
   a(['propose', 'accept', 'reject', 'undo', 'correct', 'advance'].every(function (k) { return typeof WA.fondness[k] === 'function'; }), 'v2770/fond: 六个结算端出口齐备');
   // propose 是包装函数（不是同一引用）：判据必须落在**行为等价**上，而不是引用相等。
-  a(WA.fondness.propose('Q', { delta: 0.3 }).reason === WA.fondness.apply('Q', { delta: 0.3 }).reason && WA.fondness.propose('Q', { delta: 0.3 }).reason === 'disabled', 'v2770/fond: propose 与 apply 行为等价（语义别名，不另立一套判据）');
+  // v2.522.0（口径跟位，不是放宽）: fondness 出厂默认自 v2.412.0 起是 enabled:true（全开策略），
+  //   旧判据用「两个入口都返回 disabled」当等价见证，钉的其实是旧的产品默认值。改成在**两个闸位**上
+  //   各钉一次：①开闸之下两个入口都真落账、都不带 fault 理由；②关闸之下两个入口报**同一条** disabled。
+  //   等价性不但没松，反而从单点变成两点——「一个是别名、另一个自己一套语义」的偏差在任一侧都会红。
+  const prOn = WA.fondness.propose('Q', { delta: 0.3 });
+  const apOn = WA.fondness.apply('Q', { delta: 0.3 });
+  a(prOn.ok === true && apOn.ok === true && typeof prOn.value === 'number' && typeof apOn.value === 'number'
+    && (prOn.reason || null) === (apOn.reason || null),
+    'v2770/fond: propose 与 apply 行为等价（开闸下都落账、都不带 fault 理由）');
+  reset(WA);
+  WA.fondness.setSettings({ enabled: false });
+  a(WA.fondness.propose('Q', { delta: 0.3 }).reason === WA.fondness.apply('Q', { delta: 0.3 }).reason
+    && WA.fondness.propose('Q', { delta: 0.3 }).reason === 'disabled',
+    'v2770/fond: 关闸时 propose 与 apply 报同一条 disabled（语义别名，不另立一套判据）');
+  reset(WA);
 
   // ① 阶段封顶：段顶可达
   reset(WA);

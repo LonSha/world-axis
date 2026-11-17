@@ -16,7 +16,13 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   WA.engines = WA.engines || {};
 
-  const VERSION = '2.328.0';
+  const VERSION = '2.522.0';
+  // v2.522.0：三容器的静态上界（写入侧硬上界，满即拒写；与 core/store.js __BOUNDED_CAPS、
+  //   core/evict.js NON_EVICT 三处同名同值）。为什么是静态而不是设置项：拓扑树是世界的**结构**，
+  //   不是可调偏好 —— 让用户能把节点上限调成 0 等于让地图消失；而 per-call 上界一旦与设置脱钩
+  //   就变成「点了没效果的开关」。512/1024/64 按现场规模定：四级树 512 节点 ≈ 32 个场所 × 16 子空间，
+  //   通道数按节点数的两倍留余量（每处场所平均 2 条门/楼梯），同时在场的角色 64 远超实际。
+  const MAX = Object.freeze({ nodes: 512, portals: 1024, activeScenes: 64 });
 
   // 场所类型与默认功能映射
   const DEFAULT_AFFORDANCES = Object.freeze({
@@ -54,50 +60,116 @@
     };
   }
 
+  // ── v2.522.0：持久化写入通道（本轮的核心变更）─────────────────────────────
+  //   此前本模块**自己持一份 `_memState`**：`getState()` 在 store 里找不到 `spatialTopology`
+  //   这个键就退回进程态。于是 registerNode / connect 都返回 ok，但
+  //     ① 重启后投影出来的节点全丢；② 分支复制带不走；③ mirrorStatus 只能报 persisted:false。
+  //   现在（与 geoTracker / localGrid 同款三处结构）：
+  //     · **读**仍走 `store.get()`（memCache 是活对象，transact 提交后就地生效）；
+  //     · **写**一律走 `store.transact` —— 权限闸 / 写失败记账 / 骨架校验都在那一处；
+  //     · 只有 store 不可用（裸上下文、单测）才退回进程态，且退回这件事本身是**可见的**
+  //       （`stateSource()` 报 `mem` 而不是 `store`）。
+  //   为什么不在两个写口各写一份：本仓反复治的就是「同一件事两本账」—— 写路径只能有一个入口。
+  function blankState() {
+    // 默认结构仍以 DEFAULT_TOPOLOGY_STATE 为**唯一真源**（冻结的是顶层；JSON 往返拿到可写副本）；
+    //   transitLocks 是本模块自己追加的台账（按 nodeId 增删，不进骨架），故在这里补上。
+    const s = JSON.parse(JSON.stringify(DEFAULT_TOPOLOGY_STATE));
+    s.transitLocks = {};
+    return s;
+  }
+  function ensureShape(st) {
+    const s = (st && typeof st === 'object') ? st : blankState();
+    if (!s.nodes || typeof s.nodes !== 'object') s.nodes = {};
+    if (!Array.isArray(s.portals)) s.portals = [];
+    if (!s.activeScenes || typeof s.activeScenes !== 'object') s.activeScenes = {};
+    if (!s.transitLocks || typeof s.transitLocks !== 'object') s.transitLocks = {};
+    return s;
+  }
+  function memState() {
+    if (!spatialTopology._memState) spatialTopology._memState = blankState();
+    return spatialTopology._memState;
+  }
+  /** 唯一写入口：返回 mutator 的返回值（失败返回 {ok:false, reason}，不吞错）。 */
+  function write(fn) {
+    if (WA.store && typeof WA.store.transact === 'function') {
+      let out = null;
+      try {
+        WA.store.transact(function (draft) {
+          draft.spatialTopology = ensureShape(draft.spatialTopology);
+          out = fn(draft.spatialTopology);
+        });
+      } catch (e) {
+        return { ok: false, reason: 'store-threw' };
+      }
+      return out;
+    }
+    return fn(ensureShape(memState()));
+  }
+  /** v2.522.0：状态来源（store / mem）—— 诊断面据此说清「这份地图存不存得下来」。 */
+  function stateSource() {
+    try {
+      if (WA.store && typeof WA.store.get === 'function') {
+        const s = WA.store.get();
+        if (s && s.spatialTopology) return 'store';
+      }
+    } catch (e) {}
+    return 'mem';
+  }
   /**
    * 空间拓扑管理器
    */
   const spatialTopology = {
     version: VERSION,
-
+    MAX: MAX,
     /**
-     * 获取或初始化状态
+     * 获取（不写）当前状态。**只读用途**：要改就调下面的写方法，别就地改返回值。
      */
     getState() {
-      if (WA.store && typeof WA.store.get === 'function') {
-        const s = WA.store.get();
-        if (s && s.spatialTopology) return s.spatialTopology;
-      }
-      if (!this._memState) {
-        this._memState = JSON.parse(JSON.stringify(DEFAULT_TOPOLOGY_STATE));
-      }
-      return this._memState;
+      try {
+        if (WA.store && typeof WA.store.get === 'function') {
+          const s = WA.store.get();
+          if (s && s.spatialTopology) return ensureShape(s.spatialTopology);
+        }
+      } catch (e) {}
+      return ensureShape(memState());
     },
+    /** v2.522.0：当前状态来源（'store' = 随存档持久化 / 'mem' = 仅在本次进程内） */
+    stateSource: stateSource,
 
     /**
      * 注册或更新空间节点
      */
-    registerNode(id, opts) {
-      const state = this.getState();
-      const node = createNode(id, opts);
-      state.nodes[id] = node;
-      return { ok: true, node };
+registerNode(id, opts) {
+      // v2.522.0：走唯一写入口（transact ⇒ 持久化）。满则拒写，既有节点一条不动。
+      if (id === undefined || id === null || String(id) === '') return { ok: false, reason: 'missing-id' };
+      const key = String(id);
+      return write(function (state) {
+        if (!state.nodes[key] && Object.keys(state.nodes).length >= MAX.nodes) {
+          return { ok: false, reason: 'nodes-full', cap: MAX.nodes };
+        }
+        const node = createNode(key, opts);
+        state.nodes[key] = node;
+        return { ok: true, node: node };
+      });
     },
-
     /**
      * 批量导入预设地点拓扑（如外部世界书/东京大舞台数据）
      */
     importNodes(nodeList) {
       if (!Array.isArray(nodeList)) return { ok: false, reason: 'nodeList-must-be-array' };
-      const state = this.getState();
-      let imported = 0;
-      for (const item of nodeList) {
-        if (item && item.id) {
-          state.nodes[item.id] = createNode(item.id, item);
+      // v2.522.0：满即停（不是先写一半再报错）—— skipped 如实报被拒的条数，绝不静默丢弃。
+      return write(function (state) {
+        let imported = 0, skipped = 0;
+        for (const item of nodeList) {
+          if (!(item && item.id)) continue;
+          const key = String(item.id);
+          if (!state.nodes[key] && Object.keys(state.nodes).length >= MAX.nodes) { skipped++; continue; }
+          state.nodes[key] = createNode(key, item);
           imported++;
         }
-      }
-      return { ok: true, count: imported };
+        return skipped ? { ok: true, count: imported, skipped: skipped, reason: 'nodes-full' }
+          : { ok: true, count: imported };
+      });
     },
 
     /**
@@ -105,24 +177,32 @@
      */
     connect(fromId, toId, opts) {
       opts = opts || {};
-      const state = this.getState();
-      const portal = {
-        id: opts.id || (fromId + '<->' + toId),
-        from: String(fromId),
-        to: String(toId),
-        type: opts.type || 'door', // 'door' | 'stair' | 'elevator' | 'street' | 'gate'
-        status: opts.status || 'open', // 'open' | 'locked' | 'sealed'
-        keyId: opts.keyId || null,
-        bidirectional: opts.bidirectional !== false
-      };
-      // 查重
-      const idx = state.portals.findIndex(p => p.id === portal.id);
-      if (idx >= 0) {
-        state.portals[idx] = portal;
-      } else {
-        state.portals.push(portal);
+      // v2.522.0：同走唯一写入口。查重/替换在同一次事务里做（先读后写不能跨事务）。
+      if (fromId === undefined || fromId === null || toId === undefined || toId === null) {
+        return { ok: false, reason: 'missing-endpoint' };
       }
-      return { ok: true, portal };
+      return write(function (state) {
+        const portal = {
+          id: opts.id || (String(fromId) + '<->' + String(toId)),
+          from: String(fromId),
+          to: String(toId),
+          type: opts.type || 'door', // 'door' | 'stair' | 'elevator' | 'street' | 'gate'
+          status: opts.status || 'open', // 'open' | 'locked' | 'sealed'
+          keyId: opts.keyId || null,
+          bidirectional: opts.bidirectional !== false
+        };
+        // 查重：同一 id 视为改门禁状态（不新增），故只有**新**通道才受上界约束
+        const idx = state.portals.findIndex(p => p.id === portal.id);
+        if (idx >= 0) {
+          state.portals[idx] = portal;
+          return { ok: true, portal: portal, replaced: true };
+        }
+        if (state.portals.length >= MAX.portals) {
+          return { ok: false, reason: 'portals-full', cap: MAX.portals };
+        }
+        state.portals.push(portal);
+        return { ok: true, portal: portal };
+      });
     },
 
     /**
@@ -189,47 +269,53 @@
     setTransitLock(nodeId, locked, reason) {
       if (!nodeId) return { ok: false, reason: 'missing-nodeId' };
       const id = String(nodeId);
-      const state = this.getState();
-      state.portals = Array.isArray(state.portals) ? state.portals : [];
-      state.transitLocks = (state.transitLocks && typeof state.transitLocks === 'object') ? state.transitLocks : {};
       const tag = String(reason || 'unspecified');
-      if (locked) {
-        const ledger = Array.isArray(state.transitLocks[id]) ? state.transitLocks[id] : [];
-        const seen = new Set(ledger.map(x => x.portalId));
-        let affected = 0;
-        for (const p of state.portals) {
-          if (!p || (p.from !== id && p.to !== id)) continue;
-          if (seen.has(p.id)) continue;           // 已登账，不重复压栈（幂等）
-          ledger.push({ portalId: p.id, prevStatus: p.status, reason: tag });
-          p.status = 'sealed';
-          affected++;
+      // v2.522.0：锁/解封都在一次事务里（跨事务会留下「门已封、台账没记」的半写现场）。
+      return write(function (state) {
+        if (locked) {
+          const ledger = Array.isArray(state.transitLocks[id]) ? state.transitLocks[id] : [];
+          const seen = new Set(ledger.map(x => x.portalId));
+          let affected = 0;
+          for (const p of state.portals) {
+            if (!p || (p.from !== id && p.to !== id)) continue;
+            if (seen.has(p.id)) continue;           // 已登账，不重复压栈（幂等）
+            ledger.push({ portalId: p.id, prevStatus: p.status, reason: tag });
+            p.status = 'sealed';
+            affected++;
+          }
+          state.transitLocks[id] = ledger;
+          return { ok: true, nodeId: id, affected: affected, locked: true, reason: tag };
         }
-        state.transitLocks[id] = ledger;
-        return { ok: true, nodeId: id, affected: affected, locked: true, reason: tag };
-      }
-      const ledger = Array.isArray(state.transitLocks[id]) ? state.transitLocks[id] : [];
-      let restored = 0;
-      for (const rec of ledger) {
-        const p = state.portals.find(x => x && x.id === rec.portalId);
-        if (p) { p.status = rec.prevStatus || 'open'; restored++; }
-      }
-      delete state.transitLocks[id];
-      return { ok: true, nodeId: id, affected: restored, locked: false, reason: tag };
+        const ledger = Array.isArray(state.transitLocks[id]) ? state.transitLocks[id] : [];
+        let restored = 0;
+        for (const rec of ledger) {
+          const p = state.portals.find(x => x && x.id === rec.portalId);
+          if (p) { p.status = rec.prevStatus || 'open'; restored++; }
+        }
+        delete state.transitLocks[id];
+        return { ok: true, nodeId: id, affected: restored, locked: false, reason: tag };
+      });
     },
     /**
      * 角色进入具体子空间/位置
      */
     locateCharacter(charName, nodeId, detail) {
       if (!charName) return { ok: false, reason: 'missing-charName' };
-      const state = this.getState();
-      detail = detail || {};
-      state.activeScenes[charName] = {
-        nodeId: String(nodeId),
-        floor: detail.floor || null,
-        room: detail.room || null,
-        timestamp: clockNow('spatial-topology')
-      };
-      return { ok: true, location: state.activeScenes[charName] };
+      const who = String(charName);
+      const d = detail || {};
+      return write(function (state) {
+        // 上界：只约束**新**角色，已登记角色的移动不受影响（否则场景里第 65 个角色永远动不了）
+        if (!state.activeScenes[who] && Object.keys(state.activeScenes).length >= MAX.activeScenes) {
+          return { ok: false, reason: 'activeScenes-full', cap: MAX.activeScenes };
+        }
+        state.activeScenes[who] = {
+          nodeId: String(nodeId),
+          floor: d.floor || null,
+          room: d.room || null,
+          timestamp: clockNow('spatial-topology')
+        };
+        return { ok: true, location: state.activeScenes[who] };
+      });
     },
 
     /**

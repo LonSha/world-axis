@@ -20,7 +20,28 @@ const dg = require('./dependency-guard.js');
 const RUN_REL = 'tests/run.js';
 const SHIM_MARK = "require('./ui-dom.js').JSDOMShim";
 
-function readRun() { return fs.readFileSync(path.join(BASE, RUN_REL), 'utf8'); }
+/**
+ * v2.522.0\uff1a\u626b\u63cf\u9762\u8ddf\u4e0a\u4ee3\u7801\u642c\u5bb6\u3002
+ *   run.js \u7684 v2.6.0 \u6574\u5757\uff08606 \u884c\uff09\u5df2\u62bd\u5230 tests/segments/settings-write-v2600.js\uff0c
+ *   \u5e76\u7ecf**\u8c03\u7528\u70b9\u539f\u4f4d**\u6302\u8f7d\uff08\u7b49\u4ef7\u6027\u7531 tests/segment-extract-v2400.js \u4e0e
+ *   tests/test-surface-gate.js \u53cc\u5411\u54ac\u4f4f\uff1a\u62c9\u6389\u8c03\u7528\u70b9\u5373\u62a5\u5b64\u513f\uff09\u3002
+ *   \u90a3\u4e24\u5757\u91cc\u5404\u81ea\u672c\u6765\u6709\u4e00\u5904 jsdom \u4f18\u5148\u53d6\u7528\u7684\u7ad9\u70b9\uff0c\u62bd\u53d6\u540e run.js \u53ea\u5269 9 \u5904\n *   \u2014\u2014 A5 \u56e0\u6b64\u5047\u7ea2\uff08\u5b9e\u6d4b\u57fa\u7ebf 11 / \u62bd\u53d6\u540e 9\uff09\u3002\n *   \u5224\u636e\u672c\u610f\u662f\u300c\u4f9d\u8d56\u4f18\u5148\u53d6\u7528\u8fd9\u6761\u8def\u4e0d\u88ab\u5220\u7a7a\u300d\uff0c\u4e0d\u662f\u300c\u8fd9 10 \u5904\u5fc5\u987b\u5199\u5728\u540c\u4e00\u4e2a\u6587\u4ef6\u91cc\u300d\uff0c
+ *   \u6545\u628a**\u540c\u4e00\u4efd\u6e90\u7801\u9762**\u6269\u5230 run.js + tests/segments/*.js\uff0c\u9608\u503c 10 \u4e0d\u52a8\u3002
+ *   \uff08\u4e0d\u964d\u9608\u503c\u7684\u7406\u7531\uff1a\u964d\u5230 9 \u5c31\u662f\u628a\u300c\u6bcf\u62bd\u4e00\u6bb5\u5c31\u964d\u4e00\u6b21\u300d\u5199\u8fdb\u5224\u636e\uff0c
+ *    \u4e0b\u4e00\u6b21\u62bd\u53d6\u53c8\u8981\u518d\u964d\uff0c\u76f4\u5230\u8fd9\u6761\u5224\u636e\u53d8\u6210\u4e00\u53e5\u7a7a\u8bdd\u3002\uff09
+ */
+function readRun() {
+  const parts = [fs.readFileSync(path.join(BASE, RUN_REL), 'utf8')];
+  const segDir = path.join(BASE, 'tests/segments');
+  let ents = [];
+  try {
+    ents = fs.readdirSync(segDir).filter(function (f) { return /\.js$/.test(f); }).sort();
+  } catch (e) { ents = []; }
+  ents.forEach(function (f) {
+    try { parts.push(fs.readFileSync(path.join(segDir, f), 'utf8')); } catch (e) { /* \u5355\u4e2a\u6bb5\u8bfb\u4e0d\u5230\u4e0d\u63a9\u76d6\u5176\u4f59 */ }
+  });
+  return parts.join('\n');
+}
 function readFile(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 
 function runAll(a) {

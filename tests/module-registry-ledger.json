@@ -1,13 +1,13 @@
 {
- "version": "2.517.0",
- "loadOrderCount": 504,
- "loadedCount": 483,
+ "version": "2.522.0",
+ "loadOrderCount": 506,
+ "loadedCount": 485,
  "uiCount": 21,
- "nsCount": 494,
+ "nsCount": 496,
  "totals": {
-  "loadEdges": 361,
+  "loadEdges": 364,
   "hardEdges": 0,
-  "callRefs": 609,
+  "callRefs": 614,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -173,6 +173,7 @@
     "engines/lingqi.js",
     "engines/lingua-broker.js",
     "engines/living-world.js",
+    "engines/local-grid.js",
     "engines/lost-and-found.js",
     "engines/maritime-navigation.js",
     "engines/memory-relay.js",
@@ -275,6 +276,7 @@
     "engines/somatic-trauma.js",
     "engines/source-hints.js",
     "engines/source-reconcile.js",
+    "engines/spatial-bridge.js",
     "engines/stage-presence.js",
     "engines/stage-session.js",
     "engines/stage.js",
@@ -475,6 +477,7 @@
     "engines/life.js",
     "engines/lingua-broker.js",
     "engines/living-world.js",
+    "engines/local-grid.js",
     "engines/memory-relay.js",
     "engines/memory.js",
     "engines/metabolism-clock.js",
@@ -652,6 +655,7 @@
     "engines/lingqi.js",
     "engines/lingua-broker.js",
     "engines/living-world.js",
+    "engines/local-grid.js",
     "engines/lost-and-found.js",
     "engines/maritime-navigation.js",
     "engines/memory-relay.js",
@@ -748,6 +752,7 @@
     "engines/somatic-trauma.js",
     "engines/source-hints.js",
     "engines/source-reconcile.js",
+    "engines/spatial-bridge.js",
     "engines/stage-presence.js",
     "engines/stage-session.js",
     "engines/stage.js",
@@ -2484,6 +2489,51 @@
    "callRefs": [],
    "ghostRefs": [],
    "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/local-grid.js": {
+   "ns": [
+    "localGrid"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules",
+    "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_local_grid_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/spatial-bridge.js": {
+   "ns": [
+    "spatialBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_spatial_bridge_v1"
+   ],
    "consumedBy": []
   },
   "engines/transit-scheduler.js": {

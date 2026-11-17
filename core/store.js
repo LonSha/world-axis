@@ -285,6 +285,28 @@
         characterLocations: {},
         locationHistory: []
       },
+      // v2.519.0: 分形局部网格（场所 -> 区域 -> 地点，各区域独立坐標系）
+      localGrid: {
+        venues: {},
+        zones: {},
+        spots: {},
+        links: [],
+        overrides: {},
+        solved: {}
+      },
+      // v2.522.0: 分形空间拓扑（region 〉sector 〉venue 〉subspace 四级树 + 门禁通道 + 角色所在子空间）
+      //   为什么现在才进骨架：`engines/spatial-topology.js` 自 v2.328.0 起**自己持 `_memState`**
+      //   —— `getState()` 在 store 里找不到 `spatialTopology` 这个键就退回进程态。后果不是「少个默认值」，
+      //   而是三件事同时发生：重启后投影出来的节点全丢、分支复制带不走、`mirrorStatus()` 只能报
+      //   `persisted:false`（诚实，但等于承认这半边地图是一次性的）。
+      //   骨架键是**唯一**的持久化入口（`ensureShape` 会为旧存档补齐本键），engine 侧写路径改为
+      //   `store.transact`，读路径仍是 `store.get()` —— 与 geoTracker / localGrid 同款三处结构。
+      //   `transitLocks` 故意不进骨架：它按 nodeId 增删（解封即 `delete`），有界的对象不需要预置键。
+      spatialTopology: {
+        nodes: {},
+        portals: [],
+        activeScenes: {}
+      },
       // v2.323.0: 通用退场角色跨题材自主生计与烟火生活流转 + 怪诞市井暗线
       offstageLife: {
         characters: {},
@@ -1889,6 +1911,21 @@
     'commission.contracts': { cap: 'per-call', site: 'commission.js create() 入口 maxContracts 预检（per-call，取设置上界）' },
     'investigation.clues': { cap: 'per-call', site: 'investigation.js register() 入口 maxClues 预检（per-call，取设置上界）' },
     'investigation.evidence': { cap: 'per-call', site: 'investigation.js investigate() 入口 maxEvidence 预检（per-call，取设置上界）' },
+    // v2.519.0: 分形局部网格（场所-区域-地点三层，各区域独立局部坐标系）。
+    //   cap 与 engines/local-grid.js 的 DEF/bounds 同源，per-call 由调用点传设置值。
+    'localGrid.venues': { cap: 'per-call', kind: 'object', site: 'local-grid.js registerVenue() 入口 maxVenues 预检（per-call，取设置上界）' },
+    'localGrid.zones': { cap: 'per-call', kind: 'object', site: 'local-grid.js registerZone() 入口 maxZones 预检（per-call，取设置上界）' },
+    'localGrid.spots': { cap: 'per-call', kind: 'object', site: 'local-grid.js registerSpot() 入口 maxSpots 预检（per-call，取设置上界）' },
+    'localGrid.links': { cap: 'per-call', site: 'local-grid.js link() 入口 maxLinks 预检（per-call，取设置上界）' },
+    'localGrid.solved': { cap: 'per-call', kind: 'object', site: 'local-grid.js getZone() 求解缓存写入（per-call，取 maxZones 上界）' },
+    // v2.522.0: 分形空间拓扑三容器（本轮进骨架 ⇒ 必须同时登记容量，否则容量体检把它们报成 unbounded）。
+    //   cap 是 engine 内的静态上界 `MAX`（拓扑树不是用户可调的设置项，故不走 per-call）。
+    //   **不设挤出站点**：三处都是写入侧硬上界（满则 nodes-full / portals-full / activeScenes-full 拒写，
+    //   既有节点一条不动）—— 与 diplomacy.pairs / region.places 同族，声明在 core/evict.js 的 NON_EVICT。
+    //   登记为挤出站点会让 evict-meta 的 A 面当场红（零调用站点），那正是判据在说真话。
+    'spatialTopology.nodes': { cap: 512, kind: 'object', site: 'spatial-topology.js registerNode()/importNodes() 入口 MAX.nodes 预检（满则 nodes-full 拒写，不走 evict）' },
+    'spatialTopology.portals': { cap: 1024, site: 'spatial-topology.js connect() 入口 MAX.portals 预检（满则 portals-full 拒写，不走 evict）' },
+    'spatialTopology.activeScenes': { cap: 64, kind: 'object', site: 'spatial-topology.js locateCharacter() 入口 MAX.activeScenes 预检（满则 activeScenes-full 拒写，不走 evict）' },
     'aftermath.effects': { cap: 'per-call', site: 'aftermath.js register() 入口 maxEffects 预检（per-call，取设置上界）' },
     'operations.projects': { cap: 'per-call', site: 'operations.js enact() 入口 maxProjects 预检（per-call，取设置上界）' },
     // v2.250.0（拓展）：三个新引擎的有界容器登记。与 core/evict.js 的 SITES 表

@@ -922,11 +922,27 @@ module.exports = async function toolDiagV092(ctx) {
   assert(icNoDup, '端到端：约束文本不重复注入主槽位');
   assert(global.__waInjLog !== undefined || true, '日志占位（不强制）');
   // ── 端到端降级：槽位路由不可用时回退并入主块 ──
+  // v2.522.0（判据输入面收口，不是放宽）:本子判据问的是「槽位通道不可用时，带 position 的文本
+  //   是否并进主块」，**与注入预算无关**（预算裁决另有专锁 v0.1.7 一族）。而全量顺序下，
+  //   此前各节累积的世界状态会把共享注入预算吃掉大半，末位并入的这两条小约束于是可能被预算裁掉
+  //   ——现象是「主块里查不到这两条」，根因却在预算，把它判成「降级失效」是替预算背锅
+  //   （实测复现：injectBudget=60 ⇒ 只剩「约束」一条，章节那条被裁；=0/auto ⇒ 两条都在）。
+  //   故这里**临时**把预算档位置为「不限」（0 是本仓 injectBudget 的『不限』哨兵），跑完立刻还原；
+  //   主块内容的生成路径一字未改，判据本身一个字未改。
   const keepIC = WA.injectChannel;
+  const keepICB = (WA.backstage && typeof WA.backstage.getSettings === 'function')
+    ? WA.backstage.getSettings().injectBudget : null;
   delete WA.injectChannel;
+  if (WA.backstage && typeof WA.backstage.setSettings === 'function') WA.backstage.setSettings({ injectBudget: 0 });
   global.__lastExtensionPrompt = null;
   global.__extPromptLog = [];
-  WA.render.applyInjections(icCtx);
+  try {
+    WA.render.applyInjections(icCtx);
+  } finally {
+    if (WA.backstage && typeof WA.backstage.setSettings === 'function' && keepICB !== null) {
+      WA.backstage.setSettings({ injectBudget: keepICB });
+    }
+  }
   const icFall = global.__lastExtensionPrompt;
   assert(icFall.key === 'WorldAxis', '降级：回退到主槽位 WorldAxis');
   assert(global.__extPromptLog.filter(function (r) { return r.key === 'WorldAxis:after_last_user'; }).length === 0, '降级：无独立槽位调用');

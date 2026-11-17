@@ -764,6 +764,179 @@
       + '浮世绘底线：引擎只记账与拒收（欠满两季才许逼佃、还愿须凭据一致、认领须物证），'
       + '<b>不替世界做道德裁决</b> —— 好坏留给故事。</div></div>', bad);
   }
+  // ── v2.520.0（平面图）：把 peekVenue 的坐标画成格子阵 ──────────────
+  //   为什么用 <svg> 而不是一堆绝对定位 <div>：格子是方阵，一个 <rect> 就是一个点，
+  //   一条 <line> 就是一条相邻边 —— 用 div 画连线要旋转/描边，脏且难读。
+  //   **为什么这不违反「零控件」纪律**：<svg>/<rect>/<line>/<text> 都不是控件，
+  //   本图不建 DOM、不绑事件、不产生 id（配色走 fill-opacity / stroke-opacity，
+  //   不用 <pattern id=...>），故 UI 绑定守卫（G17）与段体零 id 判据（D1g）都不受影响。
+  //   为什么坐标只认 peekVenue：getZone 会在缓存缺失时求解并 transact 写 store ——
+  //   面板是渲染出口，不能因为「用户看了一眼」就把世界写一遍。
+  //   图里没有米数、没有方位文字：格子距离是**格数**，跨 zone 不连线（各 zone 独立坐标系）。
+  function lgZoneSvg(z) {
+    const cells = (z && z.cells) || {};
+    const names = Object.keys(cells);
+    if (!names.length) return '<div class="wa-dim" style="font-size:11px;">本平面无坐标点（既无显式坐标，也未求解）</div>';
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    names.forEach(function (n) {
+      const c = cells[n];
+      if (c.x < x0) x0 = c.x;
+      if (c.x > x1) x1 = c.x;
+      if (c.y < y0) y0 = c.y;
+      if (c.y > y1) y1 = c.y;
+    });
+    const CW = 42, PAD = 4;
+    const w = (x1 - x0 + 1) * CW + PAD * 2;
+    const h = (y1 - y0 + 1) * CW + PAD * 2;
+    const at = function (c) { return { x: PAD + (c.x - x0) * CW, y: PAD + (c.y - y0) * CW }; };
+    const out = [];
+    out.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h
+      + '" style="display:block;max-width:100%;color:inherit;font-size:10px;">');
+    //   连线先画（压在格子下面）：同平面相邻关系，不含距离与方位
+    (z.edges || []).forEach(function (e) {
+      const a = cells[e[0]], b = cells[e[1]];
+      if (!a || !b) return;
+      const pa = at(a), pb = at(b);
+      out.push('<line x1="' + (pa.x + CW / 2) + '" y1="' + (pa.y + CW / 2)
+        + '" x2="' + (pb.x + CW / 2) + '" y2="' + (pb.y + CW / 2)
+        + '" stroke="currentColor" stroke-opacity="0.35" stroke-width="1" />');
+    });
+    names.forEach(function (n) {
+      const c = cells[n], p = at(c);
+      const raw = (c.src === 'raw');
+      out.push('<rect x="' + (p.x + 1) + '" y="' + (p.y + 1) + '" width="' + (CW - 2) + '" height="' + (CW - 2)
+        + '" rx="3" fill="currentColor" fill-opacity="0.10" stroke="currentColor"'
+        + ' stroke-opacity="' + (raw ? '0.35' : '0.7') + '"' + (raw ? ' stroke-dasharray="3 3"' : '') + '>');
+      out.push('<title>' + esc(String(n)) + '</title></rect>');
+      out.push('<text x="' + (p.x + CW / 2) + '" y="' + (p.y + CW / 2) + '" text-anchor="middle"'
+        + ' dominant-baseline="middle" fill="currentColor">' + esc(String(n).slice(0, 4)) + '</text>');
+    });
+    out.push('</svg>');
+    return out.join('');
+  }
+  // ── v2.519.0（局部网格接线）：分形局部网格只读块 ────────────────
+  //   为什么放在概览页、不新开一页：`engines/local-grid.js` 本轮新增的是一台
+  //   **平面求解器**（解析相邻文本 → 对称补边 → 显式坐标优先 → BFS 按方位推导 →
+  //   剩余方阵流式安置 → nearestFree 螺旋消撞）。它答的不是「世界多大」，而是
+  //   「同一张平面图里，谁在东边两步」—— 与地理轨 geoTracker 是**两个问题**。
+  //   本块存在的真正理由是把那条**互斥边界**摆到明面上：跨 venue / 跨 zone 一律
+  //   返回 cross-venue / cross-zone 且 distance 为 null，绝不折算米数。跨域拒绝次数
+  //   是**读数**，不是错误 —— 它为 0 才该问「是不是根本没在跑」。
+  //   三条纪律与上面九块逐条同款：零控件（只拼字符串）、零 id、零世界写
+  //   （只读 WA.localGrid.stats / selfCheck；场所排行直接数 root().spots，**不调**
+  //   getVenue —— 那会为每个 zone 触发一次求解，面板每次重绘都重算一遍）。
+  function localGridBlock() {
+    try {
+      const LG = WA.localGrid;
+      if (!LG || typeof LG.stats !== 'function') {
+        return foldCard('局部网格', '未装载',
+          '<div class="wa-item wa-dim">WA.localGrid 不在场：本块如实写缺席，不补默认读数'
+          + '（装载 engines/local-grid.js 后此处才有数）。</div>');
+      }
+      const st = LG.stats();
+      const ck = (typeof LG.selfCheck === 'function') ? LG.selfCheck() : null;
+      const issues = (ck && ck.issues) ? ck.issues : [];
+      const faults = st.faults || {};
+      const fk = Object.keys(faults);
+      const bad = issues.length > 0;  // 拒收/异常不是病：自检不合规才是（红线只给真缺陷）
+      const head = (st.venues || 0) + ' 场所 / ' + (st.zones || 0) + ' 区域 / ' + (st.spots || 0) + ' 地点';
+      const sum = (ck && ck.ok)
+        ? esc(head)
+        : '<span class="wa-bad">' + esc(head) + '（自检 ' + issues.length + ' 处不合规）</span>';
+      // 场所排行：一次遍历 root().spots 数点位，**不触发任何求解**（面板是热路径）。
+      const lg = (typeof LG._root === 'function') ? LG._root() : null;
+      const cnt = {};
+      const sk = lg ? Object.keys(lg.spots || {}) : [];
+      for (let i = 0; i < sk.length; i++) {
+        const sp = lg.spots[sk[i]] || {};
+        const vn = sp.venue || '?';
+        if (!cnt[vn]) cnt[vn] = { n: 0, placed: 0 };
+        cnt[vn].n++;
+        if (typeof sp.x === 'number' && typeof sp.y === 'number') cnt[vn].placed++;
+      }
+      const rank = Object.keys(cnt).sort(function (a, b) { return cnt[b].n - cnt[a].n; }).slice(0, 5)
+        .map(function (k) {
+          const c = cnt[k];
+          return '<div class="wa-kv"><span>' + esc(k) + '</span><span>'
+            + c.placed + '/' + c.n + ' 已定位</span></div>';
+        }).join('');
+      // ── v2.521.0（空间缝合）：把「四张地图」接上的两行读数 ──────────
+      //   为什么必须在这里出现 `WA.spatialBridge` 这个字面引用：module-cycle-gate
+      //   会把它算成「零读 ns」—— 模块提供了、产品源面没人读。那条红只能靠真消费
+      //   消掉，不许靠账本登记绕过去（登记等于承认它没人用）。
+      let bridgeLine = '';
+      try {
+        const SB = WA.spatialBridge;
+        if (SB && typeof SB.diagnose === 'function') {
+          const dg = SB.diagnose();
+          const pr = dg.present || {};
+          const on = ['localGrid', 'spatialTopology', 'geoTracker', 'atlas'].filter(function (k) { return pr[k]; });
+          const mg = dg.mirror || {};
+          bridgeLine = '<div class="wa-kv"><span>缝合层</span><span>' + on.length + '/4 引擎在场'
+            + (mg.absent ? ' · 拓扑缺席' : ' · 已投影 ' + (mg.venues || 0) + ' 场所 / ' + (mg.nodes || 0) + ' 节点')
+            + '</span></div>';
+        }
+      } catch (e3) { bridgeLine = ''; }
+      //   预热进度：面板只认已求解缓存（peekVenue），所以「几 / 几 平面已求解」
+      //   就是「图上有几张是实线」。预算 0 时如实写「关」，不给一个假装在跑的数。
+      let warmLine = '';
+      try {
+        const zN = lg ? Object.keys(lg.zones || {}).length : 0;
+        const sN = lg ? Object.keys(lg.solved || {}).length : 0;
+        const budget = (typeof LG.settings === 'function') ? (LG.settings().preheatMax || 0) : 0;
+        warmLine = '<div class="wa-kv"><span>预热</span><span>' + sN + ' / ' + zN + ' 平面已求解'
+          + (budget ? ' · 预算 ' + budget : ' · 预算 0（关；settings.preheatMax 可开）')
+          + '</span></div>';
+      } catch (e4) { warmLine = ''; }
+      const faultLine = fk.length
+        ? '<div class="wa-kv"><span class="wa-dim">拒收 / 异常</span><span class="wa-dim">'
+          + esc(fk.map(function (k) { return k + ' × ' + faults[k]; }).join('、')) + '</span></div>'
+        : '';
+      // 平面图：**只走 peekVenue**（只读已求解缓存，绝不求解 —— getVenue 会 transact 写 solved）
+      let mapHtml = '';
+      (function () {
+        const top = Object.keys(cnt).sort(function (a, b) { return cnt[b].n - cnt[a].n; }).slice(0, 3);
+        for (let i = 0; i < top.length; i++) {
+          const vn = top[i];
+          let pk = null;
+          try { pk = (typeof LG.peekVenue === 'function') ? LG.peekVenue(vn) : null; } catch (e2) { pk = null; }
+          if (!pk || !pk.ok || !pk.zones || !pk.zones.length) continue;
+          const zs = pk.zones.slice(0, 4).map(function (z) {
+            return '<div style="margin:6px 0 2px 0;font-size:11px;opacity:0.8;">' + esc(z.zone)
+              + ' <span class="wa-dim">' + z.placed + '/' + z.total + ' 已定位'
+              + (z.source === 'solved' ? ' ·求解结果' : ' ·未求解（素材原始网格）') + '</span></div>'
+              + lgZoneSvg(z);
+          }).join('');
+          mapHtml += '<details style="margin:4px 0;"><summary style="cursor:pointer;font-size:12px;opacity:0.85;">'
+            + esc(vn) + ' <span class="wa-dim">' + pk.zones.length + ' 平面 · 只读</span></summary>'
+            + zs
+            + (pk.zones.length > 4 ? '<div class="wa-dim" style="font-size:11px;">另有 ' + (pk.zones.length - 4) + ' 个平面未画（面板限 4）</div>' : '')
+            + '</details>';
+        }
+      })();
+      return foldCard('局部网格',
+        sum + '｜求解 ' + (st.solved || 0) + ' 次（推导 ' + (st.computed || 0) + ' / 流式 ' + (st.streamed || 0) + '）',
+        '<div class="wa-card"><div class="wa-card-h">局部网格：区域平面求解（只读）</div>'
+        + '<div class="wa-kv"><span>主体</span><span>' + (ck && ck.enabled ? '开启' : '开关关着（设置页可开）') + '</span></div>'
+        + '<div class="wa-kv"><span>规模</span><span>' + esc(head) + '｜连线 ' + (st.links || 0) + ' 显式 / ' + (st.adjDeclared || 0) + ' 声明</span></div>'
+        + '<div class="wa-kv"><span>撞点消解</span><span>' + (st.collisions || 0) + ' 次（nearestFree 螺旋外扩，不叠格）</span></div>'
+        + '<div class="wa-kv"><span>跨域拒绝</span><span>venue ' + (st.crossVenue || 0) + ' / zone ' + (st.crossZone || 0)
+        + ' <span class="wa-dim">（跨域只答方位，不给米数）</span></span></div>'
+        + '<div class="wa-kv"><span>未定位</span><span>' + (st.unpositioned || 0) + ' 个（无显式坐标且无邻接可推，留空不臆造）</span></div>'
+        + faultLine
+        + bridgeLine
+        + warmLine
+        + (rank ? '<div class="wa-dim" style="font-size:11px;margin-top:6px;">点位最多的场所（已定位 / 合计）</div>' + rank : '')
+        + (mapHtml ? '<div class="wa-dim" style="font-size:11px;margin-top:8px;">平面图（实线格=求解结果，虚线格=素材原始坐标）</div>' + mapHtml : '')
+        + '<div class="wa-hint">本块只读数：写路径（registerVenue / registerZone / registerSpot / link）一律走'
+        + '引擎接口与测试面，面板不提供任何写入口。<br>'
+        + '「跨域拒绝」不是故障：地理轨（geoTracker）把不同建筑按同一原点折算距离，正是它把文京区与'
+        + '所泽算成 50 米的病根；局部网格对跨域只回方位、绝不折算米数。拒绝次数为 0 才该问'
+        + '「是不是没有跨域对照发生」。<br>'
+        + '平面图只画<b>已求解</b>或<b>素材自带坐标</b>的点：虚线格表示该平面尚未求解（用 trace 里的 getZone 跑一次就会变实线）；'
+        + '连线仅表示同平面相邻，不含距离、不含方位。</div></div>', bad);
+    } catch (e) { return ''; }
+  }
   // ══ 段体结束 ══
   //   v2.400.0（V22 后续修正）：EXV22-9 当初把本块写在了段体标记**之外**，
   //   后果是重组面（panelSource() 还原的「假如没拆」的 panel.js）里挂载行
@@ -781,11 +954,12 @@
     v22OmensBlock: v22OmensBlock,
     v23StitchBlock: v23StitchBlock,
     v24CivilBlock: v24CivilBlock,
+    localGridBlock: localGridBlock,
     bind: bind,
-    ver: '2.416.0'
+    ver: '2.520.0'
   };
   WA.panelOverviewBlocks = API;
   if (typeof WA.registerModule === 'function') {
-    WA.registerModule('ui/pages/overview-blocks.js', { kind: 'ui', ver: '2.416.0' });
+    WA.registerModule('ui/pages/overview-blocks.js', { kind: 'ui', ver: '2.520.0' });
   }
 })();
