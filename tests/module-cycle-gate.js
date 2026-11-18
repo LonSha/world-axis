@@ -155,7 +155,7 @@ const ENTRY_NS = {
   eventLog: '入口事件环',
   errorLog: '入口错误子环',
   __inited: '入口「本次激活了哪些引擎」记账',
-  // v2.523.0（OPV27-1/2）：装载面读数由 index.js 在装载尾声合成（boot-report 只做采集/合成），
+  // v2.524.0（OPV27-1/2）：装载面读数由 index.js 在装载尾声合成（boot-report 只做采集/合成），
   //   故它是**入口命名空间**——不进 LOAD_ORDER，不登记就会被判成「未登记的一对一差（static-only）」。
   boot: '入口装载面读数（已装载 N/N · 逐台耗时 · 慢 TOP3）'
 };

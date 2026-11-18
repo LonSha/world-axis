@@ -113,7 +113,7 @@ function boot(srcOv, chatId) {
     c.chat = [{ is_user: true, mes: 'TP4 专锁锚点楼层：韩烈与沈青在北境城对饮。', swipe_id: 0 }];
   } catch (e) {}
   WA.store.init();
-  // v2.523.0 收口（本轮修红）：**本锁不测「迟到结果拦截」，把那一层显式关掉**。
+  // v2.524.0 收口（本轮修红）：**本锁不测「迟到结果拦截」，把那一层显式关掉**。
   //   现场（全量顺序里 B8a/B10a 报 `实 stale`）：`engines/stale-guard.js` 的出厂值是
   //   `enabled:true`（v2.412.0 全开策略），于是 `_start` 取票、await 一次微任务、落地前
   //   再判场景。本锁的 `_runInference` 是自己覆写的同步 resolve，中间**理论上什么都不该变**；
@@ -144,7 +144,7 @@ function receiptsOf(WA) {
   const s = WA.store.get();
   return ((s.commit && s.commit.receipts) || []).slice();
 }
-// v2.523.0 收口（本轮修红）：B8/B10 失败时**必须说得出现场**。
+// v2.524.0 收口（本轮修红）：B8/B10 失败时**必须说得出现场**。
 //   现场：这两条在本节里报红，而那两条断言的名字一个字符也没告诉你「为什么 ok 不是 true」
 //   —— 而 `_start` 的 `ok:false` 有四种形态（staleGuard 作废 / 事务被拒 / 事务抛错 / 通道无结果），
 //   四种的处置完全不同。故把返回体里能读到的归因搬进断言文字（读不到再退回 JSON 原件）。

@@ -117,7 +117,7 @@ function breakOnce(src, anchor, replacement, tag) {
 function runCore() {
   const WA = boot();
   const hp = WA.healthPreflight;
-  // v2.523.0 收口（本轮修红）：**「出厂态就是 thin」这个前提自 v2.412.0 起不成立**。
+  // v2.524.0 收口（本轮修红）：**「出厂态就是 thin」这个前提自 v2.412.0 起不成立**。
   //   原文的现场是「出厂 107 个注入源里只有 6 个通」（不足半数 ⇒ 可见性门槛 degraded ⇒ thin）。
   //   全开策略把出厂开关全部打开之后，出厂态的可见性面已经过半数（实测 running）——
   //   于是 C4 / C5.1 / N1.3 / N1.5 / G1b / G2 六条一起红，而红的是**前提**，判据本身没坏。
@@ -342,7 +342,7 @@ function runCore() {
     //   为什么：第五道门槛（yield）要读 store / evolution；只挑几个依赖传进去，
     //   缺的那几项会让 yield 报 absent ⇒ state 变 unknown ⇒ G1 从 running 变 unknown。
     //   那是**夹具缺件**，不是产品缺陷 —— 判据不跟着读数改，改夹具（这条已在本仓付过两次价）。
-    // v2.523.0：这个负控制要的是「有面读不到 + 一半以上源不通」的现场；原文靠出厂态
+    // v2.524.0：这个负控制要的是「有面读不到 + 一半以上源不通」的现场；原文靠出厂态
     //   提供后一半，现在出厂态不再 degraded，故在 `withThinHere()` 里跑这两次求值。
     //   absent 的优先级不受影响：N1.1 仍要求「有面读不到 ⇒ unknown」先赢。
     const depsAbsent = Object.assign({}, WA, { injectBudget: undefined });

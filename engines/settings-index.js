@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/settings-index.js (v2.523.0)
+ * WorldAxis engines/settings-index.js (v2.524.0)
  * OPV27-6 设置面中文索引：333 台引擎登记了 `__settingsRegs`，面板侧此前既无中文名、
  *   也无搜索、也无分组——玩家想关掉某功能，得先知道它叫 `affectionNexus`。
  *
@@ -163,6 +163,6 @@
   };
   // 装载面登记与自述行：与全部引擎同形态（少这两行会在装载汇报里被算成「未自述」，
   //   而 module-registry 的装载期边也要靠 registerModule 才能记到这台）。
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/settings-index.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/settings-index 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/settings-index.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/settings-index 已加载（2.524.0）');
 })();

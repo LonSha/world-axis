@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/inject-delta.js (v2.523.0)
+ * WorldAxis engines/inject-delta.js (v2.524.0)
  * OPV27-9 注入信息增量账：同一事实被多节重复注入（memory / pulse / digest / ledger / world
  *   各来一遍）史无读数——token 预算按节切分，却不按「信息增量」算。本模块**只建读数**：
  *   逐源给出「唯一片段 / 总片段 / 重复率 / 与谁重复」，不改注入内容、不替预算裁决做去重。
@@ -135,6 +135,6 @@
   };
   // 装载面登记与自述行：与全部引擎同形态（少这两行会在装载汇报里被算成「未自述」，
   //   而 module-registry 的装载期边也要靠 registerModule 才能记到这台）。
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/inject-delta.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/inject-delta 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/inject-delta.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/inject-delta 已加载（2.524.0）');
 })();

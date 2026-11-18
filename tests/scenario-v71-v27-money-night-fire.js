@@ -1,5 +1,5 @@
 /**
- * WorldAxis tests/scenario-v69-v27-money-night-fire.js (v2.523.0)
+ * WorldAxis tests/scenario-v69-v27-money-night-fire.js (v2.524.0)
  * 场景 71 专锁：V27「钱、货、夜、火」九引擎贯通终验
  *
  * ── 本锁钉的是什么 ────────────────────────────────────────────────────

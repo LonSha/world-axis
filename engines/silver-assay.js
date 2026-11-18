@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/silver-assay.js (v2.523.0) — EXV27-2 银钱成色与火耗倾煎
+ * WorldAxis engines/silver-assay.js (v2.524.0) — EXV27-2 银钱成色与火耗倾煎
  *
  * ── 它治什么（缺口，开工前实测）──────────────────────────────────────
  *   「火耗 / 官银 / 银锭 / 汇银」在 `engines/` **0 命中**。世界里收租、军饷、当本
@@ -111,6 +111,6 @@
     assay: assay, addMeltLoss: addMeltLoss, shortString: shortString,
     view: view, stat: statView, reset: reset, setSettings: saveSettings, getSettings: settings
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/silver-assay.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/silver-assay 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/silver-assay.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/silver-assay 已加载（2.524.0）');
 })();

@@ -1,7 +1,7 @@
 # WorldAxis V27 全景双九项纲领（EXV27-1～9 + OPV27-1～9）
 
 > **基线起点**：`v2.522.0` / commit `f3a2706` / 450 引擎 / 591 测试文件 / 508 命名空间 / 5698 导出成员。
-> **目标版本**：`v2.523.0` 单版本批次收口（沿用「一个版本做完全部小更新」口径）。
+> **目标版本**：`v2.524.0` 单版本批次收口（沿用「一个版本做完全部小更新」口径）。
 > **立项纪律**：每条缺口必须给出**现场读数**与**可复算命令**；指不出证据的条目不进计划。
 > **本次特别纪律（用户口径）**：**不把门禁当内容**。优化线九项一律是**产品能力/工程质量**
 > （启动、存档、注入、可发现性、可读性、兼容、消费面），不得以「新增一把锁 / 跟位一条账」充数。
@@ -99,7 +99,7 @@ $ for k in 当票 火耗 官银 银锭 盐政 盐引 牙行 脚夫 税关 更鼓
 
 ---
 
-## 五、进度（v2.523.0 交付实测回填）
+## 五、进度（v2.524.0 交付实测回填）
 | 项 | 状态 | 落点 / 证据 |
 | :--- | :--- | :--- |
 | EXV27-1 当票质押 | **完成** | `engines/pawn-redemption.js` · 场景 71-4 · 断当须逾期（负控制①） |
@@ -122,7 +122,7 @@ $ for k in 当票 火耗 官银 银锭 盐政 盐引 牙行 脚夫 税关 更鼓
 | OPV27-9 注入信息增量账 | **完成** | `engines/inject-delta.js`：`normSeg` 只去空白与首尾标点（不做近义改写，改写会造假重复），`measure` 按注入顺序先到者拿唯一、后到者记 `dupWith` · 挂 `planInfo.delta` · 实测两源 4 段 / 唯一 3 / 重复 1（25%） |
 
 ### 本轮实测收口读数（2026-11-17）
-- 版本：`2.523.0`（`index.js` VERSION / `manifest.json` / `tests/run.js __wantPin293` / 13 个锚点测试白名单与版本正则同批跟位）
+- 版本：`2.524.0`（`index.js` VERSION / `manifest.json` / `tests/run.js __wantPin293` / 13 个锚点测试白名单与版本正则同批跟位）
 - 模块面：文件 522 · 命名空间 521 · 装载期边 384 · 调用期引用 644 · 死子 1825
 - 门禁：`module-cycle-gate-v2107` pass（65）· `segment-extract-v2400` pass（128）· `version-consistency` 通过 28 项 · `ns-consumer-ledger-v2400` pass（70）· `ledger-audit` 四绿（module-registry / module-cycle / sync-hardcoded / export-contract），余 `UI_BINDINGS` 一条 ——
   该条在 `git worktree` 的干净 HEAD（`f3a2706`）上同样复现（`ui/panel.js` 的 `send_textarea`），**属基线预存失败，不是本批引入**。

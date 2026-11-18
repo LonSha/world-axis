@@ -56,7 +56,7 @@ function runA(a) {
   a(seg.indexOf('clampBackstageResult') < 0 || seg.indexOf('return { ok: false, stale: true') < seg.indexOf('clampBackstageResult'),
     'v2131/A: 早退发生在**截断之前**（拒收的结果不该先经过任何加工）');
   // 开关关闭时的行为必须与本版之前逐字一致：`begin` 未开票 ⇒ 不校验
-  //   v2.523.0 收口：原判据用 `/sgTicket\s*=\s*\(WA\.staleGuard/` 认形状，而本版修掉了
+  //   v2.524.0 收口：原判据用 `/sgTicket\s*=\s*\(WA\.staleGuard/` 认形状，而本版修掉了
   //   一处真病 —— `begin` 返回的是**信封** `{ok,ticket,snapshot}`，原代码把整个信封当票号
   //   交给 `verdict`（非字符串 ⇒ missing-key ⇒ 每次结算都被自己丢弃）。修完形状变成
   //   `sgBegin = …begin(…)` + `sgTicket = envelope.ticket`，正则自然不再命中。

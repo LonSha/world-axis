@@ -26,7 +26,7 @@
  *   ① 11 条每台有且只有一个裁决；
  *   ② drive 类必须在 roundDrivers.DRIVERS 里，且零参调通；
  *   ③ dead 类必须在 dead-export-ledger 的 dead/uiDead 里有对应 src 条目（不得新造）。
- *   v2.523.0 归口：21 条老引擎的推进口在覆盖率锁 C2 上被判「真零调用且未裁决」，
+ *   v2.524.0 归口：21 条老引擎的推进口在覆盖率锁 C2 上被判「真零调用且未裁决」，
  *   本表逐台裁决（2 drive / 19 entry）——判据与四类语义均未改，只是把当时漏登的补齐。
  */
 (function () {
@@ -69,7 +69,7 @@
       reason: '进度条 HTML 生成器：属于 UI 组件工具箱，由页面渲染时调用，不是引擎推进' },
     { api: 'choiceBoard.refresh', cls: 'ui', driver: null,
       reason: '选项板重绘口：由页面在字体/布局变化后调用，不是引擎推进，故不进轮次' },
-    // ── v2.523.0 归口：V11 覆盖率锁（tests/v11-push-api-coverage.js）的 C2 在收口轮次里
+    // ── v2.524.0 归口：V11 覆盖率锁（tests/v11-push-api-coverage.js）的 C2 在收口轮次里
     //    复算出 21 条「真零调用且未裁决」——全是 v2.55～v2.517 之间落地的老引擎推进口，
     //    当时只做了「存在 + 自调」，没人接进任何调用面。逐台核过证据后按同一把尺子归口：
     //      ① cls='drive' 只给「零参调用不抛、且不改存档」的两台（longline.sweep /

@@ -201,7 +201,7 @@ function runC() {
   const W2 = loadAll();
   const fake2 = fakeLedger(['life']);
   try { W2.capabilityTier.applyTier('lite'); } catch (e) {}
-  // v2.523.0 收口（本轮修红）：**「lite 档会把 life 关掉」这个前提自 v2.412.0 起不成立**。
+  // v2.524.0 收口（本轮修红）：**「lite 档会把 life 关掉」这个前提自 v2.412.0 起不成立**。
   //   全开策略的判据是「档位不再收走出厂开关」，于是 lite 档下 life 仍是开的（实测 true）。
   //   本段的判据是「**关着的** L3 不算空转（不冤枉关着的机制）」，判据一字未改；
   //   改的是前提：既然档位不再替我们关，就显式关一次 —— 与同批 beat-facade / o1 / e7 / n10
@@ -289,7 +289,7 @@ function runF() {
   const W2 = loadAll();
   try { W2.capabilityTier.applyTier('lite'); } catch (e) {}
   try { W2.intake.setSettings({ enabled: true }); } catch (e) {}
-  // v2.523.0 收口（本轮修红）：本段的前提是「内容面**已经** degraded」，而它原来靠 lite 档
+  // v2.524.0 收口（本轮修红）：本段的前提是「内容面**已经** degraded」，而它原来靠 lite 档
   //   收走一批开关来制造。全开策略下这个前提没了（实测 degradedContent=0，于是 verdict 走到
   //   dormant、判据读到的是一条**前提不成立**的现场）。判据不变（内容面有问题时不许报 dormant）。
   //   制造方式改用本文件已有的那根杠杆：`openExcluded()` 把不在注入源里的悬空机制打开 ——

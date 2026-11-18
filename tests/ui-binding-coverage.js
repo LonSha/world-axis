@@ -16,7 +16,7 @@ const {uiFiles,auditWire}=require('./ui-wire-audit');
 //      H2 侧早就有 EXEMPT_H 豁免它们，本侧没有 ⇒ 同样是一件语义两个答案。
 //      豁免表**只收骨架**，且必须与 tests/run.js 的 EXEMPT_H 逐字同集（下条断言钉住）。
 const SKELETON_IDS = ['wa-panel', 'wa-orb', 'wa-search-bar', 'wa-overview-absent', 'wa-tools-absent'];
-// v2.523.0 收口：**宿主元素**白名单（与 SKELETON_IDS 同规格：列名字、不列豁免条件）。
+// v2.524.0 收口：**宿主元素**白名单（与 SKELETON_IDS 同规格：列名字、不列豁免条件）。
 //   治的病：本工具把「ui/*.js 里出现的每个字面量 #id」都当成「我们的控件必须登记」，
 //   而 `#send_textarea` 是 **SillyTavern 宿主的消息输入框**：ui/panel.js 在「回到对话」
 //   里只 `focus()` 它 —— 我们既不渲染它、也不拥有它，永远不会在 UI_BINDINGS 里登记。
@@ -41,10 +41,10 @@ function audit(options){
   src.split('\n').forEach((line,i)=>{if(/^\s*(\/\/|\*|\/\*)/.test(line))return;
    if(/querySelector(?:All)?\([^)]*\[data-/.test(line))selectors.push({file:f.rel,line:i+1,text:line.trim()});});
  }
- // v2.523.0：宿主元素单列 —— 它们不参与「我们漏登记」的判定，也不进覆盖率分母。
+ // v2.524.0：宿主元素单列 —— 它们不参与「我们漏登记」的判定，也不进覆盖率分母。
  const hostRefs=references.filter(x=>HOST_IDS.indexOf(x.id)>=0);
  const ours=references.filter(x=>HOST_IDS.indexOf(x.id)<0);
  const missing=ours.filter(x=>!registered.has(x.id));
- return {version:'2.523.0',ok:missing.length===0,references:references.length,hostRefs:hostRefs.length,registered:registered.size,covered:ours.length-missing.length,percent:ours.length?100*(ours.length-missing.length)/ours.length:0,missing,hostList:hostRefs,dynamicSelectors:selectors};
+ return {version:'2.524.0',ok:missing.length===0,references:references.length,hostRefs:hostRefs.length,registered:registered.size,covered:ours.length-missing.length,percent:ours.length?100*(ours.length-missing.length)/ours.length:0,missing,hostList:hostRefs,dynamicSelectors:selectors};
 }
 module.exports={audit,SKELETON_IDS,HOST_IDS};if(require.main===module){const r=audit();console.log(JSON.stringify(r,null,2));process.exit(r.ok?0:1);}

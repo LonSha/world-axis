@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/fire-watch.js (v2.523.0) — EXV27-6 火政与走水
+ * WorldAxis engines/fire-watch.js (v2.524.0) — EXV27-6 火政与走水
  *
  * ── 它治什么（缺口，开工前实测）──────────────────────────────────────
  *   「走水 / 失火 / 火警」在 `engines/` **0 命中**。世界里有灾后余波（aftermath）、
@@ -126,6 +126,6 @@
     ignite: ignite, muster: muster, fight: fight, loss: loss,
     view: view, stat: statView, reset: reset, setSettings: saveSettings, getSettings: settings
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/fire-watch.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/fire-watch 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/fire-watch.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/fire-watch 已加载（2.524.0）');
 })();

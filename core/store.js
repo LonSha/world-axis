@@ -1717,7 +1717,7 @@
    *      （旧存档 schemaVersion 已等于当前值，根本不会走 migrate 分支）。
    * 语义：只填 undefined 的空位，绝不覆盖任何已有值；类型不符时保留原值。
    */
-  // v2.523.0（OPV27-8）：sink/prefix 为可选第三四参——**只用于体检**，不传时行为与旧版逐字相同。
+  // v2.524.0（OPV27-8）：sink/prefix 为可选第三四参——**只用于体检**，不传时行为与旧版逐字相同。
   //   为什么要 sink：此前 ensured 补齐只回一个 filled 计数，「补了哪几个键」不可见。
   //   老档导入时用户只能看到「载入状态缺失 N 个字段」这句总数，查不到缺的是 spatialTopology
   //   还是 memory.l3 —— 补是补了，但补的是什么、谁该写它、补齐了会影响哪块读数，一概不可查。
@@ -2679,7 +2679,7 @@
       // v0.1.45: lastFix 记录本次载入结果（议题据此报，避免状态恢复后永久挂红）；
       //   healed/shapeConflicts 为历史累计，供回溯「是否曾发生过」
       __loadStat.lastFix = { filled: shapeFix.filled, conflicts: shapeFix.conflicts, at: clockWall(),
-        // v2.523.0（OPV27-8）：缺键清单——「补了哪几个键」不再只有一个总数。
+        // v2.524.0（OPV27-8）：缺键清单——「补了哪几个键」不再只有一个总数。
         //   上限 40 条：再多的档已经坏了，列一张几百行的清单没有用，给总数即可。
         missing: __shapeSink.slice(0, 40), missingTotal: __shapeSink.length };
       if (shapeFix.filled > 0) {
@@ -4408,7 +4408,7 @@
       return { ok: true, bytes: byteLen(m.raw), fromChatId: from, inherited: !!(from && from !== cid) };
     },
     loadStat() { return { loads: __loadStat.loads, hits: __loadStat.hits, misses: __loadStat.misses, errors: __loadStat.errors, healed: __loadStat.healed || 0, shapeConflicts: __loadStat.shapeConflicts || 0, migrateRefused: __loadStat.migrateRefused || 0, lastRefused: __loadStat.lastRefused ? { from: __loadStat.lastRefused.from, current: __loadStat.lastRefused.current, at: __loadStat.lastRefused.at } : null, lastFix: { filled: (__loadStat.lastFix && __loadStat.lastFix.filled) || 0, conflicts: (__loadStat.lastFix && __loadStat.lastFix.conflicts) || 0, at: (__loadStat.lastFix && __loadStat.lastFix.at) || 0,
-        // v2.523.0（OPV27-8）：投影里必须带上缺键清单——否则 lastFix 存了、读口却只回三个数，
+        // v2.524.0（OPV27-8）：投影里必须带上缺键清单——否则 lastFix 存了、读口却只回三个数，
         //   「缺了哪几个键」又在出口处被抹掉一次（这正是本项要修的那种「存了但看不见」）。
         missing: (__loadStat.lastFix && __loadStat.lastFix.missing) || [],
         missingTotal: (__loadStat.lastFix && __loadStat.lastFix.missingTotal) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, refused: __migrateReport.refused || null, current: __migrateReport.current || null, at: __migrateReport.at } : null,
@@ -5315,7 +5315,7 @@
       for (const seg of path.split('.')) { if (node == null) return fallback; node = node[seg]; }
       return node === undefined ? fallback : node;
     },
-    // v2.523.0（OPV27-8）：老档缺键体检——导入/续接前先能问「缺什么、谁写、补齐影响」。
+    // v2.524.0（OPV27-8）：老档缺键体检——导入/续接前先能问「缺什么、谁写、补齐影响」。
     //   刻意**不写存档、不改入参**：在 JSON 深拷贝上跑 ensureShape dry-run。
     //   为什么必须 dry-run：体检面污染被体检对象是这条纪律里最不能犯的错——一跑就把用户档改了。
     //   writer 取 __BOUNDED_CAPS 的 site 声明（那是产品侧唯一的「谁按什么上限裁这个容器」真源）；

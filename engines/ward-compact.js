@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/ward-compact.js (v2.523.0) — EXV27-8 保甲乡约与义仓赈济
+ * WorldAxis engines/ward-compact.js (v2.524.0) — EXV27-8 保甲乡约与义仓赈济
  *
  * ── 它治什么（缺口，开工前实测）──────────────────────────────────────
  *   「保正 / 里甲 / 乡规」在 `engines/` **0 命中**，「义仓」只在 `populate.js`
@@ -130,6 +130,6 @@
     enroll: enroll, accuse: accuse, mediate: mediate, openGranary: openGranary,
     view: view, stat: statView, reset: reset, setSettings: saveSettings, getSettings: settings
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/ward-compact.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/ward-compact 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/ward-compact.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/ward-compact 已加载（2.524.0）');
 })();

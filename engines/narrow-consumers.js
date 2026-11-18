@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/narrow-consumers.js (v2.523.0)
+ * WorldAxis engines/narrow-consumers.js (v2.524.0)
  * OPV27-5 窄消费引擎接产品链：`docs/engine-integration-inventory.md` 里有 **55 台**引擎
  *   的「Consumer files ≤2」——装进来了、也在跑，但产品侧没人读，等于白装。
  *
@@ -58,7 +58,7 @@
   const STATIC_KEYS = ['tags', 'words', 'weekdays', 'eras', 'sources', 'authorityOrder', 'guidelines',
     'labelWords', 'labelWordsZh', 'patterns', 'secretKeys', 'fields', 'tiers', 'kinds', 'noteKinds',
     'shichen', 'openTags', 'closeTags', 'columns', 'headers', 'steps', 'stages',
-    // v2.523.0（实测修正）：`entries` 在实测里全是**注册表条目**（l3Registry 28 / pushApiRegistry 15），
+    // v2.524.0（实测修正）：`entries` 在实测里全是**注册表条目**（l3Registry 28 / pushApiRegistry 15），
     //   与「这局发生了什么」无关。初版把它归进运行时键，于是「L3 注册表·entries 28」被当成在用。
     'entries'];
   /** 运行时数据的数组键名——这些才是「本局产出」。 */
@@ -151,6 +151,6 @@
   };
   // 装载面登记与自述行：与全部引擎同形态（少这两行会在装载汇报里被算成「未自述」，
   //   而 module-registry 的装载期边也要靠 registerModule 才能记到这台）。
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/narrow-consumers.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/narrow-consumers 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/narrow-consumers.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/narrow-consumers 已加载（2.524.0）');
 })();

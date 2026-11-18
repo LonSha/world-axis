@@ -356,7 +356,7 @@ section('F 联动:UI_BINDINGS 守卫与页表');
   //   但它必须能被 ui-wire-audit 看见:引用面在 panel.js,渲染面在 panel.js + ui/pages/*.js。
   const wire = require('./ui-wire-audit.js');
   a(typeof wire.auditWire === 'function', 'F1: ui-wire-audit 可复用(接线面门禁)');
-  // v2.523.0 收口:取证面必须与门禁**同一份**,不能自己另拼一个。
+  // v2.524.0 收口:取证面必须与门禁**同一份**,不能自己另拼一个。
   //   原写法 wire.auditWire(RD(PANEL_REL)) 喂的是 panelSource()(拆段重组面)。
   //   自 v2.401.0 起页模板已搬进 ui/pages/*.js:引用面(panel.js 里的 $('#wa-xxx'))仍在
   //   panel.js,渲染面却在 pages 里 ⇒ 重组面上实测 196 条幽灵,而**门禁本身是绿的**

@@ -171,7 +171,7 @@ function travelingShown(W) {
 
 /** ⑩ owner 关着时如实记 fault，不静默折成「没有待办」。 */
 function ownerClosedIsHonest(W) {
-  // v2.523.0 收口：原文靠「commission 出厂即关」造现场，而 v2.412.0 全仓全开策略把
+  // v2.524.0 收口：原文靠「commission 出厂即关」造现场，而 v2.412.0 全仓全开策略把
   //   出厂态翻成开 ⇒ 不再产生 fault（判据本身没错、是前提过期）。本条要测的是
   //   「owner 关着时如实记 fault，不静默折成『没有待办』」，故显式把 owner 关掉再量。
   try { if (W.commission && typeof W.commission.setSettings === 'function') W.commission.setSettings({ enabled: false }); } catch (e) {}

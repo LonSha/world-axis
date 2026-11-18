@@ -1,5 +1,5 @@
 /**
- * WorldAxis tests/opv27-rest-lock.js (v2.523.0)
+ * WorldAxis tests/opv27-rest-lock.js (v2.524.0)
  * V27 优化线剩余六项专锁：OPV27-3 / 5 / 6 / 7 / 8 / 9
  *
  * 本锁钉六件事（每件都先立「现场读数」，再钉「不许编」）：

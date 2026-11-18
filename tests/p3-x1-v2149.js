@@ -151,7 +151,7 @@ function probePanelView(WA, dom) {
   const bodyOf = function () { return panel.querySelector('.wa-body'); };
   // 数的是**子树节点数**（真树），不是 innerHTML.length —— 后者在 mini-DOM 下是解析前的
   //   字符串缓存，摘除节点不改它（实测 9739→9739 的假红）。节点数才是 DOM 层摘除的判据。
-  // v2.523.0 收口（本轮修红）：**原来数的是 body 的「直接子节点数」，那个口径已经过期**。
+  // v2.524.0 收口（本轮修红）：**原来数的是 body 的「直接子节点数」，那个口径已经过期**。
   //   现场（单跑就红）：`实 1→0→1 子节点 2→2`。1→0→1 已说明 omni 块确实离树，可 body 的
   //   第一层没少 —— 因为 v2.401.0 起 overview 页把旧读数整体收进了
   //   `<details id="wa-legacy-readings">`（玩家模式），omni 块从「body 的第一层」下沉到了

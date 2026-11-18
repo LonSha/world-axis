@@ -1,5 +1,5 @@
 /**
- * WorldAxis tests/opv27-boot-report-lock.js (v2.523.0)
+ * WorldAxis tests/opv27-boot-report-lock.js (v2.524.0)
  * OPV27-1（启动噪音收口）+ OPV27-2（逐台装载耗时面）专锁
  *
  * ── 本锁钉的是什么 ────────────────────────────────────────────────────
@@ -54,16 +54,16 @@ console.log('\n【OPV27-1】自述行收口');
   ok(n >= 180, 'R1 现场前提：engines/ 里带「已加载」自述行的引擎 ' + n + ' 台（≥180）');
   ok(!!br, 'core/boot-report.js 已真装载（WA.bootReport 存在）');
   eq(Object.keys(br).length, 5, '导出面 5 项（与 EXPORT_COUNT 自检一致：只留真被读的口）');
-  eq(br.ver, '2.523.0', '模块版本 2.523.0');
+  eq(br.ver, '2.524.0', '模块版本 2.524.0');
 }
 
 // ── 1. 只截获自述行；其余原样放行 ──────────────────────────────────────
 {
   const sink = [];
   console.log = function () { sink.push(Array.prototype.join.call(arguments, ' ')); };
-  const h = br.open({ ver: '2.523.0' });
-  console.log('[WorldAxis] engines/pawn-redemption 已加载（2.523.0）');
-  console.log('[WorldAxis] engines/night-watch 已加载（2.523.0）');
+  const h = br.open({ ver: '2.524.0' });
+  console.log('[WorldAxis] engines/pawn-redemption 已加载（2.524.0）');
+  console.log('[WorldAxis] engines/night-watch 已加载（2.524.0）');
   console.log('[WorldAxis] 这是一条必须放行的普通行');
   console.log('不带前缀的普通行也必须放行');
   console.log('[WorldAxis] 装载失败 1 个：engines/x.js');
@@ -73,7 +73,7 @@ console.log('\n【OPV27-1】自述行收口');
   eq(closed.quietLines, 2, '截获 2 条自述行');
   eq(closed.selfLines.length, 2, '逐台明细 2 条（收口 ≠ 丢账）');
   eq(closed.selfLines[0].self, 'engines/pawn-redemption', '明细记下 rel');
-  eq(closed.selfLines[0].ver, '2.523.0', '明细记下引擎自述版本');
+  eq(closed.selfLines[0].ver, '2.524.0', '明细记下引擎自述版本');
   eq(sink.length, 3, '其余 3 条日志原样到达控制台');
   ok(sink.indexOf('[WorldAxis] 这是一条必须放行的普通行') >= 0, '普通 [WorldAxis] 行未被吞');
   ok(sink.some(s => s.indexOf('装载失败') >= 0), '失败告警未被吞（故障必须可见）');
@@ -104,8 +104,8 @@ console.log('\n【OPV27-2】装载面读数');
     { rel: 'engines/b.js', ms: 2, ok: true },
     { rel: 'engines/c.js', ms: 0, ok: false }
   ];
-  const rep = br.summarize(rows, { ver: '2.523.0', quietLines: 2, elapsedMs: 40, total: 4,
-    verMap: { 'engines/a.js': '2.523.0' } });
+  const rep = br.summarize(rows, { ver: '2.524.0', quietLines: 2, elapsedMs: 40, total: 4,
+    verMap: { 'engines/a.js': '2.524.0' } });
   eq(rep.total, 4, 'total 取自 meta');
   eq(rep.ok, 3, '成功 3 台');
   eq(rep.failed.length, 1, '失败 1 台');
@@ -115,7 +115,7 @@ console.log('\n【OPV27-2】装载面读数');
   eq(rep.p95, 30, 'p95 = 30ms');
   eq(rep.max, 30, 'max = 30ms');
   eq(rep.quietLines, 2, 'quietLines 透传');
-  eq(rep.rows()[1].ver, '2.523.0', 'verMap 回填到逐台明细');
+  eq(rep.rows()[1].ver, '2.524.0', 'verMap 回填到逐台明细');
   eq(rep.slow(1)[0].rel, 'engines/a.js', 'slow(1) 取最慢那台');
   const txt = rep.report();
   ok(txt.indexOf('已装载 3/4') === 0, '汇报以「已装载 3/4」起头（实 ' + txt.slice(0, 24) + '…）');
@@ -137,7 +137,7 @@ console.log('\n【OPV27-2】装载面读数');
   ok(none.note.indexOf('正确结果') > 0, '空读数的 note 说清「空是正确结果」');
 
   const had = WA.boot;
-  WA.boot = { ver: '2.523.0', total: 3, ok: 3, engines: 2, elapsedMs: 12, p50: 2, p95: 9, max: 9,
+  WA.boot = { ver: '2.524.0', total: 3, ok: 3, engines: 2, elapsedMs: 12, p50: 2, p95: 9, max: 9,
     quietLines: 7, failed: [], rows: function () { return [{ rel: 'engines/a.js', ms: 9, ok: true }]; },
     slow: function (n) { return [{ rel: 'engines/a.js', ms: 9, ok: true }].slice(0, n || 10); },
     report: function () { return '已装载 3/3（引擎 2）·失败 0 · 12ms'; } };

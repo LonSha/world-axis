@@ -375,7 +375,7 @@ a(led.totals.loadEdges === 384 && led.totals.callRefs === 644,
   //   （V8 新增 injectCollector / playerArchive / roundDrivers / writeDesk 四个命名空间）。
   // v2.401.0(OPV23):账本实测回填（同上——nsCount 445 / loadedCount 434）
   // v2.518.0：493/482 → 494/483（story-window 一个命名空间 + 一个装载文件，同上批同源）。
-  // v2.523.0（V27 全景双九项）：账本实测回填 494/483 → **511/500**（真源 = tests/module-registry-ledger.json，
+  // v2.524.0（V27 全景双九项）：账本实测回填 494/483 → **511/500**（真源 = tests/module-registry-ledger.json，
   //   由 `node tests/module-registry-gate.js --update` 现场复算落定）。归因逐条可数：本批新增
   //   15 个产品文件 —— EXV27 九台（pawn-redemption / silver-assay / salt-franchise / broker-house /
   //   night-watch / fire-watch / festival-fair / ward-compact / divination-craft）+ OPV27 五个模块

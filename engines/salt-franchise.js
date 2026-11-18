@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/salt-franchise.js (v2.523.0) — EXV27-3 盐引专卖与私盐查缉
+ * WorldAxis engines/salt-franchise.js (v2.524.0) — EXV27-3 盐引专卖与私盐查缉
  *
  * ── 它治什么（缺口，开工前实测）──────────────────────────────────────
  *   「盐政 / 盐引」在 `engines/` **0 命中**，「私盐」同样。世界里盐价涨了、盐商富了，
@@ -118,6 +118,6 @@
     grant: grant, drawSalt: drawSalt, seize: seize,
     view: view, stat: statView, reset: reset, setSettings: saveSettings, getSettings: settings
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/salt-franchise.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/salt-franchise 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/salt-franchise.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/salt-franchise 已加载（2.524.0）');
 })();

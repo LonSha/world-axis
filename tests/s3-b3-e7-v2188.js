@@ -173,7 +173,7 @@ function runA(a) {
   });
   // v2.203.0（Y8）：DEF 多了 `note` / `history` 两栏（回滚栈 + 沿革）——
   //   锚点同步，仍逐字钉住原来那七项声明。
-  // v2.523.0 收口：v2.412.0 的**全开策略**把每个带 enabled 的引擎出厂设为开（rulePack 也在其中）。
+  // v2.524.0 收口：v2.412.0 的**全开策略**把每个带 enabled 的引擎出厂设为开（rulePack 也在其中）。
   //   这条判据的**意图**没变 —— 钉住 DEF 的七项声明逐字在位；变的只是出厂值，故跟到 true。
   a(/const DEF = \{ enabled: true, packs: \[\], active: '', maxPacks: 24, maxKeys: 40, seq: 0,\s*\n\s*note: '', history: \[\] \};/.test(src),
     'e7/A4: 出厂开（v2.412.0 全开策略）+ 包清单/活跃包/两项容量/序号声明逐字在位');
@@ -336,7 +336,7 @@ function runB(a) {
   a(!!H.rulePack && typeof H.rulePack === 'object', 'e7/B1: 模块装载');
   a(KEYS.every(function (k) { return typeof H.rulePack[k] === 'function' || k === 'template'; }),
     'e7/B2: 全部导出可调用（template 是组）');
-  // v2.523.0 收口：全开策略下 rulePack 出厂是开，故「出厂关」这个前提已不成立。
+  // v2.524.0 收口：全开策略下 rulePack 出厂是开，故「出厂关」这个前提已不成立。
   //   本节要验的是**关着时**七个写口逐个拒收，故在这里显式关一次（判据不动，只补前提）。
   a(H.rulePack.getSettings().enabled === true, 'e7/B3: 出厂开（v2.412.0 全开策略）');
   H.rulePack.setSettings({ enabled: false });

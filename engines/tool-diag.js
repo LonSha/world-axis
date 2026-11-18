@@ -3477,7 +3477,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/tactical-combat.js': 'tacticalCombat',
     'engines/populate.js': 'populate',
     'core/clock.js': 'clock',
-    'core/boot-report.js': 'bootReport',   // v2.523.0（OPV27-1/2）：装载汇报 + 逐台耗时面
+    'core/boot-report.js': 'bootReport',   // v2.524.0（OPV27-1/2）：装载汇报 + 逐台耗时面
     'core/store.js': 'store', 'core/settings-bus.js': 'settingsBus', 'core/evict.js': 'evict', 'core/rand.js': 'rand', 'core/input-guard.js': 'inputGuard', 'core/workflow.js': 'workflow', 'core/settle-guard.js': 'settleGuard', 'core/interceptor.js': 'interceptor',
     // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个基元模块 —— 登记一次到位。
     //   漏登记一条的后果不是「报错」，而是「自检看不见的黑盒」（inventory 的未登记模块面）。
@@ -4368,7 +4368,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         const b = li.budget;
         out.budget = { used: b.used, cap: b.cap, source: b.source, contextSize: b.contextSize || null, remain: b.remain, inputTokens: b.inputTokens, saved: b.saved, overBudget: !!b.overBudget, keptCount: b.keptCount || 0, foldedCount: (b.folded || []).length, droppedCount: (b.dropped || []).length };
         if ((b.dropped || []).length) out.budget.dropped = b.dropped;
-        // v2.523.0（OPV27-4）：**被裁清单要能一句话回答**「这轮关系块为什么没进来」。
+        // v2.524.0（OPV27-4）：**被裁清单要能一句话回答**「这轮关系块为什么没进来」。
         //   修前诊断包里 dropped 只是 {source, reason, tokens, remainAt} 四列的原始账：
         //   读者知道「它没进来、因为 no_budget」，却答不出「丢了它我损失了多少信息、
         //   同一科的事还有没有别人在说」。故这里把 plan 的档位与 **explain() 的人话**
@@ -4387,7 +4387,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
             text: ex && ex.text ? ex.text : null, ok: !!(ex && ex.ok) };
         })();
         out.budget.summary = WA.injectBudget && WA.injectBudget.summaryText ? WA.injectBudget.summaryText({ used: b.used, budget: b.cap, overBudget: !!b.overBudget, folded: b.folded || [], dropped: b.dropped || [], saved: b.saved, cost: b.cost || null, headroom: b.headroom || null }) : null;
-        // v2.523.0（V27 优化线剩余六项）：六张新读数一次挂进诊断包。
+        // v2.524.0（V27 优化线剩余六项）：六张新读数一次挂进诊断包。
         //   它们都是「玩家问一句、面板答一句」的面，没有各自的深层结构，
         //   所以在诊断面统一成一行行 text，而不是各开一棵树（开树要各自的读口与契约，
         //   那六棵树本轮没有消费者，就是下一个「死面」）。

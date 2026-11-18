@@ -68,7 +68,7 @@ function bootPlace(WA, name) {
 
 // ══ A 段：aftermath 三条真病 ══
 const WA1 = fresh();
-// v2.523.0 收口：A0a 原文写的是「默认关（enabled:false）」。边界 1 的**实质**是
+// v2.524.0 收口：A0a 原文写的是「默认关（enabled:false）」。边界 1 的**实质**是
 //   「不开口就不动世界」，而 v2.412.0 起全仓改为全开策略（engines/aftermath.js 的
 //   DEF.enabled 已翻成 true，而文件头注的边界 1 原文没同步改写 —— 于是锁与文档各说各话）。
 //   故 A0a 改为**对着真源读**：出厂态必须逐字等于源码 DEF.enabled（不写死字面量，

@@ -23,7 +23,7 @@ const SEED_SRC = fs.readFileSync(path.join(BASE, SEED_REL), 'utf8');
 const BP_SRC = fs.readFileSync(path.join(BASE, BP_REL), 'utf8');
 const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
 const PANEL_SRC = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-// v2.523.0 收口（本轮修红）：**控件的「渲染」与「绑定」在既有结构里分居两处** ——
+// v2.524.0 收口（本轮修红）：**控件的「渲染」与「绑定」在既有结构里分居两处** ——
 //   页面 HTML 由 `ui/pages/*.js` 产出，事件绑定留在 `ui/panel.js`（全局委托）。A7e 原来
 //   只在 panel.js 里找 `id="wa-seed-*"`，于是把「渲染在 pages、绑定在 panel」这个**正确**结构
 //   判成「面板没渲染」。A7d（诊断守卫表登记）与 A7c（面板真读）仍然针对 panel.js，不改。

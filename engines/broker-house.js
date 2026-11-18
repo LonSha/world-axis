@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/broker-house.js (v2.523.0) — EXV27-4 牙行居间与抽佣
+ * WorldAxis engines/broker-house.js (v2.524.0) — EXV27-4 牙行居间与抽佣
  *
  * ── 它治什么（缺口，开工前实测）──────────────────────────────────────
  *   「牙行 / 脚夫 / 税关」在 `engines/` **0 命中**。市集交易有货价（commodity-circulation）、
@@ -122,6 +122,6 @@
     enlist: enlist, match: match, commission: commission, defame: defame,
     view: view, stat: statView, reset: reset, setSettings: saveSettings, getSettings: settings
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/broker-house.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/broker-house 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/broker-house.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/broker-house 已加载（2.524.0）');
 })();

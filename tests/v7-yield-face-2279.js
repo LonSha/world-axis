@@ -76,7 +76,7 @@ function yieldOf(r) {
   return g.length === 1 ? g[0] : null;
 }
 function yieldedKeys(W) {
-  // v2.523.0 收口（本轮修红）：**不能拿 yieldAttrib().rows 当「全部有产出的引擎」**。
+  // v2.524.0 收口（本轮修红）：**不能拿 yieldAttrib().rows 当「全部有产出的引擎」**。
   //   现场：B5 报 `实 4`（关掉「全部」之后仍有 4 台在产出），B6/B6b/B7/B7b/N1b 跟着一起红。
   //   追下去不是引擎关不掉，而是**这份名单当初就缺了口**：产品的
   //   `healthPreflight.yieldAttrib({limit})` 把 limit 夹在 100 条（`Math.min(100, …)`），
@@ -134,7 +134,7 @@ function runB() {
   keys.forEach(function (k) { try { W2[k].setSettings({ enabled: false }); } catch (e) {} });
   const r2 = W2.healthPreflight.threeGates({ sample: 3 });
   const g2 = yieldOf(r2);
-  // v2.523.0 收口：**失败必须点名是哪几台**。原来只写「实得 4」，读者无法知道是哪四台；
+  // v2.524.0 收口：**失败必须点名是哪几台**。原来只写「实得 4」，读者无法知道是哪四台；
   //   本项一次实测就红了 6 条（B5/B6/B6b/B7/B7b/N1b 全挂在同一个数字上），故把当日仍在产出
   //   的引擎名一并报出（读数取自同一条 yieldAttrib，不另造真源）。
   const stillYield = yieldedKeys(W2);

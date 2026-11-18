@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/save-curve.js (v2.523.0)
+ * WorldAxis engines/save-curve.js (v2.524.0)
  * OPV27-3 存档体积曲线：空局骨架 9802 字节、最大容器 evolution 595B —— 此前**没有任何长局曲线**：
  *   10 / 50 / 200 轮存档多大、哪个容器涨得最快，全仓无人回答。本模块建这张账。
  *
@@ -135,6 +135,6 @@
   };
   // 装载面登记与自述行：与全部引擎同形态（少这两行会在装载汇报里被算成「未自述」，
   //   而 module-registry 的装载期边也要靠 registerModule 才能记到这台）。
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/save-curve.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/save-curve 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/save-curve.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/save-curve 已加载（2.524.0）');
 })();

@@ -91,7 +91,7 @@ function runAll(a) {
 
   // ════ B 现场：门禁在真仓库上零告警，且四个文件确实在可达面里 ════
   const rep = gate.scan({});
-  // v2.523.0 收口：这一条原文写「orphans 为 0」，而门禁自 v2.416.0（p_world_pulse 收编）
+  // v2.524.0 收口：这一条原文写「orphans 为 0」，而门禁自 v2.416.0（p_world_pulse 收编）
   //   与 v2.518.0（ruby-card-profile）起就**按设计**允许「已登记豁免」的不可达者（gate.EXEMPT）。
   //   于是这条判据自 v2.416 起一直红 —— 它不是发现了缺陷，而是把「豁免表生效」误当成「有孤儿」。
   //   改的是判据的**意图**而不是数字：真正该禁的是「没人知道它不执行的测试文件」，
@@ -229,7 +229,7 @@ function runNegative(a) {
   const probe2 = adapter(function (cond) { if (!cond) falses += 1; });
   probe2.ok(false, 'a'); probe2.strictEqual(1, 2, 'b'); probe2.notStrictEqual(1, 1, 'c');
   assert.strictEqual(falses, 3, 'v2750: [D6] 假命题三条都被记为假（适配器不吞失败，实 ' + falses + '）');
-  //   D5 豁免表不得是白名单垃圾桶（v2.523.0 口径更新）
+  //   D5 豁免表不得是白名单垃圾桶（v2.524.0 口径更新）
   //   原文断言「EXEMPT.length === 0」。那条自 v2.416.0 收编探针起就过期了：
   //   探针与外部作业入口**本质上**不占自动执行面，硬给它加 spawn 入口只会造出假入口。
   //   故判据改成垃圾桶的反面 —— 每条豁免必须①真不可达（在 orphans 里）②带 ≥12 字理由

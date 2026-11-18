@@ -336,7 +336,7 @@ function runAll(assertFn) {
   ['elapsedEvidence', 'sourceReconcile', 'planRoster'].forEach(function (ns, i) {
     a(td.indexOf("'" + ns + "'") >= 0, 'T5-' + (i + 4) + ' tool-diag 守卫登记 ' + ns);
   });
-  // v2.523.0 收口：原判据把版本号写死成 '2.517.0'，于是每升一次版这条就假红一次
+  // v2.524.0 收口：原判据把版本号写死成 '2.517.0'，于是每升一次版这条就假红一次
   //   （判据本意不是「版本停在 2.517」，而是「index.js 与 manifest 的版本面**同源**」）。
   //   改为从 index.js 读真源，再拿 manifest 与它比 —— 判据变强了（不再需要每版手改），
   //   意思没变：两处版本必须一致。

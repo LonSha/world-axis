@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/divination-craft.js (v2.523.0) — EXV27-9 巫觋占卜与拆字
+ * WorldAxis engines/divination-craft.js (v2.524.0) — EXV27-9 巫觋占卜与拆字
  *
  * ── 它治什么（缺口，开工前实测）──────────────────────────────────────
  *   「占卜 / 拆字 / 巫觋 / 符咒」在 `engines/` **0 命中**。教派有 theology-cult、
@@ -32,7 +32,7 @@
   }
   const stat = { casts: 0, confirmed: 0, fulfilled: 0, failed: 0, spreads: 0, refused: 0, evicted: 0, lastReason: '' };
   const CASTS = [];
-  // v2.523.0（EXV27-9 收口）：枚举名取 AUSPICE 而**不叫那个名字** —— engines/probe.js 已有一个
+  // v2.524.0（EXV27-9 收口）：枚举名取 AUSPICE 而**不叫那个名字** —— engines/probe.js 已有一个
   //   导出面枚举 VERDICT = ['guilty','clear','undecided']。同名不同值域会被
   //   tests/contract-scan-v2150.js 判成真冲突（「同名枚举值域不一致」），那是**该报**的：
   //   契约扫描按名字对齐，同名意味着「同一个概念」，而吉凶与判罪不是一回事。
@@ -115,6 +115,6 @@
     cast: cast, confirm: confirm, spread: spread,
     view: view, stat: statView, reset: reset, setSettings: saveSettings, getSettings: settings
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/divination-craft.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/divination-craft 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/divination-craft.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/divination-craft 已加载（2.524.0）');
 })();

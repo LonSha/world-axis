@@ -1,5 +1,5 @@
 /**
- * WorldAxis core/boot-report.js (v2.523.0)
+ * WorldAxis core/boot-report.js (v2.524.0)
  *   OPV27-1 装载自述行收口 · OPV27-2 逐台装载耗时面
  *
  * ── 为什么存在这个文件（现场读数，不是推测）──────────────────────────────
@@ -34,9 +34,9 @@
   //   而覆盖率判据（B1 / N7）看的就是这两个数是否相等。
   const WA = window.WorldAxis = window.WorldAxis || {};
 
-  var __VER = '2.523.0';
+  var __VER = '2.524.0';
 
-  // 自述行形态：`[WorldAxis] engines/pawn-redemption 已加载（2.523.0）`
+  // 自述行形态：`[WorldAxis] engines/pawn-redemption 已加载（2.524.0）`
   //   注意 `[WorldAxis]` 与 rel 之间是**一个空格**（182 处现场样本一致），
   //   但这里用 `\s+` 兜住历史上的双空格写法 —— 形态宽一点不损失判据：
   //   真正决定「该不该截」的是「以 [WorldAxis] 开头 + 含 已加载 + 括号版本号」三件同时成立。

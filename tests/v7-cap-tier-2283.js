@@ -115,7 +115,7 @@ function runB(WA) {
   //   v2.407.0（三缝+七主线）：MECH 109 → 115（branch-continuity / director / fact-continuity /
   //   summarizer-adapter 四台有注入面引擎），排除名单仍是 35 ⇒ 规模 74 → 80。
   //   现场实测 `view().tiers[full].size = 80`。仍是「有注入面的 − 排除」同一条口径：115 − 35 = 80。
-  // v2.523.0 收口（本轮修红）：探测集 116 → 117（与 capability-tier-v2257 的 MECH=117 同源），
+  // v2.524.0 收口（本轮修红）：探测集 116 → 117（与 capability-tier-v2257 的 MECH=117 同源），
   //   故 full 档规模 = 117 + 1 = 82。判据形态未变（仍是「探测集 + 探测口径差 1」）。
   eq(fullItem && fullItem.size, 82, 'B6: full 档规模为 82（现场实测：全开策略后探测集 117 + 探测口径差 1）');
   assert(fullItem && typeof fullItem.note === 'string' && fullItem.note.indexOf('35') >= 0, 'B7: full 档包含 35 排除注记');

@@ -471,7 +471,7 @@
         //   已经是另一个聊天 / 另一个角色了。
         //   接法：**发请求前取票**（t0 现场），**结算写库前校验**（落库那一刻的现场）。
         //   关（默认）：`begin` 返回 `{ok:false}`，`verdict` 对任何票一律放行 ⇒ 行为与本版之前**逐字一致**。
-        // v2.523.0 收口（真病，非测试问题）：`begin` 返回的是**信封**
+        // v2.524.0 收口（真病，非测试问题）：`begin` 返回的是**信封**
         //   `{ok, ticket, snapshot}`，不是票号本身，而 v2.130.0 起这里把整个信封
         //   当票号交给 `verdict` —— 后者按边界 3「票号必须是 begin 返回的那一个」
         //   做类型检查（非字符串 ⇒ missing-key）。此前 stale-guard 默认关，
@@ -801,7 +801,7 @@
     // 结算器（全量入账）
     // ════════════════════════════════════════════════════
       // V8 scheduled archive writer. Caller owns transaction; no digest/model/network side effects.
-      // v2.523.0（OPV27-3 真裁剪·按存档曲线排名裁）：原先恒写 `summary: ''` 与 `refs: []`。
+      // v2.524.0（OPV27-3 真裁剪·按存档曲线排名裁）：原先恒写 `summary: ''` 与 `refs: []`。
       //   两条都是**恒空占位**，读侧全部容缺——`chronicle-view` 走 `c.summary || c.desc || ''`
       //   与 `Array.isArray(c.refs) ? c.refs.slice(0,4) : []`（81/82 行），`ui/panel` 走
       //   `(c.summary || '').slice(0,80)`（700 行）。空串与空数组存不存，读出来一模一样。

@@ -12,7 +12,7 @@ function runAll(assertFn){
  E.setSettings({autoFulfill:false});a(!E.fulfillDue().ok&&JSON.stringify(W.store.get())===before,'disabled bridge does not mutate world');E.setSettings({autoFulfill:true});
  const r=E.fulfillDue();a(r.ok&&r.count===1,'exactly the due unconditional event fulfills');
  const hist=W.store.get().chronicle;
- // v2.523.0 收口：原文要求 summary **字段存在且为空串**。产品侧已裁决（engines/backstage.js
+ // v2.524.0 收口：原文要求 summary **字段存在且为空串**。产品侧已裁决（engines/backstage.js
 //   archiveScheduled 的头注）：「恒空占位」不再存进存档，读侧全部容缺
 //   （chronicle-view 走 c.summary || c.desc || ''，ui/panel 走 (c.summary || '')）。
 //   本条要挡的是「归档不得发明摘要」，不是「空字段必须落盘」——故判据改为

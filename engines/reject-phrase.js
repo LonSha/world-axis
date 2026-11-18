@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/reject-phrase.js (v2.523.0)
+ * WorldAxis engines/reject-phrase.js (v2.524.0)
  * OPV27-7 拒收码话术：把「engine 甩出一个英文码」翻成「玩家能做什么」。
  *
  * 立项事实：`tests/reject-code-ledger.json` 的 base 已到 **943** 条，而「哪些码能翻成一句
@@ -131,6 +131,6 @@
   };
   // 装载面登记与自述行：与全部引擎同形态（少这两行会在装载汇报里被算成「未自述」，
   //   而 module-registry 的装载期边也要靠 registerModule 才能记到这台）。
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/reject-phrase.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/reject-phrase 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/reject-phrase.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/reject-phrase 已加载（2.524.0）');
 })();

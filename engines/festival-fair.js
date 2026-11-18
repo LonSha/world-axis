@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/festival-fair.js (v2.523.0) — EXV27-7 灯会庙市与纸扎
+ * WorldAxis engines/festival-fair.js (v2.524.0) — EXV27-7 灯会庙市与纸扎
  *
  * ── 它治什么（缺口，开工前实测）──────────────────────────────────────
  *   「灯会 / 庙会 / 纸扎」在 `engines/` **0 命中**。节令有日历、香火有 pilgrim-flow、
@@ -102,6 +102,6 @@
     openStall: openStall, crowd: crowd, closeStall: closeStall,
     view: view, stat: statView, reset: reset, setSettings: saveSettings, getSettings: settings
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/festival-fair.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/festival-fair 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/festival-fair.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/festival-fair 已加载（2.524.0）');
 })();

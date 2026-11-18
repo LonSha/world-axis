@@ -197,7 +197,7 @@
         //   SOURCES / SRC_NAME 逐字同批登记 —— 只加源表不加显示名 ⇒ 注入页/导演页
         //   裸露英文键，而那是玩家唯一能开关它的地方。
         bodyAnatomy: '人体结构',
-        // v2.523.0（OPV27-5）：窄消费引擎的「在用机制」行。与 render/inject.js 的
+        // v2.524.0（OPV27-5）：窄消费引擎的「在用机制」行。与 render/inject.js 的
         //   SOURCES / SRC_NAME 逐字同批登记 —— 只加源表不加显示名 ⇒ 注入页裸露英文键
         //   `narrowConsumers`，而那是玩家唯一能开关它的地方。
         narrowConsumers: '在用机制' };

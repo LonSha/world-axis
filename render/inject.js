@@ -236,7 +236,7 @@
     'epochalTransition', 'cataclysmHazard', 'financialContagion',
     'theologyCult', 'regimentTactics', 'incarcerationJailbreak', 'bloodlineHeritage',
     'engineeringBlueprint', 'dungeonHazardMesh', 'ecosystemCascade', 'courtIntrigue',
-    // v2.523.0（OPV27-5）：窄消费引擎的「在用机制」行。与源表/def/VIS_NAMES/SRC_NAME/分支
+    // v2.524.0（OPV27-5）：窄消费引擎的「在用机制」行。与源表/def/VIS_NAMES/SRC_NAME/分支
     //   五处同批登记 —— 只加分支不加源表 = 开关点了零效果（而且**全源关闭时它照样注入**，
     //   v0.1.29 那条「真空轮 injected=false」当场就会红）；只加源表不加分支 = 声明了没人消费。
     //   默认 **true**：本模块只报「这局真长出了什么数」（vias / bookings / rows / tags），
@@ -359,7 +359,7 @@ style: false,
         // v2.411.0 (R251 缝合批)：人体结构契约。模块总开关默认为关，注入面取默认 true。
         bodyAnatomy: true,
         engineeringBlueprint: true, dungeonHazardMesh: true, ecosystemCascade: true, courtIntrigue: true,
-        // v2.523.0（OPV27-5）：窄消费引擎的「在用机制」行。取默认 true —— 它只报本局真长出的数，
+        // v2.524.0（OPV27-5）：窄消费引擎的「在用机制」行。取默认 true —— 它只报本局真长出的数，
         //   空局恒 ''，不给老用户凭空多出约束。
         narrowConsumers: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
@@ -666,7 +666,7 @@ style: false,
     //   否则用户唯一能看见它的地方裸露英文键名。取「叙述镜片」与注入分支的 source 字面量
     //   逐字同名（explain-v2900 的 A4 咬「不裸露英文键」、C1 咬「源表每项都有名」）。
     narrativeLens: '叙述镜片',
-    // v2.523.0（OPV27-5）：窄消费引擎的「在用机制」行。与注入分支的 source 字面量逐字同名。
+    // v2.524.0（OPV27-5）：窄消费引擎的「在用机制」行。与注入分支的 source 字面量逐字同名。
     narrowConsumers: '在用机制'
   };
   // ── v2.91.0 O4：开关两面对账 ──────────────────────────────────────────
@@ -1965,7 +1965,7 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.ledger && WA.ledger) { const lb = engineCall('ledger', function () { return WA.ledger.buildLedgerText(); }); if (lb) items.push({ source: '账本', content: '[重大事件账本]\n' + lb }); }
       // v0.7: world_digest块
       if (vis.digest && WA.digest) { const db = engineCall('digest', function () { return WA.digest.buildBlock(); }); if (db) items.push({ source: '世界推演', content: db }); }
-      // v2.523.0（OPV27-5）：窄消费引擎接产品链——12 台 consumer≤3 的引擎里「这局真有数」的那几台，
+      // v2.524.0（OPV27-5）：窄消费引擎接产品链——12 台 consumer≤3 的引擎里「这局真有数」的那几台，
       //   在注入正文留一行 [在用机制]。空局/无产出时 buildBlock 自己返回 ''，**不输出空块**。
       if (vis.narrowConsumers && WA.narrowConsumers) {
         const nb = engineCall('narrowConsumers', function () { return WA.narrowConsumers.buildBlock(); });
@@ -2010,7 +2010,7 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
           }
         }
       } catch (e) { WA.log('warn', '预算裁决失败，回退全量注入', e); planInfo = null; finalItems = items; }
-      // v2.523.0 OPV27-9：信息增量账——只读注面，逐源「唯一片段 / 总片段 / 与谁重复」。
+      // v2.524.0 OPV27-9：信息增量账——只读注面，逐源「唯一片段 / 总片段 / 与谁重复」。
       //   刻意**不改** finalItems：去重会改正文，属产品行为变更，须先有读数作依据；
       //   保留哪一份是优先级决定（世界状态块 > 叙事摘要 > 舆情），不是片段字符串能定的。
       try {

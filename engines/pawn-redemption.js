@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/pawn-redemption.js (v2.523.0) — EXV27-1 当票质押与赎当
+ * WorldAxis engines/pawn-redemption.js (v2.524.0) — EXV27-1 当票质押与赎当
  *
  * ── 它治什么（缺口，开工前实测）──────────────────────────────────────
  *   「当票 / 官银 / 银锭」全仓 `engines/` **0 命中**，而「当铺」只出现在
@@ -135,6 +135,6 @@
     pledge: pledge, redeem: redeem, forfeit: forfeit, dueOf: dueOf,
     view: view, stat: statView, reset: reset, setSettings: saveSettings, getSettings: settings
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/pawn-redemption.js', { kind: 'engine', ver: '2.523.0' });
-  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/pawn-redemption 已加载（2.523.0）');
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/pawn-redemption.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/pawn-redemption 已加载（2.524.0）');
 })();

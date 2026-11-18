@@ -93,7 +93,7 @@ function probeStage(env) {
     return origAppend.call(body, c);
   };
   h.tabOf('world').click();
-  // v2.523.0 收口（本轮修红）：**spy 的取证窗口当初被写成了「到本节结束」**。
+  // v2.524.0 收口（本轮修红）：**spy 的取证窗口当初被写成了「到本节结束」**。
   //   现场：P4 报 `append 61 / 泄漏 1`，而泄漏项是 `#wa-legacy-readings` 那个 details。
   //   追下去不是渲染漏过滤，而是**后面的探针故意让内容进 DOM**：P6 的判据原文就是
   //   「全知 + 过滤异常 ⇒ 内容照常进 DOM」（fail-tight 只收紧玩家视角），P7 还会再切两次页。

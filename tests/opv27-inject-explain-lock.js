@@ -1,5 +1,5 @@
 /**
- * WorldAxis tests/opv27-inject-explain-lock.js (v2.523.0)
+ * WorldAxis tests/opv27-inject-explain-lock.js (v2.524.0)
  * OPV27-4 专锁：注入被裁清单的「可替代性档位」与「一句话解释」
  *
  * ── 本锁钉的是什么 ────────────────────────────────────────────────────

@@ -192,7 +192,7 @@ function runAll(a) {
   // A5 关闭时返回空串(不产空壳、不占预算)
   a(E.indexOf("if (!cfg.enabled) return '';") >= 0,
     'A5: buildBlock 关闭时返回空串(不产空壳、不占预算)');
-  // A5b（v2.523.0 新增）：把「关闭时返回空串」从静态字面量升级成运行期真验 ——
+  // A5b（v2.524.0 新增）：把「关闭时返回空串」从静态字面量升级成运行期真验 ——
   //   全开策略之后出厂是开，光看源码里那句 `if (!cfg.enabled) return ''` 证不了它真会返回空串。
   {
     const envA5b = env0();

@@ -64,7 +64,7 @@ function runLock(file) {
 }
 function runGate(rel, args) {
   try {
-    // v2.523.0 收口：execFileSync 默认 maxBuffer 1MB，而这些锁会把装载日志
+    // v2.524.0 收口：execFileSync 默认 maxBuffer 1MB，而这些锁会把装载日志
     //   （每台引擎一行 `[WorldAxis] engines/... 已加载`）连同断言一起打到 stdout，
     //   仓库长到 700+ 引擎后单锁输出已越 1MB ⇒ 子进程被 ENOBUFS 掐死，
     //   矩阵把「缓冲区不够」读成「锁红了」。这里只放宽缓冲，判据（退出码）一字未改。

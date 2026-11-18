@@ -327,7 +327,7 @@
     //   按现场 hint 逐字登记：失主说不通 → 交给叙事（人工复核）；重复回合 → 换滑动才是新回合（改输入）。
     'claim-rejected': { kind: 'manual-review', why: '登记的失主与认领人对不上：凭据已留痕、交给叙事裁定，机器不代判' },
     'duplicated': { kind: 'adjust-input', why: '这一回合已经走过（同签名重放）：换一次新的滑动/输入才是新回合，不是原地重放' },
-    // ── v2.523.0（V27 收口）：现场复算发现**四条拒收码没有任何档**（tools/reject-recovery.js
+    // ── v2.524.0（V27 收口）：现场复算发现**四条拒收码没有任何档**（tools/reject-recovery.js
     //   的 --json 输出：problems 里这四条既不进 RULES 也不进 OVERRIDES ⇒ explain() 只能答 unknown，
     //   面板会给玩家一个空动作）。分词表收不住它们，故逐条显式登记：
     'cross-venue': { kind: 'adjust-input', why: '两端不在同一个会场（local-grid 拒绝跨会场算距离）：把目标换到同会场再提交，不是重试' },
@@ -364,7 +364,7 @@
    *  两种合法登记：给一个档（`kind`），或明说它不在这份契约里（`out:true` + why）。
    *  **未登记的判不出面码一律算缺口**（边界 ③）。 */
   const NEUTRAL_REVIEW = {
-    // v2.523.0（V27 收口）：与上方 NEUTRAL_FACE 同批补的两条，都走 out:true ——
+    // v2.524.0（V27 收口）：与上方 NEUTRAL_FACE 同批补的两条，都走 out:true ——
     //   它们是**决策/治理理由**（注入记账说「这条已落地」；宿主没有 console 时说「归档口不可用」），
     //   不是玩家做错了什么；硬塞进六档任何一档都会教玩家去修没坏的东西。
     'landed': { out: true, why: '注入预算账里的「已落地」标记（hits 里的决策理由，不是一次调用失败）—— 不在这份恢复契约里' },
@@ -1056,7 +1056,7 @@
     //     · duplicated → adjust-input（duplicate 分词）
     'bad-sample', 'claim-rejected', 'duplicated', 'fetch-failed', 'missing-channel',
     'missing-model', 'model-drift', 'no-cache', 'not-pinned', 'unknown-round',
-    // ── v2.523.0（V27 收口）：本快照一次性补 31 条「现场有、快照没有」的拒收码。
+    // ── v2.524.0（V27 收口）：本快照一次性补 31 条「现场有、快照没有」的拒收码。
     //   两类来源，都是同一件病的复发（只加码不跟快照）：
     //     ① 15 条本批新增（V27 的 OPV27-3/5/6/7/8/9 六项与五台新模块）：
     //        bad-items / empty-query / landed / no-audit / no-boot / no-console / no-phrase /
@@ -1175,7 +1175,7 @@
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
-    // v2.523.0（V27 收口）：两条现场落在判不出面的新码 —— 它们所在的对象**不带 ok**
+    // v2.524.0（V27 收口）：两条现场落在判不出面的新码 —— 它们所在的对象**不带 ok**
     //   （`hits.push({outcome:'kept', reason:'landed'})` / boot-report 的归档口在没有 console 时
     //   返回 `{reason:'no-console'}`），故既不是拒收也不是成功。按现场归属收在这里，不按名字猜。
     'landed', 'no-console',

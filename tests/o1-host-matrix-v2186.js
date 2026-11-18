@@ -267,7 +267,7 @@ function runB(a) {
     const W4 = gate.fresh({}).WA;
     const S = W4.storyChoice;
     W4.branchTree.setSettings({ enabled: true });
-    // v2.523.0 收口：v2.412.0 的**全开策略**把 storyChoice 出厂设为开，故「出厂关」这个前提
+    // v2.524.0 收口：v2.412.0 的**全开策略**把 storyChoice 出厂设为开，故「出厂关」这个前提
     //   已不成立（B/TX4 四条因此一直红，其中「待办里还剩 1 条」正是关闭路径没关住留下的选择点）。
     //   这里显式关一次再验拒收路径：判据没动，改的是前提。
     S.setSettings({ enabled: false });
@@ -297,7 +297,7 @@ function runB(a) {
     const W1 = gate.fresh({}).WA;
     const D = W1.diplomacy;
     a(!!D && typeof D.propose === 'function', 'B0 装载面：diplomacy 在场');
-    // v2.523.0 收口：同 TX4 —— 全开策略下 diplomacy 出厂是开，要验「关闭时 ⇒ disabled」必须先关。
+    // v2.524.0 收口：同 TX4 —— 全开策略下 diplomacy 出厂是开，要验「关闭时 ⇒ disabled」必须先关。
     D.setSettings({ enabled: false });
     const off1 = D.propose({ from: '甲盟', to: '乙邦', terms: [{ term: 'trade' }] });
     a(off1 && off1.ok === false && off1.reason === 'disabled', 'B/TX1 拒收路径：关闭时 ⇒ disabled');
