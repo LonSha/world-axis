@@ -4501,7 +4501,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
   //   而本判据的常量没跟。第六次也是同一句话：**常量必须跟登记表走**。
   //   实测口径（本次当场重算，不拄历史）：非通配容器 201 项 = 数组键 171 + 对象键 30，
   //   与 registryParity().checkedKeys 集合相等（数量相等且逐项相同，由下一条双向核对担保）。
-  assert(rpA1700.checked === 209, 'checked 精确值 209（现场实测：__BOUNDED_CAPS 精确非通配键；v2.382.0 撤除 humanRealism.log / routinePacing.history 两条零写点死容器登记 ⇒ 187→185；v2.250.0（VAC-4）新增 genTiming.ledger / oneShotMod.pending / moodGlide.moods / narrativeDeduction.timeline 四环，并把 livingWorld 八环与 geoTracker 两环改 per-call；实际集合由下一条 checkedKeys 与登记表双向核对）');
+  assert(rpA1700.checked === 235, 'checked 精确值 235（v2.529.0 实测回填：store.init() 后 registryParity().checked = 235，checkedKeys 与 __BOUNDED_CAPS 非通配键逐项同集合、missing 0；旧值 209 是 v2.411.0 的现场，本轮 V28/V29 增引擎带来的容器没跟上，判据没变、数没跟。原口径：__BOUNDED_CAPS 精确非通配键；v2.382.0 撤除 humanRealism.log / routinePacing.history 两条零写点死容器登记 ⇒ 187→185；v2.250.0（VAC-4）新增 genTiming.ledger / oneShotMod.pending / moodGlide.moods / narrativeDeduction.timeline 四环，并把 livingWorld 八环与 geoTracker 两环改 per-call；实际集合由下一条 checkedKeys 与登记表双向核对）');
   // ── B. object 键漏物化检出（v1.6.0 盲区修复）──
   fresh1700();
   WA.store.transact(d => { delete d.people; });
@@ -13733,7 +13733,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
     //   v2.382.0 回填（187 → 185）：与 v1700 段同源同因（撤除 humanRealism.log /
     //   routinePacing.history 两条零写点死容器登记）。两处必须同步改，否则本段与
     //   v1700 段会对同一个量给出两个不同的期望值 —— 那正是「同一份真源两处手抄」。
-    assert(rp.checked === 209, 'v2350: checked 精确值 209（现场实测；与 v1700 段同源，集合面由 checkedKeys 双向核对；v2.409.0 同批两组引擎登记 15 条容量容器 ⇒ 185→200；v2.522.0 spatialTopology 三容器进骨架 ⇒ 201→204）');
+    assert(rp.checked === 235, 'v2350: checked 精确值 235（v2.529.0 实测回填；与 v1700 段同源，集合面由 checkedKeys 双向核对；v2.409.0 同批两组引擎登记 15 条容量容器 ⇒ 185→200；v2.522.0 spatialTopology 三容器进骨架 ⇒ 201→204）');
     assert((rp.checkedKeys || []).indexOf('parallelWorld.snapshots') >= 0, 'v2350: snapshots 进精确键');
     assert((rp.checkedKeys || []).indexOf('evolution.ledger') >= 0, 'v2350: ledger 进精确键');
 
@@ -13952,7 +13952,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
     // v2.524.0 跟位：本批给 render/inject.js 真加了一条注入源 `narrowConsumers`
     //   （OPV27-5：「在用机制」窄面），源表 150 → 151。这条数是「源表变化必须有人确认」
     //   的落账点，故跟着改；账本面（evidence-ledger 的站点读数）已实测 151，两处同源。
-    assert((W.render.SOURCES || []).length === 151, "v2380: SOURCES 为 151 项（v2.524.0：+narrowConsumers「在用机制」；V9 新增四 owner、托管及变化摘要六源，109 → 115）（v2.294.0（V8）：新增结构汇流 injectCollector 注入源 ⇒ 108 → 109）（v2.292.0（EXV7-8）：新增世界自传 worldAutobiography 注入源 ⇒ 107 → 108）（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
+    assert((W.render.SOURCES || []).length === 165, "v2380: SOURCES 为 165 项（v2.529.0 实测回填：render/inject.js 源表 165 条，比旧值 151 多出的 14 条正是 V28 新增注入源（退场人物/行动回执/可察觉的痕迹/他们以为/长出来的线/暗线阶梯/该来的事/说好的事/时间与期限/听来的/别处也在走/镜头之外/信/世界近况）。原记录：v2.524.0：+narrowConsumers「在用机制」；V9 新增四 owner、托管及变化摘要六源，109 → 115）（v2.294.0（V8）：新增结构汇流 injectCollector 注入源 ⇒ 108 → 109）（v2.292.0（EXV7-8）：新增世界自传 worldAutobiography 注入源 ⇒ 107 → 108）（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
     // E. 负向自证：把 echoes 分支从源码里抹掉 ⇒ 门禁必须现形
     const broken2380 = srcIj2380.split("if (vis.echoes)").join("if (false)");
     assert(broken2380 !== srcIj2380, "v2380: （负向自证）破坏锚点在真源码中恰命中（可观测改行为）");
