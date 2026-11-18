@@ -25,6 +25,27 @@ const path = require('path');
 const runner = require(path.join(__dirname, '..', 'tests', 'isolated-runner.js'));
 const root = path.join(__dirname, '..');
 let final = null;
+// v2.529.0（OPV29-32 锁自愈的 CLI 入口）：recoverLock 一直存在且有专锁，
+//   但现场没有一条命令能调到它 —— 两次 stale lock 都是人肉 `rm -rf` 过去的。
+//   这里补一条幂等命令：先如实打印锁状态，再按 recoverLock 的两道条件（主人确认为
+//   stale/no-owner + 该 task 没有活着的 worker）决定是否回收。active / unknown 一律不动。
+if (process.argv.indexOf('--recover-lock') >= 0) {
+  const lockDir = runner.lockDirFor(root);
+  const st = runner.inspectLock(lockDir);
+  console.log('lock:', lockDir);
+  console.log('state:', st.state + (st.owner ? '  owner pid=' + st.owner.pid + ' task=' + (st.owner.task || '-') : ''));
+  if (st.state === 'free') { console.log('没有锁可回收（free）'); process.exit(0); }
+  if (st.state === 'active') { console.log('锁是活的（active）：不动。若是误判，先确认该 pid 真的已退出'); process.exit(2); }
+  if (st.state === 'unknown') { console.log('状态读不出（unknown）：' + (st.why || '') + ' —— 需人工确认后删目录'); process.exit(2); }
+  try {
+    runner.recoverLock(lockDir);
+    console.log('已回收（' + st.state + '）');
+    process.exit(0);
+  } catch (e) {
+    console.log('未回收：' + e.message);
+    process.exit(2);
+  }
+}
 runner.launch(root, { onFinish: function (r) { final = r; } }).then(function (code) {
   const ev = {
     status: final ? final.status : 'no-result',

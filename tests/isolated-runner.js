@@ -212,10 +212,17 @@ function signalGroup(child, signal) {
   try { process.kill(-child.pid, signal); }
   catch (e) { if (e.code !== 'ESRCH') throw e; }
 }
+/**
+ * 锁目录路径（**单一真源**）：launch 与 `--recover-lock` 必须算同一个路径，
+ *   否则「按提示去回收」会回收另一个目录（v2.529.0 补 CLI 入口时抽出的函数）。
+ */
+function lockDirFor(root) {
+  return path.join(os.tmpdir(), 'worldaxis-regression-' + digest(fs.realpathSync(root)).slice(0, 20) + '.lock');
+}
 async function launch(root, options) {
   const opts = options || {};
   root = fs.realpathSync(root);
-  const lockDir = path.join(os.tmpdir(), 'worldaxis-regression-' + digest(root).slice(0, 20) + '.lock');
+  const lockDir = lockDirFor(root);
   const task = fs.mkdtempSync(path.join(os.tmpdir(), 'worldaxis-regression-'));
   fs.chmodSync(task, 0o700);
   let lock;
@@ -227,7 +234,7 @@ async function launch(root, options) {
     // v2.253.0：把「下一步怎么办」当场打出来。旧提示只有一个状态词，现场两次都是人肉翻
     //   源码才知道要调 recoverLock；`unknown` 连 recoverLock 都不收，必须给出人工判据。
     if (st.state === 'stale' || st.state === 'no-owner') {
-      console.error('  回收：node -e "require(\'./tests/isolated-runner.js\').recoverLock(\'' + lockDir + '\')"');
+      console.error('  回收（一条命令，幂等；会二次确认 worker 已死）：node tools/isolated-run.js --recover-lock');
     } else if (st.state === 'unknown') {
       console.error('  需人工确认后删目录（' + (st.why || '原因未知')
         + '）：读不出主人时 runner 不敢自动回收；SELinux 标签不一致的目录 root 也可能读不到。');
@@ -419,4 +426,4 @@ function workerGuard(root) {
   return watchParent(path.dirname(work));
 }
 module.exports = { launch, isWorker, workerGuard, watchParent, prepare, snapshot, identity,
-  acquireLock, inspectLock, recoverLock, liveChild, cleanEnv };
+  acquireLock, inspectLock, recoverLock, liveChild, cleanEnv, lockDirFor };
