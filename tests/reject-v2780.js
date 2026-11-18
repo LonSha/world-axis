@@ -9343,6 +9343,102 @@ function runWitness(WA) {
       void AP; // 到场/失约两个码在下一批（appointment.settle）补见证，这里只保证它被装载
     }
   }
+  // ── v2.524.0（V28 批一·补）：`hearsay-ledger` 的十九个码（版本 / 对质 / 拼图）──
+  //   同一套路：只换 `chronicle` 这一只容器，跑完 `finally` 装回。
+  {
+    const H = WA.hearsayLedger;
+    const hs = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:v28h'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store */ }
+    };
+    if (H && WA.store && typeof WA.store.get === 'function') {
+      const keepCh = (WA.store.get() || {}).chronicle;
+      try {
+        hs(function (d) { d.chronicle = []; });
+        want('missing-event', 'V28 EXV28-09：一条版本没说它是哪件事 ⇒ missing-event');
+        trip('missing-event', function () { return H.version({ listener: '甲', content: '听说南岸涨了' }).reason; });
+        want('missing-listener', 'V28 EXV28-09：一条版本没说谁听到的 ⇒ missing-listener');
+        trip('missing-listener', function () { return H.version({ eventRef: 'ev_x', content: '听说南岸涨了' }).reason; });
+        want('versioned', 'V28 EXV28-09：同一件事按听者各存一版 ⇒ versioned');
+        trip('versioned', function () { return H.version({ eventRef: 'ev_one', listener: '甲', from: '货郎', where: '渡口', content: '南岸的粮涨了' }).reason; });
+        want('versioned-no-store', 'V28 EXV28-09：没有提交面时如实说 versioned-no-store（不当成已存）');
+        trip('versioned-no-store', function () {
+          const keepTx = WA.store.transact;
+          try { WA.store.transact = undefined; return H.version({ eventRef: 'ev_ns', listener: '甲', content: '南岸的粮涨了' }).reason; }
+          finally { WA.store.transact = keepTx; }
+        });
+        want('unheard', 'V28 EXV28-09：问一个没听过这件事的人 ⇒ unheard（不拿别人的版本顶替）');
+        trip('unheard', function () { return H.heard({ eventRef: 'ev_one', listener: '乙' }).reason; });
+        want('too-many-versions', 'V28 EXV28-09：同一件事的版本堆到上限 ⇒ too-many-versions');
+        trip('too-many-versions', function () {
+          const who = ['乙', '丙', '丁', '戊', '己', '庚', '辛'];
+          let last = null;
+          for (let i = 0; i < who.length; i++) {
+            last = H.version({ eventRef: 'ev_pile', listener: who[i], from: '市集', content: '版本' + i });
+            if (last && last.reason === 'too-many-versions') return last.reason;
+          }
+          return last && last.reason;
+        });
+        want('version-missing', 'V28 EXV28-10：对质一条不存在的版本 ⇒ version-missing');
+        trip('version-missing', function () { return H.trace({ id: 'hv_nope' }).reason; });
+        want('traced', 'V28 EXV28-10：链能追到最上游（"某地听某人说的"）⇒ traced');
+        trip('traced', function () {
+          H.version({ eventRef: 'ev_chain', listener: '戊', from: '集市', where: '集市', content: '货船昨夜靠岸' });
+          H.version({ eventRef: 'ev_chain', listener: '丙', from: '戊', where: '茶棚', content: '货船昨夜靠岸' });
+          const v2 = H.version({ eventRef: 'ev_chain', listener: '丁', from: '丙', where: '码头', content: '货船昨夜靠岸' });
+          return H.trace({ id: v2.id }).reason;
+        });
+        want('chain-broken', 'V28 EXV28-10：链缺环 ⇒ chain-broken 并指出断在哪一环（不替玩家补一个"应该是他说的"）');
+        trip('chain-broken', function () {
+          const v = H.version({ eventRef: 'ev_orphan', listener: '己', content: '有人在夜里敲过门' });
+          return H.trace({ id: v.id }).reason;
+        });
+        want('missing-topic', 'V28 EXV28-11：一块碎片没说是关于什么的 ⇒ missing-topic');
+        trip('missing-topic', function () { return H.shard({ text: '账本多了一笔', dim: '账' }).reason; });
+        want('missing-shard', 'V28 EXV28-11：只有主题没有碎片内容 ⇒ missing-shard');
+        trip('missing-shard', function () { return H.shard({ topic: '井', dim: '账' }).reason; });
+        want('missing-dimension', 'V28 EXV28-11：碎片没说它是哪个维度（拼图按维度计数）⇒ missing-dimension');
+        trip('missing-dimension', function () { return H.shard({ topic: '井', text: '井口有新绳痕' }).reason; });
+        want('sharded', 'V28 EXV28-11：碎片存下 ⇒ sharded');
+        trip('sharded', function () { return H.shard({ topic: '井', text: '井口有新绳痕', dim: '痕迹' }).reason; });
+        want('sharded-no-store', 'V28 EXV28-11：没有提交面时如实说 sharded-no-store');
+        trip('sharded-no-store', function () {
+          const keepTx = WA.store.transact;
+          try { WA.store.transact = undefined; return H.shard({ topic: '井', text: '井水变咸', dim: '水' }).reason; }
+          finally { WA.store.transact = keepTx; }
+        });
+        want('too-many-shards', 'V28 EXV28-11：同一主题碎片堆到上限 ⇒ too-many-shards');
+        trip('too-many-shards', function () {
+          let last = null;
+          for (let i = 0; i < 14; i++) {
+            last = H.shard({ topic: '枯井', text: '第' + i + '块', dim: 'd' + i });
+            if (last && last.reason === 'too-many-shards') return last.reason;
+          }
+          return last && last.reason;
+        });
+        want('need-more', 'V28 EXV28-11：碎片不够就不下结论 ⇒ need-more 并报出已有的维度');
+        trip('need-more', function () { return H.assemble({ topic: '井' }).reason; });
+        want('assembled', 'V28 EXV28-11：维度够了才拼 ⇒ assembled');
+        trip('assembled', function () {
+          H.shard({ topic: '船', text: '船期写在码头的木牌上', dim: '文书' });
+          H.shard({ topic: '船', text: '船老大昨夜喝过酒', dim: '人事' });
+          H.shard({ topic: '船', text: '货舱里少了两包', dim: '货' });
+          return H.assemble({ topic: '船' }).reason;
+        });
+        want('overturned', 'V28 EXV28-11：一条反证就能推翻整块拼图并留痕 ⇒ overturned');
+        trip('overturned', function () {
+          H.shard({ topic: '灯', text: '灯是被人吹灭的', dim: '痕迹' });
+          H.shard({ topic: '灯', text: '灯油是新添的', dim: '物' });
+          H.shard({ topic: '灯', text: '灯芯是自己烧尽的（反证）', dim: '反证', refutes: '灯是被人吹灭的' });
+          return H.assemble({ topic: '灯' }).reason;
+        });
+      } finally {
+        hs(function (d) { d.chronicle = keepCh; });
+      }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

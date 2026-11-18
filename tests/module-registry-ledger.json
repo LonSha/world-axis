@@ -1,13 +1,13 @@
 {
  "version": "2.523.0",
- "loadOrderCount": 530,
- "loadedCount": 509,
+ "loadOrderCount": 531,
+ "loadedCount": 510,
  "uiCount": 21,
- "nsCount": 520,
+ "nsCount": 521,
  "totals": {
-  "loadEdges": 402,
+  "loadEdges": 404,
   "hardEdges": 0,
-  "callRefs": 663,
+  "callRefs": 665,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -155,6 +155,7 @@
     "engines/group-refuse.js",
     "engines/handoff-pack.js",
     "engines/hazard.js",
+    "engines/hearsay-ledger.js",
     "engines/history-batch-read.js",
     "engines/history-provenance.js",
     "engines/history-search.js",
@@ -497,6 +498,7 @@
     "engines/foreshadow-germination.js",
     "engines/geophysical-reshaping.js",
     "engines/hazard.js",
+    "engines/hearsay-ledger.js",
     "engines/human-realism.js",
     "engines/inject-delta.js",
     "engines/institutional-schism.js",
@@ -677,6 +679,7 @@
     "engines/geophysical-reshaping.js",
     "engines/group-refuse.js",
     "engines/handoff-pack.js",
+    "engines/hearsay-ledger.js",
     "engines/history-batch-read.js",
     "engines/history-provenance.js",
     "engines/history-search.js",
@@ -5011,6 +5014,29 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_time_ledger_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/hearsay-ledger.js": {
+   "ns": [
+    "hearsayLedger"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_hearsay_settings_v1"
    ],
    "consumedBy": []
   },

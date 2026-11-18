@@ -267,3 +267,14 @@
 - `plans/WORLDAXIS_STORY_EXPANSION_9.md` / `..._OPTIMIZATION_9.md`（2026-11-16）是本代**前身草案**，方向一致但没读现场，把已存在的能力当缺口。本文件把它扩到 72 项并给出读数依据。
 - `plans/V27_MASTER_PLAN.md` 已交付（18 项）；本期**不重复**其 OPV27-1～9（启动噪音/存档曲线/注入裁剪/设置索引/拒收话术/老档体检等）。
 - 本文件取代此前同名的 18 项版本，实施以本文件为准。
+## 交付台账（按提交实测，不按计划口径）
+
+- `a827d1f` 批一引擎层：X1 全 6 项（offstage-queue）+ X2 的以为什么/代价（misbelief）
+  + X3 的来源/候选/断层/交汇/收线（thread-sprout、dormant-ladder）+ X4 的排期/幂等/可逆档
+  （consequence-schedule）+ X5 的三种时间对读（time-ledger）+ 说好的事（appointment）
+  + 可察觉的痕迹（trace-post）+ 行动执行态（act-step）= **九台**，四路接线全落，快档 14/14。
+- 本批追加：`hearsay-ledger`（同一件事的多个版本 / 对质链 / 碎片拼图）= X2 余三项，
+  同批补齐至 **十台**；顺手修掉批一留下的一处真债：`FROZEN2800` 未回填（全量 v2430 会红），
+  已按 `tests/export_contract.txt` 逐字回填。
+- 未做（下一批）：X2 的假消息回追、X3 的拾回只给后果、X4 的债权可催/销账、
+  X5 的异地账/回收上限、X6 全 6 项、以及 OPV28 全 36 项、版本面收口（v2.524.0）。

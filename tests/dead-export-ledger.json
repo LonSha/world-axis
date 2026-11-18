@@ -5962,6 +5962,86 @@
       "tref": 0,
       "own": 5
     },
+    "hearsayLedger.assemble": {
+      "reason": "self-only",
+      "detail": "engines/hearsay-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hearsayLedger.diverge": {
+      "reason": "self-only",
+      "detail": "engines/hearsay-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hearsayLedger.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "hearsayLedger.heard": {
+      "reason": "self-only",
+      "detail": "engines/hearsay-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "hearsayLedger.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "hearsayLedger.shard": {
+      "reason": "self-only",
+      "detail": "engines/hearsay-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hearsayLedger.stat": {
+      "reason": "self-only",
+      "detail": "engines/hearsay-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 33
+    },
+    "hearsayLedger.trace": {
+      "reason": "self-only",
+      "detail": "engines/hearsay-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hearsayLedger.version": {
+      "reason": "self-only",
+      "detail": "engines/hearsay-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "hearsayLedger.view": {
+      "reason": "self-only",
+      "detail": "engines/hearsay-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/hearsay-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "historyBatch.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",

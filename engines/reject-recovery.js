@@ -340,6 +340,10 @@
     //   irreversible：不可逆的选择不许撤回。改的同样不是输入，是别再想撤。
     'hidden-leak': { kind: 'adjust-input', why: '要标的线玩家本不该看见：换成玩家已经知道的那条线，别硬标' },
     'irreversible': { kind: 'permanent-reject', why: '这条后果是不可逆档：没有撤回这条路，接受它或改选择' },
+    // v2.524.0（V28 批一·补）：`unheard` 词表判不出档 ——
+    //   它说的是「你问的这个人没听过这件事」（不是他忘了，也不是世界没这件事）。
+    //   处置是换一个真听过的人问，或者先去把这件事弄到手，故 adjust-input。
+    'unheard': { kind: 'adjust-input', why: '这个人物没听见过这件事：换一个真听过的听者，或先让他有渠道' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -1068,6 +1072,10 @@
     //   站点命中括号配对判据「只要一处落在 ok:false 即拒收面」）；no-evidence 同批从判不出面迁入。
     //   纪律：以后**加码的同批**就要改这里，否则 B3/B4/C4 会照旧红（本仓已栽过六次）。
     'actor-missing', 'belief-not-found', 'duplicate-source', 'entry-missing', 'hidden-leak', 'irreversible', 'missing-about', 'missing-action', 'missing-aftermath', 'missing-belief', 'missing-choice', 'missing-content', 'missing-cost', 'missing-hook', 'missing-rounds', 'missing-source-ref', 'missing-verdict', 'need-cost', 'need-two-ids', 'no-evidence', 'no-settings-bus', 'per-choice-cap', 'rumor-missing', 'seed-missing', 'too-many-candidates', 'too-many-open', 'unknown-state', 'unknown-verdict',
+    // v2.524.0（V28 批一·补）：hearsay-ledger（听来的 / 拼出来的）的现场新增拒收码 ——
+    //   版本缺事件/缺听者、版本堆顶、按听者读不到、对质指向不存在的版本、
+    //   碎片缺主题/缺内容/缺维度、碎片堆顶。逐条由 reject-v2780 的真跑见证点名。
+    'missing-dimension', 'missing-listener', 'missing-shard', 'missing-topic', 'too-many-shards', 'too-many-versions', 'unheard', 'version-missing',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1128,6 +1136,9 @@
     // v2.524.0（V28 批一）：`ok:true` 的**回执码**（接上了 / 记下了 / 标上了 / 结算了）。
     //   它们不是「没拒收」，而是「确实做成了一件事」，故归成功面，不进恢复档。
     'already-live', 'collided', 'corrected', 'cost-recorded', 'dropped', 'hooked', 'jump-noted', 'marked', 'no-calendar', 'no-schedule', 'no-story-round', 'planted', 'settled', 'slot-unknown',
+    // v2.524.0（V28 批一·补）：拼图的三个 `ok:true` 回执 ——
+    //   need-more（块不够不下结论）/ assembled（维度够才拼）/ overturned（一条反证整块作废）。
+    'assembled', 'need-more', 'overturned',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
