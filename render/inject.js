@@ -34,6 +34,15 @@
     // v2.63.0: 'world' / 'shadow' / 'threads'（世界织体 / 社交漩涡 / 悬案）。
     //   与 SOURCES 同批登记（只加分支不加源表 = 开关点了零效果）。
     'causal', 'world', 'shadow', 'threads',
+    'offstageQueue',
+    'actStep',
+    'tracePost',
+    'misbelief',
+    'threadSprout',
+    'dormantLadder',
+    'consequenceSchedule',
+    'appointment',
+    'timeLedger',
     // v2.65.0: 'weather' / 'difficulty'。与注入分支同批登记，否则开关点了零效果。
     // v2.66.0: 'affect' / 'bonds' / 'masks'。与注入分支同批登记，否则开关点了零效果。
     'weather', 'difficulty', 'affect', 'bonds', 'masks', 'temporalLock', 'temperament', 'fondness', 'affectionNexus', 'intimateArbiter', 'parallelEvents',
@@ -237,6 +246,7 @@ style: false,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
         causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, affectionNexus: true, intimateArbiter: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true,
+        offstageQueue: true, actStep: true, tracePost: true, misbelief: true, threadSprout: true, dormantLadder: true, consequenceSchedule: true, appointment: true, timeLedger: true,
         // v2.96.0：传播与辟谣。取默认 true（同四条理由——其模块总开关默认为关）。
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
         // v2.117.0：人物行动。同一条理由 —— 其模块总开关默认为关闭。
@@ -607,6 +617,15 @@ style: false,
     // v2.294.0（V8 OPV8-1）：结构汇流显示名。缺此项 ⇒ 失败台账（SRC_NAME）报英文键名。
     injectCollector: '结构汇流',
     shadow: '社交漩涡', threads: '悬案',
+    offstageQueue: '退场人物',
+    actStep: '行动回执',
+    tracePost: '可察觉的痕迹',
+    misbelief: '他们以为',
+    threadSprout: '长出来的线',
+    dormantLadder: '暗线阶梯',
+    consequenceSchedule: '该来的事',
+    appointment: '说好的事',
+    timeLedger: '时间与期限',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
     // v2.88.0 O1：此处原名是「重大事件账本」，而**注入项**的 source 是「账本」（见
@@ -1901,6 +1920,15 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       //   特别注意它**不与「因果与情报」重复**：那块讲「某人以为」（可错），
       //   本块讲「查到了哪」（必须有据）——若二者同形，「有人怀疑是他」就会被读成「查实是他」。
       if (vis.threads && WA.threads) { const tb = engineCall('threads', function () { return WA.threads.buildBlock(); }); if (tb) items.push({ source: '悬案', content: tb }); }
+      if (vis.offstageQueue && WA.offstageQueue) { const b = engineCall('offstageQueue', function () { return WA.offstageQueue.buildBlock(); }); if (b) items.push({ source: '退场人物', content: b }); }
+      if (vis.actStep && WA.actStep) { const b = engineCall('actStep', function () { return WA.actStep.buildBlock(); }); if (b) items.push({ source: '行动回执', content: b }); }
+      if (vis.tracePost && WA.tracePost) { const b = engineCall('tracePost', function () { return WA.tracePost.buildBlock(); }); if (b) items.push({ source: '可察觉的痕迹', content: b }); }
+      if (vis.misbelief && WA.misbelief) { const b = engineCall('misbelief', function () { return WA.misbelief.buildBlock(); }); if (b) items.push({ source: '他们以为', content: b }); }
+      if (vis.threadSprout && WA.threadSprout) { const b = engineCall('threadSprout', function () { return WA.threadSprout.buildBlock(); }); if (b) items.push({ source: '长出来的线', content: b }); }
+      if (vis.dormantLadder && WA.dormantLadder) { const b = engineCall('dormantLadder', function () { return WA.dormantLadder.buildBlock(); }); if (b) items.push({ source: '暗线阶梯', content: b }); }
+      if (vis.consequenceSchedule && WA.consequenceSchedule) { const b = engineCall('consequenceSchedule', function () { return WA.consequenceSchedule.buildBlock(); }); if (b) items.push({ source: '该来的事', content: b }); }
+      if (vis.appointment && WA.appointment) { const b = engineCall('appointment', function () { return WA.appointment.buildBlock(); }); if (b) items.push({ source: '说好的事', content: b }); }
+      if (vis.timeLedger && WA.timeLedger) { const b = engineCall('timeLedger', function () { return WA.timeLedger.buildBlock(); }); if (b) items.push({ source: '时间与期限', content: b }); }
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = engineCall('memory', function () { return WA.memory.buildMemoryBlock(); }); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）

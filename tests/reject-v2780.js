@@ -9163,6 +9163,186 @@ function runWitness(WA) {
     }
   }
 
+  // ── v2.524.0（V28 批一）：九台新引擎的四十个新拒收码 —— **每个都带可执行见证** ──
+  //   这一批全落在三个既有容器上（`actors` / `currents` / `consequences`），故见证只需
+  //   临时换掉那一个容器的内容、`finally` 原样装回：不写世界存档、不留痕、不依赖前序见证。
+  //   为什么必须逐个真跑出来：这些码是「模型想当然」时**唯一的回执**（说完成了却没有证据、
+  //   说知道却没人告诉他、答应了却没人到场）。不给见证，就等于让门禁替我们说
+  //   「这些码没人会跑到」——而它们恰恰是这一批的全部产品面。
+  {
+    const Q = WA.offstageQueue, AS = WA.actStep, MB = WA.misbelief, TS = WA.threadSprout,
+      DL = WA.dormantLadder, CS = WA.consequenceSchedule, AP = WA.appointment, TL = WA.timeLedger;
+    const hasStore = !!(WA.store && typeof WA.store.get === 'function');
+    // 写口：优先走 transact（真提交面），没有就退回直接改读口 —— 两种都还原成同一份 keep。
+    const tx = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:v28'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store 时见证自然跑不出码 */ }
+    };
+    if (hasStore && Q && AS && MB && TS && DL && CS && AP && TL) {
+      const keep = {
+        actors: (WA.store.get() || {}).actors, currents: (WA.store.get() || {}).currents,
+        consequences: (WA.store.get() || {}).consequences,
+        bus: WA.settingsBus, rumor: WA.rumor, calendar: WA.calendar,
+        chrono: WA.chrono, storyclock: WA.storyclock
+      };
+      try {
+        tx(function (d) {
+          d.actors = {
+            wit_plain: { id: 'wit_plain', name: '见证甲', conditions: [] },
+            wit_sched: { id: 'wit_sched', name: '见证乙', conditions: [],
+              schedule: { morning: { place: '铺子', doing: '开门' } } }
+          };
+          d.currents = [];
+          d.consequences = [];
+        });
+        // ——退场轮转（EXV28-01/03）：没有这个人 / 他没有作息 / 这个时段查不到 ——
+        want('actor-missing', 'V28 EXV28-01：给一个不在册的人查作息/生计/缺席 ⇒ actor-missing（不编一份生活）');
+        trip('actor-missing', function () { return Q.routine({ id: 'wit_nobody' }).reason; });
+        want('no-schedule', 'V28 EXV28-03：人物在册但没有作息表 ⇒ 如实 no-schedule（place 取现位置，不猜他在做什么）');
+        trip('no-schedule', function () { return Q.routine({ id: 'wit_plain' }).reason; });
+        want('slot-unknown', 'V28 EXV28-03：作息表里没有这个时段 ⇒ slot-unknown（不拿相邻时段顶替）');
+        trip('slot-unknown', function () { return Q.routine({ id: 'wit_sched', slot: 'night' }).reason; });
+        want('missing-action', 'V28 EXV28-01：推进退场人物却没给「他做了什么」⇒ missing-action');
+        trip('missing-action', function () { return Q.step({ id: 'wit_plain' }).reason; });
+        want('no-settings-bus', 'V28：设置总线不在这台机器上 ⇒ 拒收并如实说 no-settings-bus（不写进 localStorage 冒充已保存）');
+        trip('no-settings-bus', function () {
+          const keepBus = WA.settingsBus;
+          try { WA.settingsBus = undefined; return Q.setSettings({ enabled: false }).reason; }
+          finally { WA.settingsBus = keepBus; }
+        });
+        // ——行动回执（EXV28-02）：说「完成了」却没有证据 ——
+        want('missing-verdict', 'V28 EXV28-02：裁决没给执行态 ⇒ missing-verdict');
+        trip('missing-verdict', function () { return AS.verdict({}).reason; });
+        want('unknown-verdict', 'V28 EXV28-02：执行态不在五档里（模型自造词）⇒ unknown-verdict 并列出允许值');
+        trip('unknown-verdict', function () { return AS.record({ id: 'wit_plain', action: '去码头问船期', verdict: '大概成了' }).reason; });
+        // ——他们以为（EXV28-06/07）：确信但错 ——
+        want('missing-about', 'V28 EXV28-06：没有「关于什么」的以为什么都不算 ⇒ missing-about');
+        trip('missing-about', function () { return MB.assert({ id: 'wit_plain' }).reason; });
+        want('missing-belief', 'V28 EXV28-06：只有「关于什么」没有「他以为是什么」⇒ missing-belief');
+        trip('missing-belief', function () { return MB.assert({ id: 'wit_plain', about: '船期' }).reason; });
+        want('missing-content', 'V28 EXV28-08：故意误导却没给要传的内容 ⇒ missing-content');
+        trip('missing-content', function () { return MB.plant({}).reason; });
+        want('planted', 'V28 EXV28-08：误导交给 rumor 的传播链 ⇒ planted（传播由 rumor 拥有，本模块不改它）');
+        trip('planted', function () {
+          const keepRumor = WA.rumor;
+          try { WA.rumor = { startChain: function () { return { id: 'rw_wit' }; } };
+            return MB.plant({ content: '据说南岸的粮要涨' }).reason; }
+          finally { WA.rumor = keepRumor; }
+        });
+        want('rumor-missing', 'V28 EXV28-08：传播口不在（拿不到链）⇒ rumor-missing（不假装已经传开）');
+        trip('rumor-missing', function () {
+          const keepRumor = WA.rumor;
+          try { WA.rumor = { startChain: function () { return null; } };
+            return MB.plant({ content: '据说南岸的粮要涨' }).reason; }
+          finally { WA.rumor = keepRumor; }
+        });
+        want('corrected', 'V28 EXV28-07：有证据才纠得动 ⇒ corrected，且已付的代价不回溯抹掉');
+        trip('corrected', function () {
+          MB.assert({ id: 'wit_plain', about: '船期', belief: '船三天后才到' });
+          return MB.correct({ id: 'wit_plain', about: '船期', evidence: '亲眼看船靠岸' }).reason;
+        });
+        want('belief-not-found', 'V28 EXV28-07：纠正一个他没信过的事 ⇒ belief-not-found（不顺手造一条）');
+        trip('belief-not-found', function () {
+          return MB.correct({ id: 'wit_plain', about: '没这回事', evidence: '亲眼看' }).reason;
+        });
+        want('cost-recorded', 'V28 EXV28-07：把代价记在他错信的那一条上 ⇒ cost-recorded');
+        trip('cost-recorded', function () {
+          return MB.cost({ id: 'wit_plain', about: '船期', what: '白等了两天' }).reason;
+        });
+        // ——长出来的线（EXV28-11/12）：来源必须说清，候选有上限 ——
+        want('missing-source-ref', 'V28 EXV28-11：支线只说「从目标来」却没说哪一条 ⇒ missing-source-ref');
+        trip('missing-source-ref', function () { return TS.sprout({ source: { type: 'goal' }, title: 't', hook: 'h' }).reason; });
+        want('missing-hook', 'V28 EXV28-11：支线没有「钩子」（读者为什么想跟）⇒ missing-hook');
+        trip('missing-hook', function () { return TS.sprout({ source: { type: 'goal', ref: 'g1' } }).reason; });
+        const sd1 = TS.sprout({ source: { type: 'goal', ref: 'g1' }, title: '把货送到南岸', hook: '货还在船上，人已经到岸' });
+        want('duplicate-source', 'V28 EXV28-11：同一条来源不许长出第二条线 ⇒ duplicate-source');
+        trip('duplicate-source', function () {
+          return TS.sprout({ source: { type: 'goal', ref: 'g1' }, title: '把货送到南岸', hook: '货还在船上' }).reason;
+        });
+        const sd2 = TS.sprout({ source: { type: 'promise', ref: 'p1' }, title: '答应替人问船期', hook: '答应了却还没去问' });
+        want('too-many-candidates', 'V28 EXV28-11：同时在跑的候选线到上限 ⇒ too-many-candidates（不许满世界撒线）');
+        trip('too-many-candidates', function () {
+          return TS.sprout({ source: { type: 'goal', ref: 'g2' }, title: '第三条', hook: '第三条线' }).reason;
+        });
+        want('seed-missing', 'V28 EXV28-12：接/丢/合一条不存在的线 ⇒ seed-missing');
+        trip('seed-missing', function () { return TS.hook({ id: 'sd_nope' }).reason; });
+        want('hooked', 'V28 EXV28-12：这条线接进正文了 ⇒ hooked');
+        trip('hooked', function () { return TS.hook({ id: sd1.id }).reason; });
+        want('already-live', 'V28 EXV28-12：同一条线接第二次 ⇒ already-live（不重复占版面）');
+        trip('already-live', function () { return TS.hook({ id: sd1.id }).reason; });
+        want('dropped', 'V28 EXV28-12：放着不跟的线降成噪点，但留一条「你当时没去」的痕 ⇒ dropped');
+        trip('dropped', function () { return TS.drop({ id: sd2.id, force: true }).reason; });
+        want('need-two-ids', 'V28 EXV28-12：交汇需要两条不同的线 ⇒ need-two-ids');
+        trip('need-two-ids', function () { return TS.collide({ a: 'x', b: 'x' }).reason; });
+        const sd3 = TS.sprout({ source: { type: 'trace', ref: 't1' }, title: '账本上的旧痕', hook: '账本里多了一笔没人认的支出' });
+        const sd4 = TS.sprout({ source: { type: 'choice', ref: 'c1' }, title: '你选的那条路', hook: '你绕开的那座桥塌了' });
+        want('collided', 'V28 EXV28-12：两条线在同一处撞上 ⇒ collided（不是「合并」，是交汇）');
+        trip('collided', function () { return TS.collide({ a: sd3.id, b: sd4.id }).reason; });
+        want('missing-cost', 'V28 EXV28-12：收线必须说清代价 ⇒ missing-cost');
+        trip('missing-cost', function () { return TS.close({ id: sd3.id }).reason; });
+        want('missing-aftermath', 'V28 EXV28-12：收线必须说清余波 ⇒ missing-aftermath');
+        trip('missing-aftermath', function () { return TS.close({ id: sd3.id, cost: '错过了最后一班船' }).reason; });
+        // ——暗线阶梯（EXV28-13）：只标玩家已经知道的事 ——
+        want('unknown-state', 'V28 EXV28-13：阶梯态不在六档里 ⇒ unknown-state 并列出六档');
+        trip('unknown-state', function () { return DL.mark({ id: sd4.id, state: '半信半疑' }).reason; });
+        want('marked', 'V28 EXV28-13：把已知的线标成阶梯态 ⇒ marked');
+        trip('marked', function () { return DL.mark({ id: sd4.id, state: '听闻' }).reason; });
+        want('hidden-leak', 'V28 EXV28-13：玩家不该看见的隐藏线不许被标成阶梯态 ⇒ hidden-leak');
+        trip('hidden-leak', function () {
+          tx(function (d) {
+            d.currents = Array.isArray(d.currents) ? d.currents : [];
+            d.currents.push({ id: 'cc_wit_hidden', kind: 'seed', stage: '候选', title: '不该被看见的',
+              hidden: true, visibility: 'hidden' });
+          });
+          return DL.mark({ id: 'cc_wit_hidden', state: '已介入' }).reason;
+        });
+        want('entry-missing', 'V28 EXV28-13：标一条不存在的线 ⇒ entry-missing');
+        trip('entry-missing', function () { return DL.mark({ id: 'cc_nope', state: '听闻' }).reason; });
+        // ——该来的事（EXV28-19/20/21）：选择要有未来应验条件 ——
+        want('missing-choice', 'V28 EXV28-19：后果排期没说挂在哪次选择上 ⇒ missing-choice');
+        trip('missing-choice', function () { return CS.schedule({ effect: 'e' }).reason; });
+        const cq1 = CS.schedule({ choiceId: 'ch_wit', effect: '你走的近道让脚夫欠了人情', dueRound: 0 });
+        CS.schedule({ choiceId: 'ch_wit', effect: '第二笔', dueRound: 0 });
+        CS.schedule({ choiceId: 'ch_wit', effect: '第三笔', dueRound: 0 });
+        want('per-choice-cap', 'V28 EXV28-19：一次选择挂的后果到上限 ⇒ per-choice-cap（不让一个选择淹掉正文）');
+        trip('per-choice-cap', function () { return CS.schedule({ choiceId: 'ch_wit', effect: '第四笔' }).reason; });
+        want('settled', 'V28 EXV28-21：到点且条件满足、带证据才结算 ⇒ settled');
+        trip('settled', function () { return CS.settle({ id: cq1.id, evidence: '脚夫当场提起这件事' }).reason; });
+        const cq2 = CS.schedule({ choiceId: 'ch_irr', effect: '桥烧了', reversible: 'irreversible' });
+        want('irreversible', 'V28 EXV28-20：不可逆的选择不许撤回 ⇒ irreversible');
+        trip('irreversible', function () { return CS.revoke({ id: cq2.id }).reason; });
+        const cq3 = CS.schedule({ choiceId: 'ch_paid', effect: '花了大钱', reversible: 'paid' });
+        want('need-cost', 'V28 EXV28-20：可付费撤回却没给代价凭证 ⇒ need-cost（不白撤）');
+        trip('need-cost', function () { return CS.revoke({ id: cq3.id }).reason; });
+        // ——时间的层次（EXV28-27/28）：离线跳跃要说明，缺真源就说缺 ——
+        want('missing-rounds', 'V28 EXV28-27：离线跳跃没说跨了多久 ⇒ missing-rounds');
+        trip('missing-rounds', function () { return TL.jump({}).reason; });
+        want('jump-noted', 'V28 EXV28-27：补一句「你离开了多久、错过什么」⇒ jump-noted');
+        trip('jump-noted', function () { return TL.jump({ rounds: 3, events: 2 }).reason; });
+        want('no-calendar', 'V28 EXV28-28：没有历法也没有阶段真源 ⇒ no-calendar（不编一个节令）');
+        trip('no-calendar', function () {
+          const kc = WA.calendar, kh = WA.chrono;
+          try { WA.calendar = undefined; WA.chrono = undefined; return TL.season().reason; }
+          finally { WA.calendar = kc; WA.chrono = kh; }
+        });
+        want('no-story-round', 'V28 EXV28-29：正文时间给不出「现在第几轮」⇒ no-story-round（不拿世界轮顶替）');
+        trip('no-story-round', function () {
+          const ks = WA.storyclock;
+          try { WA.storyclock = undefined; return TL.deviation().reason; }
+          finally { WA.storyclock = ks; }
+        });
+      } finally {
+        tx(function (d) {
+          d.actors = keep.actors; d.currents = keep.currents; d.consequences = keep.consequences;
+        });
+        WA.settingsBus = keep.bus; WA.rumor = keep.rumor; WA.calendar = keep.calendar;
+        WA.chrono = keep.chrono; WA.storyclock = keep.storyclock;
+      }
+      void AP; // 到场/失约两个码在下一批（appointment.settle）补见证，这里只保证它被装载
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

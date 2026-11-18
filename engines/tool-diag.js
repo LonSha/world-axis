@@ -3654,6 +3654,15 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/difficulty.js': 'difficulty',
     'engines/shadow.js': 'shadow',
     'engines/threads.js': 'threads',
+    'engines/offstage-queue.js': 'offstageQueue',
+    'engines/act-step.js': 'actStep',
+    'engines/trace-post.js': 'tracePost',
+    'engines/misbelief.js': 'misbelief',
+    'engines/thread-sprout.js': 'threadSprout',
+    'engines/dormant-ladder.js': 'dormantLadder',
+    'engines/consequence-schedule.js': 'consequenceSchedule',
+    'engines/appointment.js': 'appointment',
+    'engines/time-ledger.js': 'timeLedger',
     // v2.96.0（X3）：传播与辟谣（与 index.js LOAD_ORDER 同批登记）。
     'engines/rumor.js': 'rumor',
     // v2.99.0：原著幕目（与 index.js LOAD_ORDER 同批登记）。

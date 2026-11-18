@@ -731,6 +731,15 @@
     // v2.63.0：悬案（调查与情报玩法面）。
     //   须早于 render/inject.js，注入时读取 threads.buildBlock()。
     'engines/threads.js',
+    'engines/offstage-queue.js',
+    'engines/act-step.js',
+    'engines/trace-post.js',
+    'engines/misbelief.js',
+    'engines/thread-sprout.js',
+    'engines/dormant-ladder.js',
+    'engines/consequence-schedule.js',
+    'engines/appointment.js',
+    'engines/time-ledger.js',
     // v2.96.0（X3）：传播与辟谣（事实 / 目击 / 转述 / 流言四层传播链）。
     //   三条位置约束，全是硬依赖：
     //     ① 须**晚于** engines/memory.js —— 事实真源是 memory.facts（事实唯一写者 upsertFact）；

@@ -2,6 +2,54 @@
   "_note": "WorldAxis 死子面冻结账本（v2.523.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
   "version": "2.523.0",
   "dead": {
+    "actStep.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/act-step.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "actStep.record": {
+      "reason": "self-only",
+      "detail": "engines/act-step.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/act-step.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "actStep.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/act-step.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "actStep.stat": {
+      "reason": "self-only",
+      "detail": "engines/act-step.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/act-step.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 14
+    },
+    "actStep.verdict": {
+      "reason": "self-only",
+      "detail": "engines/act-step.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/act-step.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 16
+    },
+    "actStep.view": {
+      "reason": "self-only",
+      "detail": "engines/act-step.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/act-step.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "actionDesk.getSettings": {
       "reason": "self-only",
       "detail": "engines/action-desk.js 内部自用、外部零引用（过度导出）",
@@ -609,6 +657,54 @@
       "refs": 0,
       "tref": 0,
       "own": 9
+    },
+    "appointment.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/appointment.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "appointment.make": {
+      "reason": "self-only",
+      "detail": "engines/appointment.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/appointment.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "appointment.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/appointment.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "appointment.settle": {
+      "reason": "self-only",
+      "detail": "engines/appointment.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/appointment.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "appointment.stat": {
+      "reason": "self-only",
+      "detail": "engines/appointment.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/appointment.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 16
+    },
+    "appointment.view": {
+      "reason": "self-only",
+      "detail": "engines/appointment.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/appointment.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "archiveHide.getSettings": {
       "reason": "unwired",
@@ -2618,6 +2714,70 @@
       "tref": 0,
       "own": 3
     },
+    "consequenceSchedule.due": {
+      "reason": "self-only",
+      "detail": "engines/consequence-schedule.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/consequence-schedule.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "consequenceSchedule.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/consequence-schedule.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "consequenceSchedule.review": {
+      "reason": "self-only",
+      "detail": "engines/consequence-schedule.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/consequence-schedule.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "consequenceSchedule.revoke": {
+      "reason": "self-only",
+      "detail": "engines/consequence-schedule.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/consequence-schedule.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "consequenceSchedule.schedule": {
+      "reason": "self-only",
+      "detail": "engines/consequence-schedule.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/consequence-schedule.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "consequenceSchedule.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/consequence-schedule.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "consequenceSchedule.settle": {
+      "reason": "self-only",
+      "detail": "engines/consequence-schedule.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/consequence-schedule.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "consequenceSchedule.stat": {
+      "reason": "self-only",
+      "detail": "engines/consequence-schedule.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/consequence-schedule.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 18
+    },
     "conspiracyWeaver.getConspiracy": {
       "reason": "self-only",
       "detail": "engines/conspiracy-weaver.js 内部自用、外部零引用（过度导出）",
@@ -3790,6 +3950,62 @@
       "reason": "self-only",
       "detail": "engines/divination-craft.js 内部自用、外部零引用（过度导出）",
       "src": "engines/divination-craft.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "dormantLadder.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/dormant-ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "dormantLadder.mark": {
+      "reason": "self-only",
+      "detail": "engines/dormant-ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dormant-ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "dormantLadder.project": {
+      "reason": "self-only",
+      "detail": "engines/dormant-ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dormant-ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "dormantLadder.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/dormant-ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "dormantLadder.stat": {
+      "reason": "self-only",
+      "detail": "engines/dormant-ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dormant-ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "dormantLadder.stateOf": {
+      "reason": "self-only",
+      "detail": "engines/dormant-ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dormant-ladder.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "dormantLadder.view": {
+      "reason": "self-only",
+      "detail": "engines/dormant-ladder.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/dormant-ladder.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -7690,6 +7906,70 @@
       "tref": 0,
       "own": 3
     },
+    "misbelief.assert": {
+      "reason": "self-only",
+      "detail": "engines/misbelief.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/misbelief.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "misbelief.correct": {
+      "reason": "self-only",
+      "detail": "engines/misbelief.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/misbelief.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "misbelief.cost": {
+      "reason": "self-only",
+      "detail": "engines/misbelief.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/misbelief.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "misbelief.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/misbelief.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "misbelief.plant": {
+      "reason": "self-only",
+      "detail": "engines/misbelief.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/misbelief.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "misbelief.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/misbelief.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "misbelief.stat": {
+      "reason": "self-only",
+      "detail": "engines/misbelief.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/misbelief.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 19
+    },
+    "misbelief.view": {
+      "reason": "self-only",
+      "detail": "engines/misbelief.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/misbelief.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "mobStampede.escalateMobTension": {
       "reason": "test-only",
       "detail": "engines/mob-stampede.js 内部自用、外部零引用（过度导出）",
@@ -8353,6 +8633,86 @@
       "refs": 0,
       "tref": 0,
       "own": 1
+    },
+    "offstageQueue.absence": {
+      "reason": "self-only",
+      "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "offstageQueue.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "offstageQueue.pick": {
+      "reason": "self-only",
+      "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "offstageQueue.pressure": {
+      "reason": "self-only",
+      "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "offstageQueue.reunion": {
+      "reason": "self-only",
+      "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "offstageQueue.routine": {
+      "reason": "self-only",
+      "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "offstageQueue.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "offstageQueue.stat": {
+      "reason": "self-only",
+      "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 15
+    },
+    "offstageQueue.step": {
+      "reason": "self-only",
+      "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "offstageQueue.view": {
+      "reason": "self-only",
+      "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/offstage-queue.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "oneShotMod.getSettings": {
       "reason": "unwired",
@@ -13170,6 +13530,150 @@
       "tref": 0,
       "own": 14
     },
+    "threadSprout.close": {
+      "reason": "self-only",
+      "detail": "engines/thread-sprout.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/thread-sprout.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "threadSprout.collide": {
+      "reason": "self-only",
+      "detail": "engines/thread-sprout.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/thread-sprout.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "threadSprout.drop": {
+      "reason": "self-only",
+      "detail": "engines/thread-sprout.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/thread-sprout.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "threadSprout.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/thread-sprout.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "threadSprout.hook": {
+      "reason": "self-only",
+      "detail": "engines/thread-sprout.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/thread-sprout.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 11
+    },
+    "threadSprout.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/thread-sprout.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "threadSprout.sprout": {
+      "reason": "self-only",
+      "detail": "engines/thread-sprout.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/thread-sprout.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "threadSprout.stat": {
+      "reason": "self-only",
+      "detail": "engines/thread-sprout.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/thread-sprout.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 23
+    },
+    "threadSprout.view": {
+      "reason": "self-only",
+      "detail": "engines/thread-sprout.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/thread-sprout.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "timeLedger.deadline": {
+      "reason": "self-only",
+      "detail": "engines/time-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/time-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "timeLedger.deviation": {
+      "reason": "self-only",
+      "detail": "engines/time-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/time-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "timeLedger.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/time-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "timeLedger.jump": {
+      "reason": "self-only",
+      "detail": "engines/time-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/time-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "timeLedger.read": {
+      "reason": "self-only",
+      "detail": "engines/time-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/time-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "timeLedger.season": {
+      "reason": "self-only",
+      "detail": "engines/time-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/time-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "timeLedger.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/time-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "timeLedger.stale": {
+      "reason": "self-only",
+      "detail": "engines/time-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/time-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "timeLedger.stat": {
+      "reason": "self-only",
+      "detail": "engines/time-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/time-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
     "timeline.chatId": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -13662,6 +14166,46 @@
       "reason": "self-only",
       "detail": "engines/toxic-metabolism.js 内部自用、外部零引用（过度导出）",
       "src": "engines/toxic-metabolism.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "tracePost.find": {
+      "reason": "self-only",
+      "detail": "engines/trace-post.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/trace-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "tracePost.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/trace-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "tracePost.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/trace-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "tracePost.stat": {
+      "reason": "self-only",
+      "detail": "engines/trace-post.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/trace-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
+    "tracePost.view": {
+      "reason": "self-only",
+      "detail": "engines/trace-post.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/trace-post.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -14662,6 +15206,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 684
+    "dataOnly": 691
   }
 }

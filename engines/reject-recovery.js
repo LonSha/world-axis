@@ -334,6 +334,12 @@
     'cross-zone': { kind: 'adjust-input', why: '两端不在同一个区（跨区不许直算）：把目标换到同区再提交，不是重试' },
     'zone-unsolved': { kind: 'request-setup', why: '方位还没解出来（要先 getZone / preheat）：先把定位补上再算距离' },
     'unserializable': { kind: 'manual-review', why: '存档里有值无法序列化（函数/循环引用/非有限数等）：要人看一眼是哪个写入方塞进去的，机器判不出该改哪一处' },
+    // ── v2.524.0（V28 批一）：分词表判不出档的两条，逐条显式登记 ——
+    //   hidden-leak：玩家的认知边界被越过（把不该看见的暗线标成了阶梯态）。
+    //     不是重试能解决的：重发还是越界，改的是「拿哪一条线来标」。
+    //   irreversible：不可逆的选择不许撤回。改的同样不是输入，是别再想撤。
+    'hidden-leak': { kind: 'adjust-input', why: '要标的线玩家本不该看见：换成玩家已经知道的那条线，别硬标' },
+    'irreversible': { kind: 'permanent-reject', why: '这条后果是不可逆档：没有撤回这条路，接受它或改选择' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -480,7 +486,9 @@
     //   给它配恢复动作等于教玩家去「修」一件本就没坏的事（与 after-reply / compact 同一条边界）。
     'earliest-unlocked': { out: true, why: '回收清单里被选中项的排序依据（最早移入且未锁定），plan 本身返回 ok:true，不是一次拒收' },
     // ── v2.410.0：elapsed-evidence 的证据定位两态（与 NEUTRAL_FACE 同批，键集逐字同）。
-    'no-evidence': { out: true, why: '时间证据定位读数的「没给证据」态（elapsed-evidence:213，对象只报 found:false），不是调用被拒' },
+    // ── v2.524.0（V28 批一）：`no-evidence` **迁出**判不出面 —— misbelief.correct 与
+    //   consequence-schedule.settle 都把它作为调用方拒收（ok:false）返回：'没给证据'从
+    //   「一片读数的内部态」变成了「这次结算不成立」的真归因，故入拒收面、离开本表。（elapsed-evidence 侧的那处内部读数仍在，只是不再是它的唯一去处。）
     'not-in-text': { out: true, why: '时间证据定位读数的「证据不在正文」内部态（elapsed-evidence:165，出口拼成 evidence-not-in-text 面世），不是调用被拒' },
   };
 /* 拒收面冻结快照（v2.203.0 现场实测 740 条）：至少在 `ok:false` 对象里出现过 ——
@@ -1052,6 +1060,14 @@
     //   zone-unsolved / unserializable）已在 OVERRIDES 里逐条登记档位，其余由规则表收住。
     //   纪律：以后**加码的同批**就要改这里，否则 B3/B4/C4 会照旧红（本仓已栽过五次）。
     'activeScenes-full', 'bad-items', 'cross-venue', 'cross-zone', 'empty-query', 'local-grid-absent', 'missing-endpoint', 'missing-venue', 'missing-zone', 'no-audit', 'no-boot', 'no-phrase', 'no-reader', 'no-source', 'no-such-group', 'nodes-full', 'not-loaded', 'over-quota', 'portals-full', 'read-threw', 'relate-absent', 'store-threw', 'too-few-samples', 'topology-absent', 'unknown-spot', 'unknown-venue', 'unknown-zone', 'unserializable', 'zone-unsolved',
+    // ── v2.524.0（V28 批一）：九台新引擎（offstage-queue / act-step / trace-post / misbelief /
+    //   thread-sprout / dormant-ladder / consequence-schedule / appointment / time-ledger）的
+    //   现场复算新增码。判据口径没动：这 28 条由 `node tools/reject-recovery.js` 逐条点名，
+    //   本条只把它们写进快照。两条分词表收不住（hidden-leak / irreversible）已在 OVERRIDES
+    //   逐条登记档位；too-many-open 由成功面**迁入**拒收面（consequence-schedule 的 ok:false
+    //   站点命中括号配对判据「只要一处落在 ok:false 即拒收面」）；no-evidence 同批从判不出面迁入。
+    //   纪律：以后**加码的同批**就要改这里，否则 B3/B4/C4 会照旧红（本仓已栽过六次）。
+    'actor-missing', 'belief-not-found', 'duplicate-source', 'entry-missing', 'hidden-leak', 'irreversible', 'missing-about', 'missing-action', 'missing-aftermath', 'missing-belief', 'missing-choice', 'missing-content', 'missing-cost', 'missing-hook', 'missing-rounds', 'missing-source-ref', 'missing-verdict', 'need-cost', 'need-two-ids', 'no-evidence', 'no-settings-bus', 'per-choice-cap', 'rumor-missing', 'seed-missing', 'too-many-candidates', 'too-many-open', 'unknown-state', 'unknown-verdict',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1103,12 +1119,15 @@
     'already_unmasked', 'choke-triggered', 'cost-applied', 'counterfactual-echo-evoked', 'dispatched', 'faction-split-enacted',
     'foreshadow-erupted', 'good-standing', 'memory-transplanted', 'no-characters', 'no-idiosyncrasies', 'occluded-in-secret-pocket-or-hidden-layer',
     'out-of-earshot', 'overdue-present', 'pending-dispatched', 'projected', 'reform-enacted', 'room-empty-or-quiet',
-    'routine-disrupted-sheltered', 'rupture-enacted', 'scramble-completed', 'threshold-not-met', 'too-many-open',
+    'routine-disrupted-sheltered', 'rupture-enacted', 'scramble-completed', 'threshold-not-met', 
     // ── v2.411.0（R251 缝合批）：engines/body-anatomy.js 的两条**成功面** ──
     //   为什么成功面也要进快照：这两条都返回 ok:true（镜像算好了 / 首次登记落账了）。
     //   快照缺了它们，explain() 只能答 unknown，面板会给「做成了」配一个恢复动作
     //   —— 正是本面存在要挡住的那类教玩家修没坏的东西（与 built / quiet 同一条边界）。
     'mapped', 'registered',
+    // v2.524.0（V28 批一）：`ok:true` 的**回执码**（接上了 / 记下了 / 标上了 / 结算了）。
+    //   它们不是「没拒收」，而是「确实做成了一件事」，故归成功面，不进恢复档。
+    'already-live', 'collided', 'corrected', 'cost-recorded', 'dropped', 'hooked', 'jump-noted', 'marked', 'no-calendar', 'no-schedule', 'no-story-round', 'planted', 'settled', 'slot-unknown',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
@@ -1155,7 +1174,7 @@
     //   **不带 ok 的定位读数对象**里（`{ found:false, clause:'', reason:'…' }`），
     //   语义是「证据找不到」这一事实记录，不是调用被拒 ⇒ 判不出面（与 cascade_bus_tick 同规）。
     //   这两条在 v2.409.0 跨参照物批带出后未同步进快照（clean HEAD 复跑同红，非本版引入）。
-    'no-evidence', 'not-in-text',
+    'not-in-text',
   ];
   /** 三快照查表 → 面。未命中即 `unknown`（**判不出就是判不出**，不拿规则表兜）。 */
   function frozenFace(c) {

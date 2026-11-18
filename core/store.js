@@ -123,7 +123,9 @@
       echoes: [],               // {id,refCurrent,result,exposure,at}
       // 纪事（归档历史）
       periodicals: { defs: [], issues: [] },
-      chronicle: [],            // {id,kind,title,summary,at,refs}
+      chronicle: [],
+      consequences: [],        // V28 EXV28-19: 选择后果排期
+      // chronicle 条目形状：{id,kind,title,summary,at,refs}
       // 舆情（新闻/论坛/闲逛，闲逛=NON-CANON）
       opinion: { canon: [], forum: [], sandbox: [], updatedAt: 0 },
       // 记忆分层 L0-L3
@@ -1776,6 +1778,7 @@
     'chronicle': { cap: 200, site: 'backstage.js slice(-200) + horizon.js CHRONICLE_CAP 同源（v1.3.0）' },
     'currents': { cap: 40, site: 'backstage.js slice(-40)' },
     'echoes': { cap: 40, site: 'backstage.js slice(-40)' },
+    'consequences': { cap: 60, site: 'consequence-schedule.js due()' },
     'worldFacts': { cap: 100, site: 'backstage.js slice(-100)' },
     'consistency': { cap: 0, site: '当前无写入方' },
     'memory.l0': { cap: 20, site: 'memory.js slice(-CAP.l0)' },

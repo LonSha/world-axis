@@ -679,6 +679,7 @@ const LOAD = [
   //   （world 须晚于 life.js —— 到场者名单的唯一证据是人物自己的 life.schedule；
   //    三者都须早于 render/inject.js 的消费点）。
   'engines/world.js', 'engines/weather.js', 'engines/difficulty.js', 'engines/shadow.js', 'engines/threads.js',
+ 'engines/offstage-queue.js', 'engines/act-step.js', 'engines/trace-post.js', 'engines/misbelief.js', 'engines/thread-sprout.js', 'engines/dormant-ladder.js', 'engines/consequence-schedule.js', 'engines/appointment.js', 'engines/time-ledger.js',
   // v2.97.0（X3）：传播与辟谣。位置与 index.js LOAD_ORDER 同序
   //   （须晚于 memory.js/intel.js：事实真源与置信度反查都指向那两处；须早于 render/inject.js 消费点）。
   'engines/rumor.js',
