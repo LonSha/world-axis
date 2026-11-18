@@ -97,7 +97,7 @@ const p1 = LV.revalue({ id: pid, pct: -20, agreedBy: ['我', '钱庄'] });
 eq(p1.ok, true, 'P4 双方点头才折得动');
 eq(p1.dueBefore, 50, 'P5 折算前说得清', p1.dueBefore);
 eq(p1.dueAfter, 40, 'P6 折算后也说得清', p1.dueAfter);
-eq(LV.revalue({ id: pid, pct: 10, agreedBy: ['我', '钱庄'] }).reason, 'already', 'P7 折过一次不重复改（负控制）');
+eq(LV.revalue({ id: pid, pct: 10, agreedBy: ['我', '钱庄'] }).reason, 'already-handled', 'P7 折过一次不重复改（负控制）');
 
 // ── Q：EXV29-30 穷是可感知的约束 ──
 const q1 = LV.hardship({ cash: 5, need: 40 });

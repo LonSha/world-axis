@@ -221,7 +221,19 @@ function runAll(a) {
     // v2.253.0（漏摊寄售 engines/stall.js）：只有这 8 个是 refuse() 独有写法（其余码另有内联
     //   `reason:` 分支，落在面内由扫描面自己抓住）。面外这 8 个由该引擎专锁咬住。
     'not-there', 'bad-sign', 'no-such-listing', 'offline', 'self-buy', 'too-far',
-    'unknown-buyer', 'unknown-owner'];
+    'unknown-buyer', 'unknown-owner',
+    // ── v2.529.0（V28/V29 收口）：13 条**动态裁决值**落面外，本轮按现场补齐登记。
+    //   它们的共同形态是「reason 不是内联字面量」——门禁 CODE_RE 故意不认间接写法
+    //   （见 reject-code-gate.js 的形态说明：拼接/变量写法不报错也不伪归一），于是
+    //   engines/letter-post.js 的 `reason: v`（v = VERDICTS 里的 arrived/lost/intercepted）、
+    //   hearsay-ledger 的 versioned/traced/chain-broken/sharded、以及带 -no-store 后缀的
+    //   同族码，全都落在面外。**这里如实登记，不假称有专锁**：这 13 条目前唯一的咬住者
+    //   就是本文件 runWitness 的「见证零缺失」（missing=0 = 每条都真从产品 API 跑出来了），
+    //   letter-post / hearsay-ledger 尚无独立专锁 —— 这是欠账，不是已还账。
+    //   本轮之前这 13 条既没登记、也没专锁：面外清单静默落后，正是这条判据该抓的东西。
+    'arrived', 'lost', 'intercepted', 'sent',
+    'versioned', 'traced', 'chain-broken', 'sharded',
+    'versioned-no-store', 'sharded-no-store', 'ticked', 'ticked-no-store', 'opened'];
   const outSorted = wOutFace.slice().sort();
   a(outSorted.join(',') === OUT_FACE_OK.slice().sort().join(','),
     'v2780: [B] 面外见证码与登记清单逐字一致（实 ' + outSorted.join(',') + '）'

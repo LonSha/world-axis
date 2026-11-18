@@ -215,7 +215,7 @@
     }
     const b = box();
     if (b.revalues[id]) {
-      return { ok: false, reason: 'already', id: id, pct: b.revalues[id].pct, note: '这张据已经折算过一次：不重复改' };
+      return { ok: false, reason: 'already-handled', id: id, pct: b.revalues[id].pct, note: '这张据已经折算过一次：不重复改' };
     }
     const dueBefore = round2((row.principalLeft || 0) + (row.interest || 0));
     const dueAfter = round2(dueBefore * (1 + pct / 100));

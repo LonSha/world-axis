@@ -126,7 +126,7 @@
     const key = deceased + '|' + item;
     if (b.estates[key]) {
       stat.refused++;
-      return { ok: false, reason: 'already', key: key, to: b.estates[key].to, note: '这件遗物已经归了人：不许再分一次' };
+      return { ok: false, reason: 'already-handled', key: key, to: b.estates[key].to, note: '这件遗物已经归了人：不许再分一次' };
     }
     let handoff = null;
     const INV = WA.personalInventory;
@@ -187,7 +187,7 @@
     const hit = (w.wishes || []).filter(function (x) { return x.item === item; })[0];
     if (!hit) return { ok: false, reason: 'not-happened', deceased: deceased, item: item, note: '遗嘱里没有这一条：不算违背' };
     if ((w.breaches || []).some(function (x) { return x.item === item; })) {
-      return { ok: false, reason: 'already', deceased: deceased, item: item, note: '这一条已经被违过一次：后果只算一次' };
+      return { ok: false, reason: 'already-handled', deceased: deceased, item: item, note: '这一条已经被违过一次：后果只算一次' };
     }
     w.breaches = w.breaches || [];
     w.breaches.push({ item: item, intendedTo: hit.to, by: by, at: nowAt() });
@@ -248,7 +248,7 @@
     const key = subject + '|' + (caseId || 'no-case');
     if (b.overturns[key]) {
       stat.refused++;
-      return { ok: false, reason: 'already', key: key, note: '这件案子已经翻过了：不许翻第二次' };
+      return { ok: false, reason: 'already-handled', key: key, note: '这件案子已经翻过了：不许翻第二次' };
     }
     b.overturns[key] = { key: key, subject: subject, caseId: caseId || null, evidence: evidence.slice(0, 8), at: at, board: board };
     capObj(b.overturns, OVER_CAP);

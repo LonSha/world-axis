@@ -57,7 +57,7 @@ eq(t0.produced, 4, 'T1 没暂停时自转照常', t0.produced);
 eq(WO.resume().reason, 'not-happened', 'T2 没定住过就谈不上复原');
 const t1 = WO.pause({ by: '玩家' });
 eq(t1.paused, true, 'T3 定住了');
-eq(WO.pause({ by: '玩家' }).reason, 'already', 'T3b 重复定住 ⇒ already（负控制）');
+eq(WO.pause({ by: '玩家' }).reason, 'already-handled', 'T3b 重复定住 ⇒ already（负控制）');
 const t2 = WO.selfTick({ events: 6 });
 eq(t2.produced, 0, 'T4 **定住期间自转产出恒 0**（负控制）', t2.produced);
 eq(t2.suppressed, 6, 'T4b 要发生的先压着，如实报数');

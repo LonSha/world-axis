@@ -596,6 +596,15 @@
     'unknown-method', 'unknown-namespace', 'no-blueprint', 'seed-threw',
     'aftermath-wait', 'ahead-of-head', 'alias-cycle', 'all-rejected', 'all-steps-refused', 'already-',
     'already-abandoned', 'already-adopted', 'already-answered', 'already-arrived', 'already-closed', 'already-confirmed',
+    // v2.529.0：信件判送幂等码改名（'already-arrived' 是 freight 那条**不可达**死码的码名，
+    //   同一个码名不能既可达又不可达 ⇒ 信件侧改用自有码名，两条各归各家）。
+    'already-judged',
+    // v2.529.0：V28 拒收侧原先把「已经做过了」写成通用码 'already'，与 success 侧的
+    //   coordinate / world-blueprint / world-seed 的 'already' 同名 ⇒ 面判定无法把同一个
+    //   码名同时放进两面（audit 当场报 missing/stale 一对）。拒收侧改用 'already-handled'
+    //   （loose-ends 已交代 / world-bounds 已定住 / posthumous 三处 / reputation-after /
+    //   livelihood / exit-rite 共 8 处），success 侧保留 'already' 不动。
+    'already-handled',
     // ── v2.518.0：故事回应窗口（engines/story-window.js）的两条拒收码。
     //   现场复算：两条都落在 ok:false 返回体里（choose/settle 的拒收路径）⇒ 拒收面；
     //   不写 OVERRIDES（规则表已收），与 v2.203/209/221/222/231/292 同一处置。

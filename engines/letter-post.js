@@ -83,7 +83,12 @@
     if (!id) return { ok: false, reason: 'missing-id' };
     const it = find(id);
     if (!it) return { ok: false, reason: 'letter-missing' };
-    if (it.verdict) { stat.refused++; stat.lastReason = 'already-arrived'; return { ok: false, reason: 'already-arrived', verdict: it.verdict }; }
+    // v2.529.0：原来这里复用 'already-arrived' —— 与 freight.arrive 的死码撞名
+    //   （freight 那条已被 v2780 死表登记为**不可达**：要 prior dispatch + arrive 才走到，
+    //   而该组合在真产品面里跑不出来）。同一个码名不能既可达又不可达（v2780 [B] 死表与
+    //   见证表不相交当场报出来），故本引擎改用自有码名：说的是「这封信已经判过送到没送到了」，
+    //   与「货已到站」区分开。
+    if (it.verdict) { stat.refused++; stat.lastReason = 'already-judged'; return { ok: false, reason: 'already-judged', verdict: it.verdict }; }
     const r = Number.isFinite(s.atRound) ? Number(s.atRound) : round();
     if (r < it.arriveRound) {
       stat.refused++; stat.lastReason = 'too-early';

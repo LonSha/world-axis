@@ -104,7 +104,7 @@
   function pause(spec) {
     const src = (spec && typeof spec === 'object') ? spec : {};
     const b = box();
-    if (b.paused) return { ok: false, reason: 'already', pausedAt: b.pausedAt, note: '世界已经定住了' };
+    if (b.paused) return { ok: false, reason: 'already-handled', pausedAt: b.pausedAt, note: '世界已经定住了' };
     const by = clean(src.by, 40) || 'player';
     save({ paused: true, pausedAt: nowAt(), pausedBy: by });
     stat.pauses++;

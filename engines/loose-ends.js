@@ -102,7 +102,7 @@
     const m = readAll();
     const row = m[id];
     if (!row) return { ok: false, reason: 'not-happened', id: id, note: '没有这条线：不替玩家想出一条' };
-    if (row.fate) { stat.rejected++; return { ok: false, reason: 'already', id: id, fate: row.fate, note: '这条已经交代过了：不许改口' }; }
+    if (row.fate) { stat.rejected++; return { ok: false, reason: 'already-handled', id: id, fate: row.fate, note: '这条已经交代过了：不许改口' }; }
     row.fate = fate;
     row.state = 'settled';
     row.closedAt = nowAt();

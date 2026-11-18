@@ -9574,8 +9574,8 @@ function runWitness(WA) {
         trip('too-early', function () { return LT.deliver({ id: lt1.id, atRound: 0 }).reason; });
         want('arrived', 'V28 EXV28-32：到点判送到 ⇒ arrived');
         trip('arrived', function () { return LT.deliver({ id: lt1.id, atRound: 9 }).reason; });
-        want('already-arrived', 'V28 EXV28-32：同一封信判两次 ⇒ already-arrived');
-        trip('already-arrived', function () { return LT.deliver({ id: lt1.id, atRound: 9 }).reason; });
+        want('already-judged', 'V28 EXV28-32：同一封信判两次 ⇒ already-judged（v2.529.0 改名：原 already-arrived 与 freight 的死码撞名）');
+        trip('already-judged', function () { return LT.deliver({ id: lt1.id, atRound: 9 }).reason; });
         want('replied', 'V28 EXV28-32：收到之后能回 ⇒ replied');
         trip('replied', function () { return LT.reply({ id: lt1.id, text: '知道了，等我回信' }).reason; });
         want('already-replied', 'V28 EXV28-32：同一封回两次 ⇒ already-replied');
@@ -9867,6 +9867,19 @@ function runWitness(WA) {
       }
     }
   }
+  // ── V28 重复处置统一码（v2.529.0 改名）───────────────────────────────
+  //   原来八处（loose-ends / world-bounds / posthumous×3 / reputation-after /
+  //   livelihood / exit-rite）都写 'already'，与 success 侧的 coordinate /
+  //   world-blueprint / world-seed 撞名 —— 一个码名只能落一面（success 与 reject
+  //   同时命中时 audit 报 missing/stale 一对），故拒收侧改 'already-handled'。
+  //   这里补一条真见证：本码此前既无见证也无专锁 —— 面外清单静默落后就是这么来的。
+  want('already-handled', 'V28 重复处置统一码：这条已交代 / 世界已定住 / 遗物已归人 ⇒ already-handled（「already」只留在 success 面）');
+  try {
+    if (WA.worldBounds && typeof WA.worldBounds.pause === 'function') {
+      WA.worldBounds.pause({ by: '玩家' });
+      trip('already-handled', function () { return WA.worldBounds.pause({ by: '玩家' }).reason; });
+    }
+  } catch (e) { /* 引擎缺席或调用抛错 ⇒ 后面的 missing 会如实点名，不在这里吞掉 */ }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

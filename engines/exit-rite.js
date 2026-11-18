@@ -92,7 +92,7 @@
     const m = readAll();
     if (m[id]) {
       stat.refused++;
-      return { ok: false, reason: 'already', id: id, where: m[id].where, cause: m[id].cause,
+      return { ok: false, reason: 'already-handled', id: id, where: m[id].where, cause: m[id].cause,
         note: '这个人已经退场登记过了：场面不许改口，再写请另开新角色' };
     }
     const row = {

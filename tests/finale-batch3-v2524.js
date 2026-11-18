@@ -75,7 +75,7 @@ eq(LE.close({ id: '没这线', fate: '后来没了' }).reason, 'not-happened', '
 const c1 = LE.close({ id: 'x1', fate: '后来烧了' });
 eq(c1.state, 'settled', 'C5 交代后状态落 settled');
 ok(/后来烧了/.test(c1.line), 'C6 一句话交代（不复活整条线）', c1.line);
-eq(LE.close({ id: 'x1', fate: '其实没烧' }).reason, 'already', 'C7 **已交代不许改口**（负控制）');
+eq(LE.close({ id: 'x1', fate: '其实没烧' }).reason, 'already-handled', 'C7 **已交代不许改口**（负控制）');
 const c2 = LE.settle();
 eq(c2.open, 0, 'C8 每条线都有交代了');
 eq(LE.add({ id: 'x3', what: '那个只露过一面的人' }).ok, true, 'C9 再加一条');
@@ -97,7 +97,7 @@ eq(ER.add({ id: '沈账房', role: '账房', cause: 'death' }).reason, 'missing-
 const d1 = ER.add({ id: '沈账房', role: '账房', cause: 'death', where: '后院柴房', witnesses: ['甲', '乙'], last: '账本在东墙第三块砖后' });
 eq(d1.ok, true, 'D7 四样齐 ⇒ 登记成功');
 ok(/在场/.test(d1.scene) && /东墙/.test(d1.scene), 'D8 场面可读（地点 + 见证 + 最后一句话）', d1.scene);
-eq(ER.add({ id: '沈账房', role: '账房', cause: 'departure', where: '城门', witnesses: ['甲'] }).reason, 'already', 'D9 重复登记不许改口（负控制）');
+eq(ER.add({ id: '沈账房', role: '账房', cause: 'departure', where: '城门', witnesses: ['甲'] }).reason, 'already-handled', 'D9 重复登记不许改口（负控制）');
 const d2 = ER.gone('沈账房');
 eq(d2.ok, true, 'D10 退场可查');
 eq(d2.where, '后院柴房', 'D10b 查得到场面地点', d2.where);

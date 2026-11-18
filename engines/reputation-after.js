@@ -111,7 +111,7 @@
     m.__dead = (m.__dead && typeof m.__dead === 'object') ? m.__dead : {};
     if (m.__dead[subject]) {
       stat.refused++;
-      return { ok: false, reason: 'already', subject: subject, at: m.__dead[subject], note: '死期已经记过了：不许改口' };
+      return { ok: false, reason: 'already-handled', subject: subject, at: m.__dead[subject], note: '死期已经记过了：不许改口' };
     }
     m.__dead[subject] = at;
     writeAll(capIt(m));

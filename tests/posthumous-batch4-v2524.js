@@ -56,7 +56,7 @@ eq(g3.revised, true, 'G5 同一人再说一遍 ⇒ 一人一票（改口而不�
 eq(g3.weight, 3, 'G5b 权重越界被夹回并如实报', g3.weight);
 eq(g3.clamped, true, 'G5c clamped 如实说');
 RA.markDead({ subject: '沈账房', at: 200 });
-eq(RA.markDead({ subject: '沈账房', at: 250 }).reason, 'already', 'G6 死期不许改口（负控制）');
+eq(RA.markDead({ subject: '沈账房', at: 250 }).reason, 'already-handled', 'G6 死期不许改口（负控制）');
 const g4 = RA.view({ subject: '沈账房' });
 eq(g4.then.count, 1, 'G7 当时只有一个人说过', g4.then.count);
 eq(g4.now.count, 1, 'G8 后来有一个人改口', g4.now.count);
@@ -70,7 +70,7 @@ eq(PH.bequeath({ deceased: '沈账房', item: '账本' }).reason, 'missing-field
 const h1 = PH.bequeath({ deceased: '沈账房', item: '账本', to: '徒弟' });
 eq(h1.ok, true, 'H2 遗物有主');
 eq(h1.to, '徒弟', 'H2b 归属可查', h1.to);
-eq(PH.bequeath({ deceased: '沈账房', item: '账本', to: '旁人' }).reason, 'already', 'H3 同一件不许分两次（负控制）');
+eq(PH.bequeath({ deceased: '沈账房', item: '账本', to: '旁人' }).reason, 'already-handled', 'H3 同一件不许分两次（负控制）');
 eq(PH.violate({ deceased: '沈账房', item: '账本', by: '旁人' }).reason, 'not-happened', 'H4 没立遗嘱 ⇒ 谈不上违背');
 const h2 = PH.will({ deceased: '沈账房', wishes: [{ item: '账本', to: '徒弟' }, { item: '怀表' }] });
 eq(h2.ok, true, 'H5 遗嘱立下');
@@ -79,7 +79,7 @@ eq(PH.violate({ deceased: '沈账房', item: '怀表', by: '旁人' }).reason, '
 const h3 = PH.violate({ deceased: '沈账房', item: '账本', by: '旁人' });
 eq(h3.ok, true, 'H7 违背遗嘱登记在案');
 eq(h3.intendedTo, '徒弟', 'H7b 说得出本该给谁', h3.intendedTo);
-eq(PH.violate({ deceased: '沈账房', item: '账本', by: '旁人' }).reason, 'already', 'H8 后果只算一次（负控制）');
+eq(PH.violate({ deceased: '沈账房', item: '账本', by: '旁人' }).reason, 'already-handled', 'H8 后果只算一次（负控制）');
 eq(PH.breachView({ deceased: '沈账房' }).rows.length, 1, 'H9 谁欠死者一个交代，查得到');
 
 // ── I：EXV29-22 翻案要付证据 ──
@@ -88,7 +88,7 @@ eq(PH.overturn({ subject: '沈账房', evidence: ['一封信', '一份口供'], 
 const i1 = PH.overturn({ subject: '沈账房', evidence: ['一封信', '一份口供'], at: 600, earliestAt: 500, by: '知县' });
 eq(i1.ok, true, 'I3 证据够 + 时间到 ⇒ 翻得成');
 ok(/名声/.test(i1.repNote || ''), 'I3b 翻成之后名声跟着动', i1.repNote);
-eq(PH.overturn({ subject: '沈账房', evidence: ['x', 'y'], at: 700 }).reason, 'already', 'I4 翻过不许翻第二次（负控制）');
+eq(PH.overturn({ subject: '沈账房', evidence: ['x', 'y'], at: 700 }).reason, 'already-handled', 'I4 翻过不许翻第二次（负控制）');
 
 // ── J：EXV29-23 信息随人死而断 ──
 ok(!!EPI && typeof EPI.loseOnDeath === 'function', 'J0 epistemicView.loseOnDeath 已装（复用既有模块）');
