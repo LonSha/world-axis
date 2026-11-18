@@ -168,6 +168,36 @@
     stat.closed++;
     return { ok: true, reason: 'closed', id: id, aftermath: aftermath };
   }
+  /**
+   * 拾回（EXV28-15）：只能拿到**后果**，不许回到原分叉点。
+   *   为什么必须这样：线一旦放下，世界就往前走了 —— 允许「再选一次」等于
+   *   把时间当回放键。故本口只回答「如果当时去了，会撞见什么后果」，
+   *   并且必须由这条线自己带着 `ifIgnored`（当初就写下的那个后果），不许现编。
+   */
+  function recover(spec) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.refused++; stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const s = spec && typeof spec === 'object' ? spec : {};
+    const id = String(s.id || '').trim();
+    if (!id) return { ok: false, reason: 'missing-id' };
+    const t = seeds().filter(function (c) { return c.id === id; })[0];
+    if (!t) return { ok: false, reason: 'seed-missing' };
+    if (t.stage === '候选' || t.stage === '进行中') {
+      stat.refused++; stat.lastReason = 'still-live';
+      return { ok: false, reason: 'still-live', stage: t.stage,
+        note: '这条线还开着：直接接着跟，不需要「拾回」' };
+    }
+    const consequence = clean(t.ifIgnored, 110) || clean(t.closeCost, 110);
+    if (!consequence) {
+      stat.refused++; stat.lastReason = 'no-consequence';
+      return { ok: false, reason: 'no-consequence', id: id,
+        note: '当初没写下「放着不管会怎样」，现在补一个就是编事实' };
+    }
+    stat.recovered = (stat.recovered || 0) + 1;
+    return { ok: true, reason: 'recovered', id: id, title: clean(t.title, 40),
+      consequence: consequence,
+      cannotReturn: '不能回到当时那个岔口：只能看见它现在留下的后果' };
+  }
   function view() {
     const cfg = settings();
     return { enabled: cfg.enabled, candidates: seeds().filter(function (c) { return c.stage === '候选'; }),
@@ -185,7 +215,7 @@
   }
   WA.threadSprout = {
     getSettings: settings, setSettings: function (p) { return WA.settingsBus ? WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, settings(), p || {}))) : { ok: false, reason: 'no-settings-bus' }; },
-    SOURCES: SOURCES.slice(), sprout: sprout, hook: hook, drop: drop, collide: collide, close: close,
+    SOURCES: SOURCES.slice(), sprout: sprout, hook: hook, drop: drop, collide: collide, close: close, recover: recover,
     view: view, buildBlock: buildBlock,
     stat: function () { return Object.assign({}, stat); }
   };

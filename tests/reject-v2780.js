@@ -9594,6 +9594,42 @@ function runWitness(WA) {
       }
     }
   }
+// ── v2.524.0（V28 批三·续）：拾回只给后果（EXV28-15）──
+  {
+    const TS2 = WA.threadSprout;
+    const putC = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:v28d'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store */ }
+    };
+    if (TS2 && WA.store && typeof WA.store.get === 'function') {
+      const keepCur = (WA.store.get() || {}).currents;
+      try {
+        putC(function (d) { d.currents = []; });
+        want('still-live', 'V28 EXV28-15：线还开着就要「拾回」⇒ still-live（接着跟就行，不用回放）');
+        trip('still-live', function () {
+          const a = TS2.sprout({ source: { type: 'goal', ref: 'g_rec1' }, title: '还没去的码头', hook: '船今晚就走', ifIgnored: '船走了，货压在手里' });
+          TS2.hook({ id: a.id });
+          return TS2.recover({ id: a.id }).reason;
+        });
+        want('no-consequence', 'V28 EXV28-15：当初没写下「放着不管会怎样」⇒ no-consequence（现在补就是编事实）');
+        trip('no-consequence', function () {
+          const b = TS2.sprout({ source: { type: 'promise', ref: 'p_rec1' }, title: '没留后果的线', hook: '说了却没记' });
+          TS2.drop({ id: b.id, force: true });
+          return TS2.recover({ id: b.id }).reason;
+        });
+        want('recovered', 'V28 EXV28-15：拾回只拿到后果，且明说不能回到那个岔口 ⇒ recovered');
+        trip('recovered', function () {
+          const c = TS2.sprout({ source: { type: 'trace', ref: 't_rec1' }, title: '放下的那条线', hook: '当时没去', ifIgnored: '那条船载的人再没回来' });
+          TS2.drop({ id: c.id, force: true });
+          return TS2.recover({ id: c.id }).reason;
+        });
+      } finally {
+        putC(function (d) { d.currents = keepCur; });
+      }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

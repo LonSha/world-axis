@@ -348,6 +348,9 @@
     //   它说的是「这一句引用了这场里没人知道的事」（插曲的知识越界）。
     //   处置不是重试：重发还是越界 —— 要么删掉这句，要么先把这条消息送到他们手上。
     'leak': { kind: 'adjust-input', why: '插曲里说出了他们不可能知道的事：删掉这句，或先把消息真送到' },
+    // v2.524.0（V28 批三·续）：`still-live` 词表判不出档 ——
+    //   它说的是「这条线还开着，接着跟就行」，不是拒收一次写入，是**换一个动作**。
+    'still-live': { kind: 'adjust-input', why: '这条线还在跑：直接从当前阶段接着跟，不走「拾回」' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -1087,6 +1090,9 @@
     // v2.524.0（V28 批三）：letter-post（信）的现场新增拒收码 ——
     //   没说要送给谁 / 判一封不存在的信 / 没收到就回 / 同一封回两次。
     'already-replied', 'letter-missing', 'missing-to', 'not-received',
+    // v2.524.0（V28 批三·续）：thread-sprout.recover（拾回只给后果）的两条拒绝 ——
+    //   still-live（线还开着，接着跟就行）/ no-consequence（当初没写下「放着不管会怎样」）。
+    'still-live', 'no-consequence',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1155,6 +1161,8 @@
     'lined', 'no-account', 'road', 'same-place', 'two-hops',
     // v2.524.0（V28 批三）：信的 `ok:true` 回执 —— 收到之后回了一封。
     'replied',
+    // v2.524.0（V28 批三·续）：拾回的回执 —— 只拿到后果，且明说不能回到那个岔口。
+    'recovered',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
