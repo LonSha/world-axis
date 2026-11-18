@@ -95,4 +95,6 @@
     FAR: FAR, PARTIAL: PARTIAL, MAX_DIST: MAX_DIST,
     split: split, bones: bones, buildBlock: buildBlock, stat: statOf
   };
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/overhear-split.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/overhear-split 已加载（2.524.0）');
 })();

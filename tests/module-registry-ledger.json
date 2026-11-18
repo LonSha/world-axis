@@ -5,9 +5,9 @@
  "uiCount": 21,
  "nsCount": 551,
  "totals": {
-  "loadEdges": 424,
+  "loadEdges": 426,
   "hardEdges": 0,
-  "callRefs": 685,
+  "callRefs": 689,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -224,6 +224,7 @@
     "engines/outline-inject.js",
     "engines/output-guard.js",
     "engines/outsider-integration.js",
+    "engines/overhear-split.js",
     "engines/parallel-world.js",
     "engines/pawn-redemption.js",
     "engines/pending-center.js",
@@ -250,6 +251,7 @@
     "engines/power-anchor.js",
     "engines/prefilter-gate.js",
     "engines/preset-world.js",
+    "engines/price-voice.js",
     "engines/proactive.js",
     "engines/probe.js",
     "engines/production.js",
@@ -764,6 +766,7 @@
     "engines/outline-inject.js",
     "engines/output-guard.js",
     "engines/outsider-integration.js",
+    "engines/overhear-split.js",
     "engines/pawn-redemption.js",
     "engines/pending-center.js",
     "engines/perf-baseline.js",
@@ -788,6 +791,7 @@
     "engines/power-anchor.js",
     "engines/prefilter-gate.js",
     "engines/preset-world.js",
+    "engines/price-voice.js",
     "engines/probe.js",
     "engines/production.js",
     "engines/psyche-dissociation.js",
@@ -3563,10 +3567,17 @@
    "ns": [
     "overhearSplit"
    ],
-   "requires": [],
-   "requiresFiles": [],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
    "providerOrderOk": true,
-   "callRefs": [],
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []
@@ -3671,10 +3682,17 @@
    "ns": [
     "priceVoice"
    ],
-   "requires": [],
-   "requiresFiles": [],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
    "providerOrderOk": true,
-   "callRefs": [],
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []

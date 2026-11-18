@@ -112,4 +112,6 @@
     KNOW: KNOW.slice(), KCN: Object.assign({}, KCN), URGENCY_MAX: URGENCY_MAX, RULES: JSON.parse(JSON.stringify(RULES)),
     quote: quote, compare: compare, stat: statOf
   };
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/price-voice.js', { kind: 'engine', ver: '2.524.0' });
+  if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] engines/price-voice 已加载（2.524.0）');
 })();
