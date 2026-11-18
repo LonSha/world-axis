@@ -44,6 +44,8 @@
     'appointment',
     'timeLedger',
     'hearsayLedger',
+    'farAccount',
+    'interlude',
     // v2.65.0: 'weather' / 'difficulty'。与注入分支同批登记，否则开关点了零效果。
     // v2.66.0: 'affect' / 'bonds' / 'masks'。与注入分支同批登记，否则开关点了零效果。
     'weather', 'difficulty', 'affect', 'bonds', 'masks', 'temporalLock', 'temperament', 'fondness', 'affectionNexus', 'intimateArbiter', 'parallelEvents',
@@ -247,7 +249,7 @@ style: false,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
         causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, affectionNexus: true, intimateArbiter: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true,
-        offstageQueue: true, actStep: true, tracePost: true, misbelief: true, threadSprout: true, dormantLadder: true, consequenceSchedule: true, appointment: true, timeLedger: true, hearsayLedger: true,
+        offstageQueue: true, actStep: true, tracePost: true, misbelief: true, threadSprout: true, dormantLadder: true, consequenceSchedule: true, appointment: true, timeLedger: true, hearsayLedger: true, farAccount: true, interlude: true,
         // v2.96.0：传播与辟谣。取默认 true（同四条理由——其模块总开关默认为关）。
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
         // v2.117.0：人物行动。同一条理由 —— 其模块总开关默认为关闭。
@@ -628,6 +630,8 @@ style: false,
     appointment: '说好的事',
     timeLedger: '时间与期限',
     hearsayLedger: '听来的',
+    farAccount: '别处也在走',
+    interlude: '镜头之外',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
     // v2.88.0 O1：此处原名是「重大事件账本」，而**注入项**的 source 是「账本」（见
@@ -1932,6 +1936,8 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.appointment && WA.appointment) { const b = engineCall('appointment', function () { return WA.appointment.buildBlock(); }); if (b) items.push({ source: '说好的事', content: b }); }
       if (vis.timeLedger && WA.timeLedger) { const b = engineCall('timeLedger', function () { return WA.timeLedger.buildBlock(); }); if (b) items.push({ source: '时间与期限', content: b }); }
       if (vis.hearsayLedger && WA.hearsayLedger) { const b = engineCall('hearsayLedger', function () { return WA.hearsayLedger.buildBlock(); }); if (b) items.push({ source: '听来的', content: b }); }
+      if (vis.farAccount && WA.farAccount) { const b = engineCall('farAccount', function () { return WA.farAccount.buildBlock(); }); if (b) items.push({ source: '别处也在走', content: b }); }
+      if (vis.interlude && WA.interlude) { const b = engineCall('interlude', function () { return WA.interlude.buildBlock(); }); if (b) items.push({ source: '镜头之外', content: b }); }
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = engineCall('memory', function () { return WA.memory.buildMemoryBlock(); }); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）

@@ -5186,6 +5186,62 @@
       "tref": 0,
       "own": 3
     },
+    "farAccount.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/far-account.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "farAccount.reach": {
+      "reason": "self-only",
+      "detail": "engines/far-account.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/far-account.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "farAccount.read": {
+      "reason": "self-only",
+      "detail": "engines/far-account.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/far-account.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "farAccount.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/far-account.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "farAccount.stat": {
+      "reason": "self-only",
+      "detail": "engines/far-account.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/far-account.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 20
+    },
+    "farAccount.tick": {
+      "reason": "self-only",
+      "detail": "engines/far-account.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/far-account.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "farAccount.view": {
+      "reason": "self-only",
+      "detail": "engines/far-account.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/far-account.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "farfield.deliver": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -6793,6 +6849,62 @@
       "refs": 0,
       "tref": 0,
       "own": 19
+    },
+    "interlude.close": {
+      "reason": "self-only",
+      "detail": "engines/interlude.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interlude.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interlude.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/interlude.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "interlude.line": {
+      "reason": "self-only",
+      "detail": "engines/interlude.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interlude.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "interlude.open": {
+      "reason": "self-only",
+      "detail": "engines/interlude.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interlude.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "interlude.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/interlude.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "interlude.stat": {
+      "reason": "self-only",
+      "detail": "engines/interlude.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interlude.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 33
+    },
+    "interlude.view": {
+      "reason": "self-only",
+      "detail": "engines/interlude.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interlude.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "interop.probePartner": {
       "reason": "self-only",

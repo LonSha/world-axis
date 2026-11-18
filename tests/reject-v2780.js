@@ -9439,6 +9439,115 @@ function runWitness(WA) {
       }
     }
   }
+// ── v2.524.0（V28 批二）：`far-account`（别处也在走）与 `interlude`（镜头之外）──
+  //   far-account 只动 `region.events`，interlude 只动 `chronicle` 的 `kind:'interlude'` 行。
+  {
+    const F = WA.farAccount, IL = WA.interlude;
+    const put = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:v28b'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store */ }
+    };
+    if (F && IL && WA.store && typeof WA.store.get === 'function') {
+      const keepReg = (WA.store.get() || {}).region;
+      const keepCh2 = (WA.store.get() || {}).chronicle;
+      try {
+        put(function (d) { d.region = { places: [], events: [] }; d.chronicle = []; });
+        want('missing-place', 'V28 EXV28-26：异地走账没说哪个地方 ⇒ missing-place');
+        trip('missing-place', function () { return F.tick({ what: '粮价涨了' }).reason; });
+        want('missing-what', 'V28 EXV28-26：异地走账没说发生了什么 ⇒ missing-what（不凭空编一件）');
+        trip('missing-what', function () { return F.tick({ place: '码头' }).reason; });
+        want('place-missing', 'V28 EXV28-26：这个世界里没有这个地点 ⇒ place-missing（要记野地得显式 force）');
+        trip('place-missing', function () { return F.tick({ place: '不存在的码头', what: '粮价涨了' }).reason; });
+        want('missing-target', 'V28 EXV28-27：问消息能不能到，却没说到哪 ⇒ missing-target');
+        trip('missing-target', function () { return F.reach({ from: '码头' }).reason; });
+        want('no-path', 'V28 EXV28-27：两地之间没记过路 ⇒ no-path（不替玩家补一条"反正能问到"）');
+        trip('no-path', function () { return F.reach({ from: '码头', to: '山那边' }).reason; });
+        want('no-account', 'V28 EXV28-26：换到一个从来没走过账的地方 ⇒ no-account（不拿世界总轮次冒充）');
+        trip('no-account', function () { return F.read({ place: '冷清渡口' }).reason; });
+        want('ticked', 'V28 EXV28-26：那边走了几轮并记账 ⇒ ticked');
+        trip('ticked', function () { return F.tick({ place: '码头', what: '粮价涨了两成', rounds: 5, force: true }).reason; });
+        want('ticked-no-store', 'V28 EXV28-26：没有提交面时如实说 ticked-no-store');
+        trip('ticked-no-store', function () {
+          const keepTx = WA.store.transact;
+          try { WA.store.transact = undefined; return F.tick({ place: '码头', what: '补一句', force: true }).reason; }
+          finally { WA.store.transact = keepTx; }
+        });
+        want('missing-scene', 'V28 EXV28-31：插曲没说这一段是什么 ⇒ missing-scene');
+        trip('missing-scene', function () { return IL.open({ who: ['甲'], knows: ['船期'] }).reason; });
+        want('missing-cast', 'V28 EXV28-31：插曲里一个人都没有 ⇒ missing-cast');
+        trip('missing-cast', function () { return IL.open({ scene: '茶棚里等雨停', knows: ['船期'] }).reason; });
+        want('missing-knows', 'V28 EXV28-31：没声明这场里的人知道什么 ⇒ missing-knows（否则第一句就可能越界）');
+        trip('missing-knows', function () { return IL.open({ scene: '茶棚里等雨停', who: ['甲'] }).reason; });
+        want('interlude-missing', 'V28 EXV28-31：往一段不存在的插曲里写 ⇒ interlude-missing');
+        trip('interlude-missing', function () { return IL.line({ id: 'il_nope', text: '他把碗放下' }).reason; });
+        want('missing-text', 'V28 EXV28-31：这一句没内容 ⇒ missing-text');
+        trip('missing-text', function () { return IL.line({ id: 'il_nope' }).reason; });
+        want('opened', 'V28 EXV28-31：插曲开戏 ⇒ opened');
+        const il1 = IL.open({ scene: '茶棚里等雨停', who: ['甲', '乙'], knows: ['船期'], place: '茶棚' });
+        trip('opened', function () { return il1.reason; });
+        want('lined', 'V28 EXV28-31：写下一句（引用的事这场里都知道）⇒ lined');
+        trip('lined', function () { return IL.line({ id: il1.id, text: '他说明早的船到岸', facts: ['船期'] }).reason; });
+        want('leak', 'V28 EXV28-31：插曲里的人说出了他不可能知道的事 ⇒ leak 并指出是哪一条（认知边界必咬）');
+        trip('leak', function () {
+          const r = IL.line({ id: il1.id, text: '他知道那封信里写了什么', facts: ['玩家私信'] });
+          return r.reason;
+        });
+        want('empty-interlude', 'V28 EXV28-31：一句没写的插曲不算发生过 ⇒ empty-interlude');
+        trip('empty-interlude', function () {
+          const r = IL.open({ scene: '码头边的空等', who: ['丁'], knows: ['风向'] });
+          return IL.close({ id: r.id }).reason;
+        });
+        want('closed', 'V28 EXV28-31：收戏并说清"你不在场"⇒ closed');
+        trip('closed', function () { return IL.close({ id: il1.id }).reason; });
+        want('already-closed', 'V28 EXV28-31：同一段插曲收两次 ⇒ already-closed');
+        trip('already-closed', function () { return IL.close({ id: il1.id }).reason; });
+      } finally {
+        put(function (d) { d.region = keepReg; d.chronicle = keepCh2; });
+      }
+    }
+  }
+// ── v2.524.0（V28 批二·续）：路径的三种答案与插曲的句数上限 ──
+  {
+    const F2 = WA.farAccount, IL2 = WA.interlude;
+    const put2 = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:v28b2'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store */ }
+    };
+    if (F2 && IL2 && WA.store && typeof WA.store.get === 'function') {
+      const d0 = WA.store.get() || {};
+      const keepReg2 = d0.region, keepCh3 = d0.chronicle, keepWorld = d0.world;
+      try {
+        put2(function (d) {
+          d.region = { places: [{ id: '茶棚', name: '茶棚' }], events: [] };
+          d.world = d.world && typeof d.world === 'object' ? d.world : {};
+          d.world.roads = [{ from: '码头', to: '茶棚' }, { from: '茶棚', to: '山那边' }];
+          d.chronicle = [];
+        });
+        want('same-place', 'V28 EXV28-27：问的两头是同一个地方 ⇒ same-place（不必绕路）');
+        trip('same-place', function () { return F2.reach({ from: '码头', to: '码头' }).reason; });
+        want('road', 'V28 EXV28-27：两地之间记过一条路 ⇒ road（直达，一跳）');
+        trip('road', function () { return F2.reach({ from: '码头', to: '茶棚' }).reason; });
+        want('two-hops', 'V28 EXV28-27：没有直路但有一个已知中转 ⇒ two-hops 并点出经过哪里');
+        trip('two-hops', function () { return F2.reach({ from: '码头', to: '山那边' }).reason; });
+        want('lines-full', 'V28 EXV28-31：一段插曲的句数到上限 ⇒ lines-full（插曲不是长篇小说）');
+        trip('lines-full', function () {
+          const it = IL2.open({ scene: '雨停之前', who: ['甲'], knows: ['船期'] });
+          let last = null;
+          for (let i = 0; i < 14; i++) {
+            last = IL2.line({ id: it.id, text: '第' + i + '个来回', facts: ['船期'] });
+            if (last && last.reason === 'lines-full') return last.reason;
+          }
+          return last && last.reason;
+        });
+      } finally {
+        put2(function (d) { d.region = keepReg2; d.chronicle = keepCh3; d.world = keepWorld; });
+      }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

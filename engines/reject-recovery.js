@@ -344,6 +344,10 @@
     //   它说的是「你问的这个人没听过这件事」（不是他忘了，也不是世界没这件事）。
     //   处置是换一个真听过的人问，或者先去把这件事弄到手，故 adjust-input。
     'unheard': { kind: 'adjust-input', why: '这个人物没听见过这件事：换一个真听过的听者，或先让他有渠道' },
+    // v2.524.0（V28 批二）：`leak` 词表判不出档 ——
+    //   它说的是「这一句引用了这场里没人知道的事」（插曲的知识越界）。
+    //   处置不是重试：重发还是越界 —— 要么删掉这句，要么先把这条消息送到他们手上。
+    'leak': { kind: 'adjust-input', why: '插曲里说出了他们不可能知道的事：删掉这句，或先把消息真送到' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -1076,6 +1080,10 @@
     //   版本缺事件/缺听者、版本堆顶、按听者读不到、对质指向不存在的版本、
     //   碎片缺主题/缺内容/缺维度、碎片堆顶。逐条由 reject-v2780 的真跑见证点名。
     'missing-dimension', 'missing-listener', 'missing-shard', 'missing-topic', 'too-many-shards', 'too-many-versions', 'unheard', 'version-missing',
+    // v2.524.0（V28 批二）：far-account（别处也在走）与 interlude（镜头之外）的现场新增拒收码 ——
+    //   异地：地点不在册 / 两地没路；插曲：缺戏名、缺在场人、缺「他们知道什么」、
+    //   写一句越界（leak）、段不存在、句数到顶、空段收戏。逐条由 reject-v2780 真跑见证点名。
+    'empty-interlude', 'interlude-missing', 'leak', 'lines-full', 'missing-cast', 'missing-knows', 'no-path', 'place-missing',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1139,6 +1147,9 @@
     // v2.524.0（V28 批一·补）：拼图的三个 `ok:true` 回执 ——
     //   need-more（块不够不下结论）/ assembled（维度够才拼）/ overturned（一条反证整块作废）。
     'assembled', 'need-more', 'overturned',
+    // v2.524.0（V28 批二）：异地与插曲的 `ok:true` 回执 ——
+    //   路径三答（same-place / road / two-hops）、没走账（no-account）、写下一句（lined）。
+    'lined', 'no-account', 'road', 'same-place', 'two-hops',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',

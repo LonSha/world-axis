@@ -1,13 +1,13 @@
 {
  "version": "2.523.0",
- "loadOrderCount": 531,
- "loadedCount": 510,
+ "loadOrderCount": 533,
+ "loadedCount": 512,
  "uiCount": 21,
- "nsCount": 521,
+ "nsCount": 523,
  "totals": {
-  "loadEdges": 404,
+  "loadEdges": 408,
   "hardEdges": 0,
-  "callRefs": 665,
+  "callRefs": 669,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -135,6 +135,7 @@
     "engines/faction-chronicle.js",
     "engines/faction-graph.js",
     "engines/family.js",
+    "engines/far-account.js",
     "engines/farfield.js",
     "engines/fate.js",
     "engines/festival-fair.js",
@@ -167,6 +168,7 @@
     "engines/inst.js",
     "engines/institutional-inertia.js",
     "engines/intent-board.js",
+    "engines/interlude.js",
     "engines/interrogation-tell.js",
     "engines/investigation.js",
     "engines/judicial-inquest.js",
@@ -494,6 +496,7 @@
     "engines/evolution.js",
     "engines/fact-continuity.js",
     "engines/faction-schism.js",
+    "engines/far-account.js",
     "engines/farfield.js",
     "engines/foreshadow-germination.js",
     "engines/geophysical-reshaping.js",
@@ -502,6 +505,7 @@
     "engines/human-realism.js",
     "engines/inject-delta.js",
     "engines/institutional-schism.js",
+    "engines/interlude.js",
     "engines/kaleidoscope.js",
     "engines/labor-schedule.js",
     "engines/levy-corvee.js",
@@ -660,6 +664,7 @@
     "engines/faction-chronicle.js",
     "engines/faction-graph.js",
     "engines/family.js",
+    "engines/far-account.js",
     "engines/farfield.js",
     "engines/fate.js",
     "engines/festival-fair.js",
@@ -691,6 +696,7 @@
     "engines/inst.js",
     "engines/institutional-inertia.js",
     "engines/intent-board.js",
+    "engines/interlude.js",
     "engines/interrogation-tell.js",
     "engines/investigation.js",
     "engines/judicial-inquest.js",
@@ -5037,6 +5043,52 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_hearsay_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/far-account.js": {
+   "ns": [
+    "farAccount"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_far_account_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/interlude.js": {
+   "ns": [
+    "interlude"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_interlude_settings_v1"
    ],
    "consumedBy": []
   },
