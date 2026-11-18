@@ -47,14 +47,65 @@ function lockState(root) {
   return out;
 }
 
+/**
+ * 空 loose object 探测（Z6-31 的检测面）。
+ *   本次真事故的形态不是「HEAD 读不出」，而是 `object file ... is empty`：**文件在、大小 0**。
+ *   此时 `git rev-parse --verify HEAD` 仍然成功 —— 旧的 gitState 只会回 ok，等于没检测。
+ *   所以这里按 .git/objects/<2位hex>/<38位hex> 的结构找一个「长度为 0 的对象文件」。
+ *   · 只读：仅 readdir + stat，不读内容、不写盘、不 spawn 修改类命令。
+ *   · 有界：最多看 MAX_DIRS 个前缀目录、MAX_HITS 个命中即收手，避免大仓拖慢自诊。
+ *   · .git 是文件（worktree/submodule）时直接跳过 —— 那里没有 loose object 面。
+ */
+function scanEmptyLoose(root) {
+  const MAX_DIRS = 256, MAX_HITS = 5;
+  const g = path.join(root || ROOT, '.git');
+  const out = { scannedDirs: 0, hits: [], skipped: null };
+  let st;
+  try { st = fs.statSync(g); } catch (e) { out.skipped = 'no-.git'; return out; }
+  if (!st.isDirectory()) { out.skipped = 'gitfile'; return out; }
+  const objDir = path.join(g, 'objects');
+  let subs;
+  try { subs = fs.readdirSync(objDir); } catch (e) { out.skipped = 'no-objects'; return out; }
+  for (let i = 0; i < subs.length && out.scannedDirs < MAX_DIRS && out.hits.length < MAX_HITS; i++) {
+    const name = subs[i];
+    if (!/^[0-9a-f]{2}$/.test(name)) continue;          // 跳过 pack/info 等非 loose 面
+    const sub = path.join(objDir, name);
+    let files;
+    try { files = fs.readdirSync(sub); } catch (e) { continue; }
+    out.scannedDirs += 1;
+    for (let j = 0; j < files.length; j++) {
+      const f = files[j];
+      if (!/^[0-9a-f]{38}$/.test(f)) continue;
+      try {
+        if (fs.statSync(path.join(sub, f)).size === 0) {
+          out.hits.push(name + '/' + f);
+          if (out.hits.length >= MAX_HITS) break;
+        }
+      } catch (e) { /* 读不到就不算命中：不猜 */ }
+    }
+  }
+  return out;
+}
+
 function gitState(root) {
-  const r = cp.spawnSync('git', ['rev-parse', '--verify', 'HEAD'], { cwd: root || ROOT, encoding: 'utf8' });
-  if (r.status === 0) return { ok: true, head: String(r.stdout).trim() };
-  const bad = String((r.stdout || '') + (r.stderr || '')).split('\n').filter(Boolean).slice(0, 3).join(' | ');
-  return {
-    ok: false, why: bad || 'rev-parse-failed',
-    hint: '先 node tools/fault-selfhelp.js --symptom=git-object-corrupt 看清步骤；顺序是 fsck → fetch 补对象，不是 gc --prune=now'
-  };
+  const R = root || ROOT;
+  const r = cp.spawnSync('git', ['rev-parse', '--verify', 'HEAD'], { cwd: R, encoding: 'utf8' });
+  if (r.status !== 0) {
+    const bad = String((r.stdout || '') + (r.stderr || '')).split('\n').filter(Boolean).slice(0, 3).join(' | ');
+    return {
+      ok: false, why: bad || 'rev-parse-failed', head: null,
+      hint: '先 node tools/fault-selfhelp.js --symptom=git-object-corrupt 看清步骤；顺序是 fsck → fetch 补对象，不是 gc --prune=now'
+    };
+  }
+  // v2.529.0（Z6-31）：HEAD 读得出**不等于**对象库没坏 —— 本次真事故正是这一形态。
+  const loose = scanEmptyLoose(R);
+  if (loose.hits.length) {
+    return {
+      ok: false, head: String(r.stdout).trim(), why: 'empty-loose-object=' + loose.hits.length, sample: loose.hits,
+      hint: '先 node tools/fault-selfhelp.js --symptom=git-object-corrupt；顺序是 fsck --connectivity-only → fetch origin 补对象'
+    };
+  }
+  return { ok: true, head: String(r.stdout).trim(), loose: loose };
 }
 
 /** 症状表：每条只给「下一步一条命令」+「明确禁止什么」。 */
@@ -123,5 +174,5 @@ function main() {
   console.log('■ 结论：' + (d.verdict === 'none' ? '两项都没毛病（这不是“已排查完”，只是这两项都没命中）' : d.verdict));
 }
 
-module.exports = { lockDir: lockDir, lockState: lockState, gitState: gitState, SYMPTOMS: SYMPTOMS, diagnose: diagnose };
+module.exports = { lockDir: lockDir, lockState: lockState, gitState: gitState, scanEmptyLoose: scanEmptyLoose, SYMPTOMS: SYMPTOMS, diagnose: diagnose };
 if (require.main === module) main();
