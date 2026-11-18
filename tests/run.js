@@ -4716,7 +4716,12 @@ const __ctxGuard = require('./context-guard.js').boundary();
   WA.errorLog.push({ t: gNow1900 - 30000, level: 'error', msg: 'v1900 legacy2' });
   WA.errorLog.push({ t: Date.now(), level: 'error', msg: 'v1900 fresh' });
   const mG1900 = WA.store.maintain({});
-  assert(mG1900.signals.engineErrors === 3 && mG1900.signals.engineErrorsRecent === 1, '历史恢复条目不计入本周期（3 存量 / 1 新增）');
+  assert(mG1900.signals.engineErrors === 3 && mG1900.signals.engineErrorsRecent === 1,
+      // v2.529.0：断言把实值打出来。此前它红了只念「3 存量 / 1 新增」，不说实测是多少，
+      //   于是「红一次就能单跑复现」不成立 —— 全量里这条报红时根本看不出偏差方向。
+      //   判据要钉的是：**空环那一刻就是新基线**，t 早于它的一律算历史（哪怕环被清空过）。
+      '历史恢复条目不计入本周期（3 存量 / 1 新增；实 ' + mG1900.signals.engineErrors + ' / '
+      + mG1900.signals.engineErrorsRecent + '）——空环即基线重建，更早的条目一律算历史');
   assert(!!faultOf1900(mG1900) && faultOf1900(mG1900).level === 'warn', '低量故障分档 warn（不升 error）');
   const gCursorLost1900 = WA.errorLog[2];
   WA.errorLog = WA.errorLog.slice(0, 2).concat([gCursorLost1900, { t: Date.now() + 5, level: 'error', msg: 'v1900 ghost' }]);

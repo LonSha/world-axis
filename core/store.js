@@ -3590,7 +3590,16 @@
           const ix = el.indexOf(__faultWatch.cursor);
           // 游标可用 → 精确切片；失位（上次环空/环被重建）→ 退到「基线时刻之后产生」的时间口径，
           //   这样 loadEventLog 恢复的历史条目（t 早于基线）不会被误判为本周期新增。
-          if (ix >= 0) recent = el.slice(ix + 1);
+          // v2.529.0（真缺陷，全量里才现形）：**环为空时必须重建基线**。
+          //   primedAt 原本只在「从没巡视过」时写一次，之后永不刷新；而空环会把 cursor 置 null，
+          //   于是「空环 → 又来了条目」这一形态下游标必然失位，退化成拿一个**几十节之前**的
+          //   旧 primedAt 去比 —— 载入期恢复的历史条目（t 早于这一轮，但晚于那个旧基线）
+          //   就被算成本周期新增，判据「3 存量 / 1 新增」在单跑里绿、在全量里红。
+          //   单跑绿不是判据松，而是单跑时基线恰好是刚建的（同一行代码，两种现场两个答案）。
+          //   空环即基线重建：那一轮本来就没有条目可算，把基线挪到此刻是唯一自洽的选择；
+          //   环非空时不动 primedAt（失位折算仍按上一次基线，宁可多报一次也不静默丢故障）。
+          if (!el.length) { recent = []; __faultWatch.primedAt = clockWall(); }
+          else if (ix >= 0) recent = el.slice(ix + 1);
           else recent = el.filter(function (x) { return x && Number(x.t) >= __faultWatch.primedAt; });
         }
         errRecent = recent.length;
