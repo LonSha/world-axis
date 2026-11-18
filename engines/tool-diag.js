@@ -3667,6 +3667,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/far-account.js': 'farAccount',
     'engines/interlude.js': 'interlude',
     'engines/letter-post.js': 'letterPost',
+    'engines/world-brief.js': 'worldBrief',
     // v2.96.0（X3）：传播与辟谣（与 index.js LOAD_ORDER 同批登记）。
     'engines/rumor.js': 'rumor',
     // v2.99.0：原著幕目（与 index.js LOAD_ORDER 同批登记）。

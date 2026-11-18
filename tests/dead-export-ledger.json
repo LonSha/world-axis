@@ -3320,7 +3320,7 @@
       "src": "engines/credit-ledger.js",
       "refs": 0,
       "tref": 0,
-      "own": 8
+      "own": 10
     },
     "creditLedger.stat": {
       "reason": "self-only",
@@ -3328,7 +3328,7 @@
       "src": "engines/credit-ledger.js",
       "refs": 0,
       "tref": 0,
-      "own": 15
+      "own": 18
     },
     "creditLedger.writeOff": {
       "reason": "self-only",
@@ -15177,6 +15177,54 @@
       "refs": 0,
       "tref": 2,
       "own": 3
+    },
+    "worldBrief.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-brief.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 1
+    },
+    "worldBrief.oneLine": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-brief.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 4
+    },
+    "worldBrief.quiet": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-brief.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 6
+    },
+    "worldBrief.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-brief.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 1
+    },
+    "worldBrief.stat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-brief.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 24
+    },
+    "worldBrief.view": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-brief.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 7
     },
     "worldGraph.setSettings": {
       "reason": "test-only",

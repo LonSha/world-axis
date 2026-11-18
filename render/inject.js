@@ -47,6 +47,7 @@
     'farAccount',
     'interlude',
     'letterPost',
+    'worldBrief',
     // v2.65.0: 'weather' / 'difficulty'。与注入分支同批登记，否则开关点了零效果。
     // v2.66.0: 'affect' / 'bonds' / 'masks'。与注入分支同批登记，否则开关点了零效果。
     'weather', 'difficulty', 'affect', 'bonds', 'masks', 'temporalLock', 'temperament', 'fondness', 'affectionNexus', 'intimateArbiter', 'parallelEvents',
@@ -250,7 +251,7 @@ style: false,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
         causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, affectionNexus: true, intimateArbiter: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true,
-        offstageQueue: true, actStep: true, tracePost: true, misbelief: true, threadSprout: true, dormantLadder: true, consequenceSchedule: true, appointment: true, timeLedger: true, hearsayLedger: true, farAccount: true, interlude: true, letterPost: true,
+        worldBrief: true, offstageQueue: true, actStep: true, tracePost: true, misbelief: true, threadSprout: true, dormantLadder: true, consequenceSchedule: true, appointment: true, timeLedger: true, hearsayLedger: true, farAccount: true, interlude: true, letterPost: true,
         // v2.96.0：传播与辟谣。取默认 true（同四条理由——其模块总开关默认为关）。
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
         // v2.117.0：人物行动。同一条理由 —— 其模块总开关默认为关闭。
@@ -634,6 +635,7 @@ style: false,
     farAccount: '别处也在走',
     interlude: '镜头之外',
     letterPost: '信',
+    worldBrief: '世界近况',
     memory: '记忆', memorySampler: '主观记忆', pmem: '主观记忆', summarizer: '叙事摘要',
     opinion: '舆情',
     // v2.88.0 O1：此处原名是「重大事件账本」，而**注入项**的 source 是「账本」（见
@@ -1941,6 +1943,8 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.farAccount && WA.farAccount) { const b = engineCall('farAccount', function () { return WA.farAccount.buildBlock(); }); if (b) items.push({ source: '别处也在走', content: b }); }
       if (vis.interlude && WA.interlude) { const b = engineCall('interlude', function () { return WA.interlude.buildBlock(); }); if (b) items.push({ source: '镜头之外', content: b }); }
       if (vis.letterPost && WA.letterPost) { const b = engineCall('letterPost', function () { return WA.letterPost.buildBlock(); }); if (b) items.push({ source: '信', content: b }); }
+      // v2.524.0（X6）：世界一句话 + 安静的权利（无事时明说「没有值得说的事」）。
+      if (vis.worldBrief && WA.worldBrief) { const b = engineCall('worldBrief', function () { return WA.worldBrief.buildBlock(); }); if (b) items.push({ source: '世界近况', content: b }); }
       // 记忆块（visibility控制）
       if (vis.memory && WA.memory) { const mb = engineCall('memory', function () { return WA.memory.buildMemoryBlock(); }); if (mb) items.push({ source: '记忆', content: mb }); }
       // v0.8.2: 人物主观记忆块（认知与信息不对称）

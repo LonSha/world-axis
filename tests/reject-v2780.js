@@ -9630,6 +9630,119 @@ function runWitness(WA) {
       }
     }
   }
+  // ── v2.524.0（V28 批四）：承诺债可催 / 还清销账（EXV28-23）──
+  //   验的是「催」与「销账」两件事各自的前置闸，不是记账本身（记账早由 v2.250 段咬住）：
+  //   未到期催不得、死账催不得、没还清销不得、坏账无凭证销不得、销过不许再销。
+  {
+    const CL2 = WA.creditLedger;
+    const putCl = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:v28e'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store */ }
+    };
+    if (CL2 && WA.store && typeof WA.store.get === 'function') {
+      const keepCl = (WA.store.get() || {}).creditLedger;
+      const t0 = 1700000000000;
+      const DAY = 86400000;
+      try {
+        putCl(function (d) { d.creditLedger = {}; });
+        want('too-early', 'V28 EXV28-23：没到期就去催 ⇒ too-early（提前打招呼不算催收）');
+        const a = CL2.open({ borrower: '陈九', lender: '当铺', principal: 1000, days: 7, at: t0 });
+        trip('too-early', function () { return CL2.dun(a.id, { at: t0 + DAY }).reason; });
+        want('shortfall', 'V28 EXV28-23：还差着余额就要销账 ⇒ shortfall 并回欠额（不许把没还的账销掉）');
+        const b = CL2.open({ borrower: '柳七', lender: '粮行', principal: 800, days: 2, at: t0 });
+        trip('shortfall', function () { return CL2.settle(b.id, { at: t0 + 1000 }).reason; });
+        want('weak-evidence', 'V28 EXV28-23：坏账销账不给凭证 ⇒ weak-evidence（不许静静消失）');
+        const c = CL2.open({ borrower: '赵五', lender: '货栈', principal: 500, days: 2, at: t0 });
+        CL2.writeOff(c.id, '人跑了');
+        trip('weak-evidence', function () { return CL2.settle(c.id, { at: t0 + 3 * DAY }).reason; });
+        want('missing', 'V28 EXV28-23：查无此据还去催/去销 ⇒ missing（不凭空生账）');
+        trip('missing', function () { return CL2.dun('没有这张据', { at: t0 + 9 * DAY }).reason; });
+        want('closed', 'V28 EXV28-23：销过账的据再销 ⇒ closed（销账只销一次）');
+        const e = CL2.open({ borrower: '孙二', lender: '船头', principal: 400, days: 2, at: t0 });
+        CL2.repay(e.id, { amount: 400, at: t0 + 1000 });
+        CL2.settle(e.id, { at: t0 + 2000 });
+        trip('closed', function () { return CL2.settle(e.id, { at: t0 + 3000 }).reason; });
+        // 正面面（不设码）：催成功要留下「催过几次」的据 —— 回执不足即抛，门禁照红
+        const f = CL2.open({ borrower: '周四', lender: '米铺', principal: 600, days: 1, at: t0 });
+        const dun1 = CL2.dun(f.id, { at: t0 + 2 * DAY, round: 12, by: '米铺伙计' });
+        if (!(dun1 && dun1.ok && dun1.dunned === 1 && dun1.overdueDays >= 1)) {
+          throw new Error('催收回执不足：' + JSON.stringify(dun1));
+        }
+      } finally {
+        putCl(function (d) { d.creditLedger = keepCl; });
+      }
+    }
+  }
+  // ── v2.524.0（V28 批四）：世界简报 —— 拼图板 / 一句话 / 安静 / 年表（EXV28-33~36）──
+  {
+    const putB = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:v28f'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store */ }
+    };
+    if (WA.worldBrief && WA.store && typeof WA.store.get === 'function') {
+      const keepCh = (WA.store.get() || {}).chronicle;
+      try {
+        putB(function (d) { d.chronicle = []; });
+        want('no-shards', 'V28 EXV28-33：一块碎片都没有就去开板 ⇒ no-shards（不是空板，是还没板）');
+        trip('no-shards', function () { return WA.worldBrief.board().reason; });
+        want('no-readings', 'V28 EXV28-34：一条记录都没有还想说「世界近况」⇒ no-readings（不许空话）');
+        trip('no-readings', function () { return WA.worldBrief.oneLine().reason; });
+        want('no-owner', 'V28 EXV28-36：年表条目说不出是谁做的 ⇒ no-owner（年表不收来路不明的条）');
+        trip('no-owner', function () { return WA.worldBrief.record({ text: '城门口多了个摊子' }).reason; });
+        want('not-happened', 'V28 EXV28-36：还没发生的事不许写进年表 ⇒ not-happened');
+        trip('not-happened', function () {
+          return WA.worldBrief.record({ owner: '陈九', text: '下个月要办的事', at: Date.now() + 86400000 }).reason;
+        });
+        want('ok-empty', 'V28 EXV28-35：0 条新增的回执码 ok-empty —— 安静是合法结果，不是错误');
+        trip('ok-empty', function () { return WA.worldBrief.quiet({ rounds: 5 }).reason; });
+        // 正面面（不设码）：0 条新增是合法结果，必须 quiet:true 且 ok-empty、不报错
+        const q = WA.worldBrief.quiet({ rounds: 5 });
+        if (!(q && q.ok && q.quiet === true && q.reason === 'ok-empty' && q.added === 0)) {
+          throw new Error('安静没有成为合法结果：' + JSON.stringify(q));
+        }
+        // 正面面：碎片不够时缺块要显式写出来，且点名「能问谁」
+        const HS2 = WA.hearsayLedger;
+        if (HS2) {
+          HS2.shard({ topic: '药铺夜里起火', text: '有人看见火光', dim: '目击' });
+          const bd = WA.worldBrief.board({ topic: '药铺夜里起火' });
+          const row = (bd.rows || [])[0];
+          if (!(bd.ok && row && row.need > 0 && row.missing && row.verdict === 'not-yet')) {
+            throw new Error('拼图板没把缺块写出来：' + JSON.stringify(bd));
+          }
+        }
+        want('listed', 'V28 EXV28-36：年表收下一条（有 owner、已发生）的回执码 listed');
+        trip('listed', function () { return WA.worldBrief.record({ owner: '船头老陈', text: '把西厢房抵了出去' }).reason; });
+        // 正面面：年表收得进、读得回、owner 对得上
+        const rec = WA.worldBrief.record({ owner: '柳七', text: '在码头盘下了半条船', year: 3 });
+        const al = WA.worldBrief.almanac({ limit: 5 });
+        const hit = (al.rows || []).filter(function (x) { return x.who === '柳七'; })[0];
+        if (!(rec.ok && hit && hit.what === '在码头盘下了半条船')) {
+          throw new Error('年表读不回自己收的条：' + JSON.stringify(al));
+        }
+        // 正面面：有记录之后一句话必须给 readings，且读数与句子同源
+        const line = WA.worldBrief.oneLine();
+        if (!(line.ok && line.readings && line.line.indexOf(String(line.readings.round)) >= 0)) {
+          throw new Error('一句话与读数不同源：' + JSON.stringify(line));
+        }
+        // 面读数与设置：view / stat 读得出，getSettings / setSettings 改得进也改得回
+        const wbKeep = WA.worldBrief.getSettings();
+        WA.worldBrief.setSettings({ maxRows: 6 });
+        const wbNow = WA.worldBrief.getSettings();
+        WA.worldBrief.setSettings(wbKeep);
+        const wbv = WA.worldBrief.view();
+        const wbs = WA.worldBrief.stat();
+        if (!(wbNow && wbNow.maxRows === 6 && wbv && typeof wbv.shards === 'number' && wbs && typeof wbs.boards === 'number')) {
+          throw new Error('世界简报的面读数/设置面不通：' + JSON.stringify({ wbNow: wbNow, wbv: wbv, wbs: wbs }));
+        }
+      } finally {
+        putB(function (d) { d.chronicle = keepCh; });
+      }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

@@ -1,13 +1,13 @@
 {
  "version": "2.523.0",
- "loadOrderCount": 534,
- "loadedCount": 513,
+ "loadOrderCount": 535,
+ "loadedCount": 514,
  "uiCount": 21,
- "nsCount": 524,
+ "nsCount": 525,
  "totals": {
-  "loadEdges": 410,
+  "loadEdges": 412,
   "hardEdges": 0,
-  "callRefs": 671,
+  "callRefs": 673,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -342,6 +342,7 @@
     "engines/world-autobiography.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-brief.js",
     "engines/world-briefing.js",
     "engines/world-changes.js",
     "engines/world-clock.js",
@@ -554,6 +555,7 @@
     "engines/vitals.js",
     "engines/wb-inject.js",
     "engines/whisper-backchannel.js",
+    "engines/world-brief.js",
     "engines/world-singularity.js",
     "render/purifier.js"
    ]
@@ -862,6 +864,7 @@
     "engines/world-autobiography.js",
     "engines/world-blueprint.js",
     "engines/world-bridge.js",
+    "engines/world-brief.js",
     "engines/world-briefing.js",
     "engines/world-changes.js",
     "engines/world-clock.js",
@@ -5115,6 +5118,29 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_letter_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-brief.js": {
+   "ns": [
+    "worldBrief"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_worldbrief_settings_v1"
    ],
    "consumedBy": []
   },

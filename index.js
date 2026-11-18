@@ -744,6 +744,10 @@
     'engines/far-account.js',
     'engines/interlude.js',
     'engines/letter-post.js',
+    // v2.524.0（X6）：世界简报 —— 拼图板 / 世界一句话 / 安静的权利 / 世界年表。
+    //   硬依赖：须晚于 engines/hearsay-ledger.js（拼图板读它落的 shard）；
+    //   须早于 render/inject.js（注入读 worldBrief.buildBlock()）。
+    'engines/world-brief.js',
     // v2.96.0（X3）：传播与辟谣（事实 / 目击 / 转述 / 流言四层传播链）。
     //   三条位置约束，全是硬依赖：
     //     ① 须**晚于** engines/memory.js —— 事实真源是 memory.facts（事实唯一写者 upsertFact）；

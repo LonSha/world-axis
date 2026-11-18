@@ -1093,6 +1093,11 @@
     // v2.524.0（V28 批三·续）：thread-sprout.recover（拾回只给后果）的两条拒绝 ——
     //   still-live（线还开着，接着跟就行）/ no-consequence（当初没写下「放着不管会怎样」）。
     'still-live', 'no-consequence',
+    // v2.524.0（V28 批四）：world-brief（世界简报）的现场新增拒收码 ——
+    //   没碎片就开板（no-shards）/ 没记录就说近况（no-readings）/
+    //   年表条目说不出谁做的（no-owner）/ 还没发生就想进年表（not-happened）。
+    //   四条都出现在 ok:false 对象里，逐条由 reject-v2780 真跑见证点名。
+    'no-shards', 'no-readings', 'no-owner', 'not-happened',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1163,6 +1168,10 @@
     'replied',
     // v2.524.0（V28 批三·续）：拾回的回执 —— 只拿到后果，且明说不能回到那个岔口。
     'recovered',
+    // v2.524.0（V28 批四）：世界简报的两个 `ok:true` 回执 ——
+    //   `ok-empty`（这 5 轮没有值得说的事：安静是合法结果，不是错误）/
+    //   `listed`（年表收下一条：有 owner、已发生）。两者都不配恢复动作。
+    'ok-empty', 'listed',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',

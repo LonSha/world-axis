@@ -630,6 +630,15 @@
     'creditLedger.accrue': function (o) { return WA.creditLedger.accrue(o.id || o.loanId, o); },
     'creditLedger.repay': function (o) { return WA.creditLedger.repay(o.id || o.loanId, o.spec || o); },
     'creditLedger.view': function (o) { return WA.creditLedger.view(o.id || o.loanId); },
+    // v2.524.0（V28 / EXV28-23）：「答应的事成了债，逾期可催、还清销账」两个动作上台面 ——
+    //   催与销都不碰钱袋（钱仍走 repay），台上只负责把这两件事做成有据的一次动作。
+    'creditLedger.dun': function (o) { return WA.creditLedger.dun(o.id || o.loanId, o); },
+    'creditLedger.settle': function (o) { return WA.creditLedger.settle(o.id || o.loanId, o); },
+    // v2.524.0（V28 / EXV28-33~36）：世界简报上台面 —— 开一块拼图板、读一段年表、往史里记一笔。
+    //   板子只摆碎片、不替玩家下结论；年表只收已发生且追得到 owner 的条。
+    'worldBrief.board': function (o) { return WA.worldBrief.board(o); },
+    'worldBrief.almanac': function (o) { return WA.worldBrief.almanac(o); },
+    'worldBrief.record': function (o) { return WA.worldBrief.record(o.spec || o); },
     'creditLedger.checkCredit': function (o) { return WA.creditLedger.checkCredit(o.borrower || o.who, o.at); },
     'anniversaryRites.register': function (o) { return WA.anniversaryRites.register(o.spec || o); },
     'anniversaryRites.markObserved': function (o) { return WA.anniversaryRites.markObserved(o.id, o.spec || o); },
@@ -3744,7 +3753,9 @@ let ckpt = null;
         else if (key === 'customLax.defaultPromise') out.nextActions = ['customLax.remedyPromise', 'rumor.startChain', 'relationGraph.upsert'];
         else if (key === 'customLax.remedyPromise') out.nextActions = ['relationGraph.upsert', 'customLax.commitPromise'];
         else if (key === 'creditLedger.open') out.nextActions = ['creditLedger.accrue', 'creditLedger.repay'];
-        else if (key === 'creditLedger.repay') out.nextActions = ['creditLedger.open'];
+        else if (key === 'creditLedger.repay') out.nextActions = ['creditLedger.open', 'creditLedger.settle'];
+        else if (key === 'creditLedger.dun') out.nextActions = ['creditLedger.repay', 'creditLedger.settle'];
+        else if (key === 'creditLedger.settle') out.nextActions = ['creditLedger.open'];
         else if (key === 'creditLedger.checkCredit') out.nextActions = ['creditLedger.open', 'finance.ruptureCollateral'];
         else if (key === 'finance.ruptureCollateral') out.nextActions = ['rumor.startChain', 'relationGraph.upsert', 'subtextTension.assess'];
         else if (key === 'actor.applyEvaluationCosts') out.nextActions = ['drama.resolveNonBinary', 'subtextTension.assess'];
