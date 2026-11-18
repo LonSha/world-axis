@@ -312,8 +312,29 @@
 | 测试面 | `segment-extract` 128/128（面 578→579，新锁已登记非孤儿） |
 | 快档 | **14/14**（53.5s） |
 
-### 还没接的一步（如实登记）
+### 接线（已落，2026-11-18 第二轮）
 
-`outcomeDice.resolve()` 现在**可以被 ActionDesk 调到**，但**还没有把结果写回 `act.VERDICTS`**
-（即"叙事方读到 `fail` 就该写 `refuse`/`delay`"这一段编排）。这一段牵动 `act` 的四档语义与
-既有 24 个契约字段，留作 V29 批一的第一项（与 EXV29-01 同批），**不在这里偷偷改 act 的行为**。
+`outcomeDice.resolve()` 的结果**已经接进 `act` 的判定面**，但只做**单向降档**，绝不放宽：
+
+| 五档 | → act 四档 | 依据 |
+| :--- | :--- | :--- |
+| critical / extreme / success | **不动**（保持 `action`） | 办成了就是办成了 |
+| fail | `action` → **`delay`** | 没办成 = 耗掉窗口，不是"他不愿意" |
+| fumble | `action` → **`refuse`** | 办砸了 = 这一手砸了 |
+| **任意档 × 原本非 `action`** | **一律不动** | 原本就 refuse/delay/status-quo 的，骰子不得再判一次 |
+
+落点为 `WA.act.judge(kind, {check:{target,ticket,who,what}})` + 纯映射 `WA.act.diceVerdict(band, base)`
+（表 `WA.act.DICE_VERDICT` 五键可整表核）。`judge()` 仍然**不是写口**：不 `add`/`admit`/`advance`，
+只回"这一笔该落哪档"。ActionDesk 新增路由 `act.judge`。
+
+### 交付读数（实测，两轮合计）
+
+| 项 | 读数 |
+| :--- | :--- |
+| 专锁 | `tests/outcome-dice-v2525.js` **82/82**（A 默认关 / B 五档逐格 / C 坏入参 / D 一次一票 / E 注入面 / F d100 归并 / G 有界 32 / H 关回去 / I·J 三条锚负控制 / **K 接线 21 项**） |
+| 接线 | `index.js` LOAD_ORDER · `tests/run.js` LOAD+spawn · `tool-diag` MODULE_EXPORTS · `action-desk` 六路由（含 `act.judge`） |
+| 拒收码 | **0 新增**（差额 0：快照 1903 / 现场 1680+139+84） |
+| 导出契约 | `FROZEN2800` 36117 → 36162 → **36168** 字符 |
+| 两本账本 | dead 1980→1987 · uiDead 7（无新增）· 注册表 521 文件 / 532 命名空间 / 424 装载边 / 硬边 0 |
+| 测试面 | `segment-extract` 128/128（面 579） |
+| 快档 | **14/14**（45.3s） |

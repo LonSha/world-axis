@@ -144,5 +144,46 @@ ok(srcOf().indexOf("need >= 19 ? 'fail' : 'fumble'") >= 0, 'J1 ③高能力不�
 ok(srcOf().indexOf('const CAP = 32;') >= 0, 'J2 有界 CAP=32 的锚还在');
 ok(srcOf().indexOf('const DEF = { enabled: false') >= 0, 'J3 默认关的锚还在');
 
+// ── K 接线：骰子只降档，不加严（五档 → act 四档）──
+const A = WA.act;
+ok(!!A && typeof A.judge === 'function', 'K0 act.judge 已装');
+eq(A.diceVerdict('fail', 'action'), 'delay', 'K1 fail ⇒ delay（没办成，不是拒绝）');
+eq(A.diceVerdict('fumble', 'action'), 'refuse', 'K2 fumble ⇒ refuse（这一手砸了）');
+eq(A.diceVerdict('success', 'action'), 'action', 'K3 success ⇒ 不动');
+eq(A.diceVerdict('critical', 'action'), 'action', 'K4 critical ⇒ 不动');
+eq(A.diceVerdict('extreme', 'action'), 'action', 'K5 extreme ⇒ 不动');
+eq(A.diceVerdict('fumble', 'refuse'), 'refuse', 'K6 原本就拒的，骰子不得再降（不判两次）');
+eq(A.diceVerdict('fail', 'delay'), 'delay', 'K7 原本就延的，骰子不得放松也不得再降');
+eq(A.diceVerdict('fail', 'status-quo'), 'status-quo', 'K8 维持现状不受骰子影响');
+eq(Object.keys(A.DICE_VERDICT).length, 5, 'K9 五档映射表齐');
+
+// 不带 check：完全等于原判定面
+const j0 = A.judge('wait');
+eq(j0.verdict, 'delay', 'K10 不带 check 时行为不变（wait ⇒ delay）');
+eq(j0.diceAdjusted, false, 'K11 不带 check 时 diceAdjusted=false');
+
+// 关着：原样通过
+const j1 = A.judge('move', { check: { target: 50, ticket: 'k-off' } });
+eq(j1.check.reason, 'module-disabled', 'K12 开关关着 ⇒ check 回 module-disabled');
+eq(j1.diceAdjusted, false, 'K13 关着不改档');
+eq(j1.verdict, j1.baseVerdict, 'K14 关着 verdict 与原档一致');
+
+// 开着：能力 100（need 20）时任何骰点都不低于 success ⇒ 档位必然仍是 action
+OD.toggle(true);
+const j2 = A.judge('move', { check: { target: 100, ticket: 'k-100', who: '他', what: '翻墙' } });
+eq(j2.verdict, 'action', 'K15 能力满值时不会被降档（确定性）');
+ok(['critical', 'extreme', 'success'].indexOf(j2.check.band) >= 0, 'K16 need=20 不会出失败档', j2.check.band);
+eq(j2.diceAdjusted, false, 'K17 满值不触发降档');
+
+// 幂等：同一票第二次必须回放
+const j3 = A.judge('move', { check: { target: 100, ticket: 'k-100' } });
+eq(j3.check.replay, true, 'K18 同票 judge 第二次是回放');
+
+// 低能力：只允许落 delay / refuse（roll=1 的大成功除外）
+const j4 = A.judge('move', { check: { target: 1, ticket: 'k-low' } });
+ok(['action', 'delay', 'refuse'].indexOf(j4.verdict) >= 0, 'K19 低能力只可能落三档之一', j4.verdict);
+ok(j4.verdict !== 'action' || j4.check.band === 'critical', 'K20 低能力落 action 必须是大成功' , j4.check);
+OD.toggle(false);
+
 console.log('outcome-dice-v2525: pass ' + pass + ' / fail ' + fail);
 if (fail) { fails.slice(0, 12).forEach(function (f) { console.log('  ✗ ' + f); }); process.exit(1); }

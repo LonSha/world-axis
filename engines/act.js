@@ -162,6 +162,48 @@
       note: '行动、拒绝行动、延迟行动与状态维持都是合法结果：「他没动」不等于「这一轮没算」。' };
   }
 
+  /**
+   * v2.524.0（S1 接线）：骰子只**降档**，不加严——五档 → 四档的单向表。
+   *   critical / extreme / success ⇒ 不动（null = 保持原档）
+   *   fail                        ⇒ 'delay'（没办成：耗掉窗口，不是拒绝）
+   *   fumble                      ⇒ 'refuse'（办砸了：他这一手砸了）
+   *   关键边界：**只在原本该动（'action'）时才降**。原本就 refuse/delay/status-quo 的，
+   *   骰子不得把它变严或变松 —— 否则同一件事会被判两次。
+   */
+  const DICE_VERDICT = { critical: null, extreme: null, success: null, fail: 'delay', fumble: 'refuse' };
+  function diceVerdict(band, base) {
+    const b = str(base, 20) || 'action';
+    if (VERDICTS.indexOf(b) < 0) return b;
+    const to = DICE_VERDICT[str(band, 20)];
+    if (!to) return b;
+    return b === 'action' ? to : b;
+  }
+  /**
+   * v2.524.0（S1）：**判定面接骰子**。入参 `opts.check = {target, ticket, who, what}` 时
+   * 先掷（走 outcome-dice，开关关着则原样通过），再把五档单向降到四档。
+   * 本函数仍然**不是写口**：它不 add / admit / advance，只回"这一笔该落哪档"。
+   */
+  function judge(kind, opts) {
+    const o = opts || {};
+    const base = verdict(kind, { blockedReason: o.blockedReason });
+    if (!base.ok) return base;
+    const spec = (o.check && typeof o.check === 'object') ? o.check : null;
+    if (!spec) return Object.assign({}, base, { check: null, diceAdjusted: false });
+    let r = null;
+    try { r = (WA.outcomeDice && typeof WA.outcomeDice.resolve === 'function') ? WA.outcomeDice.resolve(spec) : null; }
+    catch (e) { r = null; }
+    if (!r) return Object.assign({}, base, { check: null, diceAdjusted: false, checkReason: 'outcome-dice-absent' });
+    if (r.ok !== true || !r.band) {
+      return Object.assign({}, base, { baseVerdict: base.verdict, diceAdjusted: false,
+        check: { reason: r.reason || 'unknown' } });
+    }
+    const v = diceVerdict(r.band, base.verdict);
+    return Object.assign({}, base, {
+      verdict: v, baseVerdict: base.verdict, diceAdjusted: v !== base.verdict,
+      check: { band: r.band, label: r.label, roll: r.roll, die: r.die, need: r.need,
+        ticket: r.ticket, replay: r.replay === true, reason: r.reason }
+    });
+  }
   const stat = { added: 0, admitted: 0, completed: 0, failed: 0, aborted: 0, replanned: 0,
     deferred: 0, duplicates: 0,
     // v2.231.0（OPT-2）：确认面三栏 ——
@@ -903,6 +945,8 @@
     add: add, admit: admit, advance: advance, abort: abort, replan: replan, view: view, buildBlock: buildBlock,
     // 判定面（只读）：这一笔的合法结果落在哪一档。**不是写口**，不动行动状态（见头部边界）。
     verdict: verdict,
+    // v2.524.0（S1 接线）：判定面接骰子（只降档）+ 五档→四档纯映射（可整表核）。
+    judge: judge, diceVerdict: diceVerdict, DICE_VERDICT: Object.assign({}, DICE_VERDICT),
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
   // Automatic cycle consumes the previous committed snapshot before backstage.simulate (20).

@@ -652,6 +652,7 @@
     'outcomeDice.ladder': function (o) { return WA.outcomeDice.ladder(o && o.target); },
     'outcomeDice.view': function () { return WA.outcomeDice.view(); },
     'outcomeDice.reset': function () { return WA.outcomeDice.reset(); },
+    'act.judge': function (o) { const x = o || {}; return WA.act.judge(x.kind, x); },
     'worldLoopLog.logRound': function (o) { return WA.worldLoopLog.logRound(o); },
     'worldLoopLog.absence': function (o) { return WA.worldLoopLog.absence(o); },
     'costGuard.warn': function (o) { return WA.costGuard.warn(o); },
