@@ -80,7 +80,7 @@
       "src": "engines/action-desk.js",
       "refs": 0,
       "tref": 0,
-      "own": 35
+      "own": 37
     },
     "actionDesk.transactActions": {
       "reason": "test-only",
@@ -705,6 +705,14 @@
       "refs": 0,
       "tref": 0,
       "own": 16
+    },
+    "arcSettle.stat": {
+      "reason": "self-only",
+      "detail": "engines/arc-settle.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/arc-settle.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
     },
     "archiveHide.getSettings": {
       "reason": "unwired",
@@ -3528,7 +3536,7 @@
       "src": "engines/credit-ledger.js",
       "refs": 0,
       "tref": 0,
-      "own": 10
+      "own": 11
     },
     "creditLedger.stat": {
       "reason": "self-only",
@@ -3536,7 +3544,23 @@
       "src": "engines/credit-ledger.js",
       "refs": 0,
       "tref": 0,
-      "own": 18
+      "own": 20
+    },
+    "creditLedger.transfer": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "creditLedger.unclaimable": {
+      "reason": "self-only",
+      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/credit-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "creditLedger.writeOff": {
       "reason": "self-only",
@@ -5002,6 +5026,14 @@
       "tref": 0,
       "own": 3
     },
+    "epistemicView.loseOnDeath": {
+      "reason": "self-only",
+      "detail": "engines/epistemic-view.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/epistemic-view.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "epochTide.resetAll": {
       "reason": "self-only",
       "detail": "engines/epoch-tide.js 内部自用、外部零引用（过度导出）",
@@ -5265,6 +5297,14 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "exitRite.stat": {
+      "reason": "self-only",
+      "detail": "engines/exit-rite.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/exit-rite.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
     },
     "factContinuity.diagnose": {
       "reason": "test-only",
@@ -5657,6 +5697,14 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "finale.stat": {
+      "reason": "self-only",
+      "detail": "engines/finale.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/finale.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
     },
     "financialContagion.stat": {
       "reason": "self-only",
@@ -7186,6 +7234,14 @@
       "tref": 2,
       "own": 3
     },
+    "interruptCost.stat": {
+      "reason": "self-only",
+      "detail": "engines/interrupt-cost.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/interrupt-cost.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
     "intimateArbiter.arbitrateIntimacy": {
       "reason": "self-only",
       "detail": "engines/intimate-arbiter.js 内部自用、外部零引用（过度导出）",
@@ -7786,6 +7842,14 @@
       "tref": 1,
       "own": 3
     },
+    "livelihood.stat": {
+      "reason": "self-only",
+      "detail": "engines/livelihood.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/livelihood.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
+    },
     "livingWorld.getSettings": {
       "reason": "self-only",
       "detail": "engines/living-world.js 内部自用、外部零引用（过度导出）",
@@ -8017,6 +8081,14 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "looseEnds.stat": {
+      "reason": "self-only",
+      "detail": "engines/loose-ends.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/loose-ends.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
     },
     "lostFound.getSettings": {
       "reason": "unwired",
@@ -9506,6 +9578,30 @@
       "tref": 1,
       "own": 3
     },
+    "overhearSplit.bones": {
+      "reason": "self-only",
+      "detail": "engines/overhear-split.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/overhear-split.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "overhearSplit.buildBlock": {
+      "reason": "self-only",
+      "detail": "engines/overhear-split.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/overhear-split.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "overhearSplit.stat": {
+      "reason": "self-only",
+      "detail": "engines/overhear-split.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/overhear-split.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
     "panelFold.collapseAll": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -9665,6 +9761,14 @@
       "refs": 0,
       "tref": 2,
       "own": 3
+    },
+    "pastLife.stat": {
+      "reason": "self-only",
+      "detail": "engines/past-life.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/past-life.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 8
     },
     "pathEcho.clear": {
       "reason": "self-only",
@@ -10450,6 +10554,14 @@
       "tref": 1,
       "own": 3
     },
+    "posthumous.stat": {
+      "reason": "self-only",
+      "detail": "engines/posthumous.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/posthumous.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 16
+    },
     "powerAnchor.get": {
       "reason": "self-only",
       "detail": "engines/power-anchor.js 内部自用、外部零引用（过度导出）",
@@ -10682,6 +10794,14 @@
       "tref": 0,
       "own": 1
     },
+    "priceVoice.stat": {
+      "reason": "self-only",
+      "detail": "engines/price-voice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/price-voice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
     "proactive.isDrained": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -10902,6 +11022,14 @@
       "reason": "self-only",
       "detail": "engines/pyro-telecom.js 内部自用、外部零引用（过度导出）",
       "src": "engines/pyro-telecom.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "quietRound.shouldForce": {
+      "reason": "self-only",
+      "detail": "engines/quiet-round.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/quiet-round.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -11465,6 +11593,22 @@
       "refs": 0,
       "tref": 0,
       "own": 3
+    },
+    "reputationAfter.deadAt": {
+      "reason": "self-only",
+      "detail": "engines/reputation-after.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reputation-after.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "reputationAfter.stat": {
+      "reason": "self-only",
+      "detail": "engines/reputation-after.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/reputation-after.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
     },
     "requestViewer.clear": {
       "reason": "self-only",
@@ -13144,7 +13288,7 @@
       "src": "engines/spotlight.js",
       "refs": 0,
       "tref": 1,
-      "own": 4
+      "own": 12
     },
     "spotlight.note": {
       "reason": "test-only",
@@ -15602,6 +15746,14 @@
       "tref": 2,
       "own": 3
     },
+    "worldBounds.stat": {
+      "reason": "self-only",
+      "detail": "engines/world-bounds.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-bounds.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
     "worldBrief.getSettings": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -15990,6 +16142,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 707
+    "dataOnly": 767
   }
 }
