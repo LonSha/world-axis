@@ -11,7 +11,7 @@ const PROBE=`(function(){
  const closed=!body('selfcheck')&&!document.getElementById('wa-diag-run')&&!!body('storage')===neighbor;
  button('selfcheck').click();const restored=!!body('selfcheck')&&!!document.getElementById('wa-diag-run')&&!!body('storage');
  W.store.transact(d=>{d.currents=[{id:'browser-current',title:'浏览器河堤',stage:'起线',visibility:'known',summary:'不重写此正文'}];d.evolution.round=0;});
- tab('world');const on=document.getElementById('wa-current-auto-on');if(!on)return {ok:false,why:'missing-owner-settings',closed,restored};on.click();
+ tab('world');const on=document.getElementById('wa-current-auto-on');if(!on)return {ok:false,why:'missing-owner-settings',closed,restored};if(!on.checked)on.click();
  const turns=document.getElementById('wa-current-auto-turns');turns.value='1';turns.dispatchEvent(new Event('change',{bubbles:true}));
  const enroll=p.querySelector('[data-current-auto="browser-current"]');enroll.click();
  const current=W.store.get().currents[0],enrolled=current.autoAdvance===true&&W.storylineAdvance.getSettings().enabled&&W.storylineAdvance.getSettings().turnsPerStage===1;

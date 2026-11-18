@@ -23,7 +23,10 @@ function runAll(assertFn) {
   const a = (v, m) => { if (v) pass++; else { fail++; console.error('FAIL ' + m); } if (assertFn) assertFn(!!v, m); };
   const W = load(); fixture(W);
   const ic = W.injectCollector;
-  a(ic.buildBlock() === '', 'default off');
+  // v2.523.0 收口：原文「出厂态 ⇒ 空块」自 v2.412.0 全开策略起不成立（出厂就是开的，
+// 有料就有块）。边界 1 的**实质**是「关着就不出内容」，故显式关再量，判据（空串）一字未改。
+ic.setSettings({ enabled: false });
+a(ic.buildBlock() === '', 'off ⇒ 空块（边界：关着就不出内容）');
   ic.setSettings({ enabled: true });
   const before = JSON.stringify(W.store.get());
   const block = ic.buildBlock();

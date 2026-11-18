@@ -353,11 +353,23 @@ section('E 负控制:真源码破坏 → 装载破坏副本 → 重跑同款判�
 section('F 联动:UI_BINDINGS 守卫与页表');
 {
   // 折叠钮是**动态生成**的(每段一枚),不该进 UI_BINDINGS 的静态 ids(会被判成缺失)。
-  //   但它必须能被 ui-wire-audit 看见:引用面与渲染面都在 panel.js 里。
+  //   但它必须能被 ui-wire-audit 看见:引用面在 panel.js,渲染面在 panel.js + ui/pages/*.js。
   const wire = require('./ui-wire-audit.js');
   a(typeof wire.auditWire === 'function', 'F1: ui-wire-audit 可复用(接线面门禁)');
-  const w = wire.auditWire(RD(PANEL_REL));
-  a(w.ghosts.length === 0, 'F1b: 面板零幽灵绑定(data-foldt 不是 DOM id,不产生幽灵)');
+  // v2.523.0 收口:取证面必须与门禁**同一份**,不能自己另拼一个。
+  //   原写法 wire.auditWire(RD(PANEL_REL)) 喂的是 panelSource()(拆段重组面)。
+  //   自 v2.401.0 起页模板已搬进 ui/pages/*.js:引用面(panel.js 里的 $('#wa-xxx'))仍在
+  //   panel.js,渲染面却在 pages 里 ⇒ 重组面上实测 196 条幽灵,而**门禁本身是绿的**
+  //   (uiFiles() 对 ui/panel.js 用的是 panelWireFace() = 重组面 + 全部非拆段页模块)。
+  //   本锁若自带一份「面板接线面」的定义,就成了第二个真源,两边迟早各说各话。
+  //   故直接问门禁要它自己那份面;判据(ghosts 为 0)一字未改。
+  const wireFiles = wire.uiFiles();
+  const panelFace = wireFiles.filter(function (f) { return f.rel === PANEL_REL; })[0];
+  a(!!panelFace, 'F1a: 接线面门禁的文件面里含 ' + PANEL_REL + '(实 '
+    + wireFiles.map(function (f) { return f.rel; }).join('、') + ')');
+  const w = wire.auditWire(panelFace ? panelFace.src : RD(PANEL_REL));
+  a(w.ghosts.length === 0, 'F1b: 面板零幽灵绑定(data-foldt 不是 DOM id,不产生幽灵)',
+    w.ghosts.join('、'));
   // 段体容器 id 一个都没被拆掉(既有 UI_BINDINGS 的静态 id 仍在)
   const pnl = RD(PANEL_REL);
   const keepIds = ['wa-diag-out', 'wa-samp-out', 'wa-audit-vol-out', 'wa-cap-out', 'wa-pbl-out'];

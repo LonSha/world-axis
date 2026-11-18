@@ -12323,11 +12323,11 @@
       "own": 1
     },
     "staleGuard.setSettings": {
-      "reason": "unwired",
+      "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/stale-guard.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 2,
       "own": 1
     },
     "staleGuard.size": {

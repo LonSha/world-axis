@@ -115,7 +115,9 @@ function runB(WA) {
   //   v2.407.0（三缝+七主线）：MECH 109 → 115（branch-continuity / director / fact-continuity /
   //   summarizer-adapter 四台有注入面引擎），排除名单仍是 35 ⇒ 规模 74 → 80。
   //   现场实测 `view().tiers[full].size = 80`。仍是「有注入面的 − 排除」同一条口径：115 − 35 = 80。
-  eq(fullItem && fullItem.size, 81, 'B6: full 档规模为 81（现场实测：全开策略后探测集 116 + 探测口径差 1）');
+  // v2.523.0 收口（本轮修红）：探测集 116 → 117（与 capability-tier-v2257 的 MECH=117 同源），
+  //   故 full 档规模 = 117 + 1 = 82。判据形态未变（仍是「探测集 + 探测口径差 1」）。
+  eq(fullItem && fullItem.size, 82, 'B6: full 档规模为 82（现场实测：全开策略后探测集 117 + 探测口径差 1）');
   assert(fullItem && typeof fullItem.note === 'string' && fullItem.note.indexOf('35') >= 0, 'B7: full 档包含 35 排除注记');
 
   assert(Array.isArray(v.manualOnly) && v.manualOnly.length === 35, 'B8: view().manualOnly 暴露 35 个排除机制');
@@ -139,7 +141,7 @@ function runC(WA) {
   //   故本行必须跟位 —— 上一次的「不该变」是巧合，不是规律（探针实测 turnedOn 64）。
   //   v2.407.0：目标 74 → 80（+6），出厂仍 10（+0），差值 64 → 70 —— 本行再次跟位。
   const vFull = cap.view();
-  eq(vFull.running, 116, 'C5: full 档运行机制数为 116（全开）');
+  eq(vFull.running, 117, 'C5: full 档运行机制数为 117（全开，与 MECH 同源）');
   eq(vFull.dormant, 0, 'C6: full 档休眠机制数为 0（全开）');
 
   // 验证 35 个排除机制无一被打开
@@ -160,7 +162,7 @@ function runC(WA) {
   assert(!rRoll.tier, 'C10: 空栈回滚不产生档位变化');
 
   const vLite = cap.view();
-  eq(vLite.running, 116, 'C11: 全开策略下机制数保持 116（档位不再收走出厂开关）');
+  eq(vLite.running, 117, 'C11: 全开策略下机制数保持 117（档位不再收走出厂开关）');
   //   v2.382.0：出厂 7 → 10（+3），休眠 98 → 99（+1）。现场实测 rollback 后 running=10 / dormant=99。
   //   注意这两条**不同步涨**：running +3、dormant +1，因为 MECH 105 → 109 只 +4，
   //   其中 3 台进了 BASE_ON（出厂即开），剩 1 台落在休眠面 —— 所以 C11 改 10、C12 改 99。

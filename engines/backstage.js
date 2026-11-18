@@ -471,9 +471,18 @@
         //   已经是另一个聊天 / 另一个角色了。
         //   接法：**发请求前取票**（t0 现场），**结算写库前校验**（落库那一刻的现场）。
         //   关（默认）：`begin` 返回 `{ok:false}`，`verdict` 对任何票一律放行 ⇒ 行为与本版之前**逐字一致**。
-        const sgTicket = (WA.staleGuard && typeof WA.staleGuard.begin === 'function')
+        // v2.523.0 收口（真病，非测试问题）：`begin` 返回的是**信封**
+        //   `{ok, ticket, snapshot}`，不是票号本身，而 v2.130.0 起这里把整个信封
+        //   当票号交给 `verdict` —— 后者按边界 3「票号必须是 begin 返回的那一个」
+        //   做类型检查（非字符串 ⇒ missing-key）。此前 stale-guard 默认关，
+        //   `verdict` 在关态一律放行，这条错法被开关掩着；v2.412.0 全开之后
+        //   每一次推演结算都会被自己判成 `missing-key` ⇒ **整份结果被丢弃**，
+        //   即「世界推演静默全废」。故取票必须显式取 `envelope.ticket`。
+        const sgBegin = (WA.staleGuard && typeof WA.staleGuard.begin === 'function')
           ? (function () { try { return WA.staleGuard.begin('backstage'); } catch (e) { return null; } })()
           : null;
+        const sgTicket = (sgBegin && sgBegin.ok === true && typeof sgBegin.ticket === 'string' && sgBegin.ticket)
+          ? sgBegin.ticket : null;
         const result = await this._runInference(anchor, ac.signal);
         if (ac.signal.aborted) { __simMark('failed', 'aborted', anchor && anchor.idx); return { ok: false, aborted: true }; }
         if (result) {

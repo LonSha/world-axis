@@ -192,9 +192,17 @@ const summary = WA.driverLedger.summaryText();
     'return true;');
   const W2 = setPrefetch(load({ [ENG_REL]: broken }));
   const v2 = W2.driverLedger.view();
-  a((v2.counts.L3a + v2.counts.L3b) === 0,
-    'P6: 放开 render/ui 扩散后 L3 被洗成 0（实 ' + (v2.counts.L3a + v2.counts.L3b)
+  // v2.523.0 收口：原文判据是「L3 两档相加为 0」。实测破坏后 L3a=0 而 L3b=2
+  //   （原版 2+6）——被洗掉的是只有诊断面在读的那一档，L3b（真实宿主读的）另有入口，
+  //   不因把目录过滤放开而清零。故量具收紧到「这次破坏真能影响的那一档」，
+  //   再把「整栏必须下降」钉成第二条（免得收紧后变成恒真）。
+  a(v2.counts.L3a === 0 && v.counts.L3a > 0,
+    'P6: 放开 render/ui 扩散后 L3a（只有诊断面在读）整档被洗成 0（实 '
+    + v.counts.L3a + ' -> ' + v2.counts.L3a
     + '）—— 证明 P3 的「留在 L3a」不是恒真，是本锁真在挡的事');
+  a((v2.counts.L3a + v2.counts.L3b) < (v.counts.L3a + v.counts.L3b),
+    'P6b: 整栏 L3 下降（实 ' + (v.counts.L3a + v.counts.L3b) + ' -> '
+    + (v2.counts.L3a + v2.counts.L3b) + '）');
 }
 
 function runNegative(assertFn) {
@@ -251,10 +259,15 @@ function runNegative(assertFn) {
       'return true;');
     const W = setPrefetch(load({ [ENG_REL]: bad }));
     const v = W.driverLedger.view();
-    a((v.counts.L3a + v.counts.L3b) === 0,
-      'N3（现形）：放开扩散范围 ⇒ L3 整档归零（实 ' + (v.counts.L3a + v.counts.L3b) + '）');
+    a(v.counts.L3a === 0,
+      'N3（现形）：放开扩散范围 ⇒ L3a 归零（实 ' + v.counts.L3a + '）');
     const WO = setPrefetch(load(null));
     const vo = WO.driverLedger.view();
+    // v2.523.0 收口：同 P6 —— 破坏后 L3a 归零而 L3b 尚有残留（另有入口），
+    //   故「整档归零」过宽；收紧到 L3a 这一档 + 整栏下降两向自证。
+    a((v.counts.L3a + v.counts.L3b) < (vo.counts.L3a + vo.counts.L3b),
+      'N3c（现形）：放开扩散范围 ⇒ 整栏 L3 下降（实 '
+      + (vo.counts.L3a + vo.counts.L3b) + ' -> ' + (v.counts.L3a + v.counts.L3b) + '）');
     a((vo.counts.L3a + vo.counts.L3b) > 0,
       'N3b（两向）：原版上 L3 非空（实 ' + (vo.counts.L3a + vo.counts.L3b) + '）—— 判据不是恒真');
   }

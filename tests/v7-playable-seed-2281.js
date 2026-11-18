@@ -23,6 +23,24 @@ const SEED_SRC = fs.readFileSync(path.join(BASE, SEED_REL), 'utf8');
 const BP_SRC = fs.readFileSync(path.join(BASE, BP_REL), 'utf8');
 const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
 const PANEL_SRC = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+// v2.523.0 收口（本轮修红）：**控件的「渲染」与「绑定」在既有结构里分居两处** ——
+//   页面 HTML 由 `ui/pages/*.js` 产出，事件绑定留在 `ui/panel.js`（全局委托）。A7e 原来
+//   只在 panel.js 里找 `id="wa-seed-*"`，于是把「渲染在 pages、绑定在 panel」这个**正确**结构
+//   判成「面板没渲染」。A7d（诊断守卫表登记）与 A7c（面板真读）仍然针对 panel.js，不改。
+//   判据意图不变：这些控件必须真的被某个 UI 模块渲染出来（否则绑定就是幽灵绑定 ——
+//   这正是 q8 的 F1b 在另一面看到的东西）。故这里把 ui/ 下的页面模块一并纳入取证面。
+const UI_PAGES_SRC = (function () {
+  const dir = path.join(BASE, 'ui/pages');
+  let out = '';
+  try {
+    fs.readdirSync(dir).forEach(function (f) {
+      if (!/\.js$/.test(f)) return;
+      try { out += fs.readFileSync(path.join(dir, f), 'utf8'); } catch (e) {}
+    });
+  } catch (e) {}
+  return out;
+})();
+const UI_ALL_SRC = PANEL_SRC + '\n' + UI_PAGES_SRC;
 const RUN_SRC = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
 const IDX_SRC = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
 
@@ -148,7 +166,7 @@ function runA() {
   eq(cnt(DIAG_SRC, "'wa-seed-enabled', 'wa-seed-line', 'wa-seed-replay', 'wa-seed-view', 'wa-seed-out'"), 1,
     'A7d 守卫表一次登记四个新控件');
   ['wa-seed-enabled', 'wa-seed-line', 'wa-seed-replay', 'wa-seed-view', 'wa-seed-out'].forEach(function (id, i) {
-    assert(PANEL_SRC.indexOf('id="' + id + '"') >= 0, 'A7e.' + (i + 1) + ' 面板渲染了 ' + id);
+    assert(UI_ALL_SRC.indexOf('id="' + id + '"') >= 0, 'A7e.' + (i + 1) + ' 面板渲染了 ' + id + '（渲染与绑定分居 ui/pages 与 ui/panel）');
   });
   assert(PANEL_SRC.indexOf("on('#wa-seed-replay'") >= 0, 'A7f 补播按钮有绑定');
   assert(PANEL_SRC.indexOf("on('#wa-seed-view'") >= 0, 'A7g 读数按钮有绑定');

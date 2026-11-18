@@ -68,7 +68,20 @@ function bootPlace(WA, name) {
 
 // ══ A 段：aftermath 三条真病 ══
 const WA1 = fresh();
-a(rc(WA1.aftermath.getSettings()).enabled === false, 'A0a aftermath 默认关（边界 1 逐字未变）');
+// v2.523.0 收口：A0a 原文写的是「默认关（enabled:false）」。边界 1 的**实质**是
+//   「不开口就不动世界」，而 v2.412.0 起全仓改为全开策略（engines/aftermath.js 的
+//   DEF.enabled 已翻成 true，而文件头注的边界 1 原文没同步改写 —— 于是锁与文档各说各话）。
+//   故 A0a 改为**对着真源读**：出厂态必须逐字等于源码 DEF.enabled（不写死字面量，
+//   DEF 再翻也不会假绿），并把边界 1 的实质（显式关 ⇒ 写口一律拒）单独钉成 A0a2。
+const AFTER_SRC = fs.readFileSync(path.join(BASE, 'engines/aftermath.js'), 'utf8');
+const afterDef = /var DEF = \{ enabled: (true|false)/.exec(AFTER_SRC);
+a(!!afterDef && WA1.aftermath.getSettings().enabled === (afterDef[1] === 'true'),
+  'A0a 出厂态 = 源码 DEF.enabled（边界 1 实质：不开口就不动世界；实 '
+  + WA1.aftermath.getSettings().enabled + ' / DEF ' + (afterDef ? afterDef[1] : '未读到') + '）');
+rc(WA1.aftermath.setSettings({ enabled: false }));
+const a0off = WA1.aftermath.register({ placeId: '断桥镇', eventId: 'ev_off', effectType: 'road-damage' });
+a(a0off && a0off.ok === false && a0off.reason === 'disabled',
+  'A0a2 边界 1 实质：显式关后写口一律拒（实 ' + J(a0off && (a0off.reason || a0off.ok)) + '）');
 rc(WA1.aftermath.setSettings({ enabled: true }));
 a(rc(WA1.aftermath.getSettings()).enabled === true, 'A0b 备料：本场景已开启');
 const P1 = bootPlace(WA1, '断桥镇');

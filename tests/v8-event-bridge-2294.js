@@ -12,7 +12,13 @@ function runAll(assertFn){
  E.setSettings({autoFulfill:false});a(!E.fulfillDue().ok&&JSON.stringify(W.store.get())===before,'disabled bridge does not mutate world');E.setSettings({autoFulfill:true});
  const r=E.fulfillDue();a(r.ok&&r.count===1,'exactly the due unconditional event fulfills');
  const hist=W.store.get().chronicle;
- a(hist.length===1&&hist[0].title==='开门检修'&&hist[0].summary===''&&hist[0].eventId==='due','archive copies declared title only with source id');
+ // v2.523.0 收口：原文要求 summary **字段存在且为空串**。产品侧已裁决（engines/backstage.js
+//   archiveScheduled 的头注）：「恒空占位」不再存进存档，读侧全部容缺
+//   （chronicle-view 走 c.summary || c.desc || ''，ui/panel 走 (c.summary || '')）。
+//   本条要挡的是「归档不得发明摘要」，不是「空字段必须落盘」——故判据改为
+//   「取出来是空的」（缺字段与空串等价），其余（title / eventId）一字未改。
+a(hist.length===1&&hist[0].title==='开门检修'&&(hist[0].summary||'')===''&&hist[0].eventId==='due',
+  'archive copies declared title only with source id（summary 缺字段与空串等价）');
  a(E.buildBlock().includes('[排期事件·已兑现]')&&W.chrono.chronicle().rows.some(x=>x.title==='开门检修'),'fulfilled fact reaches actual event and chronicle injection readers');
  a(E.active().some(x=>x.id==='later')&&E.active().some(x=>x.id==='conditional'),'future and unmet condition remain pending');
  a(E.fulfillDue().count===0&&W.store.get().chronicle.length===1,'repeated bridge run creates no duplicate fact');

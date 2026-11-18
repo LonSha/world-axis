@@ -1,6 +1,6 @@
-# WorldAxis 故事优先双计划实施切片
+# Agent Note: WorldAxis 故事优先双计划实施切片
 
-- Status: in-progress
+Status: in-progress
 - Plan sources: `plans/WORLDAXIS_STORY_EXPANSION_9.md`（EX-1~EX-9）+ `plans/WORLDAXIS_STORY_OPTIMIZATION_9.md`（OP-1~OP-9），合计严格 18 项。
 - Implementation evidence: `engines/story-window.js`、`engines/tool-diag.js`、`core/store.js`、`core/interceptor.js`、`render/inject.js`、`engines/inject-budget.js`、`index.js`、`tests/run.js`、`tests/story-window-v2518.js`
 - Current test evidence: focused Node regression `story-window: ok`；全量 `node tests/run.js` 52 通过 / 0 失败（source-changed 状态下取得，改动后须重跑取干净结果）；改动文件语法编译全部通过。
@@ -12,13 +12,21 @@
   调度侧真缺陷），并把五条段提取绝对基线逐条补账 —— 详见下方「第四批」。
 - Date: 2026-11-16
 
-## 决策
+## Problem
+
+方向已定（见同目录 `2026-11-16-worldaxis-story-first-direction.md`），但「18 项到底落到哪些文件、每一批修掉了什么、哪些读数还只是分层读数」散在提交信息与临时探针里：读者无法从仓库内部回答「这一项有代码落点吗、有专锁吗、宿主要验的是什么」。本笔记把这层实施事实固化成可核对的切片。
+
+## Decision
 
 先以既有 `world`、`act`、`livingWorld`、`elsewhere`、`investigation`、`storyChoice`、`foreshadow`、`rumor` 与 `render/inject` 为 owner，落一个可验收的纵向闭环：正文成功推进只开启一次推进窗口；场外行动必须留下带时间、地点、来源、可靠度和可见条件的痕迹；玩家可选择寻找、请人核实、暂不处理，也可从人物页/线索页询问、跟随、等待；选择提交到既有真实写口，不能由叙述直接制造完成事实。
 
 OP-2 的第一步不新建第二套时钟或位置真源：在行动/世界回执中补充可解释的起止位置、在途状态、时间和证据；未知继续保持未知。OP-5 的第一步不删除既有注入源，而是在结构汇流与主注入账中按当前场景、玩家知识和待处理选择优先，并记录折叠原因。
 
-## 不采用的替代方案
+## Consequences
+
+18 项全部有代码落点与专项断言，`tests/run.js` 挂上了对应专锁；L0/L1 快档全绿，L2 对 `wide-impact` 保持诚实拒收。代价是回归面继续变宽（每项一把专锁），且**仓库侧判据不等于宿主验收**：真实 SillyTavern + Ruby 卡这一条仍未做，本笔记保留 `Status: in-progress` 正是为此，而不是把「没做过」写成「已通过」。
+
+## Alternatives considered
 
 1. 不另建万能 `storyWorld` 状态：会复制人物、位置和时钟 owner。
 2. 不把 `backstage.simulate()` 的异步启动当作结算完成：只消费上一份已提交快照，并显式标记 deferred/running。

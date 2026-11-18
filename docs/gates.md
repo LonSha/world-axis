@@ -25,19 +25,19 @@ node tests/run.js          # 全量回归：通过数 / 失败数现场打印；
 ## 九道主门禁
 <!-- GATES-READINGS:BEGIN (由 tools/gen-gates-doc.js 生成，勿手改) -->
 > 本表由 `node tools/gen-gates-doc.js --write` **现场跑门禁回填**，不是手写。
-> 回填时点版本：2.517.0 · 生成器版本：2.400.0
+> 回填时点版本：2.523.0 · 生成器版本：2.400.0
 > 口径：门禁红的时候如实写红与退出码，不跳过、不美化。
 
 | 门禁 | 退出码 | 耗时 | 现场读数 |
 |---|---|---|---|
-| `node tests/export-contract.js` | 0 ✓ | 700ms | `455 / 2919 / 35123` |
-| `node tests/inventory.js` | 0 ✓ | 1674ms | `502` |
-| `node tests/test-surface-gate.js` | 0 ✓ | 2643ms | `566 / 507 / 565` |
-| `node tests/reject-code-gate.js` | 0 ✓ | 5836ms | `497 / 1791` |
-| `node tests/module-registry-gate.js` | 0 ✓ | 505ms | `482 / 493` |
-| `node tests/module-cycle-gate.js` | 0 ✓ | 1116ms | `502 / 3998` |
-| `node tests/dead-export-gate.js` | 1 ✗ | 3353ms | `1694 / 7` |
-| `node tests/readings-v2106.js` | 1 ✗ | 83086ms | `11915 / 501 / 5389` |
+| `node tests/export-contract.js` | 0 ✓ | 562ms | `463 / 2949 / 35457` |
+| `node tests/inventory.js` | 0 ✓ | 1369ms | `522` |
+| `node tests/test-surface-gate.js` | 0 ✓ | 2113ms | `578 / 518 / 576` |
+| `node tests/reject-code-gate.js` | 0 ✓ | 4691ms | `515 / 1825` |
+| `node tests/module-registry-gate.js` | 0 ✓ | 459ms | `500 / 511` |
+| `node tests/module-cycle-gate.js` | 0 ✓ | 954ms | `522 / 4120` |
+| `node tests/dead-export-gate.js` | 1 ✗ | 3020ms | `1825 / 7` |
+| `node tests/readings-v2106.js` | 1 ✗ | 71124ms | `12123 / 521 / 5559` |
 <!-- GATES-READINGS:END -->
 > **怎么读这张表**：下面那一块是 `node tools/gen-gates-doc.js --write`
 > **现场跑门禁回填**的，不是手写。修改产品面后若读数变了，

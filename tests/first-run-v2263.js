@@ -117,8 +117,32 @@ function breakOnce(src, anchor, replacement, tag) {
 function runCore() {
   const WA = boot();
   const hp = WA.healthPreflight;
-  assert(!!hp, 'A0 health-preflight 装载成功');
-
+  // v2.523.0 收口（本轮修红）：**「出厂态就是 thin」这个前提自 v2.412.0 起不成立**。
+  //   原文的现场是「出厂 107 个注入源里只有 6 个通」（不足半数 ⇒ 可见性门槛 degraded ⇒ thin）。
+  //   全开策略把出厂开关全部打开之后，出厂态的可见性面已经过半数（实测 running）——
+  //   于是 C4 / C5.1 / N1.3 / N1.5 / G1b / G2 六条一起红，而红的是**前提**，判据本身没坏。
+  //   判据意图一字未改（过半源不通 ⇒ 必须报 thin，不许折成 running）；
+  //   造现场的方式改成显式杠杆：把一半以上的注入源置成不可见（face='vis-off'），
+  //   这与 N2 负控制要证明的事（删掉 thin 分支 ⇒ 同一个现场被报成 running）严格对齐。
+  function thinFaceList(impl) {
+    const vs = (impl && impl.call(WA.render)) || {};
+    const faces = vs.faceAudit || [];
+    const half = Math.floor(faces.length / 2);
+    return faces.map(function (f, i) { return i < half ? Object.assign({}, f, { face: 'vis-off' }) : f; });
+  }
+  // 现场要**就地**造（不能替换成快照对象）：`WA.render` 的方法彼此用 `this` 取字段，
+  //   换成 `Object.assign({}, …)` 的快照后 threeGates 立刻抛，结论变 unknown（实测踩中）。
+  //   故只临时改一个函数、跑完立刻还原 —— 取证不得改变被取证对象。
+  function withThinHere(fn) {
+    const r = WA.render;
+    const saved = r.visibilityStat;
+    r.visibilityStat = function () {
+      const vs = (saved && saved.call(r)) || {};
+      return Object.assign({}, vs, { faceAudit: thinFaceList(saved) });
+    };
+    try { return fn(); } finally { r.visibilityStat = saved; }
+  }
+  function thinOnReal() { return withThinHere(function () { return hp.firstRunView({ sample: 0 }); }); }
   // ═══════════════════════════════════════════════════════════════════════════
   section('A. 源码面：两个口各恰定义一次，导出面两项，判序写死');
   eq((HP_SRC.match(/function firstRunView\(opts\)/g) || []).length, 1, 'A1 firstRunView 定义恰 1 处');
@@ -228,9 +252,13 @@ function runCore() {
     });
   }, function () { WA.render = SAVED.r; });
   eq(cRunning.state, 'running', 'C3 可见性面全通 ⇒ running');
-  eq(v.state, 'thin', 'C4 出厂态 ⇒ thin（6/107 不足半数）');
+  // 出厂态读数照旧保留（v），只是不再拿它当 thin 的证据 —— 它现在确实是 running。
+  eq(v.state, 'running', 'C4a 出厂态（全开策略）如实报 running（' + v.nums.sourcesOn + '/' + v.nums.sources + ' 源通）');
+  const cThin = thinOnReal();
+  eq(cThin.state, 'thin', 'C4 过半注入源不通 ⇒ thin（显式现场：一半以上源设为不可见）');
+  assert(cThin.nums.degraded > 0, 'C4b 且 degraded 读数摆在那里（实 ' + cThin.nums.degraded + '）');
   // C5 四态全覆盖（这四条的并集必须恰是封闭集，多一个少一个都说明有态走不到）
-  const seen = [cUnknown.state, cBlocked.state, cRunning.state, v.state];
+  const seen = [cUnknown.state, cBlocked.state, cRunning.state, cThin.state];
   STATES.forEach(function (s, i) { assert(seen.indexOf(s) >= 0, 'C5.' + i + ' 四态 ' + s + ' 在运行时真走到（' + seen.join('/') + '）'); });
   // C6 机制面缺席时不得报 running（「不知道」≠「健康」—— 本仓 v2.259.0 用 ok 字段踩过）
   assert(cUnknown.state !== 'running', 'C6 读不到时绝不报 running');
@@ -314,18 +342,21 @@ function runCore() {
     //   为什么：第五道门槛（yield）要读 store / evolution；只挑几个依赖传进去，
     //   缺的那几项会让 yield 报 absent ⇒ state 变 unknown ⇒ G1 从 running 变 unknown。
     //   那是**夹具缺件**，不是产品缺陷 —— 判据不跟着读数改，改夹具（这条已在本仓付过两次价）。
+    // v2.523.0：这个负控制要的是「有面读不到 + 一半以上源不通」的现场；原文靠出厂态
+    //   提供后一半，现在出厂态不再 degraded，故在 `withThinHere()` 里跑这两次求值。
+    //   absent 的优先级不受影响：N1.1 仍要求「有面读不到 ⇒ unknown」先赢。
     const depsAbsent = Object.assign({}, WA, { injectBudget: undefined });
     // ① 正版在这一组 deps 下必须报 unknown（A4 判序的运行时证明）
     const okOnAbsent = loadHPFrom(HP_SRC, 'N1ok', depsAbsent);
     assert(!!okOnAbsent, 'N1.0 正版副本装载成功');
-    const okState = okOnAbsent ? okOnAbsent.firstRunView({ sample: 0 }).state : '(未装载)';
+    const okState = okOnAbsent ? withThinHere(function () { return okOnAbsent.firstRunView({ sample: 0 }).state; }) : '(未装载)';
     eq(okState, 'unknown', 'N1.1 正版：有面读不到 ⇒ unknown（不折成 blocked/thin/running）');
     // ② 同款判据跑在破坏副本上：absent 不再进 unknown ⇒ 结论必变
     const bad = breakOnce(HP_SRC, A_ORDER_UNKNOWN, "if (!mechOk || !g) state = 'unknown';", 'N1');
     if (bad) {
       const u = loadHPFrom(bad, 'N1', depsAbsent);
       if (u && typeof u.firstRunView === 'function') {
-        const badState = u.firstRunView({ sample: 0 }).state;
+        const badState = withThinHere(function () { return u.firstRunView({ sample: 0 }).state; });
         assert(badState !== 'unknown',
           'N1.2 破坏后 absent 不再产生 unknown（实 ' + badState + '）—— 判序真的是活的');
         // 破坏后落到哪一档也要能说清：absent=1 不再拦路，degraded=1 仍在 ⇒ thin
@@ -334,7 +365,9 @@ function runCore() {
     }
     // ③ 恢复真 WA，后续判据必须读到真货（副本会覆盖 global.WorldAxis）
     global.WorldAxis = WA;
-    eq(hp.firstRunView({ sample: 0 }).state, 'thin', 'N1.5 恢复到真 WA 后结论回出厂态 thin（副本不外泄）');
+    // 判据意图不变：副本不许外泄 —— 恢复后必须读回**真 WA 的读数**（与 B 段的出厂读数同值）。
+    eq(hp.firstRunView({ sample: 0 }).state, v.state,
+      'N1.5 恢复到真 WA 后读数回到真货（与 B 段出厂读数同值：' + v.state + '）—— 副本不外泄');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -345,14 +378,14 @@ function runCore() {
     if (bad) {
       const u = loadHPFrom(bad, 'N2', deps);
       if (u) {
-        const r = u.firstRunView({ sample: 0 });
+        const r = withThinHere(function () { return u.firstRunView({ sample: 0 }); });
         // 出厂态真值是 thin（6/107 只过了一半以下的源）。删掉这条分支后，
         //   blocked=0 且 degraded>0 会一路落到最后的 else ⇒ running。
         //   这正是本仓点名的「把部分成功折成全成功」—— 玩家读到「正在运转」就不会去切档。
-        eq(r.state, 'running', 'G1 删掉 thin 分支后出厂态被误报成 running（实 ' + r.state + '）');
+        eq(r.state, 'running', 'G1 删掉 thin 分支后同一个现场被误报成 running（实 ' + r.state + '）');
         assert(r.nums.degraded > 0, 'G1b 而 degraded 实际上是 ' + r.nums.degraded + '（读数摆在那里，结论却错）');
         global.WorldAxis = WA;
-        eq(hp.firstRunView({ sample: 0 }).state, 'thin', 'G2 正版出厂态是 thin（判据真）');
+        eq(thinOnReal().state, 'thin', 'G2 正版在同一个现场上仍是 thin（判据真）');
       } else { assert(false, 'G3 破坏副本装载失败'); global.WorldAxis = WA; }
     }
     global.WorldAxis = WA;

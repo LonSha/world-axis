@@ -201,7 +201,13 @@ function runC() {
   const W2 = loadAll();
   const fake2 = fakeLedger(['life']);
   try { W2.capabilityTier.applyTier('lite'); } catch (e) {}
-  eq((W2.capabilityTier.shapeOf('life') || {}).on, false, 'C5 前提：lite 档下 life 是关着的');
+  // v2.523.0 收口（本轮修红）：**「lite 档会把 life 关掉」这个前提自 v2.412.0 起不成立**。
+  //   全开策略的判据是「档位不再收走出厂开关」，于是 lite 档下 life 仍是开的（实测 true）。
+  //   本段的判据是「**关着的** L3 不算空转（不冤枉关着的机制）」，判据一字未改；
+  //   改的是前提：既然档位不再替我们关，就显式关一次 —— 与同批 beat-facade / o1 / e7 / n10
+  //   的「先关再验」同一形态（同批先例：tests/v7-yield-face-2279.js 的 B5 也做过同样处置）。
+  try { W2.life.setSettings({ enabled: false }); } catch (e) {}
+  eq((W2.capabilityTier.shapeOf('life') || {}).on, false, 'C5 前提：life 此刻是关着的');
   W2.driverLedger = fake2;
   const r2 = W2.healthPreflight.threeGates({ sample: 3 });
   eq(driveOf(r2).state, 'pass', 'C6 关着的 L3 不算空转 ⇒ pass');
@@ -283,6 +289,20 @@ function runF() {
   const W2 = loadAll();
   try { W2.capabilityTier.applyTier('lite'); } catch (e) {}
   try { W2.intake.setSettings({ enabled: true }); } catch (e) {}
+  // v2.523.0 收口（本轮修红）：本段的前提是「内容面**已经** degraded」，而它原来靠 lite 档
+  //   收走一批开关来制造。全开策略下这个前提没了（实测 degradedContent=0，于是 verdict 走到
+  //   dormant、判据读到的是一条**前提不成立**的现场）。判据不变（内容面有问题时不许报 dormant）。
+  //   制造方式改用本文件已有的那根杠杆：`openExcluded()` 把不在注入源里的悬空机制打开 ——
+  //   可见性门槛按「开着却看不见的比例」判，>0 且不足半数即 degraded（产品侧判据，未改）。
+  //   实测：`openExcluded()` 不足以压低可见性（那些悬空机制本来就不在注入源表里，
+  //   faceAudit 里根本没有它们的位置）—— 所以这里改用**真的会改可见性的杠杆**：
+  //   把注入源表里超过一半的源显式关掉。可见性门槛按 on/全部 的比例判（产品侧判据，未改）：
+  //   ≥ 半数 ⇒ pass、>0 但不足半数 ⇒ degraded、=0 ⇒ blocked；三者都满足「内容面有问题」。
+  try {
+    const src = (W2.render && Array.isArray(W2.render.SOURCES)) ? W2.render.SOURCES : [];
+    const half = Math.ceil(src.length / 2) + 1;
+    src.slice(0, half).forEach(function (k) { try { W2[k].setSettings({ enabled: false }); } catch (e) {} });
+  } catch (e) {}
   W2.driverLedger = fakeLedger(['intake']);
   const r2 = W2.healthPreflight.threeGates({ sample: 3 });
   assert(r2.verdict !== 'dormant',

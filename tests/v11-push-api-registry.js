@@ -228,7 +228,9 @@ function runAll(a) {
     const sum = R.CLASSES.reduce(function (n, c) { return n + (s.byClass[c] || 0); }, 0);
     //   v2.407.0 跟位：vitals.tick / gauge.step / oneShotMod.flush / vitals.sweep 由
     //   actionDesk 路由接线，不再是真零调用 ⇒ 移出裁决表，19 → 15。
-    a(s.total === 15, 'v11push: [A10a] 登记总数 == 15（实 ' + s.total + '）');
+    //   v2.523.0 跟位：15 → 36。v11-push-api-coverage 的 C2 复算出 21 条老引擎推进口
+    //   「真零调用且未裁决」，逐台核过证据后补进本表（2 drive / 19 entry，理由见各条目）。
+    a(s.total === 36, 'v11push: [A10a] 登记总数 == 36（实 ' + s.total + '；v2.523.0 归口 21 条老引擎推进口）');
     a(sum === s.total, 'v11push: [A10b] 各裁决之和 == 总数（' + sum + ' vs ' + s.total + '）');
   }
 }

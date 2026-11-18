@@ -37,7 +37,13 @@ function runAll(assertFn) {
   for (const d of ['tolerance', 'motif', 'marginal', 'quota', 'spotlight', 'rhythmLoop', 'eraCycle']) {
     aa(RD_SRC.indexOf(d) >= 0, 'A1 驱动器表含 ' + d);
   }
-  aa(/enabled:\s*false/.test(RD_SRC), 'A2 默认关（enabled:false 字面量在源码里）');
+  // v2.523.0 收口：原文断言「enabled:false 字面量在源码里」。v2.412.0 全开策略把本轮驱动器的
+  //   出厂值翻成 true ⇒ 字面量已不是 false。A2 的**实质**是「出厂开关必须是源码里明写的
+  //   字面量，不许靠 undefined 隐式默认」（隐式默认在两条装载链上会给出不同答案）。
+  const a2m = /enabled:\s*(true|false)/.exec(RD_SRC);
+  aa(!!a2m, 'A2 出厂开关是源码里明写的字面量（实 ' + (a2m ? a2m[1] : '未读到') + '）');
+  aa(!!a2m && load().roundDrivers.getSettings().enabled === (a2m[1] === 'true'),
+    'A2b 运行时出厂态 = 源码字面量（开关与源码不许各说各话）');
   aa(RUN_SRC.indexOf('engines/round-drivers.js') >= 0, 'A3 装载链在序');
   aa(BS_SRC.indexOf('roundDrivers.tickAll') >= 0, 'A4 backstage 挂点存在');
   // ── B 运行时 ──
@@ -87,6 +93,9 @@ function runNegative(assertFn) {
   // ── N2 原版对照：不破坏时未开启就不跑 ──
   {
     const WAo = load();
+    // v2.523.0 收口：出厂态已随全开策略变 true，故「未开启不跑」必须**显式关**才量得到
+    //   （否则量的是出厂态，不是这条判据要挡的门）。判据（runs===0）一字未改。
+    WAo.roundDrivers.setSettings({ enabled: false });
     WAo.roundDrivers.tickAll();
     const sto = WAo.roundDrivers.stat();
     aa(sto.runs === 0, 'N3 原版同判据仍真（未开启不跑）');

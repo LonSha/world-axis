@@ -185,11 +185,22 @@ function runAll(a) {
   // A3 无自动落地开关:本模块**零写路径**(它是读侧模块,唯一产品出口是 buildBlock)
   a(E.indexOf('store.transact') < 0 && !/\bdraft\.[a-zA-Z]/.test(E),
     'A3: 零世界写路径(无 store.transact / 无 draft 赋值 —— 本模块只读,不落地)');
-  // A4 默认休眠(这是**口径**:默认关 ⇒ 不占预算、不改现有行为)
-  a(/const DEF = \{ enabled: false,/.test(E), 'A4: DEF.enabled === false(默认休眠,不占预算)');
+  // A4 出厂值：v2.412.0 的**全开策略**把所有带 enabled 的引擎出厂设为开，本模块也在其中。
+  //   原文断言「默认休眠 ⇒ 不占预算」，那个前提自 v2.412.0 起就不成立（不是本批改的）。
+  //   判据的**意图**（关掉之后不产空壳、不占预算）没丢：由 A5 的静态面 + A5b 的运行期真验一起钉住。
+  a(/const DEF = \{ enabled: true,/.test(E), 'A4: DEF.enabled === true(全开策略 v2.412.0)');
   // A5 关闭时返回空串(不产空壳、不占预算)
   a(E.indexOf("if (!cfg.enabled) return '';") >= 0,
     'A5: buildBlock 关闭时返回空串(不产空壳、不占预算)');
+  // A5b（v2.523.0 新增）：把「关闭时返回空串」从静态字面量升级成运行期真验 ——
+  //   全开策略之后出厂是开，光看源码里那句 `if (!cfg.enabled) return ''` 证不了它真会返回空串。
+  {
+    const envA5b = env0();
+    envA5b.WA.retrieval.setSettings({ enabled: false });
+    a(envA5b.WA.retrieval.buildBlock() === '',
+      'A5b: 显式关掉后 buildBlock 真返回空串(不产空壳、不占预算)');
+    envA5b.WA.retrieval.setSettings({ enabled: true });
+  }
   // A6 **无未定义标识符**(D1 修法的静态面):`chr` 这种全仓不存在的名字不许出现
   //   ⚠ 为什么单列一条:`node --check` **只查语法**,
   //     `chr(60) + 'x'` 语法完全合法 —— 真装载才 ReferenceError。

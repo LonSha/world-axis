@@ -336,8 +336,15 @@ function runAll(assertFn) {
   ['elapsedEvidence', 'sourceReconcile', 'planRoster'].forEach(function (ns, i) {
     a(td.indexOf("'" + ns + "'") >= 0, 'T5-' + (i + 4) + ' tool-diag 守卫登记 ' + ns);
   });
-  a(src('index.js').indexOf("const VERSION = '2.517.0'") >= 0, 'T5-7 版本面已升 2.517.0');
-  a(JSON.parse(src('manifest.json')).version === '2.517.0', 'T5-8 manifest 同源 2.517.0');
+  // v2.523.0 收口：原判据把版本号写死成 '2.517.0'，于是每升一次版这条就假红一次
+  //   （判据本意不是「版本停在 2.517」，而是「index.js 与 manifest 的版本面**同源**」）。
+  //   改为从 index.js 读真源，再拿 manifest 与它比 —— 判据变强了（不再需要每版手改），
+  //   意思没变：两处版本必须一致。
+  const verM = /const VERSION = '([0-9]+\.[0-9]+\.[0-9]+)'/.exec(src('index.js'));
+  a(!!verM, 'T5-7 版本面在 index.js 里可读（实 ' + (verM ? verM[1] : '未读到') + '）');
+  a(!!verM && JSON.parse(src('manifest.json')).version === verM[1],
+    'T5-8 manifest 与 index.js 同源（实 ' + JSON.parse(src('manifest.json')).version
+    + ' vs ' + (verM ? verM[1] : '未读到') + '）');
 
   // O6 门禁 N5 负控制：本批**不得**改 prune-sections.js / run.js 的裁剪相关段
   a(src('tools/prune-sections.js').indexOf('labelUnits') < 0,

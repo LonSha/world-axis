@@ -115,13 +115,21 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //     · DORMANT   99 → 105：那 6 个出厂是关的（115 − 10 = 105，恒等式成立）
 //     · RUNNING0  10 不变：9 个新出厂开的全无注入面，不进这一桶
 //     · FULL_MECH 74 → 80：= MECH − 35（L3_EXCLUDES 悬空名单未变，115 − 35 = 80）
-const BASE_ON = 234;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
-const MECH = 116;           // 有注入面的机制数
+// v2.523.0 收口：本文件这五个常量自 v2.517.0 起就没再跟位，实测早已漂了 ——
+//   干净树 f3a2706（v2.522.0）上就已经是 **261 开 / 117 机制**，而登记还写着 234 / 116，
+//   于是这条面在 v2.518–v2.522 五个版本里**一直红**（本机全量从来跑不到它，没人看见）。
+//   本轮把它一次跟到位，并把「谁推的」写清楚：252 → 261 是 v2.518–v2.522 五个版本的存量漂移，
+//   261 → 270 是本批 9 台 EXV27 引擎（pawnRedemption / silverAssay / saltFranchise /
+//   brokerHouse / nightWatch / fireWatch / festivalFair / wardCompact / divinationCraft）。
+//   口径证据：探针 `/tmp/probe_sw.cjs` 在 f3a2706 与本树上逐名 diff，开集新增恰这 9 个键；
+//   MECH（有 buildBlock 的机制）**两树同为 117** —— 本批没有新增注入面，故 MECH 不动。
+const BASE_ON = 270;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
+const MECH = 117;           // 有注入面的机制数
 const DORMANT = 0;          // 关着但有注入面的（全开策略后为 0）
-const RUNNING0 = 116;        // 出厂开 且 有注入面的
+const RUNNING0 = 117;        // 出厂开 且 有注入面的
 // full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
 // v2.294.0：= MECH(103) − L3_EXCLUDES(35)。排除名单本身未变，变的只有 MECH。
-const FULL_MECH = 116; // 全开策略后 full 与出厂一致（116）
+const FULL_MECH = 117; // 全开策略后 full 与出厂一致（117）
 const FULL_RUNNING = FULL_MECH + (BASE_ON - RUNNING0);
 
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
@@ -281,7 +289,7 @@ function runB(a) {
   const r4 = T.rollback();
   a(r4.ok === false && r4.reason === 'no-history', 'B5: 全开下 full/standard 均 noop，栈空如实报 no-history（实 ' + (r4 && r4.reason) + '）');
   a(!r4.tier, 'B5b: 空栈回滚不产生档位变化');
-  a(T.view().running === 116, 'B5c: 回到 standard 仍是全开 116（实 ' + T.view().running + '）');
+  a(T.view().running === MECH, 'B5c: 回到 standard 仍是全开 ' + MECH + '（实 ' + T.view().running + '）');
   // B6 **本版最要紧的一条**：full → lite 后出厂机制一个不少（初版缺陷在此）
   const r5 = T.applyTier('lite');
   a(r5.ok === true, 'B6: 切回 lite 成功');

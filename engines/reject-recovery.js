@@ -327,6 +327,13 @@
     //   按现场 hint 逐字登记：失主说不通 → 交给叙事（人工复核）；重复回合 → 换滑动才是新回合（改输入）。
     'claim-rejected': { kind: 'manual-review', why: '登记的失主与认领人对不上：凭据已留痕、交给叙事裁定，机器不代判' },
     'duplicated': { kind: 'adjust-input', why: '这一回合已经走过（同签名重放）：换一次新的滑动/输入才是新回合，不是原地重放' },
+    // ── v2.523.0（V27 收口）：现场复算发现**四条拒收码没有任何档**（tools/reject-recovery.js
+    //   的 --json 输出：problems 里这四条既不进 RULES 也不进 OVERRIDES ⇒ explain() 只能答 unknown，
+    //   面板会给玩家一个空动作）。分词表收不住它们，故逐条显式登记：
+    'cross-venue': { kind: 'adjust-input', why: '两端不在同一个会场（local-grid 拒绝跨会场算距离）：把目标换到同会场再提交，不是重试' },
+    'cross-zone': { kind: 'adjust-input', why: '两端不在同一个区（跨区不许直算）：把目标换到同区再提交，不是重试' },
+    'zone-unsolved': { kind: 'request-setup', why: '方位还没解出来（要先 getZone / preheat）：先把定位补上再算距离' },
+    'unserializable': { kind: 'manual-review', why: '存档里有值无法序列化（函数/循环引用/非有限数等）：要人看一眼是哪个写入方塞进去的，机器判不出该改哪一处' },
   };
   /** 词法碎片（**不是码**）：`reason: 'store-' + String(err)` 这类拼接写法，
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
@@ -340,6 +347,11 @@
    *  两种合法登记：给一个档（`kind`），或明说它不在这份契约里（`out:true` + why）。
    *  **未登记的判不出面码一律算缺口**（边界 ③）。 */
   const NEUTRAL_REVIEW = {
+    // v2.523.0（V27 收口）：与上方 NEUTRAL_FACE 同批补的两条，都走 out:true ——
+    //   它们是**决策/治理理由**（注入记账说「这条已落地」；宿主没有 console 时说「归档口不可用」），
+    //   不是玩家做错了什么；硬塞进六档任何一档都会教玩家去修没坏的东西。
+    'landed': { out: true, why: '注入预算账里的「已落地」标记（hits 里的决策理由，不是一次调用失败）—— 不在这份恢复契约里' },
+    'no-console': { out: true, why: '宿主没有可用的 console（启动归档口因此关掉）—— 环境缺件，不是某次操作被拒' },
     // ── v2.275.0（D 类第 11 组）：save-health 的两条「上游读数面缺席」。
     //   为什么给档而不是 out:true —— 「模块没装上」是**可以动手补的**（装回来 / 查装载），
     //   与「这条码本来就不是被拒」不同，故走 request-setup 而不折进 out-of-contract。
@@ -1025,6 +1037,21 @@
     //     · duplicated → adjust-input（duplicate 分词）
     'bad-sample', 'claim-rejected', 'duplicated', 'fetch-failed', 'missing-channel',
     'missing-model', 'model-drift', 'no-cache', 'not-pinned', 'unknown-round',
+    // ── v2.523.0（V27 收口）：本快照一次性补 31 条「现场有、快照没有」的拒收码。
+    //   两类来源，都是同一件病的复发（只加码不跟快照）：
+    //     ① 15 条本批新增（V27 的 OPV27-3/5/6/7/8/9 六项与五台新模块）：
+    //        bad-items / empty-query / landed / no-audit / no-boot / no-console / no-phrase /
+    //        no-reader / no-source / no-such-group / not-loaded / over-quota / read-threw /
+    //        too-few-samples / unserializable。
+    //     ② 16 条空间/拓扑批的欠账（local-grid / spatial-bridge / topology 一带）：
+    //        activeScenes-full / cross-venue / cross-zone / local-grid-absent / missing-endpoint /
+    //        missing-venue / missing-zone / nodes-full / portals-full / relate-absent / store-threw /
+    //        topology-absent / unknown-spot / unknown-venue / unknown-zone / zone-unsolved。
+    //   判据口径没动：这 31 条由 `node tools/reject-recovery.js` 的现场复算逐条点名，
+    //   本条只把它们写进快照；其中 4 条分词表收不住（cross-venue / cross-zone /
+    //   zone-unsolved / unserializable）已在 OVERRIDES 里逐条登记档位，其余由规则表收住。
+    //   纪律：以后**加码的同批**就要改这里，否则 B3/B4/C4 会照旧红（本仓已栽过五次）。
+    'activeScenes-full', 'bad-items', 'cross-venue', 'cross-zone', 'empty-query', 'local-grid-absent', 'missing-endpoint', 'missing-venue', 'missing-zone', 'no-audit', 'no-boot', 'no-phrase', 'no-reader', 'no-source', 'no-such-group', 'nodes-full', 'not-loaded', 'over-quota', 'portals-full', 'read-threw', 'relate-absent', 'store-threw', 'too-few-samples', 'topology-absent', 'unknown-spot', 'unknown-venue', 'unknown-zone', 'unserializable', 'zone-unsolved',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1085,6 +1112,10 @@
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
+    // v2.523.0（V27 收口）：两条现场落在判不出面的新码 —— 它们所在的对象**不带 ok**
+    //   （`hits.push({outcome:'kept', reason:'landed'})` / boot-report 的归档口在没有 console 时
+    //   返回 `{reason:'no-console'}`），故既不是拒收也不是成功。按现场归属收在这里，不按名字猜。
+    'landed', 'no-console',
     'bridge-threw', 'budget', 'climate-throw', 'commitment', 'commitment-fulfilled',
     'condition-unmet', 'corrupt-overflow', 'crisis', 'diag-idle', 'distorted', 'duty-off',
     'empty-string', 'faithful', 'fidelity-off', 'folded_too_small', 'high-vigilance',

@@ -17,7 +17,13 @@ var pass = 0, fail = 0;
 function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log("FAIL: " + name); } }
 ok("A1: 13 exports", /WA\.aftermath\s*=\s*\{[\s\S]*getSettings[\s\S]*setSettings[\s\S]*register[\s\S]*repair[\s\S]*inspect[\s\S]*active[\s\S]*pending[\s\S]*view[\s\S]*cancel[\s\S]*buildBlock[\s\S]*diagnose[\s\S]*stat[\s\S]*reset[\s\S]*\}/.test(SRC));
 ok("A2: EXPORT_COUNT = 13", /EXPORT_COUNT = 13/.test(SRC));
-ok("A3: DEF.enabled=false", /enabled:\s*false/.test(SRC));
+// v2.523.0 收口：原文断言「DEF 里是 enabled:false」。v2.412.0 全仓改全开策略后
+//   aftermath 的 DEF 已翻成 true（engines/aftermath.js 边界 1 的头注也同步改写成
+//   「出厂态随全开策略；显式关后写口一律 disabled」）。A3 的**实质**是
+//   「出厂开关必须是源码里明写的字面量，不许靠 undefined 隐式默认」——判据照此收紧，
+//   而「关着就不动世界」这条实质边界由 s3-u4-v2197 的 A0a2 逐字钉住。
+const DEF_LIT = /var DEF = \{ enabled:\s*(true|false)/.exec(SRC);
+ok("A3: DEF 里出厂开关是明写的字面量（实 " + (DEF_LIT ? DEF_LIT[1] : "未读到") + "）", !!DEF_LIT);
 ok("A4: self-check", /aftermath: export count mismatch/.test(SRC));
 ok("A5: inject SOURCES", INJ.indexOf("'aftermath'") >= 0);
 ok("A6: inject __REG.def", INJ.indexOf("aftermath: true") >= 0);

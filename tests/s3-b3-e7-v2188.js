@@ -2,7 +2,7 @@
 // WorldAxis tests/s3-b3-e7-v2188.js (v2.188.0) — E7 玩家自定义规则包与白名单自动化模板专锁（四段齐备）
 //
 // 本锁钉的是**否定式核心**（每条都是「不许把两种不同的处境写成同一个形状」）：
-//   ① **默认关**：`enabled:false` 时 save / apply / drop / importPack / exportPack / template.set /
+//   ① **开关纪律**：`enabled:false` 时 save / apply / drop / importPack / exportPack / template.set /
 //      template.run **全部**拒收 `disabled` —— 不是「静默成功」；
 //   ② **模板不得绕过各模块的拒收与容量规则**：模板动作只调**既有公开读口**，写口的拒收
 //      **原样带回**（不回滚、不吞掉、不折成「成功但没生效」）；预算跑满即停并如实报
@@ -173,8 +173,10 @@ function runA(a) {
   });
   // v2.203.0（Y8）：DEF 多了 `note` / `history` 两栏（回滚栈 + 沿革）——
   //   锚点同步，仍逐字钉住原来那七项声明。
-  a(/const DEF = \{ enabled: false, packs: \[\], active: '', maxPacks: 24, maxKeys: 40, seq: 0,\s*\n\s*note: '', history: \[\] \};/.test(src),
-    'e7/A4: 默认关 + 包清单/活跃包/两项容量/序号声明逐字在位');
+  // v2.523.0 收口：v2.412.0 的**全开策略**把每个带 enabled 的引擎出厂设为开（rulePack 也在其中）。
+  //   这条判据的**意图**没变 —— 钉住 DEF 的七项声明逐字在位；变的只是出厂值，故跟到 true。
+  a(/const DEF = \{ enabled: true, packs: \[\], active: '', maxPacks: 24, maxKeys: 40, seq: 0,\s*\n\s*note: '', history: \[\] \};/.test(src),
+    'e7/A4: 出厂开（v2.412.0 全开策略）+ 包清单/活跃包/两项容量/序号声明逐字在位');
   a(/bounds: \{ maxPacks: \[1, 64\], maxKeys: \[4, 96\] \}/.test(src), 'e7/A5: 两项容量区间声明逐字在位');
   a(/LS_KEY = 'worldaxis_rule_pack_settings_v1'/.test(src), 'e7/A6: 设置键是单一真源');
   a(/module: 'rulePack'/.test(src), 'e7/A7: 设置登记 module 为 rulePack');
@@ -334,7 +336,11 @@ function runB(a) {
   a(!!H.rulePack && typeof H.rulePack === 'object', 'e7/B1: 模块装载');
   a(KEYS.every(function (k) { return typeof H.rulePack[k] === 'function' || k === 'template'; }),
     'e7/B2: 全部导出可调用（template 是组）');
-  a(H.rulePack.getSettings().enabled === false, 'e7/B3: 默认关（enabled:false）');
+  // v2.523.0 收口：全开策略下 rulePack 出厂是开，故「出厂关」这个前提已不成立。
+  //   本节要验的是**关着时**七个写口逐个拒收，故在这里显式关一次（判据不动，只补前提）。
+  a(H.rulePack.getSettings().enabled === true, 'e7/B3: 出厂开（v2.412.0 全开策略）');
+  H.rulePack.setSettings({ enabled: false });
+  a(H.rulePack.getSettings().enabled === false, 'e7/B3b: 可关闭，且关后读回 false');
   ['save', 'apply', 'drop', 'exportPack'].forEach(function (k) {
     a(H.rulePack[k]('x').reason === 'disabled', 'e7/B4: 关闭时 ' + k + ' 拒收 disabled');
   });
@@ -583,20 +589,20 @@ function runC(a) {
     'e7/C9b: 赋值判据本身两向自证（真赋值判真、比较式判假 —— 本锁第一版正是在这里误红九条）');
   a(src.indexOf('removeItem(') < 0 && src.indexOf('localStorage.setItem') < 0,
     'e7/C10: 不直调删除/写盘口（唯一写路径是 saveSettings → settingsBus）');
-  a(/const DEF = \{[\s\S]{0,120}enabled: false/.test(src), 'e7/C11: DEF 的第一项就是 enabled:false（默认关写在最显眼处）');
+  a(/const DEF = \{[\s\S]{0,120}enabled: true/.test(src), 'e7/C11: DEF 的第一项就是 enabled（出厂开写在最显眼处，全开策略 v2.412.0）');
 }
 
 // ── N 段：真源码破坏 + 两向自证 ─────────────────────────────────────────
 function runN(a) {
   const SRC = srcOf();
   const CASES = [
-    { n: 1, why: 'N1: 默认关被翻成开 ⇒ 「我没开它」与「它一直在写」两件事合一',
-      from: "  const DEF = { enabled: false, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,",
-      to: "  const DEF = { enabled: true, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,",
+    { n: 1, why: 'N1: 出厂开被翻成关 ⇒ 「它一直在写」与「我没开它」两件事合一（全开策略下翻哪个方向都算改事实）',
+      from: "  const DEF = { enabled: true, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,",
+      to: "  const DEF = { enabled: false, packs: [], active: '', maxPacks: 24, maxKeys: 40, seq: 0,",
       // 判据取的是**入参那份源码**建的宿主（不是模块顶层的原版常量）——
       //   否则破坏副本永远进不来，这一条会退化成「对原文件断言」。
       probe: function (__src) { const WA = hostWith(__src, ENGINES); return WA.rulePack.getSettings().enabled; },
-      want: false },
+      want: true },
     { n: 2, why: 'N2: 关闭时让写口「静默成功」⇒ 关着它也在写（就是这么来的）',
       from: "    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }\n    const n = nameOf(name);\n    if (!n) { fault('missing-name'); return { ok: false, reason: 'missing-name' }; }\n    const snap = surface(cfg.maxKeys);",
       to: "    const n = nameOf(name);\n    if (!n) { fault('missing-name'); return { ok: false, reason: 'missing-name' }; }\n    const snap = surface(cfg.maxKeys);",

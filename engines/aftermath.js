@@ -14,7 +14,8 @@
  *   · active()/pending()/view()/buildBlock()/diagnose()/stat()/reset()
  *
  * ── 边界（全是否定式）────────────────────────────────────────
- *   1 默认关（enabled:false）。
+ *   1 出厂态随全仓全开策略（v2.412.0 起 DEF.enabled = true）——边界 1 的**实质**是
+ *     「不开口就不动世界」：显式关后本模块所有写口一律 reason:'disabled'，不静默放行。
  *   2 一段痕迹文字不自动解释成资源惩罚——必须 register 登记效果才生效。
  *   3 衰减不自动证明修好——sediment 衰减只影响感知面，效果是否生效由本模块判定。
  *   4 同一事件效果只生效一次——register 用 eventId 去重。

@@ -26,6 +26,8 @@
  *   ① 11 条每台有且只有一个裁决；
  *   ② drive 类必须在 roundDrivers.DRIVERS 里，且零参调通；
  *   ③ dead 类必须在 dead-export-ledger 的 dead/uiDead 里有对应 src 条目（不得新造）。
+ *   v2.523.0 归口：21 条老引擎的推进口在覆盖率锁 C2 上被判「真零调用且未裁决」，
+ *   本表逐台裁决（2 drive / 19 entry）——判据与四类语义均未改，只是把当时漏登的补齐。
  */
 (function () {
   'use strict';
@@ -66,7 +68,61 @@
     { api: 'cyberUI.progress', cls: 'ui', driver: null,
       reason: '进度条 HTML 生成器：属于 UI 组件工具箱，由页面渲染时调用，不是引擎推进' },
     { api: 'choiceBoard.refresh', cls: 'ui', driver: null,
-      reason: '选项板重绘口：由页面在字体/布局变化后调用，不是引擎推进，故不进轮次' }
+      reason: '选项板重绘口：由页面在字体/布局变化后调用，不是引擎推进，故不进轮次' },
+    // ── v2.523.0 归口：V11 覆盖率锁（tests/v11-push-api-coverage.js）的 C2 在收口轮次里
+    //    复算出 21 条「真零调用且未裁决」——全是 v2.55～v2.517 之间落地的老引擎推进口，
+    //    当时只做了「存在 + 自调」，没人接进任何调用面。逐台核过证据后按同一把尺子归口：
+    //      ① cls='drive' 只给「零参调用不抛、且不改存档」的两台（longline.sweep /
+    //         ecoAudit.sweep，实测 mutated=false）；
+    //      ② 其余 19 台一律 'entry'：其中 world.tick / life.tick / opportunity.sweep /
+    //         diplomacy.expire 零参虽不抛但**会写存档**（实测 mutated=true），按 A4「drive
+    //         必须零参不改存档」不许进轮次；另外十几台的入参本身就是业务对象
+    //         （人 / 项目 / 委托 / 组织 / 实验规格），轮次造不出来。
+    //    为什么不硬接进 roundDrivers：那会把「世界怎么变」改成每轮自动发生，
+    //    属剧情语义决策，不是归口轮次该顺手做的事。本批只把「零调用」这件事**显式化**，
+    //    与 dead-export-ledger 的 self-only 归因不同源、也不互相顶替。
+    { api: 'longline.sweep', cls: 'drive', driver: { method: 'sweep' },
+      reason: '长线伏笔逾期扫描：零参安全且不写存档（实测 mutated=false），只读到期表' },
+    { api: 'ecoAudit.sweep', cls: 'drive', driver: { method: 'sweep' },
+      reason: '世界生态自洽审计：零参只读扫描，不写存档（实测 mutated=false），适合每轮跑' },
+    { api: 'world.tick', cls: 'entry', driver: null,
+      reason: '世界织体推进零参即可调但会写存档（实测 mutated=true），故需剧情事件提供推进时机，轮次不自作主张' },
+    { api: 'life.tick', cls: 'entry', driver: null,
+      reason: '人物生活推进零参即可调但会写存档（实测 mutated=true），日程事实需由剧情事件提供' },
+    { api: 'opportunity.sweep', cls: 'entry', driver: null,
+      reason: '机会形成扫描零参可调但会写存档（实测 mutated=true），机会何时成熟需由剧情节奏提供' },
+    { api: 'diplomacy.expire', cls: 'entry', driver: null,
+      reason: '外交到期清理零参可调但会写存档（实测 mutated=true），到期判定需与推演主路径同拍' },
+    { api: 'parallelWorld.advance', cls: 'entry', driver: null,
+      reason: '平行世界推进是异步口（返回 Promise），同步轮次循环无法消费其结果，需外部驱动' },
+    { api: 'worldLab.advance', cls: 'entry', driver: null,
+      reason: '隔离世界实验推进：零参会自造一次实验轮次（实测产出 adv_* 记录），故需调用方给出实验规格' },
+    { api: 'training.progress', cls: 'entry', driver: null,
+      reason: '训练进度需具体人物入参（progress(who)），由训练事件提供，轮次造不出人' },
+    { api: 'survey.advance', cls: 'entry', driver: null,
+      reason: '探索推进需侦察目标与选项（advance(opts)），未开侦察时直接拒（scout-closed）' },
+    { api: 'oracle.advance', cls: 'entry', driver: null,
+      reason: '占卜推进需已登记的占卜计划（零参调用直接抛 plan 未定义），由剧情事件铺好再推' },
+    { api: 'collab.settle', cls: 'entry', driver: null,
+      reason: '协作结算需任务编号（settle(taskId0,opts)），零参拒 bad-task，任务只能由协作面产生' },
+    { api: 'mend.step', cls: 'entry', driver: null,
+      reason: '关系修复推进需人物、事项与类型（step(person,id,kind,opts)），零参拒 bad-kind' },
+    { api: 'economy.tick', cls: 'entry', driver: null,
+      reason: '经济推进需时间戳与选项（tick(stamp,opts)），零参拒 missing-stamp，时间由时钟统一给' },
+    { api: 'inst.settle', cls: 'entry', driver: null,
+      reason: '组织制度结算需组织与分支编号（settle(orgId,brId,opts)），零参拒 missing-evidence' },
+    { api: 'lifeline.advance', cls: 'entry', driver: null,
+      reason: '生理照护推进需人物/病情/疗程四参（advance(person,condition,course,opts)），零参拒 missing-fields' },
+    { api: 'commission.advance', cls: 'entry', driver: null,
+      reason: '多阶段委托推进需委托编号与回执（advance(id,receiptId)），零参拒 not-found' },
+    { api: 'commission.settle', cls: 'entry', driver: null,
+      reason: '委托结算需委托编号（settle(id)），交付核验必须由委托面按号触发，零参拒 not-found' },
+    { api: 'operations.settle', cls: 'entry', driver: null,
+      reason: '组织项目运营结算需项目编号（settle(projId,opts)），零参拒 not-found' },
+    { api: 'campaign.advance', cls: 'entry', driver: null,
+      reason: '战役推进需在场场景（零参拒 no-scene），场景由剧情层开启后才轮得到推进' },
+    { api: 'modelCatalog.refresh', cls: 'entry', driver: null,
+      reason: '模型清单刷新是异步网络口（refresh(spec) 返回 Promise），由设置面按需拉取，不进轮次' }
   ];
 
   const CLS = ['drive', 'entry', 'ui', 'dead'];

@@ -12,7 +12,7 @@ function clockMapping(W){W.store.transact(d=>{d.currents=['起线','延展','成
  const view=W.undercurrentCalendar.build({horizonDays:7,maxItems:15}),expected=[7,4,2,1,0];
  return ['起线','延展','成形','收束','淡出'].every((k,i)=>{const r=view.items.find(x=>x.title===k);return r&&r.etaDays===expected[i]&&r.windowText===W.undercurrentCalendar.STAGE_WINDOWS[k].windowText;});}
 try{
- const W=load();seed(W);a(W.storylineAdvance.tick().reason==='disabled','default off');
+ const W=load();seed(W);W.storylineAdvance.setSettings({enabled:false});a(W.storylineAdvance.tick().reason==='disabled','off ⇒ tick refuses (边界：关着就不推进)');
  W.storylineAdvance.setSettings({enabled:true,turnsPerStage:1});
  a(W.backstage.setCurrentAdvance('public',true).ok,'explicit enroll public');a(W.backstage.setCurrentAdvance('hidden',true).ok,'explicit enroll hidden');
  a(!W.backstage.setCurrentAdvance('legacy',true).ok,'no guessing legacy stages');

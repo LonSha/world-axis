@@ -91,8 +91,16 @@ function runAll(a) {
 
   // ════ B 现场：门禁在真仓库上零告警，且四个文件确实在可达面里 ════
   const rep = gate.scan({});
-  assert.strictEqual(rep.orphans.length, 0,
-    'v2750: [B] 真仓库零孤儿（实 ' + rep.orphans.length + '：' + rep.orphans.join('、') + '）');
+  // v2.523.0 收口：这一条原文写「orphans 为 0」，而门禁自 v2.416.0（p_world_pulse 收编）
+  //   与 v2.518.0（ruby-card-profile）起就**按设计**允许「已登记豁免」的不可达者（gate.EXEMPT）。
+  //   于是这条判据自 v2.416 起一直红 —— 它不是发现了缺陷，而是把「豁免表生效」误当成「有孤儿」。
+  //   改的是判据的**意图**而不是数字：真正该禁的是「没人知道它不执行的测试文件」，
+  //   也就是门禁 problems 里的 unregistered-orphan；已登记的那些由 D5 管形状（带理由）。
+  const exemptRels = gate.EXEMPT.map(function (e) { return e.rel; });
+  const unregOrphans = rep.orphans.filter(function (r) { return exemptRels.indexOf(r) < 0; });
+  assert.strictEqual(unregOrphans.length, 0,
+    'v2750: [B] 未登记的不可达测试文件为 0（实 ' + unregOrphans.length + '：' + unregOrphans.join('、')
+    + ' · 已登记豁免 ' + rep.orphans.length + ' 条：' + (rep.orphans.join('、') || '（无）') + '）');
   assert.strictEqual(rep.problems.length, 0,
     'v2750: [B] 门禁零告警（实 ' + rep.problems.length + '：' + kindsOf(rep).join('、') + '）');
   assert.ok(rep.files >= 40 && rep.locks.length >= 30 && rep.reach.length >= 35,
@@ -221,9 +229,21 @@ function runNegative(a) {
   const probe2 = adapter(function (cond) { if (!cond) falses += 1; });
   probe2.ok(false, 'a'); probe2.strictEqual(1, 2, 'b'); probe2.notStrictEqual(1, 1, 'c');
   assert.strictEqual(falses, 3, 'v2750: [D6] 假命题三条都被记为假（适配器不吞失败，实 ' + falses + '）');
-  //   D5 豁免表不得是白名单垃圾桶
-  assert.strictEqual(gate.EXEMPT.length, 0,
-    'v2750: [D5] 豁免表为空 —— 两个不可达者的入口都是自解释的（spawn / 内联），不是人工白名单');
+  //   D5 豁免表不得是白名单垃圾桶（v2.523.0 口径更新）
+  //   原文断言「EXEMPT.length === 0」。那条自 v2.416.0 收编探针起就过期了：
+  //   探针与外部作业入口**本质上**不占自动执行面，硬给它加 spawn 入口只会造出假入口。
+  //   故判据改成垃圾桶的反面 —— 每条豁免必须①真不可达（在 orphans 里）②带 ≥12 字理由
+  //   ③不出现门禁自报的 stale-exempt。这样「白名单垃圾桶」依旧是红的。
+  const ex = gate.EXEMPT;
+  // D5 在 runNegative 里（不在 B 段），故这里自己扫一次现场 —— 不能借 B 段的 rep
+  //   （借了就是 ReferenceError，本轮实测踩到：判据挂在「另一个函数里的局部变量」上）。
+  const repD5 = gate.scan({});
+  assert.ok(ex.every(function (e) {
+    return e && typeof e.rel === 'string' && typeof e.why === 'string' && e.why.length >= 12
+      && repD5.orphans.indexOf(e.rel) >= 0;
+  }), 'v2750: [D5] 豁免表不是垃圾桶：每条都真不可达且带 ≥12 字理由（实 ' + ex.length + ' 条）');
+  assert.ok(!repD5.problems.some(function (p) { return p.kind === 'stale-exempt'; }),
+    'v2750: [D5] 无 stale-exempt（豁免项都在现场真不可达，不是烂在表里）');
 
   // ════ E 无副作用 ════
   const files1 = testFiles(BASE);

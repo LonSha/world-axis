@@ -149,23 +149,37 @@ function probePanelView(WA, dom) {
   const tabOf = function (p) { return panel.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === p; })[0]; };
   tabOf('overview').click();
   const bodyOf = function () { return panel.querySelector('.wa-body'); };
-  // 数的是**子节点数**（真树），不是 innerHTML.length —— 后者在 mini-DOM 下是解析前的
-  //   字符串缓存，摘除节点不改它（实测 9739→9739 的假红）。子节点数才是 DOM 层摘除的判据。
-  const lenOf = function () { const b = bodyOf(); return b ? b.childNodes.length : -1; };
+  // 数的是**子树节点数**（真树），不是 innerHTML.length —— 后者在 mini-DOM 下是解析前的
+  //   字符串缓存，摘除节点不改它（实测 9739→9739 的假红）。节点数才是 DOM 层摘除的判据。
+  // v2.523.0 收口（本轮修红）：**原来数的是 body 的「直接子节点数」，那个口径已经过期**。
+  //   现场（单跑就红）：`实 1→0→1 子节点 2→2`。1→0→1 已说明 omni 块确实离树，可 body 的
+  //   第一层没少 —— 因为 v2.401.0 起 overview 页把旧读数整体收进了
+  //   `<details id="wa-legacy-readings">`（玩家模式），omni 块从「body 的第一层」下沉到了
+  //   「body → details → 里层」。于是「摘掉一个块」不再改变第一层的计数，判据恒假。
+  //   判据意图不变（玩家视角下内容真变少，而不是标记被换掉）；量具跟着结构走：
+  //   数**整棵子树**的节点数（与标记无关、与嵌套深度无关），第一层计数一并报出来。
+  const descCount = function (n) {
+    const kids = (n && n.childNodes) || [];
+    let c = 0;
+    for (let i = 0; i < kids.length; i++) c += 1 + descCount(kids[i]);
+    return c;
+  };
+  const lenOf = function () { const b = bodyOf(); return b ? descCount(b) : -1; };
+  const topOf = function () { const b = bodyOf(); return b ? b.childNodes.length : -1; };
   const before = bodyOf().querySelectorAll('[data-omniscient]').length;
-  const beforeLen = lenOf();
+  const beforeLen = lenOf(), beforeTop = topOf();
   sel.value = 'player';
   if (typeof sel.onchange === 'function') sel.onchange({ target: sel });
   const after = bodyOf().querySelectorAll('[data-omniscient]').length;
   // 长度是**独立于标记**的判据：标记自身被摘掉时节点数恒 0，只有「body 有没有变短」
   //   才分得清「过滤生效」与「本来就没标记」（前者 N1 实测踩到的假红）。
-  const afterLen = lenOf();
+  const afterLen = lenOf(), afterTop = topOf();
   const outTxt = (panel.querySelector('#wa-view-out') || {}).textContent || '';
   sel.value = 'omniscient';
   if (typeof sel.onchange === 'function') sel.onchange({ target: sel });
   const restored = bodyOf().querySelectorAll('[data-omniscient]').length;
   return { before: before, after: after, restored: restored, outTxt: outTxt,
-    beforeLen: beforeLen, afterLen: afterLen };
+    beforeLen: beforeLen, afterLen: afterLen, beforeTop: beforeTop, afterTop: afterTop };
 }
 
 // ══════════════ X1 探针 ══════════════
@@ -304,7 +318,8 @@ function judge(a) {
   const pv = probePanelView(WA, envP.dom);
   a(pv.before >= 1 && pv.after === 0 && pv.restored >= 1 && pv.afterLen < pv.beforeLen,
     'v2149: [P3-6] 面板真执行：玩家视角下 overview 的 omniscient 块离树且 body 变短、切回后在场（实 '
-      + pv.before + '→' + pv.after + '→' + pv.restored + ' 子节点 ' + pv.beforeLen + '→' + pv.afterLen + '）');
+      + pv.before + '→' + pv.after + '→' + pv.restored + ' 子树节点 ' + pv.beforeLen + '→' + pv.afterLen
+      + ' / 第一层 ' + pv.beforeTop + '→' + pv.afterTop + '）');
   a(String(pv.outTxt).length > 0,
     'v2149: [P3-6b] 选择器给出回执（不是静默切换；实「' + String(pv.outTxt).slice(0, 40) + '」）');
 

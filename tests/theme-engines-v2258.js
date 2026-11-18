@@ -156,7 +156,10 @@ function runA(a) {
 //   V7 的 intentBoard / worldAutobiography 等出厂即开）。
 //   本文件此前写死 7（v2.257.0 的读数），在 V7 交付后既没跟上、也没人发现 ——
 //   正是本仓点过名的「陈旧常量：写死一种形态 = 给其它形态发通行证」。
-// v2.412.0 全开策略跟位：出厂 203 引擎全开，有注入面且真在跑的读数实测 116
+// v2.412.0 全开策略跟位：出厂 203 引擎全开，有注入面且真在跑的读数实测 117
+// v2.523.0 收口（本轮修红）：116 → 117，与 `tests/capability-tier-v2257.js` 的 MECH=117 同一真源
+//   （同一个读数面：带开关 + 有注入面的机制数）。本批没有新增有注入面的引擎（探针 NEW_MECH=0），
+//   涨的是 v2.518 之后累积的存量差 —— 旧常量一直是「上一版实测值」，没人跟着重算。
 // （旧读数 10 是「默认关」时代的残账；本常量必须跟现场实测走，不许写死旧形态）
 // helper: turn OFF every tier-theme engine (rebuilds the pre-all-on factory scene)
 function turnOffTierEngines(WA) {
@@ -166,7 +169,7 @@ function turnOffTierEngines(WA) {
   }); });
 }
 
-const FACTORY_RUNNING = 116;
+const FACTORY_RUNNING = 117;
 function runB(a) {
   const env = fresh();
   const WA = env.WA;

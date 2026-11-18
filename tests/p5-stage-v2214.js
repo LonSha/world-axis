@@ -93,6 +93,17 @@ function probeStage(env) {
     return origAppend.call(body, c);
   };
   h.tabOf('world').click();
+  // v2.523.0 收口（本轮修红）：**spy 的取证窗口当初被写成了「到本节结束」**。
+  //   现场：P4 报 `append 61 / 泄漏 1`，而泄漏项是 `#wa-legacy-readings` 那个 details。
+  //   追下去不是渲染漏过滤，而是**后面的探针故意让内容进 DOM**：P6 的判据原文就是
+  //   「全知 + 过滤异常 ⇒ 内容照常进 DOM」（fail-tight 只收紧玩家视角），P7 还会再切两次页。
+  //   于是 P4 的计数器把 P6 那一次**正当放行**也数成了泄漏 —— 判据的意图（玩家视角切页的迁移
+  //   必须零 omni）没错，错的是取证窗口：它的名字、理由、断言文字都只覆盖「切页那一刻」。
+  //   修法：切完页当场回收 spy、当场冻结读数。**判据逐字不变**（appends > 0 && leaked === 0），
+  //   只是不再把后续探针的正当行为算进它头上；同时也不再把一个被替换过的 appendChild 留在树上
+  //   给本节后面的探针用（取证不得改变被取证对象 —— 与本节 keepView/restoreView 同规）。
+  const p4Appends = appends, p4Leaked = leaked;
+  body.appendChild = origAppend;
   // P5 fail-tight：玩家 + applyView 抛错 → 纯警示 + 零控件
   const origApply = h.WA.perspective.applyView;
   h.WA.perspective.applyView = function () { throw new Error('q5-probe-boom'); };
@@ -119,7 +130,7 @@ function probeStage(env) {
   const wgEl = h.panel.querySelector('#wa-wg-out');
   const wgFilled = wgRan && !!wgEl && wgEl.textContent.trim().length > 0;
   const wgNoOmni = wgEl ? h.omniIn(wgEl) === 0 : false;
-  return { omniKept: omniKept, omniGone: omniGone, serNoMarker: serNoMarker, leaked: leaked, appends: appends,
+  return { omniKept: omniKept, omniGone: omniGone, serNoMarker: serNoMarker, leaked: p4Leaked, appends: p4Appends,
     ftWarn: ftWarn, ftCtrls: ftCtrls, omniLooseCtrls: omniLooseCtrls,
     hsFilled: hsFilled, hsNoOmni: hsNoOmni, wgFilled: wgFilled, wgNoOmni: wgNoOmni };
 }

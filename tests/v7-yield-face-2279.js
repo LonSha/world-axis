@@ -76,8 +76,26 @@ function yieldOf(r) {
   return g.length === 1 ? g[0] : null;
 }
 function yieldedKeys(W) {
-  return W.healthPreflight.yieldAttrib({ limit: 200 }).rows
-    .filter(function (r) { return r.state === 'yield'; }).map(function (r) { return r.key; });
+  // v2.523.0 收口（本轮修红）：**不能拿 yieldAttrib().rows 当「全部有产出的引擎」**。
+  //   现场：B5 报 `实 4`（关掉「全部」之后仍有 4 台在产出），B6/B6b/B7/B7b/N1b 跟着一起红。
+  //   追下去不是引擎关不掉，而是**这份名单当初就缺了口**：产品的
+  //   `healthPreflight.yieldAttrib({limit})` 把 limit 夹在 100 条（`Math.min(100, …)`），
+  //   返回体的 `rows` 是 `rows.slice(0, limit)` —— 而本仓带产出面的机制已经超过 100 台
+  //   （v2.412.0 全开策略 + 本批 9 台 EXV27 引擎）。于是「关掉全部有产出的引擎」实际只关了
+  //   前 100 台，剩下几台从未被关过 —— 判据问的是「全关」，量具却只能点到 100 台。
+  //   故这里改按**产品自己的口径**枚举全集：`capabilityTier.shapeOf(k).hasBuild` 决定
+  //   「什么算带产出面的机制」（与 yieldAttrib 同一个判据面），`buildBlock()` 非空决定
+  //   「此刻有没有产出」（与 yieldAttrib 的 state=yield 同一个证据）。判据文字与阈值一字未改。
+  const out = [];
+  Object.keys(W).forEach(function (k) {
+    let sh = null;
+    try { sh = W.capabilityTier.shapeOf(k); } catch (e) { sh = null; }
+    if (!sh || !sh.hasBuild) return;
+    let len = 0;
+    try { len = String(W[k].buildBlock() || '').length; } catch (e) { len = 0; }
+    if (len > 0) out.push(k);
+  });
+  return out;
 }
 
 // ═══ A 结构 ═══════════════════════════════════════════════════════════
@@ -116,7 +134,11 @@ function runB() {
   keys.forEach(function (k) { try { W2[k].setSettings({ enabled: false }); } catch (e) {} });
   const r2 = W2.healthPreflight.threeGates({ sample: 3 });
   const g2 = yieldOf(r2);
-  eq(g2.nums.yield, 0, 'B5 关掉全部有产出的引擎后 yield=0');
+  // v2.523.0 收口：**失败必须点名是哪几台**。原来只写「实得 4」，读者无法知道是哪四台；
+  //   本项一次实测就红了 6 条（B5/B6/B6b/B7/B7b/N1b 全挂在同一个数字上），故把当日仍在产出
+  //   的引擎名一并报出（读数取自同一条 yieldAttrib，不另造真源）。
+  const stillYield = yieldedKeys(W2);
+  eq(g2.nums.yield, 0, 'B5 关掉全部有产出的引擎后 yield=0（实 ' + g2.nums.yield + '：' + stillYield.join(',') + '）');
   eq(g2.state, 'blocked', 'B6 一台不出 ⇒ blocked');
   assert(String(g2.why).indexOf('世界没有运转') >= 0, 'B6b why 说「世界没有运转」');
   eq(g2.fix, null, 'B6c 不给假按钮');

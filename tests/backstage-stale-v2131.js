@@ -56,8 +56,16 @@ function runA(a) {
   a(seg.indexOf('clampBackstageResult') < 0 || seg.indexOf('return { ok: false, stale: true') < seg.indexOf('clampBackstageResult'),
     'v2131/A: 早退发生在**截断之前**（拒收的结果不该先经过任何加工）');
   // 开关关闭时的行为必须与本版之前逐字一致：`begin` 未开票 ⇒ 不校验
-  a(/sgTicket\s*=\s*\(WA\.staleGuard/.test(s) && /&& sgTicket\)/.test(s),
+  //   v2.523.0 收口：原判据用 `/sgTicket\s*=\s*\(WA\.staleGuard/` 认形状，而本版修掉了
+  //   一处真病 —— `begin` 返回的是**信封** `{ok,ticket,snapshot}`，原代码把整个信封当票号
+  //   交给 `verdict`（非字符串 ⇒ missing-key ⇒ 每次结算都被自己丢弃）。修完形状变成
+  //   `sgBegin = …begin(…)` + `sgTicket = envelope.ticket`，正则自然不再命中。
+  //   判据的**意思**没变（仍是「未开票 ⇒ 校验面整段跳过」），故改为认新形状，并补一条
+  //   「票号必须取自信封」的正向判据 —— 那正是这次修掉的真病，不许再退化。
+  a(/sgBegin\s*=\s*\(WA\.staleGuard/.test(s) && /&& sgTicket\)/.test(s),
     'v2131/A: 关（默认）时 `begin` 不开票 ⇒ 校验面**整段跳过**（不因「没开开关」误丢结果）');
+  a(/typeof sgBegin\.ticket === 'string'/.test(s) && /sgBegin\.ticket\s*:\s*null/.test(s),
+    'v2131/A: 票号取自 begin 返回的**信封字段**（信封当票号 ⇒ verdict 判 missing-key ⇒ 结算静默全废）');
 }
 
 // ── B 面：运行时两向 ───────────────────────────────────────────────

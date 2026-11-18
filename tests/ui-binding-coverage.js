@@ -16,6 +16,16 @@ const {uiFiles,auditWire}=require('./ui-wire-audit');
 //      H2 侧早就有 EXEMPT_H 豁免它们，本侧没有 ⇒ 同样是一件语义两个答案。
 //      豁免表**只收骨架**，且必须与 tests/run.js 的 EXEMPT_H 逐字同集（下条断言钉住）。
 const SKELETON_IDS = ['wa-panel', 'wa-orb', 'wa-search-bar', 'wa-overview-absent', 'wa-tools-absent'];
+// v2.523.0 收口：**宿主元素**白名单（与 SKELETON_IDS 同规格：列名字、不列豁免条件）。
+//   治的病：本工具把「ui/*.js 里出现的每个字面量 #id」都当成「我们的控件必须登记」，
+//   而 `#send_textarea` 是 **SillyTavern 宿主的消息输入框**：ui/panel.js 在「回到对话」
+//   里只 `focus()` 它 —— 我们既不渲染它、也不拥有它，永远不会在 UI_BINDINGS 里登记。
+//   把它硬塞进任何一层都会说假话（ids=我们静态渲染 / dynamic=我们异步渲染 /
+//   player=玩家分支渲染），而「往表里塞一条读不出来的登记」正是本仓点名的
+//   「让判据闭嘴」。故开一张显式白名单：宿主元素**单独计数**（hostRefs），
+//   不进 registered、也不进 covered —— 覆盖率分母同步扣掉它们，
+//   于是 100% 的含义仍然是「我们自己的引用全部登记」，没有被宿主元素冲淡。
+const HOST_IDS = ['send_textarea'];
 //   v2.410.0 收口：与 tests/run.js 的 EXEMPT_H（v2.380.0 起 wa-search-bar、
 //   v2.401.0 OPV23 起 wa-overview-absent / wa-tools-absent，共五员）逐字同批——
 //   此前 H2 侧两次扩员本侧都没跟，被 v8-desk-ui-2294 的 H2/coverage 同集判据当场抓出。
@@ -31,7 +41,10 @@ function audit(options){
   src.split('\n').forEach((line,i)=>{if(/^\s*(\/\/|\*|\/\*)/.test(line))return;
    if(/querySelector(?:All)?\([^)]*\[data-/.test(line))selectors.push({file:f.rel,line:i+1,text:line.trim()});});
  }
- const missing=references.filter(x=>!registered.has(x.id));
- return {version:'2.294.0',ok:missing.length===0,references:references.length,registered:registered.size,covered:references.length-missing.length,percent:references.length?100*(references.length-missing.length)/references.length:0,missing,dynamicSelectors:selectors};
+ // v2.523.0：宿主元素单列 —— 它们不参与「我们漏登记」的判定，也不进覆盖率分母。
+ const hostRefs=references.filter(x=>HOST_IDS.indexOf(x.id)>=0);
+ const ours=references.filter(x=>HOST_IDS.indexOf(x.id)<0);
+ const missing=ours.filter(x=>!registered.has(x.id));
+ return {version:'2.523.0',ok:missing.length===0,references:references.length,hostRefs:hostRefs.length,registered:registered.size,covered:ours.length-missing.length,percent:ours.length?100*(ours.length-missing.length)/ours.length:0,missing,hostList:hostRefs,dynamicSelectors:selectors};
 }
-module.exports={audit,SKELETON_IDS};if(require.main===module){const r=audit();console.log(JSON.stringify(r,null,2));process.exit(r.ok?0:1);}
+module.exports={audit,SKELETON_IDS,HOST_IDS};if(require.main===module){const r=audit();console.log(JSON.stringify(r,null,2));process.exit(r.ok?0:1);}

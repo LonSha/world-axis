@@ -145,8 +145,13 @@ function runAll(A) {
     A(!!F && typeof F.run === 'function', 'B1 门面在场且 run 可调');
     A(F.OPS.length === 9 && F.ENGINES.length === 4 && F.BLOCK_ENGINES.length === 2,
       'B2 导出面读数（op 9 / 家族 4 / 产块 2）');
-    // 门面默认关（承「新能力默认关」）
-    A(F.getSettings().enabled === false, 'B3 门面默认关闭（关着时四引擎现状一字不变）');
+    // v2.523.0 收口：v2.412.0 的**全开策略**把所有带 enabled 的引擎出厂设为开，beatFacade 与
+    //   它家族的四个引擎都在其中。本节要验的是「门面**关着**时的行为」，故显式关一次 ——
+    //   原文把「出厂关」当成前提，那个前提自 v2.412.0 起就不成立，B3/B4/B9/N1b 因此一直红。
+    //   改的是前提（显式关门），不是判据：关掉之后下面每条仍然在真关着的状态下判。
+    F.setSettings({ enabled: false });
+    F.ENGINES.forEach(function (k) { if (WA[k] && typeof WA[k].setSettings === 'function') WA[k].setSettings({ enabled: false }); });
+    A(F.getSettings().enabled === false, 'B3 门面可关闭且关着（关着时四引擎现状一字不变）');
     const off = F.run('report', { rec: {} });
     A(off.ok === false && off.fault === 'facade-off' && off.reason === undefined,
       'B4 未开门时 fault=facade-off 且**无 reason**（不代引擎拒收 —— 边界 ①）');
@@ -219,7 +224,9 @@ function runAll(A) {
     const b1 = hit(src, ANCHORS.aAllOff.txt, 'allOff: true || readable.length === ENGINES.length');
     const WA = hostWith({ facadeSrc: b1, withFamily: false });
     A(WA.beatFacade.status().allOff === true, 'N1 把 allOff 放宽 ⇒ 家族全缺席仍报全关（破坏可观测）');
-    A(hostWith({}).beatFacade.status().allOff === true,
+    const hb = hostWith({});
+    hb.beatFacade.ENGINES.forEach(function (k) { if (hb[k] && typeof hb[k].setSettings === 'function') hb[k].setSettings({ enabled: false }); });
+    A(hb.beatFacade.status().allOff === true,
       'N1b 原版上同款判据有别（四引擎在场且全关 ⇒ 真）—— 两向成立');
     // N2 fault 改写成 reason 形态 ⇒ A3 判据必须现形
     //   ⚠ 替换串**不得原样复制锚点串** —— 否则本锁里该锚点出现 2 次，A12（判据不携带副本）

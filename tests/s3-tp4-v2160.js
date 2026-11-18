@@ -113,6 +113,17 @@ function boot(srcOv, chatId) {
     c.chat = [{ is_user: true, mes: 'TP4 专锁锚点楼层：韩烈与沈青在北境城对饮。', swipe_id: 0 }];
   } catch (e) {}
   WA.store.init();
+  // v2.523.0 收口（本轮修红）：**本锁不测「迟到结果拦截」，把那一层显式关掉**。
+  //   现场（全量顺序里 B8a/B10a 报 `实 stale`）：`engines/stale-guard.js` 的出厂值是
+  //   `enabled:true`（v2.412.0 全开策略），于是 `_start` 取票、await 一次微任务、落地前
+  //   再判场景。本锁的 `_runInference` 是自己覆写的同步 resolve，中间**理论上什么都不该变**；
+  //   但全量顺序里上游节会留下未回收的异步尾巴（单跑 98/0、全量里必红 —— 正是这个形态），
+  //   那条尾巴在这次 await 里把聊天现场换了，于是 stale-guard 正确拒收，而 B8a 读到的
+  //   `ok:false` 是**另一层的正确行为**，不是 TP4 链的病。
+  //   TP4 的判据是「结算要走 commit、要出回执、幂等不重做、降级可见」——这四条与 stale-guard
+  //   无关，判据逐字未改，改的是前提：本夹具显式声明「这一层关着」，把测到的现象收回到
+  //   本锁的判据面上（同批先例：beat-facade / o1-host-matrix / e7 / n10 的「先关再验」）。
+  try { if (WA.staleGuard && typeof WA.staleGuard.setSettings === 'function') WA.staleGuard.setSettings({ enabled: false }); } catch (e) {}
   return WA;
 }
 function switchChat(WA, chatId) {
@@ -132,6 +143,18 @@ function worldSnap(WA) {
 function receiptsOf(WA) {
   const s = WA.store.get();
   return ((s.commit && s.commit.receipts) || []).slice();
+}
+// v2.523.0 收口（本轮修红）：B8/B10 失败时**必须说得出现场**。
+//   现场：这两条在本节里报红，而那两条断言的名字一个字符也没告诉你「为什么 ok 不是 true」
+//   —— 而 `_start` 的 `ok:false` 有四种形态（staleGuard 作废 / 事务被拒 / 事务抛错 / 通道无结果），
+//   四种的处置完全不同。故把返回体里能读到的归因搬进断言文字（读不到再退回 JSON 原件）。
+function whyOf(r) {
+  if (r === undefined || r === null) return String(r);
+  if (r.error) return 'error:' + String((r.error && r.error.message) || r.error);
+  if (r.reason) return String(r.reason);
+  if (r.aborted) return 'aborted' + (r.stale ? '(stale)' : '');
+  if (r.stale) return 'stale';
+  try { return JSON.stringify(r); } catch (e) { return String(r); }
 }
 
 // ── A 段：结构面 ────────────────────────────────────────────────
@@ -380,7 +403,7 @@ async function runAsync(a) {
     };
     const st0 = W.commit.stat();
     return Promise.resolve(W.backstage._start({ idx: 0, swipe: 0, hash: 'h' }, 'tp4')).then(function (r) {
-      a(r && r.ok === true, 'v2160-tp4 B8a 推演结算完成');
+      a(r && r.ok === true, 'v2160-tp4 B8a 推演结算完成（实 ' + whyOf(r) + '）');
       const st1 = W.commit.stat();
       a(st1.begun === st0.begun + 1 && st1.committed === st0.committed + 1,
         'v2160-tp4 B8b 结算真走了 commit（begun/committed 各 +1）');
@@ -400,7 +423,7 @@ async function runAsync(a) {
       const st2 = W.store.txStat ? W.store.txStat() : null;
       return W.backstage._start({ idx: 0, swipe: 0, hash: 'h' }, 'tp4-3').then(function (r3) {
         W.commit = keep;
-        a(r3 && r3.ok === true, 'v2160-tp4 B10a WA.commit 缺席时推演照常完成（降级可见）');
+        a(r3 && r3.ok === true, 'v2160-tp4 B10a WA.commit 缺席时推演照常完成（降级可见，实 ' + whyOf(r3) + '）');
         a(receiptsOf(W).length === 2, 'v2160-tp4 B10b 降级路径不写回执（与 v2.159.0 逐字一致）');
         a(!!W.store.get().people['p_探针甲'], 'v2160-tp4 B10c 降级路径世界照常写入');
       });

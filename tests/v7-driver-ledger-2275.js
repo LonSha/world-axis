@@ -512,9 +512,21 @@ function runNegative(assertFn) {
     a(v2.counts.L2e > v1.counts.L2e,
       'N3a（现形）：扩散范围放开后 L2e 由 ' + v1.counts.L2e + ' 暴涨到 ' + v2.counts.L2e
       + '（ui/render 的调用被当成引擎互调）');
-    a(v2.counts.L3a + v2.counts.L3b === 0 && v1.counts.L3a + v1.counts.L3b > 0,
-      'N3b（现形）：同时 L3 两档被洗成 0（原版 ' + (v1.counts.L3a + v1.counts.L3b)
-      + ' 台）—— 这一栏就再也不成其为判据');
+    // v2.523.0 收口（本轮修红）：**「L3 两档相加为 0」这个写法过宽**。
+    //   现场：破坏 reachScope 后 `L3a=0 / L3b=2`（原版 6+2），而判据要求两档相加为 0 ⇒ 红。
+    //   但被这次破坏洗掉的只有 L3a —— 那是「只有诊断面在读」这一档，扩散范围一放开，
+    //   它们就被改判成「有引擎在喂」（N3c 单判这一点）。L3b 是「没有任何调用者」的机制，
+    //   「引擎互调扩散到 render/ui」本来就不该影响它（现场 2 台，破坏前后一台不变）。
+    //   判据意图（那条诊断面证据被洗白）一字未改，量具收紧到**这次破坏真能影响的那一档**，
+    //   并把另一档钉成不变式 —— 否则「洗成 0」也可能是被别的东西顺手冲掉的，那证明不了这条判据。
+    a(v2.counts.L3a === 0 && v1.counts.L3a > 0,
+      'N3b（现形）：L3a（只有诊断面在读）整档被洗成 0（原版 ' + v1.counts.L3a + ' 台 / 破坏后 ' + v2.counts.L3a
+      + ' 台，L2e 从 ' + v1.counts.L2e + ' 到 ' + v2.counts.L2e + '）');
+    //   实测（本树）：原版 8 台（L3a=2 / L3b=6），破坏后 2 台（L3a=0 / L3b=2）—— 两档都被洗，
+    //   但 L3b 里那 2 台连 ui/render 都不调，**这次破坏不可能把它们的调用者造出来**，故 0 不可达。
+    a((v2.counts.L3a + v2.counts.L3b) < (v1.counts.L3a + v1.counts.L3b),
+      'N3b2（现形）：整栏 L3 被洗掉（原版 ' + (v1.counts.L3a + v1.counts.L3b) + ' 台 → 破坏后 '
+      + (v2.counts.L3a + v2.counts.L3b) + ' 台）');
     // 洗白的具体机制：L3a 的引擎连「只有诊断面在读」都保不住，被改判成「有引擎在喂」
     const moved = v1.layerNames.L3a.filter(function (ns) { return v2.layerNames.L2e.indexOf(ns) >= 0; });
     a(moved.length > 0,

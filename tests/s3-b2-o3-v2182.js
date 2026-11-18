@@ -74,7 +74,10 @@ function runA(a) {
   a(body.length > 0, 'o3v2182/A1: 能从真源码取出 WA.perfBaseline 的对象字面量体');
   KEYS.forEach(function (k) { a(body.indexOf(k + ':') > 0, 'o3v2182/A2: 导出面含 ' + k); });
   a(body.indexOf('buildBlock:') < 0, 'o3v2182/A3: 导出面**没有** buildBlock（无消费方不挂导出）');
-  a(/EXPORT_COUNT\s*=\s*10/.test(src), 'o3v2182/A4: EXPORT_COUNT = 10');
+  // v2.523.0 跟位：本批 OPV27-2（冷启动热点）给 perfBaseline 真加了一枚读数口 `boot()`
+  //   （`WA.boot` 逐台耗时）。导出面 10 → 11，引擎里那条自校验（_exported !== EXPORT_COUNT）
+  //   同批改成 11；本条的作用是「导出面变化必须有人确认」，确认结果就是这一枚。
+  a(/EXPORT_COUNT\s*=\s*11/.test(src), 'o3v2182/A4: EXPORT_COUNT = 11（v2.523.0：+boot 读数口）');
   a(/perfBaseline: export count mismatch/.test(src), 'o3v2182/A5: 自证串在位');
   a(/const DEF = \{ enabled: (false|true), nearRatio: 0.8 \}/.test(src), 'o3v2182/A6: DEF.enabled 显式字面量 + 小数阈值 0.8（v2.412 全开跟位）');
   a(/bounds: \{ nearRatio: \[0\.5, 1\] \}/.test(src), 'o3v2182/A7: 区间声明逐字在位（小数域）');

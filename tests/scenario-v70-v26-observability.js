@@ -335,6 +335,11 @@ WA.modelPin.reset();
 WA.degradeAudit.reset();
 WA.callTimeline.reset();
 global.fetch = async function () {
+  // v2.523.0 收口：桩 fetch 原来**同步即返**，于是 api-router 量到的耗时 ms=0，
+  //   model-receipt 按边界「ms<=0 ⇒ tps=null（不产出除零伪读数）」如实给 null，
+  //   而本节的判据是「TPS 由真 usage 与真耗时算出（> 0）」——判据没错，是现场没有耗时。
+  //   故让桩真的花 2ms（不是伪造 tps，是把「一次真网络往返有耗时」这个前提补上）。
+  await new Promise(function (r) { setTimeout(r, 2); });
   return { ok: true, status: 200, json: async function () {
     return { model: 'gpt-4o-mini', usage: { prompt_tokens: 120, completion_tokens: 300 },
       choices: [{ message: { content: '答复正文' }, finish_reason: 'stop' }] };

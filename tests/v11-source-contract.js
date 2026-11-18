@@ -126,7 +126,14 @@ const NON_SOURCE_BUILDBLOCK = {
   summarizerAdapter: { verify: 'reasoning', reason: '摘要适配层（三缝②）：engines/backstage.js WA.summarizerAdapter.buildBlock 真调用，块进推演上下文，只输出带来源的摘要，非死面' },
   director: { verify: 'reasoning', reason: '导演排期（三缝③）：engines/backstage.js WA.director.buildBlock 真调用，块进推演上下文，只给确定性排序建议，非死面' },
   branchContinuity: { verify: 'reasoning', reason: '分支连续性（主线A/B）：engines/backstage.js WA.branchContinuity.buildBlock 真调用，块进推演上下文，只读判据引擎的纪律注入，非死面' },
-  factContinuity: { verify: 'reasoning', reason: '事实连续性（主线C/E/F）：engines/backstage.js WA.factContinuity.buildBlock 真调用，块进推演上下文，只读判据引擎的纪律注入，非死面' }
+  factContinuity: { verify: 'reasoning', reason: '事实连续性（主线C/E/F）：engines/backstage.js WA.factContinuity.buildBlock 真调用，块进推演上下文，只读判据引擎的纪律注入，非死面' },
+  // v2.523.0 补登记：v2.517 之后新增的两台空间面引擎。逐台核过证据，不是「塞白名单遮羞」：
+  //   两台在 tests/dead-export-ledger.json 里已归因 self-only（refs 0 / tref 0），且产品侧
+  //   （engines/ core/ ui/ render/）搜不到任何 WA.<ns>.buildBlock( 调用点 ⇒ verify 只能是 dead。
+  //   注意 localGrid 的块确实在 /overview 页有读数，但那是 UI 侧直读 WA.localGrid.stats/root，
+  //   与 buildBlock 无关（ui/pages/overview-blocks.js 头注已写明「不调 buildBlock」）。
+  localGrid: { verify: 'dead', reason: '局部格网：buildBlock 产品侧零调用点（死面账本归因 self-only）；/overview 页的格网读数走 WA.localGrid.stats/root，不经本块' },
+  spatialBridge: { verify: 'dead', reason: '空间桥：buildBlock 产品侧零调用点（死面账本归因 self-only）；同平面方位由 localGrid 与 nearby() 直供，本块无消费者' }
 };
 // ─────────────────────────────────────────────────────────────────────────────
 // 白名单 B：SOURCES 源、但该命名空间上**没有** buildBlock。V11 立项实测 9 项，两种产出方式。
@@ -411,11 +418,17 @@ function runAll(a) {
   // v2.382.0（幽灵引用治理批次⑦）：立项基线 115 / 114 被 v2.360.0 之后新增的注入源与
   //   buildBlock 顶过期；现场复算 SOURCES 144、runtimeKeys 144。与 checked 187→185、
   //   cap-tier 70→74 同属「表跟位」，改前改后均以本脚本 N0~N6 双向自证验收。
-  a(j.sources.length === 149, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.517.0 现场基线 149；v2.382.0 曾 144，V26 批新增认知面四源+1）');
+  //   v2.523.0 跟位：SOURCES 现场复算 151（基线 149）。与 runtimeKeys 155 并排读：多出的
+  //   四台里两台进了源表（带 def/VIS_NAMES/vis.X 契约），两台（localGrid / spatialBridge）
+  //   走白名单 A 的 dead 档 —— 判据（长度相等）未动。
+  a(j.sources.length === 151, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.523.0 现场基线 151；v2.517.0 为 149）');
   //   v2.407.0 跟位：runtimeKeys 144 → 150（memoryRelay/stageSession 为 v2.402.0 V10 新增，
   //   summarizerAdapter/director/branchContinuity/factContinuity 为 v2.407.0 三缝新增）；
   //   SOURCES 仍 144 —— 六台都没有 def/VIS_NAMES/vis.X 注入契约，走白名单 A 归属。
-  a(j.runtimeKeys.length === 151, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.517.0 现场基线 151；v2.407.0 为 150，V26 批新增 healthPreflight）');
+  //   v2.523.0 跟位：runtimeKeys 现场复算 155（基线 151）。涨出来的命名空间里，未进源表的
+  //   localGrid / spatialBridge 两台已在白名单 A 按 dead 逐台裁决（证据见下方补登记）；
+  //   其余进的是 SOURCES 或已在册项 —— 表跟位，判据（长度相等）未动。
+  a(j.runtimeKeys.length === 155, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.523.0 现场基线 155；v2.517.0 为 151）');
   a(j.missingDef.length === 0, 'v11src: [T2] 源表每项在 def 有默认值（缺: ' + (j.missingDef.join(',') || '无') + '）');
   a(j.missingName.length === 0, 'v11src: [T3] 源表每项有面板显示名（缺: ' + (j.missingName.join(',') || '无') + '）');
   a(j.missingVis.length === 0, 'v11src: [T4] 源表每项有 vis 读取点（缺: ' + (j.missingVis.join(',') || '无') + '）');
