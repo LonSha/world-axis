@@ -9330,6 +9330,54 @@
       "tref": 0,
       "own": 2
     },
+    "outcomeDice.bandOf": {
+      "reason": "self-only",
+      "detail": "engines/outcome-dice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/outcome-dice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "outcomeDice.buildBlock": {
+      "reason": "self-only",
+      "detail": "engines/outcome-dice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/outcome-dice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "outcomeDice.needOf": {
+      "reason": "self-only",
+      "detail": "engines/outcome-dice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/outcome-dice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "outcomeDice.saveSettings": {
+      "reason": "self-only",
+      "detail": "engines/outcome-dice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/outcome-dice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "outcomeDice.settings": {
+      "reason": "self-only",
+      "detail": "engines/outcome-dice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/outcome-dice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "outcomeDice.stat": {
+      "reason": "self-only",
+      "detail": "engines/outcome-dice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/outcome-dice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
     "outputGuard.check": {
       "reason": "self-only",
       "detail": "engines/output-guard.js 内部自用、外部零引用（过度导出）",
@@ -15902,6 +15950,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 697
+    "dataOnly": 702
   }
 }

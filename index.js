@@ -611,6 +611,7 @@
     // v2.251.0（拓展 SG-1）：判定成功等级五档（cf. coc-kp-host success_level）。
     //   须早于 engines/fate.js：fate.check 在返回值里追加 grade（只追加，不改 pass/crit/fumble）。
     'engines/success-grade.js',
+    'engines/outcome-dice.js',
     // v2.302.0 (V13 Batch A): 剧情变奏骰与空间具身声学
     'engines/narrative-dice.js',
     'engines/spatial-acoustics.js',

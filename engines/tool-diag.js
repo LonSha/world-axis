@@ -4021,6 +4021,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/capability-tier.js': 'capabilityTier',
     'engines/capability-audit.js': 'capabilityAudit',
     'engines/success-grade.js': 'successGrade',
+    'engines/outcome-dice.js': 'outcomeDice',
     'engines/weighted-draw.js': 'weightedDraw',
     'engines/narrative-dice.js': 'narrativeDice',
     'engines/spatial-acoustics.js': 'spatialAcoustics',

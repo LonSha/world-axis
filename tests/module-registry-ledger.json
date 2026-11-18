@@ -1,9 +1,9 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 541,
- "loadedCount": 520,
+ "loadOrderCount": 542,
+ "loadedCount": 521,
  "uiCount": 21,
- "nsCount": 531,
+ "nsCount": 532,
  "totals": {
   "loadEdges": 424,
   "hardEdges": 0,
@@ -3458,6 +3458,20 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_successgrade_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/outcome-dice.js": {
+   "ns": [
+    "outcomeDice"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_outcomedice_settings_v1"
    ],
    "consumedBy": []
   },

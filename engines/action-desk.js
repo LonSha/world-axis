@@ -646,6 +646,12 @@
     'narrativePreset.apply': function (o) { return WA.narrativePreset.apply(o); },
     'narrativePreset.restore': function () { return WA.narrativePreset.restore(); },
     'narrativePreset.overview': function () { return WA.narrativePreset.overview(); },
+    // v2.524.0 S1（单列可开关项）：说了不一定成 —— d20 五档检定，默认关
+    'outcomeDice.resolve': function (o) { return WA.outcomeDice.resolve(o); },
+    'outcomeDice.toggle': function (o) { return WA.outcomeDice.toggle(o && o.on); },
+    'outcomeDice.ladder': function (o) { return WA.outcomeDice.ladder(o && o.target); },
+    'outcomeDice.view': function () { return WA.outcomeDice.view(); },
+    'outcomeDice.reset': function () { return WA.outcomeDice.reset(); },
     'worldLoopLog.logRound': function (o) { return WA.worldLoopLog.logRound(o); },
     'worldLoopLog.absence': function (o) { return WA.worldLoopLog.absence(o); },
     'costGuard.warn': function (o) { return WA.costGuard.warn(o); },

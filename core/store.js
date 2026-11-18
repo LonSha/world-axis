@@ -60,6 +60,7 @@
       inputDebounce: null,                  // {floorId, at} —— 同楼层不重复结算
       costChoice: null,                     // {option, at} —— 超预算三选项的选定
       toneTrail: [],                        // 近几轮的走向读数（语气突变判据）
+      diceLog: [],                          // S1 判定票（同一票只掷一次；最近 32 票）
       // 世界钟
       clock: { iso: '', label: '', dayIndex: 0, source: 'unset' }, // source: unset|user|text|engine
       // 世界背景（用户设定或世界书注入的自由文本，纯框架不预设内容）
@@ -1770,6 +1771,8 @@
     ticketRing: { cap: 64, kind: 'array', site: 'world-loop-log.js ticket()（ticketKeep 上界 64）' },
     switchAudit: { cap: 128, kind: 'array', site: 'controllability.js switchNote()（auditKeep 上界 128）' },
     toneTrail: { cap: 10, kind: 'array', site: 'story-rhythm.js tone()（recentRounds 上界 10）' },
+    // v2.524.0（S1 单列可开关项）：判定票环，与 outcome-dice.js 内 CAP 对齐。
+    diceLog: { cap: 32, kind: 'array', site: 'outcome-dice.js resolve()（CAP 上界 32）' },
     'commodityCirculation.stockpiles': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
     'commodityCirculation.debts': { cap: 50, kind: 'object', site: 'store.withOwnerState write capacity' },
     'commodityCirculation.blacklists': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
