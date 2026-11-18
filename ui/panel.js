@@ -200,7 +200,17 @@
         // v2.524.0（OPV27-5）：窄消费引擎的「在用机制」行。与 render/inject.js 的
         //   SOURCES / SRC_NAME 逐字同批登记 —— 只加源表不加显示名 ⇒ 注入页裸露英文键
         //   `narrowConsumers`，而那是玩家唯一能开关它的地方。
-        narrowConsumers: '在用机制' };
+        narrowConsumers: '在用机制',
+    // v2.529.0（收口 v2560/【D】的 14 条缺口）：V28 新增的 14 个注入源**只进了源表、
+    //   没进显示名表** ⇒ 注入页/导演页把这些开关渲染成裸英文键名，而那是用户唯一能
+    //   开关它们的地方（同 v2.56.0 / v2.96.0 / v2.117.0 的理由）。名字取自
+    //   plans/V28_MASTER_PLAN.md 对应条目的中文命题，不另起一套叫法。
+    offstageQueue: '场外轮转', actStep: '判定步', tracePost: '痕迹投递',
+    misbelief: '误信认知', threadSprout: '支线萌芽', dormantLadder: '暗线阶梯',
+    consequenceSchedule: '后果排期', appointment: '承诺债', timeLedger: '三层时间对账',
+    hearsayLedger: '传闻账', farAccount: '异地同时', interlude: '视角插曲',
+    letterPost: '信件与口信', worldBrief: '世界近况'
+  };
 
   // v0.6 新增组件样式注入
   (function injectStyles() {
