@@ -25,7 +25,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const STORE_KEY = 'habitTells';
   const CAP = 48;
-  const MOODS = ['calm', 'tense', 'angry'];
+  const BODY_MOODS = ['calm', 'tense', 'angry'];
   const CN = { calm: '平静', tense: '紧张', angry: '发怒' };
   const stat = { registered: 0, rolled: 0, shown: 0, hidden: 0, identified: 0, badInput: 0 };
   let shadow = null;
@@ -84,8 +84,8 @@
     const raw = (src.rates && typeof src.rates === 'object') ? src.rates : {};
     const rates = {};
     const lack = [];
-    for (let i = 0; i < MOODS.length; i++) {
-      const k = MOODS[i];
+    for (let i = 0; i < BODY_MOODS.length; i++) {
+      const k = BODY_MOODS[i];
       const v = Number(raw[k]);
       if (!isFinite(v)) { lack.push(k); continue; }
       if (v < 0 || v > 1) return refuse('bad-target', { field: k, got: raw[k], why: '频率须 0..1' });
@@ -113,7 +113,7 @@
     const who = clean(src.who, 32);
     const mood = clean(src.mood, 16) || 'calm';
     if (!who) return refuse('missing-fields', { missing: ['who'] });
-    if (MOODS.indexOf(mood) < 0) return { ok: false, reason: 'unknown-kind', field: 'mood', got: mood, allowed: MOODS.slice() };
+    if (BODY_MOODS.indexOf(mood) < 0) return { ok: false, reason: 'unknown-kind', field: 'mood', got: mood, allowed: BODY_MOODS.slice() };
     const m = readAll();
     const p = m[who];
     if (!p) return { ok: false, reason: 'not-happened', who: who, note: '没登记过这个小动作：不猜' };
@@ -145,7 +145,7 @@
     const m = readAll();
     const p = m[who];
     if (!p) return { ok: false, reason: 'not-happened', who: who };
-    if (MOODS.indexOf(mood) < 0) return { ok: false, reason: 'unknown-kind', field: 'mood', got: mood, allowed: MOODS.slice() };
+    if (BODY_MOODS.indexOf(mood) < 0) return { ok: false, reason: 'unknown-kind', field: 'mood', got: mood, allowed: BODY_MOODS.slice() };
     const rate = p.rates[mood];
     const n = Math.floor(sightings);
     const chance = n <= 0 ? 0 : Math.round((1 - Math.pow(1 - rate, n)) * 1000) / 1000;
@@ -192,7 +192,7 @@
   }
 
   WA.habitTell = {
-    MOODS: MOODS.slice(), CN: Object.assign({}, CN), CAP: CAP,
+    BODY_MOODS: BODY_MOODS.slice(), CN: Object.assign({}, CN), CAP: CAP,
     register: register, shouldShow: shouldShow, identify: identify, read: read, report: report,
     buildBlock: buildBlock, stat: statOf
   };

@@ -37,7 +37,7 @@
     advance_thread: '推线', resolve_thread: '结线', abandon_thread: '弃线', upsert_deviation: '登记偏离' };
   const THREAD_STATES = ['open', 'advanced', 'resolved', 'abandoned'];
   const THREAD_STATE_LABEL = { open: '已开', advanced: '推进中', resolved: '已结', abandoned: '已弃' };
-  const MOODS = ['平静', '缠结', '惊惶', '温存', '荒谬'];
+  const DREAM_MOODS = ['平静', '缠结', '惊惶', '温存', '荒谬'];
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
     return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
@@ -104,7 +104,7 @@
         const st = clean(p.state, 200);
         if (!st) { out = { ok: false, reason: 'empty-state' }; return false; }
         b.state = st;
-        if (p.mood != null) b.mood = MOODS.indexOf(clean(p.mood, 10)) >= 0 ? clean(p.mood, 10) : b.mood;
+        if (p.mood != null) b.mood = DREAM_MOODS.indexOf(clean(p.mood, 10)) >= 0 ? clean(p.mood, 10) : b.mood;
         out = { ok: true, reason: 'ok', op: o, label: OP_LABEL[o], state: st, mood: b.mood };
         return true;
       }
@@ -286,7 +286,7 @@
     archive: archive, volumeList: volumeList, volumeGet: volumeGet, deviationList: deviationList,
     buildBlock: buildBlock, stat: function () { return JSON.parse(JSON.stringify(stat)); }, reset: reset,
     OPS: OPS, OP_LABEL: OP_LABEL, THREAD_STATES: THREAD_STATES, THREAD_STATE_LABEL: THREAD_STATE_LABEL,
-    MOODS: MOODS, MAX_VOLUME_KB: DEF.maxVolumeKB, MAX_VOLUMES: DEF.maxVolumes,
+    DREAM_MOODS: DREAM_MOODS, MAX_VOLUME_KB: DEF.maxVolumeKB, MAX_VOLUMES: DEF.maxVolumes,
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/dream.js', { kind: 'engine', ver: '2.230.0' });
   if (WA.log) WA.log('info', 'dream 已加载（2.230.0）');

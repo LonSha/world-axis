@@ -29,7 +29,7 @@
   const __REG = { key: LS_KEY, def: DEF, module: 'worldLoopLog',
     bounds: { maxRows: [4, 64], maxMoves: [2, 24], ticketKeep: [8, 64] } };
   const stat = { rounds: 0, absences: 0, whys: 0, traces: 0, tickets: 0, refused: 0, lastReason: '' };
-  const CAUSES = ['budget', 'offstage', 'no-goal', 'quiet'];
+  const STOP_CAUSES = ['budget', 'offstage', 'no-goal', 'quiet'];
   function settings() {
     if (!WA.settingsBus) return Object.assign({}, DEF);
     return WA.settingsBus.normalize(__REG, Object.assign({}, DEF, WA.settingsBus.read(__REG) || {}));
@@ -57,7 +57,7 @@
     }
     const hist = { budget: 0, offstage: 0, 'no-goal': 0, quiet: 0 };
     const out = moves.map(function (m) {
-      const whyNot = m.visible === false ? (CAUSES.indexOf(m.whyNot) >= 0 ? m.whyNot : 'quiet') : '';
+      const whyNot = m.visible === false ? (STOP_CAUSES.indexOf(m.whyNot) >= 0 ? m.whyNot : 'quiet') : '';
       if (whyNot) hist[whyNot]++;
       return { who: clean(m.who, 40), basis: clean(m.basis, 120), visible: m.visible !== false, whyNot: whyNot };
     });
@@ -107,7 +107,7 @@
       else ev = '他自己这轮没动（静默，也是一个合法结果）';
     }
     stat.absences++;
-    return { ok: true, reason: 'ok', who: who, cause: cause, evidence: ev, causes: CAUSES.slice() };
+    return { ok: true, reason: 'ok', who: who, cause: cause, evidence: ev, causes: STOP_CAUSES.slice() };
   }
 
   /** OPV28-09：结算依据一句话（与账本一致，不许套话）。 */
@@ -195,7 +195,7 @@
     setSettings: function (p) { return WA.settingsBus ? WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, settings(), p || {}))) : { ok: false, reason: 'no-settings-bus' }; },
     logRound: logRound, absence: absence, why: why, provenance: provenance,
     ticket: ticket, tickets: tickets, degrade: degrade, view: view,
-    CAUSES: CAUSES.slice(),
+    STOP_CAUSES: STOP_CAUSES.slice(),
     stat: function () { return Object.assign({}, stat); }
   };
   if (WA.registerModule) WA.registerModule('engines/world-loop-log.js', { kind: 'engine', ver: VERSION });

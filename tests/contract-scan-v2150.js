@@ -138,6 +138,16 @@ function runB(a) {
     'shift-conflict', 'crew-full', 'no-road',
     'activity-closed', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
     'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day', 'bad-sign', 'no-such-listing', 'not-there', 'offline', 'self-buy', 'too-far', 'unknown-buyer', 'unknown-owner',
+    // v2.524.0（V29 全量尾部实红）：13 条**动态裁决值**落面外 —— 快照落后于 tests/reject-lock-v2780.js。
+    //   后者的清单早已登记这 13 条（v2.529.0），本处没跟上，于是两份「必须逐字同集」的冻结
+    //   清单分叉：B7b 报「实 42 vs 登记 29」。补的是本处，不是去动那边。
+    //   它们的形态是「reason 不是内联字面量」（`reason: broken ? 'chain-broken' : 'traced'`、
+    //   `reason: v`），门禁 CODE_RE 故意不认间接写法。**如实说：这 13 条目前唯一的咬住者
+    //   是 reject-v2780.js 的「见证零缺失」（missing=0 = 每条都真从产品 API 跑出来了），
+    //   letter-post / hearsay-ledger 尚无独立专锁 —— 这是欠账，不是已还账。**
+    'arrived', 'opened', 'sent', 'lost', 'intercepted',
+    'versioned', 'versioned-no-store', 'chain-broken', 'traced',
+    'sharded', 'sharded-no-store', 'ticked', 'ticked-no-store',
     '__exp7-absent-check', '__exp7-rain-check', '__exp7-settle-check'].sort();
   const stripC = function (s) { return require('./test-surface-gate.js').stripComments(s); };
   const faceText = TOOL.productFiles(BASE).map(function (rel) {

@@ -27,7 +27,7 @@
   const STORE_KEY = 'exitRites';
   const CAP = 24;
   // 四档离场理由：只钉这四种，别的写不进来（写不进来就不会被瞎编）
-  const CAUSES = ['death', 'departure', 'exile', 'retire'];
+  const EXIT_CAUSES = ['death', 'departure', 'exile', 'retire'];
   const CN = { death: '亡故', departure: '离去', exile: '逐出', retire: '退隐' };
   const stat = { rites: 0, refused: 0, badInput: 0, handoffs: 0 };
   let shadow = null;
@@ -82,7 +82,7 @@
     if (!cause) missing.push('cause');
     if (!where) missing.push('where');
     if (missing.length) return refuse('missing-fields', { missing: missing, why: '退场要有场面：人/身份/理由/地点四样缺一不可' });
-    if (CAUSES.indexOf(cause) < 0) return refuse('unknown-kind', { field: 'cause', got: cause, allowed: CAUSES.slice() });
+    if (EXIT_CAUSES.indexOf(cause) < 0) return refuse('unknown-kind', { field: 'cause', got: cause, allowed: EXIT_CAUSES.slice() });
     const raw = Array.isArray(src.witnesses) ? src.witnesses : [];
     const witnesses = raw.map(function (w) { return clean(w, 32); }).filter(function (w) { return !!w; });
     if (!witnesses.length) return refuse('missing-fields', { missing: ['witnesses'], why: '没人看着的离场不算场面' });
@@ -153,7 +153,7 @@
   }
 
   WA.exitRite = {
-    CAUSES: CAUSES.slice(), CN: Object.assign({}, CN), CAP: CAP,
+    EXIT_CAUSES: EXIT_CAUSES.slice(), CN: Object.assign({}, CN), CAP: CAP,
     add: add, gone: gone, list: list, buildBlock: buildBlock, stat: statOf
   };
 })();
