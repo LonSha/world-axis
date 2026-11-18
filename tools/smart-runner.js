@@ -363,7 +363,11 @@ function main() {
       rows.push({ rel: rel, rc: o.plan ? null : r.status, ms: ms });
       lines.push('  ' + (o.plan ? '·' : (r.status === 0 ? '✓' : '✗')) + ' ' + rel + (o.plan ? '（计划：将执行）' : '  rc=' + r.status + ' · ' + (ms / 1000).toFixed(2) + 's'));
       if (!o.plan && r.status !== 0) return finish({ tier: o.tier, exit: 1, verdict: 'failed', what: TIERS[o.tier].what, budgetMs: budgetMs, rows: rows },
-        lines.concat('[SmartRunner] ✗ ' + rel + ' 非零退出 —— 本层结论为「不通过」'));
+        // v2.524.0（OPV29-16）：红行后面直接钉一条**最小复现**命令。
+        //   治的是「红一次 → 重跑整层(~90s) → 再红」这个默认动作：读红的人应当立刻能单跑那一道。
+        //   提示文本由 `tools/gate-hint.js` 生成（只生成文本、不执行），故这里零副作用。
+        lines.concat('[SmartRunner] ✗ ' + rel + ' 非零退出 —— 本层结论为「不通过」',
+          require(path.join(ROOT, 'tools/gate-hint.js')).text(rel)));
     }
     return finish({ tier: o.tier, exit: 0, verdict: o.plan ? 'plan' : 'passed', what: TIERS[o.tier].what, budgetMs: budgetMs, rows: rows },
       lines.concat('[SmartRunner] ' + (o.plan ? '· 以上为计划（未执行）' : '✓ ' + TIERS[o.tier].name + ' 通过（本层判据见 what；它不证明其它层）')));

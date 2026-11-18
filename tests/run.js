@@ -22213,6 +22213,10 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   负控制：任一片非零即整体非零、改坏可执行面必须点名、被测试提到的文件拒排、
     //   非路径字面量不得混进装载边、静态面不得冒充首屏读数、未知门禁名与负耗时拒收。
     await runScript('./optperf-batch1-v2524.js');
+    // v2.524.0（V29 优化线 Z3 先行两项）：OPV29-15 故障自诊 / OPV29-16 红门禁最小复现。
+    //   负控制：命令里不许出现 run.js（不拿整趟充数）、活锁不得被当成可回收、
+    //   禁止清单必须点名 `find -delete` 与 `gc --prune=now`（本仓被这两种“顺手命令”坑过）。
+    await runScript('./opv29-z3-v2524.js');
     // v2.518.0：故事优先第一阶段 —— 故事回应窗口的两把锁。
     //   · tests/story-window-v2518.js：纯单元锁（自建 mock，只测窗口自身行为）。
     //   · tests/story-window-integration-v2518.js：端到端集成锁（走 ui-gate-sync 的
