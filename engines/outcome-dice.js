@@ -39,19 +39,35 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_outcomedice_settings_v1';
-  const DEF = { enabled: false, die: 20 };
+  const DEF = { enabled: false, die: 100 };
   const __REG = { key: LS_KEY, def: DEF, module: 'outcomeDice', bounds: { die: [20, 100] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const STORE_KEY = 'diceLog';
+  const SKILL_KEY = 'diceSkills';
+  const SKILL_CAP = 64;
   const CAP = 32;
-  const LABEL = { critical: '大成功', extreme: '极难成功', success: '成功', fail: '失败', fumble: '大失败' };
-  const RANK = { fumble: -1, fail: 0, success: 1, extreme: 3, critical: 5 };
+  /**
+   * CoC7 技能默认值（1..100）。**开关打开后就接管这些事件项**：格斗、射击、交谈……
+   * 都是"重要的事"，该由骰子说话；关着时一切照常（玩家说成就成）。
+   * 值可逐个改（`setSkill`），也可整表读（`skills()`）—— 表是数据，不是写死的判据。
+   */
+  const SKILL_DEF = {
+    '格斗': 50, '闪避': 40, '射击': 45, '投掷': 40,
+    '交谈': 55, '话术': 45, '恐吓': 45, '魅惑': 40, '心理学': 45,
+    '侦查': 50, '聆听': 45, '潜行': 40, '追踪': 35,
+    '撬锁': 30, '机械维修': 35, '攀爬': 40, '游泳': 35, '驾驶': 40,
+    '医学': 30, '急救': 35, '图书馆使用': 55, '会计': 30, '法律': 30
+  };
+  const LABEL = { critical: '大成功', extreme: '极难成功', hard: '困难成功', success: '成功', fail: '失败', fumble: '大失败' };
+  const RANK = { fumble: -1, fail: 0, success: 1, hard: 2, extreme: 3, critical: 5 };
   const CONSEQ = {
-    critical: { effect: 'beyond', cost: null, desc: '超出预期：不止办成，还多拿到一样东西（线索/物件/人情）' },
+    critical: { effect: 'beyond', cost: null, desc: '极端成功：一击定局，还多得一样东西（线索 / 物件 / 人情 / 威慑）' },
     extreme: { effect: 'clean', cost: null, desc: '干净利落：办成且没有响动' },
+    hard: { effect: 'done-clean', cost: null, desc: '办成了，而且没留下手尾' },
     success: { effect: 'done', cost: null, desc: '办成了' },
     fail: { effect: 'stalled', cost: 'time_or_chance', desc: '没办成：耗掉一段窗口，机会变窄' },
-    fumble: { effect: 'setback', cost: 'harm_or_expose', desc: '办砸了：受伤 / 暴露 / 弄坏东西，且被人记住' }
+    fumble: { effect: 'backlash', cost: 'harm_or_expose', backlash: true,
+      desc: '反噬成真：事情真的砸在自己身上——枪会真打中自己或同伴，火会真烧起来，谎会当场被拆穿，且被人记住' },
   };
   const stat = { rolled: 0, off: 0, replay: 0, badInput: 0, lastBand: '', lastAt: 0 };
   let shadow = null;
@@ -80,10 +96,30 @@
   /** 纯判据：需求 + 骰点 → 五档（不掷骰、不读 store）。 */
   function bandOf(need, roll) {
     if (roll === 1) return 'critical';
-    if (roll >= 20) return need >= 19 ? 'fail' : 'fumble';
+    // 用户口径：大失败要能"突然"发生——再高的能力也留 5% 的翻车口子（d100 侧是 100，1%）。
+    if (roll >= 20) return 'fumble';
     const ext = Math.floor(need / 5);
     if (ext >= 2 && roll <= ext) return 'extreme';
     return roll <= need ? 'success' : 'fail';
+  }
+  /**
+   * d100 六档（本模块自己的口径，**不用 success-grade 的条件式大失败**）：
+   *   roll = 1      ⇒ 大成功（恒 1%）
+   *   roll ≥ 96     ⇒ 大失败（恒 5%，**任何技能都可能**——"突然来一个大失败"要真能发生）
+   *   roll ≤ target/5 ⇒ 极难成功；≤ target/2 ⇒ 困难成功；≤ target ⇒ 成功；其余失败
+   * 技能只决定中间三档的宽窄，不决定上下限——所以六档在每个技能值下都存在。
+   */
+  function bandOf100(target, roll) {
+    // 严格照 CoC7 原文（调查员手册·技能检定）：
+    //   大成功 = 01；大失败 = 技能 <50 时 96-100，技能 ≥50 时只有 100；
+    //   极难成功 = ≤ 技能/5；困难成功 = ≤ 技能/2；常规成功 = ≤ 技能；其余失败。
+    //   注意顺序：**大失败先判**（技能 100 掷 100 仍是大失败，不是成功）。
+    if (roll === 1) return 'critical';
+    if (target < 50 ? roll >= 96 : roll === 100) return 'fumble';
+    if (roll <= Math.floor(target / 5)) return 'extreme';
+    if (roll <= Math.floor(target / 2)) return 'hard';
+    if (roll <= target) return 'success';
+    return 'fail';
   }
   /** d100 模式：标签归并到五档（困难/普通成功都算 success）。 */
   function bandFromGrade(gradeName) {
@@ -105,6 +141,58 @@
       WA.store.transact(function (d) { d[STORE_KEY] = arr; return true; }, 'outcome:log');
       return true;
     } catch (e) { return false; }
+  }
+
+  function readSkills() {
+    try {
+      const all = WA.store && typeof WA.store.get === 'function' ? (WA.store.get() || {}) : {};
+      const m = all[SKILL_KEY];
+      const src = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+      const out = Object.assign({}, SKILL_DEF);
+      Object.keys(src).forEach(function (k) {
+        if (typeof src[k] === 'number' && isFinite(src[k])) out[k] = src[k];
+      });
+      return out;
+    } catch (e) { return Object.assign({}, SKILL_DEF); }
+  }
+  function writeSkills(m) {
+    try {
+      if (!WA.store || !WA.store.transact) return false;
+      WA.store.transact(function (d) { d[SKILL_KEY] = m; return true; }, 'outcome:skills');
+      return true;
+    } catch (e) { return false; }
+  }
+  /** 整表读：这一局里格斗、射击、交谈各是多少。 */
+  function skills() {
+    const m = readSkills();
+    return { ok: true, reason: 'ok', skills: m, count: Object.keys(m).length, cap: SKILL_CAP,
+      note: '开关打开后，这些是会被骰子接管的事件项；关着时它们只是读数' };
+  }
+  /** 改一项技能值（1..100 整数）。 */
+  function setSkill(name, value) {
+    const k = name === undefined || name === null ? '' : String(name).trim();
+    if (!k) return refuse('missing-fields', { missing: ['skill'] });
+    if (!isInt100(value)) return refuse('bad-target', { skill: k, value: value });
+    const m = readSkills();
+    m[k] = value;
+    const keys = Object.keys(m);
+    if (keys.length > SKILL_CAP) keys.slice(SKILL_CAP).forEach(function (x) { delete m[x]; });
+    writeSkills(m);
+    return { ok: true, reason: 'ok', skill: k, value: value, skills: m };
+  }
+  /**
+   * **技能检定**（开关打开后接管事件项）：`check({skill:'格斗', ticket, who, what})`。
+   *   · 技能不在表里 ⇒ `not-in-table`（不猜、不默认 50）
+   *   · 其余完全走 `resolve()`：同一张票只掷一次，六档由 success-grade 判
+   */
+  function check(o) {
+    const c = (o && typeof o === 'object') ? o : {};
+    const name = c.skill === undefined || c.skill === null ? '' : String(c.skill).trim();
+    if (!name) return refuse('missing-fields', { missing: ['skill'] });
+    const table = readSkills();
+    if (typeof table[name] !== 'number') return refuse('not-in-table', { skill: name, known: Object.keys(table) });
+    return resolve({ target: c.target === undefined ? table[name] : c.target, die: c.die,
+      ticket: c.ticket, who: c.who, what: c.what || name, skill: name });
   }
 
   /**
@@ -131,23 +219,34 @@
           note: '这张票已经掷过：照首次结果执行，不许“读到失败再重掷”' });
       }
     }
-    let band, roll, need = null;
+    let band, roll, need = null, rollsUsed = null;
     if (die === 20) {
       need = needOf(o.target);
       roll = WA.rand.int(1, 20);
       band = bandOf(need, roll);
     } else {
-      roll = WA.rand.int(1, 100);
-      if (!WA.successGrade || typeof WA.successGrade.grade !== 'function') return refuse('bad-roll', { why: 'd100 模式下 successGrade 未装载' });
-      const g = WA.successGrade.grade(roll, o.target);
-      if (!g || !g.ok) return refuse(g && g.reason ? g.reason : 'bad-roll', { roll: roll, target: o.target });
-      band = bandFromGrade(g.grade);
+      const bn = Math.max(0, Math.min(2, o.bonus | 0));
+      const pn = Math.max(0, Math.min(2, o.penalty | 0));
+      const extra = Math.max(bn, pn);
+      // CoC7 原文：奖励/惩罚骰**不是"掷两次取小/大"**，而是"多骰十位骰、个位骰只有一个"。
+      //   组合出若干个 d100 候选（00 记作 100），奖励取对玩家最有利（最小），惩罚取最不利（最大）。
+      const unit = WA.rand.int(0, 9);
+      const tens = [];
+      for (let i = 0; i <= extra; i++) tens.push(WA.rand.int(0, 9));
+      const cand = tens.map(function (t) { const v = t * 10 + unit; return v === 0 ? 100 : v; });
+      if (extra === 0) { roll = cand[0]; rollsUsed = null; }
+      else {
+        roll = (bn > pn) ? Math.min.apply(null, cand) : Math.max.apply(null, cand);
+        rollsUsed = { unit: unit, tens: tens.slice(), candidates: cand.slice() };
+      }
+      band = bandOf100(o.target, roll);
     }
     const at = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('outcomeDice') : Date.now();
     const entry = {
       ticket: ticket, die: die, roll: roll, target: o.target, need: need,
       band: band, label: LABEL[band], rank: RANK[band],
       who: o.who ? String(o.who) : '', what: o.what ? String(o.what) : '',
+      skill: o.skill ? String(o.skill) : '', rolls: rollsUsed,
       consequence: CONSEQ[band], at: at
     };
     const log = readLog();
@@ -201,8 +300,10 @@
   }
 
   WA.outcomeDice = {
-    resolve: resolve, toggle: toggle, ladder: ladder, view: view, buildBlock: buildBlock,
+    resolve: resolve, check: check, skills: skills, setSkill: setSkill,
+    toggle: toggle, ladder: ladder, view: view, buildBlock: buildBlock,
     reset: reset, settings: settings, saveSettings: saveSettings, stat: statOf,
-    bandOf: bandOf, needOf: needOf, REG: __REG, DEF: DEF, LABEL: LABEL, RANK: RANK, CAP: CAP
+    bandOf: bandOf, bandOf100: bandOf100, needOf: needOf,
+    REG: __REG, DEF: DEF, LABEL: LABEL, RANK: RANK, CAP: CAP, CONSEQ: CONSEQ
   };
 })();

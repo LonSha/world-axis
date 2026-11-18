@@ -61,6 +61,8 @@
       costChoice: null,                     // {option, at} —— 超预算三选项的选定
       toneTrail: [],                        // 近几轮的走向读数（语气突变判据）
       diceLog: [],                          // S1 判定票（同一票只掷一次；最近 32 票）
+      diceSkills: null,                     // S1 技能表覆盖（格斗/射击/交谈…；null=用内置默认）
+      identityLedger: {},                   // EXV29-01 四元组基线（每人一条：称呼/口音/习惯/忌讳）
       // 世界钟
       clock: { iso: '', label: '', dayIndex: 0, source: 'unset' }, // source: unset|user|text|engine
       // 世界背景（用户设定或世界书注入的自由文本，纯框架不预设内容）
@@ -1773,6 +1775,8 @@
     toneTrail: { cap: 10, kind: 'array', site: 'story-rhythm.js tone()（recentRounds 上界 10）' },
     // v2.524.0（S1 单列可开关项）：判定票环，与 outcome-dice.js 内 CAP 对齐。
     diceLog: { cap: 32, kind: 'array', site: 'outcome-dice.js resolve()（CAP 上界 32）' },
+    diceSkills: { cap: 64, kind: 'object', site: 'outcome-dice.js setSkill()（SKILL_CAP 上界 64）' },
+    identityLedger: { cap: 48, kind: 'object', site: 'identity-ledger.js capIt()（CAP 上界 48）' },
     'commodityCirculation.stockpiles': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
     'commodityCirculation.debts': { cap: 50, kind: 'object', site: 'store.withOwnerState write capacity' },
     'commodityCirculation.blacklists': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },

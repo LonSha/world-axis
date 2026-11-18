@@ -653,6 +653,14 @@
     'outcomeDice.view': function () { return WA.outcomeDice.view(); },
     'outcomeDice.reset': function () { return WA.outcomeDice.reset(); },
     'act.judge': function (o) { const x = o || {}; return WA.act.judge(x.kind, x); },
+    // S1：开关打开后接管格斗/射击/交谈这些事件项
+    'outcomeDice.check': function (o) { return WA.outcomeDice.check(o); },
+    'outcomeDice.skills': function () { return WA.outcomeDice.skills(); },
+    'outcomeDice.setSkill': function (o) { const x = o || {}; return WA.outcomeDice.setSkill(x.skill, x.value); },
+    // EXV29-01：四元组同一性（只报不改）
+    'identityLedger.snapshot': function (o) { return WA.identityLedger.snapshot(o); },
+    'identityLedger.audit': function (o) { return WA.identityLedger.audit(o); },
+    'identityLedger.report': function () { return WA.identityLedger.report(); },
     'worldLoopLog.logRound': function (o) { return WA.worldLoopLog.logRound(o); },
     'worldLoopLog.absence': function (o) { return WA.worldLoopLog.absence(o); },
     'costGuard.warn': function (o) { return WA.costGuard.warn(o); },

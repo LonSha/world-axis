@@ -48,8 +48,8 @@ eq(OD.bandOf(10, 2), 'extreme', 'B6 need=10 掷 2 极难成功（⌊10/5⌋=2）
 eq(OD.bandOf(10, 3), 'success', 'B7 need=10 掷 3 普通成功');
 eq(OD.bandOf(10, 10), 'success', 'B8 need=10 掷 10 刚好成功');
 eq(OD.bandOf(10, 11), 'fail', 'B9 need=10 掷 11 失败');
-eq(OD.bandOf(19, 20), 'fail', 'B10 need=19 掷 20 只算失败（高能力不吃挂）');
-eq(OD.bandOf(20, 20), 'fail', 'B11 need=20 掷 20 只算失败');
+eq(OD.bandOf(19, 20), 'fumble', 'B10 need=19 掷 20 仍是大失败（用户口径：突然的翻车要能发生）');
+eq(OD.bandOf(20, 20), 'fumble', 'B11 need=20 掷 20 也是大失败');
 eq(OD.bandOf(4, 20), 'fumble', 'B12 need=4 掷 20 大失败');
 // 单调性：need 越低，同一骰点的档不得更高
 const ORDER = { fumble: -1, fail: 0, success: 1, extreme: 3, critical: 5 };
@@ -86,10 +86,10 @@ eq(OD.view().total, 0, 'C5 坏入参一条都不记账');
 // ── 一次一票（防刷）──
 const r1 = OD.resolve({ target: 50, ticket: 't-1', who: '他', what: '撬锁' });
 eq(r1.ok, true, 'D1 第一票 ok');
-eq(r1.die, 20, 'D2 默认 d20');
+eq(r1.die, 100, 'D2 默认 d100（六档为主）');
 eq(r1.reason, 'ok', 'D3 reason=ok');
-ok(r1.roll >= 1 && r1.roll <= 20, 'D4 骰点在 1..20', r1.roll);
-eq(r1.band, OD.bandOf(10, r1.roll), 'D5 档与纯判据一致');
+ok(r1.roll >= 1 && r1.roll <= 100, 'D4 骰点在 1..100', r1.roll);
+ok(['critical','extreme','hard','success','fail','fumble'].indexOf(r1.band) >= 0, 'D5 d100 六档之一', r1.band);
 eq(r1.replay, false, 'D6 首次不是 replay');
 const r2 = OD.resolve({ target: 50, ticket: 't-1', who: '他', what: '撬锁' });
 eq(r2.replay, true, 'D7 同票重掷 → replay:true');
@@ -107,7 +107,7 @@ ok(OD.buildBlock().indexOf('【判定】') === 0, 'E1 开着时注入面以【�
 const h = OD.resolve({ target: 60, ticket: 't-100', die: 100 });
 eq(h.ok, true, 'F1 d100 也能掷');
 eq(h.die, 100, 'F2 die=100');
-ok(['critical', 'extreme', 'success', 'fail', 'fumble'].indexOf(h.band) >= 0, 'F3 d100 归并到五档', h.band);
+ok(['critical','extreme','hard','success','fail','fumble'].indexOf(h.band) >= 0, 'F3 d100 落六档之一', h.band);
 
 // ── 有界：32 票封顶 ──
 for (let i = 0; i < 40; i++) OD.resolve({ target: 50, ticket: 'cap-' + i });
@@ -132,17 +132,64 @@ function broke(from, to) {
   return { ok: true, patched: raw.replace(from, to) };
 }
 const nc = [];
-const n1 = broke("if (roll >= 20) return need >= 19 ? 'fail' : 'fumble';", "if (roll >= 20) return 'fumble';");
+const n1 = broke("if (roll >= 20) return 'fumble';", "if (roll >= 20) return 'success';");
 nc.push({ name: 'N1 高能力也吃大失败（判据破坏）', hit: n1.ok });
 const n2 = broke('const CAP = 32;', 'const CAP = 9999;');
 nc.push({ name: 'N2 账本上界改大（有界破坏）', hit: n2.ok });
-const n3 = broke('const DEF = { enabled: false, die: 20 };', 'const DEF = { enabled: true, die: 20 };');
+const n3 = broke('const DEF = { enabled: false, die: 100 };', 'const DEF = { enabled: true, die: 100 };');
 nc.push({ name: 'N3 默认开关偷偷改开', hit: n3.ok });
 nc.forEach(function (x) { ok(x.hit, 'I ' + x.name + ' 的锚点存在（可被真破坏）'); });
 // 反向证明：现在的源码里三处锚点都还在（没被人提前改掉）
-ok(srcOf().indexOf("need >= 19 ? 'fail' : 'fumble'") >= 0, 'J1 ③高能力不吃挂的锚还在');
+ok(srcOf().indexOf("if (roll >= 20) return 'fumble';") >= 0, 'J1 大失败恒可能的锚还在');
 ok(srcOf().indexOf('const CAP = 32;') >= 0, 'J2 有界 CAP=32 的锚还在');
 ok(srcOf().indexOf('const DEF = { enabled: false') >= 0, 'J3 默认关的锚还在');
+// ── L 技能项：开关打开后接管格斗/射击/交谈 ──
+// 六档恒可能：技能高低不影响上下限
+eq(OD.bandOf100(100, 1), 'critical', 'L0a 满技能掷 1 也是大成功');
+eq(OD.bandOf100(100, 96), 'success', 'L0b 按 CoC7：技能 100 掷 96 仍是成功（≥50 时只有 100 才大失败）');
+eq(OD.bandOf100(100, 100), 'fumble', 'L0b2 技能 100 掷 100 是大失败（照原文）');
+eq(OD.bandOf100(40, 96), 'fumble', 'L0b3 技能 40 掷 96 是大失败（<50 时 96-100）');
+eq(OD.bandOf100(5, 1), 'critical', 'L0c 低技能掷 1 也是大成功');
+eq(OD.bandOf100(5, 100), 'fumble', 'L0d 低技能掷 100 大失败');
+eq(OD.bandOf100(80, 16), 'extreme', 'L0e 80 技能：16 ≤ 80/5 ⇒ 极难');
+eq(OD.bandOf100(80, 40), 'hard', 'L0f 80 技能：40 ≤ 80/2 ⇒ 困难');
+eq(OD.bandOf100(80, 41), 'success', 'L0g 80 技能：41 ⇒ 普通成功');
+eq(OD.bandOf100(80, 81), 'fail', 'L0h 80 技能：81 ⇒ 失败');
+eq(Object.keys(OD.LABEL).length, 6, 'L0i 六档标签齐');
+ok(OD.RANK.hard === 2 && OD.RANK.extreme === 3, 'L0j 档位排序（困难 2 < 极难 3）');
+ok(OD.LABEL && OD.RANK && OD.bandOf100, 'L0k 六档判据已导出');
+// 奖励骰 / 惩罚骰（CoC7）：惩罚骰取高、奖励骰取低；都只影响这一次
+OD.toggle(true);
+const pen = OD.resolve({ target: 50, ticket: 'p1x', penalty: 1 });
+ok(pen.rolls && pen.rolls.tens.length === 2 && pen.rolls.candidates.length === 2, 'L0l 惩罚骰多骰一颗十位骰（个位只有一个）', pen.rolls);
+ok(pen.roll === Math.max.apply(null, pen.rolls.candidates), 'L0m 惩罚骰取最不利（最大）', pen.rolls);
+const bon = OD.resolve({ target: 50, ticket: 'b1x', bonus: 1 });
+ok(bon.roll === Math.min.apply(null, bon.rolls.candidates), 'L0n 奖励骰取最有利（最小）', bon.rolls);
+ok(bon.rolls.unit >= 0 && bon.rolls.unit <= 9, 'L0n2 个位骰只有一颗（0..9）', bon.rolls.unit);
+const one = OD.resolve({ target: 50, ticket: 'n1x' });
+eq(one.rolls, null, 'L0o 没有奖励/惩罚时不留多余骰');
+OD.toggle(false);
+const SK = OD.skills();
+ok(SK.ok && SK.count >= 20, 'L1 技能表已装（≥20 项）', SK.count);
+eq(SK.skills['格斗'], 50, 'L2 格斗默认 50');
+eq(SK.skills['交谈'], 55, 'L3 交谈默认 55');
+eq(SK.skills['射击'], 45, 'L4 射击默认 45');
+eq(OD.setSkill('格斗', 80).value, 80, 'L5 可改技能值');
+eq(OD.skills().skills['格斗'], 80, 'L6 改动落库');
+eq(OD.setSkill('格斗', 0).reason, 'bad-target', 'L7 技能值 0 被拒');
+eq(OD.check({ skill: '不存在' }).reason, 'not-in-table', 'L8 不在表里的技能 ⇒ not-in-table（不默认 50）');
+eq(OD.check({ skill: '格斗', ticket: 'sk-off' }).reason, 'module-disabled', 'L9 关着时技能检定原样通过');
+OD.toggle(true);
+const c1 = OD.check({ skill: '交谈', ticket: 'sk-1', who: '他', what: '和掌柜搭话' });
+eq(c1.ok, true, 'L10 开着时技能检定 ok');
+eq(c1.target, 55, 'L11 用的是技能值（交谈 55）');
+eq(c1.skill, '交谈', 'L12 回执带技能名');
+ok(c1.roll >= 1 && c1.roll <= 100, 'L13 d100 骰点', c1.roll);
+const c2 = OD.check({ skill: '交谈', ticket: 'sk-1' });
+eq(c2.replay, true, 'L14 同一张票技能检定也是回放');
+const fb = OD.resolve({ target: 95, ticket: 'sk-fb', die: 20 });
+ok(fb.consequence && fb.consequence.backlash === true || fb.band !== 'fumble', 'L15 大失败带反噬标记', fb.band);
+OD.toggle(false);
 
 // ── K 接线：骰子只降档，不加严（五档 → act 四档）──
 const A = WA.act;
@@ -155,7 +202,7 @@ eq(A.diceVerdict('extreme', 'action'), 'action', 'K5 extreme ⇒ 不动');
 eq(A.diceVerdict('fumble', 'refuse'), 'refuse', 'K6 原本就拒的，骰子不得再降（不判两次）');
 eq(A.diceVerdict('fail', 'delay'), 'delay', 'K7 原本就延的，骰子不得放松也不得再降');
 eq(A.diceVerdict('fail', 'status-quo'), 'status-quo', 'K8 维持现状不受骰子影响');
-eq(Object.keys(A.DICE_VERDICT).length, 5, 'K9 五档映射表齐');
+eq(Object.keys(A.DICE_VERDICT).length, 6, 'K9 六档映射表齐（困难成功也在内）');
 
 // 不带 check：完全等于原判定面
 const j0 = A.judge('wait');
@@ -184,6 +231,32 @@ const j4 = A.judge('move', { check: { target: 1, ticket: 'k-low' } });
 ok(['action', 'delay', 'refuse'].indexOf(j4.verdict) >= 0, 'K19 低能力只可能落三档之一', j4.verdict);
 ok(j4.verdict !== 'action' || j4.check.band === 'critical', 'K20 低能力落 action 必须是大成功' , j4.check);
 OD.toggle(false);
+
+// ── M EXV29-01（同批）：四元组同一性账本（只报不改）──
+const IL = WA.identityLedger;
+ok(!!IL && typeof IL.snapshot === 'function', 'M0 identityLedger 已装');
+eq(IL.audit({ id: '无名氏', address: '老张' }).reason, 'not-happened', 'M1 没基线不猜（not-happened）');
+eq(IL.snapshot({ id: 'p1' }).reason, 'missing-fields', 'M2 四元组缺项 ⇒ missing-fields');
+const s1 = IL.snapshot({ id: 'p1', address: '张大哥', accent: '西关口音', habit: '说话搓手指', taboo: '不提他娘' });
+eq(s1.ok, true, 'M3 基线已立');
+eq(s1.created, true, 'M4 第一次是新建');
+const s2 = IL.snapshot({ id: 'p1', address: '张大哥', accent: '西关口音', habit: '说话搓手指', taboo: '不提他娘' });
+eq(s2.created, false, 'M5 同人再记只刷新，不产生第二条');
+const a1 = IL.audit({ id: 'p1', address: '老张', accent: '西关口音', habit: '说话搓手指', taboo: '不提他娘' });
+eq(a1.ok, true, 'M6 审计 ok');
+eq(a1.drift.length, 1, 'M7 只漂了 1 项（称呼）');
+eq(a1.drift[0].field, 'address', 'M8 漂的是称呼');
+eq(a1.ratio, 0.75, 'M9 一致率 0.75');
+const a2 = IL.audit({ id: 'p1', address: '张大哥', accent: '西关口音' });
+eq(a2.drift.length, 0, 'M10 只查两项时只比这两项（未给的不算漂）');
+ok(OD.CONSEQ && OD.CONSEQ.fumble && OD.CONSEQ.fumble.backlash === true, 'L16 大失败带反噬标记');
+ok(/打中自己/.test(OD.CONSEQ.fumble.desc), 'L17 射击类大失败是**真打中自己**', OD.CONSEQ.fumble.desc);
+ok(!/差点/.test(OD.CONSEQ.fumble.desc), 'L18 大失败不许写成「差点」');
+ok(OD.CONSEQ.fumble.effect === 'backlash', 'L19 大失败的效果面是 backlash');
+ok(/一击定局/.test(OD.CONSEQ.critical.desc), 'L20 大成功是极端的好（一击定局）');
+eq(Object.keys(OD.CONSEQ).length, 6, 'L21 六档各有一条后果');
+ok(IL.buildBlock().indexOf('【同一性】') === 0, 'M11 漂过就有注入面');
+ok(IL.report().people.length >= 1, 'M12 报告能列出人');
 
 console.log('outcome-dice-v2525: pass ' + pass + ' / fail ' + fail);
 if (fail) { fails.slice(0, 12).forEach(function (f) { console.log('  ✗ ' + f); }); process.exit(1); }

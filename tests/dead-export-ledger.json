@@ -6474,6 +6474,30 @@
       "tref": 0,
       "own": 2
     },
+    "identityLedger.buildBlock": {
+      "reason": "self-only",
+      "detail": "engines/identity-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/identity-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "identityLedger.stat": {
+      "reason": "self-only",
+      "detail": "engines/identity-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/identity-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 12
+    },
+    "identityLedger.view": {
+      "reason": "self-only",
+      "detail": "engines/identity-ledger.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/identity-ledger.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "identityMatch.saveSettings": {
       "reason": "test-only",
       "detail": "engines/identity-match.js 内部自用、外部零引用（过度导出）",
@@ -9345,6 +9369,14 @@
       "refs": 0,
       "tref": 0,
       "own": 6
+    },
+    "outcomeDice.bandOf100": {
+      "reason": "self-only",
+      "detail": "engines/outcome-dice.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/outcome-dice.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
     },
     "outcomeDice.buildBlock": {
       "reason": "self-only",
@@ -15958,6 +15990,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 703
+    "dataOnly": 707
   }
 }

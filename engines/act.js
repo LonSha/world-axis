@@ -170,7 +170,7 @@
    *   关键边界：**只在原本该动（'action'）时才降**。原本就 refuse/delay/status-quo 的，
    *   骰子不得把它变严或变松 —— 否则同一件事会被判两次。
    */
-  const DICE_VERDICT = { critical: null, extreme: null, success: null, fail: 'delay', fumble: 'refuse' };
+  const DICE_VERDICT = { critical: null, extreme: null, hard: null, success: null, fail: 'delay', fumble: 'refuse' };
   function diceVerdict(band, base) {
     const b = str(base, 20) || 'action';
     if (VERDICTS.indexOf(b) < 0) return b;

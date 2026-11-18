@@ -1,9 +1,9 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 542,
- "loadedCount": 521,
+ "loadOrderCount": 543,
+ "loadedCount": 522,
  "uiCount": 21,
- "nsCount": 532,
+ "nsCount": 533,
  "totals": {
   "loadEdges": 424,
   "hardEdges": 0,
@@ -3473,6 +3473,18 @@
    "stateKeys": [
     "worldaxis_outcomedice_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/identity-ledger.js": {
+   "ns": [
+    "identityLedger"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/narrative-dice.js": {
