@@ -22217,6 +22217,13 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   负控制：命令里不许出现 run.js（不拿整趟充数）、活锁不得被当成可回收、
     //   禁止清单必须点名 `find -delete` 与 `gc --prune=now`（本仓被这两种“顺手命令”坑过）。
     await runScript('./opv29-z3-v2524.js');
+    // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
+    //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是
+    //   「装了 story-tone 也说没有」「改了一句也永远 available:false」——不崩的假判据。
+    //   锁法：静态面剥注释后扫**代码引用**（解释性注释不算引用），行为面 vm 装配最小 WorldAxis
+    //   真调 season / deviation / read / roundCost / offstageRoute / tone / silence，两向都判。
+    //   负控制：空世界、空收据、无 apiRouter 时必须如实说读不到，不许编数。
+    await runScript('./costguard-timeledger-v2529.js');
     // v2.518.0：故事优先第一阶段 —— 故事回应窗口的两把锁。
     //   · tests/story-window-v2518.js：纯单元锁（自建 mock，只测窗口自身行为）。
     //   · tests/story-window-integration-v2518.js：端到端集成锁（走 ui-gate-sync 的

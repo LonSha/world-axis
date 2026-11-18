@@ -3368,7 +3368,7 @@
       "src": "engines/cost-guard.js",
       "refs": 0,
       "tref": 0,
-      "own": 5
+      "own": 3
     },
     "counterfactualSandbox.stat": {
       "reason": "self-only",
@@ -13720,7 +13720,7 @@
       "src": "engines/story-rhythm.js",
       "refs": 0,
       "tref": 0,
-      "own": 4
+      "own": 3
     },
     "storyTone.getSettings": {
       "reason": "unwired",

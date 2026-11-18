@@ -129,7 +129,10 @@
     const s = spec && typeof spec === 'object' ? spec : {};
     const dir = Number.isFinite(s.direction) ? s.direction : null;
     if (dir === null) return refuse('missing-fields', { field: 'direction' });
-    const has = !!(WA.storyTone && (typeof WA.storyTone.current === 'function' || typeof WA.storyTone.view === 'function'));
+    // v2.529.0: 此处曾探测 `storyTone.current` / `storyTone.view`——两个成员从来不存在
+    //   （story-tone 的真实读面只有 `get()`），于是 has 恒为 false：装了 story-tone 也照样说
+    //   「现场没有 story-tone」，是一条假判据。改为探真实成员 get。
+    const has = !!(WA.storyTone && typeof WA.storyTone.get === 'function');
     if (!has) return { ok: true, reason: 'ok', available: false, abrupt: false,
       line: '现场没有 story-tone：语气一致这一条此刻判不了，不假装判过' };
     const d = draft();

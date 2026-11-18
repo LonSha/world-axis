@@ -22,12 +22,18 @@
   function round() { try { return WA.evolution && WA.evolution.roundOf ? WA.evolution.roundOf() : 0; } catch (e) { return 0; } }
   function clean(v, n) { return typeof v === 'string' ? v.slice(0, n || 60) : ''; }
   function safe(fn, dflt) { try { const v = fn(); return v === undefined || v === null ? dflt : v; } catch (e) { return dflt; } }
+  /** v2.529.0 世界钟标签的唯一真源：calendar.setClock 写的就是 store.clock.label（本引擎不自留副本）。 */
+  function clockLabel() {
+    let d = {};
+    try { d = WA.store && WA.store.get ? (WA.store.get() || {}) : {}; } catch (e) { d = {}; }
+    return d && d.clock && typeof d.clock.label === 'string' ? d.clock.label : '';
+  }
   /** 三栏：世界钟 / 正文时间 / 真实活动。 */
   function read() {
     const cfg = settings();
     if (!cfg.enabled) return { ok: true, reason: 'disabled', rows: [] };
     const world = safe(function () { return WA.clock && WA.clock.now ? String(WA.clock.now('timeLedger')) : ''; }, '');
-    const worldLabel = safe(function () { return WA.calendar && WA.calendar.labelNow ? String(WA.calendar.labelNow()) : ''; }, '');
+    const worldLabel = safe(clockLabel, '');
     const story = safe(function () { return WA.storyclock && WA.storyclock.discipline ? String(WA.storyclock.discipline()) : ''; }, '');
     const real = safe(function () { return WA.playtime && WA.playtime.lastActive ? Number(WA.playtime.lastActive()) : 0; }, 0);
     stat.reads++;
@@ -49,12 +55,13 @@
       text: '你离开了约 ' + rounds + ' 轮，这期间世界走了 ' + events + ' 件事'
         + (missed.length ? '；错过了：' + missed.slice(0, 3).join('、') : '') };
   }
-  /** 节令：只读 calendar / chrono，缺就 unknown。 */
+  /** 节令：世界钟标签是唯一真源（calendar.setClock 写的 store.clock.label 就含「第N日·时段」）。 */
   function season() {
-    const label = safe(function () { return WA.calendar && WA.calendar.labelNow ? String(WA.calendar.labelNow()) : ''; }, '');
-    const phase = safe(function () { return WA.chrono && WA.chrono.phase ? String(WA.chrono.phase()) : ''; }, '');
-    if (!label && !phase) return { ok: true, known: false, reason: 'no-calendar' };
-    return { ok: true, known: true, label: label, phase: phase };
+    const label = safe(clockLabel, '');
+    // v2.529.0: 此处曾读 `chrono.phase()`——chrono 没有 phase（它的 layer() 是变更层，不是时段）。
+    //   时段本来就在 label 的「·」后缀里，另造一个 phase 只会多出第二份口径，故不造。
+    if (!label) return { ok: true, known: false, reason: 'no-calendar' };
+    return { ok: true, known: true, label: label };
   }
   /** 期限压迫：agenda.upcoming 里最近的一条。 */
   function deadline() {
@@ -77,10 +84,13 @@
     return { ok: true, staleCount: old.length, total: facts.length, limit: limit,
       items: old.slice(-3).map(function (f) { return clean(f.key, 30) + '：' + clean(f.value, 40); }) };
   }
-  function deviation() {
+  function deviation(spec) {
     const cfg = settings();
-    // 正文时间锚：storyclock 若给得出「正文说现在第几轮」，与真实轮次比。
-    const storyRound = safe(function () { return WA.storyclock && WA.storyclock.roundOf ? Number(WA.storyclock.roundOf()) : NaN; }, NaN);
+    const s = spec && typeof spec === 'object' ? spec : {};
+    // v2.529.0: 此处曾读 `storyclock.roundOf()` —— 该成员不存在（storyclock 只给「第N日·时段」
+    //   这种绝对坐标，readLatest/parseStamp，**不给轮次映射**），于是本函数永远走「判不了」分支。
+    //   轮与日单位不同，不臆造换算：改由调用方显式传 spec.storyRound，没传就如实说判不了。
+    const storyRound = Number.isFinite(s.storyRound) ? Number(s.storyRound) : NaN;
     const r = round();
     if (!Number.isFinite(storyRound)) return { ok: true, known: false, reason: 'no-story-round' };
     const dev = Math.abs(r - storyRound);

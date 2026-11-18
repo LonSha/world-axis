@@ -144,7 +144,10 @@
     let health = '';
     if (quiet) {
       try {
-        if (WA.worldHealth && typeof WA.worldHealth.note === 'function') { WA.worldHealth.note('ok-empty'); health = 'noted'; }
+        // v2.529.0: 曾调用 `worldHealth.note('ok-empty')`——该成员不存在（world-health 只有读数面
+        //   summary/diagnose/stat/reset，没有写入面）。不是抛错，而是这句「记过了」永远是假的。
+        //   现如实标注：健康面没有记账入口，不声称记过。
+        health = (WA.worldHealth && typeof WA.worldHealth.summary === 'function') ? 'read-only' : 'health-absent';
       } catch (e) { health = 'note-failed'; }
     }
     return { ok: true, reason: quiet ? 'ok-empty' : 'ok', quiet: quiet,

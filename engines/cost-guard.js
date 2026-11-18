@@ -43,7 +43,14 @@
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
     let v = null;
-    try { v = WA.modelReceipt && typeof WA.modelReceipt.view === 'function' ? WA.modelReceipt.view() : null; } catch (e) { v = null; }
+    // v2.529.0: 此处曾读 `modelReceipt.view()` —— 该成员不存在（model-receipt 的真实读面是
+    //   list/stats/drifters），于是本函数永远报「读不到收据」。口径仍是「与收据同源」：
+    //   取最新一笔回执（list 默认最新在前）求和，不另造一份读数。
+    try {
+      const lr = (WA.modelReceipt && typeof WA.modelReceipt.list === 'function') ? WA.modelReceipt.list({ limit: 1 }) : null;
+      const row = (lr && lr.ok && Array.isArray(lr.rows)) ? lr.rows[0] : null;
+      if (row) v = { tokens: (Number(row.promptTokens) || 0) + (Number(row.completionTokens) || 0), calls: 1 };
+    } catch (e) { v = null; }
     if (!v) return { ok: true, reason: 'ok', available: false,
       line: '这一轮花了多少，此刻读不到收据（没有收据就不报数）' };
     const tokens = Number.isFinite(v.tokens) ? v.tokens : (Number.isFinite(v.totalTokens) ? v.totalTokens : 0);
@@ -54,13 +61,20 @@
   }
 
   /** OPV28-14：场外低配通道（主链不变；失败只降级、不伪造事件）。 */
-  function offstageRoute() {
+  function offstageRoute(spec) {
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
+    const s = spec && typeof spec === 'object' ? spec : {};
     let low = null;
     try {
-      if (WA.apiRouter && typeof WA.apiRouter.pick === 'function') low = WA.apiRouter.pick({ purpose: 'offstage', tier: 'low' });
-      else if (WA.apiRouter && typeof WA.apiRouter.route === 'function') low = WA.apiRouter.route({ purpose: 'offstage', tier: 'low' });
+      // v2.529.0: 此处曾读 `apiRouter.pick()` / `apiRouter.route()` —— 两者都不存在（api-router 只有
+      //   getChannel/setChannel/listChannels/call 与并发闸），apiRouter **没有 tier 路由概念**。
+      //   不发明 tier：按调用方点名的通道（默认 observe）取配置，「配了 baseUrl」才算可用。
+      const chName = (typeof s.channel === 'string' && s.channel) ? s.channel : 'observe';
+      if (WA.apiRouter && typeof WA.apiRouter.getChannel === 'function') {
+        const c = WA.apiRouter.getChannel(chName);
+        if (c && c.baseUrl) low = { channel: chName, tier: 'low', model: c.model || '' };
+      }
     } catch (e) { low = null; }
     stat.routes++;
     if (!low) return { ok: true, reason: 'ok', available: false, mainChannel: 'unchanged',
