@@ -97,7 +97,7 @@
     return s.slice(0, max || 24);
   }
   function nowAt() {
-    try { return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('etiquette') : Date.now(); }
+    try { return (function () { try { return WA.clock.now('etiquette'); } catch (e) { return Date.now(); } })(); }
     catch (e) { return Date.now(); }
   }
   function capIt(m) {

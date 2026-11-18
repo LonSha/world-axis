@@ -81,7 +81,7 @@
     if (n.missing.length) return refuse('missing-fields', { missing: n.missing, why: '四元组必填满，不许空串顶过去' });
     const m = readAll();
     const existed = !!m[n.id];
-    const at = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('identityLedger') : Date.now();
+    const at = (function () { try { return WA.clock.now('identityLedger'); } catch (e) { return Date.now(); } })();
     m[n.id] = {
       quad: Object.assign({}, n.quad), at: at, audits: (existed ? (m[n.id].audits || 0) : 0),
       ref: (o && o.ref !== undefined && o.ref !== null) ? String(o.ref).slice(0, 24) : (existed ? (m[n.id].ref || '') : ''),
@@ -119,7 +119,7 @@
     base.audits = (base.audits || 0) + 1;
     // 留痕：只留最近一次（单条，天然有界）。有漂才记，没漂就记"这一轮没漂"。
     base.last = {
-      at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('identityLedger') : Date.now(),
+      at: (function () { try { return WA.clock.now('identityLedger'); } catch (e) { return Date.now(); } })(),
       ref: ref,
       ratio: Math.round(ratio * 100) / 100,
       drift: drift.map(function (d) { return { field: d.field, cn: d.cn, was: d.was, now: d.now, ref: ref }; })

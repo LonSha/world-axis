@@ -55,7 +55,7 @@
     return s.slice(0, max || 60);
   }
   function nowAt() {
-    try { return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('exitRite') : Date.now(); }
+    try { return (function () { try { return WA.clock.now('exitRite'); } catch (e) { return Date.now(); } })(); }
     catch (e) { return Date.now(); }
   }
   function capIt(m) {

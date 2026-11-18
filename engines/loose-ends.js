@@ -56,7 +56,7 @@
     return s.slice(0, max || 60);
   }
   function nowAt() {
-    try { return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('looseEnds') : Date.now(); }
+    try { return (function () { try { return WA.clock.now('looseEnds'); } catch (e) { return Date.now(); } })(); }
     catch (e) { return Date.now(); }
   }
   function capIt(m) {

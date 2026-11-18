@@ -40,7 +40,7 @@
     return Object.assign({ ok: false, reason: code }, extra || {});
   }
   function nowAt() {
-    try { return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('livelihood') : Date.now(); }
+    try { return (function () { try { return WA.clock.now('livelihood'); } catch (e) { return Date.now(); } })(); }
     catch (e) { return Date.now(); }
   }
   function box() {

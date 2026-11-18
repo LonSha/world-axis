@@ -53,7 +53,7 @@
     return s.slice(0, max || 32);
   }
   function nowAt() {
-    try { return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('habitTell') : Date.now(); }
+    try { return (function () { try { return WA.clock.now('habitTell'); } catch (e) { return Date.now(); } })(); }
     catch (e) { return Date.now(); }
   }
   // 只走 `WA.rand`（时间/随机源的单一出口）。没有 rand 时**不掷**：

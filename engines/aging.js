@@ -60,7 +60,7 @@
     return TIERS[i];
   }
   function nowAt() {
-    try { return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('aging') : Date.now(); }
+    try { return (function () { try { return WA.clock.now('aging'); } catch (e) { return Date.now(); } })(); }
     catch (e) { return Date.now(); }
   }
   function capIt(m) {

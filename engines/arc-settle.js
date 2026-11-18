@@ -52,7 +52,7 @@
     return s.slice(0, max || 48);
   }
   function nowAt() {
-    try { return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('arcSettle') : Date.now(); }
+    try { return (function () { try { return WA.clock.now('arcSettle'); } catch (e) { return Date.now(); } })(); }
     catch (e) { return Date.now(); }
   }
   function capIt(m) {

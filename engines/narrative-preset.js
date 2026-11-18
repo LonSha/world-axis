@@ -24,6 +24,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.529.0: 决策时间单一出口（G20：产品代码零裸调 Date.now()）。此前本引擎直接裸调，
+  //   冻结/回放时这段读到的时刻不受控 —— 回放对不上时无从定位。
+  const clockNow = function (s) { try { return WA.clock.now(s); } catch (e) { return Date.now(); } };
   const VERSION = '2.524.0';
   const LS_KEY = 'worldaxis_narrativepreset_settings_v1';
   const DEF = { enabled: true, worldPct: 35, productionCap: 6, overviewWindow: 3, overviewTodos: 3 };
@@ -76,7 +79,7 @@
     });
     const kept = {};
     try { NARRATIVE.forEach(function (ns) { if (has(ns)) kept[ns] = (WA[ns].getSettings() || {}).enabled !== false; }); } catch (e) { /* 只做读数 */ }
-    writeSnap({ at: Date.now(), prev: prev });
+    writeSnap({ at: clockNow('narrativePreset'), prev: prev });
     stat.applied++;
     return { ok: true, reason: 'ok', narrowed: Object.keys(prev), narrativeOn: Object.keys(kept).filter(function (k) { return kept[k]; }), prev: prev };
   }

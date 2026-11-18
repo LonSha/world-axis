@@ -60,7 +60,7 @@
     return Math.max(lo, Math.min(hi, n));
   }
   function nowAt() {
-    try { return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('floorOrder') : Date.now(); }
+    try { return (function () { try { return WA.clock.now('floorOrder'); } catch (e) { return Date.now(); } })(); }
     catch (e) { return Date.now(); }
   }
   function hist() {

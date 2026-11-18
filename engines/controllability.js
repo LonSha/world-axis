@@ -24,6 +24,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.529.0: 决策时间单一出口（G20：产品代码零裸调 Date.now()）。此前本引擎直接裸调，
+  //   冻结/回放时这段读到的时刻不受控 —— 回放对不上时无从定位。
+  const clockNow = function (s) { try { return WA.clock.now(s); } catch (e) { return Date.now(); } };
   const VERSION = '2.524.0';
   const LS_KEY = 'worldaxis_controllability_settings_v1';
   const DEF = { enabled: true, auditKeep: 40, undoWindow: 3 };
@@ -71,7 +74,7 @@
     try {
       if (WA.store && WA.store.transact) {
         WA.store.transact(function (dd) {
-          dd.roundMark = { round: r, at: Date.now(), payload: payload.slice(0, 400000) };
+          dd.roundMark = { round: r, at: clockNow('controllability'), payload: payload.slice(0, 400000) };
           return true;
         }, 'ctl:mark');
       }
@@ -177,7 +180,7 @@
     const face = String(s.face || '').slice(0, 40);
     if (!face) return refuse('missing-fields', { field: 'face' });
     const row = { face: face, on: s.on !== false, by: String(s.by || '').slice(0, 40) || '未知（调用方没说是谁）',
-      at: Date.now(), round: round(), why: String(s.why || '').slice(0, 60) };
+      at: clockNow('controllability'), round: round(), why: String(s.why || '').slice(0, 60) };
     const d = draft();
     const log = Array.isArray(d.switchAudit) ? d.switchAudit.slice() : [];
     log.push(row);

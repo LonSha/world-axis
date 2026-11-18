@@ -241,7 +241,7 @@
       }
       band = bandOf100(o.target, roll);
     }
-    const at = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('outcomeDice') : Date.now();
+    const at = (function () { try { return WA.clock.now('outcomeDice'); } catch (e) { return Date.now(); } })();
     const entry = {
       ticket: ticket, die: die, roll: roll, target: o.target, need: need,
       band: band, label: LABEL[band], rank: RANK[band],

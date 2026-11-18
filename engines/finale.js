@@ -48,7 +48,7 @@
   }
   function num0(v) { const n = Number(v); return isFinite(n) && n > 0 ? n : 0; }
   function nowAt() {
-    try { return (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('finale') : Date.now(); }
+    try { return (function () { try { return WA.clock.now('finale'); } catch (e) { return Date.now(); } })(); }
     catch (e) { return Date.now(); }
   }
 

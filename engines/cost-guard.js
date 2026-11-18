@@ -23,6 +23,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.529.0: 决策时间单一出口（G20：产品代码零裸调 Date.now()）。此前本引擎直接裸调，
+  //   冻结/回放时这段读到的时刻不受控 —— 回放对不上时无从定位。
+  const clockNow = function (s) { try { return WA.clock.now(s); } catch (e) { return Date.now(); } };
   const VERSION = '2.524.0';
   const LS_KEY = 'worldaxis_costguard_settings_v1';
   const DEF = { enabled: true, maxOfflineRounds: 20, warnAt: 80, keepReasons: 12 };
@@ -115,7 +118,7 @@
     }
     try {
       if (WA.store && WA.store.transact) {
-        WA.store.transact(function (dd) { dd.inputDebounce = { floorId: floor, at: Date.now() }; return true; }, 'cost:debounce');
+        WA.store.transact(function (dd) { dd.inputDebounce = { floorId: floor, at: clockNow('costGuard') }; return true; }, 'cost:debounce');
       }
     } catch (e) { /* 记不下也不重复推 */ }
     return { ok: true, reason: 'ok', duplicate: false, skipped: false, floorId: floor };
@@ -165,7 +168,7 @@
     if (OPTIONS.indexOf(opt) < 0) return refuse('missing-fields', { field: 'option', options: OPTIONS.slice() });
     try {
       if (WA.store && WA.store.transact) {
-        WA.store.transact(function (d) { d.costChoice = { option: opt, at: Date.now() }; return true; }, 'cost:choose');
+        WA.store.transact(function (d) { d.costChoice = { option: opt, at: clockNow('costGuard') }; return true; }, 'cost:choose');
       }
     } catch (e) { /* 选了但没记下 —— 如实说 */ }
     return { ok: true, reason: 'ok', option: opt,
