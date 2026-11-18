@@ -61,7 +61,10 @@
       costChoice: null,                     // {option, at} —— 超预算三选项的选定
       toneTrail: [],                        // 近几轮的走向读数（语气突变判据）
       diceLog: [],                          // S1 判定票（同一票只掷一次；最近 32 票）
-      diceSkills: null,                     // S1 技能表覆盖（格斗/射击/交谈…；null=用内置默认）
+      diceSkills: {},                       // S1 技能表覆盖（格斗/射击/交谈…；空对象=用内置默认）
+      //   v2.524.0：原来是 null，而登记表声明 kind:'object' ⇒ registryParity 报类型错配、
+      //   干净库被记一条 warn 议题。读侧本来就 (`(m && typeof m==='object' && !Array.isArray(m)) ? m : {}`)
+      //   把非对象当空表，故改成 {} 与既有语义逐字一致，只把“声明的类型”与“物化的类型”对齐。
       identityLedger: {},                   // EXV29-01 四元组基线（每人一条：称呼/口音/习惯/忌讳）
       addressForms: {},                     // EXV29-02 称呼随亲疏（每组关系一条：用的称呼 + 关系档）
       aging: {},                            // EXV29-03 年龄与体貌推进（每人一条：年龄 + 累计天数 + 体貌档）
@@ -75,7 +78,9 @@
       arcSettle: {},                        // EXV29-14 卷末结算（每卷一条：发生了什么/谁变了/留下什么）
       looseEnds: {},                        // EXV29-15 未收的线（每条一句 fate：它后来怎样）
       exitRites: {},                        // EXV29-16 退场名册（场面 + 见证人；不含删除）
-      pastLife: null,                       // EXV29-18 前世继承（from={chatId,round}，不继承则删键）
+      pastLife: {},                         // EXV29-18 前世继承（from={chatId,round}，不继承则删键）
+      //   v2.524.0：同上 —— 声明 kind:'object' 就必须物化成对象；读侧对非对象一律当空表，
+      //   `decline` 仍是删键（零残留的判据看的是键数，不是 null）。
       reputationAfter: {},                  // EXV29-20 身后名（一人一票：subject|by 一条，含来源）
       posthumous: {},                       // EXV29-19/21/22/24 身后四事（债/遗物/遗嘱/翻案/记得的人）
       livelihood: {},                       // EXV29-26～30 生计五面（流水 32 笔 / 囤货记恨 / 旧债折算）

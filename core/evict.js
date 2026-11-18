@@ -529,6 +529,42 @@
   //     旧值本来就是过时信息，不构成容量治理；把它们计进挤出会让 evicts 虚高。
   // 本表存在的意义：让「为什么不给它记账」是**声明过的决定**，而不是漏掉。
   const NON_EVICT = {
+    // ══ v2.524.0（V29 拓展线 Y1～Y6 / S1）：新登记的容量键，逐个给解释方 ══
+    //   病（本轮全量实测）：这些键进了 `__BOUNDED_CAPS`，却没进 SITES、也没进本表 ——
+    //   于是双集合门禁两层同时报「未解释」，而容量治理对它们其实一直空转。
+    //   本表的每一条都写**真实机制**，不为凑绿而编：
+    //   ① 键空间型（一人一条 / 一事一条，增长轴由实体数量界定，不存在独立追加轴）：
+    'identityLedger': '键空间=人物 id（一人一条身份账），无独立追加轴；cap 为容量水位，写入侧不裁剪',
+    'addressForm': '同上：键空间=人物 id（一人一套称呼表）',
+    'addressForms': '同上：键空间=人物 id（一人一套称呼表）',
+    'aging': '同上：键空间=人物 id（一人一条年龄轨迹）',
+    'habitTells': '同上：键空间=人物 id×习惯键',
+    'etiquette': '同上：键空间=人物 id×场合',
+    'etiquetteHits': '同上：键空间=人物 id×忌讳项',
+    'exitRites': '键空间=人物 id（每个人只有一次退场），无追加轴；不提供删除函数，只随人写一次',
+    'reputationAfter': '键空间=评价人×被评人（一人一票，同一对被改写），无追加轴',
+    'pastLife': '键空间=上一局归档里的继承项（选定后落成固定几键，decline 全删），无追加轴',
+    //   ② 写入侧自裁剪型（引擎内截断，产品源码零 WA.evict.* 调用 —— 与 diplomacy/freight 同族）：
+    'floorOrder': '写入侧自裁剪（同场座位表，重算时重建；不走 evict）',
+    'interruptCost': '写入侧自裁剪（打断账环形，超出即丢最旧；不走 evict）',
+    'quietRound': '写入侧自裁剪（静默回合环形；不走 evict）',
+    'finale': '写入侧自裁剪（终局四线固定四键，重算覆盖；不走 evict）',
+    'arcSettle': '写入侧自裁剪（卷末结账一人一条，随卷重建；不走 evict）',
+    'posthumous': '写入侧自裁剪（内部五桶各自截断，写前先夹桶再整箱存档；不走 evict）',
+    'livelihood': '写入侧自裁剪（流水环形 32 条，超出丢最旧；不走 evict）',
+    'worldBounds': '写入侧自裁剪（暂停/序/档长几个标量键，重算覆盖；不走 evict）',
+    'looseEnds': '欠账：cap 已登记但写入侧尚未强制裁剪（随主线结算显式删除，无追加轴）；待 OPV29-26 补真裁剪',
+    //   ③ S1 单列可开关项（dice）：
+    'diceLog': '写入侧自裁剪（判定票环形 CAP=32，超出丢最旧；不走 evict）',
+    'diceSkills': '写入侧自裁剪（技能覆盖表，SKILL_CAP=64 满则拒写；不走 evict）',
+    //   ④ 既有登记（非本轮新增）：只作容量水位，写入侧没有拆卸点。
+    //     如实写在这里，而不是给它们硬凑一个站点 —— 没裁剪就是没裁剪。
+    'productionQueue': '既有登记：容量水位／治理阈值，写入侧无裁剪点（不是本轮新增）',
+    'factQueue': '同上（既有登记，无裁剪点）',
+    'ticketRing': '同上（既有登记，无裁剪点）',
+    'switchAudit': '同上（既有登记，无裁剪点）',
+    'toneTrail': '同上（既有登记，无裁剪点）',
+    'consequences': '同上（既有登记，无裁剪点）',
     'commodityCirculation.stockpiles': '写入侧硬上界 128，store.withOwnerState 超限拒收，保留现有义务',
     'commodityCirculation.debts': '写入侧硬上界 50，store.withOwnerState 超限拒收，保留现有义务',
     'commodityCirculation.blacklists': '写入侧硬上界 128，store.withOwnerState 超限拒收，保留现有义务',

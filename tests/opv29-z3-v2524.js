@@ -57,7 +57,8 @@ ok(help.SYMPTOMS['slim-suspect'].next.indexOf('WA_SLIM=0') >= 0, 'Y7 瘦身可�
 eq(help.SYMPTOMS['no-such-symptom'], undefined, 'Y8 未知病症不给治法（不猜）');
 const d = help.diagnose({ root: ROOT });
 eq(d.git.ok, true, 'Y9 现场 git 读得出 HEAD', d.git.why);
-ok(['active', 'stale', 'no-owner', 'unknown'].indexOf(d.lock.state) >= 0, 'Y10 锁态在四态内', d.lock.state);
+ok(['free', 'active', 'stale', 'no-owner', 'unknown'].indexOf(d.lock.state) >= 0, 'Y10 锁态在五态内', d.lock.state);
+if (d.lock.state === 'free') eq(d.lock.hint, null, 'Y10b **没有锁就不得提示“可回收”**（本轮自诊工具自查出的真 bug）');
 ok(d.verdict === 'none' || !!d.step, 'Y11 有结论就一定有下一步（不空口）');
 if (d.lock.state === 'active') ok(/不要删/.test(d.lock.hint || ''), 'Y12 **活锁不得被当成可回收**（负控制）', d.lock.hint);
 else ok(d.lock.state !== 'active', 'Y12 当前非活锁，本项不适用（不算通过也不算失败）');

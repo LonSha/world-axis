@@ -40,7 +40,8 @@ function lockState(root) {
   catch (e) { return { dir: dir, state: 'unknown', why: 'runner-unreadable', hint: null }; }
   const st = inspect(dir);
   const out = { dir: dir, state: st.state, why: st.why || null, pid: st.owner ? st.owner.pid : null };
-  if (st.state === 'active') out.hint = '活锁：等它跑完，或先确认那个 pid 已不是回归；不要删。';
+  if (st.state === 'free') out.hint = null;   // 没有锁：无需处置（不得读成“可回收”）
+  else if (st.state === 'active') out.hint = '活锁：等它跑完，或先确认那个 pid 已不是回归；不要删。';
   else if (st.state === 'stale' || st.state === 'no-owner') out.hint = '可回收：node tools/fault-selfhelp.js --recover（幂等；会先确认没有活子进程）';
   else if (st.state === 'unknown') out.hint = '读不出主人：先 ls -la ' + dir + ' 看一眼 why=' + (st.why || '?') + '，再决定。';
   return out;

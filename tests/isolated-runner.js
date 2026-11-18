@@ -27,6 +27,12 @@ function identity(pid) {
  *   `unknown` 是「文件在、但读不出/解析不出」，回收由人确认（`dir` 与 `why` 一并回带，便于照着查）。
  */
 function inspectLock(dir) {
+  // v2.524.0（V29 OPV29-15 用药时自查出的真 bug）：**目录根本不存在**时旧实现读不到 owner.json
+  //   就返回 `no-owner`，而 `no-owner` 在 recoverLock 与现场提示里都等于「可按 stale 回收」。
+  //   于是“没有锁”与“锁坏了”被压成同一个词：自诊工具在锁已回收之后仍然报「可回收」，
+  //   照它办就会去回收一个不存在的东西（recoverLock 会抛 absent —— 读起来像“回收失败”）。
+  //   五态：free（没有锁）/ no-owner / stale / active / unknown。free 不需要任何处置。
+  if (!fs.existsSync(dir)) return { state: 'free', dir };
   const p = path.join(dir, 'owner.json');
   if (!fs.existsSync(p)) return { state: 'no-owner', dir, why: 'no owner.json in lock dir' };
   try {
