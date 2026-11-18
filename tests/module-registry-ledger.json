@@ -1,13 +1,13 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 535,
- "loadedCount": 514,
+ "loadOrderCount": 541,
+ "loadedCount": 520,
  "uiCount": 21,
- "nsCount": 525,
+ "nsCount": 531,
  "totals": {
-  "loadEdges": 412,
+  "loadEdges": 424,
   "hardEdges": 0,
-  "callRefs": 673,
+  "callRefs": 685,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -96,9 +96,12 @@
     "engines/compare.js",
     "engines/consequence-schedule.js",
     "engines/contest.js",
+    "engines/continuity-guard.js",
     "engines/contraband.js",
+    "engines/controllability.js",
     "engines/coop.js",
     "engines/coordinate.js",
+    "engines/cost-guard.js",
     "engines/counterfactual-sandbox.js",
     "engines/covenant-sanction.js",
     "engines/covert-espionage.js",
@@ -205,6 +208,7 @@
     "engines/mortuary-rites.js",
     "engines/motif.js",
     "engines/narrative-lens.js",
+    "engines/narrative-preset.js",
     "engines/narrow-consumers.js",
     "engines/night-watch.js",
     "engines/noesis.js",
@@ -310,6 +314,7 @@
     "engines/storage-forecast.js",
     "engines/story-choice.js",
     "engines/story-loop.js",
+    "engines/story-rhythm.js",
     "engines/story-tone.js",
     "engines/story-window.js",
     "engines/storyclock.js",
@@ -350,6 +355,7 @@
     "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
+    "engines/world-loop-log.js",
     "engines/world-reader.js",
     "engines/world-seed.js",
     "engines/world-singularity.js",
@@ -481,7 +487,10 @@
     "engines/collateral-rupture.js",
     "engines/commodity-circulation.js",
     "engines/consequence-schedule.js",
+    "engines/continuity-guard.js",
+    "engines/controllability.js",
     "engines/coordinate.js",
+    "engines/cost-guard.js",
     "engines/counterfactual-echo.js",
     "engines/courier-dispatch.js",
     "engines/dilemma-bargain.js",
@@ -522,6 +531,7 @@
     "engines/misbelief.js",
     "engines/mob-stampede.js",
     "engines/mortuary-rites.js",
+    "engines/narrative-preset.js",
     "engines/narrow-consumers.js",
     "engines/offline-return.js",
     "engines/offstage-life.js",
@@ -546,6 +556,7 @@
     "engines/somatic-trauma.js",
     "engines/stage-presence.js",
     "engines/stage-session.js",
+    "engines/story-rhythm.js",
     "engines/summarizer-adapter.js",
     "engines/summarizer.js",
     "engines/supply-choke.js",
@@ -556,6 +567,7 @@
     "engines/wb-inject.js",
     "engines/whisper-backchannel.js",
     "engines/world-brief.js",
+    "engines/world-loop-log.js",
     "engines/world-singularity.js",
     "render/purifier.js"
    ]
@@ -635,9 +647,12 @@
     "engines/compare.js",
     "engines/consequence-schedule.js",
     "engines/contest.js",
+    "engines/continuity-guard.js",
     "engines/contraband.js",
+    "engines/controllability.js",
     "engines/coop.js",
     "engines/coordinate.js",
+    "engines/cost-guard.js",
     "engines/counterfactual-sandbox.js",
     "engines/covenant-sanction.js",
     "engines/covert-espionage.js",
@@ -734,6 +749,7 @@
     "engines/mortuary-rites.js",
     "engines/motif.js",
     "engines/narrative-lens.js",
+    "engines/narrative-preset.js",
     "engines/narrow-consumers.js",
     "engines/night-watch.js",
     "engines/noesis.js",
@@ -834,6 +850,7 @@
     "engines/storage-forecast.js",
     "engines/story-choice.js",
     "engines/story-loop.js",
+    "engines/story-rhythm.js",
     "engines/story-tone.js",
     "engines/story-window.js",
     "engines/storyclock.js",
@@ -872,6 +889,7 @@
     "engines/world-graph.js",
     "engines/world-health.js",
     "engines/world-lab.js",
+    "engines/world-loop-log.js",
     "engines/world-reader.js",
     "engines/world-seed.js",
     "engines/world-singularity.js",
@@ -5141,6 +5159,144 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_worldbrief_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/narrative-preset.js": {
+   "ns": [
+    "narrativePreset"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_narrativepreset_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/world-loop-log.js": {
+   "ns": [
+    "worldLoopLog"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_worldlooplog_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/cost-guard.js": {
+   "ns": [
+    "costGuard"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_costguard_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/continuity-guard.js": {
+   "ns": [
+    "continuityGuard"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_continuityguard_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/controllability.js": {
+   "ns": [
+    "controllability"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_controllability_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/story-rhythm.js": {
+   "ns": [
+    "storyRhythm"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_storyrhythm_settings_v1"
    ],
    "consumedBy": []
   },

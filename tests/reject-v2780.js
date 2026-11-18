@@ -9780,6 +9780,93 @@ function runWitness(WA) {
       }
     }
   }
+  // ── v2.524.0（OPV28 组一~六）：六台治理面的可执行见证 ──
+  //   一律**不新造码**：全部撞现场已有的码（conflict / missing-fields / no-path / leak /
+  //   shortfall / weak-evidence / closed / permission-denied / too-few / stale / missing），
+  //   正面面用不设码的断言（读数对不上就抛，门禁照红）。
+  {
+    const putG = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:opv28'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store */ }
+    };
+    if (WA.store && typeof WA.store.get === 'function') {
+      const keepP = (WA.store.get() || {}).people;
+      const keepC = (WA.store.get() || {}).chronicle;
+      try {
+        putG(function (d) {
+          d.people = [{ name: '阿禾', knows: ['井水发苦'], belongings: { 盐: 2 } },
+            { name: '外人', knows: [], belongings: {} }];
+        });
+        // 组一：叙事优先预设不许关叙事面
+        want('conflict', 'OPV28-01：预设名单里出现叙事面 ⇒ conflict（叙事优先不许把叙事本身关掉）');
+        trip('conflict', function () { return WA.narrativePreset.apply({ narrow: ['offstageQueue'] }).reason; });
+        // 组一：契约缺必答字段要点名
+        want('missing-fields', 'OPV28-02：契约必答 6 字段缺项 ⇒ missing-fields 并点名');
+        trip('missing-fields', function () { return WA.narrativePreset.check({ 谁: '阿禾' }).reason; });
+        // 组二：说不出依据的动作 = 猜的
+        want('weak-evidence', 'OPV28-07：这轮谁动了却给不出依据 ⇒ weak-evidence（不拿「大概会」凑数）');
+        trip('weak-evidence', function () {
+          return WA.worldLoopLog.logRound({ moves: [{ who: '阿禾', basis: '' }] }).reason;
+        });
+        // 组二：查无此账就说不出依据
+        want('causal-absent', 'OPV28-09：结算依据对不上账 ⇒ causal-absent（不套话）');
+        trip('causal-absent', function () { return WA.worldLoopLog.why('没有这条账').reason; });
+        // 组三：离线不给轮数就没法分批
+        want('missing-fields', 'OPV28-15：离线预算不给轮数 ⇒ missing-fields'); 
+        // 组四：人不能瞬移 / 不在场不能知道 / 东西不会凭空多
+        want('no-path', 'OPV28-19：跨地点既没路也没花时间 ⇒ no-path（人不能瞬移）');
+        trip('no-path', function () { return WA.continuityGuard.position({ who: '阿禾', from: '码头', to: '城里' }).reason; });
+        want('leak', 'OPV28-20：不在场也没听过就说 ⇒ leak 并点名事实');
+        trip('leak', function () { return WA.continuityGuard.knowledge({ who: '外人', fact: '井水发苦' }).reason; });
+        want('shortfall', 'OPV28-21：凭空多出来的东西说不出从谁来 ⇒ shortfall');
+        trip('shortfall', function () { return WA.continuityGuard.items({ who: '阿禾', item: '盐', delta: 1 }).reason; });
+        want('weak-evidence', 'OPV28-22：关系一次跳太多又没事件 ⇒ weak-evidence');
+        trip('weak-evidence', function () { return WA.continuityGuard.relation({ who: '阿禾', target: '外人', delta: 30 }).reason; });
+        // 组五：危险操作没确认就拒收 / 没标过就撤不回
+        want('permission-denied', 'OPV28-28：删档没二次确认 ⇒ permission-denied（确认后再来）');
+        trip('permission-denied', function () { return WA.controllability.confirm({ op: 'delete-save' }).reason; });
+        want('missing', 'OPV28-26：没 mark 就 rollback ⇒ missing（撤不回不装作撤了）');
+        trip('missing', function () {
+          putG(function (d) { d.roundMark = null; });
+          return WA.controllability.rollback({}).reason;
+        });
+        // 组六：三个选项后果一样 = 一个选项
+        want('too-few', 'OPV28-35：三个选项后果差集为空 ⇒ too-few（这其实是一个选项）');
+        trip('too-few', function () {
+          return WA.storyRhythm.options([{ text: '去', consequence: { 钱: -1 } },
+            { text: '不去', consequence: { 钱: -1 } }, { text: '等等', consequence: { 钱: -1 } }]).reason;
+        });
+        // 正面面：总闸只折世界状态类，场景一条不折
+        const g = WA.narrativePreset.gate([
+          { source: '世界', content: '世界状态：' + '甲'.repeat(120) },
+          { source: '场景', content: '你在药铺门口' }
+        ]);
+        if (!(g && g.ok && g.folded === true && g.sceneKept === 1 && g.line)) {
+          throw new Error('总闸没折世界状态类或把场景折了：' + JSON.stringify(g));
+        }
+        // 正面面：信息释放单轮 ≤ 上限，其余延后不丢
+        const rl = WA.storyRhythm.release(['甲', '乙', '丙', '丁', '戊']);
+        if (!(rl && rl.ok && rl.released.length === 3 && rl.deferred === 2)) {
+          throw new Error('信息释放节奏没按上限放：' + JSON.stringify(rl));
+        }
+        // 正面面：安静是合法结果（静默许可）
+        putG(function (d) { d.chronicle = []; });
+        const sl = WA.narrativePreset.silence({ rounds: 5 });
+        if (!(sl && sl.ok && sl.quiet === true && sl.line)) {
+          throw new Error('静默许可没把「没事」说成合法结果：' + JSON.stringify(sl));
+        }
+        // 正面面：可关性只报真能关的源
+        const off = WA.controllability.offable();
+        if (!(off && off.ok && off.total >= 10 && off.offableCount >= 1)) {
+          throw new Error('可关性读数不对：' + JSON.stringify(off));
+        }
+      } finally {
+        putG(function (d) { d.people = keepP; d.chronicle = keepC; });
+      }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

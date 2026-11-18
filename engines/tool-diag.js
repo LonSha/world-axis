@@ -3668,6 +3668,12 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
     'engines/interlude.js': 'interlude',
     'engines/letter-post.js': 'letterPost',
     'engines/world-brief.js': 'worldBrief',
+    'engines/narrative-preset.js': 'narrativePreset',
+    'engines/world-loop-log.js': 'worldLoopLog',
+    'engines/cost-guard.js': 'costGuard',
+    'engines/continuity-guard.js': 'continuityGuard',
+    'engines/controllability.js': 'controllability',
+    'engines/story-rhythm.js': 'storyRhythm',
     // v2.96.0（X3）：传播与辟谣（与 index.js LOAD_ORDER 同批登记）。
     'engines/rumor.js': 'rumor',
     // v2.99.0：原著幕目（与 index.js LOAD_ORDER 同批登记）。

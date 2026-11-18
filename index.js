@@ -748,6 +748,15 @@
     //   硬依赖：须晚于 engines/hearsay-ledger.js（拼图板读它落的 shard）；
     //   须早于 render/inject.js（注入读 worldBrief.buildBlock()）。
     'engines/world-brief.js',
+    // v2.524.0（OPV28 组一~组六）：六台「面向玩家与调度的治理面」。
+    //   硬依赖：continuity-guard 早于 story-rhythm（pov 复用它的 knowledge 口径）；
+    //   narrative-preset / controllability 读 world-brief（静默许可与注入块）。
+    'engines/narrative-preset.js',
+    'engines/world-loop-log.js',
+    'engines/cost-guard.js',
+    'engines/continuity-guard.js',
+    'engines/controllability.js',
+    'engines/story-rhythm.js',
     // v2.96.0（X3）：传播与辟谣（事实 / 目击 / 转述 / 流言四层传播链）。
     //   三条位置约束，全是硬依赖：
     //     ① 须**晚于** engines/memory.js —— 事实真源是 memory.facts（事实唯一写者 upsertFact）；

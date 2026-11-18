@@ -698,14 +698,6 @@
       "tref": 0,
       "own": 16
     },
-    "appointment.view": {
-      "reason": "self-only",
-      "detail": "engines/appointment.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/appointment.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "archiveHide.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -2954,6 +2946,70 @@
       "tref": 1,
       "own": 3
     },
+    "continuityGuard.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/continuity-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "continuityGuard.items": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/continuity-guard.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "continuityGuard.relation": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/continuity-guard.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "continuityGuard.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/continuity-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "continuityGuard.stat": {
+      "reason": "self-only",
+      "detail": "engines/continuity-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/continuity-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 14
+    },
+    "continuityGuard.terminal": {
+      "reason": "self-only",
+      "detail": "engines/continuity-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/continuity-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "continuityGuard.time": {
+      "reason": "self-only",
+      "detail": "engines/continuity-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/continuity-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "continuityGuard.view": {
+      "reason": "self-only",
+      "detail": "engines/continuity-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/continuity-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "contrabandPipeline.defineContrabandPolicy": {
       "reason": "self-only",
       "detail": "engines/contraband-pipeline.js 内部自用、外部零引用（过度导出）",
@@ -3025,6 +3081,78 @@
       "refs": 0,
       "tref": 3,
       "own": 2
+    },
+    "controllability.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/controllability.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "controllability.importCheck": {
+      "reason": "self-only",
+      "detail": "engines/controllability.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/controllability.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "controllability.offable": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/controllability.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 5
+    },
+    "controllability.secretScan": {
+      "reason": "self-only",
+      "detail": "engines/controllability.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/controllability.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "controllability.setSettings": {
+      "reason": "self-only",
+      "detail": "engines/controllability.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/controllability.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 2
+    },
+    "controllability.stat": {
+      "reason": "self-only",
+      "detail": "engines/controllability.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/controllability.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
+    "controllability.switchAudit": {
+      "reason": "self-only",
+      "detail": "engines/controllability.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/controllability.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 10
+    },
+    "controllability.switchNote": {
+      "reason": "self-only",
+      "detail": "engines/controllability.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/controllability.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "controllability.view": {
+      "reason": "self-only",
+      "detail": "engines/controllability.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/controllability.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     },
     "coop.advanceProjectWork": {
       "reason": "self-only",
@@ -3153,6 +3281,78 @@
       "refs": 0,
       "tref": 3,
       "own": 3
+    },
+    "costGuard.debounce": {
+      "reason": "self-only",
+      "detail": "engines/cost-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/cost-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "costGuard.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/cost-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "costGuard.offlineBudget": {
+      "reason": "self-only",
+      "detail": "engines/cost-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/cost-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "costGuard.offstageRoute": {
+      "reason": "self-only",
+      "detail": "engines/cost-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/cost-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "costGuard.recycle": {
+      "reason": "self-only",
+      "detail": "engines/cost-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/cost-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "costGuard.roundCost": {
+      "reason": "self-only",
+      "detail": "engines/cost-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/cost-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "costGuard.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/cost-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "costGuard.stat": {
+      "reason": "self-only",
+      "detail": "engines/cost-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/cost-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
+    "costGuard.view": {
+      "reason": "self-only",
+      "detail": "engines/cost-guard.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/cost-guard.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
     },
     "counterfactualSandbox.stat": {
       "reason": "self-only",
@@ -8698,6 +8898,86 @@
       "tref": 0,
       "own": 5
     },
+    "narrativePreset.cap": {
+      "reason": "self-only",
+      "detail": "engines/narrative-preset.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "narrativePreset.check": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "narrativePreset.contract": {
+      "reason": "self-only",
+      "detail": "engines/narrative-preset.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "narrativePreset.drain": {
+      "reason": "self-only",
+      "detail": "engines/narrative-preset.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "narrativePreset.gate": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "narrativePreset.getSettings": {
+      "reason": "self-only",
+      "detail": "engines/narrative-preset.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "narrativePreset.setSettings": {
+      "reason": "self-only",
+      "detail": "engines/narrative-preset.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "narrativePreset.silence": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "narrativePreset.stat": {
+      "reason": "self-only",
+      "detail": "engines/narrative-preset.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
+    "narrativePreset.view": {
+      "reason": "self-only",
+      "detail": "engines/narrative-preset.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/narrative-preset.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
     "narrowConsumers.registry": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -8947,14 +9227,6 @@
       "own": 15
     },
     "offstageQueue.step": {
-      "reason": "self-only",
-      "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/offstage-queue.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "offstageQueue.view": {
       "reason": "self-only",
       "detail": "engines/offstage-queue.js 内部自用、外部零引用（过度导出）",
       "src": "engines/offstage-queue.js",
@@ -13154,6 +13426,70 @@
       "tref": 1,
       "own": 3
     },
+    "storyRhythm.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/story-rhythm.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "storyRhythm.pov": {
+      "reason": "self-only",
+      "detail": "engines/story-rhythm.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/story-rhythm.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "storyRhythm.release": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/story-rhythm.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 3
+    },
+    "storyRhythm.repetition": {
+      "reason": "self-only",
+      "detail": "engines/story-rhythm.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/story-rhythm.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "storyRhythm.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/story-rhythm.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "storyRhythm.stat": {
+      "reason": "self-only",
+      "detail": "engines/story-rhythm.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/story-rhythm.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 13
+    },
+    "storyRhythm.tone": {
+      "reason": "self-only",
+      "detail": "engines/story-rhythm.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/story-rhythm.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "storyRhythm.view": {
+      "reason": "self-only",
+      "detail": "engines/story-rhythm.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/story-rhythm.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
     "storyTone.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -15186,22 +15522,6 @@
       "tref": 2,
       "own": 1
     },
-    "worldBrief.oneLine": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/world-brief.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 4
-    },
-    "worldBrief.quiet": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/world-brief.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 6
-    },
     "worldBrief.setSettings": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -15241,6 +15561,78 @@
       "refs": 0,
       "tref": 2,
       "own": 3
+    },
+    "worldLoopLog.degrade": {
+      "reason": "self-only",
+      "detail": "engines/world-loop-log.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-loop-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "worldLoopLog.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/world-loop-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "worldLoopLog.provenance": {
+      "reason": "self-only",
+      "detail": "engines/world-loop-log.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-loop-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "worldLoopLog.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/world-loop-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "worldLoopLog.stat": {
+      "reason": "self-only",
+      "detail": "engines/world-loop-log.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-loop-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 14
+    },
+    "worldLoopLog.ticket": {
+      "reason": "self-only",
+      "detail": "engines/world-loop-log.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-loop-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "worldLoopLog.tickets": {
+      "reason": "self-only",
+      "detail": "engines/world-loop-log.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-loop-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 7
+    },
+    "worldLoopLog.view": {
+      "reason": "self-only",
+      "detail": "engines/world-loop-log.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/world-loop-log.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "worldLoopLog.why": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/world-loop-log.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 6
     },
     "worldReader.renderHolographicGeoMap": {
       "reason": "test-only",
@@ -15510,6 +15902,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 692
+    "dataOnly": 697
   }
 }

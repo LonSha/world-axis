@@ -48,6 +48,18 @@
       shadowCouncil: {"agents":{},"deadDrops":{},"_stats":{"agentsInfiltrated":0,"lettersDropped":0,"lettersRetrieved":0,"sanitizations":0}},
       dynasticLineage: {"clans":{},"members":{},"_stats":{"lineagesBound":0,"successionsDecided":0,"privilegesClaimed":0}},
       worldSingularity: {"currentEpoch":"classical-era","singularityTension":0,"epochHistory":[],"convergenceTriggered":false,"_stats":{"tensionsAdvanced":0,"convergencesTriggered":0,"epochsShifted":0}},
+      // ── v2.524.0（OPV28 治理面）：九个顶层键在这里**出生**（引擎不许凭空长键）──
+      //   预设快照 / 产量排队 / 事实延后队列 / 票据环 / 整轮标记 / 开关审计 /
+      //   输入去抖 / 成本选择 / 语气轨迹。全部有界（见 __BOUNDED_CAPS 与各引擎内的挤出）。
+      narrativePresetSnapshot: null,        // {at, prev:{ns:settings}} —— 叙事优先预设的可还原点
+      productionQueue: [],                  // 每轮世界自转超出产量上限的条目（排队不丢，下轮先出）
+      factQueue: [],                        // 单轮新事实超出释放上限的条目（延后不丢）
+      ticketRing: [],                       // 幂等票据环（同一张票重复推进会被拦下）
+      roundMark: null,                      // {round, at, payload} —— 单轮回滚的标记点
+      switchAudit: [],                      // 开关审计：谁、何时、关了哪个面
+      inputDebounce: null,                  // {floorId, at} —— 同楼层不重复结算
+      costChoice: null,                     // {option, at} —— 超预算三选项的选定
+      toneTrail: [],                        // 近几轮的走向读数（语气突变判据）
       // 世界钟
       clock: { iso: '', label: '', dayIndex: 0, source: 'unset' }, // source: unset|user|text|engine
       // 世界背景（用户设定或世界书注入的自由文本，纯框架不预设内容）
@@ -1752,6 +1764,12 @@
     return { state: target, filled: filled, conflicts: conflicts };
   }
   const __BOUNDED_CAPS = {
+    // v2.524.0（OPV28）：治理面的五个数组键，全部有界；引擎内挤出与这里逐条对齐。
+    productionQueue: { cap: 60, kind: 'array', site: 'narrative-preset.js cap()/drain()' },
+    factQueue: { cap: 40, kind: 'array', site: 'story-rhythm.js release()' },
+    ticketRing: { cap: 64, kind: 'array', site: 'world-loop-log.js ticket()（ticketKeep 上界 64）' },
+    switchAudit: { cap: 128, kind: 'array', site: 'controllability.js switchNote()（auditKeep 上界 128）' },
+    toneTrail: { cap: 10, kind: 'array', site: 'story-rhythm.js tone()（recentRounds 上界 10）' },
     'commodityCirculation.stockpiles': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
     'commodityCirculation.debts': { cap: 50, kind: 'object', site: 'store.withOwnerState write capacity' },
     'commodityCirculation.blacklists': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
