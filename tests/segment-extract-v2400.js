@@ -155,7 +155,7 @@ const BASE_ASSERT_CC = 5267;  // v2.518.0 +4（三把 story-window 专锁 +1 把
 //       唯独这条「面本身没有意外增减」的绝对基线没人补。本批一次补齐，不改判据口径。
 //     为什么仍然不用「>= 564」了事：下界判据对「面塌了」是瞎的（见上段原文）。代价是每加一把锁
 //     就要动这个常量 —— 而那正是它的价值：动它的人必须亲手确认「我确实新增了一个测试文件」。
-const BASE_TEST_FILES = 579;  // v2.524.0（S1）：+1 tests/outcome-dice-v2525.js（d20 五档判定专锁）  // v2.524.0：575→577→578（+2：tests/opv27-boot-report-lock.js · tests/opv27-inject-explain-lock.js —— V27 优化线 OPV27-1/2 与 OPV27-4 两把专锁；+1：tests/opv27-rest-lock.js —— OPV27-3/5/6/7/8/9 六项一把锁、六条真源码负控制）
+const BASE_TEST_FILES = 585;  // v2.524.0（V29 批六）：+1 tests/worldbounds-batch6-v2524.js（EXV29-31～36 六段一把锁）  // v2.524.0（V29 批五）：+1 tests/livelihood-batch5-v2524.js（EXV29-25～30 六段一把锁）  // v2.524.0（V29 批四）：+1 tests/posthumous-batch4-v2524.js（EXV29-19～24 六段一把锁）  // v2.524.0（V29 批三）：+1 tests/finale-batch3-v2524.js（EXV29-13～18 五段一把锁）  // v2.524.0（S1）：+1 tests/outcome-dice-v2525.js（d20 五档判定专锁）  // v2.524.0（V29 批一）：+1 tests/identity-batch1-v2524.js（EXV29-02～06 五段一把锁）  // v2.524.0（V29 批二）：+1 tests/floor-batch2-v2524.js（EXV29-07～12 六段一把锁）  // v2.524.0：575→577→578（+2：tests/opv27-boot-report-lock.js · tests/opv27-inject-explain-lock.js —— V27 优化线 OPV27-1/2 与 OPV27-4 两把专锁；+1：tests/opv27-rest-lock.js —— OPV27-3/5/6/7/8/9 六项一把锁、六条真源码负控制）
                                // v2.518.0：564→571（+7：V25 缝合 + V26 可观测 + 四把 story-window 专锁 + ruby-card-profile）（本版 +2：scenario-v68-v24-civil-life.js 专锁 + tests/probes/p_world_pulse.js 探针收编）
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }

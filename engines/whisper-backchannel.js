@@ -113,8 +113,50 @@
     };
   }
 
+  /**
+   * EXV29-10（v2.524.0）：房间视图 —— 一次耳语在**满屋人**眼里各是什么。
+   *   `audienceScope` 里的人拿内容；其余人只拿"他们在低声说话"，**拿不到一个字**。
+   *   复用 `sendWhisper` 已写进 `people[].whisperChannels` 的记录，不另立账。
+   */
+  function perimeter(o) {
+    const src = (o && typeof o === 'object') ? o : {};
+    const room = Array.isArray(src.room) ? src.room.map(function (x) { return String(x || '').trim(); }).filter(Boolean) : [];
+    const whisperId = src.whisperId ? String(src.whisperId) : '';
+    const senderId = src.senderId ? String(src.senderId) : '';
+    if (!room.length) return { ok: false, reason: 'missing-fields', missing: ['room'] };
+    let rec = null;
+    try {
+      const st = (WA.store && typeof WA.store.get === 'function') ? (WA.store.get() || {}) : {};
+      const ppl = st.people || {};
+      const ids = [senderId].concat(room).filter(Boolean);
+      for (let i = 0; i < ids.length && !rec; i++) {
+        const ch = (ppl[ids[i]] && Array.isArray(ppl[ids[i]].whisperChannels)) ? ppl[ids[i]].whisperChannels : [];
+        for (let j = ch.length - 1; j >= 0; j--) {
+          if (!whisperId || ch[j].id === whisperId) { rec = ch[j]; break; }
+        }
+      }
+    } catch (e) { rec = null; }
+    if (!rec) return { ok: false, reason: 'not-happened', note: '没有这条耳语的账：先 sendWhisper' };
+    const inside = Array.isArray(rec.audienceScope) ? rec.audienceScope.slice() : [];
+    const rows = room.map(function (who) {
+      if (inside.indexOf(who) >= 0) {
+        const isIntercept = (who !== rec.senderId && who !== rec.recipientId);
+        return { who: who, inside: true, fidelity: 'full', got: rec.content,
+          why: isIntercept ? '他是偷听到的（听力够、离得近）' : '他是说话人或指定听者' };
+      }
+      return { who: who, inside: false, fidelity: 'voice-only', got: '（他们在低声说话，听不清）',
+        why: '不在这次耳语的听者范围内：只知道有人在低声说话' };
+    });
+    const leaked = rows.filter(function (r) { return !r.inside && String(r.got).indexOf(rec.content) >= 0; });
+    return { ok: true, reason: 'ok', whisperId: rec.id, inside: inside, rows: rows,
+      leak: leaked.length,
+      note: leaked.length ? '有 ' + leaked.length + ' 个圈外人拿到了内容（这是泄漏）'
+        : '圈外人一个字都没拿到：只听见"他们在说话"' };
+  }
+
   WA.whisperBackchannel = {
-    sendWhisper: sendWhisper
+    sendWhisper: sendWhisper,
+    perimeter: perimeter
   };
 
   if (typeof WA.registerModule === 'function') {

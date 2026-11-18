@@ -222,9 +222,35 @@
     lines.push('均衡铁律：各角色有自己的事务与目的，不强制人人表态，也不让配角只负责附和；镜头外的角色可以继续与主线无关的活动，交集必须具有合理的因果来源。');
     return lines.join('\n') + '\n';
   }
+  /**
+   * EXV29-12（v2.524.0）：公平尺 —— 谁最久没被点到，下一轮就该轮到谁。
+   *   `list: [{who, lastRound}]`（调用方给"上次被点到是第几轮"），`round` 是当前轮。
+   *   入参优先于内部账：这样它不依赖别的引擎怎么写存档，判据仍是可核的。
+   */
+  function fairness(list, round) {
+    const arr = Array.isArray(list) ? list : [];
+    if (!arr.length) return { ok: false, reason: 'missing-fields', missing: ['list'] };
+    const cur = isFinite(Number(round)) ? Number(round) : 0;
+    const rows = arr.map(function (p) {
+      const who = String((p && p.who) || '').trim();
+      if (!who) return null;
+      const last = isFinite(Number(p.lastRound)) ? Number(p.lastRound) : -9999;
+      return { who: who, lastRound: last, idle: (last === -9999) ? 9999 : (cur - last) };
+    }).filter(Boolean);
+    if (!rows.length) return { ok: false, reason: 'missing-fields', missing: ['who'] };
+    rows.sort(function (a, b) { return (b.idle - a.idle); });
+    const top = rows[0];
+    return {
+      ok: true, reason: 'ok', due: top.who, idle: top.idle, rows: rows,
+      why: top.idle === 9999 ? (top.who + ' 一次都没被点到：这一轮该他') : (top.who + ' 已经 ' + top.idle + ' 轮没被点到：这一轮该他'),
+      starved: rows.filter(function (r) { return r.idle >= 3; }).length
+    };
+  }
+
   WA.spotlight = {
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     note: note, seal: seal, report: report, idle: idle, resolveIntervention: resolveIntervention, buildBlock: buildBlock,
+    fairness: fairness,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
   };
 })();

@@ -613,6 +613,29 @@
     'engines/success-grade.js',
     'engines/outcome-dice.js',
     'engines/identity-ledger.js',
+    // v2.524.0 (V29 批一): 称呼随亲疏 / 年龄体貌 / 习惯认人 / 失礼后果（只判不说）
+    'engines/address-form.js',
+    'engines/aging.js',
+    'engines/habit-tell.js',
+    'engines/etiquette.js',
+    'engines/floor-order.js',
+    'engines/interrupt-cost.js',
+    'engines/overhear-split.js',
+    'engines/quiet-round.js',
+    // v2.524.0 (V29 批三·Y3 收束与谢幕): 终局条件 / 卷末结算 / 未收的线 / 退场仪典 / 前世
+    'engines/finale.js',
+    'engines/arc-settle.js',
+    'engines/loose-ends.js',
+    'engines/exit-rite.js',
+    'engines/past-life.js',
+    // v2.524.0 (V29 批四·Y4 身后与传承): 身后名 / 身后四事（债·遗物·翻案·悼念）
+    'engines/reputation-after.js',
+    'engines/posthumous.js',
+    // v2.524.0 (V29 批五·Y5 物价与生计): 三人三价 / 生计五面
+    'engines/price-voice.js',
+    'engines/livelihood.js',
+    // v2.524.0 (V29 批六·Y6 时间的边界): 离线/回来/暂停/并发/长档/局长度
+    'engines/world-bounds.js',
     // v2.302.0 (V13 Batch A): 剧情变奏骰与空间具身声学
     'engines/narrative-dice.js',
     'engines/spatial-acoustics.js',

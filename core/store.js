@@ -63,6 +63,23 @@
       diceLog: [],                          // S1 判定票（同一票只掷一次；最近 32 票）
       diceSkills: null,                     // S1 技能表覆盖（格斗/射击/交谈…；null=用内置默认）
       identityLedger: {},                   // EXV29-01 四元组基线（每人一条：称呼/口音/习惯/忌讳）
+      addressForms: {},                     // EXV29-02 称呼随亲疏（每组关系一条：用的称呼 + 关系档）
+      aging: {},                            // EXV29-03 年龄与体貌推进（每人一条：年龄 + 累计天数 + 体貌档）
+      habitTells: {},                       // EXV29-04 习惯动作可认人（每人一条：小动作 + 三情绪频率）
+      etiquette: {},                        // EXV29-05 忌讳与失礼（自定义忌讳 / 已学到的忌讳）
+      etiquetteHits: [],                    // EXV29-05 最近 16 次踩忌讳（给一屏后果用）
+      floorOrder: {},                       // EXV29-07 发言秩序（在场者 + 最近 16 轮谁说第一句）
+      interruptCost: {},                    // EXV29-08 抢话代价（每组"谁抢谁"一条：记恨/跑偏/权威）
+      quietRound: {},                       // EXV29-11 冷场账（最近 12 轮，含原因）
+      finale: {},                           // EXV29-13/17 终局判据（最近 8 次判定 + 完结后限产读数）
+      arcSettle: {},                        // EXV29-14 卷末结算（每卷一条：发生了什么/谁变了/留下什么）
+      looseEnds: {},                        // EXV29-15 未收的线（每条一句 fate：它后来怎样）
+      exitRites: {},                        // EXV29-16 退场名册（场面 + 见证人；不含删除）
+      pastLife: null,                       // EXV29-18 前世继承（from={chatId,round}，不继承则删键）
+      reputationAfter: {},                  // EXV29-20 身后名（一人一票：subject|by 一条，含来源）
+      posthumous: {},                       // EXV29-19/21/22/24 身后四事（债/遗物/遗嘱/翻案/记得的人）
+      livelihood: {},                       // EXV29-26～30 生计五面（流水 32 笔 / 囤货记恨 / 旧债折算）
+      worldBounds: {},                      // EXV29-33 世界暂停开关（paused/pausedAt/pausedBy）
       // 世界钟
       clock: { iso: '', label: '', dayIndex: 0, source: 'unset' }, // source: unset|user|text|engine
       // 世界背景（用户设定或世界书注入的自由文本，纯框架不预设内容）
@@ -1777,6 +1794,23 @@
     diceLog: { cap: 32, kind: 'array', site: 'outcome-dice.js resolve()（CAP 上界 32）' },
     diceSkills: { cap: 64, kind: 'object', site: 'outcome-dice.js setSkill()（SKILL_CAP 上界 64）' },
     identityLedger: { cap: 48, kind: 'object', site: 'identity-ledger.js capIt()（CAP 上界 48）' },
+    addressForms: { cap: 64, kind: 'object', site: 'address-form.js capIt()（CAP 上界 64）' },
+    aging: { cap: 48, kind: 'object', site: 'aging.js capIt()（CAP 上界 48）' },
+    habitTells: { cap: 48, kind: 'object', site: 'habit-tell.js capIt()（CAP 上界 48）' },
+    etiquette: { cap: 64, kind: 'object', site: 'etiquette.js capIt()（CAP 上界 64）' },
+    etiquetteHits: { cap: 16, kind: 'array', site: 'etiquette.js pushHit()（HIT_CAP 上界 16）' },
+    floorOrder: { cap: 24, kind: 'object', site: 'floor-order.js rank()/note()（CAP 上界 24）' },
+    interruptCost: { cap: 24, kind: 'object', site: 'interrupt-cost.js capIt()（CAP 上界 24）' },
+        quietRound: { cap: 12, kind: 'object', site: 'quiet-round.js HIST_CAP（历史上界 12）' },
+    finale: { cap: 8, kind: 'object', site: 'finale.js HIST_CAP（历史上界 8）' },
+    arcSettle: { cap: 8, kind: 'object', site: 'arc-settle.js capIt()（ARC_CAP 上界 8）' },
+    looseEnds: { cap: 32, kind: 'object', site: 'loose-ends.js capIt()（CAP 上界 32）' },
+    exitRites: { cap: 24, kind: 'object', site: 'exit-rite.js capIt()（CAP 上界 24）' },
+    pastLife: { cap: 3, kind: 'object', site: 'past-life.js CAP（继承项上界 3）' },
+    reputationAfter: { cap: 64, kind: 'object', site: 'reputation-after.js capIt()（CAP 上界 64）' },
+    posthumous: { cap: 64, kind: 'object', site: 'posthumous.js capObj()（各路分桶：记忆 24/遗愿 24/翻案 16）' },
+    livelihood: { cap: 64, kind: 'object', site: 'livelihood.js ENTRY_CAP（流水 32 笔 + 记恨/折算两份小表）' },
+    worldBounds: { cap: 4, kind: 'object', site: 'world-bounds.js box()（只存暂停开关三项）' },
     'commodityCirculation.stockpiles': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },
     'commodityCirculation.debts': { cap: 50, kind: 'object', site: 'store.withOwnerState write capacity' },
     'commodityCirculation.blacklists': { cap: 128, kind: 'object', site: 'store.withOwnerState write capacity' },

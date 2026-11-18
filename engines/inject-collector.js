@@ -201,6 +201,138 @@
           });
         }
       }
+      // v2.524.0（V29 批一）：同一性四面的注入（称呼 / 年岁 / 小动作 / 失礼）
+      //   四条都只在"真有事"时说话（buildBlock 自己返回空串即零 token）。
+      //   刻意**逐条显式**调用（不用 `WA[ns].buildBlock()` 的循环）：静态扫描要看得见
+      //   `WA.addressForm.buildBlock` 这几个字面量，否则这四条会被判成"导出但零消费"。
+      if (WA.addressForm && typeof WA.addressForm.buildBlock === 'function') {
+        const af = WA.addressForm.buildBlock();
+        if (af) {
+          String(af).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'addressform:' + idx, line, [], clockNow('inject-collector'), '称呼越级');
+          });
+        }
+      }
+      if (WA.aging && typeof WA.aging.buildBlock === 'function') {
+        const ag = WA.aging.buildBlock();
+        if (ag) {
+          String(ag).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'aging:' + idx, line, [], clockNow('inject-collector'), '年岁体貌');
+          });
+        }
+      }
+      if (WA.habitTell && typeof WA.habitTell.buildBlock === 'function') {
+        const ht = WA.habitTell.buildBlock();
+        if (ht) {
+          String(ht).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'habittell:' + idx, line, [], clockNow('inject-collector'), '习惯动作');
+          });
+        }
+      }
+      if (WA.floorOrder && typeof WA.floorOrder.buildBlock === 'function') {
+        const fo = WA.floorOrder.buildBlock();
+        if (fo) {
+          String(fo).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'floororder:' + idx, line, [], clockNow('inject-collector'), '发言秩序');
+          });
+        }
+      }
+      if (WA.interruptCost && typeof WA.interruptCost.buildBlock === 'function') {
+        const ic = WA.interruptCost.buildBlock();
+        if (ic) {
+          String(ic).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'interrupt:' + idx, line, [], clockNow('inject-collector'), '抢话梁子');
+          });
+        }
+      }
+      if (WA.quietRound && typeof WA.quietRound.buildBlock === 'function') {
+        const qr = WA.quietRound.buildBlock();
+        if (qr) {
+          String(qr).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'quiet:' + idx, line, [], clockNow('inject-collector'), '冷场');
+          });
+        }
+      }
+      if (WA.finale && typeof WA.finale.buildBlock === 'function') {
+        const fn = WA.finale.buildBlock();
+        if (fn) {
+          String(fn).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'finale:' + idx, line, [], clockNow('inject-collector'), '该收了');
+          });
+        }
+      }
+      if (WA.arcSettle && typeof WA.arcSettle.buildBlock === 'function') {
+        const as = WA.arcSettle.buildBlock();
+        if (as) {
+          String(as).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'arcsettle:' + idx, line, [], clockNow('inject-collector'), '卷末结算');
+          });
+        }
+      }
+      if (WA.looseEnds && typeof WA.looseEnds.buildBlock === 'function') {
+        const le = WA.looseEnds.buildBlock();
+        if (le) {
+          String(le).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'looseends:' + idx, line, [], clockNow('inject-collector'), '未收的线');
+          });
+        }
+      }
+      if (WA.exitRite && typeof WA.exitRite.buildBlock === 'function') {
+        const er = WA.exitRite.buildBlock();
+        if (er) {
+          String(er).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'exitrite:' + idx, line, [], clockNow('inject-collector'), '已退场');
+          });
+        }
+      }
+      if (WA.pastLife && typeof WA.pastLife.buildBlock === 'function') {
+        const pl = WA.pastLife.buildBlock();
+        if (pl) {
+          String(pl).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'pastlife:' + idx, line, [], clockNow('inject-collector'), '前世');
+          });
+        }
+      }
+      if (WA.posthumous && typeof WA.posthumous.buildBlock === 'function') {
+        const ph = WA.posthumous.buildBlock();
+        if (ph) {
+          String(ph).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'posthumous:' + idx, line, [], clockNow('inject-collector'), '身后事');
+          });
+        }
+      }
+      if (WA.reputationAfter && typeof WA.reputationAfter.buildBlock === 'function') {
+        const ra = WA.reputationAfter.buildBlock();
+        if (ra) {
+          String(ra).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'repafter:' + idx, line, [], clockNow('inject-collector'), '身后名');
+          });
+        }
+      }
+      if (WA.livelihood && typeof WA.livelihood.buildBlock === 'function') {
+        const lv = WA.livelihood.buildBlock();
+        if (lv) {
+          String(lv).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'livelihood:' + idx, line, [], clockNow('inject-collector'), '手头');
+          });
+        }
+      }
+      if (WA.worldBounds && typeof WA.worldBounds.buildBlock === 'function') {
+        const wb = WA.worldBounds.buildBlock();
+        if (wb) {
+          String(wb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('time', 'worldbounds:' + idx, line, [], clockNow('inject-collector'), '时间边界');
+          });
+        }
+      }
+      if (WA.etiquette && typeof WA.etiquette.buildBlock === 'function') {
+        const et = WA.etiquette.buildBlock();
+        if (et) {
+          String(et).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'etiquette:' + idx, line, [], clockNow('inject-collector'), '忌讳失礼');
+          });
+        }
+      }
       if (WA.epidemicContagion && typeof WA.epidemicContagion.buildBlock === 'function') {
         const eb = WA.epidemicContagion.buildBlock();
         if (eb) {

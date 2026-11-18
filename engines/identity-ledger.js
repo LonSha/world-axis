@@ -21,6 +21,11 @@
  *   ④ 有界：`identityLedger` 最多记 48 人，超出按"最久未审计"挤出（与 `__BOUNDED_CAPS` 逐字对齐）。
  *   ⑤ 一致率是**读数不是评分**：`ratio` 只报"四项里几项没漂"，不折算好感/信任。
  *   ⑥ 幂等：同一个人同一基线，`snapshot` 再叫一次只更新时间戳，不产生第二条基线。
+ *
+ * ── EXV29-06（漂移报告一屏）────────────────────────────────────────
+ *   `audit({...,ref:'#312'})` 的 `ref` 是**依据哪一楼**；漂移项原样带上它，
+ *   `report()` 把每人最近一次审计的漂移平铺成 `driftRows`（谁、漂了哪项、依据哪一楼），
+ *   `brief()` 出一行话。没漂就明说"没漂"，没记过就明说"还没有基线"——不许拿空表冒充"没漂"。
  */
 (function () {
   'use strict';
@@ -77,7 +82,13 @@
     const m = readAll();
     const existed = !!m[n.id];
     const at = (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('identityLedger') : Date.now();
-    m[n.id] = { quad: Object.assign({}, n.quad), at: at, audits: (existed ? (m[n.id].audits || 0) : 0) };
+    m[n.id] = {
+      quad: Object.assign({}, n.quad), at: at, audits: (existed ? (m[n.id].audits || 0) : 0),
+      ref: (o && o.ref !== undefined && o.ref !== null) ? String(o.ref).slice(0, 24) : (existed ? (m[n.id].ref || '') : ''),
+      // 换基线就该清掉旧的漂移留痕：那是"上一条基线"的事，留着会把两代混成一屏。
+      last: existed ? (m[n.id].last || null) : null
+    };
+    if (existed) m[n.id].last = null;
     writeAll(capIt(m));
     stat.snapshotted++;
     return { ok: true, reason: 'ok', id: n.id, created: !existed,
@@ -104,13 +115,21 @@
     const counted = drift.length + same.length;
     if (!counted) return refuse('missing-fields', { missing: FIELDS.slice(), why: '四项都没给，审计无从谈起' });
     const ratio = counted ? (same.length / counted) : 1;
+    const ref = (o && o.ref !== undefined && o.ref !== null) ? String(o.ref).slice(0, 24) : '';
     base.audits = (base.audits || 0) + 1;
+    // 留痕：只留最近一次（单条，天然有界）。有漂才记，没漂就记"这一轮没漂"。
+    base.last = {
+      at: (WA.clock && typeof WA.clock.now === 'function') ? WA.clock.now('identityLedger') : Date.now(),
+      ref: ref,
+      ratio: Math.round(ratio * 100) / 100,
+      drift: drift.map(function (d) { return { field: d.field, cn: d.cn, was: d.was, now: d.now, ref: ref }; })
+    };
     writeAll(m);
     stat.audited++;
     if (drift.length) { stat.drifted++; stat.lastDrift = drift.map(function (d) { return d.field; }); }
     return { ok: true, reason: 'ok', id: n.id, drift: drift, same: same,
       ratio: Math.round(ratio * 100) / 100, counted: counted,
-      baseAt: base.at, audits: base.audits,
+      baseAt: base.at, audits: base.audits, ref: ref,
       note: drift.length ? ('漂了 ' + drift.length + ' 项：' + drift.map(function (d) { return d.cn; }).join('、'))
         : '四项全对得上：还是同一个人' };
   }
@@ -121,11 +140,45 @@
     const ids = Object.keys(m);
     if (!ids.length) return { ok: true, reason: 'ok', empty: true, people: [], note: '还没有任何基线（先 snapshot）' };
     const rows = ids.map(function (id) {
-      return { id: id, at: m[id].at, audits: m[id].audits || 0, quad: Object.assign({}, m[id].quad) };
+      const last = m[id].last || null;
+      return {
+        id: id, at: m[id].at, audits: m[id].audits || 0, quad: Object.assign({}, m[id].quad),
+        baseRef: m[id].ref || '',
+        lastAt: last ? last.at : null, lastRef: last ? (last.ref || '') : '',
+        drifted: last ? last.drift.length : 0,
+        drift: last ? last.drift.slice() : []
+      };
+    });
+    const driftRows = [];
+    rows.forEach(function (r) {
+      r.drift.forEach(function (d) {
+        driftRows.push({ id: r.id, field: d.field, cn: d.cn, was: d.was, now: d.now, ref: d.ref || r.lastRef || r.baseRef || '' });
+      });
     });
     rows.sort(function (a, b) { return (b.audits - a.audits) || (b.at - a.at); });
-    return { ok: true, reason: 'ok', empty: false, people: rows.slice(0, 12), total: ids.length, cap: CAP };
+    return { ok: true, reason: 'ok', empty: false, people: rows.slice(0, 12), total: ids.length, cap: CAP,
+      driftRows: driftRows.slice(0, 20), driftTotal: driftRows.length };
   }
+  /** 一屏：谁漂了、漂了哪几项、依据哪一楼；没漂就明说"没漂"。 */
+  function brief() {
+    const r = report();
+    if (r.empty) return { ok: true, reason: 'ok', empty: true, line: '还没有任何基线：先给主要角色立一条，才谈得上"漂没漂"。', rows: [] };
+    if (!r.driftTotal) {
+      const audited = r.people.filter(function (p) { return p.audits > 0; }).length;
+      return { ok: true, reason: 'ok', empty: false, drifted: 0, line: audited
+        ? ('这 ' + audited + ' 个人都对得上基线：没漂。')
+        : '立了基线还没审过：说不清漂没漂（不许拿"没审"当"没漂"）。', rows: [] };
+    }
+    const head = r.driftRows.slice(0, 5).map(function (d) {
+      return d.id + ' 的' + d.cn + '「' + d.was + '」→「' + d.now + '」' + (d.ref ? '（' + d.ref + '）' : '');
+    });
+    return {
+      ok: true, reason: 'ok', empty: false, drifted: r.driftTotal,
+      line: '漂了 ' + r.driftTotal + ' 处：' + head.join('；') + (r.driftTotal > head.length ? ' 等' : '') + '。',
+      rows: r.driftRows.slice(0, 12)
+    };
+  }
+
   function view() {
     const r = report();
     return { ok: true, total: r.total || 0, cap: CAP, people: r.people || [], stat: statOf() };
@@ -139,7 +192,7 @@
   }
 
   WA.identityLedger = {
-    snapshot: snapshot, audit: audit, report: report, view: view, buildBlock: buildBlock,
+    snapshot: snapshot, audit: audit, report: report, brief: brief, view: view, buildBlock: buildBlock,
     stat: statOf, FIELDS: FIELDS.slice(), CN: Object.assign({}, CN), CAP: CAP
   };
 })();

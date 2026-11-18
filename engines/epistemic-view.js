@@ -427,6 +427,52 @@
     };
   }
 
+  /**
+   * EXV29-23 信息随人死而断：这个人脑子里那条信息**随他死而永久丢失**。
+   *   只丢「他自己知道的」（`beliefs[personId]` 里的那条）；世界别处若还有人知道，
+   *   就不叫丢——`stillKnownElsewhere` 如实报出还知道的人，调用方据此判"算不算丢"。
+   * @param {object} spec { who, topicId, at }
+   */
+  function loseOnDeath(spec) {
+    const s = spec && typeof spec === 'object' ? spec : {};
+    const who = clean(s.who, 60);
+    const topic = clean(s.topicId, 60);
+    if (!who) return { ok: false, reason: 'missing-fields', missing: ['who'] };
+    if (!topic) return { ok: false, reason: 'missing-fields', missing: ['topicId'] };
+    const pId = personId(who);
+    const st = ensureEpistemicStore();
+    const beliefs = (st && st.beliefs) ? st.beliefs : {};
+    // 信念表是**扁平**的：`${personId}:${topicId}` 一条（见 registerBelief）
+    const flat = pId + ':' + topic;
+    const had = !!beliefs[flat];
+    const others = Object.keys(beliefs).filter(function (k) {
+      if (k === flat) return false;
+      const i = k.lastIndexOf(':');
+      return i > 0 && k.slice(i + 1) === topic;
+    });
+    if (!had) {
+      return { ok: false, reason: 'not-happened', who: who, topicId: topic,
+        stillKnownElsewhere: others,
+        note: '他本来就不掌握这条：没有可丢的东西（不替死者编记忆）' };
+    }
+    if (WA.store && WA.store.transact) {
+      WA.store.transact(function (d) {
+        d.epistemicStore = d.epistemicStore || { beliefs: {} };
+        d.epistemicStore.beliefs = d.epistemicStore.beliefs || {};
+        delete d.epistemicStore.beliefs[flat];
+        d.epistemicStore.lost = d.epistemicStore.lost || [];
+        d.epistemicStore.lost.push({ who: pId, topicId: topic, at: WA.clock.now('epistemic') });
+        while (d.epistemicStore.lost.length > 32) d.epistemicStore.lost.shift();
+        return true;
+      }, 'epistemicView:loseOnDeath');
+    }
+    const lost = others.length === 0;
+    return { ok: true, reason: 'ok', who: who, topicId: topic, lost: lost,
+      stillKnownElsewhere: others,
+      note: lost ? '这条随他死了：世上再没人知道（真丢了，问不出来了）'
+        : ('他这一份没了，但 ' + others.length + ' 人还知道：这条不算断') };
+  }
+
   WA.epistemicView = {
     registerBelief: registerBelief,
     buildView: buildView,
@@ -435,7 +481,9 @@
     decideAction: decideAction,
     // v2.233.0 (OPV4-5): 证据可信度评估与判断更替
     weighEvidence: weighEvidence,
-    updateBeliefWithEvidence: updateBeliefWithEvidence
+    updateBeliefWithEvidence: updateBeliefWithEvidence,
+    // v2.524.0 (EXV29-23): 持有人死亡 ⇒ 他那一份永久丢失
+    loseOnDeath: loseOnDeath
   };
 
   if (typeof console !== 'undefined' && console.log) {

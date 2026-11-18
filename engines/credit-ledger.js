@@ -62,7 +62,7 @@
     if (!WA.settingsBus) { shadow = val; return val; }
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, val));
   }
-  const stat = { opened: 0, accrued: 0, repaid: 0, capped: 0, overdue: 0, evicted: 0, refused: 0, replay: 0,
+  const stat = { opened: 0, accrued: 0, repaid: 0, capped: 0, overdue: 0, evicted: 0, refused: 0, replay: 0, inherited: 0,
     dunned: 0, settled: 0, lastReason: '' };
   const RATE_SCALE = 100000000;
   const SEC_PER_DAY = 86400;
@@ -372,9 +372,83 @@
     return { ok: true, allowed: true, reason: 'good-standing', overdueCount: 0, openCount: mine.length, overdueRows: [] };
   }
 
+  /**
+   * EXV29-19 债不随人死：持有人不在了，他名下**未清**的账转到继承人名下。
+   *   只搬「还没结清」的行（open/overdue）；已结清/已核销的不动（历史不许改）。
+   *   追不到人（没继承人）不是"这笔债算了"——见 `unclaimable()`，那叫**无从追索**。
+   * @param {object} spec { holder, heir, side:'auto'|'borrower'|'lender', at }
+   */
+  function transfer(spec) {
+    const cfg = settings();
+    if (!cfg.enabled) return refuse('disabled');
+    const s = spec && typeof spec === 'object' ? spec : {};
+    const holder = intId(s.holder);
+    const heir = intId(s.heir);
+    if (!holder) return refuse('missing-fields', { missing: ['holder'] });
+    if (!heir) return refuse('missing-fields', { missing: ['heir'],
+      note: '无从追索：没有继承人，这笔债只能挂在死人名下（用 unclaimable 看得到它）' });
+    if (holder === heir) return refuse('same-party', { note: '自己继承自己的账：不成立' });
+    const side = String(s.side || 'auto');
+    if (['auto', 'borrower', 'lender'].indexOf(side) < 0) {
+      return refuse('unknown-kind', { field: 'side', got: side, allowed: ['auto', 'borrower', 'lender'] });
+    }
+    const at = Number.isFinite(s.at) ? s.at : clockNow('creditLedger.transfer');
+    const out = {};
+    transact(function (d) {
+      if (!d) { out.r = refuse('no-store'); return true; }
+      d.creditLedger = d.creditLedger || {};
+      const rows = [];
+      Object.keys(d.creditLedger).forEach(function (id) {
+        const r = d.creditLedger[id];
+        if (!r) return;
+        if (r.status !== 'open' && r.status !== 'overdue') return;
+        const asBorrower = r.borrower === holder && (side === 'auto' || side === 'borrower');
+        const asLender = r.lender === holder && (side === 'auto' || side === 'lender');
+        if (!asBorrower && !asLender) return;
+        if (asBorrower) r.borrower = heir;
+        if (asLender) r.lender = heir;
+        r.inheritedFrom = r.inheritedFrom || holder;
+        r.inheritedAt = at;
+        rows.push({ id: id, role: asBorrower ? 'borrower' : 'lender', principalLeft: r.principalLeft,
+          interest: r.interest, dueAt: r.dueAt, overdue: isOverdue(r, at), status: r.status });
+      });
+      if (!rows.length) {
+        out.r = { ok: false, reason: 'not-happened', holder: holder,
+          note: '这个名下没有未清的账：无事可转（不替他编一笔）' };
+        return true;
+      }
+      stat.inherited += rows.length; stat.lastReason = 'ok';
+      out.r = { ok: true, reason: 'ok', holder: holder, heir: heir, side: side, at: at,
+        count: rows.length, rows: rows,
+        note: '人死了，账没死：' + rows.length + ' 笔转到继承人名下（到期照旧催）' };
+      return true;
+    }, 'transfer');
+    return out.r || refuse('tx-failed');
+  }
+
+  /** 追不到人的那些账（读）：**债还在**，只是没人可追。 */
+  function unclaimable(holder) {
+    const h = intId(holder);
+    if (!h) return refuse('missing-fields', { missing: ['holder'] });
+    const all = book();
+    const at = clockNow('creditLedger.unclaimable');
+    const rows = Object.keys(all).filter(function (id) {
+      const r = all[id];
+      return r && (r.borrower === h || r.lender === h) && (r.status === 'open' || r.status === 'overdue');
+    }).map(function (id) {
+      const r = all[id];
+      return { id: id, role: r.borrower === h ? 'borrower' : 'lender', principalLeft: r.principalLeft,
+        interest: r.interest, dueAt: r.dueAt, overdue: isOverdue(r, at) };
+    });
+    return { ok: true, reason: 'ok', holder: h, count: rows.length, rows: rows,
+      note: rows.length ? ('这 ' + rows.length + ' 笔还挂在他名下：无人可追，账不消失（无从追索）')
+        : '他名下没有未清的账' };
+  }
+
   function statOf() { return Object.assign({}, stat); }
   WA.creditLedger = { open: open, accrue: accrue, repay: repay, writeOff: writeOff,
     dun: dun, settle: settle, checkCredit: checkCredit,
-    view: view, list: list, stat: statOf, settings: settings, saveSettings: saveSettings,
+    view: view, list: list, transfer: transfer, unclaimable: unclaimable,
+    stat: statOf, settings: settings, saveSettings: saveSettings,
     REG: __REG, DEF: DEF, STATUS: STATUS, RATE_SCALE: RATE_SCALE };
 })();

@@ -106,16 +106,36 @@ function acquireLock(dir, task) {
     fs.unlinkSync(p); fs.rmdirSync(dir);
   } };
 }
+/**
+ * v2.524.0（OPV29-03）：复制面瘦身。真源是 `tools/mirror-slim.js` 的 `exclusionSet()` ——
+ *   那张清单的每一条都由**文本证据**背书（产品面不排、被测试提到的不排），本处只消费它。
+ *   三条边界：
+ *     ① 本处**不理解**「为什么可以排」，只执行；判据必须留在 mirror-slim 一处（否则两处漂移）。
+ *     ② 拿不到那份清单（模块缺失/抛错）⇒ 空集 ⇒ 退化成「整棵树照抄」，与旧行为逐字一致。
+ *     ③ `WA_SLIM=0` 是显式关闭开关：怀疑瘦身吃掉了某节证据时，用它复现旧现场再比。
+ *   缓存一次：一趟隔离要 files() 三到四次，每次都走树+读 582 个锁文本是纯浪费。
+ */
+let __slimSeen = null;
+function slimSet() {
+  if (__slimSeen !== null) return __slimSeen;
+  if (process.env.WA_SLIM === '0') { __slimSeen = new Set(); return __slimSeen; }
+  try { __slimSeen = require('../tools/mirror-slim.js').exclusionSet(path.join(__dirname, '..')); }
+  catch (e) { __slimSeen = new Set(); }
+  return __slimSeen;
+}
 function files(root) {
   const out = [];
+  const slim = slimSet();
   function walk(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name === '.git' || entry.name === 'node_modules') continue;
       const abs = path.join(dir, entry.name);
       if (entry.isSymbolicLink()) throw new Error('symlink rejected: ' + path.relative(root, abs));
       if (entry.isDirectory()) walk(abs);
-      else if (entry.isFile()) out.push(path.relative(root, abs));
-      else throw new Error('nonregular file rejected');
+      else if (entry.isFile()) {
+        const rel = path.relative(root, abs);
+        if (!slim.has(rel)) out.push(rel);
+      } else throw new Error('nonregular file rejected');
     }
   }
   walk(root); return out.sort();
