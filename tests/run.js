@@ -22244,6 +22244,17 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   负控制：命令里不许出现 run.js（不拿整趟充数）、活锁不得被当成可回收、
     //   禁止清单必须点名 `find -delete` 与 `gc --prune=now`（本仓被这两种“顺手命令”坑过）。
     await runScript('./opv29-z3-v2524.js');
+    // v2.524.0（V29 优化线 Z6 收口）：OPV29-31 存储自愈 / 32 锁自愈 —— 51 项。
+    //   病：`gitState` 只跑 `rev-parse --verify HEAD`，而本次真事故是 `object file … is empty`
+    //   （文件在、大小 0）—— rev-parse 照样成功，自诊对真正出事的形态是瞎的。
+    //   负控制三向：闭眼扫空 loose / 放行 active 锁 / 去掉活 worker 拦截，三向必须各自变红。
+    await runScript('./opv29-z6-v2529.js');
+    // v2.524.0（V29 优化线 Z5 首项）：OPV29-25 新引擎脚手架 —— 48 项。
+    //   病：加一台引擎要改七处（四路接线 + 三处登记），漏一处的表现不是报错，
+    //   而是「引擎在位、却谁也不认它」；且七处彼此没有交叉校验。
+    //   锁法：真写入只对**仓库副本**跑（真仓只读 --check/--dry-run），七处逐处断言；
+    //   负控制：删锚点 / 锚点歧义 / 只文件存在不能接线 —— 三种都必须点名并拒写。
+    await runScript('./opv29-z5-v2529.js');
     // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
     //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是
     //   「装了 story-tone 也说没有」「改了一句也永远 available:false」——不崩的假判据。
