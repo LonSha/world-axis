@@ -4405,7 +4405,7 @@
       "version": "2.524.0",
       "versionSource": "title",
       "fileAnchor": "2529",
-      "commit": null,
+      "commit": "0e3f0f4",
       "wired": {
         "form": "runScript",
         "line": 22262
@@ -9552,7 +9552,7 @@
     },
     {
       "file": "tests/u4-export-lifecycle-v2191.js",
-      "sha": "c53cb9a49a2a",
+      "sha": "73d102c55160",
       "version": "2.189.0",
       "versionSource": "head",
       "fileAnchor": "2191",

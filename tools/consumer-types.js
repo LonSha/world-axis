@@ -436,24 +436,44 @@ function staleReviews(res, ledger, now) {
   });
   return out;
 }
-function buildLedger(res) {
+function buildLedger(res, prevProg) {
   // 入参 res 允许是「认登记」的快照，但**生成必须用不认登记的现场**：
   //   否则第二次跑会把刚写好的登记当成「已有消费者」而不重建（实测输出「0 条登记」）。
+  // prevProg（可选）：上一版登记的 programmatic 面。不传则读真台账；
+  //   给测试留一个**内存注入**口 —— 「重建不推后复查期」这条判据必须能造出
+  //   「旧表里有条、形态未变」的现场，而不能靠改真账本来演。
   const clean = classify({ ignoreRegistry: true });
   res = clean;
   const ver = versionOf();
   const after = reviewAfterOf(ver);
+  // ── 重建 ≠ 重新登记：复查期与理由不得因重建而顺延 ────────────────────────
+  //   病灶（本趟实测）：下面原先无条件写 `reviewAfter: after`（= 当版小版本 + 6），
+  //   于是每跑一次 `--register`，全表 336 条的复查期一起往后挪一个窗口 ——
+  //   U4 的「到点就报 overdue」于是永远等不到，登记表变成「一重建就永远年轻」的表。
+  //   这不是洁癖：红一次就能看见（同一次重建前后，同一条 key 的 reviewAfter 变了，
+  //   而这次没有任何一条条目被真的复核过）。
+  //   口径：**键已存在且形态未变** ⇒ 沿用登记那一刻的凭证（reviewAfter / why /
+  //   nextConsumer / disposition 四项都留）；**形态变了** ⇒ 四项按新形态重算
+  //   （形态变了本来就要重新复核，沿用旧期等于跳过复核，那是另一种假绿）。
+  const prevTable = (prevProg && typeof prevProg === 'object') ? prevProg : ((loadRegistry() || {}).programmatic || {});
   const programmatic = {};
   res.unregistered.forEach(function (e) {
     const shape = shapeOf(e);
+    const old = prevTable[e.key];
+    const frozen = old && old.shape === shape;
+    const keep = function (k, fallback) {
+      if (frozen && String(old[k] || '').trim()) return old[k];
+      return fallback;
+    };
     programmatic[e.key] = {
       shape: shape,
-      why: REASONS[e.key] || SHAPE_WHY[shape],
+      why: keep('why', REASONS[e.key] || SHAPE_WHY[shape]),
       // U4 四项生命周期字段：去向按**形态**派生（可复算），复查期按版本窗
       purpose: shape,
-      nextConsumer: NEXT_CONSUMER_OF[shape] || NEXT_CONSUMER_OF['query-api'],
-      reviewAfter: after,
-      disposition: 'keep'
+      nextConsumer: keep('nextConsumer', NEXT_CONSUMER_OF[shape] || NEXT_CONSUMER_OF['query-api']),
+      reviewAfter: keep('reviewAfter', after),
+      // 「应删除」不许被重建洗成 keep（否则 dispose 那条纪律一重建就失效）
+      disposition: (frozen && old.disposition === '应删除') ? '应删除' : 'keep'
     };
   });
   return {

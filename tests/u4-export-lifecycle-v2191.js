@@ -8,10 +8,12 @@
 //   ③ 四个新引擎（v2.189.0）的每个导出都有明确去向；
 //   ④ `disposition: 应删除` 的条目真的被删，或改成保留并给出理由。
 //
-// ── 分四段 ───────────────────────────────────────────────────────────
+// ── 分五段 ───────────────────────────────────────────────────────────
 //   A 静态：生命周期四项字段齐备、去向**由形态派生**（不手写）、复查窗是常量、导出面齐备；
 //   B 运行时：现场零超期、零缺字段、零去向过期；清单可列（超期/缺字段/去向过期三档分开）；
 //   C 不变式：连调两次逐字相同；
+//   E 重建 ≠ 重新登记（v2.529.0 补）：`--register` 不得把已有条目的复查期往后推，
+//     否则 U4 的「到点就报 overdue」永远等不到 —— 登记表成了「一重建就永远年轻」的表。
 //   N 负控制（**全部纯函数 / 内存副本真破坏**，两向自证）：
 //     N1 把「现在」推到复查窗之外 ⇒ overdue 成片现形（**窗口真的在算**）
 //     N2 删掉一个生命周期字段 ⇒ missing-field
@@ -172,6 +174,60 @@ function runN(A) {
     'N7 负控制全程未改真台账（消费登记表逐字未变）');
 }
 
+// ══════════ E. 重建 ≠ 重新登记（v2.529.0 补） ══════════
+//   病灶：`buildLedger()` 原先无条件写 `reviewAfter = 当版小版本 + 6`，于是每跑一次
+//   `--register`，全表条目的复查期一起往后挪一个窗口 —— U4 的「到点就报 overdue」
+//   永远等不到，登记表成了「一重建就永远年轻」的表。这一条**红一次就能看见**：
+//   同一次重建前后，同一条 key 的 reviewAfter 变了，而这次没有任何条目被真的复核。
+//   判据用内存注入的旧表演，不动真台账（E9 盯着这一点）。
+function runE(A) {
+  console.log('\nE. 重建 ≠ 重新登记（复查期不因重建顺延）');
+  const real = CT.loadRegistry();
+  // 必须用**不认登记**的现场：认登记时，已登记的条目会被当成「有消费者」而不进
+  //   unregistered —— 那样 E0b 永远取不到样本，本段会静默退化成「什么都没验」。
+  const res = CT.classify({ ignoreRegistry: true });
+  const regKeys = Object.keys(real.programmatic);
+  const liveKeys = res.unregistered.map(function (e) { return e.key; });
+  const key = regKeys.filter(function (k) { return liveKeys.indexOf(k) >= 0; })[0];
+  A(regKeys.length >= 100,
+    'E0 现场登记表非空（' + regKeys.length + ' 条）—— 空表上本段判据全是恒真的');
+  A(!!key, 'E0b 现场存在「已登记且确实无消费者」的样本条目（' + key + '）—— 本段要的正是这个形态');
+  const nowShape = real.programmatic[key].shape;
+  const after = CT.reviewAfterOf(CT.versionOf());
+  const oldEntry = {
+    shape: nowShape, why: 'OLD-WHY-登记凭证', purpose: nowShape,
+    nextConsumer: 'OLD-NEXT-消费者形态', reviewAfter: '1.0.0', disposition: '应删除'
+  };
+  const prev = {}; prev[key] = oldEntry;
+  const built = CT.buildLedger(res, prev);
+  const b = built.programmatic[key];
+  A(!!b && b.reviewAfter === '1.0.0',
+    'E1 形态未变 ⇒ 复查期沿用登记那一刻的凭证（实 ' + (b && b.reviewAfter) + ' / 当版窗 ' + after + '）');
+  A(!!b && b.why === 'OLD-WHY-登记凭证' && b.nextConsumer === 'OLD-NEXT-消费者形态',
+    'E2 理由与「下一个消费者应该长什么样」同样沿用（不被重算覆盖）');
+  A(!!b && b.disposition === '应删除', 'E3 「应删除」不被重建洗成 keep');
+
+  // 两向：形态变了 ⇒ 四项按新形态重算（沿用旧期＝跳过复核，那是另一种假绿）
+  const prev2 = {}; prev2[key] = Object.assign({}, oldEntry, { shape: 'data-const' });
+  const b2 = CT.buildLedger(res, prev2).programmatic[key];
+  A(!!b2 && b2.reviewAfter === after, 'E4 形态变了 ⇒ 复查期按当版重算（不沿用旧期）');
+  A(!!b2 && b2.disposition === 'keep' && b2.purpose === b2.shape,
+    'E5 形态变了 ⇒ 去向随形态、disposition 回 keep');
+
+  // 新增条目（旧表里没有）⇒ 按当版算
+  const built3 = CT.buildLedger(res, {});
+  const b3 = built3.programmatic[key];
+  A(!!b3 && b3.reviewAfter === after, 'E6 旧表里没有该条 ⇒ 按当版计算复查期');
+  A(!!b3 && b3.reviewAfter !== '1.0.0',
+    'E7 负控制：同一条目在「旧表为空」时不再沿用 1.0.0（判据非恒真）');
+
+  // 幂等：拿上一次重建结果当旧表再重建 ⇒ 逐字相同（凭证不会自己漂移）
+  A(JSON.stringify(CT.buildLedger(res, built.programmatic).programmatic) === JSON.stringify(built.programmatic),
+    'E8 重建幂等（以上一次结果为旧表再重建 ⇒ 逐字相同）');
+  A(JSON.stringify(CT.loadRegistry()) === JSON.stringify(real),
+    'E9 全程未改真台账（注入只活在内存里）');
+}
+
 // ── 加载契约（v2.191.0 收口补）───────────────────────────────────────────
 //   本文件初版**没有 `runAll` 导出**，且顶层无条件自跑 + `process.exit`。
 //   两个缺陷叠在一起：被 `tests/run.js` 的 `runLock` require 时（a）先终止整个回归进程，
@@ -181,11 +237,11 @@ function runN(A) {
 //   本仓点过名的**假绿**：没有任何一条门禁报错，只是后面几千条再也没跑。
 function runAll(assert) {
   const A = function (c, n, e) { assert(c, n, e); };
-  runA(A); runB(A); runC(A); runN(A);
+  runA(A); runB(A); runC(A); runE(A); runN(A);
 }
 module.exports = { runAll: require('./lock-assert.js').restoring(runAll) };
 if (require.main === module) {
-  runA(a); runB(a); runC(a); runN(a);
+  runA(a); runB(a); runC(a); runE(a); runN(a);
   console.log('\nU4-EXPORT-LIFECYCLE-V2191: '
     + (failures.length ? 'FAIL ' + failures.length + '/' + (pass + failures.length) : 'pass (' + pass + ')'));
   failures.slice(0, 8).forEach(function (f) { console.log('  · ' + f); });

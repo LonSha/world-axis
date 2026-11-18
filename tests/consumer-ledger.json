@@ -514,6 +514,286 @@
       "reviewAfter": "2.529.0",
       "disposition": "keep"
     },
+    "offstageQueue.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "offstageQueue.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "actStep.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "actStep.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "tracePost.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "tracePost.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "misbelief.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "misbelief.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "threadSprout.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "threadSprout.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "dormantLadder.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "dormantLadder.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "consequenceSchedule.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "consequenceSchedule.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "appointment.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "appointment.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "timeLedger.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "timeLedger.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "hearsayLedger.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "hearsayLedger.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "farAccount.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "farAccount.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "interlude.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "interlude.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "letterPost.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "letterPost.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "worldLoopLog.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "worldLoopLog.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "costGuard.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "costGuard.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "continuityGuard.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "continuityGuard.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "controllability.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "storyRhythm.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "storyRhythm.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
     "affect.getSettings": {
       "shape": "settings-registry-only",
       "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
@@ -2386,6 +2666,22 @@
       "reviewAfter": "2.529.0",
       "disposition": "keep"
     },
+    "outcomeDice.REG": {
+      "shape": "data-const",
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+      "purpose": "data-const",
+      "nextConsumer": "面板或诊断按需取用（常量表）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "interruptCost.MAX_WEIGHT": {
+      "shape": "data-const",
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+      "purpose": "data-const",
+      "nextConsumer": "面板或诊断按需取用（常量表）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
     "stagePresence.version": {
       "shape": "version-const",
       "why": "版本常量：由 UI 组件库与诊断按需读取，非调用型接口",
@@ -2424,6 +2720,38 @@
       "purpose": "data-const",
       "nextConsumer": "面板或诊断按需取用（常量表）",
       "reviewAfter": "2.529.0",
+      "disposition": "keep"
+    },
+    "actStep.KINDS": {
+      "shape": "data-const",
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+      "purpose": "data-const",
+      "nextConsumer": "面板或诊断按需取用（常量表）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "consequenceSchedule.REVERSIBLE": {
+      "shape": "data-const",
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+      "purpose": "data-const",
+      "nextConsumer": "面板或诊断按需取用（常量表）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "appointment.RESULTS": {
+      "shape": "data-const",
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+      "purpose": "data-const",
+      "nextConsumer": "面板或诊断按需取用（常量表）",
+      "reviewAfter": "2.530.0",
+      "disposition": "keep"
+    },
+    "narrativePreset.REQUIRED": {
+      "shape": "data-const",
+      "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+      "purpose": "data-const",
+      "nextConsumer": "面板或诊断按需取用（常量表）",
+      "reviewAfter": "2.530.0",
       "disposition": "keep"
     },
     "economy.MONEY": {
