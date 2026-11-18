@@ -22255,6 +22255,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   锁法：真写入只对**仓库副本**跑（真仓只读 --check/--dry-run），七处逐处断言；
     //   负控制：删锚点 / 锚点歧义 / 只文件存在不能接线 —— 三种都必须点名并拒写。
     await runScript('./opv29-z5-v2529.js');
+    // v2.524.0（V29 优化线 Z5）：OPV29-29 依赖零新增守门 —— 22 项。
+    //   病：已有的两把锁只管「已声明的可选依赖（jsdom）不许静默 skip」，
+    //   没有一道门禁回答「仓里有没有多出一个外部包」—— 而那一行会让别人克隆后直接跑不起来。
+    //   负控制两向：把 external 一律判成 builtin ⇒ C 段红；不剥注释 ⇒ D1/D2 红。
+    await runScript('./opv29-z5-dep-v2529.js');
     // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
     //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是
     //   「装了 story-tone 也说没有」「改了一句也永远 available:false」——不崩的假判据。
