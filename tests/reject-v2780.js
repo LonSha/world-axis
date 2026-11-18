@@ -9548,6 +9548,52 @@ function runWitness(WA) {
       }
     }
   }
+// ── v2.524.0（V28 批三）：`letter-post`（信会迟到/丢/被截/能回）──
+  {
+    const LT = WA.letterPost;
+    const putL = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:v28c'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store */ }
+    };
+    if (LT && WA.store && typeof WA.store.get === 'function') {
+      const keepCh4 = (WA.store.get() || {}).chronicle;
+      try {
+        putL(function (d) { d.chronicle = []; });
+        want('missing-from', 'V28 EXV28-32：信没说谁写的 ⇒ missing-from');
+        trip('missing-from', function () { return LT.send({ to: '乙', content: '货到了' }).reason; });
+        want('missing-to', 'V28 EXV28-32：信没说要送给谁 ⇒ missing-to');
+        trip('missing-to', function () { return LT.send({ from: '甲', content: '货到了' }).reason; });
+        want('sent', 'V28 EXV28-32：发信只写「在途」并给出到达轮次 ⇒ sent');
+        const lt1 = LT.send({ from: '甲', to: '乙', content: '货已到南岸', delay: 3 });
+        trip('sent', function () { return lt1.reason; });
+        want('letter-missing', 'V28 EXV28-32：判一封不存在的信 ⇒ letter-missing');
+        trip('letter-missing', function () { return LT.deliver({ id: 'lt_nope' }).reason; });
+        want('too-early', 'V28 EXV28-32：还没到就判送到 ⇒ too-early（信不会瞬移）');
+        trip('too-early', function () { return LT.deliver({ id: lt1.id, atRound: 0 }).reason; });
+        want('arrived', 'V28 EXV28-32：到点判送到 ⇒ arrived');
+        trip('arrived', function () { return LT.deliver({ id: lt1.id, atRound: 9 }).reason; });
+        want('already-arrived', 'V28 EXV28-32：同一封信判两次 ⇒ already-arrived');
+        trip('already-arrived', function () { return LT.deliver({ id: lt1.id, atRound: 9 }).reason; });
+        want('replied', 'V28 EXV28-32：收到之后能回 ⇒ replied');
+        trip('replied', function () { return LT.reply({ id: lt1.id, text: '知道了，等我回信' }).reason; });
+        want('already-replied', 'V28 EXV28-32：同一封回两次 ⇒ already-replied');
+        trip('already-replied', function () { return LT.reply({ id: lt1.id, text: '再回一次' }).reason; });
+        want('lost', 'V28 EXV28-32：路上丢了 ⇒ lost（不假装送到）');
+        const lt2 = LT.send({ from: '甲', to: '丙', content: '一封信', delay: 2 });
+        trip('lost', function () { return LT.deliver({ id: lt2.id, atRound: 9, verdict: 'lost' }).reason; });
+        want('intercepted', 'V28 EXV28-32：半路被截 ⇒ intercepted 并记下落在谁手里');
+        const lt3 = LT.send({ from: '甲', to: '丁', content: '另一封信', delay: 2 });
+        trip('intercepted', function () { return LT.deliver({ id: lt3.id, atRound: 9, verdict: 'intercepted', by: '驿丞' }).reason; });
+        want('not-received', 'V28 EXV28-32：没收到就回信 ⇒ not-received（不凭空回）');
+        const lt4 = LT.send({ from: '甲', to: '戊', content: '还在路上', delay: 4 });
+        trip('not-received', function () { return LT.reply({ id: lt4.id, text: '收到' }).reason; });
+      } finally {
+        putL(function (d) { d.chronicle = keepCh4; });
+      }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

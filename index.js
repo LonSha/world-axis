@@ -743,6 +743,7 @@
     'engines/hearsay-ledger.js',
     'engines/far-account.js',
     'engines/interlude.js',
+    'engines/letter-post.js',
     // v2.96.0（X3）：传播与辟谣（事实 / 目击 / 转述 / 流言四层传播链）。
     //   三条位置约束，全是硬依赖：
     //     ① 须**晚于** engines/memory.js —— 事实真源是 memory.facts（事实唯一写者 upsertFact）；

@@ -1,13 +1,13 @@
 {
  "version": "2.523.0",
- "loadOrderCount": 533,
- "loadedCount": 512,
+ "loadOrderCount": 534,
+ "loadedCount": 513,
  "uiCount": 21,
- "nsCount": 523,
+ "nsCount": 524,
  "totals": {
-  "loadEdges": 408,
+  "loadEdges": 410,
   "hardEdges": 0,
-  "callRefs": 669,
+  "callRefs": 671,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -178,6 +178,7 @@
     "engines/labor-schedule.js",
     "engines/legacy-oath.js",
     "engines/length-policy.js",
+    "engines/letter-post.js",
     "engines/levy-corvee.js",
     "engines/liaison.js",
     "engines/life-profile.js",
@@ -508,6 +509,7 @@
     "engines/interlude.js",
     "engines/kaleidoscope.js",
     "engines/labor-schedule.js",
+    "engines/letter-post.js",
     "engines/levy-corvee.js",
     "engines/life.js",
     "engines/lingua-broker.js",
@@ -705,6 +707,7 @@
     "engines/labor-schedule.js",
     "engines/legacy-oath.js",
     "engines/length-policy.js",
+    "engines/letter-post.js",
     "engines/levy-corvee.js",
     "engines/liaison.js",
     "engines/life-profile.js",
@@ -5089,6 +5092,29 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_interlude_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/letter-post.js": {
+   "ns": [
+    "letterPost"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_letter_settings_v1"
    ],
    "consumedBy": []
   },

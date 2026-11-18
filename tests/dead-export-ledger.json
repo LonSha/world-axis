@@ -7282,6 +7282,62 @@
       "tref": 0,
       "own": 1
     },
+    "letterPost.deliver": {
+      "reason": "self-only",
+      "detail": "engines/letter-post.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/letter-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "letterPost.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/letter-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "letterPost.reply": {
+      "reason": "self-only",
+      "detail": "engines/letter-post.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/letter-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "letterPost.send": {
+      "reason": "self-only",
+      "detail": "engines/letter-post.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/letter-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "letterPost.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/letter-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "letterPost.stat": {
+      "reason": "self-only",
+      "detail": "engines/letter-post.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/letter-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 34
+    },
+    "letterPost.view": {
+      "reason": "self-only",
+      "detail": "engines/letter-post.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/letter-post.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "levyCorvee.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -15398,6 +15454,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 691
+    "dataOnly": 692
   }
 }
