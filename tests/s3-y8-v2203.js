@@ -194,10 +194,22 @@ function runAll(a) {
     'y8v2203/A10: 设置面总开关在位（setSettings 的真消费方）');
   a(cnt(D, "'wa-rp-enabled'") >= 1, 'y8v2203/A10b: 该开关已进守卫表（渲染了不登记 ⇒ 守卫永远查不到 —— H2 双红）');
   // 见证当面：四码的见证住在 reject-v2780.js（另一个文件）。跨文件判据在这里补上。
-  a(cnt(rd('tests/reject-v2780.js'), "want('carries-world-facts'") === 1
-    && cnt(rd('tests/reject-v2780.js'), "want('conflict'") === 1
-    && cnt(rd('tests/reject-v2780.js'), "want('preset-world-absent'") === 1,
-    'y8v2203/A11: 三码的可执行见证在 reject-v2780.js 里各声明 1 次（新码不进基线）');
+  //   口径修正（v2.524.0）：原先按**全表**计数。但 `conflict` 是通用码 —— OPV28-01
+  //   （预设名单里出现叙事面）合法地也用它一次，于是「Y8 三码各 1 次」被别批次的复用顶红。
+  //   本判据要问的是「**Y8 自己的见证块**里，这三码各声明一次」（防同一码在自己块里写成
+  //   两条 want 的假见证），故改为在 Y8 块内切片计数。块边界取块注释，不取行号。
+  //   强度不降：块内仍是「恰 1 次」（0 次/2 次都红），另加一条全表至少出现过。
+  (function () {
+    const rv = rd('tests/reject-v2780.js');
+    const b8 = rv.slice(rv.indexOf('// ── v2.203.0（第四批 Y8）'), rv.indexOf('// ── v2.203.0（第四批 Y9）'));
+    const CODES = ['carries-world-facts', 'conflict', 'preset-world-absent'];
+    a(b8.length > 500, 'y8v2203/A11a: Y8 见证块切片命中（' + b8.length + ' 字符；空切片会让下面三条全红）');
+    CODES.forEach(function (c) {
+      a(cnt(b8, "want('" + c + "'") === 1,
+        'y8v2203/A11: ' + c + ' 在 Y8 块内恰声明 1 次（实 ' + cnt(b8, "want('" + c + "'") + '）');
+      a(cnt(rv, "want('" + c + "'") >= 1, 'y8v2203/A11r: ' + c + ' 在全表里确实被见证（防块内自说自话）');
+    });
+  })();
   // 工具（tools/reject-recovery.js）**不自带第二份表** —— 表是产品承诺，工具只持判据。
   //   按**表名**扫比按某个局部变量名扫有分量：表名正是「第二份真源」的形状。
   (function () {
