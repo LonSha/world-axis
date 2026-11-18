@@ -194,6 +194,52 @@
     };
   }
 
+  /**
+   * 同一选择在多个旁观者眼中的不同解读（v2.524.0 / EXV28-24）。
+   *
+   * ── 它治什么 ─────────────────────────────────────────────────────
+   *   `path-echo` 一直是**一个人一本账**（`record(pId, ...)`）：同一个夜晚、同一个决定，
+   *   在不同人心里被读成什么，谁也拼不起来。于是「同案异读」只能由模型即兴口述，
+   *   而口述最容易犯的错正是越界 —— 让一个不在场的人「也这么想」。
+   *
+   * ── 三条纪律 ─────────────────────────────────────────────────────
+   *   ① 每人一份**各自的**解读，各自带 `source`（他从哪儿知道的）；
+   *   ② **不越知识边界**：那人没有这条 decision 的回声账，就只进 `blind`（不替他说话），
+   *      绝不拿别人的解读凑人数；
+   *   ③ 少于 2 个人读得出来就如实说 `enough:false` —— 一个视角不叫「多方回响」。
+   * @param {string} decisionId
+   */
+  function bystanders(decisionId) {
+    const did = decisionId === null || decisionId === undefined ? '' : String(decisionId).slice(0, 80);
+    const rows = [];
+    const blind = [];
+    let scanned = 0;
+    try {
+      const d = WA.store && WA.store.get ? (WA.store.get() || {}) : {};
+      const people = Array.isArray(d.people) ? d.people : [];
+      people.forEach(function (p) {
+        if (!p || !p.life || !Array.isArray(p.life.pathEchoes)) return;
+        scanned++;
+        const rec = p.life.pathEchoes.filter(function (r) { return r && r.decisionId === did; })[0];
+        if (!rec) { blind.push(personId(p.name || p.id)); return; }
+        rows.push({
+          who: personId(p.name || p.id),
+          reading: clean(rec.decision, 60),
+          expected: rec.expectedPayoff ? Object.keys(rec.expectedPayoff).slice(0, 4) : [],
+          actualCost: rec.actualCost ? Object.keys(rec.actualCost).slice(0, 4) : [],
+          source: clean(rec.source, 40) || 'local-facts',
+          outcome: clean(rec.actualOutcome || '', 40),
+          revised: rec.revisedBias ? Object.keys(rec.revisedBias).slice(0, 4) : []
+        });
+      });
+    } catch (e) { /* 读不到就当没人读得出 */ }
+    return { ok: true, reason: 'ok', decisionId: did, rows: rows, count: rows.length,
+      scanned: scanned, blind: blind, enough: rows.length >= 2,
+      note: rows.length >= 2
+        ? '同一件事，' + rows.length + ' 个人各自读成什么，都在这儿（各自的来源也在这儿）'
+        : '只有一个视角，或者谁都没有这条账 —— 这时候说「大家都这么想」就是编' };
+  }
+
   function getLearnings(pId) {
     const p = getPerson(pId);
     if (!p || !p.life || !p.life.learnings) return { biases: {}, history: [] };
@@ -252,6 +298,7 @@
     recordExpectation: recordExpectation,
     realizeOutcome: realizeOutcome,
     getLearnings: getLearnings,
+    bystanders: bystanders,
     clear: clear
   };
 

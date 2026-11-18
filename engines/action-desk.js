@@ -639,6 +639,9 @@
     'worldBrief.board': function (o) { return WA.worldBrief.board(o); },
     'worldBrief.almanac': function (o) { return WA.worldBrief.almanac(o); },
     'worldBrief.record': function (o) { return WA.worldBrief.record(o.spec || o); },
+    // v2.524.0（V28 / EXV28-21/24）：预演对账与同案异读 —— 两个只读的动作。
+    'rehearsal.settle': function (o) { return WA.rehearsal.settle(o.id || o.previewId, o.actual || o); },
+    'pathEcho.bystanders': function (o) { return WA.pathEcho.bystanders(o.decisionId || o.id); },
     'creditLedger.checkCredit': function (o) { return WA.creditLedger.checkCredit(o.borrower || o.who, o.at); },
     'anniversaryRites.register': function (o) { return WA.anniversaryRites.register(o.spec || o); },
     'anniversaryRites.markObserved': function (o) { return WA.anniversaryRites.markObserved(o.id, o.spec || o); },

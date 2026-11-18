@@ -9743,6 +9743,43 @@ function runWitness(WA) {
       }
     }
   }
+  // ── v2.524.0（V28 批五）：预演对账 / 同案异读（EXV28-21 / EXV28-24）──
+  //   两个函数都只**读**已发生的账：预演对账不改写真跑结果，同案异读不替不在场的人说话。
+  {
+    const putE = function (fn) {
+      try {
+        if (WA.store && typeof WA.store.transact === 'function') { WA.store.transact(fn, 'witness:v28g'); return; }
+      } catch (e) { /* 落回直接写 */ }
+      try { fn(WA.store.get() || {}); } catch (e2) { /* 无 store */ }
+    };
+    if (WA.rehearsal && typeof WA.rehearsal.settle === 'function') {
+      want('missing-preview', 'V28 EXV28-21：拿一条不存在的预览去对账 ⇒ missing-preview（预演不是保证）');
+      trip('missing-preview', function () { return WA.rehearsal.settle('没有这条预览', { done: 2 }).reason; });
+    }
+    if (WA.pathEcho && typeof WA.pathEcho.bystanders === 'function' && WA.store && typeof WA.store.get === 'function') {
+      const keepPeople = (WA.store.get() || {}).people;
+      try {
+        const mk = function (name, did) {
+          return { name: name, life: { pathEchoes: [{ decisionId: did, decision: '他当时选择了沉默',
+            expectedPayoff: { reputation: 1 }, actualCost: { trust: -1 }, actualOutcome: '被记恨' }] } };
+        };
+        putE(function (d) { d.people = [mk('甲', 'dec_1'), mk('乙', 'dec_1'), { name: '丙', life: { pathEchoes: [] } }]; });
+        // 正面面：两人各自读得出来 ⇒ 两个视角、各自带来源；第三人没这条账 ⇒ 只进 blind，不替他说话
+        const r2 = WA.pathEcho.bystanders('dec_1');
+        if (!(r2 && r2.ok && r2.count === 2 && r2.enough === true && r2.blind.length === 1 && r2.rows[0].source)) {
+          throw new Error('同案异读没给出两个视角：' + JSON.stringify(r2));
+        }
+        putE(function (d) { d.people = [mk('甲', 'dec_2')]; });
+        // 正面面：只有一个视角时必须如实说「不够」，不许把一个人的解读说成「大家都这么想」
+        const r1 = WA.pathEcho.bystanders('dec_2');
+        if (!(r1 && r1.ok && r1.count === 1 && r1.enough === false)) {
+          throw new Error('单视角被说成了多方回响：' + JSON.stringify(r1));
+        }
+      } finally {
+        putE(function (d) { d.people = keepPeople; });
+      }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

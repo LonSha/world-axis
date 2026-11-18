@@ -390,6 +390,55 @@
   }
 
   /**
+   * 结算一次预演（v2.524.0 / EXV28-21）：「预演只管角色可推知的那部分」。
+   *
+   * ── 它治什么 ─────────────────────────────────────────────────────
+   *   预演此前只有两件事：登记（`preview`）与真跑（`apply`）。于是「预演说会成，结果没成」
+   *   这件事**没有任何落点** —— 玩家会以为预演给了保证，而预演其实只给了「按角色所知推得下去」。
+   *
+   * ── 三条纪律 ─────────────────────────────────────────────────────
+   *   ① **真实结果永远为准**：本函数只**比对**、只**说明偏差**，不改写真跑结果；
+   *      回执里 `truth:'actual'` 是硬话，调用方不许拿预演的结论覆盖已发生的事实。
+   *   ② 预演时算不出来的步骤（`unknown`，见 `run` 的未知清单）事后若真发生了，
+   *      记进 `beyondReach` —— 那不是「预演猜错」，是**本来就在视野外**，两件事分开报。
+   *   ③ 没有这条预览就 `missing-preview`，世界已变过就 `stale-preview`（沿用既有两码，
+   *      不新造词：旧预览的处置与 `apply` 完全同一口径）。
+   * @param {string} id 预览 id
+   * @param {object} actual { until, done } —— 真实发生了多少步 / 到哪一步为止
+   */
+  function settle(id, actual) {
+    const cfg = settings();
+    if (!cfg.enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const pid = clean(id, 60);
+    const row = rowsOf().filter(function (x) { return x && x.id === pid; })[0] || null;
+    if (!row) return { ok: false, reason: 'missing-preview', id: pid };
+    const chk = checkPreview(pid);
+    if (!chk.match) {
+      return { ok: false, reason: 'stale-preview', id: pid, pinned: chk.pinned, current: chk.current,
+        note: '世界已变化：这条预演不再作数（真实结果照旧为准，不按旧预演回写）' };
+    }
+    const a = actual && typeof actual === 'object' ? actual : {};
+    const actualUntil = clean(a.until, 40);
+    const actualDone = Number.isFinite(a.done) ? (a.done | 0) : row.done;
+    const unknown = Array.isArray(row.unknown) ? row.unknown.slice() : [];
+    const deviation = [];
+    if (row.until && actualUntil && row.until !== actualUntil) {
+      deviation.push('收场不同：预演到「' + clean(row.until, 24) + '」，实际到「' + clean(actualUntil, 24) + '」');
+    }
+    if (row.done !== actualDone) {
+      deviation.push('步数不同：预演走了 ' + row.done + ' 步，实际走了 ' + actualDone + ' 步');
+    }
+    const beyond = actualDone > row.done ? unknown.slice(0, 6) : [];
+    stat.lastReason = deviation.length ? 'diverged' : 'matched';
+    return { ok: true, reason: 'ok', id: pid, truth: 'actual',
+      matched: deviation.length === 0, deviation: deviation,
+      beyondReach: beyond,
+      note: deviation.length
+        ? '预演与真实不一致：**以真实为准**，偏差如上（预演不是保证，只说明「按当时所知推得下去」）'
+        : '预演与真实一致：这只是事后对账，不是保证下一次也对' };
+  }
+
+  /**
    * 应用一次预览（真跑同样的步骤）。旧预览 ⇒ 拒收；一致 ⇒ 按同一步骤表真跑一次。
    *   这里**不**复用试演的读数：真跑的结论由真跑给出（复用会把「试演通过」变成自证）。
    */
@@ -549,7 +598,7 @@
     POLICIES: POLICIES.slice(), POLICY_CN: Object.assign({}, POLICY_CN),
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
-    run: run, preview: preview, checkPreview: checkPreview, apply: apply,
+    run: run, preview: preview, checkPreview: checkPreview, apply: apply, settle: settle,
     rollbackScope: rollbackScope, policy: policy, divergence: divergence,
     fingerprint: fingerprint, view: view, statView: statView,
     stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }

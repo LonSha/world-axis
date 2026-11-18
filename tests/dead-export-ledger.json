@@ -10952,7 +10952,7 @@
       "src": "engines/rehearsal.js",
       "refs": 0,
       "tref": 0,
-      "own": 26
+      "own": 28
     },
     "rehearsal.statView": {
       "reason": "self-only",
