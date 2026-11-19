@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "930c4243cc8898f6aa12d5a0489a258d114b1d6bf893e35c1ce34fbd6b51d7cc",
-  "sourceCommits": 19,
+  "sourceDigest": "9b4098ac29e849df3350e9811c32e3e53f94f4d9f3f35a770293980a0c7a4984",
+  "sourceCommits": 20,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -65,6 +65,18 @@
       ],
       "recompute": true,
       "note": ""
+    },
+    "OPV29-15": {
+      "group": "Z3",
+      "commit": "bd051c6",
+      "subject": "chore(worldaxis): 台账回填 —— OPV29-15 现场已交付（漏登，不是未做）",
+      "readings": [
+        "node tests/opv29-z3-v2524.js ⇒ PASS 27/27（Y 段即故障自诊：下一步只给一条命令、禁止清单点名危险动作、活锁不得当可回收）",
+        "node tools/fault-selfhelp.js ⇒ 锁 active @ /tmp/worldaxis-regression-c5e46bb9b9c91eac0912.lock / git HEAD 857b9e5 ⇒ 现场可跑",
+        "node tools/fault-selfhelp.js --symptom=git-object-corrupt ⇒ 下一步 git fsck --connectivity-only --no-dangling，禁止 find .git -delete"
+      ],
+      "recompute": true,
+      "note": "专锁 27/27 绿；两种真事故的下一步命令各自唯一，危险动作逐条点名禁止（find -delete / git gc --prune=now / find .git -delete）。"
     },
     "OPV29-16": {
       "group": "Z3",
@@ -344,7 +356,6 @@
     "OPV29-11",
     "OPV29-12",
     "OPV29-14",
-    "OPV29-15",
     "OPV29-17",
     "OPV29-22",
     "OPV29-30"
@@ -396,8 +407,8 @@
     ]
   },
   "counts": {
-    "delivered": 23,
-    "pending": 13,
+    "delivered": 24,
+    "pending": 12,
     "rangeForm": 1,
     "noRecompute": 5,
     "unparsedForm": 0,
