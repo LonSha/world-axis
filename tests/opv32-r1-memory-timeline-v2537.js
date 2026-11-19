@@ -96,5 +96,23 @@ a(guardFirst >= 0 && titlePos > guardFirst, 'D3 负控制：标题出现在守�
 // 台账：KINDS 里确实有 collapse/timeline（否则 A3 会指向一个不存在的块）。
 a(SV.KINDS.indexOf('collapse') >= 0 && SV.KINDS.indexOf('timeline') >= 0, 'D4 台账：collapse / timeline 在渲染器的块类型表内');
 
+console.log('\n■ E 面：P0 护栏与反馈层（v2.539.0）');
+const rbSeg = (function () {
+  const i = pAll.indexOf('function renderBody()');
+  if (i < 0) return '';
+  const j = pAll.indexOf(NL + '  function ', i + 10);
+  return pAll.slice(i, j < 0 ? pAll.length : j);
+})();
+a(pAll.indexOf('function __toast(msg, bad)') >= 0 && pAll.indexOf("__toastEl.id = 'wa-toast'") >= 0,
+  'E1 toast 有唯一入口且容器 id 固定（不是散在 148 处 innerHTML 里）');
+a(pAll.indexOf('(mainDoc.body || mainDoc.documentElement).appendChild(__toastEl)') >= 0,
+  'E2 toast 挂在 body 下 —— 面板整块重建抹不掉它');
+a(rbSeg.indexOf('wa-toast') < 0, 'E3 renderBody 段不碰 toast（提示不参与重绘）');
+a(pAll.indexOf('没有改动任何数据') >= 0, 'E4 取消时明说「没有改动」——不留「可能已生效」的疑心');
+const guardCount = (pAll.split('if (!__ok(').length - 1);
+a(guardCount >= 4, 'E5 半不可逆操作已接护栏（实 ' + guardCount + ' 处，判据 ≥4）', guardCount);
+a(pAll.split('if (!__ok(').join('if (!(').indexOf('if (!__ok(') < 0,
+  'E6 负控制：删掉护栏调用 ⇒ E5 判据变红（判据非恒真）');
+
 console.log('\n合计：' + pass + ' / ' + (pass + fail));
 process.exitCode = fail ? 1 : 0;

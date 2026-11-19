@@ -1673,3 +1673,62 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .wa-mini { margin: 3px 5px 3px 0; }
   .wa-tabs { min-height: 42px; }
 }
+
+/* v2.539.0（P0 反馈层）：toast —— 面板第一次有「瞬时结果」这一层。
+   为什么挂 body 而不挂面板：renderBody 是整块重建（148 处 innerHTML），
+   挂在面板里的提示会被下一次重绘抹掉 —— 那种「闪一下没了」比不弹更坏。
+   为什么纯 opacity/transform 过渡：它不引起布局重排（不推挤面板高度）。 */
+.wa-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translate(-50%, 10px);
+  z-index: 2147483000;
+  max-width: min(84vw, 420px);
+  padding: 9px 14px;
+  border-radius: 8px;
+  background: #14181f;
+  color: #e8edf3;
+  border: 1px solid #2a313b;
+  font-size: var(--wa-fs-sm);
+  line-height: 1.45;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.wa-toast-on { opacity: 1; transform: translate(-50%, 0); }
+.wa-toast-bad { border-color: #f43f5e; color: #ffe4e6; }
+@media (prefers-reduced-motion: reduce) { .wa-toast { transition: none; } }
+
+/* v2.539.0（P4 视觉语法 R1）：区块节奏与空态 —— 不动任何 DOM，只给已有元素分层。
+   病：192 个 .wa-sec 与 47 个 .wa-empty 是同一个视觉重量，眼睛无处停；*. 空态全是灰色一行字，
+   读起来像“页面没加载完”而不是“这里本来就没东西”。
+   治法（只加不删）：① 区块标题从“一行粗字”变成“分隔带”（上内边距 + 极细分隔线 + 字距）；
+   ② 空态变成“明确定义的空盒子”（虚线边框 + 居中 + 最小高），与加载中可区分；
+   ③ （撤回）原本还想给统计格补一层表面，现场查证 .wa-stat 早已有背景+边框+圆角 ——
+      再叠一层只会让「卡片里套卡片」，故不做。注释留在这里记录这条查证，不写没做的事。 */
+.wa-sec {
+  margin-top: var(--wa-sp-4, 16px);
+  padding-top: var(--wa-sp-2, 7px);
+  border-top: 1px solid var(--wa-border-subtle);
+  letter-spacing: 0.02em;
+}
+.wa-sec:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.wa-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px dashed var(--wa-border-subtle);
+  border-radius: var(--wa-r-md, 8px);
+  color: var(--wa-text-dim);
+  text-align: center;
+  font-size: var(--wa-fs-sm);
+}
+.wa-empty::before {
+  content: "○";
+  margin-right: 6px;
+  opacity: 0.55;
+}

@@ -492,6 +492,42 @@
   let lastPerfSnap = null;
 
   function h(html) { const d = mainDoc.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
+  /** v2.539.0（P0 护栏 + 反馈层）：
+   *  病（现场实测）：面板 696 个按钮只有 5 处 confirm(，而「删事实 / 弃伏笔 / 删伏笔 / 清空事实」
+   *    这类半不可逆操作全是一击生效；同时全仓 toast 出现 0 次 —— 玩家点完只看到页面上某一行
+   *    输出区变了（还可能已被 renderBody 重建掉），于是「点了没反应」与「点了成功了」体感同形。
+   *  处置：两条唯一入口，不散落。
+   *    · __toast(msg,bad)：固定浮层，成功 1.8s / 失败 4.2s 收起；挂在 body 下，不参与 renderBody
+   *      重建（否则「刚弹出的提示被下一次重绘抹掉」会成为新的假绿）。
+   *    · __ok(label)：二次确认；被取消时必留一句「没有改动任何数据」——
+   *      玩家最怕的是「不知道刚才取消的到底有没有生效」。
+   *  为什么不抽成模块：它们要读 mainDoc 与面板生命周期，而 ui 层模块无宿主上下文；
+   *    形态与既有 esc / _msTs 同一档（面板内的展示基元）。 */
+  let __toastEl = null, __toastTimer = null;
+  function __toast(msg, bad) {
+    try {
+      if (!__toastEl || !__toastEl.parentNode) {
+        __toastEl = mainDoc.createElement('div');
+        __toastEl.id = 'wa-toast';
+        __toastEl.className = 'wa-toast';
+        __toastEl.setAttribute('role', 'status');
+        __toastEl.setAttribute('aria-live', 'polite');
+        (mainDoc.body || mainDoc.documentElement).appendChild(__toastEl);
+      }
+      __toastEl.textContent = String(msg == null ? '' : msg);
+      __toastEl.className = 'wa-toast wa-toast-on' + (bad ? ' wa-toast-bad' : '');
+      if (__toastTimer) clearTimeout(__toastTimer);
+      __toastTimer = setTimeout(function () {
+        if (__toastEl) __toastEl.className = 'wa-toast';
+      }, bad ? 4200 : 1800);
+    } catch (e) { /* 无 DOM 环境（无头测试）⇒ 静默：反馈层缺席不是产品面缺席 */ }
+  }
+  function __ok(label) {
+    let yes = true;
+    try { yes = window.confirm(String(label)); } catch (e) { yes = true; }
+    if (!yes) __toast('已取消 —— 没有改动任何数据');
+    return yes;
+  }
   // v2.111.0（计划二 #69）：转义走单一真源 core/sanitize.js；本处是兜底实现。
   //   修掉两个真缺陷：① 原映射表把双引号映射成双引号自己（恒等），故属性上下文里等于不转义；
   //   ② 另有 2 处调用了全仓不存在的 escapeHtml 函数（一碰就 ReferenceError）。
@@ -677,7 +713,7 @@
     return `
       ${vacuum}
       ${(function () {
-        // v2.536.0：世界账簿 —— 玩家端第一眼要答的问题不是「某台引擎算得对不对」，
+        // v2.536.0：世界账本 —— 玩家端第一眼要答的问题不是「某台引擎算得对不对」，
         //   而是「我的世界现在有哪些账」。本块**枚举 store 的顶层键**（不硬编码清单）：
         //   数组报条目数、对象报字段数、标量报值，空的一律不列（空账报「0 条」会让页面变成
         //   一堵「都是 0」的墙）。它只读、不改、不落盘；键是数据，所以不登记为控件。
@@ -703,7 +739,7 @@
         return WA.schemaView.render({
           blocks: [{
             type: 'collapse',
-            title: '世界账簿（这台世界现在有 ' + rows.length + ' 类账）',
+            title: '世界账本（这台世界现在有 ' + rows.length + ' 类账）',
             children: [{ type: 'kv', rows: rows.slice(0, 40), empty: '这台世界还是空的：去开局页立骨架' }]
           }]
         });
@@ -12818,9 +12854,12 @@ on('#wa-desk-show', showDesk);
       const i = Number(b.dataset.factdel); const s = WA.store.get();
       const cur = (s.memory && s.memory.facts) || []; if (!cur[i]) return;
       const label = String(cur[i].key || '');
+      // v2.539.0（P0 护栏）：删除是半不可逆（虽有撤销栈，但玩家不知道），先问一句。
+      if (!__ok('删除事实「' + label + '」？\n（可经工具页「撤销编辑」回滚）')) return;
       const next = cur.slice(); next.splice(i, 1);
       const r = WA.store.patch('memory.facts', next);
       memOut(r && r.ok ? ('已删除事实「' + label + '」（可经工具页「撤销编辑」回滚）') : ('删除失败：' + ((r && r.reason) || '?')), !(r && r.ok));
+      __toast(r && r.ok ? ('已删除事实「' + label + '」') : ('删除失败：' + ((r && r.reason) || '?')), !(r && r.ok));
       if (r && r.ok) renderBody();
     });
     panelEl.querySelectorAll('[data-facttoggle]').forEach(b => b.onclick = () => {
@@ -12834,8 +12873,11 @@ on('#wa-desk-show', showDesk);
     panelEl.querySelectorAll('[data-fsdel]').forEach(b => b.onclick = () => {
       const i = Number(b.dataset.fsdel); const s = WA.store.get();
       const cur = (s.memory && s.memory.foreshadows) || []; if (!cur[i]) return;
+      // v2.539.0（P0 护栏）：删伏笔 = 丢掉「将来要回收的钩子」，先问一句并带上内容前缀。
+      if (!__ok('删除这条伏笔？\n「' + String((cur[i] && cur[i].content) || '').slice(0, 60) + '」\n（可经工具页「撤销编辑」回滚）')) return;
       const next = cur.slice(); next.splice(i, 1);
       const r = WA.store.patch('memory.foreshadows', next);
+      __toast(r && r.ok ? '已删除伏笔' : ('删除失败：' + ((r && r.reason) || '?')), !(r && r.ok));
       memOut(r && r.ok ? '已删除伏笔（可经工具页「撤销编辑」回滚）' : ('删除失败：' + ((r && r.reason) || '?')), !(r && r.ok));
       if (r && r.ok) renderBody();
     });
@@ -12856,9 +12898,12 @@ on('#wa-desk-show', showDesk);
     panelEl.querySelectorAll('[data-fsdrop]').forEach(b => b.onclick = () => {
       const i = Number(b.dataset.fsdrop); const s = WA.store.get();
       const cur = (s.memory && s.memory.foreshadows) || []; if (!cur[i]) return;
+      // v2.539.0（P0 护栏）：放弃伏笔会把它永久移出注入面（status=dropped 是终态），先问一句。
+      if (!__ok('放弃这条伏笔？\n「' + String((cur[i] && cur[i].content) || '').slice(0, 60) + '」\n（终态：放弃后不再参与注入）')) return;
       const next = cur.slice(); next[i] = Object.assign({}, next[i], { status: 'dropped' });
       const r = WA.store.patch('memory.foreshadows', next);
       memOut(r && r.ok ? '伏笔已标记为「已放弃」' : ('写入失败：' + ((r && r.reason) || '?')), !(r && r.ok));
+      __toast(r && r.ok ? '伏笔已放弃（不再参与注入）' : ('写入失败：' + ((r && r.reason) || '?')), !(r && r.ok));
       if (r && r.ok) renderBody();
     });
     panelEl.querySelectorAll('[data-refview]').forEach(b => b.onclick = () => {
@@ -13093,7 +13138,10 @@ on('#wa-desk-show', showDesk);
       const s = WA.store.get();
       const cur = (s.memory && s.memory.facts) || [];
       if (!cur.length) return;
+      // v2.539.0（P0 护栏）：这是面板上威力最大的一击（整张事实表清空），必须报价再清。
+      if (!__ok('清空全部 ' + cur.length + ' 条长期事实？\n（可经工具页「撤销编辑」回滚）')) return;
       const r = WA.store.patch('memory.facts', []);
+      __toast(r && r.ok ? ('已清空 ' + cur.length + ' 条长期事实') : ('清空失败：' + ((r && r.reason) || '?')), !(r && r.ok));
       memOut(r && r.ok ? ('已清空 ' + cur.length + ' 条长期事实（可经撤销回滚）') : ('清空失败：' + ((r && r.reason) || '?')), !(r && r.ok));
       if (r && r.ok) renderBody();
     });
