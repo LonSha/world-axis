@@ -389,6 +389,7 @@
     'engines/tool-analyzer.js',
     'engines/tool-import.js',
     'engines/inject-inspector.js',
+    'engines/inject-budget-tables.js',
     'engines/inject-budget.js',
     'engines/tool-diag.js',
     'engines/contract-audit.js',

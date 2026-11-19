@@ -442,7 +442,7 @@ const LOAD = [
   'core/exec.js',
   'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/inline-tags.js', 'engines/periodicals.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js', 'engines/kaleidoscope.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget-tables.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js', 'engines/kaleidoscope.js',
   // v2.50.0（第三十五面）: 宿主两侧 + 时间轴三账。
   //   位置与 index.js LOAD_ORDER 同序（须早于 render/inject.js，须晚于 engines/timeline.js）
   'engines/host-wb-trace.js', 'engines/ledger-timeline.js', 'engines/floor-changes.js',
@@ -22584,6 +22584,23 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   另：--json 在未 --measure 时 attributable 必须为 false（静态面不许冒充首屏读数）——这条由 C2 钉住。
     //   读数：专锁 pass (21) · 冷开 42 / 静态 1794 = 2% · 34 页 · 首屏 46 · --check rc=0。
     await runScript('./opv29-z1-05-v2529.js');
+    // v2.529.0（V29 优化线 Z1）：OPV29-10 inject-budget 拆段（科目表与算法分离）—— 14 项。
+    //   病：计划要「按注册表/诊断/面板三块拆，保留原导出面」，验收「预算读数不变」。
+    //   拆前 engines/inject-budget.js 1425 行里混着 573 行**纯声明**（源优先级 / 成本分档 / 科目归类）
+    //   与一千多行算法：改一条 rank 要在算法里翻，想知道「哪些源算世界骨架」也没有独立真源。
+    //   做法：新增 engines/inject-budget-tables.js（600 行，零算法，只挂 WA.injectBudgetTables），
+    //   引擎降到 863 行，求值期先取表；**缺表/空表当场抛错**（不静默退化成空表 ——
+    //   空表会让「pinned 绝不静默丢弃」静默失效，比崩溃危险）。
+    //   次序硬约束：index.js LOAD_ORDER 与 tests/run.js LOAD **两份表同序双登记**，tables 在引擎之前。
+    //   实测现场：表载荷 3 块 · PRIORITY 163 键 / 科目行 163 行 · 导出面 23 键逐字不变 ·
+    //   引擎零表字面量 · plan() kept 2 / dropped 0 / folded 0 · costOf(20)=long · 未归类 0。
+    //   连带修的四处真源（都是拆段后当场红的）：settle-v2850 的 rank 破坏锚点改指表文件、
+    //   round-cost-v2269 直 require 改为先表后引擎、cost-v2880 的隔离装载 files 补上表文件、
+    //   tools/tx4_smoke.js 的 PRIORITY 断言改读表文件；计划表两处读数回填（engines 504→505、inject-budget 98K→55K）。
+    //   实测负控制两组（都是真破坏现场）：把一行源优先级表塞回引擎 ⇒ FAIL 1/14（A4 红）；
+    //   拿掉缺表守卫（改成静默空表兜底）⇒ FAIL 3/14（B1/B2/C2 红：rc 从 1 变 0）；逐字还原后均回到 pass (14)。
+    //   读数：专锁 pass (14) · 引擎 1425→863 行 / 新表文件 600 行 · 装载边 561→562 · plan-readings pass(16)。
+    await runScript('./opv29-z1-10-v2529.js');
     // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
     //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是
     //   「装了 story-tone 也说没有」「改了一句也永远 available:false」——不崩的假判据。

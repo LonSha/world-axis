@@ -54,6 +54,7 @@ function runAll(assertFn) {
   require(path.join(BASE, 'core/input-guard.js'));
   require(path.join(BASE, 'core/clock.js'));
   require(path.join(BASE, 'core/settings-bus.js'));
+  require(path.join(BASE, 'engines/inject-budget-tables.js'));
   require(path.join(BASE, 'engines/inject-budget.js'));
   require(path.join(BASE, 'engines/inject-value.js'));
   require(path.join(BASE, 'engines/perf-ledger.js'));

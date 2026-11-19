@@ -273,7 +273,7 @@ const BROKEN = [
     from: "        const lone = !!(commitment && commitment.kind === 'cooperation' && !reciprocated(draft, p, commitment));",
     to: "        const lone = false;",
     why: '摘掉协作对偶检查 ⇒ 单向宣布的合作被当作已建立的协作（unreciprocated 从现场消失）' },
-  { key: 'rank', rel: 'engines/inject-budget.js',
+  { key: 'rank', rel: 'engines/inject-budget-tables.js',
     from: "    '世界织体': { rank: 5, fold: true },",
     to: "",
     why: '删掉一个源声明 ⇒ plan().unranked 必须点名（覆盖判据现形）' },

@@ -235,11 +235,11 @@ function runNegative(a) {
   const broken = s.replace(ANCHOR_MAIN, 'Object.keys(byList).forEach(function (name) {');
   a(broken !== s, 'v2880: [N1] 破坏确实改写了源码（账本主键退回注入项清单）');
   const ov = { 'engines/inject-budget.js': broken };
-  const WAb = gate.fresh({ files: ['engines/inject-budget.js'], srcOverride: ov }).WA;
+  const WAb = gate.fresh({ files: ['engines/inject-budget-tables.js', 'engines/inject-budget.js'], srcOverride: ov }).WA;
   const cb = inject(WAb, EXT).budget.cost;
   a(cb.measured < okMeas, 'v2880: [N1] 破坏后 B1 现形：空世界下账上只剩 ' + cb.measured + ' 源（原版 ' + okMeas + ' 源）——判据不是瞎的');
   a(cb.bands.short + cb.bands.medium + cb.bands.long === cb.measured, 'v2880: [N2] 影响面有限：分档计数守恒在破坏副本上仍成立');
-  const WAb2 = gate.fresh({ files: ['engines/inject-budget.js'], srcOverride: ov }).WA;
+  const WAb2 = gate.fresh({ files: ['engines/inject-budget-tables.js', 'engines/inject-budget.js'], srcOverride: ov }).WA;
   setAll(WAb2, false);
   WAb2.render.applyInjections({ injections: EXT });
   a(WAb2.store.get().lastInjection.budget.cost.measured === 0, 'v2880: [N2] 引擎未调用那条在破坏副本上仍为 0——逐锚敏感');
