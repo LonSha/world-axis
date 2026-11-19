@@ -442,7 +442,7 @@ const LOAD = [
   'core/exec.js',
   'engines/backstage-protocols.js', 'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/inline-tags.js', 'engines/periodicals.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/fact-age.js',
-  'engines/json-repair.js',
+  'engines/json-repair.js', 'engines/replica-family.js',
   'engines/lazy-load.js',
   'engines/save-migrate.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
@@ -22208,6 +22208,8 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   负控制三向：闭眼扫空 loose / 放行 active 锁 / 去掉活 worker 拦截，三向必须各自变红。
     //   实测负控制：FAIL 3/51（D4b/D4c/D4d）· FAIL 1/51（C3a）· FAIL 2/51（C4a/C4b）
     await runScript('./opv29-z6-v2529.js');
+    // v2.530.0（OPV30-R1）：副本族（产名 / 铺开 / 回收）。
+    await runScript('./opv30-r1-replica-family-v2530.js');
     // v2.524.0（V29 优化线 Z5 首项）：OPV29-25 新引擎脚手架 —— 48 项。
     //   病：加一台引擎要改七处（四路接线 + 三处登记），漏一处的表现不是报错，
     //   而是「引擎在位、却谁也不认它」；且七处彼此没有交叉校验。

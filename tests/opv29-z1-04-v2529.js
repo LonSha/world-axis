@@ -142,7 +142,7 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   a(!!eager && eager.length === 569, 'B1 首帧清单 LOAD_ORDER 解析出 569 条（实测回填）', eager && eager.length);
   // A0b / A0e：惰性档非空 ——防「删空档换下降」
   a(!!lazy && lazy.length >= 10, 'B2 惰性档**非空**且成规模（≥10 条；删空换下降会在这里红）', lazy && lazy.length);
-  a(!!lazy && lazy.length === 22, 'B3 惰性档 22 条（实测回填，静默漂移会红）', lazy && lazy.length);
+  a(!!lazy && lazy.length === 23, 'B3 惰性档 23 条（实测回填，静默漂移会红）', lazy && lazy.length);
   const inter = (eager || []).filter(function (x) { return (lazy || []).indexOf(x) >= 0; });
   a(inter.length === 0, 'B4 首帧清单与惰性档**零交集**（不双登记：否则「下降」是假的）', inter);
   a((lazy || []).every(function (x) { return x.indexOf('ui/') !== 0; }), 'B5 惰性档不含 ui/*（UI 层本来就不在装载序）');
@@ -153,9 +153,9 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const led = JSON.parse(RD('tests/module-registry-ledger.json'));
   const notInLedger = (lazy || []).filter(function (x) { return !led.modules[x]; });
   a(notInLedger.length === 0, 'B8 惰性档每条仍在 registry 账本里（门禁眼里没有「消失的模块」）', notInLedger);
-  a(led.lazyCount === 22, 'B9 账本记录 lazyCount=22（registry 报告的惰性面读数）', led.lazyCount);
-  a(led.loadedCount === 570 && led.loadOrderCount === 569,
-    'B10 全量契约面 570 / 首帧面 569（差 1 = 只多了 lazy-load 自己）', [led.loadedCount, led.loadOrderCount]);
+  a(led.lazyCount === 23, 'B9 账本记录 lazyCount=23（registry 报告的惰性面读数）', led.lazyCount);
+  a(led.loadedCount === 571 && led.loadOrderCount === 569,
+    'B10 全量契约面 571 / 首帧面 569（差 2 = lazy-load 自己 + 副本族）', [led.loadedCount, led.loadOrderCount]);
   // 首帧装载边 vs 全量装载边（验收原话的读数）
   const edgesOf = function (list) {
     return list.reduce(function (n, rel) {

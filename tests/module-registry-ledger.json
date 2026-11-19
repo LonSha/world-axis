@@ -1,14 +1,14 @@
 {
  "version": "2.524.0",
  "loadOrderCount": 569,
- "lazyCount": 22,
- "loadedCount": 570,
- "uiCount": -1,
- "nsCount": 581,
+ "lazyCount": 23,
+ "loadedCount": 571,
+ "uiCount": -2,
+ "nsCount": 582,
  "totals": {
-  "loadEdges": 463,
+  "loadEdges": 464,
   "hardEdges": 0,
-  "callRefs": 749,
+  "callRefs": 751,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -292,6 +292,7 @@
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/relation-temp.js",
+    "engines/replica-family.js",
     "engines/reply-guard.js",
     "engines/request-viewer.js",
     "engines/research-closure.js",
@@ -860,6 +861,7 @@
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/relation-temp.js",
+    "engines/replica-family.js",
     "engines/reply-guard.js",
     "engines/request-viewer.js",
     "engines/research-closure.js",
@@ -11218,6 +11220,25 @@
   "engines/msg-align.js": {
    "ns": [
     "msgAlign"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/replica-family.js": {
+   "ns": [
+    "replicaFamily"
    ],
    "requires": [
     "registerModule"

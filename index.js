@@ -1611,6 +1611,7 @@
     'engines/macro-guard.js',
     'engines/mixed-index.js',
     'engines/msg-align.js',
+    'engines/replica-family.js',
     'engines/save-migrate.js',
     'engines/setup-plan.js',
     'engines/slot-format.js',

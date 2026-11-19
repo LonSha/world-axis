@@ -149,6 +149,12 @@
    "evidence": "瞬时清理导出全部在 dead-export-ledger 冻结。产品面零读。",
    "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('ephemeralScrub.')).length)\""
   },
+  "replicaFamily": {
+   "cls": "pending-wire",
+   "provider": "engines/replica-family.js",
+   "evidence": "副本族（产名 / 铺开 / 回收）：plan(current, want) 的三张单是「这一族该建几条」的输入，cleanup(state, round) 的 drop 是世界书删除侧的依据，stat(state) 是面板读数。落地点：后台推演把「在场角色」铺开成前台角色1..N 时读 plan.create；回收流程读 cleanup.drop。今天产品面零读（worldbook.js 只读不写、wb-inject 只镜像变量），故定 pending-wire —— 接线时刻：铺开侧接上 plan.create、回收侧接上 cleanup.drop 的那一版。",
+   "recompute": "grep -n 'replicaFamily' engines/replica-family.js tests/opv30-r1-replica-family-v2530.js"
+  },
   "factAge": {
    "cls": "pending-wire",
    "provider": "engines/fact-age.js",

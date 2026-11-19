@@ -51,7 +51,7 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 // v2.529.0（缝合批 19 件）：47 → 66（+19）。这 19 条**是本批引入的**（每件一个新命名空间），
 //   与 v2.524.0 那次「+9 不是本批引入」的情形不同 —— 所以这次必须逐条登记，
 //   不能像上次那样只解释来源。19 条的 cls 全是 pending-wire，evidence 写明消费点归属。
-const BASE_DEAD_NS = 69;   // v2.529.0 跟位：47 → 66（+19，缝合批）→ 69（+2，factAge / jsonRepair 两条 pending-wire）。 七个拆段表文件（OPV29-07~11）不进本账：它们不是零读，是在调用期被同族引擎读。
+const BASE_DEAD_NS = 70;   // v2.530.0 跟位：47 → 66（+19，缝合批）→ 69（+2，factAge / jsonRepair）→ 70（+1，replicaFamily：副本族也是 pending-wire，产品面尚未接线）。 七个拆段表文件（OPV29-07~11）不进本账：它们不是零读，是在调用期被同族引擎读。
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。
