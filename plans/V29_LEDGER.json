@@ -2,21 +2,16 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "77f989f15661f4835e89760c4bc9ce0a764a9ba85f602c7db36320576fdd01c2",
-  "sourceCommits": 9,
+  "sourceDigest": "119f97db13b6c109703a58c15f1679edf95f009654182f316be4c52fc92e70fa",
+  "sourceCommits": 11,
   "total": 36,
   "delivered": {
     "OPV29-16": {
       "group": "Z3",
-      "commit": "30af0ae",
-      "subject": "feat(worldaxis): OPV29-16 红门禁最小复现 —— 18 项，面数 598→599",
-      "readings": [
-        "node tests/opv29-z3-16-v2529.js ⇒ pass (18)",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 598→599",
-        "删掉打印行（红门禁不再给命令）⇒ FAIL 5/18（A4+A4b+A6+C1+C5）",
-        "repro 写死字面量脚本名（与失败的那个不同源）⇒ FAIL 4/18（A3+A3b+A7+C3）"
-      ],
-      "recompute": true,
+      "commit": "bc7cf4b",
+      "subject": "chore(worldaxis): 台账回填 tests/*.js 595->596（OPV29-16 新增专锁后现场值）",
+      "readings": [],
+      "recompute": false,
       "note": ""
     },
     "OPV29-18": {
@@ -98,6 +93,26 @@
         "21 三向 ⇒ FAIL 3/25（找不到锚原样返回，A2/A8/A10）· FAIL 1/25（不复核写盘，A11）·",
         "19 三向 ⇒ FAIL 5/20（A3+A6）· FAIL 4/20（只红 B10）· FAIL 5/20（A5+A10）",
         "3. `flake-audit` 曾有一条 log 规则（console.log ⇒ harness），于是「写一个打印时间戳"
+      ],
+      "recompute": true,
+      "note": ""
+    },
+    "OPV29-24": {
+      "group": "Z4",
+      "commit": "0f7700e",
+      "subject": "feat(worldaxis): OPV29-24 快档与全量同源 —— 24 项，面数 599→600",
+      "readings": [
+        "node tests/opv29-z4-24-v2529.js ⇒ pass (24)",
+        "node tools/fast-vs-full.js ⇒ SMOKE_SET 14 项 / FAST_GATES 3 项 / 挂载面 173 / 未覆盖 172",
+        "node tools/fast-vs-full.js --check ⇒ rc=0（FAST_GATES ⊆ SMOKE_SET 成立）",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 599→600",
+        "关系判成相等（子集→等号）⇒ FAIL 3/24（B3+B5+D1）",
+        "只认 rel 形态（cmd 不解析）⇒ FAIL 2/24（A3 归零 + D3）",
+        "解析失败当空集（不记 unparsed）⇒ FAIL 1/24（只红 D5）",
+        "root 不逐层传（探针失效）⇒ FAIL 2/24（D8+D9）",
+        "⇒ FAST_GATES 解析成 0 项。若不是「分叉」那条治住，0 vs 14 会被当成不一致",
+        "2. 关系判成**相等** ⇒ 既有正确设计（smoke 故意更大）被判成分叉 —— 这是「判据比",
+        "3. `read()` 用模块级 ROOT、忽略传入的 root ⇒ `audit(空目录)` 仍读真仓库，探针形同"
       ],
       "recompute": true,
       "note": ""
@@ -249,7 +264,6 @@
     "OPV29-15",
     "OPV29-17",
     "OPV29-22",
-    "OPV29-24",
     "OPV29-30",
     "OPV29-34",
     "OPV29-36"
@@ -261,16 +275,26 @@
         "form": "OPV29-01～36"
       }
     ],
-    "noRecompute": [],
+    "noRecompute": [
+      "OPV29-16"
+    ],
     "unparsedForm": [],
-    "dupClaims": []
+    "dupClaims": [
+      {
+        "item": "OPV29-16",
+        "commits": [
+          "bc7cf4b",
+          "30af0ae"
+        ]
+      }
+    ]
   },
   "counts": {
-    "delivered": 15,
-    "pending": 21,
+    "delivered": 16,
+    "pending": 20,
     "rangeForm": 1,
-    "noRecompute": 0,
+    "noRecompute": 1,
     "unparsedForm": 0,
-    "dupClaims": 0
+    "dupClaims": 1
   }
 }
