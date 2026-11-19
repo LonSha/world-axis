@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "d0e420e364906b425feb6d3829b9a127c9ddae2c48a7b90f6b9129c140df244f",
-  "sourceCommits": 30,
+  "sourceDigest": "de9d1726f181070fb1cc901d741c176c4c3f016b2bce9753bce5263228300e26",
+  "sourceCommits": 31,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -92,6 +92,30 @@
         "node tools/plan-readings.js ⇒ pass（16 条读数与现场全等）",
         "node tools/release-manifest.js ⇒ rc=0",
         "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（冻结基线 27）"
+      ],
+      "recompute": true,
+      "note": ""
+    },
+    "OPV29-11": {
+      "group": "Z2",
+      "commit": "bc216de",
+      "subject": "perf(engines): OPV29-11 backstage / world-lab / world.js 三件拆段（1140 / 1281 / 1333 行）",
+      "readings": [
+        "wc -l engines/backstage.js ⇒ 1140",
+        "wc -l engines/backstage-protocols.js ⇒ 167",
+        "wc -l engines/world-lab.js ⇒ 1281",
+        "wc -l engines/world-lab-tables.js ⇒ 66",
+        "wc -l engines/world.js ⇒ 1333",
+        "wc -l engines/world-tables.js ⇒ 61",
+        "wc -l tests/run.js ⇒ 22994",
+        "node tests/opv29-z1-11-v2529.js ⇒ pass (36)",
+        "node tests/module-registry-gate.js ⇒ 文件 545 / 装载期边 436 / 调用期 699 / 结构问题 0",
+        "node tests/module-cycle-gate.js ⇒ 别名 567 / 有引用 565 / nsFaceDrift 0 / problems 0",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
+        "node tools/plan-readings.js ⇒ pass（16 条）",
+        "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（基线 27）",
+        "node tests/s3-b3-e9-v2188.js ⇒ 334 / 失败 0",
+        "node tests/transit-v2930.js ⇒ pass（74 项）"
       ],
       "recompute": true,
       "note": ""
@@ -440,7 +464,6 @@
     "OPV29-04",
     "OPV29-07",
     "OPV29-08",
-    "OPV29-11",
     "OPV29-30"
   ],
   "violations": {
@@ -513,8 +536,8 @@
     ]
   },
   "counts": {
-    "delivered": 31,
-    "pending": 5,
+    "delivered": 32,
+    "pending": 4,
     "rangeForm": 1,
     "noRecompute": 7,
     "unparsedForm": 0,
