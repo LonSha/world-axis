@@ -3166,7 +3166,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
     assert(rep400.indexOf('## 健康巡视') >= 0 && rep400.indexOf('健康分: ') >= 0, '实跑报告产出健康巡视内容');
     assert(rep400.indexOf('写入完整性:') >= 0, '实跑报告产出写入完整性内容');
   } catch (e) { assert(false, '错误报告实跑失败: ' + e.message); }
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
   const panelSrc400 = require('./panel-source.js').panelSource();
   assert(panelSrc400.indexOf('id="wa-maintain"') >= 0 && panelSrc400.indexOf('健康巡视') >= 0, '面板含「健康巡视」入口');
@@ -3429,7 +3428,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
   assert(diagSrc500.indexOf('## 并发一致性') >= 0, '错误报告含「## 并发一致性」段');
   assert(diagSrc500.indexOf('外部写入（其他标签页）') >= 0, '报告透出外部写入计量');
   assert(diagSrc500.indexOf('冲突现场: 无') >= 0, '报告在无现场时给出明确「无」');
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
   const panelSrc500 = require('./panel-source.js').panelSource();
   assert(panelSrc500.indexOf('id="wa-conf-view"') >= 0 && panelSrc500.indexOf('冲突现场') >= 0, '面板含「冲突现场」入口（D 块）');
@@ -3693,7 +3691,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
   assert(pSg700 >= 0 && pSg700 < pIc700, 'index.js 加载序：settle-guard 先于 interceptor');
   const dg700 = WA.toolDiag.collect();
   assert(dg700.worldState.storage.settleGuard && typeof dg700.worldState.storage.settleGuard.settles === 'number', '诊断透出 settleGuard 节');
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
   const panelSrc700 = require('./panel-source.js').panelSource();
   assert(panelSrc700.indexOf('id="wa-settle-view"') >= 0 && panelSrc700.indexOf('结算守卫</button>') >= 0, '面板渲染结算守卫按钮（按钮行）');
@@ -5734,7 +5731,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
     fresh2200();
     const dSrcC2200 = require('./diag-source.js')();
     const sSrcC2200 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const pSrcC2200 = require('./panel-source.js').panelSource();
 
@@ -5811,7 +5807,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
       global.document = dom2200.window.document;
       try { global.Node = dom2200.window.Node; } catch (e) {}
       WA.mainDoc = global.document;
-      // v2.401.0(OPV23):先装三个段文件(自挂 WA.<ns>),panel.js 的转发才拿得到真实现
           //  (与 index.js LOAD_ORDER 同序;段体先于宿主文件求值,转发调用期 bind 才成立)
           for (const __seg23 of ['ui/pages/overview-blocks.js', 'ui/pages/overview-main.js', 'ui/pages/tools-page.js', 'ui/pages/dashboards.js']) {
             vm.runInContext(fs.readFileSync(path.join(BASE, __seg23), 'utf8'), ctx, { filename: __seg23 });
@@ -5969,7 +5964,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // D7. 端到端（真 DOM）：面板入口真能建档
     let JSDOMD2200 = null;
     try { JSDOMD2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMD2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMD2200 = null; } }
-    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
     //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
     //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
     if (!JSDOMD2200) JSDOMD2200 = require('./ui-dom.js').JSDOMShim;
@@ -5981,7 +5975,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
       global.document = domD2200.window.document;
       try { global.Node = domD2200.window.Node; } catch (e) {}
       WA.mainDoc = global.document;
-      // v2.401.0(OPV23):先装三个段文件(自挂 WA.<ns>),panel.js 的转发才拿得到真实现
           //  (与 index.js LOAD_ORDER 同序;段体先于宿主文件求值,转发调用期 bind 才成立)
           for (const __seg23 of ['ui/pages/overview-blocks.js', 'ui/pages/overview-main.js', 'ui/pages/tools-page.js', 'ui/pages/dashboards.js']) {
             vm.runInContext(fs.readFileSync(path.join(BASE, __seg23), 'utf8'), ctx, { filename: __seg23 });
@@ -6129,7 +6122,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // E7. 端到端（真 DOM）：出口真能点通，且反馈不被重绘冲掉
     let JSDOME2200 = null;
     try { JSDOME2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOME2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOME2200 = null; } }
-    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
     //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
     //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
     if (!JSDOME2200) JSDOME2200 = require('./ui-dom.js').JSDOMShim;
@@ -6141,7 +6133,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
       global.document = domE2200.window.document;
       try { global.Node = domE2200.window.Node; } catch (e) {}
       WA.mainDoc = global.document;
-      // v2.401.0(OPV23):先装三个段文件(自挂 WA.<ns>),panel.js 的转发才拿得到真实现
           //  (与 index.js LOAD_ORDER 同序;段体先于宿主文件求值,转发调用期 bind 才成立)
           for (const __seg23 of ['ui/pages/overview-blocks.js', 'ui/pages/overview-main.js', 'ui/pages/tools-page.js', 'ui/pages/dashboards.js']) {
             vm.runInContext(fs.readFileSync(path.join(BASE, __seg23), 'utf8'), ctx, { filename: __seg23 });
@@ -6272,7 +6263,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // F7. 端到端（真 DOM）：事件页留痕
     let JSDOMF2200 = null;
     try { JSDOMF2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMF2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMF2200 = null; } }
-    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
     //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
     //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
     if (!JSDOMF2200) JSDOMF2200 = require('./ui-dom.js').JSDOMShim;
@@ -6284,7 +6274,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
       global.document = domF2200.window.document;
       try { global.Node = domF2200.window.Node; } catch (e) {}
       WA.mainDoc = global.document;
-      // v2.401.0(OPV23):先装三个段文件(自挂 WA.<ns>),panel.js 的转发才拿得到真实现
           //  (与 index.js LOAD_ORDER 同序;段体先于宿主文件求值,转发调用期 bind 才成立)
           for (const __seg23 of ['ui/pages/overview-blocks.js', 'ui/pages/overview-main.js', 'ui/pages/tools-page.js', 'ui/pages/dashboards.js']) {
             vm.runInContext(fs.readFileSync(path.join(BASE, __seg23), 'utf8'), ctx, { filename: __seg23 });
@@ -6496,7 +6485,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
     // H4. 真 DOM：轮转全部带守卫的页，逐页无缺失
     let JSDOMH2200 = null;
     try { JSDOMH2200 = require('jsdom').JSDOM; } catch (e) { try { JSDOMH2200 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMH2200 = null; } }
-    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
     //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
     //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
     if (!JSDOMH2200) JSDOMH2200 = require('./ui-dom.js').JSDOMShim;
@@ -6508,7 +6496,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
       global.document = domH2200.window.document;
       try { global.Node = domH2200.window.Node; } catch (e) {}
       WA.mainDoc = global.document;
-      // v2.401.0(OPV23):先装三个段文件(自挂 WA.<ns>),panel.js 的转发才拿得到真实现
           //  (与 index.js LOAD_ORDER 同序;段体先于宿主文件求值,转发调用期 bind 才成立)
           for (const __seg23 of ['ui/pages/overview-blocks.js', 'ui/pages/overview-main.js', 'ui/pages/tools-page.js', 'ui/pages/dashboards.js']) {
             vm.runInContext(fs.readFileSync(path.join(BASE, __seg23), 'utf8'), ctx, { filename: __seg23 });
@@ -6936,7 +6923,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
     //    源码照常含 id，静态断言全绿，而用户拖滑块毫无反应。）
     let JSDOMB2300 = null;
     try { JSDOMB2300 = require('jsdom').JSDOM; } catch (e) { try { JSDOMB2300 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDOMB2300 = null; } }
-    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
     //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
     //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
     if (!JSDOMB2300) JSDOMB2300 = require('./ui-dom.js').JSDOMShim;
@@ -6948,7 +6934,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
       global.document = domB2300.window.document;
       try { global.Node = domB2300.window.Node; } catch (e) {}
       WA.mainDoc = global.document;
-      // v2.401.0(OPV23):先装三个段文件(自挂 WA.<ns>),panel.js 的转发才拿得到真实现
           //  (与 index.js LOAD_ORDER 同序;段体先于宿主文件求值,转发调用期 bind 才成立)
           for (const __seg23 of ['ui/pages/overview-blocks.js', 'ui/pages/overview-main.js', 'ui/pages/tools-page.js', 'ui/pages/dashboards.js']) {
             vm.runInContext(fs.readFileSync(path.join(BASE, __seg23), 'utf8'), ctx, { filename: __seg23 });
@@ -7207,7 +7192,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
   {
     let JSDoM2300 = null;
     try { JSDoM2300 = require('jsdom').JSDOM; } catch (e) { try { JSDoM2300 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSDoM2300 = null; } }
-    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
     //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
     //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
     if (!JSDoM2300) JSDoM2300 = require('./ui-dom.js').JSDOMShim;
@@ -7219,7 +7203,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
       global.document = domE2300.window.document;
       try { global.Node = domE2300.window.Node; } catch (e) {}
       WA.mainDoc = global.document;
-      // v2.401.0(OPV23):先装三个段文件(自挂 WA.<ns>),panel.js 的转发才拿得到真实现
           //  (与 index.js LOAD_ORDER 同序;段体先于宿主文件求值,转发调用期 bind 才成立)
           for (const __seg23 of ['ui/pages/overview-blocks.js', 'ui/pages/overview-main.js', 'ui/pages/tools-page.js', 'ui/pages/dashboards.js']) {
             vm.runInContext(fs.readFileSync(path.join(BASE, __seg23), 'utf8'), ctx, { filename: __seg23 });
@@ -7966,7 +7949,6 @@ const __ctxGuard = require('./context-guard.js').boundary();
     assert(dynIds2500.indexOf('wa-key-sweep-ghost') >= 0, '新控件 wa-key-sweep-ghost 纳入 UI_BINDINGS.dynamic');
     let JSD2500 = null;
     try { JSD2500 = require('jsdom').JSDOM; } catch (e) { try { JSD2500 = require('/tmp/node_modules/jsdom').JSDOM; } catch (e2) { JSD2500 = null; } }
-    // v2.103.0（A3 = O16）：缺 jsdom 时**不再静默跳过** —— 改走仓库自带的零依赖替身
     //   （tests/ui-dom.js 的 JSDOMShim，与 jsdom 同形：new JSDOM(html,{url}) → {window:{document,Node}}）。
     //   「缺依赖 ⇒ 静默少跑 ⇒ 回归照绿」让门禁结论与覆盖范围脱钩；本仓零 npm 依赖，替身才是可持续来源。
     if (!JSD2500) JSD2500 = require('./ui-dom.js').JSDOMShim;
@@ -11639,7 +11621,6 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       '健康分 signals 透出 bridgePublishes/bridgeEnabled（实 publishes=' + mt21.signals.bridgePublishes + '）');
     assert(typeof mt21.signals.bridgeExternalReads === 'number' && typeof mt21.signals.bridgeFailures === 'number',
       'signals 四字段齐备（publishes/failures/externalReads/enabled）');
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const panelSrc21 = require('./panel-source.js').panelSource();
     assert(panelSrc21.indexOf('function bridgeBlock()') >= 0 && panelSrc21.indexOf('${bridgeBlock()}') >= 0,
@@ -11891,7 +11872,6 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       + mt22.signals.lonshaVerdict + '）');
     assert(mt22.signals.lonshaAvailable === false && mt22.signals.lonshaVerdict === 'not-mounted',
       '无 LonSha 环境下健康分如实报「未装」（不是扣分项，也不是无名 null）');
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const panelSrc22 = require('./panel-source.js').panelSource();
     assert(panelSrc22.indexOf('function lonshaBlock()') >= 0 && panelSrc22.indexOf('${lonshaBlock()}') >= 0,
@@ -12189,7 +12169,6 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       && dSrc18.indexOf('lonshaEchoKeys') >= 0,
       '诊断 flatten 清单新增三行（账本画像 / 对读面 / **上游键集自证**）'
       + '——否则「对方给了几本账」与「我读的键上游是不是真有」在总览里缺席');
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const pSrc18 = require('./panel-source.js').panelSource();
     assert(pSrc18.indexOf('ledgerSection') >= 0 && pSrc18.indexOf('ledgerSummary') >= 0
@@ -17941,8 +17920,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   {
     await runLock('./delete-gate-v2124.js');
     await runLock('./delete-gate-v2124.js', 'runNegative');
-    // 真消费方判据：有出口必须有读者（导出了没人看 = 不存在）。
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const panelSrc2124 = require('./panel-source.js').panelSource();
     assert(panelSrc2124.indexOf('function heartbeatBlock() {') > 0
@@ -17972,7 +17949,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   {
     await runLock('./sandbox-isolation-v2125.js');
     await runLock('./sandbox-isolation-v2125.js', 'runNegative');
-    // 真消费方判据：有出口必须有读者（导出了没人看 = 不存在）。
     const diagSrc2125 = require('./diag-source.js')();
     assert(diagSrc2125.indexOf('WA.sandbox.isolationReport()') > 0,
       'v2125: 诊断节真读隔离报告（P7 的唯一真消费方 —— 没有它，报告只是一份自述）');
@@ -18042,7 +18018,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
           'v2127: 锁 ' + spec + ' 的锚点 ' + k + ' 在 ' + a.rel + ' 中恰 1 次（撞车 ⇒ 该条静默跳过）');
       });
     });
-    // 真消费方判据：有出口必须有读者（导出了没人看 = 不存在）。
     //   X1 的三处读者：backstage 推演段（此前该文件对 plan 零引用）、面板「查看」、本锁自身。
     const backSrc2127 = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
     assert(backSrc2127.indexOf('WA.plan.chainBlock()') > 0,
@@ -18949,7 +18924,6 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       'v2155: 新模块登记进诊断的模块导出表并纳入诊断读数（登记面缺席即判「模块没载」）');
     assert(tdg2155.indexOf("ids: ['wa-ws-enabled'") >= 0,
       'v2155: 种子库 13 枚控件进 UI_BINDINGS 守卫组（渲染了不登记，「渲染了但 id 写错」永不可见）');
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const pnl2155 = require('./panel-source.js').panelSource();
     assert(pnl2155.indexOf('function renderTools()') >= 0 && pnl2155.indexOf('世界种子库') >= 0
@@ -19304,7 +19278,6 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     const dgSrc2164 = require('./diag-source.js')();
     const stSrc2164 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
     const evSrc2164 = fs.readFileSync(path.join(BASE, 'core/evict.js'), 'utf8');
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const pnSrc2164 = require('./panel-source.js').panelSource();
     assert(ixSrc2164.indexOf("'engines/world-blueprint.js',") > 0
@@ -20493,7 +20466,6 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   }
   section('v2.203.0（第四批·Y8）：规则包扩展（冲突 / 归一 / 回滚 / 组合 —— 只报不判 + 单一真源）');
   {
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const panelSrc2203 = require('./panel-source.js').panelSource();
     const diagSrc2203 = require('./diag-source.js')();
@@ -20543,7 +20515,6 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   }
   section('v2.203.0（第四批·Y9）：世界实验室扩展（沙盒推进 / 结果报告 / 选择性采纳 / 拍引擎联动）');
   {
-    // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const panelSrc2203b = require('./panel-source.js').panelSource();
     const diagSrc2203b = require('./diag-source.js')();
