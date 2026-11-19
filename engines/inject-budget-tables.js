@@ -597,4 +597,10 @@
 
   WA.injectBudgetTables = { PRIORITY, COST_BANDS, ACCOUNTS_ROWS };
   if (WA.log) WA.log('info', '注入预算科目表已加载');
+  // OPV29-10：表文件也是模块（命名空间 `injectBudgetTables`），尾调 registerModule
+  // 让它进账本——否则命名空间只存在于静态提供方面，module-cycle-gate 的 B6 会把它
+  // 记成「static-only 漂移」（与 reject-recovery-tables 同一种形态）。
+  if (typeof WA.registerModule === 'function') {
+    WA.registerModule('engines/inject-budget-tables.js', { kind: 'data', ver: '2.529.0' });
+  }
 })();

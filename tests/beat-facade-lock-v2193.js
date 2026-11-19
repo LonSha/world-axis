@@ -54,7 +54,9 @@ function hostWith(opts) {
   run('core/store.js');
   run('core/input-guard.js');
   if (o.withFamily !== false) Object.keys(FAM).forEach(function (ns) { run(FAM[ns]); });
-  if (o.withU5) run(RR);
+  // OPV29-09：U5 的七块冻结表已拆到 `engines/reject-recovery-tables.js`，
+  //   隔离宿主里也必须**先表后引擎**（引擎求值期取不到表会抛「冻结表未装载」）。
+  if (o.withU5) { run('engines/reject-recovery-tables.js'); run(RR); }
   if (o.withFamily !== false && o.extra) o.extra.forEach(function (r) { run(r); });
   const WA = c.window.WorldAxis;
   try { WA.store.init(); } catch (e) {}

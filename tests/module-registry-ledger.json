@@ -1,13 +1,13 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 561,
- "loadedCount": 540,
+ "loadOrderCount": 563,
+ "loadedCount": 542,
  "uiCount": 21,
- "nsCount": 551,
+ "nsCount": 553,
  "totals": {
-  "loadEdges": 426,
+  "loadEdges": 430,
   "hardEdges": 0,
-  "callRefs": 689,
+  "callRefs": 693,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -164,6 +164,7 @@
     "engines/history-provenance.js",
     "engines/history-search.js",
     "engines/human-realism.js",
+    "engines/inject-budget-tables.js",
     "engines/inject-collector.js",
     "engines/inject-delta.js",
     "engines/inject-value.js",
@@ -268,6 +269,7 @@
     "engines/regional.js",
     "engines/rehearse.js",
     "engines/reject-phrase.js",
+    "engines/reject-recovery-tables.js",
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/relation-temp.js",
@@ -710,6 +712,7 @@
     "engines/history-provenance.js",
     "engines/history-search.js",
     "engines/human-realism.js",
+    "engines/inject-budget-tables.js",
     "engines/inject-collector.js",
     "engines/inject-delta.js",
     "engines/inject-value.js",
@@ -806,6 +809,7 @@
     "engines/region.js",
     "engines/rehearse.js",
     "engines/reject-phrase.js",
+    "engines/reject-recovery-tables.js",
     "engines/reject-recovery.js",
     "engines/relation-graph.js",
     "engines/relation-temp.js",
@@ -1537,12 +1541,37 @@
    "stateKeys": [],
    "consumedBy": []
   },
+  "engines/inject-budget-tables.js": {
+   "ns": [
+    "injectBudgetTables"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "engines/inject-budget.js"
+   ]
+  },
   "engines/inject-budget.js": {
    "ns": [
     "injectBudget"
    ],
-   "requires": [],
-   "requiresFiles": [],
+   "requires": [
+    "injectBudgetTables"
+   ],
+   "requiresFiles": [
+    "engines/inject-budget-tables.js"
+   ],
    "providerOrderOk": true,
    "callRefs": [],
    "ghostRefs": [],
@@ -6820,15 +6849,38 @@
    ],
    "consumedBy": []
   },
-  "engines/reject-recovery.js": {
+  "engines/reject-recovery-tables.js": {
    "ns": [
-    "rejectRecovery"
+    "rejectRecoveryTables"
    ],
    "requires": [
     "registerModule"
    ],
    "requiresFiles": [
     "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "engines/reject-recovery.js"
+   ]
+  },
+  "engines/reject-recovery.js": {
+   "ns": [
+    "rejectRecovery"
+   ],
+   "requires": [
+    "registerModule",
+    "rejectRecoveryTables"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "engines/reject-recovery-tables.js"
    ],
    "providerOrderOk": true,
    "callRefs": [

@@ -107,6 +107,10 @@ function codes() { return Object.keys(gate.scan({}).hits).sort(); }
 /** 装载产品模块（Node 侧用 mock 的 window 别名）。**只读，不写任何东西。** */
 function product() {
   require('../tests/mock.js');
+  // OPV29-09：七块冻结表已拆到 engines/reject-recovery-tables.js（1162 行纯数据）。
+  // 引擎求值期先取表、缺表当场抛错 ⇒ 隔离装载必须**先表后算法**，否则这里会抛
+  // 「冻结表未装载」（那不是缺陷，是守卫在按设计工作）。
+  require('../engines/reject-recovery-tables.js');
   require('../engines/reject-recovery.js');
   const WA = global.window && global.window.WorldAxis;
   if (!WA || !WA.rejectRecovery) throw new Error('产品模块 engines/reject-recovery.js 没装上 WA.rejectRecovery');

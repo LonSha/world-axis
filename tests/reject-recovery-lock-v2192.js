@@ -21,19 +21,24 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const SELF_REL = 'tests/reject-recovery-lock-v2192.js';
 const PROD_REL = 'engines/reject-recovery.js';
+/** OPV29-09：七块冻结表（RULES / OVERRIDES / ARTIFACTS / NEUTRAL_REVIEW /
+ *  REJECT_FACE / SUCCESS_FACE / NEUTRAL_FACE）已搬到这个文件（1162 行纯数据）。
+ *  表锚点必须跟着去那边——锚点在引擎里找不到了，这不是「锁放宽」，是**锚点归位**：
+ *  A14 仍然要求每个锚点在它的目标文件里恰中 1 次，破坏也仍然打在同一处字面量上。 */
+const TAB_REL = 'engines/reject-recovery-tables.js';
 const TOOL_REL = 'tools/reject-recovery.js';
 const RUN_REL = 'tests/run.js';
 const rr = require('../tools/reject-recovery.js');
 /** 统一锚点表（{rel, txt}；txt 在目标文件里恰中 1 次，且不含反斜杠）。 */
 const ANCHORS = {
   aKinds: { rel: PROD_REL, txt: "const KINDS = ['retry-same-input', 'request-setup', 'adjust-input'," },
-  aRules: { rel: PROD_REL, txt: 'const RULES = [' },
-  aOver: { rel: PROD_REL, txt: 'const OVERRIDES = {' },
-  aNeutral: { rel: PROD_REL, txt: 'const NEUTRAL_REVIEW = {' },
-  aArtifacts: { rel: PROD_REL, txt: 'const ARTIFACTS = {' },
-  aRejectFace: { rel: PROD_REL, txt: 'const REJECT_FACE = [' },
-  aSuccessFace: { rel: PROD_REL, txt: "'anonymous', 'applied', 'attenuated', 'checked', 'clean', 'first', 'first-baseline'," },
-  aNeutralFace: { rel: PROD_REL, txt: 'const NEUTRAL_FACE = [' },
+  aRules: { rel: TAB_REL, txt: 'const RULES = [' },
+  aOver: { rel: TAB_REL, txt: 'const OVERRIDES = {' },
+  aNeutral: { rel: TAB_REL, txt: 'const NEUTRAL_REVIEW = {' },
+  aArtifacts: { rel: TAB_REL, txt: 'const ARTIFACTS = {' },
+  aRejectFace: { rel: TAB_REL, txt: 'const REJECT_FACE = [' },
+  aSuccessFace: { rel: TAB_REL, txt: "'anonymous', 'applied', 'attenuated', 'checked', 'clean', 'first', 'first-baseline'," },
+  aNeutralFace: { rel: TAB_REL, txt: 'const NEUTRAL_FACE = [' },
   aExplain: { rel: PROD_REL, txt: 'function explain(code, opt) {' },
   aFrozen: { rel: PROD_REL, txt: 'function frozenFace(c) {' },
   aExport: { rel: PROD_REL, txt: 'WA.rejectRecovery = {' },
@@ -253,10 +258,11 @@ function runC(A) {
 function runN(A) {
   // ── N1 拒收面破坏：把一条码从 REJECT_FACE 挪到 SUCCESS_FACE ⇒ 快照与现场必须现形 ──
   {
-    const S = rd(PROD_REL);
+    const S = rd(TAB_REL);
     const broken = breakOnce(S, "'hard-cut', ", "'hard-cutX', ", 'n1-move-off-reject');
-    // 破坏的是**产品副本**：产品经由读缝装载，工具仍读真源码
-    const p2 = loadBrokenProduct(broken);
+    // 破坏的是**表副本**（hard-cut 那条快照条目在表文件里）；引擎仍读真源：
+    // 「快照与现场脱钩」这个形态没变，只是快照换了个文件住。
+    const p2 = loadBrokenProduct(rd(PROD_REL), broken);
     A(p2.REJECT_FACE.indexOf('hard-cut') < 0, 'N1 破坏版里 hard-cut 不在拒收面（判据真在读产品快照）');
     const liveF = rr.live();
     const liveReject = Object.keys(liveF).filter(function (c) { return liveF[c].face === 'reject'; });
@@ -288,9 +294,9 @@ function runN(A) {
   }
   // ── N4 成功面破坏：给 clean 配上档位 ⇒ tainted 判据必须现形 ──
   {
-    const S = rd(PROD_REL);
+    const S = rd(TAB_REL);
     const broken = breakOnce(S, "  const SUCCESS_FACE = ['absent', ", "  const SUCCESS_FACE = ['absentX', ", 'n4-success');
-    const p4 = loadBrokenProduct(broken);
+    const p4 = loadBrokenProduct(rd(PROD_REL), broken);
     A(p4.SUCCESS_FACE.indexOf('absent') < 0, 'N4 破坏版里 absent 被移出成功面（实含 ' + (p4.SUCCESS_FACE.indexOf('absent') >= 0) + '）');
     A(rr.product().SUCCESS_FACE.indexOf('absent') >= 0, 'N4b 原版上 absent 在成功面');
     // 破坏版上，absent 会被面判定成 unknown（它既不在成功面也不在拒收面）
@@ -299,10 +305,10 @@ function runN(A) {
   }
   // ── N5 判不出面破坏：把 NEUTRAL_REVIEW 的键集与快照拆开 ⇒ A7/B3 必须现形 ──
   {
-    const S = rd(PROD_REL);
+    const S = rd(TAB_REL);
     const broken = breakOnce(S, "'crisis': { out: true, why: '决策理由（action=pause）' },",
       '', 'n5-neutral-drop');
-    const p5 = loadBrokenProduct(broken);
+    const p5 = loadBrokenProduct(rd(PROD_REL), broken);
     A(Object.keys(p5.NEUTRAL_REVIEW).indexOf('crisis') < 0, 'N5 破坏版里 crisis 不在登记表');
     A(p5.NEUTRAL_FACE.indexOf('crisis') >= 0, 'N5b 但快照里还在 —— 两侧脱钩，正是 A7 要抓的形态');
     A(p5.NEUTRAL_FACE.slice().sort().join('|') !== Object.keys(p5.NEUTRAL_REVIEW).sort().join('|'),
@@ -368,7 +374,7 @@ function runN(A) {
   }
 }
 /** 在内存里装载一份破坏版产品模块（不进模块缓存、不碰真文件）。 */
-function loadBrokenProduct(src) {
+function loadBrokenProduct(src, tabSrc) {
   const vm = require('vm');
   const ctx = { window: {}, console: console };
   ctx.window.WorldAxis = { registerModule: function () {} };
@@ -376,6 +382,14 @@ function loadBrokenProduct(src) {
   ctx.window = ctx.window;
   ctx.global = ctx;
   vm.createContext(ctx);
+  // OPV29-09：表与算法分离后，破坏版装载必须**先表后引擎**（与产品装载次序一致）。
+  // 第二个参数缺省用真表；要破坏表时由调用方传入破坏副本 —— 否则引擎求值期
+  // 取不到 WA.rejectRecoveryTables，会抛「冻结表未装载」而不是给出破坏版的行为。
+  const tab = tabSrc === undefined ? rd(TAB_REL) : tabSrc;
+  vm.runInContext(tab, ctx, { filename: TAB_REL + '#broken' });
+  if (!ctx.window.WorldAxis.rejectRecoveryTables) {
+    throw new Error('破坏版表文件没装上 WA.rejectRecoveryTables（破坏可能把它整段打断了）');
+  }
   vm.runInContext(src, ctx, { filename: PROD_REL + '#broken' });
   const WA = ctx.window.WorldAxis;
   if (!WA || !WA.rejectRecovery) throw new Error('破坏版产品模块没装上 WA.rejectRecovery（破坏可能把它整段打断了）');

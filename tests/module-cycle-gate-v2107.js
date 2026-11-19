@@ -264,7 +264,12 @@ function runAll(A) {
   //   save-curve / narrow-consumers）入场 ⇒ 文件面 517→522、别名 522、有引用 520（实测回填）。
   //   五个模块都被产品源面真读（render/inject.js 两处、engines/action-desk.js 一处、
   //   engines/tool-diag.js 两处），故「有引用」同步 +5 —— 不是「新增文件但没人读」。
-  A(a.files === 562 && a.aliasFiles === 562 && a.refFiles === 560,
+  // v2.529.0（V29 优化线 OPV29-10 / OPV29-09）：两个**纯数据表文件**入场
+  //   （engines/inject-budget-tables.js 600 行、engines/reject-recovery-tables.js 1198 行），
+  //   都尾调 registerModule 且都被各自的算法引擎静态读（WA.injectBudgetTables /
+  //   WA.rejectRecoveryTables）⇒ 文件面 / 别名各 +2、「有引用」同步 +2。
+  //   实测回填：562/562/560 → 564/564/562（node -e audit 直读）。
+  A(a.files === 564 && a.aliasFiles === 564 && a.refFiles === 562,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -406,7 +411,10 @@ function runAll(A) {
   //   合计 +29）。归因口径与前几批逐字相同：新文件尾调 registerModule 计装载期边；
   //   它们读 store / settingsBus / clock / __settingsRegs 计调用期 (file, ns) 去重边。
   //   恒等式由本判据当场核对（不靠人算）。
-  A(a.edgesLoad === 426 && a.edgesCall === 3936 && a.edgesAll === 4362 && a.identityOk,
+  // v2.529.0（V29 OPV29-10/09）：两个表文件都被算法引擎静态读（+2 调用期边），
+  //   且各尾调 registerModule（+2 装载期边，见 module-registry-gate 账本 430）⇒ 实测回填
+  //   426/3936/4362 → 430/3938/4368。恒等式仍由本判据当场核对（不靠人算）。
+  A(a.edgesLoad === 430 && a.edgesCall === 3938 && a.edgesAll === 4368 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -488,7 +496,8 @@ function runAll(A) {
   // v2.401.0(OPV23):实测回填（LOAD_ORDER 440 → 452，ui/pages 四段文件与关联模块入序）
   // v2.524.0（V27 拓展线）：LOAD_ORDER 506 → 515（九台引擎入序，实测回填）。
   // v2.524.0（V27 优化线）：LOAD_ORDER 516 → 521（本批新增的五个 OPV27 模块入序，实测回填）。
-  A(a.edgesLoad >= 20 && a.orderLen === 561,
+  // v2.529.0（V29 OPV29-10/09）：两个表文件入序（LOAD_ORDER 561 → 563，实测回填）。
+  A(a.edgesLoad >= 20 && a.orderLen === 563,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -539,7 +548,10 @@ function runAll(A) {
   // v2.524.0（V27 优化线）：三面 560/506/517 → 565/511/522（实测回填）。本批五个新 ns 同时进
   //   静态提供方、账本（module-registry-gate --update 落定）与读面 —— 读面也 +5 正是 OPV27-5
   //   那件事的旁证：它们不再是「只有专锁在读」的零消费面。
-  A(a.nsProvided === 605 && a.nsLedger === 551 && a.nsRead === 562,
+  // v2.529.0（V29 OPV29-10/09）：两个表 ns 同时进静态提供方、账本（module-registry-gate
+  //   --update 落定 553）与读面（各自的算法引擎静态读）⇒ 三面 605/551/562 → 607/553/564。
+  //   差额 607-553=54 与回填前**相同**：两个 ns 三面同步增长，漂移口径不动（B6 常量不改）。
+  A(a.nsProvided === 607 && a.nsLedger === 553 && a.nsRead === 564,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
@@ -593,6 +605,10 @@ function runAll(A) {
     + '（未在用的 5 个是取数型入口 ns，只在 index.js 内部自用；v2.181.0：UI 主题层 9 个 ns 全部接上真读者）');
   // v2.153.0（RX5+RX6）：两个新引擎进账本 ⇒ 账本缺项文件面收缩，缺项 5 不变（UI 层仍 4 文件）。
   // v2.401.0(OPV23):实测回填（缺项 15 → 19——ui/pages 四段文件入账本外文件面）
+  // v2.529.0（V29 OPV29-10/09）：实测仍是 **22**，且 22 条逐条未变（index.js + 21 个
+  //   ui 文件）。两个新表文件曾一度使缺项变 24（它们进文件面、账本还没收），
+  //   `node tests/module-registry-gate.js --update` 把账本落定后即回到 22 ——
+  //   这一轮记下这个中间态，是因为「+2 就该把常量写 24」会让判据在 --update 之后反而红。
   A(a.runtimeMissing === 22 && a.ledgerAvailable,
     'B11 账本缺项文件 ' + a.runtimeMissing + ' 个（入口 + 十二个 ui 文件，如实报出）');
   // 次序判据方向的两向自证（用假产品面，不碰真文件）

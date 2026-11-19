@@ -87,7 +87,9 @@ function runAll(a) {
   a(P.indexOf('一格未动') >= 0 && P.indexOf('被改动了') >= 0,
     'y3v2199/A5: 面板对「当前世界动没动」给出两向结论（一格未动 / 被改动了）');
   a(P.indexOf('本模块不替你丢档') >= 0, 'y3v2199/A6: 满档拒收回执在界面上说清不丢档');
-  const RR = rd('engines/reject-recovery.js');
+  const RR = rd('engines/reject-recovery-tables.js');
+  // OPV29-09：拒收面快照已随七块冻结表搬到 `engines/reject-recovery-tables.js`
+  // （1162 行纯数据），锚点归位；判据本身不变 —— 仍然要求该码在快照里出现。
   a(RR.indexOf("'slots-full'") >= 0, 'y3v2199/A7: 拒收码 slots-full 已进恢复映射的拒收面快照');
   ['no-receipt-face', 'receipt-failed', 'receipt-threw'].forEach(function (c) {
     a(RR.indexOf("'" + c + "'") < 0, 'y3v2199/A8: 已废旧码 ' + c + ' 不在任何面快照里');

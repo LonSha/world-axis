@@ -227,7 +227,7 @@ function runAll(a) {
   // 恢复动作面：三码都在拒收面快照里（U5 台账的跨文件同源）
   // 三码在**拒收面快照**里同批登记（逐字连写的同一行恰 1 次）—— 比单码各数一次准：
   //   单码计数会被规则表的词法面拉高（`'conflict',` 在词表里另有一处），判据就不再指向快照。
-  a(cnt(rd('engines/reject-recovery.js'), "'carries-world-facts', 'conflict', 'preset-world-absent',") === 1,
+  a(cnt(rd('engines/reject-recovery-tables.js'), "'carries-world-facts', 'conflict', 'preset-world-absent',") === 1,
     'y8v2203/A11c: 三码在 reject-recovery 的拒收面快照里**同行连写**恰 1 次（U5 面口径同源）');
   // 锚点纯度 + 唯一性
   const anchorDecl = SELF.slice(SELF.indexOf('const ANCHOR = {'), SELF.indexOf('\n};', SELF.indexOf('const ANCHOR = {')));

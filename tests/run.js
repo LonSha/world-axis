@@ -777,7 +777,7 @@ const LOAD = [
   //   runWitness(WA) 拿到的 WA 就是这里装载出来的那个 —— 装载面没给它模块，
   //   相关码的见证与锚点核对会整段静默跳过（门禁只会报「未分类」，看不出是装载面的问题）。
   //   另有第二处依赖：tests/reject-code-gate.js 的 CLI 直接从本文件提取 LOAD。
-  'engines/beat-report.js', 'engines/beat-ledger.js', 'engines/plan-audit.js', 'engines/gen-gate.js', 'engines/reject-recovery.js',
+  'engines/beat-report.js', 'engines/beat-ledger.js', 'engines/plan-audit.js', 'engines/gen-gate.js', 'engines/reject-recovery-tables.js', 'engines/reject-recovery.js',
   // v2.193.0（第二批 · U1）：拍引擎家族统一运行门面。位置与 index.js LOAD_ORDER 同序
   //   （紧随四成员与恢复映射之后 —— 门面 run() 时读 WA[成员]、编排期读 WA.rejectRecovery）。
   'engines/beat-facade.js',
@@ -22601,6 +22601,15 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   拿掉缺表守卫（改成静默空表兜底）⇒ FAIL 3/14（B1/B2/C2 红：rc 从 1 变 0）；逐字还原后均回到 pass (14)。
     //   读数：专锁 pass (14) · 引擎 1425→863 行 / 新表文件 600 行 · 装载边 561→562 · plan-readings pass(16)。
     await runScript('./opv29-z1-10-v2529.js');
+    // v2.529.0（V29 Z1）：OPV29-09 reject-recovery 拆段（账本与判定分离）—— 19 项。
+    //   1388 行里 1162 行（84%）是冻结表（七块：三面快照 1682/139/84 等），搬到
+    //   engines/reject-recovery-tables.js（1204 行纯数据、零具名函数），引擎降到 244 行；
+    //   求值期先取表，缺表 / 空表当场抛错。双登记同序（tables 在引擎之前）。
+    //   连带修：tools/reject-recovery.js 隔离装载改先表后引擎；锁 v2192 的 7 个表锚点归位，
+    //   破坏版装载改为按表源跑；y3 A7 / y8 A11c 快照锚点归位；beat-facade 的 U5 宿主补表；
+    //   cycle-gate B1/B2/B3/B5 实测回填 564 / 430·3938·4368 / 563 / 607·553·564（B6 差 54 不动）。
+    //   负控制（真破坏）：快照字面量回流引擎 ⇒ FAIL 4/19；守卫换静默降级 ⇒ FAIL 4/19；还原回 pass (19)。
+    await runScript('./opv29-z1-09-v2529.js');
     // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
     //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是
     //   「装了 story-tone 也说没有」「改了一句也永远 available:false」——不崩的假判据。
