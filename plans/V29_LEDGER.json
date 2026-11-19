@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "8bead66aff7c282f55513357ae3c72868a2b0940ccfd13231ad60cbab441a9b3",
-  "sourceCommits": 27,
+  "sourceDigest": "d4bc201408d2cf72e745e871e25ceb4c4a06602f964f81847664b306f4c9d663",
+  "sourceCommits": 28,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -37,6 +37,18 @@
       ],
       "recompute": true,
       "note": ""
+    },
+    "OPV29-05": {
+      "group": "Z1",
+      "commit": "8d6a19e",
+      "subject": "feat(worldaxis): OPV29-05 首屏预算 —— 「只渲染可见页」第一次有了冷开读数与机械判据（21 项，冷开 42 / 静态 1794 = 2%）",
+      "readings": [
+        "node tools/first-screen-budget.js --check ⇒ PASS（rc=0）：冷开 42 ≤ 预算 1600 且 ≤ 静态半数 897",
+        "node tests/opv29-z1-05-v2529.js ⇒ pass (21)",
+        "真破坏负控制：拿掉 C3 ⇒ FAIL 1/21 · 冷开假装 1794 ⇒ FAIL 5/21"
+      ],
+      "recompute": true,
+      "note": "专锁 21 项全绿 · 面数 610→611 · 裸锚 27 = 基线 · segment-extract pass（128）· test-surface-gate 全通过 · orphan pass · plan-readings pass（16）· readings-v2106 pass（61）· release-manifest rc=0"
     },
     "OPV29-06": {
       "group": "Z1",
@@ -388,7 +400,6 @@
   },
   "pending": [
     "OPV29-04",
-    "OPV29-05",
     "OPV29-07",
     "OPV29-08",
     "OPV29-09",
@@ -466,8 +477,8 @@
     ]
   },
   "counts": {
-    "delivered": 28,
-    "pending": 8,
+    "delivered": 29,
+    "pending": 7,
     "rangeForm": 1,
     "noRecompute": 7,
     "unparsedForm": 0,
