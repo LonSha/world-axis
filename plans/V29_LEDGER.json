@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "de9d1726f181070fb1cc901d741c176c4c3f016b2bce9753bce5263228300e26",
-  "sourceCommits": 31,
+  "sourceDigest": "64c9c01baceffc5dba2255ccb5841ce25d9c2dce746f8f8e2501e90713562335",
+  "sourceCommits": 32,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -56,6 +56,32 @@
       "subject": "chore(worldaxis): 台账回填 —— 已交付 22/36，计划读数 tests/*.js 601 → 602（+ OPV29-06 门禁实测：七快 19.5s / 慢门 86.0s / 合计下界 105.5s）",
       "readings": [],
       "recompute": false,
+      "note": ""
+    },
+    "OPV29-07": {
+      "group": "Z2",
+      "commit": "3138c4c",
+      "subject": "perf(tool-diag): OPV29-07 tool-diag 拆段（8425 → 6004 行 · 表 2467 行）",
+      "readings": [
+        "wc -l engines/tool-diag.js ⇒ 6004",
+        "wc -l engines/tool-diag-tables.js ⇒ 2467",
+        "wc -l tests/run.js ⇒ 22994",
+        "node tests/opv29-z1-07-v2529.js ⇒ pass (23)",
+        "node tests/module-registry-gate.js ⇒ 文件 546 / 装载期边 438 / 调用期 701 / 结构问题 0",
+        "node tests/module-cycle-gate.js ⇒ rc=0 · 别名 568 / 有引用 566 / problems 0",
+        "node tests/export-contract.js ⇒ rc=0（tests/export_contract.txt 无 diff）",
+        "node tests/inventory.js ⇒ rc=0",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
+        "node tools/plan-readings.js ⇒ pass（16 条）",
+        "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（基线 27）",
+        "node tests/settle-v2830.js ⇒ pass (55)",
+        "node tests/s3-tx7-v2170.js ⇒ 44 / 0",
+        "node tests/s3-tx8-v2171.js ⇒ 49 / 0",
+        "node tests/s3-tx9-v2172.js ⇒ 46 / 0",
+        "node tests/s3-b3-e7-v2188.js ⇒ 347 / 失败 0",
+        "node tests/s3-b3-n8-v2224.js ⇒ 344 / 失败 0"
+      ],
+      "recompute": true,
       "note": ""
     },
     "OPV29-09": {
@@ -462,7 +488,6 @@
   },
   "pending": [
     "OPV29-04",
-    "OPV29-07",
     "OPV29-08",
     "OPV29-30"
   ],
@@ -536,8 +561,8 @@
     ]
   },
   "counts": {
-    "delivered": 32,
-    "pending": 4,
+    "delivered": 33,
+    "pending": 3,
     "rangeForm": 1,
     "noRecompute": 7,
     "unparsedForm": 0,
