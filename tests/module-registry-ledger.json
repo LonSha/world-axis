@@ -1,14 +1,14 @@
 {
  "version": "2.524.0",
  "loadOrderCount": 569,
- "lazyCount": 23,
- "loadedCount": 571,
- "uiCount": -2,
- "nsCount": 582,
+ "lazyCount": 24,
+ "loadedCount": 572,
+ "uiCount": -3,
+ "nsCount": 583,
  "totals": {
-  "loadEdges": 464,
+  "loadEdges": 465,
   "hardEdges": 0,
-  "callRefs": 751,
+  "callRefs": 753,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -112,6 +112,7 @@
     "engines/counterfactual-sandbox.js",
     "engines/covenant-sanction.js",
     "engines/covert-espionage.js",
+    "engines/ctx-boundary.js",
     "engines/day-route.js",
     "engines/deep-clean.js",
     "engines/degrade-audit.js",
@@ -696,6 +697,7 @@
     "engines/counterfactual-sandbox.js",
     "engines/covenant-sanction.js",
     "engines/covert-espionage.js",
+    "engines/ctx-boundary.js",
     "engines/day-route.js",
     "engines/deep-clean.js",
     "engines/degrade-audit.js",
@@ -11011,6 +11013,25 @@
   "engines/contrast.js": {
    "ns": [
     "contrast"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/ctx-boundary.js": {
+   "ns": [
+    "ctxBoundary"
    ],
    "requires": [
     "registerModule"
