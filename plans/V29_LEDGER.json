@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "6a33f331aab854b689573a225571edac1f71a16c51d774b2c54541c3962ee51c",
-  "sourceCommits": 29,
+  "sourceDigest": "d0e420e364906b425feb6d3829b9a127c9ddae2c48a7b90f6b9129c140df244f",
+  "sourceCommits": 30,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -56,6 +56,26 @@
       "subject": "chore(worldaxis): 台账回填 —— 已交付 22/36，计划读数 tests/*.js 601 → 602（+ OPV29-06 门禁实测：七快 19.5s / 慢门 86.0s / 合计下界 105.5s）",
       "readings": [],
       "recompute": false,
+      "note": ""
+    },
+    "OPV29-09": {
+      "group": "Z2",
+      "commit": "c5eb2de",
+      "subject": "perf(reject-recovery): OPV29-09 冻结表与判定分离（1388 → 244 行）",
+      "readings": [
+        "wc -l engines/reject-recovery.js ⇒ 244",
+        "wc -l engines/reject-recovery-tables.js ⇒ 1204",
+        "node tools/reject-recovery.js ⇒ rc=0（承诺与现场逐条一致）",
+        "node tests/reject-recovery-lock-v2192.js ⇒ pass (215)",
+        "node tests/module-cycle-gate-v2107.js ⇒ pass（65 项）",
+        "node tests/module-registry-gate.js ⇒ pass（文件 542 / ns 553）",
+        "node tests/settle-v2830.js ⇒ pass (55)",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
+        "node tools/plan-readings.js ⇒ pass（16 条读数与现场全等）",
+        "node tools/release-manifest.js ⇒ rc=0",
+        "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（冻结基线 27）"
+      ],
+      "recompute": true,
       "note": ""
     },
     "OPV29-10": {
@@ -420,7 +440,6 @@
     "OPV29-04",
     "OPV29-07",
     "OPV29-08",
-    "OPV29-09",
     "OPV29-11",
     "OPV29-30"
   ],
@@ -494,8 +513,8 @@
     ]
   },
   "counts": {
-    "delivered": 30,
-    "pending": 6,
+    "delivered": 31,
+    "pending": 5,
     "rangeForm": 1,
     "noRecompute": 7,
     "unparsedForm": 0,
