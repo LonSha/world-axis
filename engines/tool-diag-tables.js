@@ -551,6 +551,9 @@
     //   （离线批要么不发生、要么重复发生，而两者在读数上同形）。
     'engines/offline-return.js': 'offlineReturn',
     // v2.152.0（RP6）：面板渲染性能观测。登记为必载——renderBody 分流与面板读数段都读它。
+    // v2.535.0：声明式视图层。它有产品读点（ui/panel.js 事件页的真消费方），故进表；
+    //   漏登记的后果与其它 UI 模块同：自检/契约面对它没有出口，而不是报错。
+    'ui/schema-view.js': 'schemaView',
     'ui/render-perf.js': 'renderPerf',
     // v2.209.0（优化 6）：面板导航协议。登记为**必载** —— 面板的每一个 data-nav 控件与
     //   `#wa-nav-back` 都走它；缺席就是「跳转与定位整条失效」本身，不该被静默兜住。

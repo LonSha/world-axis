@@ -1595,6 +1595,10 @@
     'ui/pages/people-page.js',
     'ui/pages/tools-page.js',
     'ui/pages/dashboards.js',
+    // v2.535.0：声明式视图层（schema → DOM）。必须排在 ui/panel.js **之后**：panel.js
+    //   的事件页在渲染期惰性读 WA.schemaView，先装会让首帧拿到 undefined（降级行一直显示）。
+    //   零世界读、零落盘、零控件绑定（只出结构，绑定归消费方）。
+    'ui/schema-view.js',
     'ui/settings.js',
     'ui/assistant.js',
   ];

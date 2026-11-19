@@ -1524,3 +1524,138 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     animation-duration: 0.001ms !important;
   }
 }
+
+/* ==========================================================================
+   v2.535.0：声明式视图层的排版（ui/schema-view.js 的块类名）
+   —— 只增不删。所有数值走 v2.534.0 的刻度 token，字号/圆角一律不写字面量。
+   设计口径：块与块之间靠「间距 + 表面明度」分层，不靠边框（同 .wa-item 的收口）。
+   ========================================================================== */
+
+/* 指标块：一个数就是一块 —— 标签在上（xs/dim）、数值最大（xl/强调色）、单位跟尾。
+   为什么数值用 24px：面板里所有东西都是 12px 时，「重要的数」根本读不出来。 */
+.wa-metric {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 84px;
+  padding: var(--wa-sp-2) var(--wa-sp-3);
+  background: var(--wa-surface-1);
+  border-radius: var(--wa-r-md);
+  box-shadow: var(--wa-highlight-top);
+}
+.wa-metric-label { font-size: var(--wa-fs-xs); color: var(--wa-text-dim); letter-spacing: 0.04em; }
+.wa-metric-value {
+  font-size: var(--wa-fs-xl);
+  line-height: 1.05;
+  color: var(--wa-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.wa-metric-unit { font-size: var(--wa-fs-xs); color: var(--wa-text-dim); }
+.wa-mt-ok .wa-metric-value { color: var(--wa-emerald); }
+.wa-mt-warn .wa-metric-value { color: var(--wa-amber); }
+.wa-mt-bad .wa-metric-value { color: var(--wa-rose); }
+.wa-mt-info .wa-metric-value { color: var(--wa-accent); }
+
+/* 徽章组 */
+.wa-badges { display: flex; flex-wrap: wrap; gap: var(--wa-sp-1); }
+.wa-badge-ok { color: var(--wa-emerald); border-color: rgba(16, 185, 129, 0.35); }
+.wa-badge-warn { color: var(--wa-amber); border-color: rgba(251, 191, 36, 0.35); }
+.wa-badge-bad { color: var(--wa-rose); border-color: rgba(244, 63, 94, 0.35); }
+.wa-badge-info { color: var(--wa-accent); border-color: var(--wa-accent-border); }
+
+/* 纵向堆叠（块间距的唯一来源：不在块里各写各的 margin） */
+.wa-stack { display: flex; flex-direction: column; gap: var(--wa-sp-2); }
+
+/* 折叠：原生 <details> —— 键盘可达、阅读器可读，且不需要一行 JS */
+.wa-collapse { background: var(--wa-surface-1); border-radius: var(--wa-r-md); padding: var(--wa-sp-1) var(--wa-sp-3); }
+.wa-collapse > summary {
+  cursor: pointer;
+  font-size: var(--wa-fs-sm);
+  color: var(--wa-text-secondary);
+  padding: var(--wa-sp-2) 0;
+  list-style: none;
+}
+.wa-collapse > summary::-webkit-details-marker { display: none; }
+.wa-collapse > summary::before { content: "▸ "; color: var(--wa-text-dim); }
+.wa-collapse[open] > summary::before { content: "▾ "; }
+
+/* 筛选栏 */
+.wa-filter { display: flex; gap: var(--wa-sp-2); }
+.wa-filter .wa-input { flex: 1; }
+
+/* ── 时间轴：一条竖脊 + 每拍一个点 ─────────────────────────────────────────
+   为什么不用 canvas：格线要能 tab、能被念出来、能在窄屏换行。
+   竖脊用「容器上的一条伪元素」而不是每个点自己的线 —— 后者在末项会多出一截。 */
+.wa-tl { position: relative; padding-left: var(--wa-sp-4); }
+.wa-tl::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  bottom: 6px;
+  width: 1px;
+  background: linear-gradient(180deg, var(--wa-accent-border), rgba(255, 255, 255, 0.06));
+}
+.wa-tl-row { position: relative; display: flex; gap: var(--wa-sp-2); padding: var(--wa-sp-1) 0; }
+.wa-tl-dot {
+  position: absolute;
+  left: calc(-1 * var(--wa-sp-4) + 2px);
+  top: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wa-surface-3);
+  box-shadow: 0 0 0 1px var(--wa-border-regular);
+}
+.wa-tl-ok .wa-tl-dot { background: var(--wa-emerald); box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.18); }
+.wa-tl-warn .wa-tl-dot { background: var(--wa-amber); box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.18); }
+.wa-tl-bad .wa-tl-dot { background: var(--wa-rose); box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.18); }
+.wa-tl-info .wa-tl-dot { background: var(--wa-accent); box-shadow: 0 0 0 2px var(--wa-accent-dim); }
+.wa-tl-body { flex: 1; min-width: 0; }
+.wa-tl-at {
+  display: block;
+  font-size: var(--wa-fs-xs);
+  font-family: var(--wa-font-mono);
+  color: var(--wa-text-dim);
+  letter-spacing: 0.02em;
+}
+.wa-tl-title { font-size: var(--wa-fs-sm); color: var(--wa-text-primary); }
+.wa-tl-detail { font-size: var(--wa-fs-xs); color: var(--wa-text-secondary); line-height: 1.5; margin-top: 2px; }
+
+/* ── 占格矩阵：CSS grid 的格子，不是 canvas ────────────────────────────────
+   --wa-mx-cols 由声明里的 cols 现算（这是唯一的内联变量：列数是数据，不可能静态化）。 */
+.wa-mx {
+  display: grid;
+  grid-template-columns: repeat(var(--wa-mx-cols, 8), minmax(0, 1fr));
+  gap: 2px;
+  padding: var(--wa-sp-1);
+  background: var(--wa-surface-1);
+  border-radius: var(--wa-r-md);
+  box-shadow: var(--wa-shadow-recess);
+}
+.wa-mx-cell {
+  position: relative;
+  min-height: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px;
+  background: var(--wa-surface-2);
+  border-radius: var(--wa-r-xs);
+  font-size: var(--wa-fs-xs);
+  color: var(--wa-text-primary);
+  overflow: hidden;
+  cursor: default;
+}
+.wa-mx-cell[data-w="2"] { grid-column: span 2; }
+.wa-mx-cell[data-w="3"] { grid-column: span 3; }
+.wa-mx-cell[data-h="2"] { grid-row: span 2; }
+.wa-mx-cell[data-h="3"] { grid-row: span 3; }
+.wa-mx-cell > b { font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-mx-badge { font-size: var(--wa-fs-xs); color: var(--wa-text-dim); }
+.wa-mx-ok { background: rgba(16, 185, 129, 0.14); color: var(--wa-emerald); }
+.wa-mx-warn { background: rgba(251, 191, 36, 0.14); color: var(--wa-amber); }
+.wa-mx-bad { background: rgba(244, 63, 94, 0.14); color: var(--wa-rose); }
+.wa-mx-info { background: var(--wa-accent-dim); color: var(--wa-accent); }

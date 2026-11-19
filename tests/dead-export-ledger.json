@@ -706,6 +706,46 @@
       "tref": 0,
       "own": 16
     },
+    "arcGuide.keysOf": {
+      "reason": "self-only",
+      "detail": "engines/arc-guide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/arc-guide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "arcGuide.parseArc": {
+      "reason": "self-only",
+      "detail": "engines/arc-guide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/arc-guide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "arcGuide.parseArcs": {
+      "reason": "self-only",
+      "detail": "engines/arc-guide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/arc-guide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 6
+    },
+    "arcGuide.parseBeat": {
+      "reason": "self-only",
+      "detail": "engines/arc-guide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/arc-guide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "arcGuide.plan": {
+      "reason": "self-only",
+      "detail": "engines/arc-guide.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/arc-guide.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "arcSettle.stat": {
       "reason": "self-only",
       "detail": "engines/arc-settle.js 内部自用、外部零引用（过度导出）",
@@ -3574,6 +3614,30 @@
       "reason": "self-only",
       "detail": "engines/crowd-panic.js 内部自用、外部零引用（过度导出）",
       "src": "engines/crowd-panic.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "ctxBoundary.blankLines": {
+      "reason": "self-only",
+      "detail": "engines/ctx-boundary.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ctx-boundary.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "ctxBoundary.parseRule": {
+      "reason": "self-only",
+      "detail": "engines/ctx-boundary.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ctx-boundary.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "ctxBoundary.scrub": {
+      "reason": "self-only",
+      "detail": "engines/ctx-boundary.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/ctx-boundary.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -7521,14 +7585,6 @@
       "refs": 0,
       "tref": 0,
       "own": 13
-    },
-    "lazyLoad.ensure": {
-      "reason": "self-only",
-      "detail": "engines/lazy-load.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/lazy-load.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 4
     },
     "lazyLoad.plan": {
       "reason": "self-only",
@@ -11562,6 +11618,46 @@
       "tref": 4,
       "own": 3
     },
+    "replicaFamily.cleanup": {
+      "reason": "self-only",
+      "detail": "engines/replica-family.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/replica-family.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "replicaFamily.nameOf": {
+      "reason": "self-only",
+      "detail": "engines/replica-family.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/replica-family.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "replicaFamily.namesOf": {
+      "reason": "self-only",
+      "detail": "engines/replica-family.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/replica-family.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "replicaFamily.parseSpec": {
+      "reason": "self-only",
+      "detail": "engines/replica-family.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/replica-family.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "replicaFamily.plan": {
+      "reason": "self-only",
+      "detail": "engines/replica-family.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/replica-family.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "replyGuard.getSettings": {
       "reason": "self-only",
       "detail": "engines/reply-guard.js 内部自用、外部零引用（过度导出）",
@@ -12290,6 +12386,22 @@
       "tref": 1,
       "own": 3
     },
+    "saveAudit.audit": {
+      "reason": "self-only",
+      "detail": "engines/save-audit.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/save-audit.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "saveAudit.typeOf": {
+      "reason": "self-only",
+      "detail": "engines/save-audit.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/save-audit.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
     "saveCurve.curve": {
       "reason": "self-only",
       "detail": "engines/save-curve.js 内部自用、外部零引用（过度导出）",
@@ -12510,6 +12622,14 @@
       "reason": "self-only",
       "detail": "core/schema.js 内部自用、外部零引用（过度导出）",
       "src": "core/schema.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "schemaView.stat": {
+      "reason": "self-only",
+      "detail": "ui/schema-view.js 内部自用、外部零引用（过度导出）",
+      "src": "ui/schema-view.js",
       "refs": 0,
       "tref": 0,
       "own": 3
@@ -16105,6 +16225,30 @@
       "refs": 0,
       "tref": 2,
       "own": 1
+    },
+    "writeRehearsal.checkPath": {
+      "reason": "self-only",
+      "detail": "engines/write-rehearsal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/write-rehearsal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "writeRehearsal.parseOp": {
+      "reason": "self-only",
+      "detail": "engines/write-rehearsal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/write-rehearsal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "writeRehearsal.rehearse": {
+      "reason": "self-only",
+      "detail": "engines/write-rehearsal.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/write-rehearsal.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
     }
   },
   "uiDead": {
@@ -16166,6 +16310,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 768
+    "dataOnly": 780
   }
 }

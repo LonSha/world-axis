@@ -1345,6 +1345,26 @@ const peopleIds = Object.keys(s.people);
 
       ${digest && digest.text ? `<div class="wa-sec">世界推演叙事</div><div class="wa-item wa-digest">${esc(digest.text)}</div>` : ''}
 
+      // v2.535.0：世界时间轴 —— 声明式视图层（ui/schema-view.js）的第一个真消费方。
+      //   病：世界一直在动（暗流 / 突发事件 / 势力消长），而事件页把它们摊成三坨独立读数，
+      //   玩家看不出「先后与因果」。时间轴是同一批数据的另一种排法：只读 store、零写、零落盘。
+      //   视图层缺席时回一条可见的降级行（不静默空白 —— 空白会被读成「本来就没有」）。
+      ${(function () {
+        const items = [];
+        ((s.evolution && s.evolution.worldTrends) || []).forEach(function (t) {
+          items.push({ at: t.status === '持续中' ? '进行中' : '已结束', title: t.name || '暗流',
+            badge: t.scope || '', detail: t.description || '',
+            tone: t.status === '持续中' ? 'warn' : 'ok' });
+        });
+        (s.directEvents || []).forEach(function (e) {
+          items.push({ at: '第' + (Number(e.currentTurn) || 0) + '/' + (Number(e.totalTurns) || 0) + '轮',
+            title: e.title || '突发事件', badge: e.status === 'active' ? '进行中' : (e.status || ''),
+            detail: e.opponent ? ('对手：' + e.opponent) : '',
+            tone: e.status === 'active' ? 'info' : 'ok' });
+        });
+        if (!WA.schemaView || typeof WA.schemaView.render !== 'function') return '<div class="wa-dim">视图层缺席（ui/schema-view.js 未装载）</div>';
+        return WA.schemaView.render({ blocks: [{ type: 'timeline', items: items, empty: '世界还没动起来：推演一轮，或在「世界」页开局' }] });
+      })()}
       <div class="wa-sec">势力（${factions.length}）</div>
       <div class="wa-list">${factions.slice(0,6).map(f => `<div class="wa-item">${factionBadge(f.status)} <b>${esc(f.name)}</b> <span class="wa-badge">${esc(f.status)}</span> <span class="wa-dim">${relBadge(f.relation)}${esc(f.relation)}</span>${f.currentGoal ? `<div class="wa-dim">目标：${esc(f.currentGoal)}</div>` : ''}</div>`).join('') || '<div class="wa-empty">暂无势力</div>'}</div>
       ${(() => {

@@ -30,6 +30,8 @@ const mj = diagSrc.indexOf('\n  };', mi);
 const MODULE_EXPORTS = vm.runInNewContext('(' + diagSrc.slice(diagSrc.indexOf('{', mi), mj + 4) + ')');
 const OWNER = {}; Object.keys(MODULE_EXPORTS).forEach(function (f) { OWNER[MODULE_EXPORTS[f]] = f; });
 const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf',
+  // v2.535.0：ui/schema-view.js —— 与 tests/run.js 的 UI_NS2800 成对（两处同批）。
+  'schemaView',
   // v2.209.0（优化 6）：ui/panel-nav.js —— 与 tests/run.js 的 UI_NS2800 成对（两处口径必须一致）。
   'panelNav',
   // v2.225.0(Q8):ui/panel-fold.js —— 与 tests/run.js 的 UI_NS2800 成对(两处口径必须一致)。
