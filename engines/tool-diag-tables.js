@@ -21,39 +21,10 @@
   const WA = G.WorldAxis = G.WorldAxis || {};
 
   const MODULE_EXPORTS = {
-    // v2.529.0（OPV29-04）：补齐诊断清单一格 ——22 个惰性项（契约面仍在，只是首帧不装）、
-    //   lazy-load 自己，以及七个拆段表文件（OPV29-07~11 的存量漏登记）。
-    //   判据来自全量回归的「诊断清单覆盖全部磁盘模块」：漏登记不会报错，只会让自检看不见它。
-    'engines/action-desk-routes.js': 'actionDeskRoutes',
-    'engines/api-vault.js': 'apiVault',
-    'engines/backstage-protocols.js': 'backstageProtocols',
-    'engines/card-file.js': 'cardFile',
-    'engines/chat-guard.js': 'chatGuard',
-    'engines/contrast.js': 'contrast',
-    'engines/fact-age.js': 'factAge',
-    'engines/floor-census.js': 'floorCensus',
-    'engines/floor-favorites.js': 'floorFavorites',
-    'engines/floor-hide.js': 'floorHide',
-    'engines/floor-scrub.js': 'floorScrub',
-    'engines/green-keys.js': 'greenKeys',
-    'engines/import-kind.js': 'importKind',
-    'engines/inject-budget-tables.js': 'injectBudgetTables',
-    'engines/json-repair.js': 'jsonRepair',
+    // v2.529.0（OPV29-04）：惰性档引擎自己。它有产品读点（index.js 的 WA.lazyLoad.bind/add），
+    //   所以在出口契约串里也确实有它 ⇒ 该进表。其余 22 个惰性项零读、不进表
+    //   （理由见 tests/segments/tool-diag-v092.js 的覆盖判据注释）。
     'engines/lazy-load.js': 'lazyLoad',
-    'engines/macro-guard.js': 'macroGuard',
-    'engines/mixed-index.js': 'mixedIndex',
-    'engines/msg-align.js': 'msgAlign',
-    'engines/reject-recovery-tables.js': 'rejectRecoveryTables',
-    'engines/save-migrate.js': 'saveMigrate',
-    'engines/setup-plan.js': 'setupPlan',
-    'engines/slot-format.js': 'slotFormat',
-    'engines/store-merge.js': 'storeMerge',
-    'engines/story-export.js': 'storyExport',
-    'engines/stream-gate.js': 'streamGate',
-    'engines/tool-diag-tables.js': 'toolDiagTables',
-    'engines/world-lab-tables.js': 'worldLabTables',
-    'engines/world-tables.js': 'worldTables',
-    'engines/write-serial.js': 'writeSerial',
     // v2.273.0（V6 拓展线 EXV6-1~9）：八台只读读数引擎一次登记到位。
     //   漏登记的后果不是报错，而是「自检看不见的黑盒」（全量回归的
     //   「诊断清单覆盖全部磁盘模块」判据正是为这一格设的）。

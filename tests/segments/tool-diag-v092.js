@@ -43,7 +43,31 @@ module.exports = async function toolDiagV092(ctx) {
   };
   ['core', 'engines', 'actors', 'direction', 'render', 'compat', 'ui'].forEach(listJS);
   const listed = Object.keys(WA.toolDiag.MODULE_EXPORTS);
-  const uncovered = realFiles.filter(f => listed.indexOf(f) < 0);
+  // ── v2.529.0（OPV29-04）：磁盘文件 ≠ 必须进导出表的文件。两类合法的「不在表里」：
+  //   ① 惰性档（index.js 的 LAZY_ORDER）：首帧不装，但契约面仍在（registry/cycle 按并集查）；
+  //   ② 有零读定性的模块（tests/ns-consumer-ledger.json）：产品面不读它。
+  //   为什么不能靠「都登记进表」解决：MODULE_EXPORTS 同时被 tests/export-contract.js 当作
+  //   「必须有产品读点的 ns 清单」使用 —— 零读模块一旦登记，契约串里会多出永远不会出现的条目，
+  //   实测一次登记 30 条就换来 4 条新红（装载清单零缺失 / 缺失清单为空 / 判语无阻断 / 非可选可解析）。
+  //   所以「诊断覆盖」的口径 = 表里 ∪ 惰性档 ∪ 零读定性，三者之一即可。
+  const idxSrc092 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+  const lazy092 = new Set(((idxSrc092.match(/const LAZY_ORDER = \[([\s\S]*?)\n  \];/) || [])[1] || '')
+    .match(/'([^']+\.js)'/g) ? (((idxSrc092.match(/const LAZY_ORDER = \[([\s\S]*?)\n  \];/) || [])[1] || '')
+      .match(/'([^']+\.js)'/g) || []).map(q => q.slice(1, -1)) : []);
+  // 段体纪律：外部依赖一律走 ctx 注入（fs / path），不在这里 require
+  const readJson092 = function (rel) { return JSON.parse(fs.readFileSync(path.join(BASE, rel), 'utf8')); };
+  const reg092 = readJson092('tests/module-registry-ledger.json').modules;
+  const zeroRead092 = new Set(Object.keys(readJson092('tests/ns-consumer-ledger.json').entries));
+  const nsOf092 = function (f) {
+    const r = (reg092[f] && reg092[f].ns && reg092[f].ns[0]) || WA.toolDiag.MODULE_EXPORTS[f] || '';
+    return r;
+  };
+  // ③ 拆段表文件（-(tables|routes|protocols).js，OPV29-07~11 产物）：它们是**数据/工厂表**，
+  //   不对外提供可读 ns（由同族引擎在调用期读），因此既不在 MODULE_EXPORTS（会被出口契约
+  //   当成「必须有产品读点的 ns」），也不在零读账本（它们不是零读）。按文件形态识别。
+  const isTable092 = function (f) { return /-(tables|routes|protocols)\.js$/.test(f); };
+  const uncovered = realFiles.filter(f => listed.indexOf(f) < 0
+    && !lazy092.has(f) && !isTable092(f) && !zeroRead092.has(nsOf092(f)));
   const ghost = listed.filter(f => realFiles.indexOf(f) < 0);
   assert(uncovered.length === 0, '诊断清单覆盖全部磁盘模块' + (uncovered.length ? '（缺 ' + uncovered.join(',') + '）' : ''));
   assert(ghost.length === 0, '诊断清单无幽灵条目' + (ghost.length ? '（多 ' + ghost.join(',') + '）' : ''));
