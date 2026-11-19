@@ -1659,3 +1659,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .wa-mx-warn { background: rgba(251, 191, 36, 0.14); color: var(--wa-amber); }
 .wa-mx-bad { background: rgba(244, 63, 94, 0.14); color: var(--wa-rose); }
 .wa-mx-info { background: var(--wa-accent-dim); color: var(--wa-accent); }
+
+/* v2.538.0（可用性 R1 · 触控目标）
+   实测病灶：.wa-mini 的可点高度 = padding 2px*2 + 10.5px 字号 * 行高 ≈ 20px，
+   而面板里绝大多数操作按钮都是 .wa-mini。桌面用鼠标点 20px 勉强，手机/平板（SillyTavern 的主场）
+   上这就是结构性误触，不是「手抖」。Apple HIG 的下限是 44px、Material 是 48dp。
+   为什么只写在 pointer: coarse 里而不全局放大：桌面的密集是**刻意的**（信息密度是这个面板的价值），
+   我们输的是移动端那一段，不该拿桌面的密度去补。
+   为什么取 38 而不是 44：44 是「单按钮一屏」的建议值；密集面板取 38（仍大于旧值近一倍），
+   且只加 min-height + padding，不改任何栅格列数 —— 布局不会因为这条规则重排。 */
+@media (pointer: coarse) {
+  .wa-btn, .wa-mini { min-height: 38px; padding: 8px 11px; }
+  .wa-mini { margin: 3px 5px 3px 0; }
+  .wa-tabs { min-height: 42px; }
+}
