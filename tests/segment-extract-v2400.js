@@ -155,7 +155,7 @@ const BASE_ASSERT_CC = 5267;  // v2.518.0 +4（三把 story-window 专锁 +1 把
 //       唯独这条「面本身没有意外增减」的绝对基线没人补。本批一次补齐，不改判据口径。
 //     为什么仍然不用「>= 564」了事：下界判据对「面塌了」是瞎的（见上段原文）。代价是每加一把锁
 //     就要动这个常量 —— 而那正是它的价值：动它的人必须亲手确认「我确实新增了一个测试文件」。
-const BASE_TEST_FILES = 599;  // v2.524.0（V29 Z6/Z5）：+3 tests/opv29-z5-dep-v2529.js（依赖零新增）+ tests/opv29-z6-v2529.js（31/32 存储·锁自愈） 与 tests/opv29-z5-v2529.js（25 新引擎脚手架）—— 两个都是纯脚本体、已挂进 run.js，面数 +2 是**真测试文件**。
+const BASE_TEST_FILES = 600;  // v2.524.0（V29 Z6/Z5）：+3 tests/opv29-z5-dep-v2529.js（依赖零新增）+ tests/opv29-z6-v2529.js（31/32 存储·锁自愈） 与 tests/opv29-z5-v2529.js（25 新引擎脚手架）—— 两个都是纯脚本体、已挂进 run.js，面数 +2 是**真测试文件**。
 //   v2.529.0：591→592（+1 tests/opv29-z5-26-v2529.js —— OPV29-26 登记一致性校验 40 项；文件在 + 已挂进 run.js 的 LOAD 段，两件同时成立才计数）。
 //   v2.529.0：592→593（+1 tests/opv29-z6-33-v2529.js —— OPV29-33 密钥扫描扩面 28 项；同上口径）。
 //   v2.529.0：593→594（+1 tests/opv29-z5-28-v2529.js —— OPV29-28 计划台账自动汇总 41 项；同上口径）。
@@ -163,7 +163,8 @@ const BASE_TEST_FILES = 599;  // v2.524.0（V29 Z6/Z5）：+3 tests/opv29-z5-dep
 //   v2.529.0：595→596（+1 tests/opv29-z4-v2529.js —— OPV29-21 空转检测 + OPV29-23 抖测试治理 25 项；同上口径）。
 //   v2.529.0：596→597（+1 tests/opv29-z4-anchor-v2529.js —— OPV29-19 锚定收窄 + OPV29-20 负控制覆盖 20 项；口径不变：文件在 + 被 run.js 真执行）。
 //   v2.529.0：597→598（+1 tests/opv29-z5-27-v2529.js —— OPV29-27 版本面跟位 + OPV29-35 发布清单化 23 项；同上口径）。
-//   v2.529.0：598→599（+1 tests/opv29-z3-16-v2529.js —— OPV29-16 红门禁最小复现 17 项；同上口径）。
+//   v2.529.0：598→599（+1 tests/opv29-z3-16-v2529.js —— OPV29-16 红门禁最小复现 18 项；同上口径）。
+//   v2.529.0：599→600（+1 tests/opv29-z4-24-v2529.js —— OPV29-24 快档与全量同源 24 项；同上口径）。
 //   口径不变：面数只认「文件在 + 被 run.js 真执行」两件同时成立（孤儿面另由 test-surface-gate 判）。  // v2.524.0（V29 批六）：+1 tests/worldbounds-batch6-v2524.js（EXV29-31～36 六段一把锁）  // v2.524.0（V29 批五）：+1 tests/livelihood-batch5-v2524.js（EXV29-25～30 六段一把锁）  // v2.524.0（V29 批四）：+1 tests/posthumous-batch4-v2524.js（EXV29-19～24 六段一把锁）  // v2.524.0（V29 批三）：+1 tests/finale-batch3-v2524.js（EXV29-13～18 五段一把锁）  // v2.524.0（S1）：+1 tests/outcome-dice-v2525.js（d20 五档判定专锁）  // v2.524.0（V29 批一）：+1 tests/identity-batch1-v2524.js（EXV29-02～06 五段一把锁）  // v2.524.0（V29 批二）：+1 tests/floor-batch2-v2524.js（EXV29-07～12 六段一把锁）  // v2.524.0：575→577→578（+2：tests/opv27-boot-report-lock.js · tests/opv27-inject-explain-lock.js —— V27 优化线 OPV27-1/2 与 OPV27-4 两把专锁；+1：tests/opv27-rest-lock.js —— OPV27-3/5/6/7/8/9 六项一把锁、六条真源码负控制）  // v2.529.0：585→588（真值取 pf.testFiles() 现场）——7235e85 实际新增 7 个测试文件却只按 +6 记（当批即漏 1），此后又 +2：tests/opv29-z3-v2524.js · tests/costguard-timeledger-v2529.js
                                // v2.518.0：564→571（+7：V25 缝合 + V26 可观测 + 四把 story-window 专锁 + ruby-card-profile）（本版 +2：scenario-v68-v24-civil-life.js 专锁 + tests/probes/p_world_pulse.js 探针收编）
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
