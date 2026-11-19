@@ -371,12 +371,25 @@
     // v2.296.0（V10 OPV10-7）：全仓统一待办中心。位置在 store / commit 之后、引擎之前
     'core/unified-pending.js',
     'core/interceptor.js',
+    'engines/api-vault.js',
     // OPV29-11：backstage 的协议常量与设置登记表已拆到 engines/backstage-protocols.js，
     //   必须先于引擎装载（缺表时引擎求值期当场抛错，不静默退化成「没有协议」）。
     'engines/backstage-protocols.js',
     'engines/backstage.js',
+    'engines/card-file.js',
+    'engines/chat-guard.js',
+    'engines/contrast.js',
     'engines/evolution.js',
     'engines/enemies.js',
+    'engines/floor-census.js',
+    'engines/floor-favorites.js',
+    'engines/floor-hide.js',
+    'engines/floor-scrub.js',
+    'engines/green-keys.js',
+    'engines/import-kind.js',
+    'engines/macro-guard.js',
+    'engines/mixed-index.js',
+    'engines/msg-align.js',
     'engines/regional.js',
     'engines/parallel-world.js', // v2.34.0: 平行世界（主线之外独立推演，缝合自狐神抚 V19.5）
      'engines/horizon.js',
@@ -388,6 +401,11 @@
     'engines/editor-faction.js',
     'engines/editor-events.js',
     'engines/inspector-state.js',
+    'engines/setup-plan.js',
+    'engines/slot-format.js',
+    'engines/store-merge.js',
+    'engines/story-export.js',
+    'engines/stream-gate.js',
     'engines/tool-snapshot.js',
     'engines/tool-analyzer.js',
     'engines/tool-import.js',
@@ -1066,6 +1084,7 @@
     // v2.518.0：正文后故事回应窗口。位置在结构汇流之后、render/inject 之前；
     // 只读既有 world/livingWorld/messages，写入自己的编排账，不替代事实 owner。
     'engines/story-window.js',
+    'engines/write-serial.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',

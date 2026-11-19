@@ -1,13 +1,13 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 568,
- "loadedCount": 547,
+ "loadOrderCount": 587,
+ "loadedCount": 566,
  "uiCount": 21,
- "nsCount": 558,
+ "nsCount": 577,
  "totals": {
-  "loadEdges": 440,
+  "loadEdges": 459,
   "hardEdges": 0,
-  "callRefs": 703,
+  "callRefs": 741,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -49,6 +49,7 @@
     "engines/alchemy-toxicology.js",
     "engines/anniversary-rites.js",
     "engines/anomaly-mutation.js",
+    "engines/api-vault.js",
     "engines/appointment.js",
     "engines/archive-hide.js",
     "engines/artifice-degradation.js",
@@ -79,6 +80,7 @@
     "engines/call-timeline.js",
     "engines/campaign.js",
     "engines/capacity-audit.js",
+    "engines/card-file.js",
     "engines/care-chain.js",
     "engines/cartography-survey.js",
     "engines/cascade-bus.js",
@@ -86,6 +88,7 @@
     "engines/celestial-omens.js",
     "engines/channel-probe.js",
     "engines/chapters.js",
+    "engines/chat-guard.js",
     "engines/chat-recycle.js",
     "engines/choice-board.js",
     "engines/chronicle-view.js",
@@ -100,6 +103,7 @@
     "engines/contest.js",
     "engines/continuity-guard.js",
     "engines/contraband.js",
+    "engines/contrast.js",
     "engines/controllability.js",
     "engines/coop.js",
     "engines/coordinate.js",
@@ -148,6 +152,10 @@
     "engines/financial-contagion.js",
     "engines/fire-watch.js",
     "engines/first-run.js",
+    "engines/floor-census.js",
+    "engines/floor-favorites.js",
+    "engines/floor-hide.js",
+    "engines/floor-scrub.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
     "engines/foreshadow-tree.js",
@@ -158,6 +166,7 @@
     "engines/gen-timing.js",
     "engines/geo-tracker.js",
     "engines/geophysical-reshaping.js",
+    "engines/green-keys.js",
     "engines/group-refuse.js",
     "engines/handoff-pack.js",
     "engines/hazard.js",
@@ -166,6 +175,7 @@
     "engines/history-provenance.js",
     "engines/history-search.js",
     "engines/human-realism.js",
+    "engines/import-kind.js",
     "engines/inject-budget-tables.js",
     "engines/inject-collector.js",
     "engines/inject-delta.js",
@@ -195,6 +205,7 @@
     "engines/living-world.js",
     "engines/local-grid.js",
     "engines/lost-and-found.js",
+    "engines/macro-guard.js",
     "engines/maritime-navigation.js",
     "engines/memory-relay.js",
     "engines/memory-tiers.js",
@@ -202,6 +213,7 @@
     "engines/mend.js",
     "engines/military-levy.js",
     "engines/misbelief.js",
+    "engines/mixed-index.js",
     "engines/mob-stampede.js",
     "engines/model-catalog.js",
     "engines/model-pin.js",
@@ -210,6 +222,7 @@
     "engines/mood-glide.js",
     "engines/mortuary-rites.js",
     "engines/motif.js",
+    "engines/msg-align.js",
     "engines/narrative-lens.js",
     "engines/narrative-preset.js",
     "engines/narrow-consumers.js",
@@ -301,10 +314,12 @@
     "engines/service-network.js",
     "engines/session.js",
     "engines/settings-index.js",
+    "engines/setup-plan.js",
     "engines/shadow-council.js",
     "engines/siege-attrition.js",
     "engines/silver-assay.js",
     "engines/sim-rehearsal.js",
+    "engines/slot-format.js",
     "engines/social-legacy.js",
     "engines/solo-voice.js",
     "engines/somatic-trauma.js",
@@ -318,13 +333,16 @@
     "engines/stall.js",
     "engines/stealth-infiltration.js",
     "engines/storage-forecast.js",
+    "engines/store-merge.js",
     "engines/story-choice.js",
+    "engines/story-export.js",
     "engines/story-loop.js",
     "engines/story-rhythm.js",
     "engines/story-tone.js",
     "engines/story-window.js",
     "engines/storyclock.js",
     "engines/storyline-advance.js",
+    "engines/stream-gate.js",
     "engines/subtext-tension.js",
     "engines/summarizer-adapter.js",
     "engines/summarizer.js",
@@ -370,6 +388,7 @@
     "engines/world-snapshot.js",
     "engines/world-tables.js",
     "engines/write-desk.js",
+    "engines/write-serial.js",
     "render/map-viewport.js",
     "render/purifier.js"
    ]
@@ -614,6 +633,7 @@
     "engines/alchemy-toxicology.js",
     "engines/anniversary-rites.js",
     "engines/anomaly-mutation.js",
+    "engines/api-vault.js",
     "engines/appointment.js",
     "engines/archive-hide.js",
     "engines/artifice-degradation.js",
@@ -641,11 +661,13 @@
     "engines/call-timeline.js",
     "engines/campaign.js",
     "engines/capacity-audit.js",
+    "engines/card-file.js",
     "engines/care-chain.js",
     "engines/cartography-survey.js",
     "engines/cataclysm-hazard.js",
     "engines/celestial-omens.js",
     "engines/channel-probe.js",
+    "engines/chat-guard.js",
     "engines/chat-recycle.js",
     "engines/choice-board.js",
     "engines/chronicle-view.js",
@@ -660,6 +682,7 @@
     "engines/contest.js",
     "engines/continuity-guard.js",
     "engines/contraband.js",
+    "engines/contrast.js",
     "engines/controllability.js",
     "engines/coop.js",
     "engines/coordinate.js",
@@ -702,6 +725,10 @@
     "engines/financial-contagion.js",
     "engines/fire-watch.js",
     "engines/first-run.js",
+    "engines/floor-census.js",
+    "engines/floor-favorites.js",
+    "engines/floor-hide.js",
+    "engines/floor-scrub.js",
     "engines/floor-settle.js",
     "engines/floor-snapshot.js",
     "engines/foreshadow-tree.js",
@@ -712,6 +739,7 @@
     "engines/gen-timing.js",
     "engines/geo-tracker.js",
     "engines/geophysical-reshaping.js",
+    "engines/green-keys.js",
     "engines/group-refuse.js",
     "engines/handoff-pack.js",
     "engines/hearsay-ledger.js",
@@ -719,6 +747,7 @@
     "engines/history-provenance.js",
     "engines/history-search.js",
     "engines/human-realism.js",
+    "engines/import-kind.js",
     "engines/inject-budget-tables.js",
     "engines/inject-collector.js",
     "engines/inject-delta.js",
@@ -746,12 +775,14 @@
     "engines/living-world.js",
     "engines/local-grid.js",
     "engines/lost-and-found.js",
+    "engines/macro-guard.js",
     "engines/maritime-navigation.js",
     "engines/memory-relay.js",
     "engines/memory-tiers.js",
     "engines/mend.js",
     "engines/military-levy.js",
     "engines/misbelief.js",
+    "engines/mixed-index.js",
     "engines/mob-stampede.js",
     "engines/model-catalog.js",
     "engines/model-pin.js",
@@ -760,6 +791,7 @@
     "engines/mood-glide.js",
     "engines/mortuary-rites.js",
     "engines/motif.js",
+    "engines/msg-align.js",
     "engines/narrative-lens.js",
     "engines/narrative-preset.js",
     "engines/narrow-consumers.js",
@@ -846,10 +878,12 @@
     "engines/service-network.js",
     "engines/session.js",
     "engines/settings-index.js",
+    "engines/setup-plan.js",
     "engines/shadow-council.js",
     "engines/siege-attrition.js",
     "engines/silver-assay.js",
     "engines/sim-rehearsal.js",
+    "engines/slot-format.js",
     "engines/social-legacy.js",
     "engines/solo-voice.js",
     "engines/somatic-trauma.js",
@@ -863,13 +897,16 @@
     "engines/stall.js",
     "engines/stealth-infiltration.js",
     "engines/storage-forecast.js",
+    "engines/store-merge.js",
     "engines/story-choice.js",
+    "engines/story-export.js",
     "engines/story-loop.js",
     "engines/story-rhythm.js",
     "engines/story-tone.js",
     "engines/story-window.js",
     "engines/storyclock.js",
     "engines/storyline-advance.js",
+    "engines/stream-gate.js",
     "engines/subtext-tension.js",
     "engines/summarizer-adapter.js",
     "engines/supply-chain.js",
@@ -913,6 +950,7 @@
     "engines/world-snapshot.js",
     "engines/world-tables.js",
     "engines/write-desk.js",
+    "engines/write-serial.js",
     "render/map-viewport.js"
    ]
   },
@@ -1145,6 +1183,25 @@
    "stateKeys": [],
    "consumedBy": []
   },
+  "engines/api-vault.js": {
+   "ns": [
+    "apiVault"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
   "engines/backstage-protocols.js": {
    "ns": [
     "backstageProtocols"
@@ -1189,6 +1246,63 @@
    ],
    "consumedBy": []
   },
+  "engines/card-file.js": {
+   "ns": [
+    "cardFile"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/chat-guard.js": {
+   "ns": [
+    "chatGuard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/contrast.js": {
+   "ns": [
+    "contrast"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
   "engines/evolution.js": {
    "ns": [
     "evolution"
@@ -1226,6 +1340,177 @@
    "callRefs": [
     "clock",
     "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/floor-census.js": {
+   "ns": [
+    "floorCensus"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/floor-favorites.js": {
+   "ns": [
+    "floorFavorites"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/floor-hide.js": {
+   "ns": [
+    "floorHide"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/floor-scrub.js": {
+   "ns": [
+    "floorScrub"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/green-keys.js": {
+   "ns": [
+    "greenKeys"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/import-kind.js": {
+   "ns": [
+    "importKind"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/macro-guard.js": {
+   "ns": [
+    "macroGuard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/mixed-index.js": {
+   "ns": [
+    "mixedIndex"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/msg-align.js": {
+   "ns": [
+    "msgAlign"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
    ],
    "ghostRefs": [],
    "stateKeys": [],
@@ -1522,6 +1807,101 @@
    "requiresFiles": [],
    "providerOrderOk": true,
    "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/setup-plan.js": {
+   "ns": [
+    "setupPlan"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/slot-format.js": {
+   "ns": [
+    "slotFormat"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/store-merge.js": {
+   "ns": [
+    "storeMerge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/story-export.js": {
+   "ns": [
+    "storyExport"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/stream-gate.js": {
+   "ns": [
+    "streamGate"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []
@@ -7573,6 +7953,25 @@
    "stateKeys": [
     "worldaxis_story_window_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/write-serial.js": {
+   "ns": [
+    "writeSerial"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "render/inject.js": {

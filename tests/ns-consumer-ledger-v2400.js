@@ -37,14 +37,21 @@ const VICTIM_REL = 'engines/courier-dispatch.js';
 /** 注入的探针 ns 名：`__` 前缀 + 本锁标识，确保不会与真 ns 撞名。 */
 const PROBE_NS = '__negCtlProbeNs2400';
 /** 分类法五类（与账本 _classes 必须逐字一致）。 */
-const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfwitness'];
+// v2.529.0（缝合批 19 件）：新增第 6 类 `pending-wire`。理由：19 件外部缝合引擎已入库，
+//   功能面与专锁都在，但**产品消费点尚未接线**（谁会在什么时候读它，逐条写在 evidence 里）。
+//   这个状态既不是 readonly-api（不是刻意不读），也不是 stale（不是死面：有测试读点、有明确接线计划），
+//   硬塞进任一类都是失真。所以给它一个名字，并在纪律里加上时限（⑤：超过一个版本周期必须改判或补接线）。
+const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfwitness', 'pending-wire'];
 /** 零读 ns 的既有基数（v2.380.0 基线读数；变化必须显式改这里并写清原因）。
  *  v2.409.0 跟位：35 → 38。v2.407.0「三缝 + 七主线」新增引擎（director / fact-continuity /
  *  branch-continuity / summarizer-adapter / reading-bookmark / stage-session / memory-relay 等）
  *  带来 3 个新的「产品源面零读」ns（stage / summarizerAdapter / readingBookmark 等，
  *  由 module-cycle-gate 现场 deadNs 实测 38 条），账本 entries 已逐条定性补登；
  *  与门禁 deadNs 双向一致已由 B 组判据复核。 */
-const BASE_DEAD_NS = 47;   // v2.524.0 跟位：38 → 47（+9）。
+// v2.529.0（缝合批 19 件）：47 → 66（+19）。这 19 条**是本批引入的**（每件一个新命名空间），
+//   与 v2.524.0 那次「+9 不是本批引入」的情形不同 —— 所以这次必须逐条登记，
+//   不能像上次那样只解释来源。19 条的 cls 全是 pending-wire，evidence 写明消费点归属。
+const BASE_DEAD_NS = 66;   // v2.529.0 跟位：47 → 66（+19，缝合批）。
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。
@@ -106,13 +113,16 @@ function runA(A) {
   });
 
   const dis = L._discipline;
-  A(Array.isArray(dis) && dis.length === 4, 'A4 纪律恰 4 条（实 ' + (Array.isArray(dis) ? dis.length : 'N/A') + '）');
+  // v2.529.0（缝合批）：纪律 4 → 5（新增 ⑤ pending-wire 的时限条款）。
+  A(Array.isArray(dis) && dis.length === 5, 'A4 纪律恰 5 条（实 ' + (Array.isArray(dis) ? dis.length : 'N/A') + '）');
   A(Array.isArray(dis) && dis.some(function (s) { return /禁止改账本销账/.test(s); }),
     'A4b 纪律含「stale 不得替代 dead-export-ledger，禁止改账本销账」');
   A(Array.isArray(dis) && dis.some(function (s) { return /未定性/.test(s) && /计红/.test(s); }),
     'A4c 纪律含「新增零读 ns 未登记 ⇒ 报未定性并计红」');
   A(Array.isArray(dis) && dis.some(function (s) { return /双向一致/.test(s); }),
     'A4d 纪律含「账本键集与门禁 deadNs 双向一致」');
+  A(Array.isArray(dis) && dis.some(function (s) { return /pending-wire/.test(s) && /时限|一个版本周期/.test(s); }),
+    'A4e 纪律含「pending-wire 有时限：超一个版本周期必须补接线或改判 stale」');
 
   const E = L.entries || {};
   const keys = Object.keys(E);
@@ -148,7 +158,8 @@ function runA(A) {
   // 为什么这条必须跟着改而不是放宽成「大于等于」：这条断言的作用是逼每次升版时
   // 显式确认「零读面的面真的变了、并且我写了原因」，一旦放宽成范围判断，
   // 账本版本忘了升也能绿，这条门禁就退化成装饰。
-  A(L.version === '2.524.0', 'A10 账本 version === 2.524.0（实 ' + L.version + '）');
+  // v2.529.0 跟位：账本已随缝合批升版（entries 47→66），断言跟位到 2.529.0。
+  A(L.version === '2.529.0', 'A10 账本 version === 2.529.0（实 ' + L.version + '）');
 }
 
 // ────────────────────────────── B 运行时一致性 ──────────────────────────────

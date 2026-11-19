@@ -1192,6 +1192,29 @@ const LOAD = [
   'engines/call-timeline.js',        // OPV26-4 单轮调用时间线
   'engines/model-catalog.js',        // OPV26-5 模型清单拉取
   'engines/degrade-audit.js',        // OPV26-6 降智行为面审计
+  // v2.529.0（缝合批，19 件）：nekotools 7 件 A + 3 件 B、RedBird-Tools 6 件 A + 3 件 B。
+  //   全部是**纯函数**：不读别人的账、不写盘、不挂 fetch/渲染钩子，也没有别的引擎消费它们，
+  //   所以装载位置没有依赖约束 —— 统一放段末，避免打断上面按批次「一行多条」的分组。
+  //   进 LOAD 是**硬要求**：专锁要用真 API 把这些函数跑出来，没装就整段静默跳过。
+  'engines/api-vault.js',
+  'engines/card-file.js',
+  'engines/chat-guard.js',
+  'engines/contrast.js',
+  'engines/floor-census.js',
+  'engines/floor-favorites.js',
+  'engines/floor-hide.js',
+  'engines/floor-scrub.js',
+  'engines/green-keys.js',
+  'engines/import-kind.js',
+  'engines/macro-guard.js',
+  'engines/mixed-index.js',
+  'engines/msg-align.js',
+  'engines/setup-plan.js',
+  'engines/slot-format.js',
+  'engines/store-merge.js',
+  'engines/story-export.js',
+  'engines/stream-gate.js',
+  'engines/write-serial.js',
   'compat/host.js', 'compat/mvu.js', 'compat/th-helper.js'
 ];
 for (const rel of LOAD) {
@@ -22605,6 +22628,10 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //     它锁的是「读不到 ≠ 一切正常」这条口径：上游全缺席必须 unknown（不是 clean），
     //     真有截断/降智/漂移必须逐条说出来并进正文块，单个 owner 抛错不许一错全空。
 await runScript('./story-window-evidence-v2518.js');
+    // v2.529.0（外部仓库缝合批）：19 件引擎分两批缝入，各配一份专锁（nekotools 10 件 / RedBird-Tools 9 件），每件一处真破坏负控制（锚点未命中同样记红）；详见两份专锁文件头。
+    // 形态：纯脚本体，走 runScript 档；不登记 ⇒ test-surface-gate 判 unregistered-orphan。
+    await runScript('./stitch-nekotools-v2529.js');
+    await runScript('./stitch-redbird-v2529.js');
     // v2.408.0（OPV23-9）：分层回归调度器专锁 —— 四级金字塔「每档真跑它声称的那件事」。
     //   为什么必须登记：不登记 ⇒ tests/test-surface-gate.js 判 unregistered-orphan、
     //   segment-extract-v2400 的 C4b/C4e 同红，且本锁**从未在全量里跑过**。

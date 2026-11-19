@@ -5,15 +5,17 @@
     "readonly-api": "对外诊断/自证读口，产品源面**刻意**不读：由 tests、宿主（SillyTavern）、或人读诊断面消费。零读是设计，不是缺陷。",
     "stale": "真死面：无产品读点、无测试读点、无运行时消费方。已在 tests/dead-export-ledger.json 受控冻结，本账本只做指向，不抢那份账。",
     "derived-handle": "同一函数的第二句柄（主句柄已在 WA.<ns>.<method> 上）。保留是为了向后兼容，产品面只用主句柄 ⇒ 零读是预期的。",
-    "gate-selfwitness": "模块自身的出口面自证位（__ 前缀）：形状不符时写进去供人读，正常运行期恒为 null/缺席。产品面不读它是**正确**的 —— 它被读的那一刻就是缺陷已发生。"
+    "gate-selfwitness": "模块自身的出口面自证位（__ 前缀）：形状不符时写进去供人读，正常运行期恒为 null/缺席。产品面不读它是**正确**的 —— 它被读的那一刻就是缺陷已发生。",
+    "pending-wire": "功能面已落地、但产品消费点**尚未接线**（本批次是外部缝合件入库）。零读是当前事实，不是设计：每条的 evidence 必须写清「谁会在什么时候读它」，接线完成后必须删除本行（留着会被 ④ 判为过期登记）。不许拿它当 stale 的替代品 —— stale 要进 dead-export-ledger。"
   },
   "_discipline": [
     "① 每条必须给出可复算证据（provider 文件 + 消费方类型 + 复算命令口径）。",
     "② stale 类必须在 dead-export-ledger 有对应条目；本账本不得替代那份账（禁止改账本销账）。",
     "③ 新增零读 ns 而本账本未登记 ⇒ 门禁报『未定性』并计红（不许当成 0 条边蒙过去）。",
-    "④ 本账本的键集与门禁 deadNs 读数双向一致：门禁多一个 → 未定性；账本多一个 → 过期登记。"
+    "④ 本账本的键集与门禁 deadNs 读数双向一致：门禁多一个 → 未定性；账本多一个 → 过期登记。",
+    "⑤ pending-wire 是**有时限**的定性：只用于「缝合件已入库、接线是下一步」的中间态。若某条 pending-wire 超过一个版本周期仍无人读，必须改判 stale（进 dead-export-ledger）或补消费点，不许靠改 evidence 文字续命。"
   ],
-  "version": "2.524.0",
+  "version": "2.529.0",
   "entries": {
     "LEAK_THRESHOLD": {
       "cls": "gate-selfwitness",
@@ -296,6 +298,120 @@
       "provider": "engines/divination-craft.js",
       "evidence": "v2.524.0 EXV27-9 巫觋占卜与拆字。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
       "recompute": "grep -n 'divinationCraft' tests/scenario-v71-v27-money-night-fire.js | head -2"
+    },
+    "apiVault": {
+      "cls": "pending-wire",
+      "provider": "engines/api-vault.js",
+      "evidence": "IndexedDB + AES-GCM 的密钥仓（不可导出 CryptoKey）。消费方应是「填 API Key 的设置面」：存/取/删都走它；当前设置面还没接，故零读。",
+      "recompute": "grep -rn \"apiVault\" engines core ui tests | head"
+    },
+    "cardFile": {
+      "cls": "pending-wire",
+      "provider": "engines/card-file.js",
+      "evidence": "角色卡 PNG/JSON 直读（tEXt 块、卡摘要、世界书指纹）。消费方应是「导入前识别与重复卡检测」，导入流程还没接。",
+      "recompute": "grep -rn \"cardFile\" engines core ui tests | head"
+    },
+    "chatGuard": {
+      "cls": "pending-wire",
+      "provider": "engines/chat-guard.js",
+      "evidence": "存档防覆盖守卫（读失败时拦存盘）。消费方应是宿主的保存路径：现在保存路径还没有守卫，故零读。",
+      "recompute": "grep -rn \"chatGuard\" engines core ui tests | head"
+    },
+    "contrast": {
+      "cls": "pending-wire",
+      "provider": "engines/contrast.js",
+      "evidence": "WCAG 对比度与背景压暗量。消费方应是界面配色/背景图那层：配色当前是手挑常量，没接体检。",
+      "recompute": "grep -rn \"contrast(\" engines core ui tests | head"
+    },
+    "floorCensus": {
+      "cls": "pending-wire",
+      "provider": "engines/floor-census.js",
+      "evidence": "未发楼层普查（该发却没发）。消费方应是「提示词读数/诊断面板」：读数面还没接这一项。",
+      "recompute": "grep -rn \"floorCensus\" engines core ui tests | head"
+    },
+    "floorFavorites": {
+      "cls": "pending-wire",
+      "provider": "engines/floor-favorites.js",
+      "evidence": "楼层收藏（waxFavorite 只动 extra、不存盘）。消费方应是楼层操作菜单，菜单还没接。",
+      "recompute": "grep -rn \"floorFavorites\" engines core ui tests | head"
+    },
+    "floorHide": {
+      "cls": "pending-wire",
+      "provider": "engines/floor-hide.js",
+      "evidence": "楼层双层隐藏（waxHiddenByData / waxHiddenByVisual 分离）。消费方应是楼层渲染与上下文构建，两处都还没接。",
+      "recompute": "grep -rn \"floorHide\" engines core ui tests | head"
+    },
+    "floorScrub": {
+      "cls": "pending-wire",
+      "provider": "engines/floor-scrub.js",
+      "evidence": "楼层文本清洗（三形态规则、swipe/display 同步口径）。消费方应是清洗面板与导出，都还没接。",
+      "recompute": "grep -rn \"floorScrub\" engines core ui tests | head"
+    },
+    "greenKeys": {
+      "cls": "pending-wire",
+      "provider": "engines/green-keys.js",
+      "evidence": "世界书绿灯短关键词。消费方应是「写世界书条目」的各处（现在都是塞整句标题）；接线要逐个写点改。",
+      "recompute": "grep -rn \"greenKeys\" engines core ui tests | head"
+    },
+    "importKind": {
+      "cls": "pending-wire",
+      "provider": "engines/import-kind.js",
+      "evidence": "从 JSON 形状认文件类型。消费方应是所有导入入口（现在靠后缀/按钮），还没接。",
+      "recompute": "grep -rn \"importKind\" engines core ui tests | head"
+    },
+    "macroGuard": {
+      "cls": "pending-wire",
+      "provider": "engines/macro-guard.js",
+      "evidence": "副作用宏守卫。消费方是「请求预览 / 提示词归因」那条线 —— 那条线本身还没做（全仓无 {{ 宏处理），故零读。",
+      "recompute": "grep -rn \"macroGuard\" engines core ui tests | head"
+    },
+    "mixedIndex": {
+      "cls": "pending-wire",
+      "provider": "engines/mixed-index.js",
+      "evidence": "常驻混合索引（只列名字 + 40 字简报）。消费方应是上下文构建的常驻段，还没接。",
+      "recompute": "grep -rn \"mixedIndex\" engines core ui tests | head"
+    },
+    "msgAlign": {
+      "cls": "pending-wire",
+      "provider": "engines/msg-align.js",
+      "evidence": "最终 messages 与结构化消息列表对齐。消费方是提示词归因线（还没做），故零读。",
+      "recompute": "grep -rn \"msgAlign\" engines core ui tests | head"
+    },
+    "setupPlan": {
+      "cls": "pending-wire",
+      "provider": "engines/setup-plan.js",
+      "evidence": "进卡/离卡的设置恢复计划。消费方应是角色切换流程，流程还没接。",
+      "recompute": "grep -rn \"setupPlan\" engines core ui tests | head"
+    },
+    "slotFormat": {
+      "cls": "pending-wire",
+      "provider": "engines/slot-format.js",
+      "evidence": "存档位命名与解析（UTF-8 字节预算）。消费方应是存档位读写，还没接。",
+      "recompute": "grep -rn \"slotFormat\" engines core ui tests | head"
+    },
+    "storeMerge": {
+      "cls": "pending-wire",
+      "provider": "engines/store-merge.js",
+      "evidence": "设置文件合并（每条谁新留谁 + 墓碑）。消费方应是设置持久化层，还没接。",
+      "recompute": "grep -rn \"storeMerge\" engines core ui tests | head"
+    },
+    "storyExport": {
+      "cls": "pending-wire",
+      "provider": "engines/story-export.js",
+      "evidence": "纯正文导出（剥块/宏/HTML）。消费方应是导出按钮与「复制正文」，还没接。",
+      "recompute": "grep -rn \"storyExport\" engines core ui tests | head"
+    },
+    "streamGate": {
+      "cls": "pending-wire",
+      "provider": "engines/stream-gate.js",
+      "evidence": "流式标签闸门。消费方应是流式渲染入口 —— 本文件**刻意不装 fetch hook**（装 hook 需要产品接线时再做），故零读。",
+      "recompute": "grep -rn \"streamGate\" engines core ui tests | head"
+    },
+    "writeSerial": {
+      "cls": "pending-wire",
+      "provider": "engines/write-serial.js",
+      "evidence": "世界书写回串行队列 + 配置条目纪律。消费方应是世界书写回点（现在没有统一写回点），故零读。",
+      "recompute": "grep -rn \"writeSerial\" engines core ui tests | head"
     }
   }
 }
