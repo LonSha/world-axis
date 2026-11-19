@@ -3,15 +3,15 @@
 > 由 `node tools/plan-ledger.js --write` 从 `git log` 生成。手改会被
 > `node tools/plan-ledger.js --check` 点名（重算与盘上不一致 ⇒ 退出 1）。
 
-- 生成源：subject 提到 `OPV29-` 的提交 **18** 条 · 源摘要 `79be02c3903c`
+- 生成源：subject 提到 `OPV29-` 的提交 **19** 条 · 源摘要 `930c4243cc88`
 - 已交付 **23 / 36**，未交付 **13**
-- 欠账读数：区间号 1 · 无复算读数 4 · 形态不认识 0 · 重复声称 3
+- 欠账读数：区间号 1 · 无复算读数 5 · 形态不认识 0 · 重复声称 4
 
 ## Z1（已交付 4 / 6）
 
 | 项 | 提交 | 标题 | 复算读数 |
 | :--- | :--- | :--- | :--- |
-| OPV29-01 | `a51e564` | feat(worldaxis): OPV29-01 锁级分片并行 —— v2.82.0 单节 792.2s → 263.6s（省 66.7%，27 项） | 7 条：`node tests/opv29-z1-01-v2529.js ⇒ pass (27)` |
+| OPV29-01 | `8874b46` | chore(worldaxis): 台账回填 —— 已交付 23/36，计划读数 tests/*.js 602 → 603（+ OPV29-01 锁级分片：按节 4.1% / N= | **缺（recompute:false）** |
 | OPV29-02 | `5c1a186` | feat(worldaxis): OPV29-02 增量回归 —— 改了什么只跑哪些锁，不知道就退回全量（20 项） | **缺（recompute:false）** |
 | OPV29-03 | `f7b2835` | feat(worldaxis): OPV29-03 隔离器瘦身 —— 35.5M→32.0M，三条铁律不许瘦错（22 项） | 7 条：`node tests/opv29-z1-03-v2529.js ⇒ pass (22)` |
 | OPV29-06 | `d755c54` | chore(worldaxis): 台账回填 —— 已交付 22/36，计划读数 tests/*.js 601 → 602（+ OPV29-06 门禁实测：七快 19.5s / 慢 | **缺（recompute:false）** |

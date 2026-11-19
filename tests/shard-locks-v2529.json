@@ -1,26 +1,22 @@
 {
   "ver": 1,
-  "note": "OPV29-01 锁级分片账本：每把锁「能不能在子进程里独立判」由现场实测决定，不是猜的。并行段必须经 tools/lock-child.js（rc=0 ≠ 判了：本仓 11 把锁没有 require.main 块）；判据逐条回灌宿主，条数 ≠ 子进程自报即红。",
+  "note": "OPV29-01 锁级分片账本：每把锁「能不能在子进程里独立判」由现场实测决定，不是猜的。并行段必须经 tools/lock-child.js（rc=0 ≠ 判了：本仓 11 把锁没有 require.main 块）；判据逐条回灌宿主，条数 ≠ 子进程自报即红。 并行/串行划分以 tests/shard-locks-v2529.json 为单一真源；test-surface-gate 的 shardEdges 只在「工具真 spawn lock-child + 子入口存在 + 账本可解析」三样都在时才认这条边。",
   "groups": {
     "v2.82.0 checkpoints snapshots-discipline lock": {
       "sharedSection": "v2.82.0 checkpoints snapshots-discipline lock (lib-outside-state x guard-key x branch-must-land x wiring)",
       "sharedMs": 792224,
       "sharedCriteria": 2843,
       "parallelMs": 263600,
-      "parallelCriteria": 2072,
-      "parallelPrintedRows": 2714,
-      "serialCriteria": 37,
-      "inSectionInlineCriteria": 92,
+      "parallelCriteria": 2019,
+      "parallelPrintedRows": 2661,
+      "serialCriteria": 91,
+      "inSectionInlineCriteria": 91,
       "measuredAt": "2026-11-19",
-      "source": "实测：共享世界该节 ⏱ 792.22s（回归日志 /tmp/worldaxis-regression-gNKneb/run.log，38 把顺序挂载）；36 把经 tools/lock-child.js 8 路并行墙钟 263.6s（三次实测 244/244/263.6s）。判据三口径：并行段回灌行 2714 + 串行段 37（b6-b7 37✓1✗、state-repair 首判即崩 0）= 2751；与共享世界该节 2843 差 92 条，是节内内联 assert 与非常规方法（如 runCompat）的判据，未搬走、仍留宿主。",
+      "source": "实测：共享世界该节 ⏱ 792.22s（回归日志 /tmp/worldaxis-regression-gNKneb/run.log，38 把顺序挂载）；34 把经 tools/lock-child.js 8 路并行（jobs=8）并行后单节实跑 ⏱ 445.64s（日志 /tmp/worldaxis-regression-1ntXPt/run.log），并行段墙钟 263.6s（三次 244/244/263.6）；串行 4 把：b6-b7（顺序依赖 38 行）、state-repair（首判即崩）、settle-v2841（额外方法 runCompat）、render-pre-v2108（宿主内前置 + aWire 锚点要求 run.js 保留真挂载行，实测 42 条/13.154s）。判据三口径：并行回灌行 2661 + 串行 91 = 2752；与共享世界 2843 差 91 条，即节内内联 assert 未搬走、仍留宿主执行。",
       "parallel": [
         {
           "file": "settle-v2820.js",
           "criteria": 160
-        },
-        {
-          "file": "settle-v2841.js",
-          "criteria": 11
         },
         {
           "file": "settle-v2850.js",
@@ -151,10 +147,6 @@
           "criteria": 88
         },
         {
-          "file": "render-pre-v2108.js",
-          "criteria": 42
-        },
-        {
           "file": "settle-v2830.js",
           "criteria": 55
         }
@@ -167,8 +159,20 @@
         {
           "file": "state-repair-v2108.js",
           "why": "独立跑崩溃 rc=2：`Cannot read properties of undefined (reading 'store')` @tests/state-repair-v2108.js:89 —— 读的全局 store 由共享宿主提供"
+        },
+        {
+          "file": "settle-v2841.js",
+          "why": "该节对它的调用是 runAll + runNegative + runCompat（额外方法）；lock-child 默认入口只跑前两个，并行会漏 runCompat 的判据 ⇒ 保守留串行。实测独立跑 rows=11 / 34.9s。"
+        },
+        {
+          "file": "render-pre-v2108.js",
+          "why": "切换后现场实测两条红：①它自己的 aWire 锚点要求 run.js 里恰出现 1 次 `await require('./render-pre-v2108.js').runAll(assert)`，移进子进程后实 0；②它在宿主内给后续锁装前置，移走后 v2870 的 [B7-F] 实收回 0 个（应 1）。⇒ 两个入口必须留在宿主串行、且先于数组执行。实测 42 条 / 13.154s / 0 红。"
         }
-      ]
+      ],
+      "serialMsEst": 48054,
+      "sectionAfterMs": 344600,
+      "totalAfterMs": 344600,
+      "savedPct": 56.5
     }
   }
 }

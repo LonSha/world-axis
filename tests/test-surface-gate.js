@@ -248,6 +248,50 @@ function wrappedOf(src, files) {
   return out;
 }
 
+/**
+ * 并行账本边（v2.529.0 / OPV29-01）：`tests/shard-locks-v2529.json` 里登记、且由
+ * `tools/shard-locks.js` → `tools/lock-child.js` 以子进程执行的锁，也构成**真执行入口**。
+ *
+ * 为什么必须补这条：`v2.82.0 checkpoints …` 一节约 792.2s，38 把锁顺序挂载；拆成
+ * 「36 把并行 + 2 把串行」后，那 36 个文件名不再出现在 `runLock('./x.js')`/`require('./x.js')`
+ * 里（它们在清单数组 + 账本里），于是本门禁会把它们全判 orphan —— 判据面比现场窄，
+ * 不是产品有洞（与本节 v2.528.0 那条「spawn 别名」教训同族）。
+ *
+ * 防假绿（缺一不可）：
+ *   ① 工具必须真 spawn 子进程，且**点名** `lock-child`（不是随便 spawn 一下）；
+ *   ② `lock-child` 必须存在且自带执行入口（`module.exports` 与主流程）；
+ *   ③ 账本必须是可解析 JSON 且登记了锁文件名。
+ *   只有三样都在，账本里的名字才算边；否则返回空（宁可不认，也不让「往 JSON 里塞个名字」变可达）。
+ */
+/** 读一个相对路径：虚拟面里优先，缺失时回落真仓库（tools/ 不在 vfs 的扫描面内，见 v 的构建处）。 */
+function readRel(vfs, rel) {
+  if (vfs && typeof vfs[rel] === 'string') return vfs[rel];
+  try { return fs.readFileSync(path.join(BASE, rel), 'utf8'); } catch (e) { return null; }
+}
+function shardEdges(vfs) {
+  const LED = 'tests/shard-locks-v2529.json';
+  const TOOL = 'tools/shard-locks.js';
+  const CHILD = 'tools/lock-child.js';
+  const ledTxt = readRel(vfs, LED);
+  const tool = readRel(vfs, TOOL);
+  const child = readRel(vfs, CHILD);
+  if (!ledTxt || !tool || !child) return [];
+  if (!SPAWN_CALL.test(tool) || tool.indexOf('lock-child') < 0) return [];
+  if (!/module\.exports/.test(child)) return [];
+  let j;
+  try { j = JSON.parse(ledTxt); } catch (e) { return []; }
+  const out = [];
+  Object.keys((j && j.groups) || {}).forEach(function (g) {
+    const it = j.groups[g] || {};
+    (it.parallel || []).concat(it.serial || []).forEach(function (x) {
+      const name = (typeof x === 'string') ? x : (x && x.file);
+      if (!name) return;                     // 解析不出文件名的不许进图（否则会造出 tests/ 这种假边）
+      const rel = 'tests/' + String(name);
+      if (out.indexOf(rel) < 0) out.push(rel);
+    });
+  });
+  return out;
+}
 /** 可达性：从 run.js 出发的 require 图 BFS + 执行入口（spawn / 内联）作为并列根。 */
 function buildReach(vfs) {
   const files = Object.keys(vfs).sort();
@@ -260,6 +304,11 @@ function buildReach(vfs) {
     graph[rel] = mine.filter(function (r) { return files.indexOf(r) >= 0; });
   });
   const hasRun = files.indexOf(RUN_REL) >= 0;
+  // 并行账本边并入 run.js 的出边（见 shardEdges 注释）：它们由 run.js 的 shard 段驱动。
+  if (hasRun) {
+    const sh = shardEdges(vfs).filter(function (r) { return (graph[RUN_REL] || []).indexOf(r) < 0; });
+    if (sh.length) graph[RUN_REL] = (graph[RUN_REL] || []).concat(sh);
+  }
   const ent = hasRun ? entriesOf(text(RUN_REL), files) : { direct: [], wrapped: [], spawned: [], inline: [], spawnLines: 0 };
   const roots = (hasRun ? [RUN_REL] : []).concat(ent.spawned, ent.inline);
   const reached = {};

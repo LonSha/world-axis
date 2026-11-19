@@ -52,32 +52,55 @@ function runA() {
   a(new Set(files).size === files.length, 'A6 并行/串行互斥（无一把同时在两边）', String(files.length));
   const zero = it.parallel.filter(function (x) { return !(x.criteria > 0); }).map(function (x) { return x.file; });
   a(zero.length === 0, 'A7 并行段每把都有判据（空转锁不许进并行段；零判据：' + (zero.join(',') || '无') + '）');
-  const whyBad = it.serial.filter(function (x) { return !/FAIL|崩/.test(String(x.why)); }).map(function (x) { return x.file; });
-  a(it.serial.length === 2 && whyBad.length === 0,
+  const whyBad = it.serial.filter(function (x) { return !/FAIL|崩|额外方法|前置/.test(String(x.why)); }).map(function (x) { return x.file; });
+  a(it.serial.length === 4 && whyBad.length === 0,
     'A8 串行段每把都带现场证据（' + it.serial.length + ' 把 · 无凭据：' + (whyBad.join(',') || '无') + '）');
-  a(it.parallelCriteria === 2072 && it.parallelPrintedRows === 2714 && it.serialCriteria === 37,
+  a(it.parallelCriteria === 2019 && it.parallelPrintedRows === 2661 && it.serialCriteria === 91,
     'A9 三口径读数入账（assert ' + it.parallelCriteria + ' / 行 ' + it.parallelPrintedRows + ' / 串行 ' + it.serialCriteria + '）');
   a(it.sharedCriteria - (it.parallelPrintedRows + it.serialCriteria) === it.inSectionInlineCriteria,
     'A10 差额可解释：' + it.sharedCriteria + ' − (' + it.parallelPrintedRows + ' + ' + it.serialCriteria + ') = '
       + it.inSectionInlineCriteria + ' 条节内内联判据（未搬走）');
-  // 账本 vs run.js 实际挂载清单（防「方案与真跑的节」漂移）
+  // 账本 vs run.js 实际挂载面（防「方案与真跑的节」漂移）：两种形态都要认 ——
+  //   并行段：`const __V82_PARALLEL = [ './x.js', … ]` 里的字面量；
+  //   串行段：`runLock('./x.js', …)` / `require('./x.js').m(…)` 的调用。
   const src = fs.readFileSync(path.join(root, 'tests/run.js'), 'utf8');
   const lines = src.split('\n');
   const begin = lines.findIndex(function (l) { return l.indexOf("section('v2.82.0 checkpoints") >= 0; });
   let end = lines.length;
   for (let i = begin + 1; i < lines.length; i++) { if (/^\s*section\('/.test(lines[i])) { end = i; break; } }
   const span = begin < 0 ? '' : lines.slice(begin, end).join('\n');
-  const inRun = new Set();
-  const re = /runLock\('\.\/([A-Za-z0-9._-]+\.js)'|require\('\.\/([A-Za-z0-9._-]+\.js)'\)\./g;
+  const arrStart = span.indexOf('const __V82_PARALLEL = [');
+  const arrEnd = arrStart < 0 ? -1 : span.indexOf('];', arrStart);
+  const arrText = arrStart >= 0 && arrEnd > arrStart ? span.slice(arrStart, arrEnd) : '';
+  const inArray = new Set();
+  const reArr = /'\.\/([A-Za-z0-9._-]+\.js)'/g;
   let m;
-  while ((m = re.exec(span)) !== null) inRun.add(m[1] || m[2]);
-  const missing = files.filter(function (f) { return !inRun.has(f); });
-  const extra = Array.from(inRun).filter(function (f) { return files.indexOf(f) < 0; });
-  a(begin >= 0 && span.length > 0 && missing.length === 0 && extra.length === 0,
-    'A11 账本与该节在 run.js 的实际挂载清单严格一致（漏 ' + missing.length + ' / 多 ' + extra.length + '）',
-    'run.js 里 ' + inRun.size + ' 把');
+  while ((m = reArr.exec(arrText)) !== null) inArray.add(m[1]);
+  const inCalls = new Set();
+  const re = /runLock\('\.\/([A-Za-z0-9._-]+\.js)'|require\('\.\/([A-Za-z0-9._-]+\.js)'\)\./g;
+  while ((m = re.exec(span)) !== null) inCalls.add(m[1] || m[2]);
+  const missingP = it.parallel.map(function (x) { return x.file; }).filter(function (f) { return !inArray.has(f); });
+  const extraP = Array.from(inArray).filter(function (f) { return it.parallel.every(function (x) { return x.file !== f; }); });
+  const missingS = it.serial.map(function (x) { return x.file; }).filter(function (f) { return !inCalls.has(f); });
+  const extraS = Array.from(inCalls).filter(function (f) { return it.serial.every(function (x) { return x.file !== f; }); });
+  a(begin >= 0 && inArray.size > 0 && missingP.length === 0 && extraP.length === 0,
+    'A11 并行段：run.js 的 __V82_PARALLEL 与账本 parallel 严格一致（漏 ' + missingP.length + ' / 多 ' + extraP.length + '）',
+    'run.js 数组里 ' + inArray.size + ' 把');
+  a(missingS.length === 0 && extraS.length === 0,
+    'A12 串行段：run.js 的 runLock/require 调用与账本 serial 严格一致（漏 ' + missingS.length + ' / 多 ' + extraS.length + '）',
+    '调用面 ' + Array.from(inCalls).join(','));
+  // A14（v2.529.0 事故固化）：串行理由必须带**实测数字证据**，不许只写“依赖顺序”。
+  //   来源：切换那轮把 render-pre-v2108 挪进并行段，当场出现两条红 —— 它自己的 aWire 锚点
+  //   （要求 run.js 里恰 1 次真挂载行）变 0，下游 v2870 的 [B7-F] 实收回 0 个（应 1）。
+  //   两条都是“宿主内前置被搬到子进程”的后果；仅在 why 里写“顺序依赖”防不住下次重犯。
+  const whyNum = it.serial.filter(function (x) {
+    const w = String(x.why || '');
+    return !(/\d/.test(w) && /实|实测|rc=|条|FAIL|行/.test(w));
+  }).map(function (x) { return x.file; });
+  a(whyNum.length === 0,
+    'A14 串行段每把的 why 都带现场读数（无数字证据：' + (whyNum.join(',') || '无') + '）');
   a(/rc=0\s*≠\s*判了|rc=0 不等于判了/.test(String(led.note || '')),
-    'A12 账本 note 写明「rc=0 不等于判了」这条教训');
+    'A13 账本 note 写明「rc=0 不等于判了」这条教训');
 }
 
 // ── B 回灌解析（纯函数，不给假绿开口子）──────────────────────────

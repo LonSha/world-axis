@@ -13763,7 +13763,10 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
     //   v2.382.0 回填（187 → 185）：与 v1700 段同源同因（撤除 humanRealism.log /
     //   routinePacing.history 两条零写点死容器登记）。两处必须同步改，否则本段与
     //   v1700 段会对同一个量给出两个不同的期望值 —— 那正是「同一份真源两处手抄」。
-    assert(rp.checked === 235, 'v2350: checked 精确值 235（v2.529.0 实测回填；与 v1700 段同源，集合面由 checkedKeys 双向核对；v2.409.0 同批两组引擎登记 15 条容量容器 ⇒ 185→200；v2.522.0 spatialTopology 三容器进骨架 ⇒ 201→204）');
+    // v2.529.0 第三次回填（235 → 236）：OPV29-26 的对账工具把 reading.marks 补登后，
+    //   v1700 段已改 236，本段（v2350）漏改 —— 全量回归当场点名「实 236 ≠ 期望 235」。
+    //   同一个量在仓库里出现两个期望值，就是「同一份真源两处手抄」的活证据：改一处必须同批改。
+    assert(rp.checked === 236, 'v2350: checked 精确值 236（v2.529.0 实测回填；与 v1700 段同源，集合面由 checkedKeys 双向核对；v2.409.0 同批两组引擎登记 15 条容量容器 ⇒ 185→200；v2.522.0 spatialTopology 三容器进骨架 ⇒ 201→204）');
     assert((rp.checkedKeys || []).indexOf('parallelWorld.snapshots') >= 0, 'v2350: snapshots 进精确键');
     assert((rp.checkedKeys || []).indexOf('evolution.ledger') >= 0, 'v2350: ledger 进精确键');
 
@@ -16461,17 +16464,55 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   信封单格式号、导入默认不覆盖、删档如实报 orphans；外加接线核验（四处接线同批，
   //   反向断言 store 骨架与容量表**不得**含 checkpoints——库不在骨架里）。
   section('v2.82.0 checkpoints snapshots-discipline lock (lib-outside-state x guard-key x branch-must-land x wiring)');
-  await runLock('./settle-v2820.js');
-  await runLock('./settle-v2820.js', 'runNegative');
+  // v2.529.0（锁级并行切换）现场实测的两条硬约束，写在这里不许再被「顺手挪进数组」：
+  //   ① render-pre-v2108 的两个入口**必须留在宿主进程里串行** —— 它在本节里给后续锁装宿主内前置；
+  //      移进 lock-child 子进程后，v2870 的 [B7-F]「清空题材连自己开的机制一并收回」实收回 0 个（应 1），
+  //      它自己的 aWire 锚点（要求在 run.js 里恰出现 1 次真挂载行）也当场变 0 ⇒ 两条真红。
+  //   ② 顺序也必须是原序（本段在数组之前）：前置先于依赖。
+  await require('./render-pre-v2108.js').runAll(assert);
+  await require('./render-pre-v2108.js').runNegative(assert);
+  const __V82_PARALLEL = [
+    './settle-v2820.js',
+    './settle-v2850.js',
+    './settle-v2860.js',
+    './identity-v2860.js',
+    './causal-view-v2870.js',
+    './cost-v2880.js',
+    './replay-v2890.js',
+    './explain-v2900.js',
+    './switch-matrix-v2910.js',
+    './resource-ledger-v2920.js',
+    './transit-v2930.js',
+    './journal-v2940.js',
+    './org-econ-v2950.js',
+    './hazard-weather-v2960.js',
+    './hazard-trigger-v2138.js',
+    './life-e8-v2139.js',
+    './faction-graph-v2139.js',
+    './collab-tasks-v2139.js',
+    './canon-deviation-v2139.js',
+    './noesis-v2140.js',
+    './lifeline-v2141.js',
+    './perspective-lock-v2142.js',
+    './duty-v2143.js',
+    './fidelity-v2144.js',
+    './rumor-v2960.js',
+    './phone-bridge-v2970.js',
+    './alias-trace-v2970.js',
+    './coord-v2970.js',
+    './tape-vol-v2980.js',
+    './canon-v2990.js',
+    './canon-align-v2100.js',
+    './interop-v2101.js',
+    './perf-trace-v2102.js',
+    './settle-v2830.js'
+  ];
+  await require('../tools/shard-locks.js').runParallel(assert, __V82_PARALLEL, { jobs: 8 });
   // v2.83.0（第三十七面）：模块契约（B4）+ 配置 schema/迁移（B6）。
   //   两者的判据都在这一份文件里（B4 的读数取自 module-registry-ledger.json，
   //   由 tests/module-registry-gate.js 实测产出 —— 静态扫描测不出「必须先装载」，
   //   见该门禁头部留档的两次失败）。
   //   render-pre 的 runAll 含一个 async 入口（theater.generate），须 await（与 settle-v2830 同规格）。
-  await require('./render-pre-v2108.js').runAll(assert);
-  await require('./render-pre-v2108.js').runNegative(assert);
-  await require('./settle-v2830.js').runAll(assert);
-  await require('./settle-v2830.js').runNegative(assert);
   // v2.84.0 A3 收口：**开关组合面**与**存档兼容**。
   //   为什么还要一把新锁：tests/inject-vis-v2580.js 已逐源证明「单开关真生效」，但它的
   //   probeAll 在每个源上只翻「该源自己」那一个开关、其余全开 —— 于是三类组合至今无判据：
@@ -16494,26 +16535,18 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   ③ B2：本版新增的两条边界**全是否定式**（层级只说明归属≠可达；路走得通≠现在走得动），
   //      而存在面判据（有 parent 字段吗 / 有 cap 字段吗）对它们一无所知——
   //      「有字段」与「字段被当成什么读」是两件事。
-  await runLock('./settle-v2850.js');
-  await runLock('./settle-v2850.js', 'runNegative');
   // v2.86.0（第四十面）：注入链韧性 + 失败分类（A5 第一部分）。
   //   实测：43 个源调用点里只有 style 一处在 try/catch 内 ⇒ 让 bonds 抛一次异常，
   //   47 个源**全部**丢失（连世界状态的时间/背景/人物一起消失），异常还冒泡出扩展。
   //   本锁把「源抛异常只丢该源 + 按显示名留痕 + 空串不计故障」做成可测事实。
-  await runLock('./settle-v2860.js');
-  await runLock('./settle-v2860.js', 'runNegative');
   // v2.86.0（第四十面）：事实唯一写者（A3）。
   //   实测：人物条目有五个创建点（life / intel 两处 / backstage 两处 / registry），
   //   各写各的 `draft.people[id] = {...}` ⇒ 「这个条目是谁建出来的」完全不可见。
   //   本锁把「创建只此一处 + 每次新建打来源标签 + 残点必带 fallback」做成可测事实。
-  await runLock('./identity-v2860.js');
-  await runLock('./identity-v2860.js', 'runNegative');
   // v2.87.0（第四十一面）：因果观测面 —— 当前状态与累计分列（B6）。
   //   实测：causal.stat() 是**进程累计**（刷新即零），而「这条链现在怎么了」
   //   此前只能逐条 classify —— tool-diag 与 ui/panel 读到的那个数既答不出
   //   「发生过几次」，也答不出「现在怎么样」。本锁把两份读数分列做成可测事实。
-  await runLock('./causal-view-v2870.js');
-  await runLock('./causal-view-v2870.js', 'runNegative');
   // v2.87.0（第四十二面，结束版）：导演工作台 + 题材组合 + 导入差异预览。
   //   实测缺口一：干预只能「执行再看结果」——预览与试演都不存在；
   //   实测缺口二：rules.js 的 16 模块全量注入，题材无从装卸；
@@ -16526,22 +16559,16 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   但**耗时**这一维从未被测量 —— 45 个源的注入链里，任何一处慢函数都只能以
   //   「反正有点慢」的体感存在。本锁把「计时落在唯一引擎出口」「账本主键是引擎真调过的源
   //   （而不是碰巧有内容的源）」「0ms 是低于精度不是很快」「分档不参与判定」做成可测事实。
-  await runLock('./cost-v2880.js');
-  await runLock('./cost-v2880.js', 'runNegative');
   // v2.89.0（第四十三面）：因果回放证据升级（O2）。
   //   本仓库从 v2.14.0 起就报 `reproducible`（种子是不是显式定的），但**没有任何地方
   //   能证明「这一轮真能重放」**——种子相同而调用顺序漂移时，它会安静地换一整套数。
   //   本锁把「磁带按位置记答案、错位被当场报出、回放不碰派生流、复核不擦掉证据、
   //   replayable 与 reproducible 分列」做成可测事实，并用三个真源码破坏点逐锚自证。
-  await runLock('./replay-v2890.js');
-  await runLock('./replay-v2890.js', 'runNegative');
   // v2.90.0（第四十四面）：每轮执行解释 —— 玩家面与全知面分列（O3）。
   //   实测缺口：`applyInjections` 逐段写 `if (vis.xx && WA.xx)`，于是「用户关的 / 模块没加载 /
   //   本轮没内容 / 构建抛异常」四种截然不同的局面，在存档上长得一模一样（都是「这个源没进正文」）。
   //   本锁把「源表逐项事后归因」「玩家面只给进了什么与还有几项没进（不剧透未落地源名）」
   //   「轮次不符照实拒答」「纯读不改存档」做成可测事实，并用三个真源码破坏点逐锚自证。
-  await runLock('./explain-v2900.js');
-  await runLock('./explain-v2900.js', 'runNegative');
   // v2.92.0（第四十五面）：因果与状态批量治理 —— 开关矩阵的两面真值 + 悬空身份引用（O4）。
   //   实测缺口：① 决定「源进不进正文」的是**两个开关相与**（渲染可见性 × 模块级总开关），
   //   而 settle-v2841 只翻了可见性那一面；勾着 longline 却关掉模块时产物零字节，
@@ -16551,8 +16578,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   本锁把「归因码新增 module-off（七态封闭）」「逐源两面对账（on/vis-off/mod-off/unavailable）」
   //   「悬空引用只报不删且点名到人」做成可测事实，并用四个真源码破坏点逐锚自证
   //   （其中负控制同时覆盖「静默报零」与「失去分辨力」两个方向）。
-  await runLock('./switch-matrix-v2910.js');
-  await runLock('./switch-matrix-v2910.js', 'runNegative');
   // v2.92.0（第四十六面）：资源账本健康面 —— 先落观测不落功能（O5）。
   //   实测缺口：`engines/org.js` 从 v2.54.0 起只有**累计计数**（grants / transfers / blocked），
   //   于是「某笔交易后存量 == 存量 ± 流量」这句话在此之前**不可判定**——计数只知道发生了
@@ -16560,8 +16585,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   本锁把「增量守恒（存量 ± 流量）」「被拒交易不记流水」「异常笔三类单列」「对账现形
   //   （绕过产品写路径的篡改必须被报出）」「挤出即记账」「纯读不改存档」做成可测事实，
   //   并用五个真源码破坏点逐锚自证（含「静默报零」与「失去分辨力」两个方向）。
-  await runLock('./resource-ledger-v2920.js');
-  await runLock('./resource-ledger-v2920.js', 'runNegative');
   // v2.93.0（第四十七面）：天气封锁联动 —— 三层通行判定（X4）。
   //   实测缺口：world.reach 只答「路通不通」，weather.effect 只答「耗时乘几」，
   //   两者从不交谈——于是「暴风雪封了乙镇：人过不去、货过不去，但口信送到了」
@@ -16570,8 +16593,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   本锁把「三层分列（person/goods/message）」「封锁归因带地点与天气名」
   //   「未登记天气不回落成晴也不回落成封锁」「关闭不是天气很差」做成可测事实，
   //   并用六个真源码破坏点逐锚自证（含「静默放行」与「静默掠过的不知」两向）。
-  await runLock('./transit-v2930.js');
-  await runLock('./transit-v2930.js', 'runNegative');
   // v2.94.0（第四十八面）：流水落盘与跨会话可查 —— 账本三面收口（O6 + O7 + O8）。
   //   实测缺口：三句话在 v2.93.0 都答不上来——① 「上一节会话里那笔之后存量对不对」
   //   （流水只驻内存，`reconcile` 在环形挤出后只能核**带内**）；② 「库存被写坏了吗」
@@ -16580,8 +16601,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   自相矛盾与存量背离」「卷不合规四态各自点名」「经济风三态不回落成『平稳』」
   //   「异常笔真的被健康分消费」「挤出期说清只核带内」做成可测事实，
   //   并用六个真源码破坏点逐锚自证（每个负控制都在破坏副本上重跑**同款判据**）。
-  await runLock('./journal-v2940.js');
-  await runLock('./journal-v2940.js', 'runNegative');
   // v2.95.0（第四十九面）：经济引擎 —— 职册 / 功簿 / 薪俸 / 欠薪 / 罚没（X2 · B3）。
   //   实测缺口：四句话在 v2.94.0 都答不上来——① 「这个组织里有谁、各任什么职」
   //   （org 从 v2.54.0 起只有库存与累计计数，没有名册）；② 「这一期该发多少、
@@ -16592,8 +16611,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   「发薪/补发/罚没走同一支 transfer 因而自动进 O5 流水、可被 O6 带外对账核」
   //   「欠就是欠：ok（流程跑完）与 settled（从此不欠谁）分开」做成可测事实，
   //   并用六个真源码破坏点逐锚自证（每个负控制都在破坏副本上重跑**同款判据**）。
-  await runLock('./org-econ-v2950.js');
-  await runLock('./org-econ-v2950.js', 'runNegative');
   // ── v2.96.0 两锁端到端 ──
   //   X6（hazard ↔ weather 联动）：判定面只读天气、四态如实（link-off / engine-absent /
   //   missing / ok + disabled 显式归成不可用）、硬下界 1、导出面零新增。
@@ -16601,8 +16618,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //     · 未给地点这一路原本不可达（`at` 空串被三目当假值吃掉 ⇒ 回执里根本不出现天气面读数）；
   //     · 天气总开关关闭时 `effect()` 返回 `{ok:true,factor:1,reason:'disabled'}`，
   //       原样转手会让「关闭」与「晴天」在回执里逐字相同——恰好是本版要防的那件事。
-  await runLock('./hazard-weather-v2960.js');
-  await runLock('./hazard-weather-v2960.js', 'runNegative');
   // ── E7（区域天气与灾害**深度**联动）：X6 只做了 hazard 读天气（判定面下调目标值），
   //   本版补上**反向**——恶劣天气自己长出风险账。三件事各自成判据：
   //     · 三个新拒收码分得开（triggered / already-open / below-threshold）——
@@ -16612,8 +16627,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //     · 只建账不动别人：天气表 / 天气计数 / 世界表字节级不变（观测不得改变被观测对象）。
   //   负控制九条（N1–N15）逐条真源码破坏 + 原版正控，其中 N13/N14 是**两层复合闸**：
   //   单破一层只能观测到它自己的那一面（照跑一圈 / 逐地如实报），没有第二层确认就不声称打穿。
-  await runLock('./hazard-trigger-v2138.js');
-  await runLock('./hazard-trigger-v2138.js', 'runNegative');
   // ── E8（人物推进公平性的**二阶**治理）：E4 把「位置决定命运」换了个排法，
   //   本版把组内定序交还随机源，并让**频率**成为可检验的读数。四条判据各自成证：
   //     · 定序可复现（同种子同序、跨种子不止一种）——走 `WA.rand`，不用 `Math.random()`；
@@ -16623,8 +16636,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //       一个人「非常平均」是恒真句；
   //     · 静默降级才是缺陷（退回环形是逃生阀）⇒ 判据落在「throws 有没有涨」。
   //   负控制六条 + 原版正控 + 渲染真探针（点人物页签 → 真跑渲染 → 点结算读输出行）。
-  await runLock('./life-e8-v2139.js');
-  await runLock('./life-e8-v2139.js', 'runNegative');
   // ── E9（势力关系动态图）：全库此前**没有**势力间成对关系数据（`f.relation` 是「该势力对
   //   主视角的态度」，不是「甲对乙」）⇒ 本版把边定为**推导值**（`derived` + 逐条 `basis`），
   //   绝不把两个都「敌对」主视角的势力画成互相敌对。四条判据各自成证：
@@ -16634,8 +16645,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //       与 `nodes`（进图了）、`heat.unknowns`（不知道）与 `hostiles: 0`（知道是零）**三处不可合并**；
   //     · 面板四种「没算成」情形一律显式报出，不留空面板。
   //   负控制六条（含正控制段：同款判据在原版上必须为假）+ 面板真渲染 + 诊断真读者。
-  await runLock('./faction-graph-v2139.js');
-  await runLock('./faction-graph-v2139.js', 'runNegative');
   // ── E10（协作任务与违约）：collab 原有四张表（sessions/claims 答「谁在开会话、谁占着哪个
   //   角色」，queue/conflicts 答「排了什么待重放、两端分歧怎么判」）**一个字都没说**
   //   「几个人约好一起做一件事、到点各人做到没有」。本版新开第五张表 `tasks`。四条判据各自成证：
@@ -16647,8 +16656,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //       `SITES`：只在登记表登、执行表漏登 ⇒ `evict.array` 走 unknown-site **静默失败**
   //       （调用方以为挤过了，表无限增长）——本版实测补上的正是这一处。
   //   负控制八条（含正控制段：同款判据在原版上必须为假）+ 面板真渲染 + 诊断真读者。
-  await runLock('./collab-tasks-v2139.js');
-  await runLock('./collab-tasks-v2139.js', 'runNegative');
   // ── E11（剧情偏离度量化）：v2.100.0 的 align 三口答「撞上了什么」，**不判偏离** ——
   //   本版补上「偏了多少」（score ∈ [0,1]）。四条口径各自成证：
   //     · **只报不改**（源码级可核：deviation / deviationTrend 体内零 store.transact）；
@@ -16656,8 +16663,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //     · `spread`（散不散）与 `lag`（快不快）**各自成数**——合并后两种偏法同分；
   //     · 阈值**不改分**（调低告警线 ⇒ score 逐字不变，只有 over 翻转）。
   //   负控制五条（含正控制段：同款判据在原版上必须为假）+ 面板真渲染 + 诊断真读者。
-  await runLock('./canon-deviation-v2139.js');
-  await runLock('./canon-deviation-v2139.js', 'runNegative');
   // ── F1（v2.140.0，防全知闸门）：仓库已有六个信息不对称零件（enigma 知情名单 / intel 来源置信 /
   //   rumor 传播降级 / masks 假面 / probe 卷宗 / shadow 共同隐瞒）—— 各自都很硬，但都是「记账员」，
   //   没有一个在「正文生成前」当「守门员」。rules.js 的「知情路径铁律」是给模型的软约束，没有引擎判据兜底。
@@ -16670,13 +16675,9 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //     · **只读不改世界**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）；
   //       leakScan 检出穿帮只留痕不删文（删文是叙事决定，不是引擎决定）。
   //   负控制五条（含正控制段：同款判据在原版上必须为假）+ 面板真渲染 + 诊断真读者。
-  await runLock('./noesis-v2140.js');
-  await runLock('./noesis-v2140.js', 'runNegative');
   // v2.141.0（F2）：时点与注意力闸门 + 生理与照护真实层。
   //   与上面各锁同规格：runAll 与 runNegative 各跑一遍，判据上交宿主（否则锁在回归里
   //   既不计数、又读 a.product 直接抛——v2.140.0 首版实测过的形态）。
-  await runLock('./lifeline-v2141.js');
-  await runLock('./lifeline-v2141.js', 'runNegative');
   // v2.142.0（F3）：视角锁 —— 「这一笔该不该现在由这个视角写」。
   //   与 noesis 是两个真源、不可合并：noesis 答「他知道吗」，本模块答「这一笔该不该由他交代」；
   //   一个人完全可能知道，却不该由当前视角写。
@@ -16688,8 +16689,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   out-of-lens 补共视角 / interior-blocked 换渠道或删句；lens-leak 是留痕码不是拒收码。
   //   同规格：runAll 与 runNegative 各跑一遍，判据上交宿主（锁自带 fresh 并上交，
   //   否则在回归里既不计数、又直接抛）。
-  await runLock('./perspective-lock-v2142.js');
-  await runLock('./perspective-lock-v2142.js', 'runNegative');
   // v2.143.0（F4）：在岗闸门 —— 「在职 ≠ 在岗」。
   //   与 knows 是两个真源、不可合并：knows 答「他知道吗」，本口答「他此刻在不在岗」；
   //   人下班了，知道的事不会忘掉（把 off-duty 塞进 knows 的否决面会把「他在休假」
@@ -16699,8 +16698,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   三态封闭：任职面缺席 ⇒ known:false（**不冒充「不在岗」**）。
   //   同规格：runAll 与 runNegative 各跑一遍，判据上交宿主（锁自带 fresh 并上交，
   //   否则在回归里既不计数、又直接抛）。
-  await runLock('./duty-v2143.js');
-  await runLock('./duty-v2143.js', 'runNegative');
   // v2.144.0（F5）：记忆失真面 —— 「记着 ≠ 记对」。
   //   治的病：rumor 早就记着 intact / tampered / drift 三个读数，但消费方**只有作者面**
   //   （panel 链详情 / tool-diag 计数），**裁决面完全不知道「他记的是不是原版」**——
@@ -16712,15 +16709,11 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   拿累积值会把「改写在传给他之后才发生」误判成「他手里的也变了」。
   //   同规格：runAll 与 runNegative 各跑一遍，判据上交宿主（锁自带 fresh 并上交，
   //   否则在回归里既不计数、又直接抛）。
-  await runLock('./fidelity-v2144.js');
-  await runLock('./fidelity-v2144.js', 'runNegative');
   // ── X3（传播与辟谣）：四层显式分层、一事实一链、改层不许升格、
   //   未声明的改写一律拒收、intact 累积不可恢复、玩家面只出公开层、全知视图进诊断。
   //   面板段（B17）同样是真消费：起链后 id 回填必须活到下一次点击——
   //   本轮实测的正是「回填被紧随的 renderBody() 抹掉」这条：输出留得住、id 留不住，
   //   紧接着的转述/调查就当场变成 missing-fields。面板侧已改为「id 与输出同源缓存 + 起链不重建」。
-  await runLock('./rumor-v2960.js');
-  await runLock('./rumor-v2960.js', 'runNegative');
   // ── v2.97.0（第五十面 / X5）：跨插件因果桥（入站边）—— 手机侧动作进世界台账 ──
   //   入站是**显式动作**（不猜、不轮询）；绝不覆盖世界状态，只写 causal.phoneOps；
   //   按 opId 幂等；不认识的动作拒收而不是吞掉；能力缺席如实降级；可追溯靠真源比对。
@@ -16730,20 +16723,12 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   O10 回放语义坐标：坐标是**标记出来的**不是猜的（无人标记照实报 null，不编默认轮次）；
   //   只在录制时落格（回放不写磁带）；`n` 是位置真源、坐标是附加语义层，两者分列——
   //   「第 7 格对不上」与「第 2 轮 causal.tick 段第 3 步对不上」是两句不同的话。
-  await runLock('./phone-bridge-v2970.js');
-  await runLock('./phone-bridge-v2970.js', 'runNegative');
-  await runLock('./alias-trace-v2970.js');
-  await runLock('./alias-trace-v2970.js', 'runNegative');
-  await runLock('./coord-v2970.js');
-  await runLock('./coord-v2970.js', 'runNegative');
   // ── v2.98.0（第五十五面 / P2）：磁带卷跨会话可查 —— 导出 / 校验 / 带外核对 ──
   //   到此为止「可复现」的证据面全在进程内（磁带只驻内存），上一节会话那一轮抽取对不对跨会话不可判定。
   //   本版补上另一半：显式导出（纯读）+ 带外核对（零状态触碰），与 v2.94.0 O6 的流水卷同规格。
   //   最贵的一条是**位置真源照搬**：每格的 `n` 由录制时现算，导出与核对都**不重算**——
   //   重算会把「导出」变成一次改写，被手改过的位置会被洗白成「自洽」，于是「这卷被动过」永远说不出口。
   //   故核对把位置链与值链**分列**（posBroken 答「被改过」，outcome 答「值链是否与种子相符」），互不掩盖。
-  await runLock('./tape-vol-v2980.js');
-  await runLock('./tape-vol-v2980.js', 'runNegative');
   // ── v2.99.0（第五十六面）：原著幕目 —— 把长文本切成可定位的「幕 → 剧情点」骨架 ──
   //   本仓叙事状态全是**世界侧**的，「原著里本该长什么样」此前零输入面；于是
   //   「现在演到原著哪一段了」只能靠人记，「已偏离哪一段」「哪一段不可能再发生」连基准都没有。
@@ -16754,8 +16739,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   先截点再分幕）、坐标越界**照实不成立而不夹到边界**（夹了就说不出「你指的这段不存在」）。
   //   两处自纠留在锁内：诊断节若改用会改 stat 的入口，「看一眼」就变成「动了一下」；
   //   `pick` 加固成全域总之后，用怪异输入撞内部异常的老写法会静默变成假绿。
-  await runLock('./canon-v2990.js');
-  await runLock('./canon-v2990.js', 'runNegative');
   // ── v2.100.0（第五十七面）：原著对位 —— 拿世界侧已发生的事去撞幕目题名 ──
   //   上一面只交了「基准」（幕目骨架），于是「现在演到哪一幕了」仍只能靠人记。
   //   本面补上「可观测的那一半」，并把五条最容易被顺手破坏的口径逐条钉住：
@@ -16766,8 +16749,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //        仍要报原著总幕数）；⑤ 幕号越界照实不成立（夹到边界等于说了一句假话）。
   //   另有一条自纠留在锁内：evidence 是**重叠**二字窗，拼起来不等于原短语——
   //   最初的 `evidence.join('') === 短语` 是恒假判据（长得像绿灯的那种坏判据）。
-  await runLock('./canon-align-v2100.js');
-  await runLock('./canon-align-v2100.js', 'runNegative');
   // ── v2.101.0（第五十八面）：跨插件互操作验收面 —— 「装了没」与「装对了没」是两件事 ──
   //   前面的面全是**本扩展内部**的自洽性（模块契约 / 存档 / 读面口径 / 原著对位），
   //   而本扩展真正的运行前提是**三个外部件**：SillyTavern+TavernHelper 宿主、
@@ -16783,8 +16764,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   `WA.settingsBus.orphanSettingsKeys()`（真源在 `store`，settingsBus 上无此口），
   //   `try/catch` 把 ReferenceError 吞成 `-1` ⇒ 恒报「-1 个幽灵键」而没人发现。
   //   静态面判据（A1–A6）不做负控制：它们读的是**真文件文本**，破坏必须真写坏源码（见专锁 N2）。
-  await runLock('./interop-v2101.js');
-  await runLock('./interop-v2101.js', 'runNegative');
   // ── v2.102.0（A2/O12）：性能基线与分层增量 —— 「快不快」与「变了才不算」都要能被核对 ──
   //   上一面（O11）治的是「装了没 / 装对了没」，本面治的是**同一件事在时间轴上的另一半**：
   //   注入链每轮把全部源重建一遍，而「哪些源真受影响」「冷启一次要多久」此前都无从判定；
@@ -16795,8 +16774,6 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   （只比「缓存 vs 缓存」是自指的，恒真 ⇒ 判据必须对**独立再算一遍**的那份）。
   //   一条自纠留在锁内：`ensure` 不计时（计时归调用方）——两处都计一遍会让同一笔账进两个桶，
   //   而那种失真在读数上完全看不出来（两边都「有数」）。
-  await runLock('./perf-trace-v2102.js');
-  await runLock('./perf-trace-v2102.js', 'runNegative');
   // ── v2.100.0（第五十七面）：出口面增量 / 数据面位置 / 见证面 —— 三处都在「跑得动」上面 ──
   //   本面新增四个模块口（canon: alignView / gap / position / signal），全部接真消费方
   //   （面板两枚「按号」入口 + 诊断节只读 + 对位读数），出口面契约随之 members 668→672、
