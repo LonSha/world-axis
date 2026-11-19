@@ -49,7 +49,13 @@ const PANEL = 'ui/panel.js', RUNJS = 'tests/run.js', INDEX = 'index.js';
 const LK = 'lonsha_memory_bridge_v1', RP = 'worldaxis_phone_ops_v1';
 let PASS = 0, FAIL = 0;
 const a = (ok, msg) => { if (ok) PASS++; else { FAIL++; console.log('  ✗ ' + msg); } };
-function src(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function src(rel) {
+  // OPV29-07：注册表 / 可选面名单 / UI_BINDINGS 守卫表已出闸到 engines/tool-diag-tables.js。
+  //   判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」⇒ 读「引擎+表」合并面
+  //   （tests/diag-source.js，同一处置见 tests/economy-v2119.js / canon-v2990.js）。
+  if (rel === 'engines/tool-diag.js') return require('./diag-source.js')();
+  return fs.readFileSync(path.join(ROOT, rel), 'utf8');
+}
 function hits(s, x) { return s.split(x).length - 1; }
 function must1(s, x, tag) { const n = hits(s, x); if (n !== 1) throw new Error('anchor hits != 1 (' + n + ') :: ' + tag); return n; }
 // ══════════════ 真源码破坏锚点（各自恰中 1 次）══════════════

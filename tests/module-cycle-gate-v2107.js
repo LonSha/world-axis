@@ -434,7 +434,9 @@ function runAll(A) {
   //   v2.529.0（缝合批 19 件）：装载期边 +19（每件的 registerModule 尾调 1 条）；
   //   调用期 +1（新件合计 2×19 条调用期引用里，1 条落到已有命名空间... 实测为 3961 → 3962）。
   //   合计 4401 → 4422。恒等式仍成立（460 + 3962 = 4422）。
-  A(a.edgesLoad === 463 && a.edgesCall === 3963 && a.edgesAll === 4426 && a.identityOk,
+  //   v2.529.0 收口：store-merge 的墓碑老化改走 clockWall ⇒ 多一条 WA.clock.wallNow() 调用期读
+  //   ⇒ 调用期 3963 → 3964、合计 4426 → 4427（恒等式 463 + 3964 = 4427 当场核对）。
+  A(a.edgesLoad === 463 && a.edgesCall === 3964 && a.edgesAll === 4427 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'

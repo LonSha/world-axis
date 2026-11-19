@@ -56,7 +56,13 @@ const INJECT = path.join(BASE, 'render/inject.js');
 const DIAG = path.join(BASE, 'engines/tool-diag.js');
 const PANEL = path.join(BASE, 'ui/panel.js');
 const NL = String.fromCharCode(10);
-function src(p) { return fs.readFileSync(p, 'utf8'); }
+function src(p) {
+  // OPV29-07：注册表 / 可选面名单 / UI_BINDINGS 守卫表已出闸到 engines/tool-diag-tables.js。
+  //   判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」⇒ 读「引擎+表」合并面
+  //   （tests/diag-source.js，同一处置见 tests/economy-v2119.js / canon-v2990.js）。
+  if (p === DIAG) return require('./diag-source.js')();
+  return fs.readFileSync(p, 'utf8');
+}
 function budgetSrc() { return src(BUDGET); }
 const ANCHOR_MAIN = 'Object.keys(cs || {}).forEach(function (name) {';
 const ANCHOR_SUB = 'const sub = (raw === 0 && runs > 0);';

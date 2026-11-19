@@ -125,7 +125,10 @@ const SRC = fs.readFileSync(ABS, 'utf8');
 const WSRC = fs.readFileSync(WABS, 'utf8');
 const XSRC = fs.readFileSync(XABS, 'utf8');
   /** 按锚点声明的 rel 取该文件当前文本（三处锚点分布在三个文件里）。 */
-  const srcOf = function (rel) { return rel === REL ? SRC : (rel === WREL ? WSRC : (rel === WXREL ? XSRC : fs.readFileSync(path.join(BASE, rel), 'utf8'))); };
+  // OPV29-07：诊断表（注册表 / 可选面名单 / UI_BINDINGS）已出闸到 engines/tool-diag-tables.js
+  //   ⇒ 该文件读「引擎+表」合并面（锚点问的是「产品里有没有这条」，不是「它写在哪个文件」）。
+  const srcOf = function (rel) { if (rel === 'engines/tool-diag.js') return require('./diag-source.js')();
+    return rel === REL ? SRC : (rel === WREL ? WSRC : (rel === WXREL ? XSRC : fs.readFileSync(path.join(BASE, rel), 'utf8'))); };
   const absOf = function (rel) { return path.join(BASE, rel); };
 
   // ── 装配：真源码 or 破坏副本（同一台装载机；破坏只发生在内存副本上）──
