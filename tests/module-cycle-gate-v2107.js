@@ -269,7 +269,10 @@ function runAll(A) {
   //   都尾调 registerModule 且都被各自的算法引擎静态读（WA.injectBudgetTables /
   //   WA.rejectRecoveryTables）⇒ 文件面 / 别名各 +2、「有引用」同步 +2。
   //   实测回填：562/562/560 → 564/564/562（node -e audit 直读）。
-  A(a.files === 564 && a.aliasFiles === 564 && a.refFiles === 562,
+  // v2.529.0（V29 OPV29-11）：三个表文件入场（backstage-protocols 167 行 / world-lab-tables 66 行 /
+  //   world-tables 61 行），都尾调 registerModule 且都被各自的引擎静态读 ⇒ 562/562/560 → 564/564/562
+  //   → 本轮 567/567/565（三件各 +1 文件、+1 别名、+1 有引用）。实测回填。
+  A(a.files === 567 && a.aliasFiles === 567 && a.refFiles === 565,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -414,7 +417,9 @@ function runAll(A) {
   // v2.529.0（V29 OPV29-10/09）：两个表文件都被算法引擎静态读（+2 调用期边），
   //   且各尾调 registerModule（+2 装载期边，见 module-registry-gate 账本 430）⇒ 实测回填
   //   426/3936/4362 → 430/3938/4368。恒等式仍由本判据当场核对（不靠人算）。
-  A(a.edgesLoad === 430 && a.edgesCall === 3938 && a.edgesAll === 4368 && a.identityOk,
+  // v2.529.0（V29 OPV29-11）：三表登记各 +1 装载期边、三引擎读表各 +1 ⇒ 430 → 436；
+  //   调用期不变（3938）；合计 4368 → 4374。恒等式仍由判据当场核对。
+  A(a.edgesLoad === 436 && a.edgesCall === 3938 && a.edgesAll === 4374 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -497,7 +502,7 @@ function runAll(A) {
   // v2.524.0（V27 拓展线）：LOAD_ORDER 506 → 515（九台引擎入序，实测回填）。
   // v2.524.0（V27 优化线）：LOAD_ORDER 516 → 521（本批新增的五个 OPV27 模块入序，实测回填）。
   // v2.529.0（V29 OPV29-10/09）：两个表文件入序（LOAD_ORDER 561 → 563，实测回填）。
-  A(a.edgesLoad >= 20 && a.orderLen === 563,
+  A(a.edgesLoad >= 20 && a.orderLen === 566,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -551,7 +556,9 @@ function runAll(A) {
   // v2.529.0（V29 OPV29-10/09）：两个表 ns 同时进静态提供方、账本（module-registry-gate
   //   --update 落定 553）与读面（各自的算法引擎静态读）⇒ 三面 605/551/562 → 607/553/564。
   //   差额 607-553=54 与回填前**相同**：两个 ns 三面同步增长，漂移口径不动（B6 常量不改）。
-  A(a.nsProvided === 607 && a.nsLedger === 553 && a.nsRead === 564,
+  // v2.529.0（V29 OPV29-11）：三个表 ns 同时进静态提供方、账本（--update 落定 556）与读面
+  //   ⇒ 607/553/564 → 610/556/567。差额 610-556=54 与回填前**相同**（三面同步增长，B6 常量不动）。
+  A(a.nsProvided === 610 && a.nsLedger === 556 && a.nsRead === 567,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。

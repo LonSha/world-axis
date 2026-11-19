@@ -440,7 +440,7 @@ const LOAD = [
   //   同一 vm 上下文里跑，且 act.js / world.js 在调用期经 WA.exec 取值；装载面没给它模块，
   //   两条路径会各自静默降级成「一律按真世界执行」（专锁的隔离判据因而不成立却不报错）。
   'core/exec.js',
-  'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/inline-tags.js', 'engines/periodicals.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
+  'engines/backstage-protocols.js', 'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/inline-tags.js', 'engines/periodicals.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget-tables.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js', 'engines/kaleidoscope.js',
   // v2.50.0（第三十五面）: 宿主两侧 + 时间轴三账。
@@ -701,7 +701,7 @@ const LOAD = [
   // v2.63.0：世界织体 / 社交漩涡 / 悬案。位置与 index.js LOAD_ORDER 同序
   //   （world 须晚于 life.js —— 到场者名单的唯一证据是人物自己的 life.schedule；
   //    三者都须早于 render/inject.js 的消费点）。
-  'engines/world.js', 'engines/weather.js', 'engines/difficulty.js', 'engines/shadow.js', 'engines/threads.js',
+  'engines/world-tables.js', 'engines/world.js', 'engines/weather.js', 'engines/difficulty.js', 'engines/shadow.js', 'engines/threads.js',
  'engines/offstage-queue.js', 'engines/act-step.js', 'engines/trace-post.js', 'engines/misbelief.js', 'engines/thread-sprout.js', 'engines/dormant-ladder.js', 'engines/consequence-schedule.js', 'engines/appointment.js', 'engines/time-ledger.js', 'engines/hearsay-ledger.js', 'engines/far-account.js', 'engines/interlude.js', 'engines/letter-post.js', 'engines/world-brief.js', 'engines/narrative-preset.js', 'engines/world-loop-log.js', 'engines/cost-guard.js', 'engines/continuity-guard.js', 'engines/controllability.js', 'engines/story-rhythm.js',
   // v2.97.0（X3）：传播与辟谣。位置与 index.js LOAD_ORDER 同序
   //   （须晚于 memory.js/intel.js：事实真源与置信度反查都指向那两处；须早于 render/inject.js 消费点）。
@@ -999,6 +999,7 @@ const LOAD = [
   //   必须进 LOAD：专锁（s3-b3-e9-v2188）与面板门禁（ui-gate-sync 的 fresh 按本表装载）
   //   都要在同一 vm 上下文里装载它；它的三条路径执行面（rehearsal.run）真跑依赖 exec 的
   //   沙箱上下文，而那个上下文只有在真装载的同一条链上才建得起来。
+  'engines/world-lab-tables.js',
   'engines/world-lab.js',
   // v2.230.0（拓展 N12）：十枚新引擎，与 index.js LOAD_ORDER 同序。
   //   必须进 LOAD：专锁要在同一 vm 上下文里装载它们；ui-gate-sync 的 fresh 也按本表。
@@ -22584,23 +22585,19 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   另：--json 在未 --measure 时 attributable 必须为 false（静态面不许冒充首屏读数）——这条由 C2 钉住。
     //   读数：专锁 pass (21) · 冷开 42 / 静态 1794 = 2% · 34 页 · 首屏 46 · --check rc=0。
     await runScript('./opv29-z1-05-v2529.js');
-    // v2.529.0（V29 优化线 Z1）：OPV29-10 inject-budget 拆段（科目表与算法分离）—— 14 项。
-    //   病：计划要「按注册表/诊断/面板三块拆，保留原导出面」，验收「预算读数不变」。
-    //   拆前 engines/inject-budget.js 1425 行里混着 573 行**纯声明**（源优先级 / 成本分档 / 科目归类）
-    //   与一千多行算法：改一条 rank 要在算法里翻，想知道「哪些源算世界骨架」也没有独立真源。
-    //   做法：新增 engines/inject-budget-tables.js（600 行，零算法，只挂 WA.injectBudgetTables），
-    //   引擎降到 863 行，求值期先取表；**缺表/空表当场抛错**（不静默退化成空表 ——
-    //   空表会让「pinned 绝不静默丢弃」静默失效，比崩溃危险）。
-    //   次序硬约束：index.js LOAD_ORDER 与 tests/run.js LOAD **两份表同序双登记**，tables 在引擎之前。
-    //   实测现场：表载荷 3 块 · PRIORITY 163 键 / 科目行 163 行 · 导出面 23 键逐字不变 ·
-    //   引擎零表字面量 · plan() kept 2 / dropped 0 / folded 0 · costOf(20)=long · 未归类 0。
-    //   连带修的四处真源（都是拆段后当场红的）：settle-v2850 的 rank 破坏锚点改指表文件、
-    //   round-cost-v2269 直 require 改为先表后引擎、cost-v2880 的隔离装载 files 补上表文件、
-    //   tools/tx4_smoke.js 的 PRIORITY 断言改读表文件；计划表两处读数回填（engines 504→505、inject-budget 98K→55K）。
-    //   实测负控制两组（都是真破坏现场）：把一行源优先级表塞回引擎 ⇒ FAIL 1/14（A4 红）；
-    //   拿掉缺表守卫（改成静默空表兜底）⇒ FAIL 3/14（B1/B2/C2 红：rc 从 1 变 0）；逐字还原后均回到 pass (14)。
-    //   读数：专锁 pass (14) · 引擎 1425→863 行 / 新表文件 600 行 · 装载边 561→562 · plan-readings pass(16)。
+    // v2.529.0（V29 Z1）：OPV29-10 inject-budget 拆段（科目表与算法分离）—— 14 项。
+    //   1425 行里 573 行是纯声明（源优先级表 163 行 + 科目行），与一千多行算法混在一起；搬到
+    //   engines/inject-budget-tables.js（600 行零算法），引擎降到 863 行，求值期先取表，
+    //   缺表/空表当场抛错（静默空表会让「pinned 绝不静默丢弃」失效，比崩溃危险）。
+    //   双登记同序；连带修 settle-v2850 rank 锚点、round-cost-v2269 / cost-v2880 先表后引擎、
+    //   tx4_smoke PRIORITY 改读表；计划表回填 engines 504→505、inject-budget 98K→55K。
+    //   负控制两组（真破坏）：一行 rank 表塞回引擎 ⇒ FAIL 1/14；守卫换静默兜底 ⇒ FAIL 3/14。
+    //   读数：专锁 pass (14) · 引擎 863 行 / 表 600 行 · 装载边 561→562 · plan-readings 16。
     await runScript('./opv29-z1-10-v2529.js');
+    // v2.529.0（V29 Z1）：OPV29-11 backstage / world-lab / world 三件拆段（契约文本与封闭词表出闸）—— 36 项。
+    //   三件 1140 / 1281 / 1333 行，三表 167 / 66 / 61 行（零具名函数，尾调 registerModule 进账本）。
+    //   负控制（真破坏）：CHANNELS 字面量回流引擎 ⇒ FAIL 1/36；拿掉 world-lab 缺表守卫 ⇒ FAIL 2/36；还原回 pass (36)。
+    await runScript('./opv29-z1-11-v2529.js');
     // v2.529.0（V29 Z1）：OPV29-09 reject-recovery 拆段（账本与判定分离）—— 19 项。
     //   1388 行里 1162 行（84%）是冻结表（七块：三面快照 1682/139/84 等），搬到
     //   engines/reject-recovery-tables.js（1204 行纯数据、零具名函数），引擎降到 244 行；

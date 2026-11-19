@@ -51,6 +51,10 @@ const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
 const ENG_REL = 'engines/world-lab.js';
+/** OPV29-11：语汇常量与 settings 登记表（MAX_ROUNDS / DEF_SIM_ROUNDS / SIM_ROUND_MS /
+ *  MAX_AHEAD / LS_KEY / DEF）已搬到 engines/world-lab-tables.js —— 这些锚点跟着去那边。
+ *  判据本身不变：仍然要求锚点在目标文件里恰中 1 次（A12），仍然要求它是内部常量而非 bounds。 */
+const TAB_REL = 'engines/world-lab-tables.js';
 const SELF_REL = 'tests/s3-y9-v2203.js';
 // v2.401.0（OPV23 拆段遗留红·同族第九次）：`ui/panel.js` 走 panel-source 的**重组面**
 //   —— 本锁的切片锚点（Y8/Y9 渲染段、N7 的两段）与 `wa-wl-*` / `wa-wl-adv*` 控件
@@ -99,10 +103,10 @@ const ANCHOR = {
   note: '       <div class="wa-dim">v2.203.0（Y9）四件事：',
   out: '       <div id="wa-wl-out" class="wa-out"></div>'
 };
-const TGT = { simCap: ENG_REL, simDefault: ENG_REL, simRoundMs: ENG_REL, maxAhead: ENG_REL,
+const TGT = { simCap: TAB_REL, simDefault: TAB_REL, simRoundMs: TAB_REL, maxAhead: TAB_REL,
   simRoundOf: ENG_REL, roundTag: ENG_REL, simulate: ENG_REL, report: ENG_REL, adopt: ENG_REL,
   beats: ENG_REL, chainCall: ENG_REL, pushFact: ENG_REL, adoptPool: ENG_REL, staleFlag: ENG_REL,
-  withCtx: ENG_REL, simFace: ENG_REL, writesSingle: ENG_REL, lskey: ENG_REL, def: ENG_REL,
+  withCtx: ENG_REL, simFace: ENG_REL, writesSingle: ENG_REL, lskey: TAB_REL, def: TAB_REL,
   statFace: ENG_REL, exportsFace: ENG_REL, note: PANEL_REL, out: PANEL_REL };
 /** 本模块偏好键**键名**（⚠ ANCHOR.lskey 是源码声明行、不是键名）。 */
 const LSKEY = 'worldaxis_world_lab_settings_v1';
@@ -128,7 +132,8 @@ function runAll(a) {
   require(path.join(BASE, 'tests/mock.js'));
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
   const LS = global.localStorage;
-  const P = rd(PANEL_REL), D = rd(DIAG_REL), E = rd(ENG_REL), SELF = rd(SELF_REL);
+  const P = rd(PANEL_REL), D = rd(DIAG_REL), E = rd(ENG_REL), SELF = rd(SELF_REL),
+    T = rd(TAB_REL);   // OPV29-11：语汇常量与 settings 登记表所在的表文件
   function env0(ov) { return gate.fresh(ov ? { srcOverride: ov } : {}); }
   function seed(WA) {
     WA.store.init();
@@ -203,9 +208,9 @@ function runAll(a) {
   a(codeSeg.indexOf('WA.worldLab.simulate(') >= 0 && codeSeg.indexOf('WA.worldLab.report(') >= 0
     && codeSeg.indexOf('WA.worldLab.adopt(') >= 0 && codeSeg.indexOf('WA.worldLab.beats(') >= 0,
     'y9v2203/A5c: 去注释后四口真读口**带括号**在场（防自我指涉：判据不许把自己删掉）');
-  a(E.indexOf(ANCHOR.simCap) > 0 && E.indexOf(ANCHOR.simDefault) > 0,
+  a(T.indexOf(ANCHOR.simCap) > 0 && T.indexOf(ANCHOR.simDefault) > 0 && E.indexOf(ANCHOR.simCap) < 0,
     'y9v2203/A6: 轮数上限与默认轮数是**内部常量**（不进 bounds —— bounds 管设置键，它管入参夹取）');
-  a(E.indexOf(ANCHOR.simRoundMs) > 0 && E.indexOf(ANCHOR.maxAhead) > 0,
+  a(T.indexOf(ANCHOR.simRoundMs) > 0 && T.indexOf(ANCHOR.maxAhead) > 0 && E.indexOf(ANCHOR.simRoundMs) < 0,
     'y9v2203/A6b: 每轮拨多久 / 最多投影几拍也是内部常量（两处都不冒充设置）');
   a(E.indexOf(ANCHOR.simRoundOf) > 0 && E.indexOf('Math.max(1, Math.min(MAX_ROUNDS, Math.floor(n)))') > 0,
     'y9v2203/A6c: 夹取集中在**一个** simRoundOf（不在三处各写一遍上下限）');
@@ -228,7 +233,8 @@ function runAll(a) {
     'y9v2203/A8c: 每一轮的推进都在**隔离上下文**里跑（ex.withContext —— 真跑与试演同一路径）');
   a(E.indexOf(ANCHOR.simFace) > 0 && E.indexOf(ANCHOR.writesSingle) > 0,
     'y9v2203/A9: 口径回带四栏（simCap / simDefault / beatAheadCap / writesSingle）');
-  a(E.indexOf(ANCHOR.lskey) >= 0, 'y9v2203/A9b: 偏好键是单一真源');
+  a(T.indexOf(ANCHOR.lskey) >= 0 && cnt(T, LSKEY) === 1,
+    'y9v2203/A9b: 偏好键是单一真源（表文件里声明一次，且引擎里不再另有一份）');
   a(E.indexOf(ANCHOR.statFace) > 0, 'y9v2203/A9c: stat 面回带 sim 三栏（hasSim / simRows / hasReport）—— 诊断面读它');
   a(E.indexOf(ANCHOR.exportsFace) > 0, 'y9v2203/A9d: 导出面以 diagnose / stat 收口（页面真走的口）');
   a(P.indexOf(SEG_RENDER_START) > 0 && P.indexOf('启用世界实验室') > 0,

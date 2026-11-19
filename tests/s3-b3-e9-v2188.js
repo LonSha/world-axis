@@ -71,13 +71,17 @@ function fakeLS() {
  * 合成宿主：真 settingsBus + 真 inputGuard + **真 store**。
  *   `extra` 用来放隔离执行面（exec / rehearsal / blueprint / depCheck）。
  */
-function hostWith(src, extra) {
+function hostWith(src, extra, tabSrc) {
   const c = synthHost.negativeContext({});
   const __ls = fakeLS();
   c.window.localStorage = __ls;
   vm.runInContext(readOf('core/settings-bus.js'), c, { filename: 'core/settings-bus.js' });
   vm.runInContext(readOf('core/store.js'), c, { filename: 'core/store.js' });
   vm.runInContext(readOf('core/input-guard.js'), c, { filename: 'core/input-guard.js' });
+  // OPV29-11：world-lab 的语汇常量与 settings 登记表已拆到 engines/world-lab-tables.js，
+  // 隔离宿主里也必须先装表（否则引擎求值期抛「词表未装载」—— 那是守卫在按设计工作）。
+  vm.runInContext(tabSrc === undefined ? readOf('engines/world-lab-tables.js') : tabSrc,
+    c, { filename: 'engines/world-lab-tables.js' });
   vm.runInContext(src, c, { filename: REL });
   const WA = c.window.WorldAxis;
   try { WA.store.init(); } catch (e) { /* 已初始化 */ }
@@ -150,6 +154,8 @@ function a(cond, name) { if (cond) { pass++; console.log('  ✓ ' + name); } els
 // ── A 段：静态契约 ─────────────────────────────────────────────────────
 function runA(a) {
   const src = srcOf();
+  // OPV29-11：语汇常量与 settings 登记表已拆到表文件 —— 静态契约判据改读合并面
+  const srcAll = src + '\n' + readOf('engines/world-lab-tables.js');
   const body = exportBody(src);
   a(body.length > 0, 'e9/A1: 能从真源码取出 WA.worldLab 的对象字面量体');
   KEYS.forEach(function (k) {
@@ -160,13 +166,13 @@ function runA(a) {
     const re = new RegExp('\\b' + k + '\\s*:');
     a(!re.test(body), 'e9/A3: 导出面**没有** ' + k + '（反事实不回溯覆盖存档 / 不倒带）');
   });
-  a(/const DEF = \{ enabled: true, maxSteps: 6, armA: '', armB: '' \}/.test(src),
+  a(/const DEF = \{ enabled: true, maxSteps: 6, armA: '', armB: '' \}/.test(srcAll),
     'e9/A4: 默认关 + 步数上限 + 两条路径槽声明逐字在位');
-  a(/bounds: \{ maxSteps: \[1, 12\] \}/.test(src), 'e9/A5: 步数区间声明逐字在位');
-  a(/LS_KEY = 'worldaxis_world_lab_settings_v1'/.test(src), 'e9/A6: 设置键是单一真源');
-  a(/module: 'worldLab'/.test(src), 'e9/A7: 设置登记 module 为 worldLab');
-  a(/const ARMS = \['hold', 'a', 'b'\]/.test(src), 'e9/A8: 三条路径是封闭集（hold / a / b）');
-  a(/const HOLD_STEP = \{ kind: 'wait', who: '世界', ms: 0 \}/.test(src),
+  a(/bounds: \{ maxSteps: \[1, 12\] \}/.test(srcAll), 'e9/A5: 步数区间声明逐字在位');
+  a(/LS_KEY = 'worldaxis_world_lab_settings_v1'/.test(srcAll), 'e9/A6: 设置键是单一真源');
+  a(/module: 'worldLab'/.test(srcAll), 'e9/A7: 设置登记 module 为 worldLab');
+  a(/const ARMS = \['hold', 'a', 'b'\]/.test(srcAll), 'e9/A8: 三条路径是封闭集（hold / a / b）');
+  a(/const HOLD_STEP = \{ kind: 'wait', who: '世界', ms: 0 \}/.test(srcAll),
     'e9/A9: hold 臂那一步逐字在位（wait 是三个动作里唯一零状态面写入的一个）');
   // 边界① 零写：只在**剥掉注释与字符串**的代码面上查（模块头正是在讲这条边界）
   const codeNoStr = codeNoStrOf(src);   // 判据工具单一真源（A/C 两段共用）
@@ -553,11 +559,13 @@ function runB(a) {
 // ── C 段：接线面 ───────────────────────────────────────────────────────
 function runC(a) {
   const src = srcOf();
-  a(src.indexOf('bounds: {') >= 0, 'e9/C1: 设置区间声明（settingsBus 越界夹回的前提）');
+  // OPV29-11：设置登记表已搬到 world-lab-tables.js ⇒ C1/C4 读「引擎 + 表」合并面
+  const srcAll = src + '\n' + readOf('engines/world-lab-tables.js');
+  a(srcAll.indexOf('bounds: {') >= 0, 'e9/C1: 设置区间声明（settingsBus 越界夹回的前提）');
   a(src.indexOf('WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);') >= 0,
     'e9/C2: 设置键走 __settingsRegs 登记');
   a(src.indexOf('WA.registerModule') >= 0, 'e9/C3: 装载期自注册（模块图需要）');
-  a(/module: 'worldLab'/.test(src), 'e9/C4: 设置登记的 module 与命名空间同名');
+  a(/module: 'worldLab'/.test(srcAll), 'e9/C4: 设置登记的 module 与命名空间同名');
   a(/WA\.clock \? WA\.clock\.now/.test(src), 'e9/C5: 时间走决策时钟守卫（G20 时间源治理）');
   a(src.indexOf('WA.inputGuard.text') >= 0, 'e9/C6: 参数经 inputGuard 收口');
   // 它读到 store 的**唯一**一处在 liveDigest 里（且只读）
@@ -624,7 +632,8 @@ function runN(a) {
     { n: 1, why: 'N1: 默认开被翻成关 ⇒ 出厂即缺一面（v2.412.0 全开策略跟位：方向反转）',
       from: "  const DEF = { enabled: true, maxSteps: 6, armA: '', armB: '' };",
       to: "  const DEF = { enabled: false, maxSteps: 6, armA: '', armB: '' };",
-      probe: function (__src) { const WA = hostWith(__src, LAB()); return WA.worldLab.getSettings().enabled; },
+      tab: true,
+      probe: function (__src, __tab) { const WA = hostWith(__src, LAB(), __tab); return WA.worldLab.getSettings().enabled; },
       want: true },
     { n: 2, why: 'N2: 关闭时让 run「静默成功」⇒ 关着它也在跑（就是这么来的）',
       from: "    if (!cfg.enabled) { fault('disabled'); return { ok: false, reason: 'disabled' }; }\n    if (!WA.rehearsal",
@@ -796,17 +805,20 @@ function runN(a) {
       want: true }
   ];
   CASES.forEach(function (cs) {
-    const hits = SRC.split(cs.from).length - 1;
+    // OPV29-11：`tab: true` 的用例破坏表文件（语汇常量已搬到那里），其余仍破坏引擎
+    const base = cs.tab ? readOf('engines/world-lab-tables.js') : SRC;
+    const hits = base.split(cs.from).length - 1;
     a(hits === 1, 'e9/N0(' + cs.n + '): 破坏锚点恰中 1 次（实 ' + hits + '）');
     if (hits !== 1) return;
-    const broken = SRC.split(cs.from).join(cs.to);
-    a(broken !== SRC, 'e9/Na(' + cs.n + '): 破坏真的改动了源码文本');
+    const broken = base.split(cs.from).join(cs.to);
+    a(broken !== base, 'e9/Na(' + cs.n + '): 破坏真的改动了源码文本');
     const same = function (x, y) { return JSON.stringify(x) === JSON.stringify(y); };
     let okSet = null;
-    try { okSet = cs.probe(SRC); } catch (e) { okSet = 'THREW ' + e.message; }
+    try { okSet = cs.probe(SRC, undefined); } catch (e) { okSet = 'THREW ' + e.message; }
     a(same(okSet, cs.want), 'e9/Nb(' + cs.n + '): 原版上同款判据为真（实 ' + JSON.stringify(okSet) + '）');
     let badSet = null;
-    try { badSet = cs.probe(broken); } catch (e) { badSet = 'THREW ' + e.message; }
+    try { badSet = cs.tab ? cs.probe(SRC, broken) : cs.probe(broken, undefined); }
+    catch (e) { badSet = 'THREW ' + e.message; }
     a(!same(badSet, cs.want), 'e9/Nc(' + cs.n + '): 破坏副本上同款判据现形（实 ' + JSON.stringify(badSet) + '）');
     a(String(cs.probe).indexOf(cs.to.slice(0, 24)) < 0, 'e9/Nd(' + cs.n + '): 判据不引用破坏后的锚点串（H5 纯度）');
     const shown = cs.from.split('\n')[0];

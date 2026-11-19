@@ -1,13 +1,13 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 563,
- "loadedCount": 542,
+ "loadOrderCount": 566,
+ "loadedCount": 545,
  "uiCount": 21,
- "nsCount": 553,
+ "nsCount": 556,
  "totals": {
-  "loadEdges": 430,
+  "loadEdges": 436,
   "hardEdges": 0,
-  "callRefs": 693,
+  "callRefs": 699,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -54,6 +54,7 @@
     "engines/atlas.js",
     "engines/auto-hide.js",
     "engines/autobiography-epiphany.js",
+    "engines/backstage-protocols.js",
     "engines/backstage-tone.js",
     "engines/backstage.js",
     "engines/bathhouse-laundry.js",
@@ -358,12 +359,14 @@
     "engines/world-diary.js",
     "engines/world-graph.js",
     "engines/world-health.js",
+    "engines/world-lab-tables.js",
     "engines/world-lab.js",
     "engines/world-loop-log.js",
     "engines/world-reader.js",
     "engines/world-seed.js",
     "engines/world-singularity.js",
     "engines/world-snapshot.js",
+    "engines/world-tables.js",
     "engines/write-desk.js",
     "render/map-viewport.js",
     "render/purifier.js"
@@ -614,6 +617,7 @@
     "engines/atlas.js",
     "engines/auto-hide.js",
     "engines/autobiography-epiphany.js",
+    "engines/backstage-protocols.js",
     "engines/backstage-tone.js",
     "engines/bathhouse-laundry.js",
     "engines/beat-facade.js",
@@ -896,12 +900,14 @@
     "engines/world-diary.js",
     "engines/world-graph.js",
     "engines/world-health.js",
+    "engines/world-lab-tables.js",
     "engines/world-lab.js",
     "engines/world-loop-log.js",
     "engines/world-reader.js",
     "engines/world-seed.js",
     "engines/world-singularity.js",
     "engines/world-snapshot.js",
+    "engines/world-tables.js",
     "engines/write-desk.js",
     "render/map-viewport.js"
    ]
@@ -1135,14 +1141,37 @@
    "stateKeys": [],
    "consumedBy": []
   },
+  "engines/backstage-protocols.js": {
+   "ns": [
+    "backstageProtocols"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "engines/backstage.js"
+   ]
+  },
   "engines/backstage.js": {
    "ns": [
     "backstage"
    ],
    "requires": [
+    "backstageProtocols",
     "workflow"
    ],
    "requiresFiles": [
+    "engines/backstage-protocols.js",
     "core/workflow.js"
    ],
    "providerOrderOk": true,
@@ -5058,12 +5087,37 @@
    ],
    "consumedBy": []
   },
+  "engines/world-tables.js": {
+   "ns": [
+    "worldTables"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "engines/world.js"
+   ]
+  },
   "engines/world.js": {
    "ns": [
     "world"
    ],
-   "requires": [],
-   "requiresFiles": [],
+   "requires": [
+    "worldTables"
+   ],
+   "requiresFiles": [
+    "engines/world-tables.js"
+   ],
    "providerOrderOk": true,
    "callRefs": [],
    "ghostRefs": [],
@@ -8082,15 +8136,38 @@
    ],
    "consumedBy": []
   },
-  "engines/world-lab.js": {
+  "engines/world-lab-tables.js": {
    "ns": [
-    "worldLab"
+    "worldLabTables"
    ],
    "requires": [
     "registerModule"
    ],
    "requiresFiles": [
     "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "engines/world-lab.js"
+   ]
+  },
+  "engines/world-lab.js": {
+   "ns": [
+    "worldLab"
+   ],
+   "requires": [
+    "registerModule",
+    "worldLabTables"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "engines/world-lab-tables.js"
    ],
    "providerOrderOk": true,
    "callRefs": [

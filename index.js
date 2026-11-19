@@ -371,6 +371,9 @@
     // v2.296.0（V10 OPV10-7）：全仓统一待办中心。位置在 store / commit 之后、引擎之前
     'core/unified-pending.js',
     'core/interceptor.js',
+    // OPV29-11：backstage 的协议常量与设置登记表已拆到 engines/backstage-protocols.js，
+    //   必须先于引擎装载（缺表时引擎求值期当场抛错，不静默退化成「没有协议」）。
+    'engines/backstage-protocols.js',
     'engines/backstage.js',
     'engines/evolution.js',
     'engines/enemies.js',
@@ -747,6 +750,8 @@
     // v2.63.0：世界织体（社会生活 / 共同日程 / 地点与路途）。
     //   须早于 render/inject.js，注入时读取 world.buildBlock()；
     //   且须**晚于** life.js —— 在场者名单的唯一证据是「人物自己的日程安排」（life.schedule）。
+    // OPV29-11：world 的封闭词表与设置登记表已拆到 engines/world-tables.js（先装表）。
+    'engines/world-tables.js',
     'engines/world.js',
     // v2.65.0 天气与难度。天气必须晚于 world.js：setWeather 用 world.reach 确认地点已登记。
     'engines/weather.js',
@@ -1223,6 +1228,8 @@
     //   导出面（worldBlueprint.exportBlueprint）、体检面（depCheck.check）都是它的**调用期**依赖。
     //   本模块**零 store 写**（没有 transact、没有 draft 赋值）—— 实验全落在隔离副本上，
     //   且「live 前后摘要一致」是跑前跑后**实测**出来的，不是一句声明。
+    // OPV29-11：world-lab 的语汇常量与登记表已拆到 engines/world-lab-tables.js（先装表）。
+    'engines/world-lab-tables.js',
     'engines/world-lab.js',
     // v2.201.0（第四批 Y6）：世界历史检索（engines/history-search.js）。
     //   位置排在**全部六个检索源的装载之后**（chronicle-view / worldbook+wb-search / atlas /

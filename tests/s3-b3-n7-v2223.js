@@ -59,6 +59,8 @@ const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
 const ENG_REL = 'engines/world-lab.js';
+/** OPV29-11：ADAPTERS 等语汇常量已搬到 world-lab-tables.js —— 该锚点跟位。 */
+const TAB_REL = 'engines/world-lab-tables.js';
 const SELF_REL = 'tests/s3-b3-n7-v2223.js';
 // v2.401.0（OPV23 拆段遗留红·同族第九次）：`ui/panel.js` 走 panel-source 的**重组面**
 //   —— 本锁的切片锚点（Y8/Y9 渲染段、N7 的两段）与 `wa-wl-*` / `wa-wl-adv*` 控件
@@ -122,7 +124,7 @@ const ANCHOR = {
   out: '       <div id="wa-wl-out" class="wa-out"></div>'
 };
 const TGT = {
-  seedKey: ENG_REL, adapters: ENG_REL, probeAdapter: ENG_REL, classifyAdapter: ENG_REL,
+  seedKey: ENG_REL, adapters: TAB_REL, probeAdapter: ENG_REL, classifyAdapter: ENG_REL,
   advance: ENG_REL, adapterTable: ENG_REL, exportsFace: ENG_REL, probeCount: ENG_REL,
   unhook: ENG_REL, withCtx: ENG_REL, holderKey: ENG_REL, enableProbe: ENG_REL,
   seedBefore: ENG_REL, scope: ENG_REL, unsafeDirect: ENG_REL, disabledOut: ENG_REL,

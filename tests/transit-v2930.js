@@ -54,6 +54,7 @@ const DIAG = path.join(BASE, 'engines/tool-diag.js');
 const PANEL = path.join(BASE, 'ui/panel.js');
 function src(p) { return fs.readFileSync(p, 'utf8'); }
 // ── 真源码破坏锚点（各恰中 1 次才动刀）──
+const WTAB = 'engines/world-tables.js';
 const A_CH = "const CHANNELS = ['person', 'goods', 'message'];";
 const A_LV_STORM = "storm: { person: false, goods: false, message: true },";
 const A_LV_CLEAR = "rain: { person: true, goods: true, message: true },\n    clear: { person: true, goods: true, message: true } };";
@@ -104,12 +105,12 @@ function secBody(srcText, from, to) {
 function tOf(WA, ch, f, t) { return WA.world.transit(ch, f, t); }
 // ══════════════ 判据 ══════════════
 function runAll(a) {
-  const wSrc = src(WORLD), dSrc = src(DIAG), pSrc = src(PANEL);
+  const wSrc = src(WORLD), dSrc = src(DIAG), pSrc = src(PANEL), tSrc = src(WTAB);
   // ── A 面（静态）──
-  a(hits(wSrc, A_CH) === 1, 'v2930: [A1] 三层通道封闭集合在真源码（person / goods / message）');
+  a(hits(tSrc, A_CH) === 1, 'v2930: [A1] 三层通道封闭集合在真源码（person / goods / message）');
   a(wSrc.indexOf('CHANNELS: CHANNELS, transit: transit,') > 0,
     'v2930: [A1] 两个新成员在 WA.world 导出对象里（导出即有承诺）');
-  a(hits(wSrc, A_LV_STORM) === 1 && hits(wSrc, 'snow: { person: false, goods: false, message: true },') === 1,
+  a(hits(tSrc, A_LV_STORM) === 1 && hits(tSrc, 'snow: { person: false, goods: false, message: true },') === 1,
     'v2930: [A1] 封锁表：storm / snow 封人·物而留消息（两条都在真源码）');
   a(wSrc.indexOf('function weatherBlockOf(place)') > 0 && wSrc.indexOf('function transit(channel, from, to)') > 0,
     'v2930: [A1] 只读封锁面与判定入口都在真源码，且 transit 签名只有三参（不收用不上的 at）');
@@ -269,10 +270,11 @@ function runAll(a) {
     'v2930: [C1] 至少一种天气两层都通（封锁不是「一律封」——一律封等于没有分辨率）');
   // C1b：罕见天气词（不在封锁表里）⇒ 既不假装通行也不假装封锁
   const H4 = fresh(); const W4 = H4.WA; seed(W4); on(W4);
-  const wSrcB = src(WORLD).replace("    rain: { person: true, goods: true, message: true },\n    clear: { person: true, goods: true, message: true } };",
+  // OPV29-11：封锁表在 engines/world-tables.js（词表随 OPV29-11 搬家），破坏与注入键都归位
+  const wSrcB = src(WTAB).replace("    rain: { person: true, goods: true, message: true },\n    clear: { person: true, goods: true, message: true } };",
     '    rain: { person: true, goods: true, message: true } };');
-  a(wSrcB !== src(WORLD), 'v2930: [B10] 破坏确实改写了源码（从封锁表摘掉 clear）');
-  const H5 = fresh({ srcOverride: { 'engines/world.js': wSrcB } }); const W5 = H5.WA; seed(W5); on(W5);
+  a(wSrcB !== src(WTAB), 'v2930: [B10] 破坏确实改写了源码（从封锁表摘掉 clear）');
+  const H5 = fresh({ srcOverride: { [WTAB]: wSrcB } }); const W5 = H5.WA; seed(W5); on(W5);
   wx(W5, PL.B, 'clear');
   const uk = tOf(W5, 'person', PL.A, PL.B);
   a(uk.ok === true && uk.weatherReason === 'unknown-kind',
@@ -294,24 +296,24 @@ function runAll(a) {
     'v2930: [C2] 耗时倍数取产品面（两实例同值；clear=1 表示「晴天不减速」）');
 }
 function runNegative(a) {
-  const wSrc = src(WORLD);
+  const wSrc = src(WORLD), tSrc = src(WTAB);
   // N0：六个真源码破坏锚点各恰中 1 次（先证锚点干净，否则下面的「破坏」可能改在别处）
-  a(hits(wSrc, A_CH) === 1 && hits(wSrc, A_LV_STORM) === 1 && hits(wSrc, A_LV_CLEAR) === 1
+  a(hits(tSrc, A_CH) === 1 && hits(tSrc, A_LV_STORM) === 1 && hits(tSrc, A_LV_CLEAR) === 1
     && hits(wSrc, A_WB_DISABLED) === 1 && hits(wSrc, A_WB_UNKNOWN) === 1 && hits(wSrc, A_BLOCK_CNT) === 1,
     'v2930: [N0] 六个真源码破坏锚点各恰中 1 次');
   // N1a：storm 改成「什么都不封」⇒ B1 现形（三层分辨率消失，而库存判定全绿）
-  const sA = wSrc.replace(A_LV_STORM, B_LV_OPEN);
-  a(sA !== wSrc, 'v2930: [N1a] 破坏确实改写了源码（storm 不再封路）');
-  const HA = fresh({ srcOverride: { 'engines/world.js': sA } }); const WAa = HA.WA; seed(WAa); on(WAa);
+  const sA = tSrc.replace(A_LV_STORM, B_LV_OPEN);
+  a(sA !== tSrc, 'v2930: [N1a] 破坏确实改写了源码（storm 不再封路）');
+  const HA = fresh({ srcOverride: { [WTAB]: sA } }); const WAa = HA.WA; seed(WAa); on(WAa);
   wx(WAa, PL.B, 'storm');
   const pa = tOf(WAa, 'person', PL.A, PL.B), ga = tOf(WAa, 'goods', PL.A, PL.B), ma = tOf(WAa, 'message', PL.A, PL.B);
   a(pa.ok === true && ga.ok === true && ma.ok === true,
     'v2930: [N1a] 破坏后 B1 现形：storm 下人与物都过得去（实 ' + P([pa.ok, ga.ok, ma.ok]) + '）——「不封」与「封三层」都通不过原版判据');
   a(HA.WA.world.stat().blocks.person === 0, 'v2930: [N1a] 破坏后封锁计数永远为 0（死面）');
   // N1b：从封锁表摸掉 clear ⇒ 该天气词变 unknown-kind（「不知道」不再静默当通行）
-  const sB = wSrc.replace(A_LV_CLEAR, B_LV_RAIN_ONLY);
-  a(sB !== wSrc, 'v2930: [N1b] 破坏确实改写了源码（封锁表未被白名单全覆盖）');
-  const HB = fresh({ srcOverride: { 'engines/world.js': sB } }); const WB = HB.WA; seed(WB); on(WB);
+  const sB = tSrc.replace(A_LV_CLEAR, B_LV_RAIN_ONLY);
+  a(sB !== tSrc, 'v2930: [N1b] 破坏确实改写了源码（封锁表未被白名单全覆盖）');
+  const HB = fresh({ srcOverride: { [WTAB]: sB } }); const WB = HB.WA; seed(WB); on(WB);
   wx(WB, PL.B, 'clear');
   const rb = tOf(WB, 'person', PL.A, PL.B);
   a(rb.ok === true && rb.weatherReason === 'unknown-kind',
@@ -327,9 +329,11 @@ function runNegative(a) {
   a(rc.ok === true && rc.weatherReason !== 'disabled',
     'v2930: [N1c] 破坏后 B5 现形：关闭态的理由不再是 disabled（实 ' + P(rc.weatherReason) + '）');
   // N1d：未覆盖的天气词被报成 ok（还带个空天气名）⇒ 两向自证：原版报不知道，破坏后**假装知道**
-  const sD = wSrc.replace(A_LV_CLEAR, B_LV_RAIN_ONLY).replace(A_WB_UNKNOWN, B_WB_UNKNOWN_FAKE);
-  a(sD !== sC && sD !== wSrc, 'v2930: [N1d] 破坏确实改写了源码（两处累积改写）');
-  const HD = fresh({ srcOverride: { 'engines/world.js': sD } }); const WD = HD.WA; seed(WD); on(WD);
+  // N1d 是**跨两文件**的累积破坏：词表在 world-tables.js，天气归因在 world.js
+  const sDtab = tSrc.replace(A_LV_CLEAR, B_LV_RAIN_ONLY);
+  const sD = wSrc.replace(A_WB_UNKNOWN, B_WB_UNKNOWN_FAKE);
+  a(sDtab !== tSrc && sD !== wSrc, 'v2930: [N1d] 破坏确实改写了源码（两处累积改写）');
+  const HD = fresh({ srcOverride: { 'engines/world.js': sD, [WTAB]: sDtab } }); const WD = HD.WA; seed(WD); on(WD);
   wx(WD, PL.B, 'clear');
   const rdd = tOf(WD, 'person', PL.A, PL.B);
   a(rdd.ok === true && rdd.weatherReason === 'ok' && rdd.weather && rdd.weather.kind === '',
@@ -344,9 +348,9 @@ function runNegative(a) {
   a(stE.transits.person === 1 && stE.blocks.person === 0,
     'v2930: [N1e] 破坏后 B7 现形：没过去也计成功（实 transits=' + P(stE.transits) + ' blocks=' + P(stE.blocks) + '）');
   // N1f：通道集合被改宽（多一个词）⇒ B6 现形：不在封闭集合里的通道不再被拒
-  const sF = wSrc.replace(A_CH, B_CH_WIDE);
-  a(sF !== wSrc, 'v2930: [N1f] 破坏确实改写了源码（通道集合被改宽）');
-  const HF = fresh({ srcOverride: { 'engines/world.js': sF } }); const WF = HF.WA; seed(WF); on(WF);
+  const sF = tSrc.replace(A_CH, B_CH_WIDE);
+  a(sF !== tSrc, 'v2930: [N1f] 破坏确实改写了源码（通道集合被改宽）');
+  const HF = fresh({ srcOverride: { [WTAB]: sF } }); const WF = HF.WA; seed(WF); on(WF);
   const te = tOf(WF, 'teleport', PL.A, PL.B);
   a(te.reason !== 'bad-channel' && te.ok === true,
     'v2930: [N1f] 破坏后 B6 现形：集合外的通道不再被拒（实 ' + P(te.reason) + '）');

@@ -47,27 +47,28 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
-  const LS_KEY = 'worldaxis_world_lab_settings_v1';
-  const DEF = { enabled: true, maxSteps: 6, armA: '', armB: '' };
-  const __REG = {
-    key: LS_KEY, def: DEF, module: 'worldLab',
-    bounds: { maxSteps: [1, 12] }
-  };
-  const FORMAT = 1;
-  const MOD_TAG = __REG.module;
-  /** 三条路径的**封闭集**：hold = 什么都不做（一步「等待」，rehearsal 明说它不写任何状态面）。 */
-  const ARMS = ['hold', 'a', 'b'];
-  const ARM_CN = { hold: '什么都不做', a: '选 A', b: '选 B' };
-  /** hold 臂的那一步：`wait` 是 rehearsal 三个动作里唯一「零状态面写入」的一个。 */
-  const HOLD_STEP = { kind: 'wait', who: '世界', ms: 0 };
-  // ── v2.203.0（Y9）四个常量 ─────────────────────────────────────
-  /** 沙盒推进的轮数上限（**内部常量**，不进 bounds：bounds 管的是设置键，这是入参夹取）。 */
-  const MAX_ROUNDS = 12;
-  const DEF_SIM_ROUNDS = 3;
-  /** 每一轮在沙盒里往前拨多久（内部常量：它只影响副本里的故事时钟，不影响 live）。 */
-  const SIM_ROUND_MS = 60000;
-  /** 与拍引擎联动时，最多往前投影几拍（**只投影、不落拍**）。 */
-  const MAX_AHEAD = 12;
+  // OPV29-11：world-lab 的语汇常量与设置登记表在 engines/world-lab-tables.js（纯数据）。求值期先取表；缺表**当场抛错**
+  // —— 空词表会让「不在表里就拒收」变成「什么都拒收」或「什么都不校验」，两种都是不崩的错。
+  const __T = WA.worldLabTables;
+  if (!__T || !__T.__REG || !__T.FORMAT) {
+    throw new Error('world-lab: 词表未装载（engines/world-lab-tables.js 必须先于 engines/world-lab.js 装载）');
+  }
+  const LS_KEY = __T.LS_KEY;
+  const DEF = __T.DEF;
+  const __REG = __T.__REG;
+  const FORMAT = __T.FORMAT;
+  const MOD_TAG = __T.MOD_TAG;
+  const ARMS = __T.ARMS;
+  const ARM_CN = __T.ARM_CN;
+  const HOLD_STEP = __T.HOLD_STEP;
+  const MAX_ROUNDS = __T.MAX_ROUNDS;
+  const DEF_SIM_ROUNDS = __T.DEF_SIM_ROUNDS;
+  const SIM_ROUND_MS = __T.SIM_ROUND_MS;
+  const MAX_AHEAD = __T.MAX_AHEAD;
+  const BEAT_FACES = __T.BEAT_FACES;
+  const BEAT_SANDBOX_MEMBERS = __T.BEAT_SANDBOX_MEMBERS;
+  const ADAPTERS = __T.ADAPTERS;
+
 
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : null;
@@ -294,6 +295,7 @@
     { key: 'trace.denied', label: '逐步被拒的条数', src: 'rehearsal.run().trace[*].ok === false', pick: function (x) {
       return Array.isArray(x.trace) ? x.trace.filter(function (t) { return t && t.ok === false; }).length : null; } }
   ];
+
   function diff() {
     if (!_lab) return { ok: false, reason: 'no-lab', rows: [] };
     const st = staleness();
@@ -626,8 +628,6 @@
    *   · 投影：从当前拍起，按拍账里既有的 pending 行**往前摆几拍**，逐条标 `src`；
    *   · 「不落拍」是**实测**的：调用前后读一次拍账摘要，逐字一致才算数。
    */
-  const BEAT_FACES = ['beatLedger', 'beatReport', 'beatMask', 'beatFacade'];
-  const BEAT_SANDBOX_MEMBERS = ['rehearse', 'preview', 'simulate'];
   function beatSandboxFace() {
     for (let i = 0; i < BEAT_FACES.length; i++) {
       const m = WA[BEAT_FACES[i]];
@@ -748,18 +748,6 @@
    *   每类都指向**来源引擎自己的口**（本模块不自带第二份推进逻辑）。`order` 是时序标签：
    *   推进按 order 升序在同一份副本上累积（不是 N 份独立推演）。
    */
-  const ADAPTERS = [
-    { key: 'action', order: 10, label: '行动', kind: 'advance', engine: 'act', member: 'advance',
-      why: '行动结算是逐字走 exec.mutate 的推进面 —— 它能把这一步真跑在副本上' },
-    { key: 'economy', order: 20, label: '经济', kind: 'advance', engine: 'org', member: 'grant',
-      why: '组织账本（供给 / 薪酬 / 项目欠账）—— 它的写口直调 store.transact，故必须逐条判能不能进副本' },
-    { key: 'logistics', order: 30, label: '物流', kind: 'advance', engine: 'freight', member: 'arrive',
-      why: '货运到货确认 —— 与世界经济同一本账，隔离范围必须与经济类分开验' },
-    { key: 'deadline', order: 40, label: '期限', kind: 'read', engine: 'agenda', member: 'upcoming',
-      why: '跨模块到期清单是纯读面：它不推进任何东西，只作每轮之后的一口观测' },
-    { key: 'consequence', order: 50, label: '后果', kind: 'advance', engine: 'causal', member: 'tick',
-      why: '因果推进（后果落地）—— 与行动面同族走 exec.mutate，但时序排在行动之后' }
-  ];
   /** 探针与推进共用冻结时刻（副本时钟；**不碰 live 时钟**）。 */
   let _probeAt = 0;
   /** 一次性挂钩：挂上记数包装，返回句柄（还原用）。对象 / 方法缺席或**不可写**时返回 null。 */
