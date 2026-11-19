@@ -3,9 +3,9 @@
 > 由 `node tools/plan-ledger.js --write` 从 `git log` 生成。手改会被
 > `node tools/plan-ledger.js --check` 点名（重算与盘上不一致 ⇒ 退出 1）。
 
-- 生成源：subject 提到 `OPV29-` 的提交 **25** 条 · 源摘要 `5c286d4983f2`
+- 生成源：subject 提到 `OPV29-` 的提交 **26** 条 · 源摘要 `328b1bb45ac2`
 - 已交付 **27 / 36**，未交付 **9**
-- 欠账读数：区间号 1 · 无复算读数 7 · 形态不认识 0 · 重复声称 6
+- 欠账读数：区间号 1 · 无复算读数 7 · 形态不认识 0 · 重复声称 7
 
 ## Z1（已交付 4 / 6）
 
@@ -39,7 +39,7 @@
 | OPV29-19 | `695725d` | feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项 | 8 条：`node tests/opv29-z4-v2529.js ⇒ pass (25)` |
 | OPV29-20 | `695725d` | feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项 | 8 条：`node tests/opv29-z4-v2529.js ⇒ pass (25)` |
 | OPV29-21 | `695725d` | feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项 | 8 条：`node tests/opv29-z4-v2529.js ⇒ pass (25)` |
-| OPV29-22 | `b9acf44` | feat(worldaxis): OPV29-22 替身与真源边界 —— 替身顶替零容忍 / 产品源注入 0 处 / 清缓存路径真读真源（13 项） | 4 条：`node tools/mock-boundary.js --check ⇒ PASS（rc=0）：清缓存 51 / 注入 2（在册）/ 产品源顶替 0` |
+| OPV29-22 | `b54d947` | chore(worldaxis): 台账回填 —— OPV29-22 已交付（专锁 13 项 / 面数 608->609 / 负控制 FAIL 3/13、FAIL 2/13、FAI | 3 条：`node tools/mock-boundary.js --check => PASS（rc=0）：清缓存 51 / 注入 2（在册）/ 产品源顶替 0` |
 | OPV29-23 | `695725d` | feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项 | 8 条：`node tests/opv29-z4-v2529.js ⇒ pass (25)` |
 | OPV29-24 | `c0dd117` | chore(worldaxis): 台账回填 tests/*.js 596->597（OPV29-24 新增专锁后现场值） | **缺（recompute:false）** |
 
