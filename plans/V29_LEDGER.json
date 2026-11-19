@@ -2,10 +2,23 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "3eac4614567d806fc3412a5a84b4e7711119778ae0fe9de8ae5e9e93868b6aea",
-  "sourceCommits": 8,
+  "sourceDigest": "77f989f15661f4835e89760c4bc9ce0a764a9ba85f602c7db36320576fdd01c2",
+  "sourceCommits": 9,
   "total": 36,
   "delivered": {
+    "OPV29-16": {
+      "group": "Z3",
+      "commit": "30af0ae",
+      "subject": "feat(worldaxis): OPV29-16 红门禁最小复现 —— 18 项，面数 598→599",
+      "readings": [
+        "node tests/opv29-z3-16-v2529.js ⇒ pass (18)",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 598→599",
+        "删掉打印行（红门禁不再给命令）⇒ FAIL 5/18（A4+A4b+A6+C1+C5）",
+        "repro 写死字面量脚本名（与失败的那个不同源）⇒ FAIL 4/18（A3+A3b+A7+C3）"
+      ],
+      "recompute": true,
+      "note": ""
+    },
     "OPV29-18": {
       "group": "Z3",
       "commit": "52bb590",
@@ -234,7 +247,6 @@
     "OPV29-13",
     "OPV29-14",
     "OPV29-15",
-    "OPV29-16",
     "OPV29-17",
     "OPV29-22",
     "OPV29-24",
@@ -254,8 +266,8 @@
     "dupClaims": []
   },
   "counts": {
-    "delivered": 14,
-    "pending": 22,
+    "delivered": 15,
+    "pending": 21,
     "rangeForm": 1,
     "noRecompute": 0,
     "unparsedForm": 0,
