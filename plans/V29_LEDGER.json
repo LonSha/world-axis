@@ -2,10 +2,18 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "7fa858f467f7d89700305eebec870b3c5799752f4d1a755bee6de89a12c9b62d",
-  "sourceCommits": 14,
+  "sourceDigest": "5f05c3b789d54eee1ecf245fc0b4a1d3293d3dd622ea7d4bf4ba3661c421c986",
+  "sourceCommits": 15,
   "total": 36,
   "delivered": {
+    "OPV29-02": {
+      "group": "Z1",
+      "commit": "5c1a186",
+      "subject": "feat(worldaxis): OPV29-02 增量回归 —— 改了什么只跑哪些锁，不知道就退回全量（20 项）",
+      "readings": [],
+      "recompute": false,
+      "note": ""
+    },
     "OPV29-03": {
       "group": "Z1",
       "commit": "f7b2835",
@@ -312,7 +320,6 @@
   },
   "pending": [
     "OPV29-01",
-    "OPV29-02",
     "OPV29-04",
     "OPV29-05",
     "OPV29-06",
@@ -336,6 +343,7 @@
       }
     ],
     "noRecompute": [
+      "OPV29-02",
       "OPV29-16",
       "OPV29-24"
     ],
@@ -358,10 +366,10 @@
     ]
   },
   "counts": {
-    "delivered": 20,
-    "pending": 16,
+    "delivered": 21,
+    "pending": 15,
     "rangeForm": 1,
-    "noRecompute": 2,
+    "noRecompute": 3,
     "unparsedForm": 0,
     "dupClaims": 2
   }
