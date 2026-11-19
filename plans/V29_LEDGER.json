@@ -2,10 +2,26 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "935a6eb7cafe4ec9030e19247965e3f261892ad96e802a5e2722bbe21a6d4aaf",
-  "sourceCommits": 16,
+  "sourceDigest": "79be02c3903c4f2a728c9f9a0b654d39625d382611c6bb77d1717ab5f494b58f",
+  "sourceCommits": 18,
   "total": 36,
   "delivered": {
+    "OPV29-01": {
+      "group": "Z1",
+      "commit": "a51e564",
+      "subject": "feat(worldaxis): OPV29-01 锁级分片并行 —— v2.82.0 单节 792.2s → 263.6s（省 66.7%，27 项）",
+      "readings": [
+        "node tests/opv29-z1-01-v2529.js ⇒ pass (27)",
+        "node tools/shard-locks.js --run ⇒ 36 把 · 墙钟 263.6s · 判据 2724（红 0）",
+        "node tools/shard-locks.js --check ⇒ 账本与现场一致（36 并行 + 2 串行 = 38）",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 605→606",
+        "node tools/anchor-audit.js --target=opv29 ⇒ 专锁 19 个 · 裸锚 27（基线 27）· 缺读数 0 · 缺负控制 0",
+        "把回灌行清成 `p.rows = []`（判据全丢）⇒ FAIL 1/1（「回灌 0 < 自报 29」，该锁判据 80 → 1）",
+        "首版把回灌完整性写成 `rows.length !== reported` ⇒ 假红 10 条（10 把锁自己 console.log('✓') 双重打印），已改「< 才红、> 只可见」"
+      ],
+      "recompute": true,
+      "note": ""
+    },
     "OPV29-02": {
       "group": "Z1",
       "commit": "5c1a186",
@@ -32,17 +48,10 @@
     },
     "OPV29-06": {
       "group": "Z1",
-      "commit": "ff62c3b",
-      "subject": "feat(worldaxis): OPV29-06 门禁时长看板（每道一条读数 · 可复算 · 超时点名）+ 专锁 27 项",
-      "readings": [
-        "node tests/opv29-z1-06-v2529.js ⇒ pass (27)",
-        "node tools/gate-timing.js ⇒ 8 道逐行 · 未量 0 · 合计下界 105.5s",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 604→605",
-        "node tools/anchor-audit.js --target=opv29 ⇒ 专锁 18 个 · 缺读数 0 · 缺负控制 0 · 裸锚 27（基线 27）",
-        "「未量」整行写成 unmeasured: [] ⇒ FAIL 1/27（只红 C1）",
-        "拆掉 recordRow 未知门禁拒收闸 ⇒ FAIL 2/27（C5 + C8）"
-      ],
-      "recompute": true,
+      "commit": "d755c54",
+      "subject": "chore(worldaxis): 台账回填 —— 已交付 22/36，计划读数 tests/*.js 601 → 602（+ OPV29-06 门禁实测：七快 19.5s / 慢门 86.0s / 合计下界 105.5s）",
+      "readings": [],
+      "recompute": false,
       "note": ""
     },
     "OPV29-13": {
@@ -334,7 +343,6 @@
     }
   },
   "pending": [
-    "OPV29-01",
     "OPV29-04",
     "OPV29-05",
     "OPV29-07",
@@ -358,11 +366,19 @@
     ],
     "noRecompute": [
       "OPV29-02",
+      "OPV29-06",
       "OPV29-16",
       "OPV29-24"
     ],
     "unparsedForm": [],
     "dupClaims": [
+      {
+        "item": "OPV29-06",
+        "commits": [
+          "d755c54",
+          "ff62c3b"
+        ]
+      },
       {
         "item": "OPV29-24",
         "commits": [
@@ -380,11 +396,11 @@
     ]
   },
   "counts": {
-    "delivered": 22,
-    "pending": 14,
+    "delivered": 23,
+    "pending": 13,
     "rangeForm": 1,
-    "noRecompute": 3,
+    "noRecompute": 4,
     "unparsedForm": 0,
-    "dupClaims": 2
+    "dupClaims": 3
   }
 }
