@@ -15,7 +15,7 @@
     "④ 本账本的键集与门禁 deadNs 读数双向一致：门禁多一个 → 未定性；账本多一个 → 过期登记。",
     "⑤ pending-wire 是**有时限**的定性：只用于「缝合件已入库、接线是下一步」的中间态。若某条 pending-wire 超过一个版本周期仍无人读，必须改判 stale（进 dead-export-ledger）或补消费点，不许靠改 evidence 文字续命。"
   ],
-  "version": "2.529.0",
+  "version": "2.530.0",
   "entries": {
     "LEAK_THRESHOLD": {
       "cls": "gate-selfwitness",
@@ -412,6 +412,12 @@
       "provider": "engines/write-serial.js",
       "evidence": "世界书写回串行队列 + 配置条目纪律。消费方应是世界书写回点（现在没有统一写回点），故零读。",
       "recompute": "grep -rn \"writeSerial\" engines core ui tests | head"
+    },
+    "saveMigrate": {
+      "cls": "pending-wire",
+      "provider": "engines/save-migrate.js",
+      "evidence": "存档结构变更的迁移与回滚。消费方应是「打开老档 / 离卡」两条路径：读档时 detect+plan，写回前 migrate 并留 backup，回退走 rollback。这两条路径还没接，故零读。",
+      "recompute": "node tests/opv29-z5-30-v2529.js"
     }
   }
 }

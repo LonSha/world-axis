@@ -441,6 +441,7 @@ const LOAD = [
   //   两条路径会各自静默降级成「一律按真世界执行」（专锁的隔离判据因而不成立却不报错）。
   'core/exec.js',
   'engines/backstage-protocols.js', 'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/inline-tags.js', 'engines/periodicals.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
+  'engines/save-migrate.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
   'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget-tables.js', 'engines/inject-budget.js', 'engines/tool-diag-tables.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js', 'engines/kaleidoscope.js',
   // v2.50.0（第三十五面）: 宿主两侧 + 时间轴三账。
@@ -22632,6 +22633,8 @@ await runScript('./story-window-evidence-v2518.js');
     // 形态：纯脚本体，走 runScript 档；不登记 ⇒ test-surface-gate 判 unregistered-orphan。
     await runScript('./stitch-nekotools-v2529.js');
     await runScript('./stitch-redbird-v2529.js');
+    await runScript("./opv29-z1-04-v2529.js");
+    await runScript('./opv29-z5-30-v2529.js');
     // v2.408.0（OPV23-9）：分层回归调度器专锁 —— 四级金字塔「每档真跑它声称的那件事」。
     //   为什么必须登记：不登记 ⇒ tests/test-surface-gate.js 判 unregistered-orphan、
     //   segment-extract-v2400 的 C4b/C4e 同红，且本锁**从未在全量里跑过**。

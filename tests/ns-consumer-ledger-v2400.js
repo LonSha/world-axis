@@ -51,7 +51,7 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 // v2.529.0（缝合批 19 件）：47 → 66（+19）。这 19 条**是本批引入的**（每件一个新命名空间），
 //   与 v2.524.0 那次「+9 不是本批引入」的情形不同 —— 所以这次必须逐条登记，
 //   不能像上次那样只解释来源。19 条的 cls 全是 pending-wire，evidence 写明消费点归属。
-const BASE_DEAD_NS = 66;   // v2.529.0 跟位：47 → 66（+19，缝合批）。
+const BASE_DEAD_NS = 67;   // v2.529.0 跟位：47 → 66（+19，缝合批）。
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。
@@ -159,7 +159,7 @@ function runA(A) {
   // 显式确认「零读面的面真的变了、并且我写了原因」，一旦放宽成范围判断，
   // 账本版本忘了升也能绿，这条门禁就退化成装饰。
   // v2.529.0 跟位：账本已随缝合批升版（entries 47→66），断言跟位到 2.529.0。
-  A(L.version === '2.529.0', 'A10 账本 version === 2.529.0（实 ' + L.version + '）');
+  A(L.version === '2.530.0', 'A10 账本 version === 2.530.0（实 ' + L.version + '）');
 }
 
 // ────────────────────────────── B 运行时一致性 ──────────────────────────────

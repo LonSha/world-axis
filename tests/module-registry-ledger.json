@@ -1,13 +1,13 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 587,
- "loadedCount": 566,
+ "loadOrderCount": 588,
+ "loadedCount": 567,
  "uiCount": 21,
- "nsCount": 577,
+ "nsCount": 578,
  "totals": {
-  "loadEdges": 459,
+  "loadEdges": 460,
   "hardEdges": 0,
-  "callRefs": 741,
+  "callRefs": 743,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -307,6 +307,7 @@
     "engines/sartorial-regalia.js",
     "engines/save-curve.js",
     "engines/save-health.js",
+    "engines/save-migrate.js",
     "engines/save-throttle.js",
     "engines/scene-narrative.js",
     "engines/scope-tag.js",
@@ -871,6 +872,7 @@
     "engines/sartorial-regalia.js",
     "engines/save-curve.js",
     "engines/save-health.js",
+    "engines/save-migrate.js",
     "engines/save-throttle.js",
     "engines/scene-narrative.js",
     "engines/scope-tag.js",
@@ -1594,6 +1596,25 @@
    "requiresFiles": [],
    "providerOrderOk": true,
    "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/save-migrate.js": {
+   "ns": [
+    "saveMigrate"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []
