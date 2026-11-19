@@ -77,7 +77,13 @@ function rd(rel) {
   // v2.401.0(OPV23):挂载行随 renderOverview 段体搬进 ui/pages/overview-main.js;
   //   panel.js 走重组面(锚点语义不变,OPV22-4 同款迁移)。
   if (rel === 'ui/panel.js') return require('./panel-source.js').panelSource();
-  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+  return fs.readFileSync(path.join(BASE, rel), 'utf8')
+    // OPV29-08：1328 条动作路由已出闸到 engines/action-desk-routes.js（工厂）。
+    //   本读取器给 rel 是 action-desk 时补上路由表源 —— 判据问的是「这条路由在不在」，
+    //   不是「它写在哪个文件」。
+    + (rel === 'engines/action-desk.js'
+      ? String.fromCharCode(10) + fs.readFileSync(path.join(BASE, 'engines/action-desk-routes.js'), 'utf8')
+      : '');
 }
 function sha(rel) { return crypto.createHash('sha256').update(rd(rel)).digest('hex'); }
 /**
@@ -915,7 +921,7 @@ function runG(T, S) {
   //   ③ 运行时真跑：真装 action-desk + 八引擎，路由真调到引擎并拿到真读数。
   //      为什么必须真跑：静态面只能证明「字面在」，而「路由拿到的东西真的是引擎算的」只能跑出来。
   const h = makeHost();
-  ENGINES.forEach(function (e) { h.load(e.rel); });  h.load('engines/action-desk.js');
+  ENGINES.forEach(function (e) { h.load(e.rel); });  h.load('engines/action-desk-routes.js'); h.load('engines/action-desk.js');
   NS_ALL.forEach(function (ns) { h.WA[ns].setSettings({ enabled: true }); });
   //   ④ action-desk **自己**出厂也是关的（`DEF = { enabled: false }`，第 45 行），
   //      而 `plan()` 一进门就是 `if (!cfg.enabled) return { ok:false, reason:'disabled' }`。

@@ -48,7 +48,13 @@ const BASE = path.resolve(__dirname, '..');
 const { load, must1 } = require('./v8-harness.js');
 
 const ENG_REL = 'engines/driver-ledger.js';
-function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8')
+    // OPV29-08：1328 条动作路由已出闸到 engines/action-desk-routes.js（工厂）。
+    //   本读取器给 rel 是 action-desk 时补上路由表源 —— 判据问的是「这条路由在不在」，
+    //   不是「它写在哪个文件」。
+    + (rel === 'engines/action-desk.js'
+      ? String.fromCharCode(10) + fs.readFileSync(path.join(BASE, 'engines/action-desk-routes.js'), 'utf8')
+      : ''); }
 
 /** 装配完整预取面（与 tests/v7-driver-ledger-2275.js 的 setPrefetch 同构）。 */
 function setPrefetch(WA) {

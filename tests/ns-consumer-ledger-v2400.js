@@ -51,7 +51,13 @@ const BASE_DEAD_NS = 47;   // v2.524.0 跟位：38 → 47（+9）。
 //   差集来自 v2.409.0（38 条基线）之后若干批新增引擎的只读面至今无人消费——账本 entries 里逐条列着，
 //   本条只把「面真变了」这件事跟位到现场值，不改零读判据本身。
 
-function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8')
+    // OPV29-08：1328 条动作路由已出闸到 engines/action-desk-routes.js（工厂）。
+    //   本读取器给 rel 是 action-desk 时补上路由表源 —— 判据问的是「这条路由在不在」，
+    //   不是「它写在哪个文件」。
+    + (rel === 'engines/action-desk.js'
+      ? String.fromCharCode(10) + fs.readFileSync(path.join(BASE, 'engines/action-desk-routes.js'), 'utf8')
+      : ''); }
 function sha(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
 function gate() { return require(path.join(BASE, GATE_REL)); }
 function ledger() { return JSON.parse(rd(LEDGER_REL)); }

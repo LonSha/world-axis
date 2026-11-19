@@ -3,6 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 const PR = 'engines/action-desk.js', BASE = path.join(__dirname, '..');
+// OPV29-08：1328 条路由已出闸到这条文件；破坏锚点落在表里时要指到这里。
+const PR_ROUTES = 'engines/action-desk-routes.js';
 function env(ov) {
   require('./mock.js');
   if (global.localStorage) global.localStorage.clear();
@@ -155,19 +157,20 @@ const mutations = [
   ['board-writes', 'const place = clean(o.place, 40);',
     'const place = clean(o.place, 40); if (WA.store && WA.store.transact && who !== "__never__") { WA.store.transact(function (d) { d.__deskProbe = (d.__deskProbe || 0) + 1; return true; }, "desk:probe"); }', readOnly],
   ['route-swapped', "'research.supply': function (o) { return WA.research.supply(o.projectId, o.who, o.material, o.amount); },",
-    "'research.supply': function (o) { return WA.research.supply(o.projectId, o.who, o.amount, o.material); },", routeSupplies],
+    "'research.supply': function (o) { return WA.research.supply(o.projectId, o.who, o.amount, o.material); },", routeSupplies, PR_ROUTES],
   ['guard-removed', "if (!fn) { noteFault('unknown-action'); return { ok: false, reason: 'unknown-action', action: key, known: Object.keys(ROUTES) }; }",
     'if (false) { noteFault(\'unknown-action\'); return { ok: false, reason: \'unknown-action\', action: key, known: Object.keys(ROUTES) }; }', unknownRefused],
   ['residue-leak', 'out.on = !!(cfg && cfg.enabled);', 'out.on = true;', noResidue]
 ];
 async function runNegative(a) {
-  for (const [name, anchor, replacement, criterion] of mutations) {
-    const source = fs.readFileSync(path.join(BASE, PR), 'utf8');
+  for (const [name, anchor, replacement, criterion, target0] of mutations) {
+    const target = target0 || PR;
+    const source = fs.readFileSync(path.join(BASE, target), 'utf8');
     a(criterion(env()), name + ': same criterion passes original');
     if (source.split(anchor).length !== 2) throw new Error(name + ': nonunique mutation anchor');
-    const ov = {}; ov[PR] = source.replace(anchor, replacement);
+    const ov = {}; ov[target] = source.replace(anchor, replacement);
     a(!criterion(env(ov)), name + ': mutated module fails same criterion');
-    a(fs.readFileSync(path.join(BASE, PR), 'utf8') === source, name + ': source unchanged');
+    a(fs.readFileSync(path.join(BASE, target), 'utf8') === source, name + ': source unchanged');
   }
 }
 module.exports = { runAll, runNegative };

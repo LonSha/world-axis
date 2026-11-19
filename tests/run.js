@@ -479,6 +479,7 @@ const LOAD = [
   // v2.231.0（优化 OP-1）：场景行动桌。必须进 LOAD —— 专锁的破坏副本与正负探针
   //   都在同一 vm 上下文里跑；装载面没给它模块，WA.actionDesk 缺席，
   //   判据会静默降级成「模块不在」而不是「行为不对」。位置与 index.js LOAD_ORDER 同序。
+  'engines/action-desk-routes.js',
   'engines/action-desk.js',
   // v2.231.0（优化 OP-2）：能力—工具—行动结果联动。同序进 LOAD。
   'engines/action-methods.js',
@@ -16472,42 +16473,10 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
   //   ② 顺序也必须是原序（本段在数组之前）：前置先于依赖。
   await require('./render-pre-v2108.js').runAll(assert);
   await require('./render-pre-v2108.js').runNegative(assert);
-  const __V82_PARALLEL = [
-    './settle-v2820.js',
-    './settle-v2850.js',
-    './settle-v2860.js',
-    './identity-v2860.js',
-    './causal-view-v2870.js',
-    './cost-v2880.js',
-    './replay-v2890.js',
-    './explain-v2900.js',
-    './switch-matrix-v2910.js',
-    './resource-ledger-v2920.js',
-    './transit-v2930.js',
-    './journal-v2940.js',
-    './org-econ-v2950.js',
-    './hazard-weather-v2960.js',
-    './hazard-trigger-v2138.js',
-    './life-e8-v2139.js',
-    './faction-graph-v2139.js',
-    './collab-tasks-v2139.js',
-    './canon-deviation-v2139.js',
-    './noesis-v2140.js',
-    './lifeline-v2141.js',
-    './perspective-lock-v2142.js',
-    './duty-v2143.js',
-    './fidelity-v2144.js',
-    './rumor-v2960.js',
-    './phone-bridge-v2970.js',
-    './alias-trace-v2970.js',
-    './coord-v2970.js',
-    './tape-vol-v2980.js',
-    './canon-v2990.js',
-    './canon-align-v2100.js',
-    './interop-v2101.js',
-    './perf-trace-v2102.js',
-    './settle-v2830.js'
-  ];
+  // 分片表出闸（v2.529.0，V29 收尾）：36 条并行锁的名单搬进 tests/shard-locks-table.js ——
+  //   run.js 行数被 segment-extract 的 A11 判据硬限在 23000 行，而「加一条锁」不该等于「改流程」。
+  //   表文件自带装载期守卫：缺表 / 非数组 / 空表 / 非 ./xxx.js 形态 一律当场抛错（不许静默降级成跑 0 条）。
+  const __V82_PARALLEL = require('./shard-locks-table.js').LOCKS;
   await require('../tools/shard-locks.js').runParallel(assert, __V82_PARALLEL, { jobs: 8 });
   // v2.83.0（第三十七面）：模块契约（B4）+ 配置 schema/迁移（B6）。
   //   两者的判据都在这一份文件里（B4 的读数取自 module-registry-ledger.json，
@@ -22602,6 +22571,8 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   8425 → 6004 行；表 2467 行（映射 561 条 / 可选面 23 / 绑定 69 组 / 端口 26 枚），引擎求值期先取表。
     //   负控制（真破坏）：拿掉守卫 ⇒ FAIL 3/23；表给 null ⇒ FAIL 1/23；表给空对象（静默降级）⇒ FAIL 2/23。
     await runScript('./opv29-z1-07-v2529.js');
+    // v2.529.0（V29 Z1）：OPV29-08 action-desk 拆段（966 条路由出闸成工厂；4123→1643 行 / 表 2530 行；拒收码三面差额 0）—— 23 项。
+    await runScript('./opv29-z1-08-v2529.js');
     // v2.529.0（V29 Z1）：OPV29-09 reject-recovery 拆段（账本与判定分离）—— 19 项。
     //   1388 行里 1162 行（84%）是冻结表（三面快照 1682/139/84 等）⇒ engines/reject-recovery-tables.js
     //   （1204 行纯数据），引擎降到 244 行；求值期先取表、缺表抛出。连带修 v2192/y3/y8/beat-facade 锚点。

@@ -67,11 +67,19 @@
 
   // 读数面（只读聚合）：这些文件调用某个引擎 = 「把它的数念出来」，不是驱动它。
   //   名单刻意只放诊断与健康聚合两处 —— 放得越宽，「没人喂」就越好洗白。
-  const READ_FACES = { 'engines/tool-diag.js': 1, 'engines/world-health.js': 1 };
+  const READ_FACES = {
+    'engines/tool-diag.js': 1,
+    // OPV29-07：诊断面的「引擎端口表」（99 处 `WA.<ns>.<member>(` 探针）已出闸到
+    //   engines/tool-diag-tables.js。面登记必须跟着走位 —— 表在哪个文件，那一面就在哪个文件；
+    //   漏登记会让这些读取被归成 other，于是「只被诊断面读」的引擎掉进 L3b（本仓 v2.294.0
+    //   修过一次同形缺陷，注释见 DIAG_NS 上方）。
+    'engines/tool-diag-tables.js': 1,
+    'engines/world-health.js': 1
+  };
   // 运行期扫描拿不到文件名，只能拿到「这段函数挂在谁的命名空间下」。
   //   故同一份名单要有一份命名空间形态 —— 早先只比文件名，运行期认不出诊断面，
   //   诊断面的读取被归成 other，L3a 与 L3b 就分不开了。
-  const DIAG_NS = { toolDiag: 1, worldHealth: 1 };
+  const DIAG_NS = { toolDiag: 1, toolDiagTables: 1, worldHealth: 1 };   // OPV29-07：表文件的命名空间也是诊断面
 
   // 扫描结果缓存：同一进程内重复调用不重复读盘（面板会反复渲染）。
   //

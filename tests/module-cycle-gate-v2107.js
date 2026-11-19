@@ -272,7 +272,11 @@ function runAll(A) {
   // v2.529.0（V29 OPV29-11）：三个表文件入场（backstage-protocols 167 行 / world-lab-tables 66 行 /
   //   world-tables 61 行），都尾调 registerModule 且都被各自的引擎静态读 ⇒ 562/562/560 → 564/564/562
   //   → 本轮 567/567/565（三件各 +1 文件、+1 别名、+1 有引用）。实测回填。
-  A(a.files === 567 && a.aliasFiles === 567 && a.refFiles === 565,
+  // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表文件连续入场 ——
+  //   engines/tool-diag-tables.js（诊断面端口表）与 engines/action-desk-routes.js（1328 条动作路由），
+  //   各 +1 文件 / +1 别名 / +1 有引用。实测 HEAD~2 ⇒ HEAD ⇒ 工作区 两档复算：
+  //   567/567/565 ⇒ 568/568/566 ⇒ **569/569/567**。
+  A(a.files === 569 && a.aliasFiles === 569 && a.refFiles === 567,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -419,7 +423,13 @@ function runAll(A) {
   //   426/3936/4362 → 430/3938/4368。恒等式仍由本判据当场核对（不靠人算）。
   // v2.529.0（V29 OPV29-11）：三表登记各 +1 装载期边、三引擎读表各 +1 ⇒ 430 → 436；
   //   调用期不变（3938）；合计 4368 → 4374。恒等式仍由判据当场核对。
-  A(a.edgesLoad === 436 && a.edgesCall === 3938 && a.edgesAll === 4374 && a.identityOk,
+  // v2.529.0（V29 OPV29-07）：诊断面端口表出闸 ⇒ 装载期 436 → 438（表登记 +1、引擎读表 +1）、
+//   调用期 3938 → 3940（表内 99 处探针里跨 ns 的那一条 + 引擎仍读旧面）；合计 4374 → 4378。
+  //   实测 HEAD~2 ⇒ HEAD 两档复算。恒等式由本判据当场核对。
+  // v2.529.0（V29 OPV29-08）：路由表出闸 ⇒ 装载期 438 → 440；调用期 3940 → 3961（+21，逐条闭合：
+  //   路由表读到 274 个 ns，其中 **20 个在引擎剩余 1643 行里也读到** ⇒ 每个多一条 (file,ns) 去重边；
+  //   再加「引擎读新命名空间 actionDeskRoutes」1 条 = 21）；合计 4378 → 4401。
+  A(a.edgesLoad === 440 && a.edgesCall === 3961 && a.edgesAll === 4401 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -502,7 +512,8 @@ function runAll(A) {
   // v2.524.0（V27 拓展线）：LOAD_ORDER 506 → 515（九台引擎入序，实测回填）。
   // v2.524.0（V27 优化线）：LOAD_ORDER 516 → 521（本批新增的五个 OPV27 模块入序，实测回填）。
   // v2.529.0（V29 OPV29-10/09）：两个表文件入序（LOAD_ORDER 561 → 563，实测回填）。
-  A(a.edgesLoad >= 20 && a.orderLen === 566,
+  // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表文件各入序一档 ⇒ 566 ⇒ 567 ⇒ **568**（实测回填）。
+  A(a.edgesLoad >= 20 && a.orderLen === 568,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -558,7 +569,10 @@ function runAll(A) {
   //   差额 607-553=54 与回填前**相同**：两个 ns 三面同步增长，漂移口径不动（B6 常量不改）。
   // v2.529.0（V29 OPV29-11）：三个表 ns 同时进静态提供方、账本（--update 落定 556）与读面
   //   ⇒ 607/553/564 → 610/556/567。差额 610-556=54 与回填前**相同**（三面同步增长，B6 常量不动）。
-  A(a.nsProvided === 610 && a.nsLedger === 556 && a.nsRead === 567,
+  // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表 ns（toolDiagTables / actionDeskRoutes）连续三面同步增长
+  //   ⇒ 610/556/567 ⇒ 611/557/568 ⇒ **612/558/569**。差额 612-558 = 54 与回填前**相同**
+  //   （三面同步增长，漂移口径不动 ⇒ B6 常量不改）。
+  A(a.nsProvided === 612 && a.nsLedger === 558 && a.nsRead === 569,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
   //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
