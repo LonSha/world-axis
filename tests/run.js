@@ -22502,6 +22502,22 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //       「为了变快而把不知道说成 0」的那种假绿，B 组就是为它设的；
     //     · `self` 档失效（改锁不算命中自己）⇒ FAIL 1/20（只红 B5）。
     await runScript('./opv29-z1-02-v2529.js');
+    // v2.529.0（V29 Z1）：OPV29-06 门禁时长看板（每道一条耗时读数，读数可复算，超时门禁可点名）。
+    //   病：八道契约门禁各打印各的，**没有一处记它们各花多久** ⇒ 拆段（OPV29-07～12）只能靠猜。
+    //   现场真跑读数（账本 tests/gate-timing.json）：七道快门禁合计 19.5s
+    //     （export-contract 823 / inventory 1912 / test-surface-gate 2976 / reject-code-gate 7481
+    //      / module-registry-gate 636 / module-cycle-gate 1302 / dead-export-gate 4409ms）；
+    //     慢门禁 readings-v2106 单独 85975ms ⇒ 八道合计下界 105.5s。
+    //   结论（本项真正要暴露的事实）：整趟贵在「一道慢门」，不在「七道快门的数量」。
+    //   读数：`node tests/opv29-z1-06-v2529.js` ⇒ pass (27)；
+    //     `node tools/gate-timing.js` ⇒ 逐道一行 + 未量/超预算/表外三类点名 + 合计下界。
+    //   负控制（全在合成账本上做，不碰真账本）：空账本 ⇒ 未量全列 8 道（未量不是「没问题」）；
+    //     注入 budgetMs+1 ⇒ 点名该道；等于预算（ms === budgetMs）不算超；
+    //     未知门禁名 / 负耗时 / 非数 ⇒ 一律拒收，且账本一字未写；连记 49 条 ⇒ 只留 48 条且丢最老那条。
+    //   负控制（真改 tools/gate-timing.js 后单跑，各自单打；改完已恢复）：
+    //     · 「未量」整行写成 `unmeasured: []`（= 把不知道当成没问题）⇒ FAIL 1/27（只红 C1）；
+    //     · 拆掉 recordRow 的未知门禁拒收闸（谁都能往账本里塞数）⇒ FAIL 2/27（C5 + C8）。
+    await runScript('./opv29-z1-06-v2529.js');
     // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
     //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是
     //   「装了 story-tone 也说没有」「改了一句也永远 available:false」——不崩的假判据。
