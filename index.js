@@ -394,6 +394,7 @@
     'engines/inject-inspector.js',
     'engines/inject-budget-tables.js',
     'engines/inject-budget.js',
+    'engines/tool-diag-tables.js',
     'engines/tool-diag.js',
     'engines/contract-audit.js',
     'engines/memory-sampler.js',

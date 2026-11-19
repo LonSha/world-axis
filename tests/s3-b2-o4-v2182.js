@@ -20,7 +20,13 @@ const REL = 'engines/capacity-audit.js';
 const KEYS = ['getSettings', 'setSettings', 'obligations', 'waterline', 'reclaimable', 'migrationCheck', 'sources', 'diagnose', 'stat', 'reset'];
 
 function srcOf() { return fs.readFileSync(path.join(BASE, REL), 'utf8'); }
-function readOf(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function readOf(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8')
+    // OPV29-07：tool-diag 的注册表/校验表已出闸到 engines/tool-diag-tables.js。
+    //   本读取器给 rel 是 tool-diag 时补上表源 —— 判据问的是「产品里有没有这条登记」，
+    //   不是「它写在哪个文件」（与 e9 锁改读「引擎+表」合并面同一口径）。
+    + (rel === 'engines/tool-diag.js'
+      ? String.fromCharCode(10) + fs.readFileSync(path.join(BASE, 'engines/tool-diag-tables.js'), 'utf8')
+      : ''); }
 function exportBody(src) {
   const at = src.indexOf('WA.capacityAudit = {');
   if (at < 0) return '';

@@ -18,7 +18,7 @@ const vm = require('vm');
 const BASE = path.join(__dirname, '..');
 const HP_REL = 'engines/health-preflight.js';
 const HP_SRC = fs.readFileSync(path.join(BASE, HP_REL), 'utf8');
-const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+const DIAG_SRC = require('./diag-source.js')();
 const RUN_SRC = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
 
 let pass = 0, fail = 0;

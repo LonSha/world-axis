@@ -349,7 +349,7 @@ async function judge(a) {
   //   调用期引用 689 → 693（各引擎读表 ns 各 +1，表内 registerModule/log 各 +1）。
   //   实测回填（`node tests/module-registry-gate.js --update` 落定后读账本 totals）。
   // v2.529.0（V29 OPV29-11）：三表登记 + 三引擎读表 ⇒ 装载期边 430 → 436；调用期 693 → 699。
-  a(led.totals.loadEdges === 436 && led.totals.callRefs === 699,
+  a(led.totals.loadEdges === 438 && led.totals.callRefs === 701,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 装载期边 +1(尾部调 registerModule)、调用期引用 +2(读 store 的 registerModule 与 settingsBus)、命名空间 +1、装载文件 +1 —— 本处四个数字由 U3 散装读数核对器(node tools/loose-readings.js)一次报出,不必等全量回归;\\n    v2830/mr: 装载期边 108 / 调用期引用 212（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（引用多 ≠ 必须先装载；v2.187.0（第三批 E4/E6/E8）：新增 engines/campaign.js / engines/atlas.js / engines/dep-check.js ⇒ 装载期边 +3（尾部各调 registerModule）、调用期 +4；v2.135.0（E6）：新增 engines/foreshadow.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎尾部各调 registerModule ⇒ 装载期边 +12；其调用期读 store/clock/evict/settingsBus/apiRouter ⇒ 调用期 +24；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
@@ -393,7 +393,9 @@ async function judge(a) {
   // v2.529.0（V29 OPV29-10/09）：两个表文件各带一个命名空间 ⇒ nsCount 551 → 553；
   //   两个表文件进账本 ⇒ loadedCount 540 → 542（与 B1 的文件面 +2 同源）。
   // v2.529.0（V29 OPV29-11）：三表各带一个 ns ⇒ nsCount 553 → 556；三表进账本 ⇒ loadedCount 542 → 545。
-  a(led.nsCount === 556 && led.loadedCount === 545,
+// v2.529.0（V29 OPV29-07）：tool-diag 的注册表/校验表出闸（toolDiagTables）⇒ nsCount 556 → 557、
+//   loadedCount 545 → 546；装载期边 436 → 438（表的登记 + 引擎读表各 1）、调用期 699 → 701。
+  a(led.nsCount === 557 && led.loadedCount === 546,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 两边各 +1(装载期边与调用期引用另计,见上一条);本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出,不必等全量回归;\n    v2830/mr: 命名空间 213 / 装载文件 205（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（v2.187.0（第三批 E4/E6/E8）：campaign / atlas / depCheck 三命名空间 ⇒ 两边各 +1，叠加 ui/* 三件后装载文件面 194 → 197；v2.135.0（E6）新增 engines/foreshadow.js ⇒ 两边各 +1；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）十二个新引擎 ⇒ 两边各 +12；v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '
@@ -431,8 +433,8 @@ async function judge(a) {
   //   `injectBudgetTables` / `rejectRecoveryTables`：两个算法引擎在求值期先取表，
   //   这是**有意为之的装载期读**（index.js 把两个 tables 文件排在各自引擎之前），
   //   不是次序违规（orderViolation 仍为 0）。判据就此同批同步：六 ns → 八 ns。
-  a(Object.keys(providers).sort().join(',') === 'backstageProtocols,injectBudgetTables,l3Registry,perfTrace,pushApiRegistry,registerModule,rejectRecoveryTables,settingsBus,workflow,worldLabTables,worldTables',
-    'v2830/mr: 全库装载期只依赖十一个 ns（backstageProtocols / injectBudgetTables / l3Registry / perfTrace / pushApiRegistry / registerModule / rejectRecoveryTables / settingsBus / worldLabTables / worldTables / workflow）——'
+  a(Object.keys(providers).sort().join(',') === 'backstageProtocols,injectBudgetTables,l3Registry,perfTrace,pushApiRegistry,registerModule,rejectRecoveryTables,settingsBus,toolDiagTables,workflow,worldLabTables,worldTables',
+    'v2830/mr: 全库装载期只依赖十二个 ns（backstageProtocols / injectBudgetTables / l3Registry / perfTrace / pushApiRegistry / registerModule / rejectRecoveryTables / settingsBus / worldLabTables / worldTables / workflow）——'
     + 'v2.182.0（第二批 · O3）：engines/perf-baseline.js 在装载期就对 perfTrace.CLASS_DEF 做深拷贝'
     + '（冻结预算副本），故 perfTrace 成了第四条装载期依赖 —— 也是唯一一条数据面硬边（前三条都是接口面）。'
     + '实测：摘掉 store/clock 零消费方失败（引用最多 ≠ 必须先装载）。v2.114.0 起 registerModule 也进了装载期依赖面：'
@@ -477,7 +479,7 @@ async function judge(a) {
   a(/cfgBtn\.onclick = /.test(pSrc), 'v2830/ui: 配置包绑定无短路守卫');
   a(/wa-cfg-view[\s\S]{0,4000}exportConfig\(/.test(pSrc) || /exportConfig\(\)[\s\S]{0,4000}wa-cfg-view/.test(pSrc) || /const ex = WA\.settingsBus\.exportConfig\(\);/.test(pSrc),
     'v2830/ui: 绑定体内真调 exportConfig（不是空壳按钮）');
-  const dSrc = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  const dSrc = require('./diag-source.js')();
   // 静态面登记 wa-cfg-view（首屏就渲染）；动态面登记其余 7 个（点开才逐步渲染）——
   //   首版把 wa-cfg-copy 也放进静态面，被「逐页无缺失」判成静态渲染缺失（实测踩到）。
   a(dSrc.indexOf("      'wa-cfg-view',") > 0, 'v2830/ui: wa-cfg-view 纳入 UI_BINDINGS 静态面');

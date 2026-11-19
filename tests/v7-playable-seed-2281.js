@@ -21,7 +21,7 @@ const SEED_REL = 'engines/playable-seed.js';
 const BP_REL = 'engines/playable-blueprint.js';
 const SEED_SRC = fs.readFileSync(path.join(BASE, SEED_REL), 'utf8');
 const BP_SRC = fs.readFileSync(path.join(BASE, BP_REL), 'utf8');
-const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+const DIAG_SRC = require('./diag-source.js')();
 const PANEL_SRC = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
 // v2.524.0 收口（本轮修红）：**控件的「渲染」与「绑定」在既有结构里分居两处** ——
 //   页面 HTML 由 `ui/pages/*.js` 产出，事件绑定留在 `ui/panel.js`（全局委托）。A7e 原来

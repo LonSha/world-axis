@@ -82,7 +82,13 @@ function countOcc(s, sub) { return s.split(sub).length - 1; }
 //   断言字面量一条未改，只把输入面换回重组面。
 function read(rel) {
   if (rel === REL_PANEL) return require('./panel-source.js').panelSource();
-  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+  return fs.readFileSync(path.join(BASE, rel), 'utf8')
+    // OPV29-07：tool-diag 的注册表/校验表已出闸到 engines/tool-diag-tables.js。
+    //   本读取器给 rel 是 tool-diag 时补上表源 —— 判据问的是「产品里有没有这条登记」，
+    //   不是「它写在哪个文件」（与 e9 锁改读「引擎+表」合并面同一口径）。
+    + (rel === 'engines/tool-diag.js'
+      ? String.fromCharCode(10) + fs.readFileSync(path.join(BASE, 'engines/tool-diag-tables.js'), 'utf8')
+      : '');
 }
 function ov(file, src) { const o = {}; o[file] = src; return o; }
 

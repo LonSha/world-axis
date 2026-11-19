@@ -29,7 +29,7 @@ const SEED_REL = 'engines/playable-seed.js';
 const BP_REL = 'engines/playable-blueprint.js';
 const SEED_SRC = fs.readFileSync(path.join(BASE, SEED_REL), 'utf8');
 const BP_SRC = fs.readFileSync(path.join(BASE, BP_REL), 'utf8');
-const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+const DIAG_SRC = require('../../tests/diag-source.js')();
 const PANEL_SRC = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
 const IDX_SRC = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
 

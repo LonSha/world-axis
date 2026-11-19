@@ -57,7 +57,7 @@ function runAll(a) {
     a(judgeGroupsByStatus(s), 'v2870/cv: [A1] 当前状态按真实状态分组（锚点恰 1 次，实 '
       + countIn(s, ANCHOR) + '）');
     a(s.indexOf('stateView: stateView') > 0, 'v2870/cv: [A2] 当前状态是**独立成员**（与 stat 分列，不合并）');
-    const diag = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diag = require('./diag-source.js')();
     a(diag.indexOf('WA.causal.stateView') > 0,
       'v2870/cv: [A1] tool-diag 真消费 stateView（没人读的出口就是死导出）');
   }

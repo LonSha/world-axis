@@ -1,13 +1,13 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 566,
- "loadedCount": 545,
+ "loadOrderCount": 567,
+ "loadedCount": 546,
  "uiCount": 21,
- "nsCount": 556,
+ "nsCount": 557,
  "totals": {
-  "loadEdges": 436,
+  "loadEdges": 438,
   "hardEdges": 0,
-  "callRefs": 699,
+  "callRefs": 701,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -338,6 +338,7 @@
     "engines/thread-sprout.js",
     "engines/time-ledger.js",
     "engines/token-budget.js",
+    "engines/tool-diag-tables.js",
     "engines/trace-post.js",
     "engines/training.js",
     "engines/travel-desk.js",
@@ -880,6 +881,7 @@
     "engines/thread-sprout.js",
     "engines/time-ledger.js",
     "engines/token-budget.js",
+    "engines/tool-diag-tables.js",
     "engines/trace-post.js",
     "engines/training.js",
     "engines/travel-desk.js",
@@ -1607,12 +1609,37 @@
    "stateKeys": [],
    "consumedBy": []
   },
+  "engines/tool-diag-tables.js": {
+   "ns": [
+    "toolDiagTables"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "engines/tool-diag.js"
+   ]
+  },
   "engines/tool-diag.js": {
    "ns": [
     "toolDiag"
    ],
-   "requires": [],
-   "requiresFiles": [],
+   "requires": [
+    "toolDiagTables"
+   ],
+   "requiresFiles": [
+    "engines/tool-diag-tables.js"
+   ],
    "providerOrderOk": true,
    "callRefs": [],
    "ghostRefs": [],

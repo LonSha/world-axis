@@ -44,7 +44,13 @@ const SELF_REL = 'tests/capability-tier-v2257.js';
 
 function rd(rel, ov) {
   if (ov && ov[rel] !== undefined) return ov[rel];
-  return fs.readFileSync(path.join(BASE, rel), 'utf8');
+  return fs.readFileSync(path.join(BASE, rel), 'utf8')
+    // OPV29-07：tool-diag 的注册表/校验表已出闸到 engines/tool-diag-tables.js。
+    //   本读取器给 rel 是 tool-diag 时补上表源 —— 判据问的是「产品里有没有这条登记」，
+    //   不是「它写在哪个文件」（与 e9 锁改读「引擎+表」合并面同一口径）。
+    + (rel === 'engines/tool-diag.js'
+      ? String.fromCharCode(10) + fs.readFileSync(path.join(BASE, 'engines/tool-diag-tables.js'), 'utf8')
+      : '');
 }
 function cnt(s, n) { return String(s).split(n).length - 1; }
 function must1(s, n, tag) {

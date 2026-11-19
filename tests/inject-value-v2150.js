@@ -241,7 +241,7 @@ function probeWiring() {
 }
 
 function probeDiagPanel() {
-  const td = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  const td = require('./diag-source.js')();
   const pn = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
   const ids = ['wa-iv-refresh', 'wa-iv-enabled', 'wa-iv-zero', 'wa-iv-max'];
   return { hasSec: td.indexOf('function secInjectValue()') > 0,

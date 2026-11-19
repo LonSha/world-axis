@@ -62,7 +62,13 @@ const ROOT = path.resolve(__dirname, '..');
 const CANON = 'engines/canon.js', DIAG = 'engines/tool-diag.js', PANEL = 'ui/panel.js';
 let PASS = 0, FAIL = 0;
 const a = (ok, msg) => { if (ok) PASS++; else { FAIL++; console.log('  ✗ ' + msg); } };
-function src(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
+function src(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8')
+    // OPV29-07：tool-diag 的注册表/校验表已出闸到 engines/tool-diag-tables.js。
+    //   本读取器给 rel 是 tool-diag 时补上表源 —— 判据问的是「产品里有没有这条登记」，
+    //   不是「它写在哪个文件」（与 e9 锁改读「引擎+表」合并面同一口径）。
+    + (rel === 'engines/tool-diag.js'
+      ? String.fromCharCode(10) + fs.readFileSync(path.join(ROOT, 'engines/tool-diag-tables.js'), 'utf8')
+      : ''); }
 function hits(s, x) { return s.split(x).length - 1; }
 function must1(s, x, tag) { const n = hits(s, x); if (n !== 1) throw new Error('anchor hits != 1 (' + n + ') :: ' + tag); return n; }
 // ══════════════ 真源码破坏锚点（各自恰中 1 次）══════════════

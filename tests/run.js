@@ -442,7 +442,7 @@ const LOAD = [
   'core/exec.js',
   'engines/backstage-protocols.js', 'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/inline-tags.js', 'engines/periodicals.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
-  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget-tables.js', 'engines/inject-budget.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js', 'engines/kaleidoscope.js',
+  'engines/chapters.js', 'engines/opinion.js', 'engines/bridge.js', 'engines/lonsha-reader.js', 'engines/direct-event.js', 'engines/editor-faction.js', 'engines/editor-events.js', 'engines/inspector-state.js', 'engines/tool-snapshot.js', 'engines/tool-analyzer.js', 'engines/tool-import.js', 'engines/inject-inspector.js', 'engines/inject-budget-tables.js', 'engines/inject-budget.js', 'engines/tool-diag-tables.js', 'engines/tool-diag.js', 'engines/contract-audit.js', 'engines/memory-sampler.js', 'engines/sampler-check.js', 'engines/inject-channel.js', 'engines/inject-slot-audit.js', 'engines/proactive.js', 'engines/wb-inject.js', 'engines/entry-router.js', 'engines/kaleidoscope.js',
   // v2.50.0（第三十五面）: 宿主两侧 + 时间轴三账。
   //   位置与 index.js LOAD_ORDER 同序（须早于 render/inject.js，须晚于 engines/timeline.js）
   'engines/host-wb-trace.js', 'engines/ledger-timeline.js', 'engines/floor-changes.js',
@@ -2758,7 +2758,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
   assert(panelSrc300.indexOf('wa-quar-view') >= 0 && panelSrc300.indexOf('隔离现场') >= 0, '面板含「隔离现场」入口');
   assert(panelSrc300.indexOf('wa-recovery-dl') >= 0 && panelSrc300.indexOf('导出恢复点') >= 0, '面板含「导出恢复点」入口');
   assert(panelSrc300.indexOf('restoreQuarantine') >= 0 && panelSrc300.indexOf('dropQuarantine') >= 0, '面板接线恢复/丢弃动作');
-  const diagSrc300 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  const diagSrc300 = require('./diag-source.js')();
   assert(diagSrc300.indexOf('quarantineStat') >= 0 && diagSrc300.indexOf('rescueStat') >= 0, '错误报告透出隔离现场与救援统计');
 
   // 清理现场
@@ -3128,7 +3128,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
   assert(stSrc400.indexOf('WA.store.maintain({ apply: true') >= 0 && /minFreedBytes:\s*256\s*\*\s*1024/.test(stSrc400), 'init 以保守门槛（256KB）接入自动治理');
 
   // ── 12. F 块：闭环接线（报告 + 面板）──
-  const diagSrc400 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  const diagSrc400 = require('./diag-source.js')();
   assert(diagSrc400.indexOf('## 健康巡视') >= 0, '错误报告含「健康巡视」段（裁决视图可带走）');
   assert(diagSrc400.indexOf('maintain: WA.store.maintain') >= 0 || diagSrc400.indexOf('maintain: WA.store.maintain ?') >= 0, '诊断包透出健康巡视');
   assert(diagSrc400.indexOf('integrity: WA.store.integrityStat') >= 0, '诊断包透出写入完整性审计');
@@ -3398,7 +3398,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     const conc500 = dg500.worldState.storage.concurrency;
     assert(!!conc500.conflict && !!conc500.external && Array.isArray(conc500.sites), 'concurrency 含 conflict/external/sites');
   } else { assert(true, 'toolDiag 未加载时跳过 collect 断言'); }
-  const diagSrc500 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  const diagSrc500 = require('./diag-source.js')();
   assert(diagSrc500.indexOf('## 并发一致性') >= 0, '错误报告含「## 并发一致性」段');
   assert(diagSrc500.indexOf('外部写入（其他标签页）') >= 0, '报告透出外部写入计量');
   assert(diagSrc500.indexOf('冲突现场: 无') >= 0, '报告在无现场时给出明确「无」');
@@ -5705,7 +5705,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
   section('v2.2.0 块3：诊断出口收口（修功能级失效）');
   {
     fresh2200();
-    const dSrcC2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const dSrcC2200 = require('./diag-source.js')();
     const sSrcC2200 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
     // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
@@ -5845,7 +5845,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     fresh2200();
     const regSrcD2200 = fs.readFileSync(path.join(BASE, 'actors/registry.js'), 'utf8');
     const profSrcD2200 = fs.readFileSync(path.join(BASE, 'actors/profile.js'), 'utf8');
-    const dSrcD2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const dSrcD2200 = require('./diag-source.js')();
     const sSrcD2200 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
     const pSrcD2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
 
@@ -6007,7 +6007,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
     const sbSrcE2200 = fs.readFileSync(path.join(BASE, 'core/settings-bus.js'), 'utf8');
     const sSrcE2200 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
     const pSrcE2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-    const dSrcE2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const dSrcE2200 = require('./diag-source.js')();
 
     // E1. 接入位 + 静态锚点
     assert(typeof WA.settingsBus.deregisterOrphan === 'function', 'settingsBus.deregisterOrphan 存在（孤儿注销出口）');
@@ -6164,7 +6164,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
   {
     fresh2200();
     const bsSrcF2200 = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
-    const dSrcF2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const dSrcF2200 = require('./diag-source.js')();
     const pSrcF2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
 
     // F1. 接入位
@@ -6353,7 +6353,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
   section('v2.2.0 块8：UI 绑定守卫全覆盖');
   {
     fresh2200();
-    const dSrcH2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const dSrcH2200 = require('./diag-source.js')();
     const pSrcH2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
 
     // H1. 分层结构
@@ -8525,7 +8525,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       }
       {
         // readEx 的真实消费端：诊断侧必须做现场抽查（否则 readEx 是死导出）
-        const diagSpot = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+        const diagSpot = require('./diag-source.js')();
         assert(diagSpot.indexOf('readEx') > 0 && diagSpot.indexOf('readSpotCheck') > 0,
           'readEx 有真实消费端（诊断现场抽查），非声明面空转');
         // 语义：现造一个「有磁盘值但读不出来」的键，抽查必须抓到它
@@ -8573,7 +8573,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       assert(typeof WA.settingsBus.readStat === 'function', 'settingsBus.readStat 已导出');
       assert(typeof WA.store.readStat === 'function', 'store.readStat 已导出');
       // ④ 双消费端接线：诊断 + 健康分（「新规则必须接双消费端」）
-      const diagG15 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+      const diagG15 = require('./diag-source.js')();
       const storeSrcG15 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
       const panelG15 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
       assert(diagG15.indexOf('settingsBus.readFailed') > 0 && diagG15.indexOf('store.readFailed') > 0,
@@ -8734,7 +8734,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       }
       assert(fs.existsSync(probeAbs16) === false, '（环境）G16 探针文件已清理，不残留');
     }
-    const diagSrc2800 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2800 = require('./diag-source.js')();
     const mi2800 = diagSrc2800.indexOf('const MODULE_EXPORTS = {');
     const mj2800 = diagSrc2800.indexOf('\n  };', mi2800);
     const MODEX2800 = vm.runInNewContext('(' + diagSrc2800.slice(diagSrc2800.indexOf('{', mi2800), mj2800 + 4) + ')');
@@ -9515,7 +9515,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
   // ── 块3：双消费端（诊断 + 健康分 + 面板）——防「声明面空转」 ──
   section('v2.10.0 块3：双消费端（诊断 + 健康分 + 面板）——防「声明面空转」');
   {
-    const dgS = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const dgS = require('./diag-source.js')();
     const stS = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
     const pnS = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
     assert(dgS.indexOf('WA.settingsBus.readStat') > 0, '诊断采集 settingsBus 读侧台账');
@@ -9720,7 +9720,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
       '读侧完整性契约留痕（可回溯）');
     assert(busS.indexOf('v2.10.0') > 0, 'settings-bus 读侧出口留痕');
     assert(storeS.indexOf('v2.10.0') > 0, 'store 读侧归因留痕');
-    assert(fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8').indexOf('v2.10.0') > 0, '诊断消费端留痕');
+    assert(require('./diag-source.js')().indexOf('v2.10.0') > 0, '诊断消费端留痕');
     assert(fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8').indexOf('v2.10.0') > 0, '面板消费端留痕');
   }
   // ══════════════════════════════════════════════════════════════════════════
@@ -9796,7 +9796,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
         while ((m = RE_SRC.exec(txt))) srcTags2110[m[1]] = rel;
       });
       // 从诊断源码里取标签表（括号配平提取，避免注释里的 `{` 破坏切片）
-      const dgTagSrc = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+      const dgTagSrc = require('./diag-source.js')();
       const t0 = dgTagSrc.indexOf('const SRC_LABEL = {');
       let depth = 0, t1 = -1;
       for (let i = dgTagSrc.indexOf('{', t0); i < dgTagSrc.length; i++) {
@@ -9945,7 +9945,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     assert((WA.settingsBus.stats.schemaStatus.failed || 0) === failBefore + 1,
       '（正向）盖章写失败记 failed（实 ' + (WA.settingsBus.stats.schemaStatus.failed || 0) + '）');
     // 双消费端
-    const diagB = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagB = require('./diag-source.js')();
     const panelB = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
     assert(diagB.indexOf('settingsBus.schemaStale') > 0 && diagB.indexOf('settingsBus.schemaStampFailed') > 0,
       '诊断消费指纹状态（陈旧 / 盖章失败两条议题）');
@@ -9999,7 +9999,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
   section('v2.11.0 块4：面C 死面接线（真功能断链接通真实消费端）');
   {
     const panelC = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-    const diagC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagC = require('./diag-source.js')();
     const bsC = fs.readFileSync(path.join(BASE, 'engines/backstage.js'), 'utf8');
     const calC = fs.readFileSync(path.join(BASE, 'engines/calendar.js'), 'utf8');
     // ① backstage 运行态 / 中止
@@ -12157,7 +12157,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     assert(mt18.signals.lonshaEchoPresent === false && mt18.signals.lonshaLedgers === 0
       && mt18.signals.lonshaBridgeConflict === 0,
       '无 LonSha 环境下如实报 0/false（不是无名 null，也不是扣分项）');
-    const dSrc18 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const dSrc18 = require('./diag-source.js')();
     assert(dSrc18.indexOf('lonshaLedgers') >= 0 && dSrc18.indexOf('lonshaBridges') >= 0
       && dSrc18.indexOf('lonshaEchoKeys') >= 0,
       '诊断 flatten 清单新增三行（账本画像 / 对读面 / **上游键集自证**）'
@@ -14759,7 +14759,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
       + JSON.stringify((denyBroken2400['state.round-read'] || {})) + '）');
 
     //   E2 规则③：把真源码里的裸读改成骨架外键（同时验证它在原版不报、破坏后必报）
-    const tdSrc2400 = fs2400.readFileSync(path2400.join(__dirname, '..', 'engines/tool-diag.js'), 'utf8');
+    const tdSrc2400 = require('./diag-source.js')();
     const tdBroken2400 = tdSrc2400.split('WA.store.get().lastInjection')
       .join('WA.store.get().ghostProbe2400');
     assert(tdBroken2400 !== tdSrc2400, 'v2400: （负向自证）E2 破坏锚点恰命中');
@@ -15399,7 +15399,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
       assert(panelSrc2470.indexOf('Object.keys(ps).forEach') < 0,
         'v2470: [接线] 旧的「Object.keys(perSlot)」遍历已消失');
       // 诊断面登记：去向区块是纯只读文本、不引入控件，inject 组 id 不变（明写留痕）
-      const tdSrc2470 = fs2470.readFileSync(path2470.join(__dirname, '..', 'engines/tool-diag.js'), 'utf8');
+      const tdSrc2470 = require('./diag-source.js')();
       assert(tdSrc2470.indexOf('「注入项去向」区块**不引入控件**') > 0,
         'v2470: [诊断] UI_BINDINGS 旁明写「去向区块不引入控件」（防后续误判漏登记）');
     }
@@ -15684,7 +15684,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
       const fsH2480 = require('fs'), pathH2480 = require('path');
       const srcInj2480 = fsH2480.readFileSync(pathH2480.join(__dirname, '..', 'render/inject.js'), 'utf8');
       const srcAud2480 = fsH2480.readFileSync(pathH2480.join(__dirname, '..', 'engines/inject-slot-audit.js'), 'utf8');
-      const srcDiag2480 = fsH2480.readFileSync(pathH2480.join(__dirname, '..', 'engines/tool-diag.js'), 'utf8');
+      const srcDiag2480 = require('./diag-source.js')();
       const srcPan2480 = fsH2480.readFileSync(pathH2480.join(__dirname, '..', 'ui/panel.js'), 'utf8');
       assert(srcInj2480.indexOf('const landedKeys = Array.isArray(slotRes.landed)') >= 0,
         'v2480: [静态] 渲染侧按真名单登记接管键位');
@@ -15722,7 +15722,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
     const fs2490 = require('fs'), path2490 = require('path');
     const srcInj2490 = fs2490.readFileSync(path2490.join(__dirname, '..', 'render/inject.js'), 'utf8');
     const srcAud2490 = fs2490.readFileSync(path2490.join(__dirname, '..', 'engines/inject-slot-audit.js'), 'utf8');
-    const srcDiag2490 = fs2490.readFileSync(path2490.join(__dirname, '..', 'engines/tool-diag.js'), 'utf8');
+    const srcDiag2490 = require('./diag-source.js')();
     const srcPan2490 = fs2490.readFileSync(path2490.join(__dirname, '..', 'ui/panel.js'), 'utf8');
 
     // ── A 组：写侧 ──
@@ -17883,7 +17883,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
       'v2121: 面板真调 auditLog.exportVol（否则「导出审计」按钮是个空壳）');
     assert(panelSrc2121.indexOf('WA.auditLog.verifyVolWith(') > 0,
       'v2121: 面板真调 auditLog.verifyVolWith（否则「带外核对」按钮是个空壳）');
-    const diagSrc2121 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2121 = require('./diag-source.js')();
     assert(diagSrc2121.indexOf('audit: secAudit(),') > 0,
       'v2121: 诊断采集真调 secAudit（第二处消费方：诊断只读口）');
   }
@@ -17930,7 +17930,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
       'v2123: 面板真读局部重算读数（否则「重算 N 源 / 跳过 M 源」只有测试看得见）');
     assert(panelSrc2123.indexOf("id=\"wa-perf-band\"") > 0 && panelSrc2123.indexOf('WA.perfTrace.bandCompare()') > 0,
       'v2123: 面板真调档位面（否则「档位面」按钮是个空壳）');
-    const diagSrc2123 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2123 = require('./diag-source.js')();
     assert(diagSrc2123.indexOf('band: WA.perfTrace.bandCompare({ dryRun: true }),') > 0,
       'v2123: 诊断采集真读档位**结构**面（且带 dryRun —— 诊断是旁观，不跑基准）');
   }
@@ -17978,7 +17978,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
     await runLock('./sandbox-isolation-v2125.js');
     await runLock('./sandbox-isolation-v2125.js', 'runNegative');
     // 真消费方判据：有出口必须有读者（导出了没人看 = 不存在）。
-    const diagSrc2125 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2125 = require('./diag-source.js')();
     assert(diagSrc2125.indexOf('WA.sandbox.isolationReport()') > 0,
       'v2125: 诊断节真读隔离报告（P7 的唯一真消费方 —— 没有它，报告只是一份自述）');
     assert(diagSrc2125.indexOf('probesOk') > 0,
@@ -18064,7 +18064,7 @@ assert(r2900.dead.length === 2010 && r2900.uiDead.length === 7 && r2900.dataOnly
     assert(injSrc2127.indexOf("if (vis.chrono && WA.chrono)") > 0
       && injSrc2127.indexOf("'世界编年史'") > 0,
       'v2127: 注入源 `chrono` 与注入分支同批登记（只加一边 = 声明了没人消费 / 开关点了零效果）');
-    const diagSrc2127 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2127 = require('./diag-source.js')();
     assert(diagSrc2127.indexOf('WA.chrono.chronicle({ limit: 12 })') > 0,
       'v2127: 诊断节真读 chronicle（没有它 chronicle 就是死导出 —— 死导出面门禁会当场红灯）');
     // 两个新读数面**都不上 WA.render**（口径与 v2.86.0 A3 / v2.103.0 同）
@@ -18408,7 +18408,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       && causalSrc2146.indexOf('function rippleDiscipline(') > 0,
       'v2146: causal 导出 rippleWeb / endingsTree / rippleDiscipline 三口');
     // 诊断只读消费两读数 + UI 绑定登记两按钮
-    const tdSrc2146 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdSrc2146 = require('./diag-source.js')();
     assert(tdSrc2146.indexOf('wa-causal-ripple') > 0 && tdSrc2146.indexOf('wa-causal-endings') > 0,
       'v2146: UI_BINDINGS 登记 wa-causal-ripple / wa-causal-endings 两出口');
     const panelSrc2146 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
@@ -18430,7 +18430,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(causalSrc2147.indexOf('function traceGraph(') > 0 && causalSrc2147.indexOf('traceGraph: traceGraph') > 0,
       'v2147: causal 实现并导出 traceGraph（引擎面）');
     // 诊断只读消费 + UI 绑定登记 + 面板输入框/按钮
-    const tdSrc2147 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdSrc2147 = require('./diag-source.js')();
     assert(tdSrc2147.indexOf('wa-causal-trace') > 0 && tdSrc2147.indexOf('wa-causal-trace-key') > 0,
       'v2147: UI_BINDINGS 登记 wa-causal-trace / wa-causal-trace-key 两出口');
     const panelSrc2147 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
@@ -18450,7 +18450,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(tapeStoreSrc2148.indexOf('WA.tapeStore = {') > 0 && tapeStoreSrc2148.indexOf('function save(vol)') > 0,
       'v2148: tapeStore 实现并导出磁带仓库');
     // 六控件的接线真源是 tool-diag.UI_BINDINGS；每个 ID 另在 panel 渲染恰一次。
-    const tdSrc2148 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdSrc2148 = require('./diag-source.js')();
     const panelSrc2148 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
     const storeIds2148 = ['wa-cw-store-save', 'wa-cw-store-list', 'wa-cw-store-load',
       'wa-cw-store-drop', 'wa-cw-store-id', 'wa-cw-store-out'];
@@ -18480,7 +18480,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       'v2149: sediment 导出 setSettings 写口（面板「启用世界沉积层」开关的落点，缺它开关恒报 module-missing）');
     // 十三枚控件的接线真源是 tool-diag.UI_BINDINGS；每个 ID 另在 panel 渲染恰一次。
     // 渲染了不登记 ⇒ 「渲染了但绑定的 id 写错」这类断裂在这批控件上永不可见。
-    const tdSrc2149 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdSrc2149 = require('./diag-source.js')();
     const panelSrc2149 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
     const viewIds2149 = ['wa-view-sel', 'wa-view-out'];
     const sedIds2149 = ['wa-sed-enabled', 'wa-sed-place', 'wa-sed-trace', 'wa-sed-key', 'wa-sed-text',
@@ -18558,7 +18558,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(settlePos2150 > 0 && afterPos2150 > 0 && settlePos2150 < afterPos2150,
       'v2150: interceptor 在 after 链推进世界之前结算（推进后 round 已 ++，每轮都会被判成轮次不符）');
     // 四枚控件的接线真源是 tool-diag.UI_BINDINGS；每个 ID 另在 panel 渲染恰一次。
-    const tdSrc2150 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdSrc2150 = require('./diag-source.js')();
     const panelSrc2150 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
     assert(tdSrc2150.indexOf('function secInjectValue()') > 0
       && tdSrc2150.indexOf('injectValue: secInjectValue()') > 0,
@@ -18718,7 +18718,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     const inj2151 = fs.readFileSync(path.join(BASE, 'render/inject.js'), 'utf8');
     assert(inj2151.indexOf('WA.offlineTick.buildBlock()') >= 0 && inj2151.indexOf('WA.farfield.buildBlock()') >= 0,
       'v2151: 离线摘要与已听闻远方消息由真实注入消费');
-    const td2151 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const td2151 = require('./diag-source.js')();
     const panel2151 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
     assert(td2151.indexOf('secOfflineTick()') >= 0 && td2151.indexOf('secFarfield()') >= 0,
       'v2151: 两个新引擎纳入诊断读数');
@@ -18760,7 +18760,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       'v2152: 面板渲染链真实分流进观测面（不是只声明不消费）');
     assert(pnl2152.indexOf('wa-rp-enabled') >= 0 && pnl2152.indexOf('wa-sf-enabled') >= 0,
       'v2152: 两条观测链各有总开关（能关才叫可选，不能关只是隐藏）');
-    const tdg2152 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdg2152 = require('./diag-source.js')();
     assert(tdg2152.indexOf("'ui/render-perf.js': 'renderPerf'") >= 0
       && tdg2152.indexOf("'engines/storage-forecast.js': 'storageForecast'") >= 0,
       'v2152: 两个新模块登记进诊断的模块导出表（登记面缺席即判「模块没载」）');
@@ -18816,7 +18816,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(regCount2153(invX2153.codeFace(stSrc2153), 'plotGauge') === 0
       && regCount2153(invX2153.codeFace(cvSrc2153), 'plotGauge') === 0,
       'v2153: 剧情深度仪不登记骨架也不登记逐出点（进程态内存环，界由自带 cap 承担）');
-    const tdg2153 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdg2153 = require('./diag-source.js')();
     assert(tdg2153.indexOf("'engines/plot-gauge.js': 'plotGauge'") >= 0
       && tdg2153.indexOf("'engines/branch-tree.js': 'branchTree'") >= 0,
       'v2153: 两个新模块登记进诊断的模块导出表（登记面缺席即判「模块没载」）');
@@ -18890,7 +18890,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     const injSrc2154 = fs.readFileSync(path.join(BASE, 'render/inject.js'), 'utf8');
     assert(injSrc2154.indexOf('worldBridge') >= 0 && injSrc2154.indexOf("'远方的传说'") >= 0,
       'v2154: 新注入源五处同批登记（SOURCES / DEF / SRC_NAME / SRC_MOD_SETTING / 注入分支——只加其一即声明了没人消费）');
-    const tdg2154 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdg2154 = require('./diag-source.js')();
     assert(tdg2154.indexOf("'engines/world-bridge.js': 'worldBridge'") >= 0
       && tdg2154.indexOf("'engines/eco-audit.js': 'ecoAudit'") >= 0
       && tdg2154.indexOf('secWorldBridge()') >= 0 && tdg2154.indexOf('secEcoAudit()') >= 0,
@@ -18948,7 +18948,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(stSrc2155.indexOf('worldSeed') >= 0 && stSrc2155.indexOf("'worldSeed.library'") >= 0
       && cvSrc2155.indexOf('worldSeed.library') >= 0,
       'v2155: 种子库两处登记齐（骨架物化 + __BOUNDED_CAPS + evict.SITES —— 缺一处即「挤出压根不发生」）');
-    const tdg2155 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdg2155 = require('./diag-source.js')();
     assert(tdg2155.indexOf("'engines/world-seed.js': 'worldSeed'") >= 0 && tdg2155.indexOf('secWorldSeed()') >= 0
       && tdg2155.indexOf('worldSeed: secWorldSeed()') >= 0,
       'v2155: 新模块登记进诊断的模块导出表并纳入诊断读数（登记面缺席即判「模块没载」）');
@@ -19008,7 +19008,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     assert(orSrc2156.indexOf("const SRC = '你不在时';") >= 0
       && fs.readFileSync(path.join(BASE, 'render/inject.js'), 'utf8').indexOf("source: '你不在时'") >= 0,
       'v2156: 摘要源名与注入链逐字同名（consume 的判据输入）');
-    const tdg2156 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const tdg2156 = require('./diag-source.js')();
     assert(tdg2156.indexOf("'engines/playtime.js': 'playtime'") >= 0
       && tdg2156.indexOf("'engines/offline-return.js': 'offlineReturn'") >= 0
       && tdg2156.indexOf('secPlaytime()') >= 0 && tdg2156.indexOf('secOfflineReturn()') >= 0
@@ -19306,7 +19306,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   容量/挤出两处漏登记会让 evict.array 走 unknown-site 静默失败）。
     const ixSrc2164 = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
     const rnSrc2164 = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
-    const dgSrc2164 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const dgSrc2164 = require('./diag-source.js')();
     const stSrc2164 = fs.readFileSync(path.join(BASE, 'core/store.js'), 'utf8');
     const evSrc2164 = fs.readFileSync(path.join(BASE, 'core/evict.js'), 'utf8');
     // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
@@ -20167,7 +20167,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       'v2200: 「拍」页已进 PAGES（页 id 纯小写 —— tests/run.js 的 C11 页清单解析器只认 [a-z]+）');
     assert(panelSrc2198.indexOf('beat: renderBeatCenter,') > 0,
       'v2200: RENDERERS 里有 beat → renderBeatCenter（页表与渲染器成对，ui-gate 的 checkPages 双向同名同数）');
-    const diagSrc2198 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2198 = require('./diag-source.js')();
     assert(diagSrc2198.indexOf("{ page: 'beat', ids:") > 0,
       'v2200: 守卫表新增 beat 页分组（渲染 + 绑定 + 守卫登记三件齐做；登记错页比不登记更坏）');
     // ② 面板真读四引擎的家门口（不是幽灵绑定）：四个 ns 各自的读口至少一处被真调
@@ -20208,7 +20208,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
       'v2201: 「章节」页已进 PAGES（页 id 纯小写 —— C11 页清单解析器只认 [a-z]+）');
     assert(panelSrc2198b.indexOf('chapter: renderChapterWorkbench,') > 0,
       'v2201: RENDERERS 里有 chapter → renderChapterWorkbench');
-    const diagSrc2201 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2201 = require('./diag-source.js')();
     assert(diagSrc2201.indexOf("{ page: 'chapter', ids:") > 0,
       'v2201: 守卫表新增 chapter 页分组（渲染 + 绑定 + 守卫登记三件齐做）');
     // 单一真源：计划 ② 点名的两个口必须是**真调用**（带括号），不是文案里的提及
@@ -20245,7 +20245,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.199.0（第三批·Y4）：待办中心（单一入口的只读聚合面）');
   {
     const panelSrc2199 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-    const diagSrc2199 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2199 = require('./diag-source.js')();
     // ① 页表 / 渲染器 / 守卫登记三处同源
     assert(panelSrc2199.indexOf("{ id: 'todo', icon: '📌', label: '待办' },") > 0,
       'v2202: 「待办」页已进 PAGES（页 id 纯小写 —— C11 页清单解析器只认 [a-z]+）');
@@ -20295,7 +20295,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.200.0（第四批·Y5）：世界快照与整包搬运（把一个世界搬走 / 搬进来）');
   {
     const panelSrc2200 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-    const diagSrc2200 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2200 = require('./diag-source.js')();
     const engSrc2200 = fs.readFileSync(path.join(BASE, 'engines/world-snapshot.js'), 'utf8');
     // ① 页表 / 渲染器 / 守卫登记三处同源（渲染了不登记 ⇒ 绑定断裂永不可见）
     assert(panelSrc2200.indexOf('{ id: \'port\', icon: \'📦\', label: \'搬运\' },') > 0,
@@ -20359,7 +20359,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.201.0（第四批·Y6）：世界历史检索（跨六个库的**一个**检索入口）');
   {
     const panelSrc2201 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-    const diagSrc2201 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2201 = require('./diag-source.js')();
     const engSrc2201 = fs.readFileSync(path.join(BASE, 'engines/history-search.js'), 'utf8');
     // ① 页表 / 渲染器 / 守卫登记三处同源（渲染了不登记 ⇒ 绑定断裂永不可见）
     assert(panelSrc2201.indexOf("{ id: 'find', icon: '🔍', label: '检索' },") > 0,
@@ -20427,7 +20427,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   section('v2.202.0（第四批·Y7）：地图与关系可视化（视图面 —— 节点 / 边 / 异常在同一幅画面里）');
   {
     const panelSrc2202 = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-    const diagSrc2202 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2202 = require('./diag-source.js')();
     const setSrc2202 = fs.readFileSync(path.join(BASE, 'ui/settings.js'), 'utf8');
     const engSrc2202 = fs.readFileSync(path.join(BASE, 'engines/world-graph.js'), 'utf8');
     // ① 页表 / 渲染器 / 守卫登记三处同源（渲染了不登记 ⇒ 绑定断裂永不可见）
@@ -20501,7 +20501,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const panelSrc2203 = require('./panel-source.js').panelSource();
-    const diagSrc2203 = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2203 = require('./diag-source.js')();
     const ruleSrc2203 = fs.readFileSync(path.join(BASE, 'engines/rule-pack.js'), 'utf8');
     // ① 四件事真取四个引擎口（提及不是引用 —— 带开括号才算）与 Y7 节同口径
     assert(panelSrc2203.indexOf('WA.rulePack.save(') > 0 && panelSrc2203.indexOf('WA.rulePack.detect(') > 0,
@@ -20551,7 +20551,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     // v2.401.0(OPV23):锚点已搬进 ui/pages/*.js 段体——改读 panelSource() 重组面
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const panelSrc2203b = require('./panel-source.js').panelSource();
-    const diagSrc2203b = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+    const diagSrc2203b = require('./diag-source.js')();
     const labSrc2203 = fs.readFileSync(path.join(BASE, 'engines/world-lab.js'), 'utf8');
     // ① 四件事真取四个引擎口
     assert(panelSrc2203b.indexOf('WA.worldLab.simulate(') > 0 && panelSrc2203b.indexOf('WA.worldLab.report(') > 0,
@@ -22598,14 +22598,14 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   三件 1140 / 1281 / 1333 行，三表 167 / 66 / 61 行（零具名函数，尾调 registerModule 进账本）。
     //   负控制（真破坏）：CHANNELS 字面量回流引擎 ⇒ FAIL 1/36；拿掉 world-lab 缺表守卫 ⇒ FAIL 2/36；还原回 pass (36)。
     await runScript('./opv29-z1-11-v2529.js');
+    // v2.529.0（V29 Z1）：OPV29-07 tool-diag 拆段（注册表 / 面板绑定表 / 引擎端口表出闸）—— 23 项。
+    //   8425 → 6004 行；表 2467 行（映射 561 条 / 可选面 23 / 绑定 69 组 / 端口 26 枚），引擎求值期先取表。
+    //   负控制（真破坏）：拿掉守卫 ⇒ FAIL 3/23；表给 null ⇒ FAIL 1/23；表给空对象（静默降级）⇒ FAIL 2/23。
+    await runScript('./opv29-z1-07-v2529.js');
     // v2.529.0（V29 Z1）：OPV29-09 reject-recovery 拆段（账本与判定分离）—— 19 项。
-    //   1388 行里 1162 行（84%）是冻结表（七块：三面快照 1682/139/84 等），搬到
-    //   engines/reject-recovery-tables.js（1204 行纯数据、零具名函数），引擎降到 244 行；
-    //   求值期先取表，缺表 / 空表当场抛错。双登记同序（tables 在引擎之前）。
-    //   连带修：tools/reject-recovery.js 隔离装载改先表后引擎；锁 v2192 的 7 个表锚点归位，
-    //   破坏版装载改为按表源跑；y3 A7 / y8 A11c 快照锚点归位；beat-facade 的 U5 宿主补表；
-    //   cycle-gate B1/B2/B3/B5 实测回填 564 / 430·3938·4368 / 563 / 607·553·564（B6 差 54 不动）。
-    //   负控制（真破坏）：快照字面量回流引擎 ⇒ FAIL 4/19；守卫换静默降级 ⇒ FAIL 4/19；还原回 pass (19)。
+    //   1388 行里 1162 行（84%）是冻结表（三面快照 1682/139/84 等）⇒ engines/reject-recovery-tables.js
+    //   （1204 行纯数据），引擎降到 244 行；求值期先取表、缺表抛出。连带修 v2192/y3/y8/beat-facade 锚点。
+    //   负控制（真破坏）：快照回流 ⇒ FAIL 4/19；守卫换静默降级 ⇒ FAIL 4/19；还原回 pass (19)。
     await runScript('./opv29-z1-09-v2529.js');
     // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
     //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是

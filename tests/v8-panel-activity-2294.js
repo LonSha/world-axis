@@ -35,7 +35,8 @@ a(noSwitch.length > 0 && d.rows.some(r => noSwitch.indexOf(r.key) >= 0 && r.stat
  W.karma.buildBlock=()=>'';W.store.transact(s=>{s.karma=[{fact:'declared'}];});
  W.karma.record=()=>({ok:true});W.writeDesk.call('karma','record',[]);
  a(W.toolDiag.secPanelYield().rows.find(r=>r.key==='karma').why==='written-container-without-yield','successful receipt plus populated container detects detached renderer');
- const rel='engines/tool-diag.js',src=fs.readFileSync(path.join(BASE,rel),'utf8');
+ const rel='engines/tool-diag.js',src=fs.readFileSync(path.join(BASE,rel),'utf8')
+  + fs.readFileSync(path.join(BASE,'engines/tool-diag-tables.js'),'utf8');  // OPV29-07：登记表已出闸，读合并面
  const broken=must1(src,"state = 'fault'; why = 'written-container-without-yield';","state = 'no-data'; why = 'missed';");
  const predicate=model=>{prefetch(model);model.karma.setSettings({enabled:true});model.karma.buildBlock=()=>'';model.karma.record=()=>({ok:true});model.store.transact(s=>{s.karma=[{fact:'declared'}];});model.writeDesk.call('karma','record',[]);return model.toolDiag.secPanelYield().rows.find(r=>r.key==='karma').state==='fault';};
  a(predicate(load()),'same detached-renderer predicate passes on original');

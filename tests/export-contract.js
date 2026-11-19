@@ -22,7 +22,9 @@ const ctx = vm.createContext(global);
 for (const rel of LOAD) vm.runInContext(fs.readFileSync(path.join(BASE, rel), 'utf8'), ctx, { filename: rel });
 // 刻意**不**装载 UI 层：口径必须与 tests/run.js 的测试块一致（无头环境不装载 UI），
 // 否则冻结串里会多出 ui/uiSettings/assistant 的成员，而测试块那里根本没有这些导出。
-const diagSrc = fs.readFileSync(BASE + '/engines/tool-diag.js', 'utf8');
+// OPV29-07：MODULE_EXPORTS / OPTIONAL_EXPORTS 已搬到 engines/tool-diag-tables.js（纯表），
+//   本判据取的是**字面量声明表**，所以直接读表源（读合并面会先命中引擎里的取表赋值行）。
+const diagSrc = require('./diag-source.js').tables();
 const mi = diagSrc.indexOf('const MODULE_EXPORTS = {');
 const mj = diagSrc.indexOf('\n  };', mi);
 const MODULE_EXPORTS = vm.runInNewContext('(' + diagSrc.slice(diagSrc.indexOf('{', mi), mj + 4) + ')');

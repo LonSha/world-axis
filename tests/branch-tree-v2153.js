@@ -54,7 +54,7 @@ function runA(a) {
   //   于是恒为空树，而全库所有门禁都是绿的（死子面把它归为 self-only，看着像「内部自用」）。
   //   判据只问「产品面有没有调用点」与「守卫表收没收」，不绑变量名、不绑实现形态。
   const panel = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-  const diag = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  const diag = require('./diag-source.js')();
   const Q = String.fromCharCode(34);
   a(panel.indexOf('WA.branchTree.fork(') >= 0, 'v2153/bt A8: 产品面有 fork 调用点（写口接线，v2.154.0 补）');
   a(panel.indexOf('WA.branchTree.choose(') >= 0, 'v2153/bt A9: 产品面有 choose 调用点（写口接线，v2.154.0 补）');

@@ -7,10 +7,13 @@ const sync = require("./ui-gate-sync.js");
 const REL = "engines/operations.js";
 const SRC = fs.readFileSync(REL, "utf8");
 const INJ = fs.readFileSync("render/inject.js", "utf8");
-const BUD = fs.readFileSync("engines/inject-budget.js", "utf8");
+// OPV29-10：PRIORITY / ACCOUNTS 已搬到 engines/inject-budget-tables.js，读「引擎+表」合并面。
+const BUD = fs.readFileSync('engines/inject-budget.js', 'utf8')
+  + fs.readFileSync('engines/inject-budget-tables.js', 'utf8');
 const PAN = fs.readFileSync("ui/panel.js", "utf8");
 const IDX = fs.readFileSync("index.js", "utf8");
-const DIAG = fs.readFileSync("engines/tool-diag.js", "utf8");
+// OPV29-07：注册表/校验表已搬到 engines/tool-diag-tables.js，读「引擎+表」合并面。
+const DIAG = require('./diag-source.js')();
 const MAN = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
 const RUN = fs.readFileSync("tests/run.js", "utf8");
 var pass = 0, fail = 0;

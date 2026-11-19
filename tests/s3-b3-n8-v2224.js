@@ -60,7 +60,13 @@ const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
 const ENG_REL = 'engines/branch-diff.js';
 const SELF_REL = 'tests/s3-b3-n8-v2224.js';
-function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8')
+    // OPV29-07：tool-diag 的注册表/校验表已出闸到 engines/tool-diag-tables.js。
+    //   本读取器给 rel 是 tool-diag 时补上表源 —— 判据问的是「产品里有没有这条登记」，
+    //   不是「它写在哪个文件」（与 e9 锁改读「引擎+表」合并面同一口径）。
+    + (rel === 'engines/tool-diag.js'
+      ? String.fromCharCode(10) + fs.readFileSync(path.join(BASE, 'engines/tool-diag-tables.js'), 'utf8')
+      : ''); }
 function cnt(s, n) { return s.split(n).length - 1; }
 function j(x) { return JSON.stringify(x); }
 /** 把「设置态」按各引擎**自己的**默认值显式写回(装置件、模块级 —— 理由与 Y6~Y9/N7 同)。 */

@@ -34,7 +34,7 @@ if (li < 0 || lj < 0) { console.error('无法从 tests/run.js 提取 LOAD 清单
 const LOAD = vm.runInNewContext('(' + runSrc.slice(runSrc.indexOf('[', li), lj + 1) + ')');
 
 // ── 2. 声明表：MODULE_EXPORTS（文件 ↔ 命名空间）从 tool-diag 源码取字面量 ──
-const diagSrc = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+const diagSrc = require('./diag-source.js').tables();
 const mi = diagSrc.indexOf('const MODULE_EXPORTS = {');
 const mj = diagSrc.indexOf('\n  };', mi);
 if (mi < 0 || mj < 0) { console.error('无法从 tool-diag.js 提取 MODULE_EXPORTS'); process.exit(2); }

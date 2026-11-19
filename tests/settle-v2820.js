@@ -458,7 +458,7 @@ function probeGuardedKey(WA) {
 function probeWiring(WA) {
   const srcIdx = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
   const srcRun = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
-  const srcDiag = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  const srcDiag = require('./diag-source.js')();
   const owner = srcDiag.indexOf("'engines/checkpoints.js': 'checkpoints'") > 0;
   const inOrder = srcIdx.indexOf("'engines/checkpoints.js'") > 0 && srcIdx.indexOf("'engines/checkpoints.js'") < srcIdx.indexOf("'render/inject.js'");
   const inLoad = srcRun.indexOf("'engines/checkpoints.js'") > 0;

@@ -281,7 +281,7 @@ t('C7: 纯字符火花图（零 canvas / 零依赖，截图可复制）', functi
 t('C8: 三处装载登记与 tool-diag 出口面同步', function () {
   const idx = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
   const run = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');
-  const diag = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  const diag = require('./diag-source.js')();
   ['engines/narrative-lens.js', 'engines/reply-guard.js', 'engines/channel-probe.js'].forEach(function (f) {
     assert.ok(idx.indexOf("'" + f + "'") > 0, 'index LOAD_ORDER 含 ' + f);
     assert.ok(run.indexOf("'" + f + "'") > 0, 'run.js LOAD 含 ' + f);

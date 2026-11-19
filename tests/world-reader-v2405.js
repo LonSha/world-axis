@@ -132,7 +132,7 @@ function runAll(assertFn) {
   const idxSrc = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
   a(cnt(idxSrc, "'engines/world-reader.js',") >= 1 && idxSrc.indexOf("'engines/world-reader.js',") < idxSrc.indexOf("'ui/panel.js',"),
     'N4 加载序列：world-reader 在 ui/panel.js 之前');
-  const td = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+  const td = require('./diag-source.js')();
   a(cnt(td, "'wa-world-pulse-card'") >= 1 && td.indexOf("'wa-world-pulse-card'") >= td.indexOf('cond:'),
     'N5 守卫表 cond 层登记 wa-world-pulse-card');
 

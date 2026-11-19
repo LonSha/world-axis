@@ -31,7 +31,7 @@ const m = runSrc.match(/const LOAD = \[([\s\S]*?)\];/);
 const LOAD = vm.runInNewContext('[' + m[1] + ']');
 const HP_REL = 'engines/health-preflight.js';
 const HP_SRC = fs.readFileSync(path.join(BASE, HP_REL), 'utf8');
-const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+const DIAG_SRC = require('../../tests/diag-source.js')();
 const PANEL_SRC = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
 
 let pass = 0, fail = 0;

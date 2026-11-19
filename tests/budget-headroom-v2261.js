@@ -119,7 +119,7 @@ const INJ_SRC = fs.readFileSync(path.join(BASE, 'render/inject.js'), 'utf8');
 assert((INJ_SRC.match(/budgetMode: planInfo\.budgetMode/g) || []).length === 1, 'A8 快照写入 budgetMode 恰 1 处');
 assert((INJ_SRC.match(/headroom: planInfo\.headroom \?/g) || []).length === 1, 'A9 快照写入 headroom 恰 1 处');
 
-const DIAG_SRC = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+const DIAG_SRC = require('./diag-source.js')();
 assert((DIAG_SRC.match(/WA\.injectBudget\.budgetView\(b\)/g) || []).length === 1, 'A10 诊断包调 budgetView 恰 1 处');
 assert(/out\.budget\.headroom = \{/.test(DIAG_SRC), 'A11 诊断包落 headroom 字段');
 assert(/out\.budget\.advice = bv\.advice;/.test(DIAG_SRC), 'A12 诊断包落 advice 字段');
@@ -480,7 +480,7 @@ eq(pFull.headroom.saturated, true, 'O4 但它是饱和的（故不能用 overBud
 
 // 假绿③：面板与诊断若各自做减法，「算不算饱和」会得出两种结论 —— 本版收敛到一个口
 const srcPanel = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-const srcDiag = fs.readFileSync(path.join(BASE, 'engines/tool-diag.js'), 'utf8');
+const srcDiag = require('./diag-source.js')();
 assert(/budgetView/.test(srcPanel) && /budgetView/.test(srcDiag), 'O5 面板与诊断都走 budgetView（不各自现算）');
 assert((srcPanel.match(/b\.cap - b\.used/g) || []).length === 0, 'O6 面板不再自己做「cap - used」（收敛完成）');
 
