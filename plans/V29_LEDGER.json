@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "9f60f1a34c3d3b736d3171bba42cfb6897522f11b1037ac69205868735c8046f",
-  "sourceCommits": 23,
+  "sourceDigest": "5c286d4983f26a5e95911eff536dc7206c84e136c5f7d57af7d21fb5889191ec",
+  "sourceCommits": 25,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -96,16 +96,11 @@
     },
     "OPV29-17": {
       "group": "Z3",
-      "commit": "faf5f82",
-      "subject": "feat(worldaxis): OPV29-17 日志分层 —— 用户层零技术输出 / 产品面零栈回溯 / debug 真能开关（17 项）",
-      "readings": [
-        "node tools/log-layers.js --check ⇒ PASS（rc=0）：用户层 0 / 栈回溯 0 / 在册 1 / 开关 26",
-        "node tests/opv29-z3-17-v2529.js ⇒ pass (17)",
-        "真破坏负控制：删掉「用户层 console 登记失实」这条违反 ⇒ FAIL 1/17（B2 红），逐字还原后回到 pass (17)",
-        "真破坏负控制（拆段防线）：把 split-guard.compare 结论恒置 true ⇒ FAIL 5/17（B1/B2/B3/B4/B6 红）"
-      ],
-      "recompute": true,
-      "note": "专锁 17 项全绿 · 面数 607→608 · 裸锚 27 = 基线 · segment-extract pass（128）· test-surface-gate 全通过 · orphan pass · plan-readings pass（16 条全等）"
+      "commit": "fc9c38f",
+      "subject": "chore(worldaxis): 台账回填 —— OPV29-17 已交付（专锁 17 项 / 面数 607→608 / 负控制 FAIL 1/17 与 FAIL 5/17 真读数）",
+      "readings": [],
+      "recompute": false,
+      "note": ""
     },
     "OPV29-18": {
       "group": "Z3",
@@ -172,6 +167,19 @@
       ],
       "recompute": true,
       "note": ""
+    },
+    "OPV29-22": {
+      "group": "Z4",
+      "commit": "b9acf44",
+      "subject": "feat(worldaxis): OPV29-22 替身与真源边界 —— 替身顶替零容忍 / 产品源注入 0 处 / 清缓存路径真读真源（13 项）",
+      "readings": [
+        "node tools/mock-boundary.js --check ⇒ PASS（rc=0）：清缓存 51 / 注入 2（在册）/ 产品源顶替 0",
+        "node tools/mock-boundary.js --prove ⇒ M4 自证 rc=0 → rc=1",
+        "node tests/opv29-z4-22-v2529.js ⇒ pass (13)",
+        "真破坏负控制：台账真删 ⇒ FAIL 3/13 · 未登记注入 ⇒ FAIL 2/13 · 产品源顶替 ⇒ FAIL 3/13"
+      ],
+      "recompute": true,
+      "note": "专锁 13 项全绿 · 面数 608→609 · 裸锚 27 = 基线 · segment-extract pass（128）· test-surface-gate 全通过 · orphan pass · plan-readings pass（16）· readings-v2106 pass（61）· release-manifest rc=0"
     },
     "OPV29-23": {
       "group": "Z4",
@@ -376,7 +384,6 @@
     "OPV29-10",
     "OPV29-11",
     "OPV29-14",
-    "OPV29-22",
     "OPV29-30"
   ],
   "violations": {
@@ -392,10 +399,18 @@
       "OPV29-06",
       "OPV29-12",
       "OPV29-16",
+      "OPV29-17",
       "OPV29-24"
     ],
     "unparsedForm": [],
     "dupClaims": [
+      {
+        "item": "OPV29-17",
+        "commits": [
+          "fc9c38f",
+          "faf5f82"
+        ]
+      },
       {
         "item": "OPV29-12",
         "commits": [
@@ -434,11 +449,11 @@
     ]
   },
   "counts": {
-    "delivered": 26,
-    "pending": 10,
+    "delivered": 27,
+    "pending": 9,
     "rangeForm": 1,
-    "noRecompute": 6,
+    "noRecompute": 7,
     "unparsedForm": 0,
-    "dupClaims": 5
+    "dupClaims": 6
   }
 }

@@ -3,9 +3,9 @@
 > 由 `node tools/plan-ledger.js --write` 从 `git log` 生成。手改会被
 > `node tools/plan-ledger.js --check` 点名（重算与盘上不一致 ⇒ 退出 1）。
 
-- 生成源：subject 提到 `OPV29-` 的提交 **23** 条 · 源摘要 `9f60f1a34c3d`
-- 已交付 **26 / 36**，未交付 **10**
-- 欠账读数：区间号 1 · 无复算读数 6 · 形态不认识 0 · 重复声称 5
+- 生成源：subject 提到 `OPV29-` 的提交 **25** 条 · 源摘要 `5c286d4983f2`
+- 已交付 **27 / 36**，未交付 **9**
+- 欠账读数：区间号 1 · 无复算读数 7 · 形态不认识 0 · 重复声称 6
 
 ## Z1（已交付 4 / 6）
 
@@ -29,16 +29,17 @@
 | OPV29-13 | `435d7fa` | feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项 | 11 条：`node tests/opv29-z6-13-v2529.js ⇒ pass (35)` |
 | OPV29-15 | `bd051c6` | chore(worldaxis): 台账回填 —— OPV29-15 现场已交付（漏登，不是未做） | 3 条：`node tests/opv29-z3-v2524.js ⇒ PASS 27/27（Y 段即故障自诊：下一步只给一条命令、禁止清单点名危险动作、活锁不得当可回收）` |
 | OPV29-16 | `bc7cf4b` | chore(worldaxis): 台账回填 tests/*.js 595->596（OPV29-16 新增专锁后现场值） | **缺（recompute:false）** |
-| OPV29-17 | `faf5f82` | feat(worldaxis): OPV29-17 日志分层 —— 用户层零技术输出 / 产品面零栈回溯 / debug 真能开关（17 项） | 4 条：`node tools/log-layers.js --check ⇒ PASS（rc=0）：用户层 0 / 栈回溯 0 / 在册 1 / 开关 26` |
+| OPV29-17 | `fc9c38f` | chore(worldaxis): 台账回填 —— OPV29-17 已交付（专锁 17 项 / 面数 607→608 / 负控制 FAIL 1/17 与 FAIL 5/17 真读 | **缺（recompute:false）** |
 | OPV29-18 | `52bb590` | feat(worldaxis): OPV29-28 计划台账自动汇总 + OPV29-18 台账与现场一致 —— 68 项 | 6 条：`node tests/opv29-z5-28-v2529.js ⇒ pass (41)` |
 
-## Z4（已交付 5 / 6）
+## Z4（已交付 6 / 6）
 
 | 项 | 提交 | 标题 | 复算读数 |
 | :--- | :--- | :--- | :--- |
 | OPV29-19 | `695725d` | feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项 | 8 条：`node tests/opv29-z4-v2529.js ⇒ pass (25)` |
 | OPV29-20 | `695725d` | feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项 | 8 条：`node tests/opv29-z4-v2529.js ⇒ pass (25)` |
 | OPV29-21 | `695725d` | feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项 | 8 条：`node tests/opv29-z4-v2529.js ⇒ pass (25)` |
+| OPV29-22 | `b9acf44` | feat(worldaxis): OPV29-22 替身与真源边界 —— 替身顶替零容忍 / 产品源注入 0 处 / 清缓存路径真读真源（13 项） | 4 条：`node tools/mock-boundary.js --check ⇒ PASS（rc=0）：清缓存 51 / 注入 2（在册）/ 产品源顶替 0` |
 | OPV29-23 | `695725d` | feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项 | 8 条：`node tests/opv29-z4-v2529.js ⇒ pass (25)` |
 | OPV29-24 | `c0dd117` | chore(worldaxis): 台账回填 tests/*.js 596->597（OPV29-24 新增专锁后现场值） | **缺（recompute:false）** |
 
@@ -63,9 +64,9 @@
 | OPV29-35 | `3480ad5` | feat(worldaxis): OPV29-27 版本面跟位 + OPV29-35 发布清单化 —— 23 项，面数 596→598 | 8 条：`node tests/opv29-z5-27-v2529.js ⇒ pass (23)` |
 | OPV29-36 | `435d7fa` | feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项 | 11 条：`node tests/opv29-z6-13-v2529.js ⇒ pass (35)` |
 
-## 未交付（10）
+## 未交付（9）
 
-OPV29-04 · OPV29-05 · OPV29-07 · OPV29-08 · OPV29-09 · OPV29-10 · OPV29-11 · OPV29-14 · OPV29-22 · OPV29-30
+OPV29-04 · OPV29-05 · OPV29-07 · OPV29-08 · OPV29-09 · OPV29-10 · OPV29-11 · OPV29-14 · OPV29-30
 
 ## 区间号（不展开，只点名）
 
