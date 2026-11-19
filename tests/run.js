@@ -22467,6 +22467,24 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //        「覆盖率不达标」的 rc≠0 混成同一个码，把「读不到」伪装成「不达标」。
     //        改为返回 null ⇒ 报 engine-unreadable。
     await runScript('./opv29-z6-13-v2529.js');
+    // v2.529.0（V29 优化线 Z1）：OPV29-03 隔离器瘦身 —— 22 项。
+    //   病：`isolated-runner.files(root)` 把整棵树走一遭、逐文件 copy 并各算一次 sha256；
+    //     历史流水 / 证据快照 / *.log 一次都不被读，却每趟都复制（分片并行时是 N 趟）。
+    //   危险面：瘦身比「瘦错」容易得多 —— 排掉**被测面**，隔离跑的就是缩小的面，绿灯随之变假。
+    //   三条铁律（`tools/mirror-slim.js`）：① 产品面一个字节都不排；② 被 tests/*.js 文本
+    //     提到的就不排；③ 其余照排。
+    //   读数：`node tests/opv29-z1-03-v2529.js` ⇒ pass (22)；
+    //     `node tools/mirror-slim.js` ⇒ 复制面 1512 个文件 · **35.5M → 32.0M**（省 3.5M / 9.7%）·
+    //     排除 6 · 拒绝 2；**目标 20M 未达成**（如实报 false：tests/ + engines/ 是被测面，
+    //     排了就等于缩小被测面，剩余体积不可再降 —— 不为凑目标改口径）。
+    //   两个「拒绝」都是现场真例，不是摆设：`ITERATION_LOG.md` 被 tests/q8-panel-fold-v2225.js
+    //     提到、`plans/evidence/2026-10-24/README.md` 被 tests/player-guide-v2272.js 提到。
+    //   负控制（真破坏 tools/mirror-slim.js 后单跑，各自单打）：
+    //     · 产品面优先改成永不拒绝 ⇒ FAIL 1/22（只红 B1）；
+    //     · 引用检查改成恒当未引用 ⇒ FAIL 3/22（A4+A5+B2）。
+    //   B 组还自带反向对照：抽掉 product-files.js / 抽掉引用它的测试后，同一文件**必须真被排**
+    //     （B5/B6）—— 否则「一条都不排」也能让铁律①②变绿，那是空转不是判据。
+    await runScript('./opv29-z1-03-v2529.js');
     // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
     //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是
     //   「装了 story-tone 也说没有」「改了一句也永远 available:false」——不崩的假判据。
