@@ -1,14 +1,14 @@
 {
  "version": "2.524.0",
  "loadOrderCount": 569,
- "lazyCount": 24,
- "loadedCount": 572,
- "uiCount": -3,
- "nsCount": 583,
+ "lazyCount": 25,
+ "loadedCount": 573,
+ "uiCount": -4,
+ "nsCount": 584,
  "totals": {
-  "loadEdges": 465,
+  "loadEdges": 466,
   "hardEdges": 0,
-  "callRefs": 753,
+  "callRefs": 755,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -395,6 +395,7 @@
     "engines/world-snapshot.js",
     "engines/world-tables.js",
     "engines/write-desk.js",
+    "engines/write-rehearsal.js",
     "engines/write-serial.js",
     "render/map-viewport.js",
     "render/purifier.js"
@@ -963,6 +964,7 @@
     "engines/world-snapshot.js",
     "engines/world-tables.js",
     "engines/write-desk.js",
+    "engines/write-rehearsal.js",
     "engines/write-serial.js",
     "render/map-viewport.js"
    ]
@@ -11374,6 +11376,25 @@
   "engines/stream-gate.js": {
    "ns": [
     "streamGate"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/write-rehearsal.js": {
+   "ns": [
+    "writeRehearsal"
    ],
    "requires": [
     "registerModule"

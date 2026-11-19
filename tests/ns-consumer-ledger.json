@@ -161,6 +161,12 @@
    "evidence": "上下文边界剔除（scrub / parseRule / stat）：把带起止标记的「后台推演 / 系统指令」块从回卷文本里剥掉，判据是配对才剥、行数守恒、幂等、坏规则点名。落地点：历史回卷与存档导出这两条读文本的路径在读之前过一道 scrub；注入侧在拼接后台块之后，用它算出「这一轮的块有几个字符该被剥掉」。今天产品面零读（回卷仍原文照搬），故定 pending-wire —— 接线时刻：回卷/导出接上 scrub 的那一版。",
    "recompute": "grep -n 'ctxBoundary' engines/ctx-boundary.js tests/opv30-r2-ctx-boundary-v2530.js"
   },
+  "writeRehearsal": {
+   "cls": "pending-wire",
+   "provider": "engines/write-rehearsal.js",
+   "evidence": "写前预演（rehearse / parseOp / checkPath / stat）：把「结构校验」挪到落盘之前 —— plan 给一行 schema 名与若干 {path,value}，本模块只回 ok / accepted / rejected 三张单，不碰 store。落地点：导入（tool-import）、面板补丁（ui/panel.js 的写入栏位）、结算回写三条写入口的**前置**一步。今天产品面零读（三条入口仍各自 `if (!Array.isArray(x))`），故定 pending-wire —— 接线时刻：任一条写入口改成「先 rehearse 再 write」的那一版。顺带说明：core/schema.js 自 v2.110.0 起产品面零读者，本模块是它的第一个候选消费方（validate 以参数注入，故本模块不直接读 WA.schema，两份读数互不冒充）。",
+   "recompute": "grep -n 'writeRehearsal' engines/write-rehearsal.js tests/opv30-r3-write-rehearsal-v2531.js"
+  },
   "factAge": {
    "cls": "pending-wire",
    "provider": "engines/fact-age.js",

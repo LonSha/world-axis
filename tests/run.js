@@ -442,7 +442,7 @@ const LOAD = [
   'core/exec.js',
   'engines/backstage-protocols.js', 'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/inline-tags.js', 'engines/periodicals.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/fact-age.js',
-  'engines/json-repair.js', 'engines/replica-family.js',
+  'engines/json-repair.js', 'engines/replica-family.js', 'engines/write-rehearsal.js',
   'engines/lazy-load.js',
   'engines/save-migrate.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
@@ -17414,7 +17414,7 @@ assert(r2900.dead.length === 2013 && r2900.uiDead.length === 7 && r2900.dataOnly
     //   —— 只被 tests/run.js 与诊断节 secStitch2130 读，后者按口径不计入产品源面读集合）⇒ 13 → 22。
     // v2.114.0：现场从 12 降到 10 —— modules 面与 index 面同步后零读 ns 收敛；
     //   读数只报不红，但「恰 N 个」这条判据本身仍须与现场同宽（否则它会在读数没异常时误红）。
-    assert(a.deadNs.length === 71 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
+    assert(a.deadNs.length === 72 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
       'v2107: 零读 ns 恰 ' + a.deadNs.length + ' 个且不含任何核心 ns（读数只报不红）');
 
     // v2.131.0（O16 收口）：**端到端读数与账本现场同源**（把 R115/R116 的人工漏改面接进自动化）。
@@ -22212,6 +22212,8 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./opv30-r1-replica-family-v2530.js');
     // v2.530.0（OPV30-R2）：上下文边界剔除（配对才剥 / 行数守恒 / 幂等）。
     await runScript('./opv30-r2-ctx-boundary-v2530.js');
+    // v2.531.0（OPV30-R3）：写前预演（不落盘 / 拒收带名字 / 未知 schema 不猜 / 可复算）。
+    await runScript('./opv30-r3-write-rehearsal-v2531.js');
     // v2.524.0（V29 优化线 Z5 首项）：OPV29-25 新引擎脚手架 —— 48 项。
     //   病：加一台引擎要改七处（四路接线 + 三处登记），漏一处的表现不是报错，
     //   而是「引擎在位、却谁也不认它」；且七处彼此没有交叉校验。

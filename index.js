@@ -1619,6 +1619,7 @@
     'engines/store-merge.js',
     'engines/story-export.js',
     'engines/stream-gate.js',
+    'engines/write-rehearsal.js',
     'engines/write-serial.js',
   ];
 
