@@ -108,7 +108,10 @@ function runAll(a) {
   {
     const s = budgetSrc();
     const priKeys = keys(s, 'const PRIORITY = {', 'const DEFAULT_RANK', /'([^']+)': \{ rank/g);
-    const accKeys = keys(s, 'const ACCOUNTS = {}', 'forEach(function (r) { ACCOUNTS', /'([^']+)', '[^']+', '[^']+'/g);
+    // OPV29-10：科目表出闸到 engines/inject-budget-tables.js 后，ACCOUNTS 由一行 forEach
+    //   从 `ACCOUNTS_ROWS`（[源名, 科目, 角色] 三元组）建成 —— 判据问的是「这批三元组盖没盖住
+    //   源面」，不是「它写成对象字面量还是行表」⇒ 直接数行表里的三元组。
+    const accKeys = keys(s, 'const ACCOUNTS_ROWS = [', '\n  ];', /'([^']+)', '[^']+', '[^']+'/g);
     const miss = priKeys.filter(function (k) { return accKeys.indexOf(k) < 0; });
     a(priKeys.length >= 45, 'v2880: [A1] 源面至少 45 条（实 ' + priKeys.length + '）——源面长了而表没跟上，本条会先现形');
     a(miss.length === 0, 'v2880: [A1] PRIORITY 的 ' + priKeys.length + ' 个源全部被科目表盖住（缺: ' + (miss.join('/') || '无') + '）');

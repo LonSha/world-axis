@@ -52,6 +52,19 @@
       ],
       "probe": "tests/module-registry-ledger.json",
       "why": "同上（命名空间 / 装载文件两面）"
+    },
+    {
+      "id": "u3-opv29-z1-04-lazycontract",
+      "file": "tests/opv29-z1-04-v2529.js",
+      "shape": "ledger-num-eq",
+      "var": "led",
+      "fields": [
+        "lazyCount",
+        "loadedCount",
+        "loadOrderCount"
+      ],
+      "probe": "tests/module-registry-ledger.json",
+      "why": "OPV29-04 的惰性面三读数（惰性条数 / 全量契约面 / 首帧面）：每增一台惰性档引擎都要跟位，过去靠人手改，v2.530.0 两个新引擎（副本族 / 上下文边界）入场时当场漏改一次 ⇒ 收进本表，由核对器分钟级盯"
     }
   ]
 }
