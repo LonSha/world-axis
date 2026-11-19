@@ -3,8 +3,8 @@
 > 由 `node tools/plan-ledger.js --write` 从 `git log` 生成。手改会被
 > `node tools/plan-ledger.js --check` 点名（重算与盘上不一致 ⇒ 退出 1）。
 
-- 生成源：subject 提到 `OPV29-` 的提交 **32** 条 · 源摘要 `64c9c01bacef`
-- 已交付 **33 / 36**，未交付 **3**
+- 生成源：subject 提到 `OPV29-` 的提交 **33** 条 · 源摘要 `7f1181de000f`
+- 已交付 **34 / 36**，未交付 **2**
 - 欠账读数：区间号 1 · 无复算读数 7 · 形态不认识 0 · 重复声称 7
 
 ## Z1（已交付 5 / 6）
@@ -17,11 +17,12 @@
 | OPV29-05 | `8d6a19e` | feat(worldaxis): OPV29-05 首屏预算 —— 「只渲染可见页」第一次有了冷开读数与机械判据（21 项，冷开 42 / 静态 1794 = 2%） | 3 条：`node tools/first-screen-budget.js --check ⇒ PASS（rc=0）：冷开 42 ≤ 预算 1600 且 ≤ 静态半数 897` |
 | OPV29-06 | `d755c54` | chore(worldaxis): 台账回填 —— 已交付 22/36，计划读数 tests/*.js 601 → 602（+ OPV29-06 门禁实测：七快 19.5s / 慢 | **缺（recompute:false）** |
 
-## Z2（已交付 5 / 6）
+## Z2（已交付 6 / 6）
 
 | 项 | 提交 | 标题 | 复算读数 |
 | :--- | :--- | :--- | :--- |
 | OPV29-07 | `3138c4c` | perf(tool-diag): OPV29-07 tool-diag 拆段（8425 → 6004 行 · 表 2467 行） | 17 条：`wc -l engines/tool-diag.js ⇒ 6004` |
+| OPV29-08 | `fac79ec` | perf(action-desk): OPV29-08 路由表出闸（4123 → 1643 行 · 表 2530 行，14 动作与拒收码不变） | 16 条：`node tests/opv29-z1-08-v2529.js ⇒ pass（23 项；A2 表体量 2530 = 2530 / A11 关键路由 8 条逐字点名全在 / C5 拒` |
 | OPV29-09 | `c5eb2de` | perf(reject-recovery): OPV29-09 冻结表与判定分离（1388 → 244 行） | 11 条：`wc -l engines/reject-recovery.js ⇒ 244` |
 | OPV29-10 | `83f3c5c` | perf(inject-budget): OPV29-10 科目表与算法分离（1425 → 863 行） | 9 条：`wc -l engines/inject-budget.js ⇒ 863` |
 | OPV29-11 | `bc216de` | perf(engines): OPV29-11 backstage / world-lab / world.js 三件拆段（1140 / 1281 / 1333 行） | 15 条：`wc -l engines/backstage.js ⇒ 1140` |
@@ -70,9 +71,9 @@
 | OPV29-35 | `3480ad5` | feat(worldaxis): OPV29-27 版本面跟位 + OPV29-35 发布清单化 —— 23 项，面数 596→598 | 8 条：`node tests/opv29-z5-27-v2529.js ⇒ pass (23)` |
 | OPV29-36 | `435d7fa` | feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项 | 11 条：`node tests/opv29-z6-13-v2529.js ⇒ pass (35)` |
 
-## 未交付（3）
+## 未交付（2）
 
-OPV29-04 · OPV29-08 · OPV29-30
+OPV29-04 · OPV29-30
 
 ## 区间号（不展开，只点名）
 

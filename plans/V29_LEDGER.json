@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "64c9c01baceffc5dba2255ccb5841ce25d9c2dce746f8f8e2501e90713562335",
-  "sourceCommits": 32,
+  "sourceDigest": "7f1181de000fcf4f2c9cc16eb2bd48ec1e2845474365773c808893fac49d9f6d",
+  "sourceCommits": 33,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -80,6 +80,31 @@
         "node tests/s3-tx9-v2172.js ⇒ 46 / 0",
         "node tests/s3-b3-e7-v2188.js ⇒ 347 / 失败 0",
         "node tests/s3-b3-n8-v2224.js ⇒ 344 / 失败 0"
+      ],
+      "recompute": true,
+      "note": ""
+    },
+    "OPV29-08": {
+      "group": "Z2",
+      "commit": "fac79ec",
+      "subject": "perf(action-desk): OPV29-08 路由表出闸（4123 → 1643 行 · 表 2530 行，14 动作与拒收码不变）",
+      "readings": [
+        "node tests/opv29-z1-08-v2529.js ⇒ pass（23 项；A2 表体量 2530 = 2530 / A11 关键路由 8 条逐字点名全在 / C5 拒收码三面差额 0，真吐 1 种码、未声明 0 种）",
+        "node tests/exp10-action-desk-v2232.js ⇒ 36 / 失败 0",
+        "node tests/opv29-z3-18-v2529.js ⇒ pass（27 项）",
+        "node tests/exv22-v2400.js ⇒ pass（138 / 0）",
+        "node tests/ns-consumer-ledger-v2400.js ⇒ pass（70 项）",
+        "node tests/v8-driver-l3-2294.js ⇒ 35 pass / 0 fail",
+        "node tests/v7-driver-ledger-2275.js ⇒ 103 passed, 0 failed",
+        "node tests/module-cycle-gate-v2107.js ⇒ pass（65 项；文件面 569/569/567 · 装载期 440 + 调用期 3961 = 4401 · LOAD_ORDER 568 · ns 612/558/569）",
+        "node tests/module-registry-gate.js ⇒ pass —— 文件 547 / 命名空间 558 / 装载期边 440 / 硬边 0 / 调用期 703 / 结构问题 0",
+        "node tests/settle-v2830.js ⇒ pass (55)",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项；run.js 22966 行 < 23000、测试文件面 618）",
+        "node tools/plan-readings.js ⇒ pass（16 条可复算读数与现场全等）",
+        "node tests/test-surface-gate.js ⇒ 全部通过",
+        "拿掉引擎守卫（`|| function(){return {};}` + 删 throw）⇒ FAIL 2 / 23（A7 / B1 红）",
+        "'recycle.enforce' 改名为 'recycle.enforceX' ⇒ FAIL 1 / 23（A11 红）",
+        "还原 ⇒ pass（23）"
       ],
       "recompute": true,
       "note": ""
@@ -488,7 +513,6 @@
   },
   "pending": [
     "OPV29-04",
-    "OPV29-08",
     "OPV29-30"
   ],
   "violations": {
@@ -561,8 +585,8 @@
     ]
   },
   "counts": {
-    "delivered": 33,
-    "pending": 3,
+    "delivered": 34,
+    "pending": 2,
     "rangeForm": 1,
     "noRecompute": 7,
     "unparsedForm": 0,
