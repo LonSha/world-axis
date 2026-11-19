@@ -1,13 +1,13 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 588,
- "loadedCount": 567,
+ "loadOrderCount": 590,
+ "loadedCount": 569,
  "uiCount": 21,
- "nsCount": 578,
+ "nsCount": 580,
  "totals": {
-  "loadEdges": 460,
+  "loadEdges": 462,
   "hardEdges": 0,
-  "callRefs": 743,
+  "callRefs": 747,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -140,6 +140,7 @@
     "engines/events.js",
     "engines/evidence-board.js",
     "engines/evolution.js",
+    "engines/fact-age.js",
     "engines/fact-continuity.js",
     "engines/faction-chronicle.js",
     "engines/faction-graph.js",
@@ -187,6 +188,7 @@
     "engines/interlude.js",
     "engines/interrogation-tell.js",
     "engines/investigation.js",
+    "engines/json-repair.js",
     "engines/judicial-inquest.js",
     "engines/kaleidoscope.js",
     "engines/knowledge-practice.js",
@@ -714,6 +716,7 @@
     "engines/epidemic-contagion.js",
     "engines/epochal-transition.js",
     "engines/evidence-board.js",
+    "engines/fact-age.js",
     "engines/fact-continuity.js",
     "engines/faction-chronicle.js",
     "engines/faction-graph.js",
@@ -760,6 +763,7 @@
     "engines/interlude.js",
     "engines/interrogation-tell.js",
     "engines/investigation.js",
+    "engines/json-repair.js",
     "engines/judicial-inquest.js",
     "engines/knowledge-practice.js",
     "engines/l3-registry.js",
@@ -1347,6 +1351,25 @@
    "stateKeys": [],
    "consumedBy": []
   },
+  "engines/fact-age.js": {
+   "ns": [
+    "factAge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
   "engines/floor-census.js": {
    "ns": [
     "floorCensus"
@@ -1445,6 +1468,25 @@
   "engines/import-kind.js": {
    "ns": [
     "importKind"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/json-repair.js": {
+   "ns": [
+    "jsonRepair"
    ],
    "requires": [
     "registerModule"

@@ -155,7 +155,7 @@ const BASE_ASSERT_CC = 5267;  // v2.518.0 +4（三把 story-window 专锁 +1 把
 //       唯独这条「面本身没有意外增减」的绝对基线没人补。本批一次补齐，不改判据口径。
 //     为什么仍然不用「>= 564」了事：下界判据对「面塌了」是瞎的（见上段原文）。代价是每加一把锁
 //     就要动这个常量 —— 而那正是它的价值：动它的人必须亲手确认「我确实新增了一个测试文件」。
-const BASE_TEST_FILES = 621;  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1）。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
+const BASE_TEST_FILES = 622;  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1）。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
 //   v2.529.0：591→592（+1 tests/opv29-z5-26-v2529.js —— OPV29-26 登记一致性校验 40 项；文件在 + 已挂进 run.js 的 LOAD 段，两件同时成立才计数）。
 //   v2.529.0：592→593（+1 tests/opv29-z6-33-v2529.js —— OPV29-33 密钥扫描扩面 28 项；同上口径）。
 //   v2.529.0：593→594（+1 tests/opv29-z5-28-v2529.js —— OPV29-28 计划台账自动汇总 41 项；同上口径）。

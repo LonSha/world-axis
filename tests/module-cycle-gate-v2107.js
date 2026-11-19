@@ -278,7 +278,7 @@ function runAll(A) {
   //   567/567/565 ⇒ 568/568/567 ⇒ 569/569/567 ⇒ **589/589/587**。
   //   v2.529.0（缝合批 19 件）：每件一个新引擎文件 + 一条 registerModule 尾调 ⇒ 文件面与别名面各 +19；
   //   19 件全是纯函数（不读别人的账），故「有引用」三项同步 +19。实测回填，非估算。
-  A(a.files === 589 && a.aliasFiles === 589 && a.refFiles === 587,
+  A(a.files === 591 && a.aliasFiles === 591 && a.refFiles === 589,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -434,7 +434,7 @@ function runAll(A) {
   //   v2.529.0（缝合批 19 件）：装载期边 +19（每件的 registerModule 尾调 1 条）；
   //   调用期 +1（新件合计 2×19 条调用期引用里，1 条落到已有命名空间... 实测为 3961 → 3962）。
   //   合计 4401 → 4422。恒等式仍成立（460 + 3962 = 4422）。
-  A(a.edgesLoad === 460 && a.edgesCall === 3962 && a.edgesAll === 4422 && a.identityOk,
+  A(a.edgesLoad === 462 && a.edgesCall === 3962 && a.edgesAll === 4424 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -519,7 +519,7 @@ function runAll(A) {
   // v2.529.0（V29 OPV29-10/09）：两个表文件入序（LOAD_ORDER 561 → 563，实测回填）。
   // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表文件各入序一档 ⇒ 567 ⇒ 567 ⇒ 568（实测回填）。
   // v2.529.0（缝合批 19 件）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +19 ⇒ **587**（实测）。
-  A(a.edgesLoad >= 20 && a.orderLen === 588,
+  A(a.edgesLoad >= 20 && a.orderLen === 590,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -578,7 +578,7 @@ function runAll(A) {
   // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表 ns（toolDiagTables / actionDeskRoutes）连续三面同步增长
   //   ⇒ 610/556/567 ⇒ 611/557/568 ⇒ **612/558/569**。差额 612-558 = 54 与回填前**相同**
   //   （三面同步增长，漂移口径不动 ⇒ B6 常量不改）。
-  A(a.nsProvided === 632 && a.nsLedger === 578 && a.nsRead === 569,
+  A(a.nsProvided === 634 && a.nsLedger === 580 && a.nsRead === 569,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -614,7 +614,7 @@ function runAll(A) {
   //   产品面静态读集合里还没出现；这是如实增长，不是判据放宽）。
   // v2.524.0（V27 拓展线）：零读 ns 38 → 47（九台新引擎的命名空间目前只有专锁与 tool-diag 登记表
   //   在读，产品面静态读集合里还没出现 —— 这是**如实增长**，不是判据放宽；消费面登记见 OPV27-5）。
-  A(a.deadNs.length === 67, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 69, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

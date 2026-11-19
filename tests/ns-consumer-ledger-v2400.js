@@ -51,7 +51,7 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 // v2.529.0（缝合批 19 件）：47 → 66（+19）。这 19 条**是本批引入的**（每件一个新命名空间），
 //   与 v2.524.0 那次「+9 不是本批引入」的情形不同 —— 所以这次必须逐条登记，
 //   不能像上次那样只解释来源。19 条的 cls 全是 pending-wire，evidence 写明消费点归属。
-const BASE_DEAD_NS = 67;   // v2.529.0 跟位：47 → 66（+19，缝合批）。
+const BASE_DEAD_NS = 69;   // v2.529.0 跟位：47 → 66（+19，缝合批）→ 69（+2，engines/fact-age.js 的 factAge 与 engines/json-repair.js 的 jsonRepair 两条 pending-wire：功能面先落地、产品消费点尚未接线，evidence 写明接线时刻）。
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。
