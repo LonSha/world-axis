@@ -63,7 +63,12 @@ function src(p) {
   if (p === DIAG) return require('./diag-source.js')();
   return fs.readFileSync(p, 'utf8');
 }
-function budgetSrc() { return src(BUDGET); }
+function budgetSrc() {
+  // OPV29：PRIORITY / DEFAULT_RANK 已出闸到 engines/inject-budget-tables.js，ACCOUNTS 仍在本引擎。
+  //   判据问的是「源面有没有被科目表盖住」，不是「它写在哪个文件」⇒ 读合并面。
+  const tabs = path.join(BASE, 'engines/inject-budget-tables.js');
+  return (fs.existsSync(tabs) ? fs.readFileSync(tabs, 'utf8') + '\n' : '') + src(BUDGET);
+}
 const ANCHOR_MAIN = 'Object.keys(cs || {}).forEach(function (name) {';
 const ANCHOR_SUB = 'const sub = (raw === 0 && runs > 0);';
 const ANCHOR_NAME = "    ledger: '账本',";

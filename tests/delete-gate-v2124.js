@@ -51,6 +51,8 @@ const STORE = 'core/store.js', PERM = 'core/permissions.js', BUS = 'core/setting
 //   故下面所有断言一条都不用改。
 function src(rel) {
   if (rel === PANEL) return require('./panel-source.js').panelSource();
+  // OPV29-07：诊断表（UI_BINDINGS 守卫表等）已出闸到 engines/tool-diag-tables.js ⇒ 读合并面。
+  if (rel === 'engines/tool-diag.js') return require('./diag-source.js')();
   return fs.readFileSync(path.join(BASE, rel), 'utf8');
 }
 function hits(s, x) { return s.split(x).length - 1; }

@@ -54,7 +54,9 @@ function src(p) { return fs.readFileSync(p, 'utf8'); }
 function auditSrc() { return src(AUDIT); }
 function panelSrc() { // v2.401.0(OPV23): panel 模板拆进 ui/pages/*.js，改读 panelSource() 重组面（与拆前逐字相等）
   return require('./panel-source.js').panelSource(); }
-function diagSrc() { return src(DIAG); }
+// OPV29-07：诊断表已出闸到 engines/tool-diag-tables.js ⇒ 读「引擎+表」合并面
+//   （判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」）。
+function diagSrc() { return require('./diag-source.js')(); }
 // ── 两个真源码破坏锚点（各须恰中 1 次）──
 //   锚点选的是**判据所依赖的那一行**，不是随便一处代码：
 //     · 导出行面那三行 —— 它是「照搬 seq 而不重算」的落点（本版最贵的口径③）；

@@ -56,7 +56,12 @@ const INJECT = path.join(BASE, 'render/inject.js');
 const DIAG = path.join(BASE, 'engines/tool-diag.js');
 const PANEL = path.join(BASE, 'ui/panel.js');
 const REGISTRY = path.join(BASE, 'actors/registry.js');
-function src(p) { return fs.readFileSync(p, 'utf8'); }
+function src(p) {
+  // OPV29-07：诊断表（UI_BINDINGS 守卫表 / 注册表）已出闸到 engines/tool-diag-tables.js。
+  //   判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」⇒ 读「引擎+表」合并面。
+  if (/engines[\\/]tool-diag\.js$/.test(p)) return require('./diag-source.js')();
+  return fs.readFileSync(p, 'utf8');
+}
 // ── 真源码破坏锚点（各恰中 1 次才动刀）──
 const ANCHOR_OFF = "else if (moduleEnabled(k) === false) st = 'module-off';";
 const ANCHOR_FACE = "else if (mod === false) face = 'mod-off';";
