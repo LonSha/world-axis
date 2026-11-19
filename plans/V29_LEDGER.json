@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "328b1bb45ac21200dec41ba11a3071495e2abf400f3d9396ca7ad78020f91afd",
-  "sourceCommits": 26,
+  "sourceDigest": "8bead66aff7c282f55513357ae3c72868a2b0940ccfd13231ad60cbab441a9b3",
+  "sourceCommits": 27,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -73,6 +73,18 @@
       ],
       "recompute": true,
       "note": ""
+    },
+    "OPV29-14": {
+      "group": "Z3",
+      "commit": "896ee74",
+      "subject": "feat(worldaxis): OPV29-14 死码归并 —— 52 条死表逐条定性、锚点漂移判据上线当天抓到并修掉 1 条（17 项）",
+      "readings": [
+        "node tools/dead-table-triage.js --check ⇒ PASS（rc=0）：死表 52 / keep 52 · del 0 · wire 0 / 漂移 0",
+        "node tests/opv29-z1-14-v2529.js ⇒ pass (17)",
+        "真破坏负控制：台账少一条 ⇒ FAIL 3/17 · bad-draft 锚点退回漂移前 ⇒ FAIL 4/17"
+      ],
+      "recompute": true,
+      "note": "专锁 17 项全绿 · 面数 609→610 · 裸锚 27 = 基线 · segment-extract pass（128）· test-surface-gate 全通过 · orphan pass · plan-readings pass（16）· readings-v2106 pass（61）· release-manifest rc=0"
     },
     "OPV29-15": {
       "group": "Z3",
@@ -382,7 +394,6 @@
     "OPV29-09",
     "OPV29-10",
     "OPV29-11",
-    "OPV29-14",
     "OPV29-30"
   ],
   "violations": {
@@ -455,8 +466,8 @@
     ]
   },
   "counts": {
-    "delivered": 27,
-    "pending": 9,
+    "delivered": 28,
+    "pending": 8,
     "rangeForm": 1,
     "noRecompute": 7,
     "unparsedForm": 0,
