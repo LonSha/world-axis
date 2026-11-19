@@ -1744,3 +1744,24 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   font-size: var(--wa-fs-sm);
   line-height: 1.5;
 }
+
+/* v2.539.3（六页内容重写 R1）：结论卡 —— 世界页顶部三句玩家语言。
+   与方法论一致：每条都带「没有时怎么办」，不是「尚无 X」。
+   视觉上刻意比 .wa-sec 轻、比正文重：它是「读一眼就走」的东西，不该抢占区块标题的层级。 */
+.wa-verdict {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--wa-border-subtle);
+  border-left: 3px solid var(--wa-accent, #4f8cff);
+  border-radius: var(--wa-r-md, 8px);
+  background: rgba(79, 140, 255, 0.06);
+}
+.wa-verdict > b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--wa-fs-xs);
+  letter-spacing: 0.08em;
+  color: var(--wa-text-dim);
+}
+.wa-verdict ul { margin: 0; padding-left: 16px; }
+.wa-verdict li { margin: 3px 0; font-size: var(--wa-fs-sm); line-height: 1.55; }

@@ -22224,6 +22224,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     // v2.535.0（OPV31-R1）：声明式视图层 —— 42 项（未知块不静默 / 缺路径不编 / 纯函数 / 负控制四向）。
     await runScript('./opv31-r1-schema-view-v2535.js');
     await runScript('./opv32-r1-memory-timeline-v2537.js');
+    await runScript('./tpl-comment-gate.js');
     // v2.524.0（V29 优化线 Z5 首项）：OPV29-25 新引擎脚手架 —— 48 项。
     //   病：加一台引擎要改七处（四路接线 + 三处登记），漏一处的表现不是报错，
     //   而是「引擎在位、却谁也不认它」；且七处彼此没有交叉校验。

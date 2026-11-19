@@ -707,10 +707,39 @@
               + '</div>';
           }
         } catch (e2) {}
+        // v2.539.3（六页内容重写 · 世界页）：诊断让位给结论。
+        //  病（现场）：世界页首屏第一块是「真空诊断」，玩家看到的是 state = live、
+        //    引擎采样（含非空产出；前 8 台）—— 这是运维语言，不是「我的世界怎么了」。
+        //  治法：① 正常态（live 且无取数失败段）时把整块收进折叠，标题只说「运行诊断（正常）」；
+        //       ② 非正常态照原样展开 —— 那时它确实是玩家该看的第一件事。
+        if (st === 'live' && !(R.faults && R.faults.length)) {
+          h = '<details class="wa-collapse"><summary>运行诊断（正常 · 只读）</summary>' + h + '</details>';
+        }
         return h + '</div>';
       } catch (e) { return '<div class="wa-item wa-dim">真空诊断读取失败（' + esc(String(e && e.message || e).slice(0, 60)) + '）</div>'; }
     })();
+    // v2.539.3（六页内容重写 · 世界页）：结论卡 —— 玩家打开这页要的是三句话，不是二十个读数。
+    //  每条都带「没有时怎么办」：空态不是「尚无 X」，而是「还没有 X —— 去做 Y」。
+    //  取数全部来自 store 既有字段（clock / background / worldFacts），零新状态、零引擎调用。
+    const __verdict = (function () {
+      const lines = [];
+      lines.push((s.clock && s.clock.label)
+        ? ('时间：' + s.clock.label)
+        : '时间：还没设定 —— 世界钟没走，「今天 / 明天」就没有锚点');
+      const bgLen = String((s.background && s.background.text) || '').length;
+      lines.push(bgLen
+        ? ('背景：已写 ' + bgLen + ' 字（角色的语气与禁忌从这里来）')
+        : '背景：还没写 —— 这是模型「像不像这个世界」的主要依据');
+      const wf = (s.worldFacts || []).length;
+      lines.push(wf
+        ? ('权威事实：' + wf + ' 条（已结算，注入时压过推测）')
+        : '权威事实：0 条 —— 去写口台录第一条，否则模型只能自由发挥');
+      return '<div class="wa-verdict"><b>此刻</b><ul>'
+        + lines.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('')
+        + '</ul></div>';
+    })();
     return `
+      ${__verdict}
       ${vacuum}
       ${(function () {
         // v2.536.0：世界账本 —— 玩家端第一眼要答的问题不是「某台引擎算得对不对」，
@@ -1404,7 +1433,14 @@ const peopleIds = Object.keys(s.people);
     const trends = (ev.worldTrends || []).filter(t => t.status === '持续中');
     const winds = (ev.winds || []).filter(w => !w.quiet);
     const hz = (ev.horizon) || {};
-    const digest = ev.worldDigest;
+const digest = ev.worldDigest;
+
+    // v2.535.0：世界时间轴 —— 声明式视图层（ui/schema-view.js）的第一个真消费方。
+    //   病：世界一直在动（暗流 / 突发事件 / 势力消长），而事件页把它们摊成三坨独立读数，
+    //   玩家看不出「先后与因果」。时间轴是同一批数据的另一种排法：只读 store、零写、零落盘。
+    //   视图层缺席时回一条可见的降级行（不静默空白 —— 空白会被读成「本来就没有」）。
+    // v2.539.3（真缺陷修复）：这四行原本**写在模板字符串内部** —— 于是它们作为文字
+    //   直接渲染在事件页顶部（玩家看到四行中文注释）。注释属于代码，不属于页面。
 
     return `
       <div class="wa-sec">突发事件（一轮生成·多轮解封）</div>
@@ -1413,10 +1449,6 @@ const peopleIds = Object.keys(s.people);
 
       ${digest && digest.text ? `<div class="wa-sec">世界推演叙事</div><div class="wa-item wa-digest">${esc(digest.text)}</div>` : ''}
 
-      // v2.535.0：世界时间轴 —— 声明式视图层（ui/schema-view.js）的第一个真消费方。
-      //   病：世界一直在动（暗流 / 突发事件 / 势力消长），而事件页把它们摊成三坨独立读数，
-      //   玩家看不出「先后与因果」。时间轴是同一批数据的另一种排法：只读 store、零写、零落盘。
-      //   视图层缺席时回一条可见的降级行（不静默空白 —— 空白会被读成「本来就没有」）。
       ${(function () {
         const items = [];
         ((s.evolution && s.evolution.worldTrends) || []).forEach(function (t) {

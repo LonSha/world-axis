@@ -155,7 +155,8 @@ const BASE_ASSERT_CC = 5267;  // v2.518.0 +4（三把 story-window 专锁 +1 把
 //       唯独这条「面本身没有意外增减」的绝对基线没人补。本批一次补齐，不改判据口径。
 //     为什么仍然不用「>= 564」了事：下界判据对「面塌了」是瞎的（见上段原文）。代价是每加一把锁
 //     就要动这个常量 —— 而那正是它的价值：动它的人必须亲手确认「我确实新增了一个测试文件」。
-const BASE_TEST_FILES = 632;   // v2.532~533（OPV30-R4/R5）：+2 tests/opv30-r4-arc-guide-v2532.js / opv30-r5-save-audit-v2533.js   // v2.531.0（OPV30-R3 收口）：+1 tests/budget-source.js（inject-budget 的合并面读数器，拆段后遗症的共享解法）   // v2.531.0（OPV30-R3）：+1 tests/opv30-r3-write-rehearsal-v2531.js（文件在 + 已挂 runScript 段，两件同时成立才计数）  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1 · 本轮 +1（tests/backstage-source.js：backstage 声明面的合并读数器））。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
+// v2.539.3：+1 tests/tpl-comment-gate.js（玩家六页真渲染的“不许出现源码注释”门禁，已挂 runScript）。
+const BASE_TEST_FILES = 633;   // v2.532~533（OPV30-R4/R5）：+2 tests/opv30-r4-arc-guide-v2532.js / opv30-r5-save-audit-v2533.js   // v2.531.0（OPV30-R3 收口）：+1 tests/budget-source.js（inject-budget 的合并面读数器，拆段后遗症的共享解法）   // v2.531.0（OPV30-R3）：+1 tests/opv30-r3-write-rehearsal-v2531.js（文件在 + 已挂 runScript 段，两件同时成立才计数）  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1 · 本轮 +1（tests/backstage-source.js：backstage 声明面的合并读数器））。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
 //   v2.529.0：591→592（+1 tests/opv29-z5-26-v2529.js —— OPV29-26 登记一致性校验 40 项；文件在 + 已挂进 run.js 的 LOAD 段，两件同时成立才计数）。
 //   v2.529.0：592→593（+1 tests/opv29-z6-33-v2529.js —— OPV29-33 密钥扫描扩面 28 项；同上口径）。
 //   v2.529.0：593→594（+1 tests/opv29-z5-28-v2529.js —— OPV29-28 计划台账自动汇总 41 项；同上口径）。
@@ -807,7 +808,8 @@ const PS_REL = 'tests/panel-source.js';
 //   头部一行搜索框（wa-page-q / wa-page-q-hint）+ buildPanel 里的「输入即跳」22 行。
 //   D3a/D3f 同步 +22 ⇒ 新增确实都在 panel.js 自身，段体仍一字未动。
 // v2.539.2（玩家端语言 R1）：18390 → 18400（+10：PAGES 六页各加一句 ask + __askLine 渲染抬头）。
-const BASE_PANEL_LINES = 18400;  // v2.518.0：17878→18038（+160：V26 +39 / people-page +54 / story-window 壳 +14 / 故事回应窗口面板节 +53，全部落在段体外）（+154：OPV24-1 世界脉搏段体增量 + 本版 v24CivilBlock +100，全部落在段体内）  // v2.529.0：18215→18225（+10：582df3e 补 14 个注入源显示名时只改了 ui/panel.js，未同批回填本常量与 BASE_PANEL_FILE_LINES）
+// v2.539.3（六页内容重写 R1 + 裸注释真缺陷）：18400 → 18432（+32：世界页结论卡 21 行 / 诊断正常态折叠 8 行 / 事件页注释搬出模板净 +3）。
+const BASE_PANEL_LINES = 18432;  // v2.518.0：17878→18038（+160：V26 +39 / people-page +54 / story-window 壳 +14 / 故事回应窗口面板节 +53，全部落在段体外）（+154：OPV24-1 世界脉搏段体增量 + 本版 v24CivilBlock +100，全部落在段体内）  // v2.529.0：18215→18225（+10：582df3e 补 14 个注入源显示名时只改了 ui/panel.js，未同批回填本常量与 BASE_PANEL_FILE_LINES）
 // 拆后 panel.js 自己的行数（split 口径；拆前 17421 - 段体 335 + 转发块 41 = 17127）。
 //   注意：这个数会随转发块注释的字数变动 —— 它是「面没塌」的粗读数，不是精确不变量。
 //   真正的不变量是 D3a（重组面 === 拆前面，逐字相等），那一条按行拼接算，
@@ -838,7 +840,7 @@ const BASE_PANEL_LINES = 18400;  // v2.518.0：17878→18038（+160：V26 +39 / 
 //       若哪天两者差额跳变，那就是段体被搬进/搬出 panel.js 了，D3 这一族必须当场复核。
 // v2.524.0（V27 OPV27-5）：16243 → 16247（+4）—— VIS_NAMES 里给「在用机制」一个中文显示名
 //   （面板上玩家唯一能开关它的地方），含注释两行；与 BASE_PANEL_LINES 同批同源。
-const BASE_PANEL_FILE_LINES = 16432;  // v2.518.0：16103→16240（+137，与 BASE_PANEL_LINES 同批同源）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）（+58：OPV24-1 世界脉搏转发壳 +53 未跟位 + 本版 v24 转发壳 +5 = 3 注释 + 1 函数 + 1 bind 项）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）  // v2.529.0：16247→16257（+10，与 BASE_PANEL_LINES 同批同源）
+const BASE_PANEL_FILE_LINES = 16464;  // v2.518.0：16103→16240（+137，与 BASE_PANEL_LINES 同批同源）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）（+58：OPV24-1 世界脉搏转发壳 +53 未跟位 + 本版 v24 转发壳 +5 = 3 注释 + 1 函数 + 1 bind 项）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）  // v2.529.0：16247→16257（+10，与 BASE_PANEL_LINES 同批同源）
 //   v2.400.0（V22 后续修正）：335 → 491。EXV22-9 把 v22OmensBlock 写在段体标记
 //   之外（重组面里定义缺席、调用在场 ⇒ 假源码），本次把段体结束标记移回函数之后，
 //   段体收编 v22 块的 156 行。段体 esc 调用同步 57 → 60（v22 块 3 处）。
