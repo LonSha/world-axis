@@ -244,9 +244,9 @@
   })();
 
   const PAGES = [
-    { id: 'overview', icon: '◈', label: '概览' },
-    { id: 'world', icon: '🌐', label: '世界' },
-    { id: 'people', icon: '👤', label: '人物' },
+    { id: 'overview', icon: '◈', label: '概览', ask: "回答：此刻该做什么 —— 时间、章节、待办、下一拍。" },
+    { id: 'world', icon: '🌐', label: '世界', ask: "回答：这片世界现在是什么状态 —— 谁在掌权、什么在变、哪里不对劲。" },
+    { id: 'people', icon: '👤', label: '人物', ask: "回答：这个人为什么这样对我 —— 他记得什么、他想要什么。" },
     { id: 'memory', icon: '🧠', label: '记忆' },
     { id: 'enemies', icon: '⚔️', label: '仇敌' },
     { id: 'parallel', icon: '🌀', label: '平行世界' },
@@ -355,10 +355,10 @@
     //   插在 retrieval 之后、events 之前：前若干页答「拿到了什么」，本页答
     //   「此刻这个人能做什么」—— 同一批里的「把已有机制摆成可执行清单」。
     { id: 'actiondesk', icon: '🧭', label: '行动桌' },
-    { id: 'events', icon: '⚡', label: '事件' },
+    { id: 'events', icon: '⚡', label: '事件', ask: "回答：正在发生什么、我还欠谁 —— 未收的线、未还的债。" },
     { id: 'director', icon: '🎬', label: '导演' },
-    { id: 'settings', icon: '⚙️', label: '设置' },
-    { id: 'connect', icon: '🔌', label: 'API' },
+    { id: 'settings', icon: '⚙️', label: '设置', ask: "回答：哪些开关会改变你看到的东西 —— 按标签找，别背名字。" },
+    { id: 'connect', icon: '🔌', label: 'API', ask: "回答：外面通不通、我的数据去哪了 —— 模型、存档、导出。" },
     // v2.294.0（V8 EXV8-2）：写口台 —— 悬空引擎的统一手动写入口。
     //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
     //   插在 assistant 之前：这一页答「这个机制怎么手动喂它」——与工具族相邻。
@@ -4660,13 +4660,23 @@ ${emptyDrill}
     });
     const out=panelEl.querySelector('#wa-setting-search-count');if(out)out.textContent=q?'匹配 '+hits+' / '+total+'（仅筛选已展开设置；不修改数值）':'';
   }
+  /** v2.539.2：把页签上那句「回答什么」渲染成正文抬头（只读 PAGES.ask，缺则不渲染）。 */
+  function __askLine(id) {
+    const hit = PAGES.filter(function (x) { return x.id === id; })[0];
+    if (!hit || !hit.ask) return '';
+    return '<div class="wa-page-ask">' + esc(hit.ask) + '</div>';
+  }
   function renderBody() {
     const body = panelEl.querySelector('.wa-body');
     // v2.152.0（RP6）：面板渲染链的耗时与 DOM 规模读数。计时包住「渲染 + 过滤 + 绑定」
     //   整段（用户感知到的就是这一整段），读数分流给 ui/render-perf.js（它不自带计时器，
     //   只收数——观测污染被观测者）。renderPerf 缺席时静默跳过（观测面不许拖垮渲染本体）。
     const __rpT0 = (WA.renderPerf && typeof clockWall === 'function') ? clockWall() : null;
-    stageOut(body, RENDERERS[currentPage]());
+    // v2.539.2（玩家端语言）：玩家模式在正文最上方加一行「这一页回答什么」。
+    //  病：六页的标题都是名词（世界/人物/事件），玩家得先猜这页能回答什么。
+    //  只对玩家模式加：开发者模式要的是密度，不是解释。
+    const __pageHtml = RENDERERS[currentPage]();
+    stageOut(body, (__devMode ? '' : __askLine(currentPage)) + __pageHtml);
     bindBody();
     applySettingSearch();
     try {

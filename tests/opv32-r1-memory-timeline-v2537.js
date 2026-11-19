@@ -123,5 +123,14 @@ a(pAll.indexOf("row.style.display = __devMode ? '' : 'none'") >= 0,
 a(pAll.split('WA.ui.goPage(hits[0].id)').join('void 0').indexOf('WA.ui.goPage(hits[0].id)') < 0,
   'F4 负控制：删掉跳转调用 ⇒ F2 判据变红（判据非恒真）');
 
+console.log('\n■ G 面：玩家端语言（v2.539.2）');
+const askCount = (pAll.match(/ask: "/g) || []).length;
+a(askCount === 6, 'G1 玩家六页各有一句「这页回答什么」（实 ' + askCount + ' 句，判据 ===6）', askCount);
+a(pAll.indexOf('function __askLine(id)') >= 0, 'G2 抬头由 __askLine 单一入口渲染（缺 ask 则不渲染，不编空话）');
+a(pAll.indexOf("(__devMode ? '' : __askLine(currentPage))") >= 0,
+  'G3 只有玩家模式加抬头（开发者模式要密度，不要解释）');
+a(pAll.split("(__devMode ? '' : __askLine(currentPage))").join('').indexOf('__askLine(currentPage)') < 0,
+  'G4 负控制：删掉抬头拼接 ⇒ G3 判据变红（判据非恒真）');
+
 console.log('\n合计：' + pass + ' / ' + (pass + fail));
 process.exitCode = fail ? 1 : 0;

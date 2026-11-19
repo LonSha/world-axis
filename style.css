@@ -1732,3 +1732,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   margin-right: 6px;
   opacity: 0.55;
 }
+
+/* v2.539.2（玩家端语言 R1）：正文抬头 —— 玩家模式每一页先说「这页回答什么」。
+   为什么不用 .wa-sec：它不是区块标题，是页面级的“提问”；用更轻的字重 + 左侧竖线，
+   让它读起来像一句引导，而不像又一个小标题。 */
+.wa-page-ask {
+  margin: 2px 0 10px;
+  padding-left: 9px;
+  border-left: 2px solid var(--wa-accent-dim, rgba(120, 170, 255, 0.35));
+  color: var(--wa-text-secondary, #98a4b3);
+  font-size: var(--wa-fs-sm);
+  line-height: 1.5;
+}
