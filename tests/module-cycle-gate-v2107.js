@@ -280,7 +280,8 @@ function runAll(A) {
   //   19 件全是纯函数（不读别人的账），故「有引用」三项同步 +19。实测回填，非估算。
   // v2.530.0（OPV30-R1/R2）：副本族与上下文边界各 +1 文件 / +1 别名 / +1 有引用 ⇒ 592/592/590 → 594/594/592。
   // v2.531.0（OPV30-R3）：写前预演 +1 文件 / +1 别名 / +1 有引用 ⇒ 594/594/592 → 595/595/593。
-  A(a.files === 595 && a.aliasFiles === 595 && a.refFiles === 593,
+  // v2.532~533（OPV30-R4/R5）：引导弧 + 存档体检各 +1 文件 / +1 别名 / +1 有引用 ⇒ 595/595/593 → 597/597/595。
+  A(a.files === 597 && a.aliasFiles === 597 && a.refFiles === 595,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -441,7 +442,9 @@ function runAll(A) {
   // v2.530.0（OPV30-R1/R2）：两件各尾调 registerModule ⇒ 装载期边 463 → 465、合计 4427 → 4429；
   //   调用期 3964 **不动**（两件都只读 store 的 registerModule，与既有 (file, ns) 对同源去重）。
   // v2.531.0（OPV30-R3）：写前预演尾调 registerModule ⇒ 装载期 466 / 合计 4430（调用期 3964 仍不动）。
-  A(a.edgesLoad === 466 && a.edgesCall === 3964 && a.edgesAll === 4430 && a.identityOk,
+  // v2.532~533（OPV30-R4/R5）：两件各尾调 registerModule ⇒ 装载期 468；同轮五台缝合件接进面板台账
+  //   （ui/settings.js 新增 5 条 (file, ns) 调用期边、另两件各读 store ⇒ 3964 → 3970）、合计 4438。
+  A(a.edgesLoad === 468 && a.edgesCall === 3970 && a.edgesAll === 4438 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -526,7 +529,8 @@ function runAll(A) {
   // v2.529.0（V29 OPV29-10/09）：两个表文件入序（LOAD_ORDER 561 → 563，实测回填）。
   // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表文件各入序一档 ⇒ 567 ⇒ 567 ⇒ 568（实测回填）。
   // v2.529.0（缝合批 19 件）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +19 ⇒ **587**（实测）。
-  A(a.edgesLoad >= 20 && a.orderLen === 569,
+  // v2.533.0（OPV30 收口）：五台缝合件入首帧面 ⇒ LOAD_ORDER 569 → 574（实测回填）。
+  A(a.edgesLoad >= 20 && a.orderLen === 574,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -588,7 +592,9 @@ function runAll(A) {
   // v2.530.0（OPV30-R1/R2）：replicaFamily / ctxBoundary 同时进静态提供方与账本 ⇒ 635/581 → 637/583；
   //   读面 570 不变（两件都还没有产品读点，定性登记在零读账本 pending-wire）——B6 差 54 不动。
   // v2.531.0（OPV30-R3）：writeRehearsal 进静态提供方与账本 ⇒ 638 / 584；读面 570 不动（仍是 pending-wire）。
-  A(a.nsProvided === 638 && a.nsLedger === 584 && a.nsRead === 570,
+  // v2.532~533（OPV30-R4/R5）：两件进静态提供方与账本 ⇒ 640/586；五台缝合件接进面板 ⇒ 读面 570 → 575。
+  //   B6 差仍是 640 - 586 = 54（三面同步增长，漂移口径不动）。
+  A(a.nsProvided === 640 && a.nsLedger === 586 && a.nsRead === 575,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -626,7 +632,7 @@ function runAll(A) {
   //   在读，产品面静态读集合里还没出现 —— 这是**如实增长**，不是判据放宽；消费面登记见 OPV27-5）。
   // v2.530.0（OPV30-R1/R2）：副本族与上下文边界都还没有产品读点 ⇒ 零读 ns 69 → 71
   //   （与 tests/ns-consumer-ledger.json 的 BASE_DEAD_NS 同源，两处必须一起动）。
-  A(a.deadNs.length === 72, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.deadNs.length === 69, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

@@ -139,6 +139,38 @@
           + '｜已触发 ' + (Number(st.triggers) || 0) + ' 行｜认的天气：' + esc(kinds)
           + (on ? '' : '（关闭时一次账都不建）') + '</div>';
       })()
+      // v2.533.0（OPV30 收口）：缝合件台账 —— 三台先入库的引擎 + 两台本轮入库的，共五行读数。
+      //   病：副本族 / 上下文边界 / 写前预演 入库后产品面零读，零读账本只能把它们定性成
+      //   pending-wire（「等接线」），而「等」没有期限。本行就是接线点：面板如实显示
+      //   **它们各自算出来的数**（未装载时显示「装载中」并顺手 ensure 一次，不假装在跑）。
+      //   五台全是纯函数引擎 ⇒ 本行只读不写，不改任何世界状态。
+      + (function () {
+        const one = function (rel, ns, fn) {
+          if (WA[ns]) { try { return fn(); } catch (e) { return '读数失败'; } }
+          try { if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') WA.lazyLoad.ensure(rel); } catch (e) {}
+          return '装载中';
+        };
+        const parts = [
+          '副本族 ' + one('engines/replica-family.js', 'replicaFamily', function () {
+            const s = WA.replicaFamily.stat({});
+            return s.family + '族/活跃' + s.active;
+          }),
+          '边界规则 ' + one('engines/ctx-boundary.js', 'ctxBoundary', function () {
+            return WA.ctxBoundary.stat([]).count + '条';
+          }),
+          '写前预演 ' + one('engines/write-rehearsal.js', 'writeRehearsal', function () {
+            const s = WA.writeRehearsal.stat();
+            return s.ok + '通过/' + s.rejected + '拒';
+          }),
+          '引导弧 ' + one('engines/arc-guide.js', 'arcGuide', function () {
+            return WA.arcGuide.stat([]).arcs + '条';
+          }),
+          '存档体检 ' + one('engines/save-audit.js', 'saveAudit', function () {
+            return WA.saveAudit.stat().calls + '次';
+          })
+        ];
+        return '<div class="wa-dim" id="wa-eng-ledger-view">缝合件台账：' + esc(parts.join('｜')) + '</div>';
+      })()
       // 群聊拒绝是**只读问路器**（无总开关）：控件恒开且置灰，仅作“当前是不是群聊”的可见读数。
       + '<label class="wa-row" title="本扩展只支持单主角对话；群聊下世界推演与写入一律拒绝并阻止写世界书"><input type="checkbox" id="wa-sw-grouprefuse"' + ((WA.groupGuard && typeof WA.groupGuard.isGroup === 'function' && WA.groupGuard.isGroup()) ? ' checked' : '') + ' disabled/> 群聊拒绝 <span class="wa-dim">（恒开：只读问路器）</span></label>'
       + '<label class="wa-row" title="净化/思考/字数三块只作用于当前那一次输出，不改世界状态"><input type="checkbox" id="wa-sw-note2130" disabled/> v2.130.0 十二引擎 <span class="wa-dim">（产注入块的两个：思考开销 / 剧情倾向——还须在「导演」页勾选对应源）</span></label>'

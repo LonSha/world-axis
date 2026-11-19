@@ -377,6 +377,14 @@
     'engines/backstage.js',
     'engines/evolution.js',
     'engines/enemies.js',
+    // v2.533.0（OPV30 收口）：五台缝合件**有产品读点**（ui/settings.js 的「缝合件台账」读数行）
+    //   ⇒ 按 Z1-04 的 B16「wired 不许懒」退出惰性档、进首帧面：它们全是纯函数，
+    //   只依赖 store 的 registerModule，排在 store/commit 之后即可。
+    'engines/arc-guide.js',
+    'engines/ctx-boundary.js',
+    'engines/replica-family.js',
+    'engines/save-audit.js',
+    'engines/write-rehearsal.js',
     'engines/lazy-load.js',
     'engines/regional.js',
     'engines/parallel-world.js', // v2.34.0: 平行世界（主线之外独立推演，缝合自狐神抚 V19.5）
@@ -1600,7 +1608,6 @@
     'engines/card-file.js',
     'engines/chat-guard.js',
     'engines/contrast.js',
-    'engines/ctx-boundary.js',
     'engines/fact-age.js',
     'engines/floor-census.js',
     'engines/floor-favorites.js',
@@ -1612,14 +1619,12 @@
     'engines/macro-guard.js',
     'engines/mixed-index.js',
     'engines/msg-align.js',
-    'engines/replica-family.js',
     'engines/save-migrate.js',
     'engines/setup-plan.js',
     'engines/slot-format.js',
     'engines/store-merge.js',
     'engines/story-export.js',
     'engines/stream-gate.js',
-    'engines/write-rehearsal.js',
     'engines/write-serial.js',
   ];
 

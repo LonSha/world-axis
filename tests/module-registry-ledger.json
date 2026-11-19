@@ -1,14 +1,14 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 569,
- "lazyCount": 25,
- "loadedCount": 573,
- "uiCount": -4,
- "nsCount": 584,
+ "loadOrderCount": 574,
+ "lazyCount": 22,
+ "loadedCount": 575,
+ "uiCount": -1,
+ "nsCount": 586,
  "totals": {
-  "loadEdges": 466,
+  "loadEdges": 468,
   "hardEdges": 0,
-  "callRefs": 755,
+  "callRefs": 759,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -52,6 +52,7 @@
     "engines/anomaly-mutation.js",
     "engines/api-vault.js",
     "engines/appointment.js",
+    "engines/arc-guide.js",
     "engines/archive-hide.js",
     "engines/artifice-degradation.js",
     "engines/atlas.js",
@@ -311,6 +312,7 @@
     "engines/ruling.js",
     "engines/salt-franchise.js",
     "engines/sartorial-regalia.js",
+    "engines/save-audit.js",
     "engines/save-curve.js",
     "engines/save-health.js",
     "engines/save-migrate.js",
@@ -643,6 +645,7 @@
     "engines/anomaly-mutation.js",
     "engines/api-vault.js",
     "engines/appointment.js",
+    "engines/arc-guide.js",
     "engines/archive-hide.js",
     "engines/artifice-degradation.js",
     "engines/atlas.js",
@@ -882,6 +885,7 @@
     "engines/ruling.js",
     "engines/salt-franchise.js",
     "engines/sartorial-regalia.js",
+    "engines/save-audit.js",
     "engines/save-curve.js",
     "engines/save-health.js",
     "engines/save-migrate.js",
@@ -1279,6 +1283,101 @@
    "callRefs": [
     "clock",
     "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/arc-guide.js": {
+   "ns": [
+    "arcGuide"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/ctx-boundary.js": {
+   "ns": [
+    "ctxBoundary"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/replica-family.js": {
+   "ns": [
+    "replicaFamily"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/save-audit.js": {
+   "ns": [
+    "saveAudit"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/write-rehearsal.js": {
+   "ns": [
+    "writeRehearsal"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
    ],
    "ghostRefs": [],
    "stateKeys": [],
@@ -11031,25 +11130,6 @@
    "stateKeys": [],
    "consumedBy": []
   },
-  "engines/ctx-boundary.js": {
-   "ns": [
-    "ctxBoundary"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
   "engines/fact-age.js": {
    "ns": [
     "factAge"
@@ -11259,25 +11339,6 @@
    "stateKeys": [],
    "consumedBy": []
   },
-  "engines/replica-family.js": {
-   "ns": [
-    "replicaFamily"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
   "engines/save-migrate.js": {
    "ns": [
     "saveMigrate"
@@ -11376,25 +11437,6 @@
   "engines/stream-gate.js": {
    "ns": [
     "streamGate"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/write-rehearsal.js": {
-   "ns": [
-    "writeRehearsal"
    ],
    "requires": [
     "registerModule"
