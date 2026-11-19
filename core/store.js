@@ -1896,6 +1896,13 @@
     'dream.volumes': { cap: 40, site: "dream.js evict.array(rows, \"dream.volumes\")" },
     'backstageTone.notes': { cap: 48, site: "backstage-tone.js evict.array(rows, \"backstageTone.notes\")" },
     'modelink.drafts': { cap: 20, site: "modelink.js evict.array(rows, \"modelink.drafts\")" },
+    // v2.529.0（OPV29-26 当场点名补登记）：reading.marks 此前只有 evict 侧与骨架两处登记，
+    //   本表（容量体检的唯一真源）**缺这一条** —— 于是它有界、有站点、能被挤出，却不出现在
+    //   任何容量读数里：一个正在被写、被截断、被落盘的容器，体检面看不见它。
+    //   现场：reading-bookmark.js:102 `WA.evict.array(draft.reading.marks, 'reading.marks')`，
+    //   cap 真源在 core/evict.js 的 SITES（24）；骨架 `reading: { marks: [] }`。
+    //   点名它的正是 `tools/registry-audit.js` 的边 1（SITES 独有且无字面键、非通配、非 per-call）。
+    'reading.marks': { cap: 24, site: "reading-bookmark.js evict.array(marks, \"reading.marks\")" },
     'opinion.canon': { cap: 20, site: 'opinion.js slice(-20)' },
     'opinion.forum': { cap: 20, site: 'opinion.js concat slice(-20)' },
     // v1.0.0 补登：有界但漏登 → sizeAudit 误报 unbounded
