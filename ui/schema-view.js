@@ -37,7 +37,11 @@
   var WA = window.WorldAxis = window.WorldAxis || {};
   var VER = '2.535.0';
 
-  var _stat = { renders: 0, blocks: 0, unknown: [], missing: [], last: 0 };
+  // v2.537.0：这里原本有 `last: Date.now()` 的墙钟读数，被「产品代码零裸调 Date.now()」门禁判红 ——
+  //   判红是对的：渲染器是纯函数，回放/快照要逐字可比，一个墙钟读数会让同一 spec 两次渲染的读数不同。
+  //   「最后一次渲染」没有任何消费方（stat() 从第一天起就没返回过 last），故整条删除而不是改走 clock.raw()：
+  //   少一个不需要的依赖，比多一个正确的依赖更难出错。
+  var _stat = { renders: 0, blocks: 0, unknown: [], missing: [] };
 
   function esc(s) {
     // 四个替换值一律用 `'&' + 'amp;'` 这种拼法而不写实体字面量：本仓多份工具链会对
@@ -242,7 +246,6 @@
   /** 顶层入口：收 {blocks:[…]} 或单块；ctx 是插值根。 */
   function render(spec, ctx) {
     _stat.renders++;
-    _stat.last = Date.now();
     if (!spec) return '';
     if (Array.isArray(spec)) return renderBlocks(spec, ctx || {});
     if (spec.blocks) return renderBlocks(spec.blocks, ctx || {});

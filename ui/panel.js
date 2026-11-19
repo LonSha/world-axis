@@ -1873,6 +1873,49 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       + '<div class="wa-stat"><div class="wa-stat-v">' + factsOn + '/' + facts.length + '</div><div class="wa-stat-k">事实 活跃/总</div></div>'
       + '<div class="wa-stat"><div class="wa-stat-v">' + fsArr.length + '</div><div class="wa-stat-k">伏笔</div></div>'
       + '</div>';
+    // ── v2.537.0（C 项 · 记忆分层时间轴）────────────────────────────────────
+    //  问题（现场）：四层记的是**同一段剧情的不同压缩度**，但页面上它们是四个互不相干
+    //   的列表堆叠。玩家看不出「这条 L3 是从哪几条 L1 压出来的」，也看不出时间先后 ——
+    //   于是「记忆分层」这条机制在玩家端等于不存在（只有开发者知道 L0→L1→L2→L3）。
+    //  处置：四层合成**一条**时间轴（按各条自己的落点时间排），轴上方给一行压缩漏斗读数。
+    //  机制仍是数据：块结构交给 WA.schemaView，本函数只做「取数 + 排期」两件事。
+    //  降级：视图层缺席（无头/旧宿主）时整块不渲染 —— 它是**增强面**，不是承载面；
+    //   但绝不静默变成半截：缺席时连标题都不出现（半截比没有更难查）。
+    if (WA.schemaView && typeof WA.schemaView.render === 'function') {
+      const tItems = [];
+      [['L0', L0], ['L1', L1], ['L2', L2], ['L3', L3]].forEach(function (pair) {
+        pair[1].forEach(function (x) {
+          if (!x) return;
+          const body = String((x.s != null ? x.s : x.text) || '');
+          if (!body) return;
+          tItems.push({
+            at: Number(x.t) || 0,
+            title: body.slice(0, 80),
+            badge: pair[0],
+            detail: (x.refs && x.refs.length) ? ('链 ' + x.refs.length + ' 条') : ''
+          });
+        });
+      });
+      // 排序**在 UI 侧**做，不交给渲染器的 sortBy：那边按字段字符串比较，而 `at` 是数字
+      //   （'10' < '9'）—— 交出去会静默排错序，且错得看不出来。渲染器只负责出结构。
+      tItems.sort(function (a, b) { return a.at - b.at; });
+      const shownTl = tItems.slice(-24).map(function (x) {
+        return { at: _msTs(x.at), title: x.title, badge: x.badge, detail: x.detail };
+      });
+      const funnel = 'L0 ' + L0.length + ' → L1 ' + L1.length + ' → L2 ' + L2.length + ' → L3 ' + L3.length;
+      out += WA.schemaView.render({ blocks: [{
+        type: 'collapse', open: true,
+        title: '记忆分层时间轴（' + tItems.length + ' 条 · 图上最近 ' + shownTl.length + ' 条）',
+        children: [
+          { type: 'text', dim: true, text: '四层是同一段剧情的不同压缩度；轴上的点是各条自己的落点时间，按先后排，徽章是该条所在的层。' },
+          { type: 'kv', rows: [
+            { k: '压缩漏斗', v: funnel },
+            { k: '巩固轮次', v: st ? (st.rounds + ' 轮') : '引擎读数缺席（不是 0 轮）' }
+          ] },
+          { type: 'timeline', items: shownTl, empty: '还没有记忆条目 —— 它们会随推演自动生成' }
+        ]
+      }] }, {});
+    }
     out += '<div class="wa-sec">检索<span class="wa-dim">（过滤下方全部记忆条目）</span></div>'
       + '<div class="wa-row"><input id="wa-mem-q" class="wa-input" placeholder="搜记忆/facts/伏笔/编年…" value="' + esc(__memQ) + '"/>'
       + '<button class="wa-btn" id="wa-mem-q-go" title="按关键词过滤下方记忆条目（空则显示全部）">搜</button></div>';

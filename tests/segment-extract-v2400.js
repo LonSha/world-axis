@@ -155,7 +155,7 @@ const BASE_ASSERT_CC = 5267;  // v2.518.0 +4（三把 story-window 专锁 +1 把
 //       唯独这条「面本身没有意外增减」的绝对基线没人补。本批一次补齐，不改判据口径。
 //     为什么仍然不用「>= 564」了事：下界判据对「面塌了」是瞎的（见上段原文）。代价是每加一把锁
 //     就要动这个常量 —— 而那正是它的价值：动它的人必须亲手确认「我确实新增了一个测试文件」。
-const BASE_TEST_FILES = 630;   // v2.532~533（OPV30-R4/R5）：+2 tests/opv30-r4-arc-guide-v2532.js / opv30-r5-save-audit-v2533.js   // v2.531.0（OPV30-R3 收口）：+1 tests/budget-source.js（inject-budget 的合并面读数器，拆段后遗症的共享解法）   // v2.531.0（OPV30-R3）：+1 tests/opv30-r3-write-rehearsal-v2531.js（文件在 + 已挂 runScript 段，两件同时成立才计数）  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1 · 本轮 +1（tests/backstage-source.js：backstage 声明面的合并读数器））。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
+const BASE_TEST_FILES = 632;   // v2.532~533（OPV30-R4/R5）：+2 tests/opv30-r4-arc-guide-v2532.js / opv30-r5-save-audit-v2533.js   // v2.531.0（OPV30-R3 收口）：+1 tests/budget-source.js（inject-budget 的合并面读数器，拆段后遗症的共享解法）   // v2.531.0（OPV30-R3）：+1 tests/opv30-r3-write-rehearsal-v2531.js（文件在 + 已挂 runScript 段，两件同时成立才计数）  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1 · 本轮 +1（tests/backstage-source.js：backstage 声明面的合并读数器））。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
 //   v2.529.0：591→592（+1 tests/opv29-z5-26-v2529.js —— OPV29-26 登记一致性校验 40 项；文件在 + 已挂进 run.js 的 LOAD 段，两件同时成立才计数）。
 //   v2.529.0：592→593（+1 tests/opv29-z6-33-v2529.js —— OPV29-33 密钥扫描扩面 28 项；同上口径）。
 //   v2.529.0：593→594（+1 tests/opv29-z5-28-v2529.js —— OPV29-28 计划台账自动汇总 41 项；同上口径）。
@@ -796,7 +796,11 @@ const PS_REL = 'tests/panel-source.js';
 // v2.524.0（V27 OPV27-5）：18211 → 18215（+4）—— render/inject.js 的源表 / 默认值 / SRC_NAME / 注入分支
 //   四处登记「在用机制」这条新源，外加 ui/panel.js 的 VIS_NAMES 一行（见 BASE_PANEL_FILE_LINES）。
 //   这 +4 是 OPV27-5 接产品链的直接成本，不是排版噪声。
-const BASE_PANEL_LINES = 18225;  // v2.518.0：17878→18038（+160：V26 +39 / people-page +54 / story-window 壳 +14 / 故事回应窗口面板节 +53，全部落在段体外）（+154：OPV24-1 世界脉搏段体增量 + 本版 v24CivilBlock +100，全部落在段体内）  // v2.529.0：18215→18225（+10：582df3e 补 14 个注入源显示名时只改了 ui/panel.js，未同批回填本常量与 BASE_PANEL_FILE_LINES）
+// v2.537.0（OPV32-R1）：18225 → 18320（+95，两批，全部落在段体外 = panel.js 自身 UI 面）。
+//   逐批实测：51c7ed4（OPV31-R1 事件页世界时间轴）+52（此前未回填本常量，D3a 在 4624ecf 上其实已红）；
+//             本轮 +43（记忆页「记忆分层时间轴」：取数 + UI 侧排序 + 降级守卫 + 说明注释）。
+//   段体一字未动 ⇒ D1d/D2a 那组段体读数不变，这正是「段外长了 ≠ 段体长了」的自证。
+const BASE_PANEL_LINES = 18320;  // v2.518.0：17878→18038（+160：V26 +39 / people-page +54 / story-window 壳 +14 / 故事回应窗口面板节 +53，全部落在段体外）（+154：OPV24-1 世界脉搏段体增量 + 本版 v24CivilBlock +100，全部落在段体内）  // v2.529.0：18215→18225（+10：582df3e 补 14 个注入源显示名时只改了 ui/panel.js，未同批回填本常量与 BASE_PANEL_FILE_LINES）
 // 拆后 panel.js 自己的行数（split 口径；拆前 17421 - 段体 335 + 转发块 41 = 17127）。
 //   注意：这个数会随转发块注释的字数变动 —— 它是「面没塌」的粗读数，不是精确不变量。
 //   真正的不变量是 D3a（重组面 === 拆前面，逐字相等），那一条按行拼接算，
@@ -827,7 +831,7 @@ const BASE_PANEL_LINES = 18225;  // v2.518.0：17878→18038（+160：V26 +39 / 
 //       若哪天两者差额跳变，那就是段体被搬进/搬出 panel.js 了，D3 这一族必须当场复核。
 // v2.524.0（V27 OPV27-5）：16243 → 16247（+4）—— VIS_NAMES 里给「在用机制」一个中文显示名
 //   （面板上玩家唯一能开关它的地方），含注释两行；与 BASE_PANEL_LINES 同批同源。
-const BASE_PANEL_FILE_LINES = 16257;  // v2.518.0：16103→16240（+137，与 BASE_PANEL_LINES 同批同源）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）（+58：OPV24-1 世界脉搏转发壳 +53 未跟位 + 本版 v24 转发壳 +5 = 3 注释 + 1 函数 + 1 bind 项）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）  // v2.529.0：16247→16257（+10，与 BASE_PANEL_LINES 同批同源）
+const BASE_PANEL_FILE_LINES = 16352;  // v2.518.0：16103→16240（+137，与 BASE_PANEL_LINES 同批同源）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）（+58：OPV24-1 世界脉搏转发壳 +53 未跟位 + 本版 v24 转发壳 +5 = 3 注释 + 1 函数 + 1 bind 项）  // OPV23-3 转发改直写形态后 16019→16031（每方法 +3 行注释/大括号）  // v2.529.0：16247→16257（+10，与 BASE_PANEL_LINES 同批同源）
 //   v2.400.0（V22 后续修正）：335 → 491。EXV22-9 把 v22OmensBlock 写在段体标记
 //   之外（重组面里定义缺席、调用在场 ⇒ 假源码），本次把段体结束标记移回函数之后，
 //   段体收编 v22 块的 156 行。段体 esc 调用同步 57 → 60（v22 块 3 处）。

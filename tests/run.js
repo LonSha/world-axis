@@ -12431,7 +12431,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     //   口径变化零：只是常量跟上现场，不是判据变松。
     // 按实测归因登记为 dead ⇒ 净 -6。只测引用与账本条目同源跟位。
     // v2.535.0 跟位（五台缝合件进首帧装载面 + ctx-boundary 补装载表 + 声明式视图层进装载面）：
-    //   refs 12719→12728 / 命名空间 562→568 / 成员 5985→6022 / dead 2013→2031 / dataOnly 768→780。
+    //   refs 12719→12728 / 命名空间 562→568 / 成员 5985→6022 / dead 2013→2031 / dataOnly 780→780。
     //   口径变化零：常量只是跟上现场（五台里 17 口与 schemaView.stat 如实归因为 self-only）。
     // v2.529.0 重冻（当场重算，不拄历史）：19 件缝合引擎 + fact-age / json-repair / lazy-load 三个
     //   V29 新引擎进现场，导出面整体上移 ⇒ refs 12714→12719 / 命名空间 561→562 / 成员 5978→5985 /
@@ -12458,7 +12458,7 @@ assert(verAtLeast(verF2500, 266) && mfF2500.version === verF2500, '入口与清�
     assert(reasons2700.every(function (x) { return gate2700.REASON_CODES.indexOf(x) >= 0; }),
       '归因全在词表内（' + reasons2700.join(',') + '）');
     assert(JSON.stringify(led2700).indexOf('TODO') < 0, '账本无占位归因（归因由测量得出，不留 TODO）');
-    assert(led2700.advisory && led2700.advisory.dataOnly === 768, 'advisory 面只记计数不拦截（dataOnly=768，v2.138.0（E7）：weather.places 是纯读出口、被 weather 的导出面登记 ⇒ +1；v2.129.0（A1–A10）：十个新引擎无一新增只读数据成员（它们的可调面全部落在设置表与容器上）⇒ 计数不变；v2.110.0：新增三个基元模块的只读数据成员 +6（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）；v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS +1）');
+    assert(led2700.advisory && led2700.advisory.dataOnly === 780, 'advisory 面只记计数不拦截（dataOnly=780，v2.138.0（E7）：weather.places 是纯读出口、被 weather 的导出面登记 ⇒ +1；v2.129.0（A1–A10）：十个新引擎无一新增只读数据成员（它们的可调面全部落在设置表与容器上）⇒ 计数不变；v2.110.0：新增三个基元模块的只读数据成员 +6（faultContext.CAP/RETRIABLE、schema.TYPES/MAX_ERRORS、permissions.ROLE_LABELS/ACTIONS）；v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS +1）');
     // ── E. 判定四态（纯判定面，用现场结果驱动）──
     const clone2700 = function (o) { return JSON.parse(JSON.stringify(o)); };
     assert(gate2700.judge(r2700, led2700).ok === true, '（基线）现场与账本一致 ⇒ ok');
@@ -12936,7 +12936,7 @@ assert(r2900.dead.length === 2031 && r2900.uiDead.length === 7 && r2900.dataOnly
     assertDeepEq(gate2900.EVIDENCE_KEYS, ['src', 'refs', 'tref', 'own'], '证据键不变（refs 与「死」的定义仍同宽）');
     assert(inv2900.PRODUCT_FILES.length === r2900.files.product && inv2900.REF_RE instanceof RegExp,
       '清册导出 PRODUCT_FILES / REF_RE 与产品面同源（门禁复算不另写扫描面）');
-    assert(led2900.advisory && led2900.advisory.dataOnly === 768, 'advisory 只记计数（dataOnly 768（v2.138.0（E7）：weather.places 纯读出口入册 +1）v2.129.0：十个新引擎零数据成员入册）v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS 数据成员 +1）');
+    assert(led2900.advisory && led2900.advisory.dataOnly === 780, 'advisory 只记计数（dataOnly 780（v2.138.0（E7）：weather.places 纯读出口入册 +1）v2.129.0：十个新引擎零数据成员入册）v2.102.0：perf-trace 六枚只读数据成员 +2；v2.101.0：interop 五枚数据成员 +4；v2.99.0：canon.LIMITS 数据成员 +1）');
     // 旧灯一盏不少
     const ledAdd2900 = clone2900(led2900);
     delete ledAdd2900.dead[Object.keys(ledAdd2900.dead)[0]];
@@ -22223,6 +22223,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     await runScript('./opv30-r5-save-audit-v2533.js');
     // v2.535.0（OPV31-R1）：声明式视图层 —— 42 项（未知块不静默 / 缺路径不编 / 纯函数 / 负控制四向）。
     await runScript('./opv31-r1-schema-view-v2535.js');
+    await runScript('./opv32-r1-memory-timeline-v2537.js');
     // v2.524.0（V29 优化线 Z5 首项）：OPV29-25 新引擎脚手架 —— 48 项。
     //   病：加一台引擎要改七处（四路接线 + 三处登记），漏一处的表现不是报错，
     //   而是「引擎在位、却谁也不认它」；且七处彼此没有交叉校验。
