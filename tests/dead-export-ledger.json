@@ -3107,11 +3107,11 @@
       "own": 1
     },
     "controllability.importCheck": {
-      "reason": "self-only",
-      "detail": "engines/controllability.js 内部自用、外部零引用（过度导出）",
+      "reason": "test-only",
+      "detail": "engines/controllability.js 内部自用、产品代码零引用；仅 tests/opv29-z6-34-v2529.js 引用（导入最小权限锁）",
       "src": "engines/controllability.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 1,
       "own": 3
     },
     "controllability.offable": {
