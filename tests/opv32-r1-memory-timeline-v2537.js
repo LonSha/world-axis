@@ -114,5 +114,14 @@ a(guardCount >= 4, 'E5 半不可逆操作已接护栏（实 ' + guardCount + ' �
 a(pAll.split('if (!__ok(').join('if (!(').indexOf('if (!__ok(') < 0,
   'E6 负控制：删掉护栏调用 ⇒ E5 判据变红（判据非恒真）');
 
+console.log('\n■ F 面：页签搜索（v2.539.0 · P1）');
+a(pAll.indexOf("id=\"wa-page-q\"") >= 0 && pAll.indexOf("panelEl.querySelector('#wa-page-q')") >= 0,
+  'F1 头部搜索框存在且拿到了引用（不是「渲染了却没人接」）');
+a(pAll.indexOf('WA.ui.goPage(hits[0].id)') >= 0, 'F2 输入即跳（复用切页单一入口 goPage，不自己改 currentPage）');
+a(pAll.indexOf("row.style.display = __devMode ? '' : 'none'") >= 0,
+  'F3 玩家模式隐藏（6 页不需要搜索框 —— 少一个要学的控件）');
+a(pAll.split('WA.ui.goPage(hits[0].id)').join('void 0').indexOf('WA.ui.goPage(hits[0].id)') < 0,
+  'F4 负控制：删掉跳转调用 ⇒ F2 判据变红（判据非恒真）');
+
 console.log('\n合计：' + pass + ' / ' + (pass + fail));
 process.exitCode = fail ? 1 : 0;

@@ -16102,6 +16102,7 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         <button class="wa-cat-btn wa-cat-pill" data-cat="meta" role="tab" aria-selected="false">⚙️ 元</button>
         <button class="wa-cat-btn wa-cat-pill" data-cat="all" role="tab" aria-selected="false">≡ 全部</button>
       </div>
+      <div class="wa-row wa-page-q-row" style="display:none;"><input id="wa-page-q" class="wa-input" type="search" placeholder="搜页签：输入即跳到第一个匹配（如 记忆 / 伏笔 / 账）" aria-label="搜索页签"/><span id="wa-page-q-hint" class="wa-dim" aria-live="polite"></span></div>
       <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}" data-cat="${PAGE_CAT[p.id] || 'core'}">${p.icon} ${p.label}</button>`).join('')}</div>
       <div id="wa-search-bar" class="wa-row" style="display:none;"><label for="wa-setting-search">设置检索（当前页）</label><input id="wa-setting-search" type="search" class="wa-input" placeholder="按标签、中文名或设置键筛选"/><span id="wa-setting-search-count" class="wa-dim" aria-live="polite"></span></div>
       <div class="wa-body"></div>
@@ -16147,6 +16148,27 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
     // v2.255.0 SIMPLIFY-NAV：玩家模式下分类条整体隐藏 —— 5 个日常页不需要分类导航，
     //   分类条本身（核心/世界/工坊/系统/全部）就是一套要学的黑话。开发者模式打开时恢复原样。
     if (!__devMode) { const cb = panelEl.querySelector('.wa-cat-bar'); if (cb) cb.style.display = 'none'; }
+    // v2.539.0（P1 页签搜索）：开发者模式下 39 个页签靠肉眼找太慢，给一个「输入即跳」的入口。
+    //  为什么是「跳到第一个匹配」而不是「隐藏不匹配的」：页签的可见性已经有两层过滤
+    //    （__devMode 的 PLAYER_PAGES + 分类 currentCat），再叠第三层 display 过滤，
+    //    三者的优先级会在下一次改导航时必然漂移（本仓点过的同型）。跳转不碰可见性，零冲突。
+    //  为什么玩家模式隐藏：玩家只有 6 页，搜索框是纯噪音。
+    (function () {
+      const row = panelEl.querySelector('.wa-page-q-row');
+      const inp = panelEl.querySelector('#wa-page-q');
+      const hint = panelEl.querySelector('#wa-page-q-hint');
+      if (!inp) return;
+      if (row) row.style.display = __devMode ? '' : 'none';
+      inp.oninput = function () {
+        const q = String(inp.value || '').trim().toLowerCase();
+        if (!q) { if (hint) hint.textContent = ''; return; }
+        const hits = PAGES.filter(function (p) {
+          return String(p.label || '').toLowerCase().indexOf(q) >= 0 || String(p.id).indexOf(q) >= 0;
+        });
+        if (hint) hint.textContent = hits.length ? (hits.length + ' 个匹配') : '无匹配（换词试试：记忆 / 伏笔 / 账 / 注入）';
+        if (hits.length) WA.ui.goPage(hits[0].id);
+      };
+    })();
   }
   function syncTabs() {
     const sb = panelEl.querySelector("#wa-search-bar");

@@ -983,7 +983,7 @@
       'wa-ck-out',
       // v2.301.0（EXV11-1/3）：开局页与驱动页的动态输出/按钮（setOut 动态写入 + 刷新按钮）。
       'wa-boot-out', 'wa-drive-view', 'wa-drive-out'] },
-    { page: 'overview', ids: ['wa-setting-search'],
+    { page: 'overview', ids: ['wa-setting-search', 'wa-page-q', 'wa-page-q-hint'],
       // v2.380.0（幽灵引用治理批次⑦）：V19/V20/V21 三个跨版本态势大盘**真挂进概览页**
       //   之后，其内层折叠 id 由渲染函数的 `wrap.innerHTML` 生成（只有函数被真调用才成树）。
       //   静态正则抓得到它们，守卫表却一条没登记 ⇒「渲染了却没登记」那一面整片放行。
