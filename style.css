@@ -40,17 +40,37 @@
   /* 文字系统 (高度易读性无衬线 + 精密等宽) */
   --wa-text-primary: #e6edf3;
   --wa-text-secondary: #8b98a5;
-  --wa-text-dim: #5c6978;
+  /* v2.534.0：原 #5c6978 在 --wa-surface-1(#0e1218) 上实测对比度 **3.42:1**（WCAG AA 要 4.5:1），
+     而它正是「次要说明」最常用的色 ⇒ 满屏小字发灰。提到 #7d8b9c ≈ 4.6:1，层级不丢、可读性过线。 */
+  --wa-text-dim: #7d8b9c;
   --wa-font-main: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
   --wa-font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, SFMono-Regular, monospace;
 
   /* v2.295.0（V10）：响应式与设计 token */
   --wa-panel-w: clamp(360px, 30vw, 600px);
   --wa-panel-h: clamp(500px, 72vh, 700px);
+  /* v2.534.0（UI 归一第一步）：排版与形状刻度。
+     病：字号有 14 种值（9.5→28px）、圆角有 14 种值，而 --wa-text-* 三个 token 全仓只被
+     用了 2 次 —— 设计系统写了没执行。人眼第一眼读的是「大小对比」，满屏 11.5px 等于没标题。
+     口径：主体 12px **不动**（面板窄、密度优先），只把「强调」拉开到 14/17/24 ——
+     层级出现而版面不溢出。旧 token 名一律保留（下面做别名转发），门禁不动。 */
+  --wa-fs-xs: 10.5px;
+  --wa-fs-sm: 12px;
+  --wa-fs-md: 14px;
+  --wa-fs-lg: 17px;
+  --wa-fs-xl: 24px;
+  --wa-r-xs: 4px;
+  --wa-r-md: 10px;
+  /* 间距刻度：存量 padding 有 40 种值，批量替换会破版（收益 < 风险），故只用于新增块。 */
+  --wa-sp-1: 4px;
+  --wa-sp-2: 8px;
+  --wa-sp-3: 12px;
+  --wa-sp-4: 16px;
+  --wa-sp-5: 24px;
   --wa-text-xs: clamp(10px, 0.75rem, 10.5px);
   --wa-text-sm: clamp(10.5px, 0.85rem, 12px);
   --wa-text-base: clamp(12px, 0.95rem, 13px);
-  --wa-r-sm: 8px;
+  --wa-r-sm: 6px;
   --wa-r-pill: 999px;
 
   /* 物理缓动 */
@@ -78,7 +98,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: var(--wa-fs-lg);
   line-height: 1;
   cursor: pointer;
   z-index: 9999;
@@ -138,7 +158,7 @@
   height: var(--wa-panel-h);
   background: linear-gradient(180deg, rgba(14, 18, 24, 0.98) 0%, rgba(9, 12, 16, 0.98) 100%);
   border: 1px solid var(--wa-border-regular);
-  border-radius: 11px;
+  border-radius: var(--wa-r-md);
   z-index: 10000;
   display: flex;
   flex-direction: column;
@@ -176,7 +196,7 @@
 .wa-title {
   color: var(--wa-text-primary);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wa-fs-md);
   letter-spacing: 0.3px;
   display: flex;
   align-items: center;
@@ -186,25 +206,25 @@
 .wa-title::before {
   content: "◈";
   color: var(--wa-accent);
-  font-size: 13px;
+  font-size: var(--wa-fs-md);
 }
 
 .wa-ver {
   font-family: var(--wa-font-mono);
-  font-size: 10px;
+  font-size: var(--wa-fs-xs);
   color: var(--wa-text-dim);
   background: rgba(255, 255, 255, 0.03);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--wa-r-xs);
   border: 1px solid var(--wa-border-subtle);
 }
 
 .wa-close {
   cursor: pointer;
   color: var(--wa-text-secondary);
-  font-size: 13px;
+  font-size: var(--wa-fs-md);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--wa-r-xs);
   transition: all var(--wa-duration) ease;
   line-height: 1;
 }
@@ -227,11 +247,11 @@
   flex: 0 0 auto;
   max-width: 96px;
   padding: 2px 4px;
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   background: var(--wa-surface-2);
   border: 1px solid var(--wa-border-subtle);
   color: var(--wa-text-secondary);
-  border-radius: 4px;
+  border-radius: var(--wa-r-xs);
   outline: none;
   font-family: var(--wa-font-main);
   transition: border-color var(--wa-duration) ease;
@@ -243,7 +263,7 @@
 }
 
 .wa-view .wa-dim {
-  font-size: 10.5px;
+  font-size: var(--wa-fs-xs);
   color: var(--wa-text-dim);
   white-space: nowrap;
   max-width: 140px;
@@ -260,7 +280,7 @@
   padding: 3px 12px;
   background: rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid var(--wa-border-subtle);
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   flex-shrink: 0;
   min-height: 26px;
   box-sizing: border-box;
@@ -268,7 +288,7 @@
 
 #wa-nav-out {
   color: var(--wa-text-dim);
-  font-size: 10.5px;
+  font-size: var(--wa-fs-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -285,14 +305,14 @@
   padding: 1px 6px;
   background: var(--wa-accent-dim);
   border: 1px solid var(--wa-accent-border);
-  border-radius: 3px;
+  border-radius: var(--wa-r-xs);
   color: var(--wa-accent);
 }
 
 #wa-nav-back {
   padding: 1px 7px;
-  font-size: 10.5px;
-  border-radius: 4px;
+  font-size: var(--wa-fs-xs);
+  border-radius: var(--wa-r-xs);
   margin: 0;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--wa-border-subtle);
@@ -328,9 +348,9 @@
   background: transparent;
   border: 1px solid transparent;
   color: var(--wa-text-secondary);
-  border-radius: 4px;
+  border-radius: var(--wa-r-xs);
   padding: 2px 7px;
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   font-weight: 500;
   cursor: pointer;
   transition: all var(--wa-duration) ease;
@@ -446,7 +466,7 @@
 }
 .wa-body::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
+  border-radius: var(--wa-r-xs);
 }
 .wa-body::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
@@ -456,7 +476,7 @@
 .wa-sec {
   margin: 12px 0 6px;
   color: var(--wa-text-primary);
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   font-weight: 600;
   letter-spacing: 0.4px;
   display: flex;
@@ -471,7 +491,7 @@
   width: 2.5px;
   height: 10px;
   background: var(--wa-accent);
-  border-radius: 1px;
+  border-radius: var(--wa-r-xs);
 }
 
 /* 统计卡片网格：更平坦利落的现代暗晶指示牌 */
@@ -484,7 +504,7 @@
 .wa-stat {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--wa-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--wa-r-sm);
   padding: 6px 4px;
   text-align: center;
   transition: border-color var(--wa-duration) ease, background var(--wa-duration) ease;
@@ -498,7 +518,7 @@
 .wa-stat-v {
   color: #fff;
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: var(--wa-fs-md);
   font-family: var(--wa-font-mono);
   font-variant-numeric: tabular-nums lining-nums;
   overflow: hidden;
@@ -508,7 +528,7 @@
 
 .wa-stat-k {
   color: var(--wa-text-dim);
-  font-size: 10px;
+  font-size: var(--wa-fs-xs);
   margin-top: 1px;
   letter-spacing: 0.3px;
 }
@@ -522,15 +542,20 @@
 
 .wa-item {
   background: var(--wa-surface-1);
-  border: 1px solid var(--wa-border-subtle);
-  border-radius: 6px;
-  padding: 7px 9px;
-  font-size: 11.5px;
+  /* v2.534.0：用「表面明度差 + 顶部 1px 高光」代替「每张卡描一圈边」——
+     面板里有 2465 个 div，边框叠边框是廉价感最直接的来源（Vercel/GitHub Primer 的做法）。
+     保留 1px 透明边框是为了不改变盒模型（改掉会让既有块整体位移 2px）。 */
+  border: 1px solid transparent;
+  box-shadow: var(--wa-highlight-top);
+  border-radius: var(--wa-r-sm);
+  padding: 8px 10px;
+  font-size: var(--wa-fs-sm);
+  transition: background var(--wa-duration) var(--wa-ease-spring);
 }
 
 .wa-empty {
   color: var(--wa-text-dim);
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   padding: 12px 6px;
   text-align: center;
   font-style: italic;
@@ -538,7 +563,7 @@
 
 .wa-dim {
   color: var(--wa-text-dim);
-  font-size: 10.5px;
+  font-size: var(--wa-fs-xs);
   line-height: 1.4;
 }
 
@@ -560,7 +585,7 @@ div.wa-dim {
   border-left: 2px solid var(--wa-accent, rgba(120, 180, 220, 0.55));
 }
 .wa-diary-line {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.55;
   color: var(--wa-text, #d8dee6);
   margin: 1px 0;
@@ -593,13 +618,13 @@ div.wa-dim {
   margin: 2px 0 4px;
 }
 .wa-intent-line {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.5;
   color: var(--wa-text, #d8dee6);
 }
 /* 卡点行：比正文再暗一档、左侧缩进，与「目标 / 当前步」三行分层 */
 .wa-intent-block {
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.45;
   color: var(--wa-warn, #c9a96a);
   margin-left: 8px;
@@ -621,7 +646,7 @@ div.wa-dim {
   border-left: 2px solid var(--wa-accent-soft, rgba(120, 180, 220, 0.32));
 }
 .wa-route-line {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.55;
   color: var(--wa-text, #d8dee6);
   margin: 1px 0;
@@ -640,12 +665,12 @@ div.wa-dim {
   padding: 6px 10px;
   border-left: 3px solid #e06c75;
   background: rgba(224,108,117,0.06);
-  border-radius: 2px;
-  font-size: 12px;
+  border-radius: var(--wa-r-xs);
+  font-size: var(--wa-fs-sm);
   line-height: 1.6;
 }
 .wa-temp-line {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.55;
   color: var(--wa-text, #d8dee6);
   margin: 1px 0;
@@ -663,12 +688,12 @@ div.wa-dim {
   padding: 6px 10px;
   border-left: 3px solid #d19a66;
   background: rgba(209,154,102,0.06);
-  border-radius: 2px;
-  font-size: 12px;
+  border-radius: var(--wa-r-xs);
+  font-size: var(--wa-fs-sm);
   line-height: 1.6;
 }
 .wa-cal-line {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.55;
   color: var(--wa-text, #d8dee6);
   margin: 1px 0;
@@ -686,12 +711,12 @@ div.wa-dim {
   padding: 6px 10px;
   border-left: 3px solid #7f9bd1;
   background: rgba(127,155,209,0.06);
-  border-radius: 2px;
-  font-size: 12px;
+  border-radius: var(--wa-r-xs);
+  font-size: var(--wa-fs-sm);
   line-height: 1.6;
 }
 .wa-cost-line {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.55;
   color: var(--wa-text, #d8dee6);
   margin: 1px 0;
@@ -709,12 +734,12 @@ div.wa-dim {
   padding: 6px 10px;
   border-left: 3px solid #9b8fd1;
   background: rgba(155,143,209,0.06);
-  border-radius: 2px;
-  font-size: 12px;
+  border-radius: var(--wa-r-xs);
+  font-size: var(--wa-fs-sm);
   line-height: 1.6;
 }
 .wa-save-line {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.55;
   color: var(--wa-text, #d8dee6);
   margin: 1px 0;
@@ -736,12 +761,12 @@ div.wa-dim {
   padding: 6px 10px;
   border-left: 3px solid #66c2a5;
   background: rgba(102,194,165,0.07);
-  border-radius: 2px;
-  font-size: 12px;
+  border-radius: var(--wa-r-xs);
+  font-size: var(--wa-fs-sm);
   line-height: 1.6;
 }
 .wa-first-line {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.55;
   color: var(--wa-text, #d8dee6);
   margin: 1px 0;
@@ -773,7 +798,7 @@ div.wa-dim {
   justify-content: space-between;
   align-items: center;
   padding: 4px 0;
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
@@ -803,9 +828,9 @@ div.wa-dim {
   align-items: center;
   gap: 6px;
   padding: 4px 6px;
-  border-radius: 5px;
+  border-radius: var(--wa-r-sm);
   cursor: pointer;
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   transition: all var(--wa-duration) ease;
 }
 
@@ -819,10 +844,10 @@ div.wa-dim {
 }
 
 .wa-node-chain {
-  font-size: 9.5px;
+  font-size: var(--wa-fs-xs);
   font-family: var(--wa-font-mono);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--wa-r-xs);
   background: var(--wa-accent-dim);
   color: var(--wa-accent);
   border: 1px solid var(--wa-accent-border);
@@ -848,10 +873,10 @@ div.wa-dim {
   flex: 1;
   background: var(--wa-surface-2);
   border: 1px solid var(--wa-border-regular);
-  border-radius: 5px;
+  border-radius: var(--wa-r-sm);
   color: var(--wa-text-primary);
   padding: 5px 8px;
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   font-family: var(--wa-font-main);
   outline: none;
   box-shadow: var(--wa-shadow-recess);
@@ -873,10 +898,10 @@ div.wa-dim {
   min-height: 64px;
   background: var(--wa-surface-2);
   border: 1px solid var(--wa-border-regular);
-  border-radius: 5px;
+  border-radius: var(--wa-r-sm);
   color: var(--wa-text-primary);
   padding: 6px 8px;
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   font-family: var(--wa-font-main);
   resize: vertical;
   box-sizing: border-box;
@@ -894,10 +919,10 @@ div.wa-dim {
   background: linear-gradient(180deg, rgba(56, 189, 248, 0.14) 0%, rgba(56, 189, 248, 0.06) 100%);
   border: 1px solid var(--wa-accent-border);
   color: #bae6fd;
-  border-radius: 5px;
+  border-radius: var(--wa-r-sm);
   padding: 5px 11px;
   cursor: pointer;
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   font-weight: 500;
   margin: 3px 0;
   box-shadow: var(--wa-highlight-top);
@@ -917,9 +942,9 @@ div.wa-dim {
 
 .wa-mini {
   padding: 2px 7px;
-  font-size: 10.5px;
+  font-size: var(--wa-fs-xs);
   margin: 1px 3px 1px 0;
-  border-radius: 4px;
+  border-radius: var(--wa-r-xs);
 }
 
 .wa-range {
@@ -930,10 +955,10 @@ div.wa-dim {
 
 /* 徽章与标签 */
 .wa-badge {
-  font-size: 9.5px;
+  font-size: var(--wa-fs-xs);
   font-family: var(--wa-font-mono);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--wa-r-xs);
   background: rgba(255, 255, 255, 0.06);
   color: var(--wa-text-secondary);
   border: 1px solid var(--wa-border-subtle);
@@ -971,9 +996,9 @@ div.wa-dim {
   background: rgba(56, 189, 248, 0.08);
   border: 1px solid var(--wa-accent-border);
   color: #bae6fd;
-  border-radius: 10px;
+  border-radius: var(--wa-r-md);
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   margin: 2px 3px 2px 0;
 }
 
@@ -995,13 +1020,13 @@ div.wa-dim {
 .wa-out {
   margin-top: 6px;
   white-space: pre-wrap;
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   font-family: var(--wa-font-mono);
   line-height: 1.5;
   color: #cbd5e1;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--wa-border-subtle);
-  border-radius: 5px;
+  border-radius: var(--wa-r-sm);
   padding: 6px 8px;
   max-height: 180px;
   overflow-y: auto;
@@ -1015,7 +1040,7 @@ div.wa-dim {
 .wa-chan {
   background: var(--wa-surface-1);
   border: 1px solid var(--wa-border-subtle);
-  border-radius: 6px;
+  border-radius: var(--wa-r-sm);
   padding: 7px 9px;
   margin-bottom: 6px;
   display: flex;
@@ -1033,7 +1058,7 @@ div.wa-dim {
 .wa-logbox {
   max-height: 100%;
   overflow-y: auto;
-  font-size: 10.5px;
+  font-size: var(--wa-fs-xs);
   font-family: var(--wa-font-mono);
   line-height: 1.5;
 }
@@ -1077,8 +1102,8 @@ div.wa-dim {
   padding: 5px 4px;
   background: var(--wa-surface-1);
   border: 1px solid var(--wa-border-subtle);
-  border-radius: 5px;
-  font-size: 11px;
+  border-radius: var(--wa-r-sm);
+  font-size: var(--wa-fs-sm);
 }
 
 .wa-enemy-blood {
@@ -1125,7 +1150,7 @@ div.wa-dim {
   padding: 8px 10px;
   border: 1px solid var(--wa-border-subtle, rgba(255,255,255,0.08));
   border-left: 3px solid var(--wa-accent, rgba(120,180,220,0.55));
-  border-radius: 6px;
+  border-radius: var(--wa-r-sm);
   background: rgba(255, 255, 255, 0.02);
 }
 .wa-world-card.wa-world-quiet {
@@ -1136,18 +1161,18 @@ div.wa-dim {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--wa-fs-sm);
   margin-bottom: 5px;
   padding-bottom: 4px;
   border-bottom: 1px dashed var(--wa-border-subtle, rgba(255,255,255,0.10));
 }
 .wa-world-badge {
   display: inline-block;
-  font-size: 10px;
+  font-size: var(--wa-fs-xs);
   line-height: 1.4;
   padding: 0 6px;
   margin: 0 3px 0 4px;
-  border-radius: 8px;
+  border-radius: var(--wa-r-sm);
   background: var(--wa-accent-dim, rgba(120,180,220,0.14));
   color: var(--wa-text-dim, #9aa7b5);
   white-space: nowrap;
@@ -1157,12 +1182,12 @@ div.wa-dim {
 .wa-world-badge-open { background: rgba(230,190,90,0.16); color: #d9b96a; }
 .wa-world-badge-chosen { background: rgba(120,200,150,0.14); color: #8fbf9f; }
 .wa-sec {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   margin: 5px 0 2px;
   color: var(--wa-text, #d8dee6);
 }
 .wa-ppl-row, .wa-cur-row, .wa-cho-row, .wa-fs-row {
-  font-size: 11.5px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.6;
   padding: 1px 0 1px 6px;
 }
@@ -1171,7 +1196,7 @@ div.wa-dim {
 .wa-world-sep { color: var(--wa-text-dim, #9aa7b5); opacity: 0.7; }
 .wa-pulse-row {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   font-style: italic;
   opacity: 0.9;
   padding-top: 4px;
@@ -1187,7 +1212,7 @@ div.wa-dim {
 /* 顶部版本号：留存但退到几乎看不见 —— 玩家不需要它，作者需要时还在。 */
 #wa-panel .wa-ver {
   opacity: 0.45;
-  font-size: 9.5px;
+  font-size: var(--wa-fs-xs);
   border-color: transparent;
   background: transparent;
   padding: 0 0 0 4px;
@@ -1210,7 +1235,7 @@ div.wa-dim {
 
 .wa-now-card-t {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: var(--wa-fs-md);
   font-weight: 600;
   color: var(--wa-text-primary);
   letter-spacing: 0.02em;
@@ -1230,14 +1255,14 @@ div.wa-dim {
   display: grid;
   grid-template-columns: 18px 1fr;
   gap: 2px 8px;
-  font-size: 13px;
+  font-size: var(--wa-fs-md);
   color: var(--wa-text-primary);
   line-height: 1.5;
 }
 
 .wa-now-step-mark {
   color: var(--wa-accent);
-  font-size: 12px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.6;
 }
 
@@ -1253,14 +1278,14 @@ div.wa-dim {
 
 .wa-now-step-hint {
   grid-column: 2;
-  font-size: 12px;
+  font-size: var(--wa-fs-sm);
   color: var(--wa-text-secondary);
   line-height: 1.5;
 }
 
 .wa-now-note {
   margin: 12px 0 0;
-  font-size: 12px;
+  font-size: var(--wa-fs-sm);
   color: var(--wa-text-secondary);
   line-height: 1.6;
 }
@@ -1276,14 +1301,14 @@ div.wa-dim {
 
 .wa-now-when {
   font-family: var(--wa-font-mono);
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   color: var(--wa-accent);
   letter-spacing: 0.06em;
   margin-bottom: 6px;
 }
 
 .wa-now-where {
-  font-size: 18px;
+  font-size: var(--wa-fs-lg);
   font-weight: 600;
   color: var(--wa-text-primary);
   line-height: 1.35;
@@ -1291,7 +1316,7 @@ div.wa-dim {
 }
 
 .wa-now-who {
-  font-size: 13px;
+  font-size: var(--wa-fs-md);
   color: var(--wa-text-secondary);
   line-height: 1.6;
 }
@@ -1300,7 +1325,7 @@ div.wa-dim {
   display: inline-block;
   margin-right: 8px;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   color: var(--wa-text-dim);
   border: 1px solid var(--wa-border-subtle);
   border-radius: var(--wa-r-pill);
@@ -1319,7 +1344,7 @@ div.wa-dim {
 .wa-now-list li {
   position: relative;
   padding-left: 14px;
-  font-size: 13px;
+  font-size: var(--wa-fs-md);
   color: var(--wa-text-primary);
   line-height: 1.6;
 }
@@ -1352,7 +1377,7 @@ div.wa-dim {
 
 .wa-legacy-readings .wa-summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--wa-fs-sm);
   color: var(--wa-text-secondary);
   line-height: 1.5;
 }
@@ -1370,14 +1395,14 @@ div.wa-dim {
 }
 .wa-people-kicker {
   color: var(--wa-accent);
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   letter-spacing: .16em;
   text-transform: uppercase;
 }
 .wa-people-hero h2 {
   margin: 4px 0 5px;
   color: var(--wa-text-primary);
-  font-size: 21px;
+  font-size: var(--wa-fs-xl);
   line-height: 1.25;
   font-weight: 650;
 }
@@ -1385,7 +1410,7 @@ div.wa-dim {
 .wa-people-empty p {
   margin: 0;
   color: var(--wa-text-secondary);
-  font-size: 12px;
+  font-size: var(--wa-fs-sm);
   line-height: 1.6;
 }
 .wa-people-card {
@@ -1404,18 +1429,18 @@ div.wa-dim {
 .wa-people-card h3 {
   margin: 0;
   color: var(--wa-text-primary);
-  font-size: 16px;
+  font-size: var(--wa-fs-lg);
   line-height: 1.35;
 }
 .wa-people-tag-count {
   color: var(--wa-text-dim);
-  font-size: 11px;
+  font-size: var(--wa-fs-sm);
   white-space: nowrap;
 }
 .wa-people-relation {
   margin: 8px 0 0;
   color: var(--wa-text-secondary);
-  font-size: 13px;
+  font-size: var(--wa-fs-md);
   line-height: 1.7;
 }
 .wa-people-relation.is-quiet {
@@ -1432,7 +1457,7 @@ div.wa-dim {
   border: 1px solid var(--wa-border-subtle);
   border-radius: 999px;
   color: var(--wa-text-dim);
-  font-size: 10px;
+  font-size: var(--wa-fs-xs);
 }
 .wa-people-empty {
   padding: 28px 16px;
@@ -1443,14 +1468,14 @@ div.wa-dim {
 .wa-people-empty-mark {
   margin-bottom: 7px;
   color: var(--wa-accent);
-  font-size: 28px;
+  font-size: var(--wa-fs-xl);
   line-height: 1;
   opacity: .7;
 }
 .wa-people-empty h3 {
   margin: 0 0 5px;
   color: var(--wa-text-primary);
-  font-size: 15px;
+  font-size: var(--wa-fs-lg);
 }
 .wa-people-network {
   border: 1px solid var(--wa-border-subtle);
@@ -1462,7 +1487,7 @@ div.wa-dim {
   padding: 9px 11px;
   color: var(--wa-text-secondary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--wa-fs-sm);
 }
 .wa-people-network-body {
   padding: 0 11px 8px;
@@ -1470,7 +1495,7 @@ div.wa-dim {
 .wa-people-network-body p {
   margin: 7px 0;
   color: var(--wa-text-dim);
-  font-size: 12px;
+  font-size: var(--wa-fs-sm);
 }
 .wa-people-legacy {
   margin-top: 14px;
@@ -1482,3 +1507,20 @@ div.wa-dim {
   padding: 2px 10px 10px;
 }
 
+
+/* ==========================================================================
+   v2.534.0（可访问性收口）—— 只增不删
+   键盘可见性 / 数字不跳动 / 尊重系统「减少动态效果」
+   ========================================================================== */
+button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--wa-accent);
+  outline-offset: 2px;
+}
+/* 读数类文本用等宽数字：数值变化时宽度不抖（否则每轮刷新整行都在「跳」）。 */
+.wa-kv b, .wa-out, .wa-log, [id$="-view"] { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}

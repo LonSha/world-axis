@@ -25,6 +25,15 @@
     //   所以在出口契约串里也确实有它 ⇒ 该进表。其余 22 个惰性项零读、不进表
     //   （理由见 tests/segments/tool-diag-v092.js 的覆盖判据注释）。
     'engines/lazy-load.js': 'lazyLoad',
+    // v2.533.0（OPV30 收口）：五台缝合件引擎。此前它们是惰性档（零读、按设计不进表），
+    //   本轮在 ui/settings.js 的「缝合件台账」接了产品读点 ⇒ 退出惰性档进首帧面 ⇒
+    //   诊断清单必须登记（判据「诊断清单覆盖全部磁盘模块」正是为这一格设的；
+    //   漏登记的后果是自检/契约面对它们没有出口，而不是报错）。
+    'engines/replica-family.js': 'replicaFamily',
+    'engines/ctx-boundary.js': 'ctxBoundary',
+    'engines/write-rehearsal.js': 'writeRehearsal',
+    'engines/arc-guide.js': 'arcGuide',
+    'engines/save-audit.js': 'saveAudit',
     // v2.273.0（V6 拓展线 EXV6-1~9）：八台只读读数引擎一次登记到位。
     //   漏登记的后果不是报错，而是「自检看不见的黑盒」（全量回归的
     //   「诊断清单覆盖全部磁盘模块」判据正是为这一格设的）。
@@ -1638,6 +1647,11 @@
       // v2.202.0（Y7）：地图与关系可视化总开关（渲染在设置页）。走通用 data-sw-ns 通道 ⇒ 写 {enabled}。
       //   登记它的意义同其它行：id 写错要有人发现（渲染 + 绑定 + 守卫登记三件齐做）。
       'wa-sw-worldgraph',
+      // v2.533.0（OPV30 收口）：缝合件台账读数行（设置页）。五行读数（副本族 / 边界规则 /
+      //   写前预演 / 引导弧 / 存档体检）随渲染出，同 wa-hzwx-view 规格：**渲染 + 守卫登记**
+      //   成对，否则「id 写错」在这个新出口上无人发现（实测：未登记时块8 直接报未覆盖
+      //   ["wa-eng-ledger-view"]）。
+      'wa-eng-ledger-view',
       'wa-sw-out',
       // v2.255.0（SIMPLIFY-NAV）：界面分区的开发者模式开关（设置页）。同一页同一纪律：
       //   渲染（ui/settings.js 的「界面」分区）+ 绑定（bind 的 #wa-set-devmode onchange）+

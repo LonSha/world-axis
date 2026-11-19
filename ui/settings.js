@@ -9,6 +9,14 @@
   //   每来一个 clock:changed 玩家就被踢回「全部」——那是「靠一次点击活着」的状态。
   //   取值域与 LANES 的 lane 一致（'all' 为缺省 = 不隐藏任何东西）。
   let __laneSel = 'all';
+  // v2.533.0（OPV30 收口）：缝合件台账的「ensure 到底成没成」记录位（模块级，不是渲染局部）。
+  //   病：台账每一行都靠 `WA.lazyLoad.ensure(rel)` 顺手把缺失的引擎拉起来，而 ensure 返回的是
+  //   **Promise** —— `try/catch` 抓不到它的 reject。隔离回归里没有 bind 过装载器，ensure 直接
+  //   `Promise.reject(new Error('lazyLoad 还没接装载器…'))` ⇒ **unhandled rejection 把整个
+  //   node 进程带走**（实测：跑到 9383 行 rc=3，后面几百节一条都没跑）。
+  //   两条纪律同时落在这里：① reject 必须被接住（catch 记进本表）；② **没装载器时不许显示
+  //   「装载中」** —— 那是「算不出来伪装成算过了」的同型错误，故当场记失败并回「装载失败」。
+  let __engEnsureFail = {};
 
   /**
    * v2.51.0（第三十六面）叙事工艺设置面（五轴）。
@@ -147,7 +155,19 @@
       + (function () {
         const one = function (rel, ns, fn) {
           if (WA[ns]) { try { return fn(); } catch (e) { return '读数失败'; } }
-          try { if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') WA.lazyLoad.ensure(rel); } catch (e) {}
+          // 上一轮试过、失败过的：如实回「装载失败」，不再重复 ensure（也不回「装载中」骗人）。
+          if (__engEnsureFail[rel]) return '装载失败';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              // ensure 是异步的：成功由下一次渲染读到 WA[ns] 自愈，失败必须被接住（否则进程死）。
+              if (p && typeof p.catch === 'function') p.catch(function () { __engEnsureFail[rel] = 1; });
+            } else {
+              // 没有装载器 = 这台引擎**本环境装不上**。当场记账，别把「装不上」写成「正在装」。
+              __engEnsureFail[rel] = 1;
+              return '装载失败';
+            }
+          } catch (e) { __engEnsureFail[rel] = 1; return '装载失败'; }
           return '装载中';
         };
         const parts = [
