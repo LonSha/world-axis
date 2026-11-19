@@ -1442,7 +1442,30 @@ const digest = ev.worldDigest;
     // v2.539.3（真缺陷修复）：这四行原本**写在模板字符串内部** —— 于是它们作为文字
     //   直接渲染在事件页顶部（玩家看到四行中文注释）。注释属于代码，不属于页面。
 
+    // v2.539.4（六页内容重写 · 事件页）：结论卡 —— 这一页 25 个区块，玩家要的是三句话。
+    //  为什么先给结论再给区块：事件页是「问世界正在发生什么」的地方，而原来第一屏是
+    //  「突发事件 / 世界推演叙事 / 势力 / 外交 / 行动调度 / 货运在途 …」的区块墙（25 个 wa-sec）。
+    //  三句各答一个问题：正在发生什么 / 谁在动 / 我在这个局里的位置。
+    //  取数全部来自本函数已读到的变量（active / factions / trends / winds / enemies / rep），零新读口。
+    const __evVerdict = (function () {
+      const l1 = active
+        ? ('正在发生：' + esc(active.title || '一场突发事件') + '（第 ' + (active.currentTurn || 1) + '/' + (active.totalTurns || 1) + ' 轮）')
+        : '正在发生：没有进行中的突发事件（可以点「生成事件」起一场）';
+      const moving = [];
+      if (trends.length) moving.push('大势 ' + trends.length + ' 条');
+      if (winds.length) moving.push('风声 ' + winds.length + ' 条');
+      if (enemies.length) moving.push('仇敌 ' + enemies.length + ' 个');
+      const l2 = factions.length
+        ? ('谁在动：' + factions.length + ' 个势力' + (moving.length ? '，另有 ' + moving.join(' / ') : ''))
+        : ('谁在动：还没有登记势力' + (moving.length ? '（现有 ' + moving.join(' / ') + '）' : ''));
+      const l3 = '你的位置：声誉 ' + (rep && rep.level ? esc(rep.level) : '未结算')
+        + ' · 经济 ' + (eco && eco.climate ? esc(eco.climate) : '未结算');
+      return '<div class="wa-verdict"><b>此刻</b><ul>'
+        + [l1, l2, l3].map(function (x) { return '<li>' + x + '</li>'; }).join('')
+        + '</ul></div>';
+    })();
     return `
+      ${__evVerdict}
       <div class="wa-sec">突发事件（一轮生成·多轮解封）</div>
       ${active ? `<div class="wa-item"><b>${esc(active.title)}</b> <span class="wa-badge">第${active.currentTurn}/${active.totalTurns}轮</span><div class="wa-dim">对手：${esc(active.opponent || '未通报')}</div><button class="wa-btn wa-mini" id="wa-de-abort" title="立即终止当前突发事件">中止事件</button></div>`
         : `<div class="wa-row"><input id="wa-de-prompt" class="wa-input" placeholder="事件要求（可空）…"/><input id="wa-de-turns" aria-label="生成轮数" class="wa-input wa-w60" type="number" value="6" min="1" max="30"/><button class="wa-btn" id="wa-de-create" title="生成一场分轮次的突发事件（每轮推进一个阶段）">生成事件</button></div>`}
