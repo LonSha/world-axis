@@ -91,6 +91,19 @@ async function main() {
     const evBody = panel.querySelector('.wa-body');
     assert(evBody.querySelectorAll('.wa-rep-cell').length === 4, '事件页声誉四维网格在树中可查询（wa-rep-cell 恰 4）');
     assert(evBody.querySelectorAll('.wa-sec').length >= 3, '事件页分节标题进入引用面（wa-sec 命中 ≥3）');
+    // v2.539.5：事件页「整页被吞」回归闸。现场病：专家面板外层 <div data-omniscient> 没闭合，
+    //   于是其后 24 个区块全被当作它的子树；玩家视角下 applyView 摘除该节点 ⇒ 26 节只剩 2 节
+    //   （势力外交/行动调度/委托/线索/余波/运营/声誉/天下大势/账本/章节 一起消失）。
+    //   判据用「分节数 + 全知容器不得吞下任何分节」，与具体标记写法解耦：只要有人再漏闭合，这里必红。
+    const evSecCount = evBody.querySelectorAll('.wa-sec').length;
+    assert(evSecCount >= 18, '事件页分节数 ≥18（实 ' + evSecCount + '；外层容器漏闭合会把整页吞成两节）');
+    const evOmni = evBody.querySelectorAll('[data-omniscient]');
+    let evWorst = 0;
+    for (let i = 0; i < evOmni.length; i++) {
+      const n = (((evOmni[i] && evOmni[i].innerHTML) || '').match(/class="wa-sec"/g) || []).length;
+      if (n > evWorst) evWorst = n;
+    }
+    assert(evWorst === 0, '全知容器不吞任何分节（最坏 ' + evWorst + ' 节；吞了 ⇒ 玩家视角丢整页）');
     const orb = dom.getElementById('wa-orb');
     let orbErr = null;
     try { orb.dispatchEvent({ type: 'pointerup' }); } catch (e) { orbErr = e; }

@@ -1518,7 +1518,6 @@ const digest = ev.worldDigest;
 
       <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
         <summary style="cursor:pointer;opacity:0.75;font-size:12px;">⚙️ 外交提案、在途物流与因果调度工单（展开专家面板）</summary>
-<div data-omniscient>
       <div class="wa-sec">势力外交（成对事实）</div>
       <div class="wa-item">
         <div class="wa-dim">与上面的「关系网」<b>不是同一个东西</b>：那一栏是<b>推导值</b>（按双方各自的对外态度算出来的图，<code>derived:true</code>），这一栏是<b>谈成的事实</b>（成对条目 / 双边态度 / 条约 / 有效期 / 履约回执）。推导结果<b>不会</b>自动迁成事实 —— 「算出来的」不许冒充「谈成的」。</div>
@@ -1570,6 +1569,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             + `</div><div id="wa-ag-out" class="wa-out wa-dim">${esc(ar)}</div>`;
         })()}
       </div>
+      </div>
       <div class="wa-sec">货运在途（守恒运输）</div>
       <div class="wa-item">
         <div class="wa-dim">economy.ship 是即时补货（旧语义保留）。本段是守恒运输：源扣减→在途→到货。<b>不凭空造库存</b>：economy.goods 是库存唯一真源。</div>
@@ -1597,6 +1597,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       </div>
 
 
+      </details>
       <div class="wa-sec">剧情选择点（决策前置）</div>
       <div class="wa-item">
         <div class="wa-dim">每个选择点<b>前置</b>登记：分歧点 + 至少两个选项，各选项的 ops 先过 rehearsal 白名单预检（拒收项<b>当场标出</b>，不给玩家看不可兑现的选项）。确认时对选中项的 ops 走 commit 三段兑现。<b>本模块不写世界</b>——它只把「选了哪个」变成可追溯的回执。</div>
@@ -1624,6 +1625,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           //   跳过来时清单已在场，锚点才可能命中。
         })()}
       </div>
+      </div>
       <div class="wa-sec">故事回应窗口</div>
       <div class="wa-item">
         <div class="wa-dim">正文成功推进后，把<b>既有 owner 已提交的事实</b>投影成一次可介入的窗口（寻找 / 请人核实 / 暂不处理）。它<b>不建第二套时钟、人物状态或库存</b>：痕迹只读 livingWorld / world / acts / investigation / opportunity / threads / plan 等的已提交事实，读不到就报未知，<b>绝不把未知写成已完成</b>。</div>
@@ -1640,6 +1642,9 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
             + '</div><div id="wa-sw-out" class="wa-out wa-dim" data-nav-out="1"></div>';
         })()}
       </div>
+      </div>
+      <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
+        <summary style="cursor:pointer;opacity:0.75;font-size:12px;">⚙️ 委托履约、线索调查与灾后余波（展开专家面板）</summary>
       <div class="wa-sec">委托履约（分期交付）</div>
       <div class="wa-item">
         <div class="wa-dim">委托是<b>分阶段</b>的：每阶段有独立的交付物、验收规则与报酬。阶段推进<b>必须凭回执</b>（同一回执不得重复用），报酬按已完成阶段结算并经 org.transfer 支付。<b>本模块不写库存</b>——钱走 org 的唯一真源。</div>
@@ -1667,6 +1672,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           // v2.209.0（优化 6）：上面的读数在**渲染期**就贴好了（见 evPendingHtml）——
           //   跳过来时清单已在场，锚点才可能命中。
         })()}
+      </div>
       </div>
       <div class="wa-sec">线索调查（证据与揭示）</div>
       <div class="wa-item">
@@ -1721,6 +1727,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           // v2.209.0（优化 6）：上面的读数在**渲染期**就贴好了（见 evPendingHtml）——
           //   跳过来时清单已在场，锚点才可能命中。
         })()}
+      </div>
       </div>
       <div class="wa-sec">运营项目（批准 → 立项 → 拨付）</div>
       <div class="wa-item">
