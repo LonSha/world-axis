@@ -3,8 +3,8 @@
 > 由 `node tools/plan-ledger.js --write` 从 `git log` 生成。手改会被
 > `node tools/plan-ledger.js --check` 点名（重算与盘上不一致 ⇒ 退出 1）。
 
-- 生成源：subject 提到 `OPV29-` 的提交 **33** 条 · 源摘要 `7f1181de000f`
-- 已交付 **34 / 36**，未交付 **2**
+- 生成源：subject 提到 `OPV29-` 的提交 **34** 条 · 源摘要 `fd84facc6c6a`
+- 已交付 **35 / 36**，未交付 **1**
 - 欠账读数：区间号 1 · 无复算读数 7 · 形态不认识 0 · 重复声称 7
 
 ## Z1（已交付 5 / 6）
@@ -50,7 +50,7 @@
 | OPV29-23 | `695725d` | feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项 | 8 条：`node tests/opv29-z4-v2529.js ⇒ pass (25)` |
 | OPV29-24 | `c0dd117` | chore(worldaxis): 台账回填 tests/*.js 596->597（OPV29-24 新增专锁后现场值） | **缺（recompute:false）** |
 
-## Z5（已交付 5 / 6）
+## Z5（已交付 6 / 6）
 
 | 项 | 提交 | 标题 | 复算读数 |
 | :--- | :--- | :--- | :--- |
@@ -59,6 +59,7 @@
 | OPV29-27 | `3480ad5` | feat(worldaxis): OPV29-27 版本面跟位 + OPV29-35 发布清单化 —— 23 项，面数 596→598 | 8 条：`node tests/opv29-z5-27-v2529.js ⇒ pass (23)` |
 | OPV29-28 | `52bb590` | feat(worldaxis): OPV29-28 计划台账自动汇总 + OPV29-18 台账与现场一致 —— 68 项 | 6 条：`node tests/opv29-z5-28-v2529.js ⇒ pass (41)` |
 | OPV29-29 | `0e3f0f4` | feat(worldaxis): OPV29-29 依赖零新增守门 —— 扫 1308 个 JS，外部包 0，白名单走既有登记表 | 5 条：`node tools/dep-audit.js                 ⇒ 依赖合规: 0 个外部包` |
+| OPV29-30 | `5a176aa` | feat(engines): OPV29-30 破坏性变更迁移 —— 存档结构变更给迁移与回滚 | 9 条：`node tests/opv29-z5-30-v2529.js ⇒ pass 33 / 33` |
 
 ## Z6（已交付 6 / 6）
 
@@ -71,9 +72,9 @@
 | OPV29-35 | `3480ad5` | feat(worldaxis): OPV29-27 版本面跟位 + OPV29-35 发布清单化 —— 23 项，面数 596→598 | 8 条：`node tests/opv29-z5-27-v2529.js ⇒ pass (23)` |
 | OPV29-36 | `435d7fa` | feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项 | 11 条：`node tests/opv29-z6-13-v2529.js ⇒ pass (35)` |
 
-## 未交付（2）
+## 未交付（1）
 
-OPV29-04 · OPV29-30
+OPV29-04
 
 ## 区间号（不展开，只点名）
 

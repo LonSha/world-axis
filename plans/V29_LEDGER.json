@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "7f1181de000fcf4f2c9cc16eb2bd48ec1e2845474365773c808893fac49d9f6d",
-  "sourceCommits": 33,
+  "sourceDigest": "fd84facc6c6a4e64a2760a33ee8c5717bb8130a71c7c48620bf445d79ee0bf0d",
+  "sourceCommits": 34,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -415,6 +415,24 @@
       "recompute": true,
       "note": "JS 文件 1308 · 内置 1938 / 本地 1250 / 已声明可选 11 / 外部 0 / 动态 489 / 拼接噪声 5。"
     },
+    "OPV29-30": {
+      "group": "Z5",
+      "commit": "5a176aa",
+      "subject": "feat(engines): OPV29-30 破坏性变更迁移 —— 存档结构变更给迁移与回滚",
+      "readings": [
+        "node tests/opv29-z5-30-v2529.js ⇒ pass 33 / 33",
+        "node tests/stitch-nekotools-v2529.js ⇒ pass 53 / 53",
+        "node tests/stitch-redbird-v2529.js ⇒ pass 89 / 89",
+        "node tests/module-registry-gate.js ⇒ pass：文件 567 / 命名空间 578 / 装载期边 460 / 硬边 0 / 调用期 743 / 结构问题 0",
+        "node tests/module-cycle-gate-v2107.js ⇒ pass（65 项）",
+        "node tests/settle-v2830.js ⇒ pass (55)",
+        "node tests/ns-consumer-ledger-v2400.js ⇒ pass（72 项）",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项）· BASE_TEST_FILES 620 → 621",
+        "node tests/test-surface-gate.js ⇒ 全部通过（孤儿 2，均豁免）"
+      ],
+      "recompute": true,
+      "note": ""
+    },
     "OPV29-31": {
       "group": "Z6",
       "commit": "b62742f",
@@ -512,8 +530,7 @@
     }
   },
   "pending": [
-    "OPV29-04",
-    "OPV29-30"
+    "OPV29-04"
   ],
   "violations": {
     "rangeForm": [
@@ -585,8 +602,8 @@
     ]
   },
   "counts": {
-    "delivered": 34,
-    "pending": 2,
+    "delivered": 35,
+    "pending": 1,
     "rangeForm": 1,
     "noRecompute": 7,
     "unparsedForm": 0,
