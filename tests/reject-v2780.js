@@ -121,11 +121,13 @@ const DEAD = {
       + '届时本门禁会以 deadLeak 提醒「该码可能复活」。'
   },
   'bad-draft': {
-    anchor: "if (!draft || typeof draft !== 'object') return { ok: false, reason: 'bad-draft' };",
-    why: 'registry.ensurePerson（v2.86.0 A3，people 条目的唯一写者）的入参守卫，在现有调用面上'
-      + '结构不可达：它的调用点（life.person / intel.personRow / backstage 两处 / registry.setProfileSafe）'
-      + '全部位于 store.transact(function (draft) {...}) 回调内，而 transact 保证传入骨架草稿对象。'
-      + '不删：唯一写者是对外导出，越界调用时它是第一道防线；届时本门禁会以 deadLeak 提醒它可能复活。'
+    anchor: "if (!opts.draft || typeof opts.draft !== 'object' || Array.isArray(opts.draft)) {",
+    why: 'collab.enqueue（v2.196.0 U2 批次⑥）的**嵌套草稿**入参守卫，在现有调用面上结构不可达：'
+      + '产品面唯一调用点是 coop.apply（engines/coop.js:437），它在 mutate(function (draft) {...}) 回调里'
+      + '把 transact/mutate 交下来的骨架草稿原样传进 opts.draft —— 而 mutate 保证传的是对象。'
+      + '（v2.529.0 OPV29-14 复算时改正：此前本条 anchor 还指着 v2.86.0 的 registry.ensurePerson，'
+      + '那行源码早已不在；结论不变、锚点归位，tools/dead-table-triage.js 的 T5 就是抓这个的。）'
+      + '不删：唯一写者是导出面，越界调用时它是第一道防线；届时本门禁会以 deadLeak 提醒它可能复活。'
   },
   'end-failed': {
     anchor: "if (!tape || !tape.ok) return { ok: false, reason: 'end-failed', result: result };",
