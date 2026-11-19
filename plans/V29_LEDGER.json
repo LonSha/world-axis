@@ -2,10 +2,26 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "2817d2af7f1f1d3c49b8ad92d88ba2f06eae89b3523b47fc4badc12fbbaed2b2",
-  "sourceCommits": 13,
+  "sourceDigest": "7fa858f467f7d89700305eebec870b3c5799752f4d1a755bee6de89a12c9b62d",
+  "sourceCommits": 14,
   "total": 36,
   "delivered": {
+    "OPV29-03": {
+      "group": "Z1",
+      "commit": "f7b2835",
+      "subject": "feat(worldaxis): OPV29-03 隔离器瘦身 —— 35.5M→32.0M，三条铁律不许瘦错（22 项）",
+      "readings": [
+        "node tests/opv29-z1-03-v2529.js ⇒ pass (22)",
+        "node tools/mirror-slim.js ⇒ 复制面 1512 个文件 · 35.5M → 32.0M（省 3.5M / 9.7%）· 排除 6 · 拒绝 2 · 目标 20M 未达成",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 602→603",
+        "node tests/test-surface-gate.js ⇒ 全部通过（无孤儿）",
+        "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
+        "产品面优先改成永不拒绝 ⇒ FAIL 1/22（只红 B1）",
+        "引用检查改成恒当未引用 ⇒ FAIL 3/22（A4+A5+B2）"
+      ],
+      "recompute": true,
+      "note": ""
+    },
     "OPV29-13": {
       "group": "Z3",
       "commit": "435d7fa",
@@ -297,7 +313,6 @@
   "pending": [
     "OPV29-01",
     "OPV29-02",
-    "OPV29-03",
     "OPV29-04",
     "OPV29-05",
     "OPV29-06",
@@ -343,8 +358,8 @@
     ]
   },
   "counts": {
-    "delivered": 19,
-    "pending": 17,
+    "delivered": 20,
+    "pending": 16,
     "rangeForm": 1,
     "noRecompute": 2,
     "unparsedForm": 0,
