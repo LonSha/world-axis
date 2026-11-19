@@ -883,7 +883,9 @@
   //   而是 secModules 把 ui/render-perf.js 报成 missing，而它本来该归 optionalMissing
   //   （「无头环境缺席」与「产品文件断裂」是两件事，混在一起会让自检的红灯失去信息量）。
   //   另注：tests/export-contract.js 里有一份**同名口径的第二副本**（OPTIONAL），两处必须同改。
-  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat', 'renderPerf', 'panelNav',
+  // v2.536.0：ui/schema-view.js —— 与 tests/run.js 的 UI_NS2800、tests/export-contract.js
+  //   的 OPTIONAL 同批（这是第三处同名名单：契约口径两处 + 自检口径一处）。
+  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat', 'renderPerf', 'panelNav', 'schemaView',
       // v2.225.0(Q8):ui/panel-fold.js —— 无头环境里 ui/*.js 不装载,不登记会被 secModules
       //   报成 missing(那是「真缺席」,不是「可选缺席」)。
       'panelFold',

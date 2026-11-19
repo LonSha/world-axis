@@ -676,6 +676,38 @@
     })();
     return `
       ${vacuum}
+      ${(function () {
+        // v2.536.0：世界账簿 —— 玩家端第一眼要答的问题不是「某台引擎算得对不对」，
+        //   而是「我的世界现在有哪些账」。本块**枚举 store 的顶层键**（不硬编码清单）：
+        //   数组报条目数、对象报字段数、标量报值，空的一律不列（空账报「0 条」会让页面变成
+        //   一堵「都是 0」的墙）。它只读、不改、不落盘；键是数据，所以不登记为控件。
+        //   为什么用折叠：账簿是「按需翻」的东西，常开会把世界页的主线挤下去。
+        if (!WA.schemaView || typeof WA.schemaView.render !== 'function') {
+          return '<div class="wa-dim">视图层缺席（ui/schema-view.js 未装载）</div>';
+        }
+        const rows = [];
+        Object.keys(s).sort().forEach(function (k) {
+          const v = s[k];
+          let val = '';
+          if (Array.isArray(v)) { if (!v.length) return; val = v.length + ' 条'; }
+          else if (v && typeof v === 'object') {
+            const n = Object.keys(v).length;
+            if (!n) return;
+            val = n + ' 项';
+          } else {
+            if (v === '' || v === null || v === undefined) return;
+            val = String(v).slice(0, 24);
+          }
+          rows.push({ k: k, v: val });
+        });
+        return WA.schemaView.render({
+          blocks: [{
+            type: 'collapse',
+            title: '世界账簿（这台世界现在有 ' + rows.length + ' 类账）',
+            children: [{ type: 'kv', rows: rows.slice(0, 40), empty: '这台世界还是空的：去开局页立骨架' }]
+          }]
+        });
+      })()}
       <div class="wa-sec">世界钟 <button class="wa-btn wa-mini" id="wa-set-clock">设定</button> <button class="wa-btn wa-mini" id="wa-next-day" title="推进一天（保留时段由引擎单一实现决定）">下一日</button></div>
       <div class="wa-kv"><span>当前</span><b>${esc(s.clock.label || '未设定')}</b></div>
       ${(() => {

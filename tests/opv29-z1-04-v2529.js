@@ -139,7 +139,7 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const mLazy = idxSrc.match(/const LAZY_ORDER = \[([\s\S]*?)\n  \];/);
   const parse = function (mm) { return mm ? (mm[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); }) : null; };
   const eager = parse(mOrd), lazy = parse(mLazy);
-  a(!!eager && eager.length === 574, 'B1 首帧清单 LOAD_ORDER 解析出 574 条（实测回填；五台缝合件已进首帧面）', eager && eager.length);
+  a(!!eager && eager.length === 575, 'B1 首帧清单 LOAD_ORDER 解析出 575 条（实测回填；五台缝合件 + 声明式视图层已进首帧面）', eager && eager.length);
   // A0b / A0e：惰性档非空 ——防「删空档换下降」
   a(!!lazy && lazy.length >= 10, 'B2 惰性档**非空**且成规模（≥10 条；删空换下降会在这里红）', lazy && lazy.length);
   a(!!lazy && lazy.length === 22, 'B3 惰性档 22 条（实测回填，静默漂移会红；五台缝合件已按 B16 退出惰性档）', lazy && lazy.length);
@@ -154,8 +154,8 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const notInLedger = (lazy || []).filter(function (x) { return !led.modules[x]; });
   a(notInLedger.length === 0, 'B8 惰性档每条仍在 registry 账本里（门禁眼里没有「消失的模块」）', notInLedger);
   a(led.lazyCount === 22, 'B9 账本记录 lazyCount=22（registry 报告的惰性面读数）', led.lazyCount);
-  a(led.loadedCount === 575 && led.loadOrderCount === 574,
-    'B10 全量契约面 575 / 首帧面 574（差 1 = 惰性装载器自己；五台缝合件已进首帧面）', [led.loadedCount, led.loadOrderCount]);
+  a(led.loadedCount === 575 && led.loadOrderCount === 575,
+    'B10 全量契约面 575 / 首帧面 575（差 0：声明式视图层进首帧面后两表填平；惰性装载器自己也在首帧表里）', [led.loadedCount, led.loadOrderCount]);
   // 首帧装载边 vs 全量装载边（验收原话的读数）
   const edgesOf = function (list) {
     return list.reduce(function (n, rel) {
