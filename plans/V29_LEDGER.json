@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "9b4098ac29e849df3350e9811c32e3e53f94f4d9f3f35a770293980a0c7a4984",
-  "sourceCommits": 20,
+  "sourceDigest": "f87bca5e4d212fb323ac03f5b26640918bf86e1c39fa8f1de0e67711c26946ce",
+  "sourceCommits": 21,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -45,6 +45,18 @@
       "readings": [],
       "recompute": false,
       "note": ""
+    },
+    "OPV29-12": {
+      "group": "Z2",
+      "commit": "829986f",
+      "subject": "feat(worldaxis): OPV29-12 拆段假绿防线 —— 拆段前后比对判据指纹，少一条即红（17 项）",
+      "readings": [
+        "node tests/opv29-z2-12-v2529.js ⇒ pass (17)；C1 现场真跑 settle-v2820.js 采到 160 条判据",
+        "node tools/split-guard.js --capture /tmp/sg-base.json settle-v2820.js causal-view-v2870.js ⇒ 2 把 / 177 条 ⇒ --compare 立即回读 177 → 177 PASS（rc=0）",
+        "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27 = 冻结基线 27（新锁的 5 处 indexOf 存在性锚点已改成精确计数读数：--capture 4 处 / --compare 5 处 / 少判据 1 处）"
+      ],
+      "recompute": true,
+      "note": "专锁 17 项全绿 · 面数 606→607 · segment-extract pass（128）· test-surface-gate 全通过 · orphan pass · readings-v2106 pass（61）· plan-readings pass（16 条全等）· manifest rc=0"
     },
     "OPV29-13": {
       "group": "Z3",
@@ -354,7 +366,6 @@
     "OPV29-09",
     "OPV29-10",
     "OPV29-11",
-    "OPV29-12",
     "OPV29-14",
     "OPV29-17",
     "OPV29-22",
@@ -407,8 +418,8 @@
     ]
   },
   "counts": {
-    "delivered": 24,
-    "pending": 12,
+    "delivered": 25,
+    "pending": 11,
     "rangeForm": 1,
     "noRecompute": 5,
     "unparsedForm": 0,
