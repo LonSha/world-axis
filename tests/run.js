@@ -402,10 +402,13 @@ async function runScript(spec, opt) {
     return;
   }
   fail++;
+  // OPV29-16：红时必须给单跑命令（全量 29 分钟，红一次要能单跑复现）
+  const repro = 'cd ' + BASE + ' && node tests/' + path.basename(spec);
   const msg = '[脚本 ' + spec + ' 子进程 rc=' + rc + (o.expectFail ? '（期望非零）' : '（期望 0）') + '] '
     + (r.error ? r.error.message : tail.slice(0, 160));
   failures.push(msg);
   console.log('  \u2717 ' + msg);
+  console.log('     \u21b3 单跑复现：' + repro);
 }
 
 // 按依赖顺序加载扩展JS到同一vm上下文（跳过index.js与UI）
@@ -22371,6 +22374,29 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //        ok:false 是被「清单缺项」触发的、不是「版本不一致」，B7 整条判据是假的。
     //        补 makeSample 把两边的文件全搬齐，并加 B7a/B12a 「样本自身清单齐」自检。
     await runScript('./opv29-z5-27-v2529.js');
+    // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
+    //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
+    //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
+    //     红变成一条没人复现的记录。
+    //   落点：`runScript` 失败分支打印一行单跑命令，**由 spec 直接算出**
+    //     （`cd <BASE> && node tests/<basename(spec)>`），不手写第二份表 ——
+    //     手写表会腐烂，且与 spec 是两份真源。
+    //   三条不许的假绿：① 只在注释里承诺、代码里没打印；② 命令写死一个不对的脚本名；
+    //     ③ 打印放在成功路径上。
+    //   读数：`node tests/opv29-z3-16-v2529.js` ⇒ pass (18)。
+    //   负控制两向（真破坏 tests/run.js 后重跑，各自单打）：
+    //     删掉打印行（红门禁不再给命令）⇒ FAIL 5/18（A4+A4b+A6+C1+C5）；
+    //     repro 写死字面量脚本名（与失败的那个不同源）⇒ FAIL 4/18（A3+A3b+A7+C3）。
+    //   写这一项时被自己咬了三次（都是真问题）：
+    //     ① A3 写成 /path\.basename\(spec\)/ 匹配函数体 —— 函数体里本来就有 2 处
+    //        （spawn 入参、成功行打印），于是「删掉 repro 那处、旧两处顶上」照样绿。
+    //        改为锁 `const repro = …` 那一行，并补 A3b 数处数。
+    //     ② C2/C4 对**全文** replace 再 test —— run.js 别处也有同名字样，破坏是假的。
+    //        改为只在 runScript 函数体窗口内验证。
+    //     ③ C3 用 src.replace 换 basename —— 只换全文第一处，而第一处不在 runScript 里，
+    //        于是「破坏了」为真、「函数体内判据输入变了」为假。这正是 OPV29-21 说的空转，
+    //        在自己的负控制里又出现了一次。
+    await runScript('./opv29-z3-16-v2529.js');
     // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
     //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是
     //   「装了 story-tone 也说没有」「改了一句也永远 available:false」——不崩的假判据。
