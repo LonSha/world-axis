@@ -439,6 +439,18 @@ function scan(opt) {
   const order = loadOrder(d) || [];
   const orderIdx = {};
   order.forEach(function (r, i) { orderIdx[r] = i; });
+  // ── v2.529.0（OPV29-04）：惰性档接在首帧清单之后编号。
+  //   为什么必须补这一段：悬空文件判据读的是 orderIdx —— 惰性档没编号，那 22 台就会被判成
+  //   「产品文件面有、装载序里没有」的悬空件（清单越短、读数越脏）。补编号后：它们在契约面内，
+  //   只是不在首帧（首帧读数由 order.length 单独给出，不被这段污染）。
+  const __LAZY_ORDER__ = (function () {
+    const src = d.indexSrc !== undefined ? d.indexSrc : safeRead(path.join(BASE, 'index.js'));
+    if (!src) return [];
+    const m = src.match(/const LAZY_ORDER = \[([\s\S]*?)\n  \];/);
+    if (!m) return [];
+    return (m[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); });
+  })();
+  __LAZY_ORDER__.forEach(function (r, i) { if (orderIdx[r] === undefined) orderIdx[r] = order.length + i; });
 
   const aliasOf = {};
   const refs = {};

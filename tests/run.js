@@ -22608,6 +22608,7 @@ await runScript('./story-window-evidence-v2518.js');
     await runScript('./stitch-redbird-v2529.js');
     await runScript("./opv29-z1-04-v2529.js");
     await runScript('./opv29-z5-30-v2529.js');
+    await runScript('./opv29-z1-04-v2529.js');
     await runScript('./opv29-z6-factage-jsonrepair-v2529.js');
     // v2.408.0（OPV23-9）：分层回归调度器专锁 —— 四级金字塔「每档真跑它声称的那件事」。
     //   为什么必须登记：不登记 ⇒ tests/test-surface-gate.js 判 unregistered-orphan、

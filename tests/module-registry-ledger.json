@@ -1,13 +1,14 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 590,
- "loadedCount": 569,
- "uiCount": 21,
- "nsCount": 580,
+ "loadOrderCount": 569,
+ "lazyCount": 22,
+ "loadedCount": 570,
+ "uiCount": -1,
+ "nsCount": 581,
  "totals": {
-  "loadEdges": 462,
+  "loadEdges": 463,
   "hardEdges": 0,
-  "callRefs": 747,
+  "callRefs": 749,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -194,6 +195,7 @@
     "engines/knowledge-practice.js",
     "engines/l3-registry.js",
     "engines/labor-schedule.js",
+    "engines/lazy-load.js",
     "engines/legacy-oath.js",
     "engines/length-policy.js",
     "engines/letter-post.js",
@@ -768,6 +770,7 @@
     "engines/knowledge-practice.js",
     "engines/l3-registry.js",
     "engines/labor-schedule.js",
+    "engines/lazy-load.js",
     "engines/legacy-oath.js",
     "engines/length-policy.js",
     "engines/letter-post.js",
@@ -1189,25 +1192,6 @@
    "stateKeys": [],
    "consumedBy": []
   },
-  "engines/api-vault.js": {
-   "ns": [
-    "apiVault"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
   "engines/backstage-protocols.js": {
    "ns": [
     "backstageProtocols"
@@ -1252,63 +1236,6 @@
    ],
    "consumedBy": []
   },
-  "engines/card-file.js": {
-   "ns": [
-    "cardFile"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/chat-guard.js": {
-   "ns": [
-    "chatGuard"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/contrast.js": {
-   "ns": [
-    "contrast"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
   "engines/evolution.js": {
    "ns": [
     "evolution"
@@ -1351,199 +1278,9 @@
    "stateKeys": [],
    "consumedBy": []
   },
-  "engines/fact-age.js": {
+  "engines/lazy-load.js": {
    "ns": [
-    "factAge"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/floor-census.js": {
-   "ns": [
-    "floorCensus"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/floor-favorites.js": {
-   "ns": [
-    "floorFavorites"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/floor-hide.js": {
-   "ns": [
-    "floorHide"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/floor-scrub.js": {
-   "ns": [
-    "floorScrub"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/green-keys.js": {
-   "ns": [
-    "greenKeys"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/import-kind.js": {
-   "ns": [
-    "importKind"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/json-repair.js": {
-   "ns": [
-    "jsonRepair"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/macro-guard.js": {
-   "ns": [
-    "macroGuard"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/mixed-index.js": {
-   "ns": [
-    "mixedIndex"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/msg-align.js": {
-   "ns": [
-    "msgAlign"
+    "lazyLoad"
    ],
    "requires": [
     "registerModule"
@@ -1638,25 +1375,6 @@
    "requiresFiles": [],
    "providerOrderOk": true,
    "callRefs": [],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/save-migrate.js": {
-   "ns": [
-    "saveMigrate"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []
@@ -1870,101 +1588,6 @@
    "requiresFiles": [],
    "providerOrderOk": true,
    "callRefs": [],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/setup-plan.js": {
-   "ns": [
-    "setupPlan"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/slot-format.js": {
-   "ns": [
-    "slotFormat"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/store-merge.js": {
-   "ns": [
-    "storeMerge"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/story-export.js": {
-   "ns": [
-    "storyExport"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/stream-gate.js": {
-   "ns": [
-    "streamGate"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []
@@ -8018,25 +7641,6 @@
    ],
    "consumedBy": []
   },
-  "engines/write-serial.js": {
-   "ns": [
-    "writeSerial"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
   "render/inject.js": {
    "ns": [
     "render"
@@ -11343,6 +10947,424 @@
    "stateKeys": [
     "worldaxis_degrade_audit_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/api-vault.js": {
+   "ns": [
+    "apiVault"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/card-file.js": {
+   "ns": [
+    "cardFile"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/chat-guard.js": {
+   "ns": [
+    "chatGuard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/contrast.js": {
+   "ns": [
+    "contrast"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/fact-age.js": {
+   "ns": [
+    "factAge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/floor-census.js": {
+   "ns": [
+    "floorCensus"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/floor-favorites.js": {
+   "ns": [
+    "floorFavorites"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/floor-hide.js": {
+   "ns": [
+    "floorHide"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/floor-scrub.js": {
+   "ns": [
+    "floorScrub"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/green-keys.js": {
+   "ns": [
+    "greenKeys"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/import-kind.js": {
+   "ns": [
+    "importKind"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/json-repair.js": {
+   "ns": [
+    "jsonRepair"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/macro-guard.js": {
+   "ns": [
+    "macroGuard"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/mixed-index.js": {
+   "ns": [
+    "mixedIndex"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/msg-align.js": {
+   "ns": [
+    "msgAlign"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/save-migrate.js": {
+   "ns": [
+    "saveMigrate"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/setup-plan.js": {
+   "ns": [
+    "setupPlan"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/slot-format.js": {
+   "ns": [
+    "slotFormat"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/store-merge.js": {
+   "ns": [
+    "storeMerge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/story-export.js": {
+   "ns": [
+    "storyExport"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/stream-gate.js": {
+   "ns": [
+    "streamGate"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/write-serial.js": {
+   "ns": [
+    "writeSerial"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   }
  }

@@ -371,44 +371,24 @@
     // v2.296.0（V10 OPV10-7）：全仓统一待办中心。位置在 store / commit 之后、引擎之前
     'core/unified-pending.js',
     'core/interceptor.js',
-    'engines/api-vault.js',
     // OPV29-11：backstage 的协议常量与设置登记表已拆到 engines/backstage-protocols.js，
     //   必须先于引擎装载（缺表时引擎求值期当场抛错，不静默退化成「没有协议」）。
     'engines/backstage-protocols.js',
     'engines/backstage.js',
-    'engines/card-file.js',
-    'engines/chat-guard.js',
-    'engines/contrast.js',
     'engines/evolution.js',
     'engines/enemies.js',
-    'engines/fact-age.js',
-    'engines/floor-census.js',
-    'engines/floor-favorites.js',
-    'engines/floor-hide.js',
-    'engines/floor-scrub.js',
-    'engines/green-keys.js',
-    'engines/import-kind.js',
-    'engines/json-repair.js',
-    'engines/macro-guard.js',
-    'engines/mixed-index.js',
-    'engines/msg-align.js',
+    'engines/lazy-load.js',
     'engines/regional.js',
     'engines/parallel-world.js', // v2.34.0: 平行世界（主线之外独立推演，缝合自狐神抚 V19.5）
      'engines/horizon.js',
      'engines/digest.js',
      'engines/limits.js',
-    'engines/save-migrate.js',
 'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
     'engines/chapters.js',
     'engines/direct-event.js',
     'engines/editor-faction.js',
     'engines/editor-events.js',
     'engines/inspector-state.js',
-    'engines/setup-plan.js',
-    'engines/slot-format.js',
-    'engines/store-merge.js',
-    'engines/story-export.js',
-    'engines/stream-gate.js',
     'engines/tool-snapshot.js',
     'engines/tool-analyzer.js',
     'engines/tool-import.js',
@@ -1087,7 +1067,6 @@
     // v2.518.0：正文后故事回应窗口。位置在结构汇流之后、render/inject 之前；
     // 只读既有 world/livingWorld/messages，写入自己的编排账，不替代事实 owner。
     'engines/story-window.js',
-    'engines/write-serial.js',
     'render/inject.js',
     'render/theater.js',
     'render/purifier.js',
@@ -1611,6 +1590,35 @@
     'ui/settings.js',
     'ui/assistant.js',
   ];
+  // ── 惰性档（v2.529.0 · OPV29-04）：首帧不装，首帧后由 engines/lazy-load.js 串行补装 ──
+  //   凭什么可以延迟：这每一条的产品读点都是零，定性记在 tests/ns-consumer-ledger.json 的
+  //   pending-wire 类（evidence 写明谁会在什么时候读它）。判据在 tests/opv29-z1-04-v2529.js：
+  //   惰性档非空、首帧装载边严格小于全量、每条都能 ensure 装回来、失败可重试。
+  //   本节注释同样不放方括号 —— 门禁用正则从本段取清单。
+  const LAZY_ORDER = [
+    'engines/api-vault.js',
+    'engines/card-file.js',
+    'engines/chat-guard.js',
+    'engines/contrast.js',
+    'engines/fact-age.js',
+    'engines/floor-census.js',
+    'engines/floor-favorites.js',
+    'engines/floor-hide.js',
+    'engines/floor-scrub.js',
+    'engines/green-keys.js',
+    'engines/import-kind.js',
+    'engines/json-repair.js',
+    'engines/macro-guard.js',
+    'engines/mixed-index.js',
+    'engines/msg-align.js',
+    'engines/save-migrate.js',
+    'engines/setup-plan.js',
+    'engines/slot-format.js',
+    'engines/store-merge.js',
+    'engines/story-export.js',
+    'engines/stream-gate.js',
+    'engines/write-serial.js',
+  ];
 
   // v0.1.16: 多源容灾——主源（本地扩展目录）失败时依次回退 jsDelivr 三域，每源 12s 闸刀
   // v2.211.0(优化 Q1 · 同版加载):回退源此前写死 @main,而那是一个会走的引用。
@@ -2005,6 +2013,21 @@
           ? __bootCap.close() : { selfLines: [], quietLines: 0 };
       } catch (e) { __bootClosed = { selfLines: [], quietLines: 0 }; }
     }
+    // ── OPV29-04（v2.529.0）惰性档接线：首帧只装 LOAD_ORDER；LAZY_ORDER 在这里交出装载器并排队，
+    //   空闲帧开始串行补装。判据不是「清单短了」而是「装得回来」：ensure 幂等、失败退回 pending、
+    //   auto 串行。补装起不来时首帧照常可用（catch 吞掉，只是不回补）。
+    try {
+      if (WA.lazyLoad && typeof WA.lazyLoad.bind === 'function') {
+        WA.lazyLoad.bind(function (rel) { return loadScript(rel); });
+        WA.lazyLoad.add(LAZY_ORDER);
+        const __kickLazy = function () {
+          try { Promise.resolve(WA.lazyLoad.auto()).then(function () {}, function () {}); }
+          catch (e) { /* 回补失败不留残局：ensure 下次还能再试 */ }
+        };
+        if (typeof requestIdleCallback === 'function') requestIdleCallback(__kickLazy, { timeout: 2000 });
+        else setTimeout(__kickLazy, 0);
+      }
+    } catch (e) { /* 惰性档坏了 → 首帧照常可用，只是不回补 */ }
     // 版本以**引擎自述**为准（不是拿 manifest 回填）：这样「某台引擎的版本没跟上」
     // 会直接出现在同一张逐台表里，而不是靠升版脚本另行发现。
     const __verMap = {};

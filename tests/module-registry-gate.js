@@ -55,10 +55,20 @@ const idxSrc = fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
 const mOrd = idxSrc.match(/const LOAD_ORDER = \[([\s\S]*?)\n  \];/);
 if (!mOrd) { console.error('module-registry-gate: index.js 里找不到 LOAD_ORDER'); process.exit(2); }
 const LOAD_ORDER = (mOrd[1].match(/'([^']+\.js)'/g) || []).map(function (s) { return s.slice(1, -1); });
-const LOAD = LOAD_ORDER.filter(function (r) { return r.indexOf('ui/') !== 0; });
-const nsFiles = new Set(LOAD_ORDER);
+// ── v2.529.0（OPV29-04）：契约面 = 首帧面 ∪ 惰性面。惰性档只推迟「装」，不缩小「查」 ——
+//   否则这 22 台引擎就从门禁眼睛里消失了（清单变短、账本变干净，而它们再也不被检查）。
+const LAZY_ORDER = (function () {
+  const m = idxSrc.match(/const LAZY_ORDER = \[([\s\S]*?)\n  \];/);
+  if (!m) return [];
+  return (m[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); });
+})();
+const LOAD = LOAD_ORDER.concat(LAZY_ORDER).filter(function (r) { return r.indexOf('ui/') !== 0; });
+const nsFiles = new Set(LOAD_ORDER.concat(LAZY_ORDER));
 const orderOf = {};
 LOAD_ORDER.forEach(function (r, i) { orderOf[r] = i; });
+// 惰性档接在首帧清单之后编号：供者在首帧、消费方在惰性档 ⇒ 次序判据照常成立；
+// 两个惰性项互相依赖时会露出来（那说明它们不该都在懒档，由 cycle 的 L5 判据点名）。
+LAZY_ORDER.forEach(function (r, i) { if (orderOf[r] === undefined) orderOf[r] = LOAD_ORDER.length + i; });
 
 // index.js / mock.js 提供的引导项——不属于任何模块文件，读它们不构成模块依赖
 const BOOTSTRAP = new Set(['VERSION', 'version', 'mainWin', 'mainDoc',
@@ -189,6 +199,7 @@ Object.keys(modules).forEach(function (rel) {
 const report = {
   version: VERSION,
   loadOrderCount: LOAD_ORDER.length,
+  lazyCount: LAZY_ORDER.length,
   loadedCount: LOAD.length,
   uiCount: LOAD_ORDER.length - LOAD.length,
   nsCount: Object.keys(nsOwner).length,

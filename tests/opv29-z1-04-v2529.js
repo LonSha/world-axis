@@ -1,0 +1,224 @@
+#!/usr/bin/env node
+// WorldAxis tests/opv29-z1-04-v2529.js — OPV29-04 惰性装载
+//
+// 验收（计划表原话）：**首帧装载边数下降；面板行为不变**。
+// 这两条各自都有一个「看起来做到了」的假形态：
+//   · 首帧装载边数下降 —— 把条目从清单里删掉，数字立刻下降，代价是那台引擎**永远不装**；
+//   · 面板行为不变 —— 首帧不装，而面板要用时又装不回来（异步取源码失败就静默少一块功能）。
+// 所以本锁钉的不是「数字小了」，而是三件事：
+//   ① 惰性档**非空**（B0：删空档换下降会立刻红）；
+//   ② 惰性档的**契约面没缩小**（B2：每条都还在 registry 账本里 —— 门禁眼里没有「消失的模块」）；
+//   ③ 装得回来（A 面：ensure 幂等、并发只装一次、失败退回 pending 可重试、auto 串行不并发）。
+// 另有一条直接针对「面板行为不变」的证据（D2）：惰性档的每个 ns 在产品源面**零出现** ——
+//   面板不读它们，延迟装载就不可能让面板少块功能（读面凭空消失才是真回归）。
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ROOT = path.join(__dirname, '..');
+let pass = 0, fail = 0;
+function a(cond, name, extra) {
+  if (cond) { pass++; console.log('  ✓ ' + name); return true; }
+  fail++;
+  console.log('  ✗ ' + name + (extra === undefined ? '' : ' :: ' + JSON.stringify(extra)));
+  return false;
+}
+const RD = function (rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); };
+
+function mkSandbox() {
+  const win = { console: { log: function () {}, warn: function () {}, error: function () {} } };
+  const sb = {
+    window: win, console: win.console,
+    Promise: Promise, JSON: JSON, Math: Math, Object: Object, Array: Array,
+    String: String, Number: Number, Boolean: Boolean, Error: Error, isFinite: isFinite
+  };
+  win.WorldAxis = { registerModule: function (n, m) { (win.__regs = win.__regs || []).push({ rel: n, meta: m }); } };
+  return sb;
+}
+function loadLazy(srcOverride) {
+  const sb = mkSandbox();
+  const ctx = vm.createContext(sb);
+  vm.runInContext(srcOverride === undefined ? RD('engines/lazy-load.js') : srcOverride, ctx, { filename: 'engines/lazy-load.js' });
+  return { LL: sb.window.WorldAxis.lazyLoad, regs: sb.window.__regs || [] };
+}
+const tick = function () { return new Promise(function (r) { setImmediate(r); }); };
+
+(async function main() {
+  // ══════════ A 面：机制（纯沙箱） ══════════
+  console.log('\n── A 面：装得回来（幂等 / 去重 / 串行 / 可重试）──');
+  {
+    const m = loadLazy();
+    const LL = m.LL;
+    a(!!LL && LL.version === '2.529.0', 'A1 模块挂载且版本对');
+    a(m.regs.length === 1 && m.regs[0].rel === 'engines/lazy-load.js', 'A2 注册一次且名对', m.regs);
+    let rejected = null;
+    try { await LL.ensure('engines/x.js'); } catch (e) { rejected = e; }
+    a(!!rejected && String(rejected.message).indexOf('bind') >= 0, 'A3 没接装载器时 ensure 明确失败（不假装装上）', rejected && rejected.message);
+    a(LL.add(['a.js', 'b.js']) === 2, 'A4 add 首次登记 2 条');
+    a(LL.add(['a.js', 'b.js', 'c.js']) === 1, 'A5 add 去重：重复登记返回 0+新条目 1', LL.add([]));
+    const calls = [];
+    LL.bind(function (rel) { calls.push(rel); return Promise.resolve({ ok: true }); });
+    const r1 = await LL.ensure('a.js');
+    const r2 = await LL.ensure('a.js');
+    a(r1.ok === true && r2.ok === true && r2.reused === true, 'A6 已装后再 ensure 直接复用（reused）', [r1, r2]);
+    a(calls.length === 1, 'A7 幂等：装载器只被调用一次', calls);
+    const c2 = [];
+    const p1 = LL.ensure('b.js'), p2 = LL.ensure('b.js');
+    a(p1 === p2, 'A8 并发 ensure 拿到同一个在飞 promise');
+    const rr = await p1;
+    a(rr.ok === true, 'A9 并发那次装成功');
+    a(c2.length === 0, 'A10 未登记的条目不进别的闸门（c 仍 pending）');
+    a(LL.plan().pending.indexOf('c.js') >= 0, 'A11 plan 里 c 仍 pending');
+  }
+  {
+    const m = loadLazy();
+    const LL = m.LL;
+    let mode = 'fail';
+    const tries = [];
+    LL.bind(function (rel) {
+      tries.push(rel);
+      if (rel === 'bad.js' && mode === 'fail') return Promise.resolve({ ok: false, error: 'boom' });
+      return Promise.resolve({ ok: true });
+    });
+    LL.add(['bad.js']);
+    const f1 = await LL.ensure('bad.js');
+    a(f1.ok === false, 'A12 装载失败 → ok:false');
+    a(LL.plan().pending.indexOf('bad.js') >= 0, 'A13 失败**退回 pending**（不是永久 dead）', LL.plan());
+    a(LL.plan().failed.indexOf('bad.js') >= 0, 'A14 失败逐条点名在 plan().failed');
+    mode = 'ok';
+    const f2 = await LL.ensure('bad.js');
+    a(f2.ok === true && LL.plan().loaded.indexOf('bad.js') >= 0, 'A15 失败后可重试，重试成功即 loaded');
+    a(tries.length === 2, 'A16 重试真的又装了一次（不是记忆里的失败）', tries);
+    // auto 串行 + 单条失败不终止
+    let live = 0, peak = 0;
+    LL.bind(function (rel) {
+      live++;
+      peak = Math.max(peak, live);
+      return new Promise(function (res) {
+        setImmediate(function () {
+          live--;
+          res(rel === 's2.js' ? { ok: false, error: 'flaky' } : { ok: true });
+        });
+      });
+    });
+    LL.add(['s1.js', 's2.js', 's3.js']);
+    const p = await LL.auto();
+    a(peak === 1, 'A17 auto **串行**：并发峰值 1（并发装载会在同一份 WA 上打架）', peak);
+    a(p.loaded.indexOf('s1.js') >= 0 && p.loaded.indexOf('s3.js') >= 0, 'A18 auto 里单条失败不终止整轮（s1/s3 仍装上）', p.loaded);
+    a(p.pending.indexOf('s2.js') >= 0, 'A19 失败的 s2 留在 pending（下次还能补）', p.pending);
+    const sz = LL.plan();
+    a(sz.loaded.length + sz.pending.length + sz.loading.length === sz.lazy.length,
+      'A20 plan 收支自洽：loaded+pending+loading == lazy 总数', sz);
+    const again = await LL.ensure('never-registered.js');
+    a(again.ok === true && LL.plan().lazy.indexOf('never-registered.js') >= 0, 'A21 未登记条目也能按需 ensure（并进入台账）');
+  }
+  {
+    // 负控制：把 add 的去重判据改坏 → A5 必须变红
+    const src = RD('engines/lazy-load.js');
+    const from = 'if (Object.prototype.hasOwnProperty.call(status, rel)) continue;';
+    a(src.indexOf(from) >= 0, 'A22 负控制锚点存在（add 去重判据）');
+    const m = loadLazy(src.split(from).join('if (false) continue;'));
+    a(m.LL.add(['x.js']) === 1 && m.LL.add(['x.js']) === 1, 'A23 负控制：去掉去重判据后重复 add 仍然加进去（A5 不是空断言）');
+  }
+  {
+    // 负控制：失败分支改成直接标 loaded → A13/A15 必须变红
+    const src = RD('engines/lazy-load.js');
+    const from = "status[rel] = 'pending';            // 失败退回 pending：可重试";
+    a(src.indexOf(from) >= 0, 'A24 负控制锚点存在（失败退回 pending）');
+    const m = loadLazy(src.split(from).join("status[rel] = 'loaded';"));
+    m.LL.bind(function () { return Promise.resolve({ ok: false }); });
+    m.LL.add(['z.js']);
+    await m.LL.ensure('z.js');
+    a(m.LL.plan().pending.indexOf('z.js') < 0, 'A25 负控制：失败被标成 loaded 后 z 不再 pending（A13 不是空断言）');
+  }
+
+  // ══════════ B 面：接线与契约面（读真文件） ══════════
+  console.log('\n── B 面：接线、契约面、首帧读数 ──');
+  const idxSrc = RD('index.js');
+  const mOrd = idxSrc.match(/const LOAD_ORDER = \[([\s\S]*?)\n  \];/);
+  const mLazy = idxSrc.match(/const LAZY_ORDER = \[([\s\S]*?)\n  \];/);
+  const parse = function (mm) { return mm ? (mm[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); }) : null; };
+  const eager = parse(mOrd), lazy = parse(mLazy);
+  a(!!eager && eager.length === 569, 'B1 首帧清单 LOAD_ORDER 解析出 569 条（实测回填）', eager && eager.length);
+  // A0b / A0e：惰性档非空 ——防「删空档换下降」
+  a(!!lazy && lazy.length >= 10, 'B2 惰性档**非空**且成规模（≥10 条；删空换下降会在这里红）', lazy && lazy.length);
+  a(!!lazy && lazy.length === 22, 'B3 惰性档 22 条（实测回填，静默漂移会红）', lazy && lazy.length);
+  const inter = (eager || []).filter(function (x) { return (lazy || []).indexOf(x) >= 0; });
+  a(inter.length === 0, 'B4 首帧清单与惰性档**零交集**（不双登记：否则「下降」是假的）', inter);
+  a((lazy || []).every(function (x) { return x.indexOf('ui/') !== 0; }), 'B5 惰性档不含 ui/*（UI 层本来就不在装载序）');
+  a(new Set(lazy || []).size === (lazy || []).length, 'B6 惰性档无重复条目');
+  const lazyFilesExist = (lazy || []).filter(function (x) { return !fs.existsSync(path.join(ROOT, x)); });
+  a(lazyFilesExist.length === 0, 'B7 惰性档每条都有真实文件（不是写了名字不存在的空档）', lazyFilesExist);
+  // 契约面没缩小：每条都在 registry 账本里
+  const led = JSON.parse(RD('tests/module-registry-ledger.json'));
+  const notInLedger = (lazy || []).filter(function (x) { return !led.modules[x]; });
+  a(notInLedger.length === 0, 'B8 惰性档每条仍在 registry 账本里（门禁眼里没有「消失的模块」）', notInLedger);
+  a(led.lazyCount === 22, 'B9 账本记录 lazyCount=22（registry 报告的惰性面读数）', led.lazyCount);
+  a(led.loadedCount === 570 && led.loadOrderCount === 569,
+    'B10 全量契约面 570 / 首帧面 569（差 1 = 只多了 lazy-load 自己）', [led.loadedCount, led.loadOrderCount]);
+  // 首帧装载边 vs 全量装载边（验收原话的读数）
+  const edgesOf = function (list) {
+    return list.reduce(function (n, rel) {
+      const e = led.modules[rel];
+      return n + ((e && Array.isArray(e.requires)) ? e.requires.length : 0);
+    }, 0);
+  };
+  const eagerEdges = edgesOf(eager || []);
+  const allEdges = edgesOf((eager || []).concat(lazy || []));
+  const lazyEdges = allEdges - eagerEdges;
+  a(lazyEdges > 0, 'B11 惰性档确实带走了一批装载期边（不是一条边都没省）', { eagerEdges: eagerEdges, allEdges: allEdges, lazyEdges: lazyEdges });
+  a(eagerEdges < allEdges, 'B12 **首帧装载边 < 全量装载边**（验收①）', { eagerEdges: eagerEdges, allEdges: allEdges });
+  a(led.totals.loadEdges === allEdges, 'B13 账本全量装载期边与逐条求和一致（读数可复算）', [led.totals.loadEdges, allEdges]);
+  // 惰性档的装载期依赖必须都在首帧面（否则它不能懒）
+  const eagerSet = {}; (eager || []).forEach(function (x) { eagerSet[x] = true; });
+  const badDep = [];
+  (lazy || []).forEach(function (rel) {
+    const e = led.modules[rel] || {};
+    (e.requiresFiles || []).forEach(function (pf) {
+      if (pf && pf !== rel && !eagerSet[pf]) badDep.push(rel + ' → ' + pf);
+    });
+  });
+  a(badDep.length === 0, 'B14 惰性档的装载期依赖全部落在首帧面（两两互依赖就不该都在懒档）', badDep);
+  // 定性背书：每条惰性项都在零读账本里登记
+  const nsLed = JSON.parse(RD('tests/ns-consumer-ledger.json')).entries;
+  const nsOf = {};
+  (lazy || []).forEach(function (rel) { ((led.modules[rel] || {}).ns || []).forEach(function (ns) { nsOf[ns] = rel; }); });
+  const unqualified = Object.keys(nsOf).filter(function (ns) { return !nsLed[ns]; });
+  a(unqualified.length === 0, 'B15 惰性档每个 ns 都在零读账本里有定性（谁会在什么时候读它）', unqualified);
+  const wrongCls = Object.keys(nsOf).filter(function (ns) {
+    const e = nsLed[ns]; return e && e.cls !== 'pending-wire' && e.cls !== 'readonly-api';
+  });
+  a(wrongCls.length === 0, 'B16 定性类别是 pending-wire / readonly-api 之一（wired 不许懒）', wrongCls);
+  // 接线三件套
+  a(idxSrc.indexOf('WA.lazyLoad.bind(') >= 0 && idxSrc.indexOf('WA.lazyLoad.add(LAZY_ORDER)') >= 0,
+    'B17 index.js 交出装载器并登记惰性档（bind + add）');
+  a(idxSrc.indexOf('__kickLazy') >= 0 && (idxSrc.indexOf('requestIdleCallback(__kickLazy') >= 0 || idxSrc.indexOf('setTimeout(__kickLazy') >= 0),
+    'B18 index.js 首帧后开始补装（空闲帧 / 0ms 兜底，不在装载循环里同步装）');
+  const kickPos = idxSrc.indexOf('__kickLazy');
+  const loopEnd = idxSrc.indexOf('for (const rel of LOAD_ORDER)');
+  a(loopEnd >= 0 && kickPos > loopEnd, 'B19 补装接线在**装载循环之后**（不是循环里偷偷装）');
+  a(RD('engines/lazy-load.js').indexOf("WA.registerModule('engines/lazy-load.js'") >= 0 && (lazy || []).indexOf('engines/lazy-load.js') < 0,
+    'B20 惰性档自己不懒（它必须在首帧装载，否则没人能补装）');
+
+  // ══════════ D 面：面板行为不变（读面证据） ══════════
+  console.log('\n── D 面：面板行为不变（惰性档的产品读点为零）──');
+  const productFiles = require('./product-files.js').testFiles().concat(
+    fs.readdirSync(path.join(ROOT, 'ui')).filter(function (f) { return f.slice(-3) === '.js'; }).map(function (f) { return 'ui/' + f; })
+  );
+  const srcOf = function (rel) { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (e) { return ''; } };
+  const hit = [];
+  const lazyNs = Object.keys(nsOf);
+  productFiles.forEach(function (rel) {
+    if (!rel || rel.indexOf('tests/') === 0) return;
+    const txt = srcOf(rel);
+    if (!txt) return;
+    lazyNs.forEach(function (ns) {
+      const re = new RegExp('WA\\.' + ns + '\\b');
+      if (re.test(txt)) hit.push(rel + ' 读 WA.' + ns);
+    });
+  });
+  a(hit.length === 0, 'D1 惰性档 ' + lazyNs.length + ' 个 ns 在产品源面**零读取**（面板不可能因为延迟装载而少功能）', hit.slice(0, 6));
+
+  console.log('\n合计：' + pass + ' / ' + (pass + fail));
+  process.exit(fail === 0 ? 0 : 1);
+})();
