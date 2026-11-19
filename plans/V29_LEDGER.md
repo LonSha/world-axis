@@ -3,9 +3,9 @@
 > 由 `node tools/plan-ledger.js --write` 从 `git log` 生成。手改会被
 > `node tools/plan-ledger.js --check` 点名（重算与盘上不一致 ⇒ 退出 1）。
 
-- 生成源：subject 提到 `OPV29-` 的提交 **21** 条 · 源摘要 `f87bca5e4d21`
-- 已交付 **25 / 36**，未交付 **11**
-- 欠账读数：区间号 1 · 无复算读数 5 · 形态不认识 0 · 重复声称 4
+- 生成源：subject 提到 `OPV29-` 的提交 **23** 条 · 源摘要 `9f60f1a34c3d`
+- 已交付 **26 / 36**，未交付 **10**
+- 欠账读数：区间号 1 · 无复算读数 6 · 形态不认识 0 · 重复声称 5
 
 ## Z1（已交付 4 / 6）
 
@@ -20,15 +20,16 @@
 
 | 项 | 提交 | 标题 | 复算读数 |
 | :--- | :--- | :--- | :--- |
-| OPV29-12 | `829986f` | feat(worldaxis): OPV29-12 拆段假绿防线 —— 拆段前后比对判据指纹，少一条即红（17 项） | 3 条：`node tests/opv29-z2-12-v2529.js ⇒ pass (17)；C1 现场真跑 settle-v2820.js 采到 160 条判据` |
+| OPV29-12 | `04bd086` | chore(worldaxis): 台账回填 —— OPV29-12 已交付（专锁 17 项 / 面数 606→607 / 裸锚 27 = 基线） | **缺（recompute:false）** |
 
-## Z3（已交付 4 / 6）
+## Z3（已交付 5 / 6）
 
 | 项 | 提交 | 标题 | 复算读数 |
 | :--- | :--- | :--- | :--- |
 | OPV29-13 | `435d7fa` | feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项 | 11 条：`node tests/opv29-z6-13-v2529.js ⇒ pass (35)` |
 | OPV29-15 | `bd051c6` | chore(worldaxis): 台账回填 —— OPV29-15 现场已交付（漏登，不是未做） | 3 条：`node tests/opv29-z3-v2524.js ⇒ PASS 27/27（Y 段即故障自诊：下一步只给一条命令、禁止清单点名危险动作、活锁不得当可回收）` |
 | OPV29-16 | `bc7cf4b` | chore(worldaxis): 台账回填 tests/*.js 595->596（OPV29-16 新增专锁后现场值） | **缺（recompute:false）** |
+| OPV29-17 | `faf5f82` | feat(worldaxis): OPV29-17 日志分层 —— 用户层零技术输出 / 产品面零栈回溯 / debug 真能开关（17 项） | 4 条：`node tools/log-layers.js --check ⇒ PASS（rc=0）：用户层 0 / 栈回溯 0 / 在册 1 / 开关 26` |
 | OPV29-18 | `52bb590` | feat(worldaxis): OPV29-28 计划台账自动汇总 + OPV29-18 台账与现场一致 —— 68 项 | 6 条：`node tests/opv29-z5-28-v2529.js ⇒ pass (41)` |
 
 ## Z4（已交付 5 / 6）
@@ -62,9 +63,9 @@
 | OPV29-35 | `3480ad5` | feat(worldaxis): OPV29-27 版本面跟位 + OPV29-35 发布清单化 —— 23 项，面数 596→598 | 8 条：`node tests/opv29-z5-27-v2529.js ⇒ pass (23)` |
 | OPV29-36 | `435d7fa` | feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项 | 11 条：`node tests/opv29-z6-13-v2529.js ⇒ pass (35)` |
 
-## 未交付（11）
+## 未交付（10）
 
-OPV29-04 · OPV29-05 · OPV29-07 · OPV29-08 · OPV29-09 · OPV29-10 · OPV29-11 · OPV29-14 · OPV29-17 · OPV29-22 · OPV29-30
+OPV29-04 · OPV29-05 · OPV29-07 · OPV29-08 · OPV29-09 · OPV29-10 · OPV29-11 · OPV29-14 · OPV29-22 · OPV29-30
 
 ## 区间号（不展开，只点名）
 
