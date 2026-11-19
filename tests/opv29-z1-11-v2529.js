@@ -142,7 +142,7 @@ a(r3.threw && r3.hit, 'B3 只装 world（不装词表）⇒ 抛「词表未装�
 
 // B4：空表（八件都空）⇒ 同样抛
 {
-  const tmp = '/tmp/wa11-empty.js';   // 本环境的 os.tmpdir() 是相对路径，固定 /tmp
+  const tmp = path.join(os.tmpdir(), 'wa11-empty-' + process.pid + '.js');   // 落盘点走 os.tmpdir() 推导，不写字面路径（v2.41.0）
   fs.writeFileSync(tmp, '(function () {\n  const WA = window.WorldAxis = window.WorldAxis || {};\n'
     + '  WA.backstageProtocols = { REASONING_PROTOCOL: \'\', VISIBILITY_SEMANTICS: \'\', STRUCTURAL_RULES: \'\',\n'
     + '    INJECTION_RULES: \'\', SIM_MODES: {}, TIME_POLICIES: {}, PULSE_LEVELS: {}, __REG_B: null };\n})();\n');

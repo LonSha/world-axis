@@ -9882,6 +9882,16 @@ function runWitness(WA) {
       trip('already-handled', function () { return WA.worldBounds.pause({ by: '玩家' }).reason; });
     }
   } catch (e) { /* 引擎缺席或调用抛错 ⇒ 后面的 missing 会如实点名，不在这里吞掉 */ }
+  // ── v2.529.0（缝 A 批）：api-vault 的「这环境用不了」必须明说 ──────────────
+  //   病：密钥库在**非安全上下文**（无 indexedDB / isSecureContext / crypto.subtle）里
+  //   什么也做不了。若那一支只返回 `{}`，调用方分不清「没有密钥」与「这个浏览上下文根本
+  //   没有这个能力」—— 前者该回落，后者该提示用户换上下文。所以 prime() 明说原因。
+  //   见证形态：本进程天然就是那种上下文（无 indexedDB）⇒ 真调一次即可跑出该码；
+  //   prime 是 async，故走 tripAsync（同步推进已 settled 的 Promise，见上方机制说明）。
+  if (WA.apiVault && typeof WA.apiVault.prime === 'function') {
+    want('not-secure-context', 'api-vault：非安全上下文时拒绝预热并明说原因（不是静默空结果）');
+    tripAsync('not-secure-context', function () { return WA.apiVault.prime(['witness']); });
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

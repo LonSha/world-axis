@@ -106,7 +106,7 @@ const r1 = throwsWith([ENG], /诊断表未装载/);
 a(r1.threw && r1.hit, 'B1 只装引擎（不装表）⇒ 抛「诊断表未装载」', r1.msg);
 
 {
-  const tmp = '/tmp/wa07-empty.js';
+  const tmp = path.join(require('os').tmpdir(), 'wa07-empty-' + process.pid + '.js');
   fs.writeFileSync(tmp, '(function () {\n  const WA = window.WorldAxis = window.WorldAxis || {};\n'
     + '  WA.toolDiagTables = { MODULE_EXPORTS: {}, OPTIONAL_EXPORTS: [], UI_BINDINGS: [], ENGINE_PORTS: null };\n})();\n');
   let msg = '';

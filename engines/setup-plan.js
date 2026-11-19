@@ -82,10 +82,10 @@
   /** 这本书在这张卡上默认开不开：全局的开，但「别的卡的书」进卡时自动停用。 */
   function worldDefault(book, facts) {
     const f = facts || {};
-    const global = f.global instanceof Set ? f.global : new Set(f.global || []);
+    const globalSet = f.global instanceof Set ? f.global : new Set(f.global || []);
     const others = f.others instanceof Set ? f.others : new Set(f.others || []);
     const mine = f.mine instanceof Set ? f.mine : new Set(f.mine || []);
-    return global.has(book) && !(others.has(book) && !mine.has(book));
+    return globalSet.has(book) && !(others.has(book) && !mine.has(book));
   }
 
   /**
@@ -103,12 +103,12 @@
     const ex = exists instanceof Set ? exists : (Array.isArray(exists) ? new Set(exists) : null);
     const f = facts || {};
     const mine = f.mine instanceof Set ? f.mine : new Set(f.mine || []);
-    const global = f.global instanceof Set ? f.global : new Set(f.global || []);
+    const globalSet = f.global instanceof Set ? f.global : new Set(f.global || []);
     for (let i = 0; i < keys.length; i++) {
       const w = keys[i];
       const on = !!src[w];
       if (ex && !ex.has(w)) continue;
-      if (on && !global.has(w)) {
+      if (on && !globalSet.has(w)) {
         if (!mine.has(w)) attach.push(w);
         continue;
       }

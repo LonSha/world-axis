@@ -80,7 +80,7 @@
       "src": "engines/action-desk.js",
       "refs": 0,
       "tref": 0,
-      "own": 37
+      "own": 31
     },
     "actionDesk.transactActions": {
       "reason": "test-only",
@@ -7521,6 +7521,30 @@
       "refs": 0,
       "tref": 0,
       "own": 13
+    },
+    "lazyLoad.ensure": {
+      "reason": "self-only",
+      "detail": "engines/lazy-load.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/lazy-load.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "lazyLoad.plan": {
+      "reason": "self-only",
+      "detail": "engines/lazy-load.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/lazy-load.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "lazyLoad.stat": {
+      "reason": "self-only",
+      "detail": "engines/lazy-load.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/lazy-load.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 18
     },
     "ledgerTimeline.probe": {
       "reason": "self-only",
@@ -16142,6 +16166,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 767
+    "dataOnly": 768
   }
 }

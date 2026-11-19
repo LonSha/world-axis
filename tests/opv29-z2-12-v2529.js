@@ -70,7 +70,7 @@ a(emptyCap.empty.length === 1 && !emptyCap.locks['no-such-lock-at-all.js'].rows.
   'B7 零判据（缺文件/空转）被记进 empty ⇒ 可拒收，不许当基线', emptyCap.empty);
 
 // B8：CLI 侧真的拒收（rc=3 且不写文件）——这一条走真进程
-const outFile = path.join('/tmp', 'sg-should-not-exist-' + process.pid + '.json');
+const outFile = path.join(require('os').tmpdir(), 'sg-should-not-exist-' + process.pid + '.json');
 try { fs.unlinkSync(outFile); } catch (e) {}
 const cli = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools', 'split-guard.js'),
   '--capture', outFile, 'no-such-lock-at-all.js'], { cwd: ROOT, encoding: 'utf8' });

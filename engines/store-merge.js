@@ -20,6 +20,9 @@
   const SECTIONS = ['cards', 'profiles', 'regexOwners', 'presetInfo', 'pluginInfo', 'worldSources', 'themeInfo'];
   const TOMBSTONE_DAYS = 30;
   const DAY_MS = 86400000;
+  // 时间源单一出口（v2.529.0 收口）：墓碑老化用「当前时间」，必须走测量时钟而不是裸 Date.now()
+  //   ——裸调绕过冻结，回放对不上时只能全库通读（同 v2.22.0 块的全库口径）。
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   function stampOf(section, rec) {
     if (!rec || typeof rec !== 'object') return '';
@@ -44,7 +47,7 @@
     const bDel = b0.deleted || {};
     const data = {};
     const deleted = {};
-    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    const now = typeof nowMs === 'number' ? nowMs : clockWall();
     const cutoff = new Date(now - TOMBSTONE_DAYS * DAY_MS).toISOString();
 
     for (let si = 0; si < SECTIONS.length; si++) {
