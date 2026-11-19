@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.524.0",
-  "sourceDigest": "5f05c3b789d54eee1ecf245fc0b4a1d3293d3dd622ea7d4bf4ba3661c421c986",
-  "sourceCommits": 15,
+  "sourceDigest": "935a6eb7cafe4ec9030e19247965e3f261892ad96e802a5e2722bbe21a6d4aaf",
+  "sourceCommits": 16,
   "total": 36,
   "delivered": {
     "OPV29-02": {
@@ -26,6 +26,21 @@
         "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
         "产品面优先改成永不拒绝 ⇒ FAIL 1/22（只红 B1）",
         "引用检查改成恒当未引用 ⇒ FAIL 3/22（A4+A5+B2）"
+      ],
+      "recompute": true,
+      "note": ""
+    },
+    "OPV29-06": {
+      "group": "Z1",
+      "commit": "ff62c3b",
+      "subject": "feat(worldaxis): OPV29-06 门禁时长看板（每道一条读数 · 可复算 · 超时点名）+ 专锁 27 项",
+      "readings": [
+        "node tests/opv29-z1-06-v2529.js ⇒ pass (27)",
+        "node tools/gate-timing.js ⇒ 8 道逐行 · 未量 0 · 合计下界 105.5s",
+        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 604→605",
+        "node tools/anchor-audit.js --target=opv29 ⇒ 专锁 18 个 · 缺读数 0 · 缺负控制 0 · 裸锚 27（基线 27）",
+        "「未量」整行写成 unmeasured: [] ⇒ FAIL 1/27（只红 C1）",
+        "拆掉 recordRow 未知门禁拒收闸 ⇒ FAIL 2/27（C5 + C8）"
       ],
       "recompute": true,
       "note": ""
@@ -322,7 +337,6 @@
     "OPV29-01",
     "OPV29-04",
     "OPV29-05",
-    "OPV29-06",
     "OPV29-07",
     "OPV29-08",
     "OPV29-09",
@@ -366,8 +380,8 @@
     ]
   },
   "counts": {
-    "delivered": 21,
-    "pending": 15,
+    "delivered": 22,
+    "pending": 14,
     "rangeForm": 1,
     "noRecompute": 3,
     "unparsedForm": 0,
