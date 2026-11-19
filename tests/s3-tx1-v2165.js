@@ -142,7 +142,7 @@ function pairsSnap(WA) { const d = (WA.store.get() || {}).diplomacy || {}; retur
 
 // ── A 结构面 ─────────────────────────────────────────────────
 function runA(a) {
-  const src = read(REL), st = read(REL_STORE), ev = read(REL_EVICT), dg = read(REL_DIAG),
+  const src = read(REL), st = read(REL_STORE), ev = read(REL_EVICT), dg = require('./diag-source.js')(),
         ix = read(REL_INDEX), rn = read(REL_RUN), pn = read(REL_PANEL);
   a(countOcc(src, A_PAIR) === 1, 'v2165/tx1 A1: pairId 排序输入面锚点恰中 1 次（实 ' + countOcc(src, A_PAIR) + '）');
   a(countOcc(src, A_GATE) === 1, 'v2165/tx1 A2: 开关门锚点恰中 1 次（实 ' + countOcc(src, A_GATE) + '）');

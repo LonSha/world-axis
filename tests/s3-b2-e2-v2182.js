@@ -72,7 +72,7 @@ function runA(a) {
   a(readOf('index.js').indexOf("'engines/agenda.js'") >= 0, 'e2v2182/A10: index.js LOAD_ORDER 装载');
   a(readOf('tests/run.js').indexOf("'engines/agenda.js'") >= 0, 'e2v2182/A11: tests/run.js LOAD 装载');
   // 诊断面三点登记：模块映射 / 节函数 / 诊断对象成员
-  const diag = readOf('engines/tool-diag.js');
+  const diag = require('./diag-source.js')();   // v2.531.0：UI_BINDINGS / MODULE_EXPORTS 已出闸到 tool-diag-tables
   a(diag.indexOf("'engines/agenda.js': 'agenda'") >= 0, 'e2v2182/A12: tool-diag MODULE_EXPORTS 登记');
   a(diag.indexOf('function secAgenda()') >= 0, 'e2v2182/A13: tool-diag secAgenda() 存在');
   a(diag.indexOf('agenda: secAgenda()') >= 0, 'e2v2182/A14: tool-diag 诊断对象成员在位');

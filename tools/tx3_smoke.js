@@ -26,7 +26,10 @@ var inj = fs.readFileSync('render/inject.js', 'utf8');
 ok('SOURCES has freight', inj.indexOf("'freight'") >= 0);
 
 // 4. PRIORITY has 货运在途
-var bud = fs.readFileSync('engines/inject-budget.js', 'utf8');
+// v2.531.0：科目表（PRIORITY / ACCOUNTS）在 OPV29-10 已出闸到 inject-budget-tables.js，
+//   本判据问的是「产品里有没有这条登记」，故读合并面（表在前、引擎在后）。
+var bud = fs.readFileSync('engines/inject-budget-tables.js', 'utf8')
+  + '\n' + fs.readFileSync('engines/inject-budget.js', 'utf8');
 ok('PRIORITY has 货运在途', bud.indexOf("'货运在途'") >= 0);
 
 // 5. disabled by default

@@ -88,7 +88,9 @@ function runA(a) {
   a(inj.indexOf("'agency'") !== -1, 'v2166/tx2 A5: inject.js SOURCES 有 agency');
 
   // A6 budget 接线
-  const bud = read(REL_BUDGET);
+  // v2.531.0：PRIORITY / ACCOUNTS 两张表在 OPV29-10 出闸到 inject-budget-tables.js；
+  //   本判据问的是「预算里有没有这条源」，故读合并面（表在前、引擎在后）。
+  const bud = require('./budget-source.js')();
   a(bud.indexOf("'行动调度'") !== -1, 'v2166/tx2 A6: inject-budget 有行动调度');
 
   // A7 panel VIS_NAMES
@@ -96,7 +98,7 @@ function runA(a) {
   a(pan.indexOf("agency: '行动调度'") !== -1, 'v2166/tx2 A7: panel VIS_NAMES 有行动调度');
 
   // A8 tool-diag secAgency + UI_BINDINGS
-  const diag = read(REL_DIAG);
+  const diag = require('./diag-source.js')();
   a(diag.indexOf('function secAgency') !== -1, 'v2166/tx2 A8: tool-diag 有 secAgency');
   a(diag.indexOf("'engines/agency.js': 'agency'") !== -1, 'v2166/tx2 A8: tool-diag 模块映射有 agency');
   a(diag.indexOf('agency: secAgency()') !== -1, 'v2166/tx2 A8: tool-diag diag 对象有 agency');

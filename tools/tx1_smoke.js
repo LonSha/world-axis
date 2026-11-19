@@ -6,7 +6,7 @@ const FILES = ['core/clock.js', 'core/rand.js', 'core/input-guard.js',
   'core/fault-context.js', 'core/schema.js', 'core/permissions.js',
   'core/audit-log.js', 'core/sanitize.js',
   'core/settings-bus.js', 'core/store.js', 'engines/diplomacy.js',
-  'render/inject.js', 'engines/inject-budget.js'];
+  'render/inject.js', 'engines/inject-budget-tables.js', 'engines/inject-budget.js'];
 const code = FILES.map(f => fs.readFileSync(require('path').join(__dirname, '..', f), 'utf8')).join('\n;\n');
 // 内存版 localStorage：settingsBus 的 save/read 走真实读写（丢弃写入会把「已保存」读回成默认值）
 const lsMem = {};

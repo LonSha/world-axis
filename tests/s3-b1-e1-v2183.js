@@ -110,7 +110,7 @@ function runA(a) {
   a(/不碰 store、不开事务、不写存档/.test(src), 'e1v2183/A16b: 「不碰 store、不开事务、不写存档」写在模块头');
   a(readOf('index.js').indexOf("'engines/pending-center.js'") >= 0, 'e1v2183/A17: index.js LOAD_ORDER 装载');
   a(readOf('tests/run.js').indexOf("'engines/pending-center.js'") >= 0, 'e1v2183/A18: tests/run.js LOAD 装载');
-  const diag = readOf('engines/tool-diag.js');
+  const diag = require('./diag-source.js')();   // v2.531.0：UI_BINDINGS / MODULE_EXPORTS 已出闸到 tool-diag-tables
   a(diag.indexOf("'engines/pending-center.js': 'pendingCenter'") >= 0, 'e1v2183/A19: tool-diag MODULE_EXPORTS 登记');
   a(diag.indexOf('function secPendingCenter()') >= 0, 'e1v2183/A20: tool-diag secPendingCenter() 存在');
   a(diag.indexOf('pendingCenter: secPendingCenter()') >= 0, 'e1v2183/A21: tool-diag 诊断对象成员在位');

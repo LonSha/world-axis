@@ -21,10 +21,12 @@ const REL_RUN = 'tests/run.js';
 
 const SRC = fs.readFileSync(REL, 'utf8');
 const INJ = fs.readFileSync(REL_INJECT, 'utf8');
-const BUD = fs.readFileSync(REL_BUDGET, 'utf8');
+// v2.531.0：两张表在 OPV29 已出闸（inject-budget-tables / tool-diag-tables）；
+//   本判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」⇒ 走合并面读数器。
+const BUD = require('./budget-source.js')();
 const PAN = fs.readFileSync(REL_PANEL, 'utf8');
 const IDX = fs.readFileSync(REL_INDEX, 'utf8');
-const DIAG = fs.readFileSync(REL_DIAG, 'utf8');
+const DIAG = require('./diag-source.js')();
 const MAN = JSON.parse(fs.readFileSync(REL_MANIFEST, 'utf8'));
 const RUN = fs.readFileSync(REL_RUN, 'utf8');
 

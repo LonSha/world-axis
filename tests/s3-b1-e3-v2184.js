@@ -76,7 +76,7 @@ function runA(a) {
   a(pan.indexOf('存档槽不承担聊天存档的职责') >= 0, 'e3v2184/A7: 与全量快照的分工写在界面上');
   a(pan.indexOf('自动快照的开关是') >= 0, 'e3v2184/A8: 「自动档开关是 autoEvery 而非总开关」写在界面上');
   // ⑦ 守卫表登记（静态 22 + 动态 1）
-  const diag = readOf('engines/tool-diag.js');
+  const diag = require('./diag-source.js')();   // v2.531.0：UI_BINDINGS / MODULE_EXPORTS 已出闸到 tool-diag-tables
   CK_IDS.forEach(function (id) {
     a(diag.indexOf("'" + id + "'") >= 0, 'e3v2184/A9: tool-diag UI_BINDINGS 登记 ' + id);
   });

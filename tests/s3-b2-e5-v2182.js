@@ -76,7 +76,7 @@ function runA(a) {
   a(/sourceRecordAbsent/.test(src), 'e5v2182/A12: 来源缺失如实标注字段在位');
   a(readOf('index.js').indexOf("'engines/chronicle-view.js'") >= 0, 'e5v2182/A13: index.js LOAD_ORDER 装载');
   a(readOf('tests/run.js').indexOf("'engines/chronicle-view.js'") >= 0, 'e5v2182/A14: tests/run.js LOAD 装载');
-  const diag = readOf('engines/tool-diag.js');
+  const diag = require('./diag-source.js')();   // v2.531.0：UI_BINDINGS / MODULE_EXPORTS 已出闸到 tool-diag-tables
   a(diag.indexOf("'engines/chronicle-view.js': 'chronicleView'") >= 0, 'e5v2182/A15: tool-diag MODULE_EXPORTS 登记');
   a(diag.indexOf('function secChronicleView()') >= 0, 'e5v2182/A16: tool-diag 节函数存在');
   a(diag.indexOf('chronicleView: secChronicleView()') >= 0, 'e5v2182/A17: tool-diag 诊断对象成员在位');

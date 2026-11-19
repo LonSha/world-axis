@@ -449,7 +449,9 @@ function runNegative(a) {
 // ── SP6 段：面板渲染 + 绑定 + 守卫登记三件 ─────────────────────
 function runSp6(a) {
   const panelSrc = read(REL_PANEL);
-  const diagSrc = read(REL_TDG);
+  // v2.531.0：UI_BINDINGS 在 OPV29-07 已随表出闸到 engines/tool-diag-tables.js；
+  //   本判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」⇒ 走合并面读数器。
+  const diagSrc = require('./diag-source.js')();
   const ids = ['wa-ws-pack', 'wa-ws-packin', 'wa-ws-import', 'wa-ws-init', 'wa-ws-confirm'];
   ids.forEach(function (id) {
     const nPanel = countOcc(panelSrc, 'id="' + id + '"');

@@ -8,7 +8,7 @@ const FILES = ['core/clock.js', 'core/rand.js', 'core/input-guard.js',
   'core/settings-bus.js', 'core/store.js',
   'engines/life.js', 'engines/plan.js', 'engines/act.js',
   'engines/agency.js',
-  'render/inject.js', 'engines/inject-budget.js'];
+  'render/inject.js', 'engines/inject-budget-tables.js', 'engines/inject-budget.js'];
 const code = FILES.map(f => fs.readFileSync(require('path').join(__dirname, '..', f), 'utf8')).join('\n;\n');
 const lsMem = {};
 const ls = { getItem: k => (k in lsMem ? lsMem[k] : null), setItem: (k, v) => { lsMem[k] = String(v); }, removeItem: k => { delete lsMem[k]; } };
