@@ -22485,6 +22485,23 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   B 组还自带反向对照：抽掉 product-files.js / 抽掉引用它的测试后，同一文件**必须真被排**
     //     （B5/B6）—— 否则「一条都不排」也能让铁律①②变绿，那是空转不是判据。
     await runScript('./opv29-z1-03-v2529.js');
+    // v2.529.0（V29 优化线 Z1）：OPV29-02 增量回归 —— 20 项。
+    //   病：全量 ≈29 分钟。太贵的直接后果不是「慢」，是**没人真跑**（红了先记下来，然后忘了）。
+    //   危险面：增量比全量危险 —— **漏跑**相关的锁 = 假绿。所以方向永远是「宁可多跑」。
+    //   口径（`tools/impact.js`）：三档引用反查（相对路径 / 带扩展名文件名 / 词干 ≥8 字符），
+    //     词干档故意放宽；**反查不到就退回全量**（`fullRequired`）——「不知道」不许当成「0 相关」。
+    //   两条「0 相关」必须分开：`doc-unreferenced`（文档在场、没有任何锁提到它 ⇒ 结论是 0）
+    //     vs `unresolved` / `no-reference`（不认识 / 在场但没人引用 ⇒ 退回全量）。
+    //   读数：`node tests/opv29-z1-02-v2529.js` ⇒ pass (20)；
+    //     `node tools/impact.js --check` ⇒ pass（索引 1438 文件 / 600 锁 / 1276 个有反向引用，1.7s）；
+    //     `node tools/impact.js`（当前与 origin/master 的全部差异）⇒ 需跑 **111 把锁**，不需全量。
+    //   语义锚点：改 `engines/reject-phrase.js` 必须带上 `tests/opv29-z6-13-v2529.js`
+    //     （它 readFileSync 读这个引擎）—— 证明反查走的是**引用关系**，不是目录前缀。
+    //   负控制（真破坏 tools/impact.js 后单跑，各自单打）：
+    //     · 未知路径不再退全量（当成文档档放行）⇒ FAIL 5/20（B1+B2+B3+B7+C3）—— 这正是
+    //       「为了变快而把不知道说成 0」的那种假绿，B 组就是为它设的；
+    //     · `self` 档失效（改锁不算命中自己）⇒ FAIL 1/20（只红 B5）。
+    await runScript('./opv29-z1-02-v2529.js');
     // v2.529.0：九处悬空成员收口（time-ledger / cost-guard / story-rhythm / narrative-preset）。
     //   病：`WA.x && WA.x.y ? ... : 默认值` 的防御式引用指向**从来不存在的成员**，于是
     //   「装了 story-tone 也说没有」「改了一句也永远 available:false」——不崩的假判据。
