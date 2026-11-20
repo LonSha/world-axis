@@ -32,6 +32,9 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
+// v2.542.1：UI_BINDINGS（逐页守卫表）已搬到 tool-diag-tables.js。A3c/A4/A4b 问的是
+//   「表里登记了没有」，必须读表；读旧文件的后果不是「少一行字」而是恒红（v2.541.7 遗留）。
+const TAB_REL = 'engines/tool-diag-tables.js';
 const SELF_REL = 'tests/s3-y1-v2200.js';
 /** v2.230.0 收口：mini-DOM 的 `innerHTML` getter 会把**容器自身标签**也序列化进去
  *  （tests/ui-dom.js 的 `ser(el)`），浏览器只返回子节点。于是「空容器」的长度不是 0，
@@ -82,6 +85,7 @@ function runAll(a) {
   const LS = global.localStorage;
   const P = rd(PANEL_REL);
   const D = rd(DIAG_REL);
+  const TAB = rd(TAB_REL);
   const SELF = rd(SELF_REL);
 
   // ════ A 段：静态契约 ════════════════════════════════════════════════
@@ -110,10 +114,10 @@ function runAll(a) {
   BTN_IDS.forEach(function (id) {
     a(cnt(segR, "id=\"" + id + "\"") === 1, 'y1v2200/A3: ' + id + ' 在渲染段恰渲染 1 次（实 ' + cnt(segR, "id=\"" + id + "\"") + '）');
     a(cnt(segB, "on('#" + id + "', () => {") === 1, 'y1v2200/A3b: ' + id + ' 的 onclick 绑定恰 1 处（实 ' + cnt(segB, "on('#" + id + "', () => {") + '）');
-    a(cnt(D, "'" + id + "'") === 1, 'y1v2200/A3c: ' + id + ' 在 tool-diag 的守卫表里恰登记 1 次（实 ' + cnt(D, "'" + id + "'") + '）');
+    a(cnt(TAB, "'" + id + "'") === 1, 'y1v2200/A3c: ' + id + ' 在 tool-diag 的守卫表里恰登记 1 次（实 ' + cnt(TAB, "'" + id + "'") + '）');
   });
-  a(D.indexOf(ANCHOR.guard) >= 0, 'y1v2200/A4: 守卫表新增 beat 页分组（登记错页比不登记更坏）');
-  a(cnt(D, "'wa-bt-out'") === 1, 'y1v2200/A4b: 动态读数出口 wa-bt-out 进 dynamic 层（点开才渲染，不进静态缺失判定）');
+  a(TAB.indexOf(ANCHOR.guard) >= 0, 'y1v2200/A4: 守卫表新增 beat 页分组（登记错页比不登记更坏）');
+  a(cnt(TAB, "'wa-bt-out'") === 1, 'y1v2200/A4b: 动态读数出口 wa-bt-out 进 dynamic 层（点开才渲染，不进静态缺失判定）');
   // ③ 零写口（边界 1 / 2 / 3 的静态面）：两段**去注释后**都不得出现任何拍引擎写口。
   //   ⚠ 为什么必须去注释：本页的段首注释里**逐字列出了那八个写口名**（用来解释边界），
   //   照原文扫会把「解释它不是写口」读成「它是写口」—— 这正是本仓点过名的
@@ -141,8 +145,10 @@ function runAll(a) {
   //   「不许写负控制」—— 判据的输入面必须与结论面同宽。
   const anchorDecl = SELF.slice(SELF.indexOf('const ANCHOR = {'), SELF.indexOf('};', SELF.indexOf('const ANCHOR = {')));
   Object.keys(ANCHOR).forEach(function (k) {
-    const targetRel = (k === 'guard') ? DIAG_REL : PANEL_REL;
-    const tgt = (k === 'guard') ? D : P;
+    // v2.542.1：guard 串（`{ page: 'beat', ids:`）随 UI_BINDINGS 搬进 tool-diag-tables.js，
+    //   锚点纯度与破坏锚点都必须跟着走 —— 否则「实 0」既可能是搬走了，也可能是真丢了，判不出来。
+    const targetRel = (k === 'guard') ? TAB_REL : PANEL_REL;
+    const tgt = (k === 'guard') ? TAB : P;
     a(cnt(tgt, ANCHOR[k]) === 1, 'y1v2200/A8: 锚点 ' + k + ' 在 ' + targetRel + ' 恰中 1 次（实 ' + cnt(tgt, ANCHOR[k]) + '）');
     a(cnt(anchorDecl, ANCHOR[k]) === 1, 'y1v2200/A8b: 锚点 ' + k + ' 在 ANCHOR 表里恰声明 1 次（H5 纯度；表外引用不计）');
   });
@@ -320,7 +326,7 @@ function runAll(a) {
       why: '往只读口里塞一次 land()（面板代推进拍号）⇒ C2b 拍账逐字不变必须现形',
       judge: function (src) { return src.indexOf('WA.beatLedger.view(); WA.beatLedger.land();') >= 0; },
       check: 'A5' },
-    { n: 5, rel: DIAG_REL, key: 'guard', to: "{ page: 'beatX', ids:",
+    { n: 5, rel: TAB_REL, key: 'guard', to: "{ page: 'beatX', ids:",
       why: '守卫表登记到不存在的页 ⇒ 守卫覆盖面查不到这一页（登记错页比不登记更坏）',
       judge: function (src) { return src.indexOf("{ page: 'beat', ids:") < 0; },
       check: 'A4' }

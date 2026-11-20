@@ -51,6 +51,10 @@ const BASE = path.join(__dirname, '..');
 const ENG_REL = 'engines/story-loop.js';
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
+// v2.542.1：两张表（MODULE_EXPORTS / UI_BINDINGS）已搬到 tool-diag-tables.js。
+//   本文件问的是「表里有没有这一条」，故这些断言必须读**表**；问「段函数在不在」的
+//   （A11b 的 `storyLoop: secStoryLoop()`）仍读 tool-diag.js —— 同一族判据不能按文件名一刀切。
+const DIAG_TAB_REL = 'engines/tool-diag-tables.js';
 const IDX_REL = 'index.js';
 const SELF_REL = 'tests/s3-b3-n9-v2227.js';
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
@@ -83,7 +87,11 @@ const ANCHOR = {
 };
 const TGT = {};
 Object.keys(ANCHOR).forEach(function (k) { TGT[k] = ENG_REL; });
-['diagMod', 'diagCollect'].forEach(function (k) { TGT[k] = DIAG_REL; });
+// v2.542.1：两枚锚点**分属两个文件** —— diagMod（MODULE_EXPORTS 那一行）已搬进
+//   tool-diag-tables.js，diagCollect（段函数登记）仍在 tool-diag.js。一刀切会让
+//   「锚点在该文件恰中 1 次」恒报实 0。
+TGT.diagMod = DIAG_TAB_REL;
+TGT.diagCollect = DIAG_REL;
 ['idxLoad'].forEach(function (k) { TGT[k] = IDX_REL; });
 ['pRenderFn', 'pRenderer', 'pPage', 'pBind', 'pSegGuard'].forEach(function (k) { TGT[k] = PANEL_REL; });
 
@@ -133,7 +141,7 @@ function fire(dom, id) {
 function runAll(a) {
   require(path.join(BASE, 'tests/mock.js'));
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
-  const E = rd(ENG_REL), P = rd(PANEL_REL), D = rd(DIAG_REL), I = rd(IDX_REL), SELF = rd(SELF_REL);
+  const E = rd(ENG_REL), P = rd(PANEL_REL), D = rd(DIAG_REL), DT = rd(DIAG_TAB_REL), I = rd(IDX_REL), SELF = rd(SELF_REL);
   function env0(ov) { return gate.fresh(ov ? { srcOverride: ov } : {}); }
 
   /* ══════════════════ A 静态契约 ══════════════════ */
@@ -190,7 +198,7 @@ function runAll(a) {
   a(iSL > 0 && iSL > iPB && iSL > iLR, 'A10: 装载次序 —— story-loop(' + iSL + ')晚于 phone-bridge(' + iPB
     + ')/ lonsha-reader(' + iLR + ')');
   // A11 诊断/面板各自单点
-  a(cnt(D, "'engines/story-loop.js': 'storyLoop'") === 1, 'A11: tool-diag 文件面映射恰 1 处');
+  a(cnt(DT, "'engines/story-loop.js': 'storyLoop'") === 1, 'A11: tool-diag 文件面映射恰 1 处');
   a(cnt(D, 'storyLoop: secStoryLoop()') === 1, 'A11b: 诊断段登记恰 1 处');
   a(cnt(P, ANCHOR.pRenderer) === 1, 'A11c: RENDERERS 映射恰 1 处');
   // A11d **三件齐**(D4 的根因层):渲染 + 绑定 + **守卫表登记**。
@@ -198,11 +206,11 @@ function runAll(a) {
   //   后果不是「少一行字」:G18 逐页点击盘查只盘这张表登记过的 id,于是这一页八枚在**全部自动化里
   //   永不可见而门禁全绿**(N7/N8 两轮各自踩过同一形态)。
   (function () {
-    const m = D.match(/page: 'storyloop', ids: \[([\s\S]*?)\]/);
+    const m = DT.match(/page: 'storyloop', ids: \[([\s\S]*?)\]/);
     const seg = m ? m[1] : '';
     const miss = NEW_IDS.filter(function (id) { return seg.indexOf("'" + id + "'") < 0; });
     a(!!m && miss.length === 0, 'A11d: 守卫表登记了 storyloop 页的控件(缺:' + (miss.join(',') || '无') + ')');
-    a(!!m && seg.indexOf("'wa-sl-out'") < 0 && D.indexOf("dynamic: ['wa-sl-out'") >= 0,
+    a(!!m && seg.indexOf("'wa-sl-out'") < 0 && DT.indexOf("dynamic: ['wa-sl-out'") >= 0,
       'A11d2: 读数出口列在 dynamic(不混进静态 ids —— 出口与控件在盘查里是两件事)');
   })();
   // A12 锚点纯度(**由生成器读出**;逐键核恰 1 次)

@@ -94,6 +94,10 @@
     //       机器判不了）⇒ manual-review。刻意与 `unreadable` 逐字同档，不另立一种口径。
     //   ⚠ 两条都已在 REJECT_FACE 快照里（A8 要求），故此处只是补档、不改面。
     'lower-priority-overrides-canonical': { kind: 'adjust-input', why: '本次写入的证据优先级低于既有 canonical 事实（context/designed 想覆盖 explicit/canon）：换成更高优先级的证据来源再写' },
+    // v2.542.1：engines/api-vault.js 的 prime() 在非安全上下文下明拒（ok:false）——它一直是
+    //   拒收面的一员，却没进快照，于是 B3/B4/C4 自 v2.28x 起恒红（同「新码没进快照」旧账）。
+    //   档位选 request-setup：这不是输入错，也不是重试能好，是**运行环境不满足前提**。
+    'not-secure-context': { kind: 'request-setup', why: '非安全上下文（页面不是 https / localhost）下浏览器禁用该能力：把 SillyTavern 用 https 或本地回环地址打开再试' },
     'store-unreadable': { kind: 'manual-review', why: '存档读不到（不冒充空世界）：机器无从判断内容是否可用，需人先修存档再重跑诊断' },
     // ── v2.192.0 首轮分面后补登的 33 条（拒收面规则表判不了，逐条显式登记）──
     'aftermath-wait': { kind: 'retry-same-input', why: '章间冷却期未过：等窗口过去同输入再来' },
@@ -893,7 +897,7 @@
     'moralDilemma-unavailable', 'mundane-environment-no-corruption', 'name-required', 'no-active-conversation', 'no-actors-in-scene', 'no-archive-found',
     'no-available-shelters-with-capacity', 'no-combat-clash-data', 'no-conclusion', 'no-doc', 'no-epoch-store', 'no-hazard-store',
     'no-infection-source', 'no-items', 'no-message', 'no-offstage-record', 'no-outbreak', 'no-send-el',
-    'no-story-context', 'no_inventory', 'nodeList-must-be-array', 'not-blocked', 'not-offstage', 'oath-not-found',
+    'no-story-context', 'no_inventory', 'nodeList-must-be-array', 'not-blocked', 'not-offstage', 'not-secure-context', 'oath-not-found',
     'observeSlice-unavailable', 'offstageLife-unavailable', 'parallelEvents-unavailable', 'pending-threw', 'pendingCenter-unavailable', 'perceptionManipulation-unavailable',
     'periodicalIdeology-unavailable', 'personalInventory-unavailable', 'phaseTransition-unavailable', 'physical_anchor_permanently_lost', 'place-not-registered', 'plan-missing',
     'platitude_blocked', 'portal_locked', 'portal_sealed', 'powerAnchor-unavailable', 'preset-unconfigured', 'probe-build-threw',
