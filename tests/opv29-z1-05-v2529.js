@@ -7,7 +7,7 @@
 //   于是「只渲染可见页」永远只能是一句口号 —— 谁也不知道它现在是真做到还是被悄悄改坏了。
 //
 // 本锁钉住 tools/first-screen-budget.js 的冷开读数与 C 面裁定：
-//   A 现场：49 页 / 1794 静态控件 / 冷开 42 控件 3947B（占静态 2%）/ 未 --measure 时 attributable=false。
+//   A 现场：49 页 / 1799 静态控件 / 冷开 43 控件 4161B（占静态 2%）/ 未 --measure 时 attributable=false。
 //   B 负控制：judge() 纯裁定器喂假数字，八种糊弄逐个真红。
 //   C 真跑：CLI --check rc=0；--json 里 attributable 必须是 false（静态面不许冒充首屏）。
 //   D 真量：--measure 逐页量一次，页数/控件/首屏读数必须与现场一致。
@@ -29,8 +29,8 @@ const cold = FB.coldBoot();
 const stat = FB.check({ cold: cold });
 a(stat.pages === 49, 'A1 页 49（实测 ' + stat.pages + '）', stat.pages);
 a(stat.playerPages === 6, 'A2 玩家页 6（实测 ' + stat.playerPages + '）', stat.playerPages);
-a(stat.controlsTotal === 1794, 'A3 静态控件 1794 处（实测 ' + stat.controlsTotal + '）', stat.controlsTotal);
-a(cold.ok === true && cold.controls === 42 && cold.bytes === 3947,
+a(stat.controlsTotal === 1799, 'A3 静态控件 1799 处（v2.542.8 跟位：1794 → 1799 = 叙事脊柱 L3/L4 的面板卡片）', stat.controlsTotal);
+a(cold.ok === true && cold.controls === 43 && cold.bytes === 4161,
   'A4 冷开读数：' + cold.controls + ' 控件 / ' + cold.bytes + 'B（打开面板那一瞬）', cold);
 a(stat.coldControls < stat.controlsTotal * 0.1,
   'A5 冷开只占静态总数 ' + Math.round(stat.coldControls / stat.controlsTotal * 100) + '%（不是「打开就全建」）');
@@ -98,9 +98,9 @@ a(jObj && jObj.check && jObj.check.attributable === false && jObj.check.note,
 const meas = FB.measure();
 a(meas.ok === true && meas.pages.length === 34,
   'D1 逐页真量：' + meas.pages.length + ' 页量到（现场 34）', meas.pages.length);
-a(meas.totalControls === 1682, 'D2 逐页合计 1682 控件（实测 ' + meas.totalControls + '）', meas.totalControls);
+a(meas.totalControls === 1683, 'D2 逐页合计 1683 控件（实测 ' + meas.totalControls + '）', meas.totalControls);
 const rowOv = (meas.pages || []).filter(function (x) { return x.page === 'overview'; })[0];
-a(rowOv && rowOv.controls === 46 && rowOv.bytes === 25195,
+a(rowOv && rowOv.controls === 46 && rowOv.bytes === 25206,
   'D3 首屏 overview 实测 ' + (rowOv && rowOv.controls) + ' 控件 / ' + (rowOv && rowOv.bytes) + 'B', rowOv);
 const full = FB.check({ cold: cold, measured: meas, expectMeasured: true });
 a(full.verdict.ok === true,

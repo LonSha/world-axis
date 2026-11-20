@@ -117,7 +117,10 @@ function runB(WA) {
   //   现场实测 `view().tiers[full].size = 80`。仍是「有注入面的 − 排除」同一条口径：115 − 35 = 80。
   // v2.524.0 收口（本轮修红）：探测集 116 → 117（与 capability-tier-v2257 的 MECH=117 同源），
   //   故 full 档规模 = 117 + 1 = 82。判据形态未变（仍是「探测集 + 探测口径差 1」）。
-  eq(fullItem && fullItem.size, 82, 'B6: full 档规模为 82（现场实测：全开策略后探测集 117 + 探测口径差 1）');
+  // v2.542.8 跟位（第三次同一个病：v2.542.6 修了 capability-tier-v2257 与 theme-engines-v2258，
+  //   漏了这一把）：探测集 117 → 132（叙事脊柱 L1–L4 四台引擎入场），悬空名单仍是 35，
+  //   故 full 档规模 = 132 − 35 = 97。判据形态未变（「探测集 − L3_EXCLUDES」）。
+  eq(fullItem && fullItem.size, 97, 'B6: full 档规模为 97（现场实测：全开策略后探测集 132 − 悬空名单 35 = 97）');
   assert(fullItem && typeof fullItem.note === 'string' && fullItem.note.indexOf('35') >= 0, 'B7: full 档包含 35 排除注记');
 
   assert(Array.isArray(v.manualOnly) && v.manualOnly.length === 35, 'B8: view().manualOnly 暴露 35 个排除机制');
@@ -133,7 +136,14 @@ function runC(WA) {
   assert(rFull.ok === true, 'C1: 切到 full 档成功');
   eq(rFull.tier, 'full', 'C2: applyTier 返回 tier 为 full');
   assert(Array.isArray(rFull.notEffective) && rFull.notEffective.length === 0, 'C3: notEffective 为空（全部当场复核生效）');
-  eq(rFull.turnedOn.length, 0, 'C4: 全开下 full 无可新开（实 0）');
+  // v2.542.8：全开策略下仍有且只有 1 个「出厂关着、但有注入面」的机制 ——
+  //   sceneIntent（L1 零 token 边界：开关默认关，注入分支与显示名都已就位）。
+  //   full 档的探测口径是「带 enabled + 有 buildBlock + 有 setSettings」，它必然命中，
+  //   故这里新开恰 1 个，且必须点名是它。原判据 `length === 0` 是 v2.542.6 之前的现场。
+  eq(rFull.turnedOn.length, 1,
+    'C4: 全开下 full 只新开那 1 个出厂休眠的注入机制（实 ' + rFull.turnedOn.length + '）');
+  eq(rFull.turnedOn[0], 'sceneIntent',
+    'C4b: 新开的就是 sceneIntent（L1 零 token 边界：出厂关、有注入面）');
   //   注：v2.293.0 复核发现本行**与 B6/C5 自相矛盾**（65 目标下新开应为 60，随目标
   //   涨到 67、出厂涨到 7，新开仍恰为 60 —— 60 = 67 − 7 与 65 − 5 同值，故**本行不该变**）。
   //   这正是「只改登记值」的边界：目标与出厂同涨同落时，差值判据保持不变。
@@ -141,7 +151,7 @@ function runC(WA) {
   //   故本行必须跟位 —— 上一次的「不该变」是巧合，不是规律（探针实测 turnedOn 64）。
   //   v2.407.0：目标 74 → 80（+6），出厂仍 10（+0），差值 64 → 70 —— 本行再次跟位。
   const vFull = cap.view();
-  eq(vFull.running, 117, 'C5: full 档运行机制数为 117（全开，与 MECH 同源）');
+  eq(vFull.running, 132, 'C5: full 档运行机制数为 132（全开，与 MECH 同源；v2.542.8 跟位 117 → 132）');
   eq(vFull.dormant, 0, 'C6: full 档休眠机制数为 0（全开）');
 
   // 验证 35 个排除机制无一被打开
@@ -157,18 +167,22 @@ function runC(WA) {
   assert(rFullAgain.ok === true && rFullAgain.noop === true, 'C8: 重复切 full 幂等生效（noop: true）');
 
   // 回滚到 lite 档
+  // v2.542.8：full 真开了 1 个 ⇒ 这一档不再 noop，栈里有 1 层 ⇒ 回滚成立。
+  //   原判据 `no-history` 建立在「full 无可开」之上，那个前提已经变了。
   const rRoll = cap.rollback();
-  assert(rRoll.ok === false && rRoll.reason === 'no-history', 'C9: 全开下切档均 noop，栈空如实报 no-history');
-  assert(!rRoll.tier, 'C10: 空栈回滚不产生档位变化');
+  assert(rRoll.ok === true && typeof rRoll.tier === 'string',
+    'C9: 全开（真开了 1 个）后回滚成立且档位有落点（实 ' + (rRoll && (rRoll.tier || rRoll.reason)) + '）');
+  assert(Array.isArray(rRoll.turnedOff) && rRoll.turnedOff.join(',') === 'sceneIntent',
+    'C10: 回滚只收回 full 开的那一个（实 ' + (rRoll && rRoll.turnedOff ? rRoll.turnedOff.join(',') : '无') + '）');
 
   const vLite = cap.view();
-  eq(vLite.running, 117, 'C11: 全开策略下机制数保持 117（档位不再收走出厂开关）');
+  eq(vLite.running, 131, 'C11: 回滚后机制数 131（= MECH 132 − 那一个由 full 新开的 sceneIntent；档位不再收走出厂开关）');
   //   v2.382.0：出厂 7 → 10（+3），休眠 98 → 99（+1）。现场实测 rollback 后 running=10 / dormant=99。
   //   注意这两条**不同步涨**：running +3、dormant +1，因为 MECH 105 → 109 只 +4，
   //   其中 3 台进了 BASE_ON（出厂即开），剩 1 台落在休眠面 —— 所以 C11 改 10、C12 改 99。
   //   v2.407.0：MECH 109 → 115 共 +6，BASE_ON 不变（出厂仍 10），六台全落休眠面
   //   —— C11 保持 10、C12 改 105。
-  eq(vLite.dormant, 0, 'C12: 全开策略下休眠机制数为 0');
+  eq(vLite.dormant, 1, 'C12: 回滚后休眠机制数 1（= 出厂关着、有注入面的 sceneIntent；v2.542.8 跟位 0 → 1）');
 }
 
 function runD() {

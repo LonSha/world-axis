@@ -45,6 +45,10 @@ const BASE = path.join(__dirname, '..');
 const HP = 'engines/health-preflight.js';
 const TIER = 'engines/capability-tier.js';
 const DIAG = 'engines/tool-diag.js';
+// v2.542.8：模块映射表（MODULE_EXPORTS）与面板节都已在 v2.529.0 拆段时搬到
+//   engines/tool-diag-tables.js。本锁问的是「登记在不在」，不是「它写在哪个文件」——
+//   故读合并面（与 tests/diag-source.js 头注释同一条口径）。
+const DIAG_TABLES = 'engines/tool-diag-tables.js';
 const PANEL = 'ui/panel.js';
 const RUNJ = 'tests/run.js';
 const IDX = 'index.js';
@@ -119,7 +123,7 @@ function fresh(ov) {
 function runA(a) {
   const H = rd(HP);
   const I = rd(TIER);
-  const D = rd(DIAG);
+  const D = rd(DIAG) + '\n' + rd(DIAG_TABLES);
   const P = rd(PANEL);
   const ID = rd(IDX);
   // A1 四条锚点各恰 1 次（口径②③④的唯一实现处）
@@ -295,12 +299,17 @@ function runC(a) {
       'C4: partial 时 nextAction 指名是哪道门槛（实「' + r.nextAction + '」）');
     a(deg.fix !== null, 'C4b: degraded 的门槛必须给得出动作（实 ' + (deg.fix ? deg.fix.do : 'null') + '）');
   } else {
-    // v2.412.0 全开策略跟位：出厂 107 源全 on（没有现成 degraded），显式构造现场 ——
+    // v2.412.0 全开策略跟位：出厂源面全 on（没有现成 degraded），显式构造现场 ——
     // 关掉过半注入源的可见性，让 visibility 门槛如实落到 degraded，判据一字不削。
+    // v2.542.8 修构造：源面已从 107 长到 156，而 face==='on' 的那一撮只有个位数，
+    //   `slice(0, floor(sources*0.7))` 会把 on 面**全部**关掉 ⇒ 门槛直接落到 blocked
+    //   （「一个都不剩」是另一档语义），于是永远构造不出 degraded。这里改为「至少留一个 on」，
+    //   关的是「过半 but 不是全部」。
     const SOURCES_N = gv.nums.sources;
-    const turnOff = Math.floor(SOURCES_N * 0.7);
-    const srcKeys = (WA.render.visibilityStat().faceAudit || [])
-      .filter(function (x) { return x.face === 'on'; }).slice(0, turnOff);
+    const onKeys = (WA.render.visibilityStat().faceAudit || [])
+      .filter(function (x) { return x.face === 'on'; });
+    const turnOff = Math.max(1, Math.min(onKeys.length - 1, Math.floor(SOURCES_N * 0.7)));
+    const srcKeys = onKeys.slice(0, turnOff);
     srcKeys.forEach(function (x) { WA.render.setVisibility(x.key, false); });
     const rDeg = hp.threeGates();
     const gvDeg = gateOf(rDeg, 'visibility');
@@ -354,7 +363,7 @@ function runD(a) {
     'D3b: 引擎缺席时面板明说「读数不可用」（不渲染成「都通」，实 '
     + cnt(P, '>体检读数不可用（engines/health-preflight.js 缺席）<') + '）');
   // D4 诊断的模块映射表已登记（漏登记 ⇒ 诊断包里看不见这个引擎）
-  const D = rd(DIAG);
+  const D = rd(DIAG) + '\n' + rd(DIAG_TABLES);
   a(cnt(D, "'engines/health-preflight.js': 'healthPreflight'") === 1,
     'D4: health-preflight 在诊断模块映射表里（漏登记 = 诊断少报一个黑盒）');
 }

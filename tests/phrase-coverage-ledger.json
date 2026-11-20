@@ -1,0 +1,18 @@
+{
+  "_note": "拒收码话术覆盖率读数（由 tools/phrase-coverage.js 生成，勿手改）。口径：在用码 = 见证 + 基线；死表不算（不可达的码给它写话术是给死路修路灯）。",
+  "version": "2.524.0",
+  "baselinePercent": 45.4,
+  "total": 1863,
+  "covered": 845,
+  "uncovered": 1018,
+  "percent": 45.4,
+  "byCluster": {
+    "capacity": 102,
+    "permission": 27,
+    "missing": 534,
+    "timing": 32,
+    "owner": 150
+  },
+  "missingTotal": 1018,
+  "generatedBy": "tools/phrase-coverage.js --ledger"
+}

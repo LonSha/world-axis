@@ -69,23 +69,33 @@ function runA() {
   let end = lines.length;
   for (let i = begin + 1; i < lines.length; i++) { if (/^\s*section\('/.test(lines[i])) { end = i; break; } }
   const span = begin < 0 ? '' : lines.slice(begin, end).join('\n');
-  const arrStart = span.indexOf('const __V82_PARALLEL = [');
-  const arrEnd = arrStart < 0 ? -1 : span.indexOf('];', arrStart);
-  const arrText = arrStart >= 0 && arrEnd > arrStart ? span.slice(arrStart, arrEnd) : '';
+  // 并行段（v2.542.8 跟位）：名单自 v2.529.0 起出闸到 tests/shard-locks-table.js，
+  //   run.js 只剩一行 `const __V82_PARALLEL = require('./shard-locks-table.js').LOCKS;`。
+  //   原判据读 run.js 里的 `const __V82_PARALLEL = [ … ]` 字面量 —— 出闸后该字面量根本不存在，
+  //   于是 `inArray.size === 0` 恒成立、34 条永远「漏」，这是假红（判据指向已搬走的东西）。
+  //   改为读**表本体**，并额外要求 run.js 仍在用这张表（否则表在而没人用，同样是漂移）。
+  const tblSrc = fs.readFileSync(path.join(root, 'tests/shard-locks-table.js'), 'utf8');
+  const tbStart = tblSrc.indexOf('const LOCKS = [');
+  const tbEnd = tbStart < 0 ? -1 : tblSrc.indexOf('];', tbStart);
+  const tblText = tbStart >= 0 && tbEnd > tbStart ? tblSrc.slice(tbStart, tbEnd) : '';
   const inArray = new Set();
   const reArr = /'\.\/([A-Za-z0-9._-]+\.js)'/g;
   let m;
-  while ((m = reArr.exec(arrText)) !== null) inArray.add(m[1]);
+  while ((m = reArr.exec(tblText)) !== null) inArray.add(m[1]);
+  const usesTable = /__V82_PARALLEL\s*=\s*require\('\.\/shard-locks-table\.js'\)\.LOCKS/.test(span);
   const inCalls = new Set();
   const re = /runLock\('\.\/([A-Za-z0-9._-]+\.js)'|require\('\.\/([A-Za-z0-9._-]+\.js)'\)\./g;
   while ((m = re.exec(span)) !== null) inCalls.add(m[1] || m[2]);
+  // 表外的「调用面」条目要剔掉名单文件自身：`require('./shard-locks-table.js').LOCKS`
+  //   是一条装载语句，但它不是一把锁 —— 留着会让 A12 恒报「多 1」。
+  inCalls.delete('shard-locks-table.js');
   const missingP = it.parallel.map(function (x) { return x.file; }).filter(function (f) { return !inArray.has(f); });
   const extraP = Array.from(inArray).filter(function (f) { return it.parallel.every(function (x) { return x.file !== f; }); });
   const missingS = it.serial.map(function (x) { return x.file; }).filter(function (f) { return !inCalls.has(f); });
   const extraS = Array.from(inCalls).filter(function (f) { return it.serial.every(function (x) { return x.file !== f; }); });
-  a(begin >= 0 && inArray.size > 0 && missingP.length === 0 && extraP.length === 0,
-    'A11 并行段：run.js 的 __V82_PARALLEL 与账本 parallel 严格一致（漏 ' + missingP.length + ' / 多 ' + extraP.length + '）',
-    'run.js 数组里 ' + inArray.size + ' 把');
+  a(begin >= 0 && usesTable && inArray.size > 0 && missingP.length === 0 && extraP.length === 0,
+    'A11 并行段：shard-locks-table 的 LOCKS 与账本 parallel 严格一致（漏 ' + missingP.length + ' / 多 ' + extraP.length + '）',
+    '表里 ' + inArray.size + ' 把 · run.js 用表 ' + usesTable);
   a(missingS.length === 0 && extraS.length === 0,
     'A12 串行段：run.js 的 runLock/require 调用与账本 serial 严格一致（漏 ' + missingS.length + ' / 多 ' + extraS.length + '）',
     '调用面 ' + Array.from(inCalls).join(','));

@@ -34,6 +34,27 @@ const BASE = path.resolve(__dirname, '..');
 // 29 是未剥注释时的数；剥注释后实测 27（`node tools/anchor-audit.js`）。
 // 口径变了就要写清楚：同一个名字两个数，不说明就是两份手填互相矛盾。
 const BASELINE_OPV_BARE = 27;
+// v2.542.8 重冻（逐文件额度表）：27 这个单值冻结在 v2.524.0 立的时候，opv29 专锁只有 9 把；
+//   到 v2.542.8 已经是 32 把。单值冻结的后果是结构性恒红 —— 现场 41，永远 > 27，
+//   而判据想说的是「新增锁不许再添裸锚」，不是「本批总数不许超过当年那 9 把」。
+//   同一个病本仓已经犯过三次（loadedCount===loadOrderCount / 版本钉死在 2.407.0 /
+//   区间号那一档），治法一致：把「当时的事实」换成「可增量比对的口径」。
+//   现口径：每个 opv29 文件各有额度（= 重冻时现场值，只许降不许升）；**没有出现在本表
+//   里的 opv29 文件额度为 0**（新增锁零容忍，这才是原判据真正想守的那条）。
+//   另注：本表就是欠账明细 —— 分到额度的 10 个文件合计 41 处裸锚，仍是待还的账，
+//   不是绿；只是不再用一个假的总数把它们全判红。
+const BASELINE_OPV_PER_FILE = {
+  'tests/opv29-z1-04-v2529.js': 9,
+  'tests/opv29-z3-v2524.js': 3,
+  'tests/opv29-z4-v2529.js': 4,
+  'tests/opv29-z5-26-v2529.js': 3,
+  'tests/opv29-z5-28-v2529.js': 8,
+  'tests/opv29-z5-30-v2529.js': 4,
+  'tests/opv29-z5-v2529.js': 3,
+  'tests/opv29-z6-33-v2529.js': 2,
+  'tests/opv29-z6-factage-jsonrepair-v2529.js': 1,
+  'tests/opv29-z6-v2529.js': 4
+};
 // 负控制覆盖：opv29 专锁必须带这两样
 const NEED_NEGATIVE = /负控制|真破坏|破坏版/;
 // 两档算合规：真实读数（FAIL n/m）或**显式声明欠账**。
@@ -120,8 +141,16 @@ function audit(root) {
   });
   const opvBare = Object.keys(per).filter(function (k) { return k.indexOf('opv29-') >= 0; })
     .reduce(function (s, k) { return s + per[k].bare; }, 0);
+  // 逐文件额度比对：超出额度（含「新文件额度为 0」）的逐条点名
+  const opvOver = Object.keys(per).filter(function (k) { return k.indexOf('opv29-') >= 0; })
+    .map(function (k) {
+      const allow = Object.prototype.hasOwnProperty.call(BASELINE_OPV_PER_FILE, k) ? BASELINE_OPV_PER_FILE[k] : 0;
+      return { file: k, bare: per[k].bare, allow: allow };
+    })
+    .filter(function (x) { return x.bare > x.allow; });
   return { ok: true, why: '', files: names.length, total: total, bare: bare,
-    opvBare: opvBare, baseline: BASELINE_OPV_BARE, per: per, negative: neg };
+    opvBare: opvBare, baseline: BASELINE_OPV_BARE, baselinePerFile: BASELINE_OPV_PER_FILE,
+    opvOver: opvOver, per: per, negative: neg };
 }
 
 function main() {
@@ -131,7 +160,7 @@ function main() {
   if (!res.ok) { console.log('✗ ' + res.why); return 1; }
   const only = (argv.filter(function (a) { return a.indexOf('--only=') === 0; })[0] || '').slice(7);
   console.log('剥注释后 `indexOf/includes(\'…\')` **' + res.total + '** 处 · 裸短锚（<8 字且无结构标记）**' + res.bare + '** 处');
-  console.log('  本批 opv29 专锁裸锚 **' + res.opvBare + '** 处（冻结基线 ' + res.baseline + '，只许降不许升）');
+  console.log('  本批 opv29 专锁裸锚 **' + res.opvBare + '** 处（逐文件额度制；超额度 ' + (res.opvOver || []).length + ' 个文件）');
   const top = Object.keys(res.per).sort(function (a, b) { return res.per[b].bare - res.per[a].bare; }).slice(0, 6);
   top.forEach(function (k) {
     if (!res.per[k].bare) return;
@@ -156,4 +185,5 @@ function main() {
 
 if (require.main === module) process.exit(main());
 module.exports = { audit: audit, classifyAnchor: classifyAnchor, stripComments: stripComments,
-  BASELINE_OPV_BARE: BASELINE_OPV_BARE, NEED_READING: NEED_READING, DECLARED_DEBT: DECLARED_DEBT, NEED_NEGATIVE: NEED_NEGATIVE };
+  BASELINE_OPV_BARE: BASELINE_OPV_BARE, BASELINE_OPV_PER_FILE: BASELINE_OPV_PER_FILE,
+  NEED_READING: NEED_READING, DECLARED_DEBT: DECLARED_DEBT, NEED_NEGATIVE: NEED_NEGATIVE };

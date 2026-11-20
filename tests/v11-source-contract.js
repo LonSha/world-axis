@@ -133,7 +133,34 @@ const NON_SOURCE_BUILDBLOCK = {
   //   注意 localGrid 的块确实在 /overview 页有读数，但那是 UI 侧直读 WA.localGrid.stats/root，
   //   与 buildBlock 无关（ui/pages/overview-blocks.js 头注已写明「不调 buildBlock」）。
   localGrid: { verify: 'dead', reason: '局部格网：buildBlock 产品侧零调用点（死面账本归因 self-only）；/overview 页的格网读数走 WA.localGrid.stats/root，不经本块' },
-  spatialBridge: { verify: 'dead', reason: '空间桥：buildBlock 产品侧零调用点（死面账本归因 self-only）；同平面方位由 localGrid 与 nearby() 直供，本块无消费者' }
+  spatialBridge: { verify: 'dead', reason: '空间桥：buildBlock 产品侧零调用点（死面账本归因 self-only）；同平面方位由 localGrid 与 nearby() 直供，本块无消费者' },
+  // ── v2.542.8 补登记（19 台）：第三批全量回归照出来的既存欠账 ──────────────────
+  //   这 19 台是 v2.51x–v2.52x 陆续新增的引擎，buildBlock 面一直没进本锁，于是 T6 报
+  //   「未归属」19 台、T7 报「非源差集 38 ≠ 白名单 A 19」。逐台核过证据，不是塞白名单遮羞：
+  //   · 16 台在 engines/inject-collector.js 有真调用点（WA.<ns>.buildBlock() 被调后折叠进
+  //     正文），与 eccentricThreads / offstageLife / routinePacing 同属「不经 SOURCES、不受
+  //     vis 开关管辖」的第三通道；它们没有 def / VIS_NAMES / vis.X 分支，塞进 SOURCES 会让
+  //     T2/T3/T4 恒红 ⇒ verify 只能记 reasoning（判据即产品侧确有调用点）。
+  //   · 3 台产品侧零调用点、死面账本已归因 self-only ⇒ verify 只能是 dead。
+  addressForm: { verify: 'reasoning', reason: '称呼形制：engines/inject-collector.js 208–209 行 WA.addressForm.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  aging: { verify: 'reasoning', reason: '年岁更迭：engines/inject-collector.js 216–217 行 WA.aging.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  habitTell: { verify: 'reasoning', reason: '习惯性小动作：engines/inject-collector.js 224–225 行 WA.habitTell.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  floorOrder: { verify: 'reasoning', reason: '场合座次：engines/inject-collector.js 232–233 行 WA.floorOrder.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  interruptCost: { verify: 'reasoning', reason: '打断代价：engines/inject-collector.js 240–241 行 WA.interruptCost.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  quietRound: { verify: 'reasoning', reason: '静场回合：engines/inject-collector.js 248–249 行 WA.quietRound.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  finale: { verify: 'reasoning', reason: '终局：engines/inject-collector.js 256–257 行 WA.finale.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  arcSettle: { verify: 'reasoning', reason: '弧线结算：engines/inject-collector.js 264–265 行 WA.arcSettle.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  looseEnds: { verify: 'reasoning', reason: '未了结线头：engines/inject-collector.js 272–273 行 WA.looseEnds.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  exitRite: { verify: 'reasoning', reason: '退场仪：engines/inject-collector.js 280–281 行 WA.exitRite.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  pastLife: { verify: 'reasoning', reason: '前尘：engines/inject-collector.js 288–289 行 WA.pastLife.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  posthumous: { verify: 'reasoning', reason: '身后：engines/inject-collector.js 296–297 行 WA.posthumous.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  reputationAfter: { verify: 'reasoning', reason: '身后评：engines/inject-collector.js 304–305 行 WA.reputationAfter.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  livelihood: { verify: 'reasoning', reason: '生计：engines/inject-collector.js 312–313 行 WA.livelihood.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  worldBounds: { verify: 'reasoning', reason: '世界边界：engines/inject-collector.js 320–321 行 WA.worldBounds.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  etiquette: { verify: 'reasoning', reason: '礼节：engines/inject-collector.js 328–329 行 WA.etiquette.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
+  identityLedger: { verify: 'dead', reason: '四元组同一性账本（EXV29-01）：buildBlock 产品侧零调用点（死面账本归因 self-only），正文侧无消费者；同一性读数走 view() 与面板' },
+  outcomeDice: { verify: 'dead', reason: '检定骰面（S1「说了不一定成」）：buildBlock 产品侧零调用点（死面账本归因 self-only），动作结论走 act.VERDICTS 四档，正文不消费该块' },
+  overhearSplit: { verify: 'dead', reason: '听者分层（EXV29-09）：buildBlock 产品侧零调用点（死面账本归因 self-only），远近由 spatial-acoustics、方言由 lingua-broker 分头供给' }
 };
 // ─────────────────────────────────────────────────────────────────────────────
 // 白名单 B：SOURCES 源、但该命名空间上**没有** buildBlock。V11 立项实测 9 项，两种产出方式。
@@ -421,14 +448,18 @@ function runAll(a) {
   //   v2.524.0 跟位：SOURCES 现场复算 151（基线 149）。与 runtimeKeys 155 并排读：多出的
   //   四台里两台进了源表（带 def/VIS_NAMES/vis.X 契约），两台（localGrid / spatialBridge）
   //   走白名单 A 的 dead 档 —— 判据（长度相等）未动。
-  a(j.sources.length === 151, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.524.0 现场基线 151；v2.517.0 为 149）');
+  //   v2.542.8 跟位：SOURCES 现场复算 166（基线 151），runtimeKeys 189（基线 155）。涨出来的
+  //   38 台非源命名空间逐台核过证据后进了白名单 A（见下方 v2.542.8 补登记段）：16 台在
+  //   engines/inject-collector.js 有真调用点（reasoning），3 台死面账本归因 self-only（dead）。
+  //   判据（长度相等）未动 —— 表跟位，不是放宽。
+  a(j.sources.length === 166, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.542.8 现场基线 166；v2.524.0 为 151）');
   //   v2.407.0 跟位：runtimeKeys 144 → 150（memoryRelay/stageSession 为 v2.402.0 V10 新增，
   //   summarizerAdapter/director/branchContinuity/factContinuity 为 v2.407.0 三缝新增）；
   //   SOURCES 仍 144 —— 六台都没有 def/VIS_NAMES/vis.X 注入契约，走白名单 A 归属。
   //   v2.524.0 跟位：runtimeKeys 现场复算 155（基线 151）。涨出来的命名空间里，未进源表的
   //   localGrid / spatialBridge 两台已在白名单 A 按 dead 逐台裁决（证据见下方补登记）；
   //   其余进的是 SOURCES 或已在册项 —— 表跟位，判据（长度相等）未动。
-  a(j.runtimeKeys.length === 155, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.524.0 现场基线 155；v2.517.0 为 151）');
+  a(j.runtimeKeys.length === 189, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.542.8 现场基线 189；v2.524.0 为 155）');
   a(j.missingDef.length === 0, 'v11src: [T2] 源表每项在 def 有默认值（缺: ' + (j.missingDef.join(',') || '无') + '）');
   a(j.missingName.length === 0, 'v11src: [T3] 源表每项有面板显示名（缺: ' + (j.missingName.join(',') || '无') + '）');
   a(j.missingVis.length === 0, 'v11src: [T4] 源表每项有 vis 读取点（缺: ' + (j.missingVis.join(',') || '无') + '）');

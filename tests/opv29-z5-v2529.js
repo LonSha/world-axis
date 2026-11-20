@@ -41,8 +41,12 @@ function run(args, opts) {
 }
 function md5(p) { return crypto.createHash('md5').update(fs.readFileSync(p)).digest('hex'); }
 
-// 仓库副本：只带脚手架会碰的六个文件（+目录骨架）
-const FILES = ['index.js', 'tests/run.js', 'engines/tool-diag.js', 'engines/action-desk.js', 'core/store.js', 'core/evict.js'];
+// 仓库副本：只带脚手架会碰的文件（+目录骨架）
+// v2.542.8 跟位：两个接线位锚点所在文件已是「表本体」——MODULE_EXPORTS 在
+//   engines/tool-diag-tables.js、ROUTES 在 engines/action-desk-routes.js。副本必须带上
+//   这两个文件，否则 apply 在副本里根本读不到锚点（ENOENT），C 段十条会全部连坐变红。
+const FILES = ['index.js', 'tests/run.js', 'engines/tool-diag.js', 'engines/tool-diag-tables.js',
+  'engines/action-desk.js', 'engines/action-desk-routes.js', 'core/store.js', 'core/evict.js'];
 let seq = 0;
 function sandbox() {
   seq += 1;
@@ -69,9 +73,13 @@ try {
   console.log('A 真仓 read-only：--check');
   const rCheck = run(['--check', '--name=' + NAME, '--ns=' + NS]);
   a(rCheck.status === 0, 'A1: --check 退出 0（实 ' + rCheck.status + '）');
+  // v2.542.8 跟位：MODULE_EXPORTS 的**表本体**已搬到 engines/tool-diag-tables.js、
+  //   ROUTES 的本体已搬到 engines/action-desk-routes.js（tool-diag.js / action-desk.js 只剩
+  //   别名投影）。脚手架要插的是「表里的一行」，锚点必须钉在表本体上，否则 --check
+  //   永远报 anchor-missing（命中 0 次）。这里跟着改 id 字面量，判据本身（点名七处）未动。
   const IDS = [
-    'wire:index.js/LOAD_ORDER', 'wire:tests/run.js/LOAD', 'wire:engines/tool-diag.js/MODULE_EXPORTS',
-    'wire:engines/action-desk.js/ROUTES', 'reg:core/store.js/defaultWorldState',
+    'wire:index.js/LOAD_ORDER', 'wire:tests/run.js/LOAD', 'wire:engines/tool-diag-tables.js/MODULE_EXPORTS',
+    'wire:engines/action-desk-routes.js/ROUTES', 'reg:core/store.js/defaultWorldState',
     'reg:core/store.js/__BOUNDED_CAPS', 'reg:core/evict.js/SITES'
   ];
   for (let i = 0; i < IDS.length; i++) {
@@ -95,8 +103,8 @@ try {
   a(rApply.status === 0, 'C1: apply 退出 0（实 ' + rApply.status + '）');
   a(has(sb, 'index.js', "'engines/" + NAME + ".js',"), 'C2: index.js LOAD_ORDER 出现该引擎');
   a(has(sb, 'tests/run.js', "'engines/" + NAME + ".js',"), 'C3: tests/run.js LOAD 出现该引擎');
-  a(has(sb, 'engines/tool-diag.js', "'engines/" + NAME + ".js': '" + NS + "'"), 'C4: MODULE_EXPORTS 文件→命名空间');
-  a(has(sb, 'engines/action-desk.js', "'" + NS + ".stat'"), 'C5: action-desk ROUTES 有只读口');
+  a(has(sb, 'engines/tool-diag-tables.js', "'engines/" + NAME + ".js': '" + NS + "'"), 'C4: MODULE_EXPORTS 文件→命名空间（表本体在 tool-diag-tables.js）');
+  a(has(sb, 'engines/action-desk-routes.js', "'" + NS + ".stat'"), 'C5: action-desk ROUTES 有只读口（表本体在 action-desk-routes.js）');
   a(has(sb, 'core/store.js', '      ' + NS + ': {'), 'C6: defaultWorldState 骨架出生');
   a(has(sb, 'core/store.js', "'" + NS + ".items'"), 'C7: __BOUNDED_CAPS 上界登记');
   a(has(sb, 'core/evict.js', "'" + NS + ".items'"), 'C8: evict.SITES 驱逐登记');
@@ -107,7 +115,9 @@ try {
   a(atLO >= 0 && idxTxt.slice(atLO, atLO + 200).indexOf("'engines/" + NAME + ".js'") >= 0,
     'C10: 插入落点在 LOAD_ORDER 结构行之后（不是文件尾）');
   // 全链路：改过的 JS 仍可解析（不是把文件切坏了）
-  const okParse = ['index.js', 'tests/run.js', 'core/store.js', 'core/evict.js', 'engines/tool-diag.js', 'engines/action-desk.js']
+  // v2.542.8 跟位：被改的六个文件现在是「表本体」那两个（tool-diag-tables / action-desk-routes），
+  //   不是只留别名的 tool-diag.js / action-desk.js。判据（六个都 node --check 过）未动。
+  const okParse = ['index.js', 'tests/run.js', 'core/store.js', 'core/evict.js', 'engines/tool-diag-tables.js', 'engines/action-desk-routes.js']
     .every(function (f) { return cp.spawnSync(process.execPath, ['--check', path.join(sb, f)], { encoding: 'utf8' }).status === 0; });
   a(okParse, 'C11: 六个被改文件全部 node --check 通过（没切坏）');
 
@@ -158,16 +168,20 @@ try {
   // ── E 少一路即红（负控制）─────────────────────────────
   console.log('E 负控制：少一路/歧义/重复都必须红');
   const sbNoRoute = sandbox();
-  const adTxt = read(sbNoRoute, 'engines/action-desk.js');
-  fs.writeFileSync(path.join(sbNoRoute, 'engines/action-desk.js'), adTxt.replace('  const ROUTES = {\n', '  const ROUTES_X = {\n'), 'utf8');
+  // v2.542.8 跟位：ROUTES 本体在 engines/action-desk-routes.js，破坏点必须落在那儿，
+  //   否则「删掉锚点」这一步根本没删到什么，E1 会退化成恒真绿。
+  const adTxt = read(sbNoRoute, 'engines/action-desk-routes.js');
+  fs.writeFileSync(path.join(sbNoRoute, 'engines/action-desk-routes.js'), adTxt.replace('  const ROUTES = {\n', '  const ROUTES_X = {\n'), 'utf8');
   const rNoRoute = run(['--root=' + sbNoRoute, '--name=' + NAME, '--ns=' + NS]);
   a(rNoRoute.status !== 0, 'E1: 删掉 ROUTES 锚点 ⇒ 非零退出（实 ' + rNoRoute.status + '）');
-  a(String(rNoRoute.stderr || '').indexOf('wire:engines/action-desk.js/ROUTES') >= 0, 'E2: 并点名缺的是哪一路');
+  a(String(rNoRoute.stderr || '').indexOf('wire:engines/action-desk-routes.js/ROUTES') >= 0, 'E2: 并点名缺的是哪一路');
   a(!fs.existsSync(path.join(sbNoRoute, 'engines', NAME + '.js')), 'E3: 失败时未留下半个引擎文件');
 
   const sbAmb = sandbox();
-  const tdiag = read(sbAmb, 'engines/tool-diag.js');
-  fs.writeFileSync(path.join(sbAmb, 'engines/tool-diag.js'),
+  // v2.542.8 跟位：MODULE_EXPORTS 本体在 engines/tool-diag-tables.js，同上——
+  //   歧义必须注入到锚点真正所在的文件里，判据才不是恒真。
+  const tdiag = read(sbAmb, 'engines/tool-diag-tables.js');
+  fs.writeFileSync(path.join(sbAmb, 'engines/tool-diag-tables.js'),
     tdiag.replace('  const MODULE_EXPORTS = {\n', '  const MODULE_EXPORTS = {\n  };\n  const MODULE_EXPORTS = {\n'), 'utf8');
   const rAmb = run(['--root=' + sbAmb, '--name=' + NAME, '--ns=' + NS]);
   a(rAmb.status !== 0, 'E4: 锚点命中两处（歧义）⇒ 非零退出（实 ' + rAmb.status + '）');

@@ -245,7 +245,11 @@ function runAll(assertFn) {
   ['summarizer-adapter.js', 'reading-bookmark.js', 'director.js', 'branch-continuity.js', 'fact-continuity.js'].forEach(function (f, i) {
     a(idx.indexOf("'" + 'engines/' + f + "'") >= 0, 'T7-' + (i + 6) + ' 加载序列含 ' + f);
   });
-  const td = src('engines/tool-diag.js');
+  // v2.542.8 跟位（同一个病第四次）：tool-diag 的登记表已拆到 engines/tool-diag-tables.js，
+  //   tool-diag.js 只剩装载与投影。判据问的是「产品里有没有这条登记」⇒ 必须读**合并面**，
+  //   口径同 tests/diag-source.js 头注释立的那条规矩（本轮已按此改过 9 把锁）。
+  //   只读 tool-diag.js 会让 T7-11~T7-15 五条恒红，而它们要说的事其实成立。
+  const td = src('engines/tool-diag.js') + '\n' + src('engines/tool-diag-tables.js');
   ['summarizerAdapter', 'readingBookmark', 'director', 'branchContinuity', 'factContinuity'].forEach(function (ns, i) {
     a(td.indexOf("'" + ns + "'") >= 0, 'T7-' + (i + 11) + ' tool-diag 守卫登记 ' + ns);
   });

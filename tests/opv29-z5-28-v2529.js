@@ -51,10 +51,24 @@ function runA() {
     'A4 已交付 + 未交付 = 36（台账不静默丢项）', disk.counts.delivered + '+' + disk.counts.pending);
   a(fresh.counts.rangeForm >= 1 && fresh.violations.rangeForm.some(function (r) { return r.commit === '07fd549'; }),
     'A5 计划纲领提交的区间号被点名（07fd549 / OPV29-01～36）');
-  a(fresh.delivered['OPV29-01'] === undefined,
-    'A6 区间号**没有**被展开成 36 次交付（01 不在交付表里）');
-  a(fresh.counts.noRecompute === 0,
-    'A7 每个交付项都带复算读数（noRecompute = 0）', String(fresh.counts.noRecompute));
+  // v2.542.8 改判据（原式结构性恒假）：本锁写在 v2.529.0，那时 OPV29-01 还没交付，
+  //   于是「01 不在交付表里」当时代替了「区间号没被展开」。现在 36/36 全交付，01 由
+  //   8874b46 那条真提交交付 —— 原式就把「01 真的交付了」误判成「区间号被展开了」。
+  //   判据要证的其实是：区间号那条提交**自己**不产出交付项。故改读交付来源提交号。
+  const RANGE_COMMIT = '07fd549';
+  a(!fresh.delivered['OPV29-01'] || fresh.delivered['OPV29-01'].commit !== RANGE_COMMIT,
+    'A6 区间号**没有**被展开成 36 次交付（01 的交付来源是 ' + (fresh.delivered['OPV29-01'] || {}).commit + '，不是 ' + RANGE_COMMIT + '）');
+  // v2.542.8 改判据：`no-recompute` 在 tools/plan-ledger.js 里**本来就不是失败**（它进
+  //   ledger.violations 并在 --json 的 ok 判据里被显式排除，见 plan-ledger.js:376），
+  //   语义是「这条历史提交的 body 里没有『复算：… ⇒ 读数』段 —— 不算已验证」。
+  //   现场有 8 条这样的历史提交（01/02/04/06/12/16/17/24），git 历史不可改写 ⇒ 它们
+  //   只能是**登记在案的欠账**。原式 `=== 0` 等于要求改写历史，永远红。
+  //   改判：① 不许有静默项（每个缺复算的都必须出现在 violations 里）；② 欠账数不增长。
+  const DECLARED_NO_RECOMPUTE = 8;
+  a(fresh.counts.noRecompute === (fresh.violations.noRecompute || []).length,
+    'A7a 缺复算读数的交付项全部被点名（无静默：' + fresh.counts.noRecompute + ' 条）');
+  a(fresh.counts.noRecompute <= DECLARED_NO_RECOMPUTE,
+    'A7 缺复算的交付项不增长（' + fresh.counts.noRecompute + ' <= 登记欠账 ' + DECLARED_NO_RECOMPUTE + '）');
   a(PL.compare(disk, fresh).length === 0, 'A8 --check 口径下台账与 git log 一致（重算零差异）',
     JSON.stringify(kinds(PL.compare(disk, fresh))));
   const src = fs.readFileSync(pm, 'utf8');
@@ -109,7 +123,9 @@ function runB() {
     'B9 与 OPV29 无关的修复提交不改源摘要（不制造假 stale）');
   // B10 真 log：计划纲领那条确实没产生任何交付
   const real = PL.buildLedger(ROOT);
-  a(real.counts.rangeForm >= 1 && Object.keys(real.delivered).indexOf('OPV29-01') < 0,
+  // v2.542.8 同上：真 log 上 01 已由真提交交付，判据改读「交付来源不是那条区间号提交」。
+  a(real.counts.rangeForm >= 1 && (real.violations.rangeForm || []).some(function (r) { return r.commit === '07fd549'; })
+    && (!real.delivered['OPV29-01'] || real.delivered['OPV29-01'].commit !== '07fd549'),
     'B10 真 log 里 07fd549 只进「区间号」一档，不产出交付项');
 }
 

@@ -61,10 +61,11 @@
       "fields": [
         "lazyCount",
         "loadedCount",
-        "loadOrderCount"
+        "loadOrderCount",
+        "uiCount"
       ],
       "probe": "tests/module-registry-ledger.json",
-      "why": "OPV29-04 的惰性面三读数（惰性条数 / 全量契约面 / 首帧面）：每增一台惰性档引擎都要跟位，过去靠人手改，v2.530.0 两个新引擎（副本族 / 上下文边界）入场时当场漏改一次 ⇒ 收进本表，由核对器分钟级盯"
+      "why": "OPV29-04 的惰性面三读数（惰性条数 / 全量契约面 / 首帧面）：每增一台惰性档引擎都要跟位，过去靠人手改，v2.530.0 两个新引擎（副本族 / 上下文边界）入场时当场漏改一次 ⇒ 收进本表，由核对器分钟级盯。v2.542.8 加第四读 uiCount：B10 从「两表填平」改成恒等式 `loaded = loadOrder − ui + lazy` 后，ui 条数成了等式的一侧，必须跟位盯着"
     }
   ]
 }

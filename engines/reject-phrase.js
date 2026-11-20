@@ -48,7 +48,13 @@
     },
     {
       id: 'missing', label: '缺少信息',
-      re: /(missing|absent|bad-|invalid|malformed|empty|required|no-?arg|mismatch)/i,
+      // v2.542.8 补「场上没有」家族：v2.524.0 之后新增的判不出面码用的是 no-field / no-line /
+      //   no-text / no-agenda / no-tension / none-developing 这套写法（缺字段、缺那句台词、
+      //   场上没有这件事在推进、没有张力），它们说的就是「信息没给全」，此前一条都不命中任何簇，
+      //   于是覆盖率被新码拉低到 45.0%（跌破 phrase-coverage 冻结的 45.2 守卫线）。
+      //   这里只点名这六个具体形态，不做 `no-.*` 泛化 —— 泛化会把 no-such-person 一类从
+      //   owner 簇抢过来（那类是「对象不存在」，不是「信息没给全」）。
+      re: /(missing|absent|bad-|invalid|malformed|empty|required|no-?arg|mismatch|no-(field|line|text|agenda|tension)\b|none-\w+)/i,
       phrase: '信息没给全（缺人 / 缺地点 / 缺数量）：把这几个补齐再提一次。'
     },
     {

@@ -26,7 +26,10 @@ const DIAG = 'engines/tool-diag.js';
 const RUN = 'tests/run.js';
 const WD_SRC = fs.readFileSync(path.join(BASE, WD), 'utf8');
 const PANEL_SRC = fs.readFileSync(path.join(BASE, PANEL), 'utf8');
-const DIAG_SRC = fs.readFileSync(path.join(BASE, DIAG), 'utf8');
+// v2.542.6：登记表（MODULE_EXPORTS / UI_BINDINGS）已搬到 tool-diag-tables.js（v2.529.0 拆段）。
+//   本文件的 A 段问的是「产品里有没有这条登记」，故读合并面（与 tests/diag-source.js 同口径）。
+const DIAG_SRC = fs.readFileSync(path.join(BASE, DIAG), 'utf8')
+  + '\n' + fs.readFileSync(path.join(BASE, 'engines/tool-diag-tables.js'), 'utf8');
 const RUN_SRC = fs.readFileSync(path.join(BASE, RUN), 'utf8');
 let pass = 0, fail = 0;
 function a(ok, msg) { if (ok) pass++; else { fail++; console.log('  x ' + msg); } }

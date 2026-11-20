@@ -34,7 +34,12 @@ const SET = 'ui/settings.js';
 const RUN = 'tests/run.js';
 const INDEX = 'index.js';
 const PP_SRC = fs.readFileSync(path.join(BASE, PP), 'utf8');
-const DIAG_SRC = fs.readFileSync(path.join(BASE, DIAG), 'utf8');
+// v2.542.8：MODULE_EXPORTS / UI_BINDINGS 两块登记表已在 v2.529.0 拆段时搬到
+//   engines/tool-diag-tables.js，采集节函数（secPopulate 等）仍在本文件。判据问的是
+//   「登记在不在」，故读合并面（与 tests/diag-source.js 头注释同一条口径）——
+//   A22/A26 两条就是被这一处「读单文件」点着的。
+const DIAG_SRC = fs.readFileSync(path.join(BASE, DIAG), 'utf8')
+  + '\n' + fs.readFileSync(path.join(BASE, 'engines/tool-diag-tables.js'), 'utf8');
 const PANEL_SRC = fs.readFileSync(path.join(BASE, PANEL), 'utf8');
 const SET_SRC = fs.readFileSync(path.join(BASE, SET), 'utf8');
 const RUN_SRC = fs.readFileSync(path.join(BASE, RUN), 'utf8');

@@ -201,7 +201,11 @@ const report = {
   loadOrderCount: LOAD_ORDER.length,
   lazyCount: LAZY_ORDER.length,
   loadedCount: LOAD.length,
-  uiCount: LOAD_ORDER.length - LOAD.length,
+  // v2.542.8 修公式：原式 `LOAD_ORDER.length - LOAD.length` 只在「LOAD 仅 = LOAD_ORDER」
+  //   时等于 ui 层条数。v2.529.0（OPV29-04）把契约面改成 `LOAD_ORDER ∪ LAZY_ORDER` 后，
+  //   该式算出的其实是「ui 条数 − 惰性条数」（现场 24 − 22 = 2），字段名与语义脱节。
+  //   现在按定义直接数首帧表里的 ui/* 条目。
+  uiCount: LOAD_ORDER.filter(function (r) { return r.indexOf('ui/') === 0; }).length,
   nsCount: Object.keys(nsOwner).length,
   totals: { loadEdges: loadEdges, hardEdges: hardEdges, callRefs: callRefs, ghostRefs: ghostRefs },
   loadErrors: loadErrors,

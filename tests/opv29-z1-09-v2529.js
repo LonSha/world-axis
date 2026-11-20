@@ -105,11 +105,11 @@ const R = WA.rejectRecovery;
 a(!!WA.rejectRecoveryTables && Object.keys(WA.rejectRecoveryTables).length === 7,
   'A5 表文件载荷七件齐（实 ' + (WA.rejectRecoveryTables ? Object.keys(WA.rejectRecoveryTables).length : 0) + ' 块）',
   WA.rejectRecoveryTables && Object.keys(WA.rejectRecoveryTables));
-a(R.REJECT_FACE.length === 1682 && R.SUCCESS_FACE.length === 139 && R.NEUTRAL_FACE.length === 84,
+a(R.REJECT_FACE.length === 1687 && R.SUCCESS_FACE.length === 139 && R.NEUTRAL_FACE.length === 89,
   'A6 三面快照条目数与拆段前逐项相等（拒收 ' + R.REJECT_FACE.length
   + ' / 成功 ' + R.SUCCESS_FACE.length + ' / 判不出 ' + R.NEUTRAL_FACE.length + '）');
-a(R.RULES.length === 5 && Object.keys(R.OVERRIDES).length === 135
-  && Object.keys(R.NEUTRAL_REVIEW).length === 84 && Object.keys(R.ARTIFACTS).length === 1,
+a(R.RULES.length === 5 && Object.keys(R.OVERRIDES).length === 136
+  && Object.keys(R.NEUTRAL_REVIEW).length === 89 && Object.keys(R.ARTIFACTS).length === 1,
   'A7 规则表 / 例外表 / 判不出面登记 / 词法碎片条目不变（'
   + R.RULES.length + ' / ' + Object.keys(R.OVERRIDES).length + ' / '
   + Object.keys(R.NEUTRAL_REVIEW).length + ' / ' + Object.keys(R.ARTIFACTS).length + '）');

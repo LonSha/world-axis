@@ -1503,7 +1503,7 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       //   关闭时注入字节与 v2.541.7 逐字节一致（判据见 tests/scene-intent-v2542.js 的 A 段）。
       if (vis.sceneIntent && WA.sceneIntent) {
         const si = engineCall('sceneIntent', function () { return WA.sceneIntent.buildBlock(); });
-        if (si) items.push({ source: '本幕', content: si });
+        if (si) items.push({ source: '本幕（场景意图）', content: si });
       }
       const snap = this.buildWorldSnapshot();
       if (snap) items.push({ source: '世界状态', content: snap });

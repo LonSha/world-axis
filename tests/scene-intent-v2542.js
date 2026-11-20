@@ -148,9 +148,9 @@ const sync = require('./ui-gate-sync.js');
   const iSnap = INJ.indexOf('const snap = this.buildWorldSnapshot();', INJ.indexOf('applyInjections('));
   a(iBranch > 0, 'E7: 注入分支存在');
   a(iBranch > 0 && iSnap > 0 && iBranch < iSnap, 'E8: 分支在 buildWorldSnapshot **之前**（「本幕」是第一项，否则它会被世界状态压到后面）');
-  a(INJ.indexOf("items.push({ source: '本幕', content: si })") >= 0, 'E9: 注入项 source 名为「本幕」');
-  a(cnt(TAB, "'本幕': { rank: 1") === 1, "E10: PRIORITY 里「本幕」= rank 1 恰 1 处（pinned，不被容量静默丢弃）");
-  a(TAB.indexOf("'本幕'") >= 0 && TAB.indexOf("'近端事件': { rank: 1") >= 0, 'E11: 「本幕」与近端事件同档（rank 1）');
+  a(INJ.indexOf("items.push({ source: '本幕（场景意图）', content: si })") >= 0, 'E9: 注入项 source 名为「本幕」');
+  a(cnt(TAB, "'本幕（场景意图）': { rank: 1") === 1, "E10: PRIORITY 里「本幕」= rank 1 恰 1 处（pinned，不被容量静默丢弃）");
+  a(TAB.indexOf("'本幕（场景意图）'") >= 0 && TAB.indexOf("'近端事件': { rank: 1") >= 0, 'E11: 「本幕」与近端事件同档（rank 1）');
   a(PAN.indexOf("sceneIntent: '本幕（场景意图）'") >= 0, 'E12: panel 的 VIS_NAMES 有显示名（缺则面板裸露英文键名）');
   // LOAD 顺序：两个面都要，且都在 render/inject.js 之前
   const order = (IDX.match(/const LOAD_ORDER = \[([\s\S]*?)\];/) || [])[1] || '';

@@ -38,7 +38,9 @@ const LEDGER = path.join(ROOT, 'tests/phrase-coverage-ledger.json');
 //   这里必须先量再填。上一版我先填了 63.0 再去量，结果量出 0%（解析面错），
 //   于是「覆盖率 0%」和「达标线 63%」同时出现在一份读数里 —— 两个数字没有一个
 //   来自现场。这一版的两个数都是从命令输出里抄下来的。
-const BASELINE_PERCENT = 45.2;
+// v2.542.8 抬线：45.2 -> 45.4（现场 845 / 1863 = 45.4%；本版给「场上没有」家族补了簇命中）。
+//   本仓纪律：线只许升不许降 —— 覆盖面上来后不抬线，等于把涨出来的这部分又让回去。
+const BASELINE_PERCENT = 45.4;
 
 function readJson(root, rel) {
   try { return { ok: true, value: JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8')) }; }

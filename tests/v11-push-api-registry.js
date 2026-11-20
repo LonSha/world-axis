@@ -230,7 +230,10 @@ function runAll(a) {
     //   actionDesk 路由接线，不再是真零调用 ⇒ 移出裁决表，19 → 15。
     //   v2.524.0 跟位：15 → 36。v11-push-api-coverage 的 C2 复算出 21 条老引擎推进口
     //   「真零调用且未裁决」，逐台核过证据后补进本表（2 drive / 19 entry，理由见各条目）。
-    a(s.total === 36, 'v11push: [A10a] 登记总数 == 36（实 ' + s.total + '；v2.524.0 归口 21 条老引擎推进口）');
+    //   v2.542.8 跟位：36 → 41。v11-push-api-coverage 的 C2 复算出 5 条推进口（offstageQueue.step /
+    //   consequenceSchedule.due / consequenceSchedule.settle / appointment.settle / farAccount.tick）
+    //   「真零调用且未裁决」，逐台核过签名与零参行为后补进本表（5 entry，理由见各条目）。
+    a(s.total === 41, 'v11push: [A10a] 登记总数 == 41（实 ' + s.total + '；v2.542.8 归口 5 条推进口）');
     a(sum === s.total, 'v11push: [A10b] 各裁决之和 == 总数（' + sum + ' vs ' + s.total + '）');
   }
 }

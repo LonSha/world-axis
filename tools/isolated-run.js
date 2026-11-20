@@ -46,7 +46,21 @@ if (process.argv.indexOf('--recover-lock') >= 0) {
     process.exit(2);
   }
 }
-runner.launch(root, { onFinish: function (r) { final = r; } }).then(function (code) {
+// v2.542.8（第三批偿还时补的 CLI 逃生口）：`launch()` 的总时长默认 5100000ms（85min），
+//   这个数立的时候全量还没到 26000 项；上一趟全量跑到 25904 项、只剩最后几节时被
+//   `stop('timeout')` 杀掉（result.json 记 status=interrupted / signal=SIGKILL /
+//   stopping=timeout，日志尾只有运行器补写的中断摘要）。那是**墙钟上限**，不是测试失败。
+//   这里只加一条命令行入参，把 opts.timeoutMs 透传下去；默认值一个字不动（默认值由
+//   tests/gate-timeout.js 的 RUNNER_TIMEOUT_DEFAULT_MS 与三处站点同值对账，不在此处改）。
+//   用法：node tools/isolated-run.js --timeout-ms 9000000
+const argTimeout = (function () {
+  const i = process.argv.indexOf('--timeout-ms');
+  if (i < 0 || !process.argv[i + 1]) return 0;
+  const n = Number(process.argv[i + 1]);
+  return Number.isFinite(n) && n >= 60000 ? n : 0;
+})();
+if (argTimeout) console.log('总时长上限：' + argTimeout + 'ms（命令行指定，默认 5100000ms 未改）');
+runner.launch(root, { onFinish: function (r) { final = r; }, timeoutMs: argTimeout || undefined }).then(function (code) {
   const ev = {
     status: final ? final.status : 'no-result',
     summary: final ? final.summary : null,

@@ -315,15 +315,23 @@ function runB(a) {
   // B4 full：本次新开 38 个（70 个 full 机制 − 其中已开 32 个）
   const r3 = T.applyTier('full');
   a(r3.ok === true, 'B4: 切 full 成功');
-  a(r3.turnedOn.length === 0, 'B4b: 全开后 full 无可新开（实 ' + r3.turnedOn.length + '）');
+  a(r3.turnedOn.length === DORMANT && r3.turnedOn[0] === 'sceneIntent',
+    'B4b: 全开后 full 只新开那 ' + DORMANT + ' 个「出厂关着但有注入面」的机制（实 '
+      + r3.turnedOn.join(',') + '）—— 其余 ' + RUNNING0 + ' 个本就在跑，不是「一键开整个世界」的假象',
+    r3.turnedOn);
   const vf = T.view();
   a(vf.running === FULL_MECH, 'B4c: full 后 ' + FULL_MECH + ' 个机制在跑（OPV7-8 下调排除 35 悬空，实 ' + vf.running + '）');
   a(vf.dormant === 0, 'B4d: full 后休眠机制为 0 个（全开策略，实 ' + vf.dormant + '）');
   // B5 回滚：full → standard（栈顶是 standard→full 那行，from=standard）
   const r4 = T.rollback();
-  a(r4.ok === false && r4.reason === 'no-history', 'B5: 全开下 full/standard 均 noop，栈空如实报 no-history（实 ' + (r4 && r4.reason) + '）');
-  a(!r4.tier, 'B5b: 空栈回滚不产生档位变化');
-  a(T.view().running === MECH, 'B5c: 回到 standard 仍是全开 ' + MECH + '（实 ' + T.view().running + '）');
+  a(r4.ok === true && r4.tier === 'standard',
+    'B5: full → standard 回滚成功且档位真回到 standard（实 ' + (r4 && (r4.tier || r4.reason)) + '）'
+      + ' —— v2.542.6 之前这里是 no-history：full 无可开故不写栈，现在 full 真开了那一个', r4);
+  a(r4.turnedOff.join(',') === 'sceneIntent' && r4.granted.length === 0,
+    'B5b: 回滚只收回 full 开的那一个（turnedOff ' + r4.turnedOff.join(',') + ' / granted ' + r4.granted.length + '）',
+    r4.turnedOff);
+  a(T.view().running === MECH - DORMANT,
+    'B5c: 回到 standard 后 ' + (MECH - DORMANT) + ' 个机制在跑（full 新开的那一个已随回滚关掉，实 ' + T.view().running + '）');
   // B6 **本版最要紧的一条**：full → lite 后出厂机制一个不少（初版缺陷在此）
   const r5 = T.applyTier('lite');
   a(r5.ok === true, 'B6: 切回 lite 成功');
@@ -384,7 +392,14 @@ function runC(a) {
   // C3 出厂态：defaultOff 95 / userOff 0 / noBuilder 66（与探针逐字同数）
   a(au.byReason.defaultOff === DORMANT, 'C3: 出厂关（有注入面）' + DORMANT + ' 个（实 ' + au.byReason.defaultOff + '）');
   a(au.byReason.userOff === 0, 'C3b: 出厂态玩家关掉 0 个（干净盘上没有表态）');
-  a(au.byReason.noBuilder === 0, 'C3c: 全开后没有休眠者，noBuilder=0（实 ' + au.byReason.noBuilder + '）');
+  // v2.542.8：这里比的是**出厂态**（fresh()）的归因面。全开策略下「关着的」只剩
+  //   L3/L4 那三台纯读数引擎（arcPhase / characterDrive / injectTier）—— 它们不写注入面，
+  //   归因如实给 no-builder。断言点名到 ns 而不是数字：数字漂了看不出是谁。
+  const nbNs = au.dormantRows.filter(function (r) { return r.reason === 'no-builder'; })
+    .map(function (r) { return r.ns; }).sort();
+  a(nbNs.join(',') === 'arcPhase,characterDrive,injectTier',
+    'C3c: 「关着且没有注入面」的休眠者恰是叙事脊柱那三台纯读数引擎（' + nbNs.join(',') + '）'
+      + ' —— 它们不写注入面，归因如实给 no-builder（不是丢档）', nbNs);
   // C4 玩家手动关掉一个默认开的 ⇒ 归因变 user-off（不是 default-off）
   const onRow = au.runningRows.filter(function (r) { return r.hasBuild; })[0];
   a(!!onRow, 'C4: 找一个出厂开着的世界机制做样本（' + (onRow ? onRow.ns : '无') + '）');
@@ -410,7 +425,7 @@ function runC(a) {
   // C7 档位与归因交叉：applyTier('standard') 后 defaultOff 应降到 61
   T.applyTier('standard');
   const a4 = A.audit();
-  a(a4.byReason.defaultOff === 0, 'C7: standard 后出厂关剩 0 个（全开策略，实 ' + a4.byReason.defaultOff + '）—— 两个模块读的是同一个现场');
+  a(a4.byReason.defaultOff === DORMANT, 'C7: standard 后出厂关只剩 ' + DORMANT + ' 个（= sceneIntent：有注入面但不在 34 条白名单里，实 ' + a4.byReason.defaultOff + '）—— 两个模块读的是同一个现场');
 }
 
 // ═══ D 面：边界与不变量 ═════════════════════════════════════════════
@@ -451,7 +466,9 @@ function runD(a) {
   a(T2.view().granted.length === 0, 'D2: 出厂 granted 为空（出厂机制不进 granted，实 ' + T2.view().granted.length + '）');
   T2.applyTier('full');
   const g = T2.view().granted;
-  a(g.length === 0, 'D2b: 全开后 full 无可开，granted 为空（实 ' + g.length + '）');
+  a(g.length === DORMANT && g[0] === 'sceneIntent',
+    'D2b: 全开只把出厂休眠的 sceneIntent 记进 granted（' + g.join(',') + '）'
+      + ' —— 出厂就开着的 ' + RUNNING0 + ' 个一个都不进（否则 lite 回滚会误关它们）', g);
   a(g.indexOf('livingWorld') < 0, 'D2c: 出厂就开着的 livingWorld 不在 granted 里 —— 它不该被档位收回');
   // D3 回滚栈只装启用面（不装世界键、不装引擎设置副本）
   const cfg = T2.getSettings();
@@ -544,7 +561,14 @@ function runNegative(a) {
     T.applyTier('full');
     T.applyTier('lite');
     const n = T.list().on.length;
-    a(n === BASE_ON, 'N2: 全开策略下 lite 回滚只收回 granted（空），出厂开关 ' + n + ' 个保全（=' + BASE_ON + '）—— 初版回收病在全开策略下不再可能发生');
+    // v2.542.8：负控制的**方向**写反了。N2 破坏的是 granted 计算里的「排除已开」那一步
+    //   （`stillOn = target.filter(on === true)`），破坏后 granted 会把出厂就开着的机制也吞进来，
+    //   于是 lite 回滚会误关它们 —— 这正是初版缺陷的形态。所以本条要断言的是**病会复现**
+    //   （lite 后的开关数明显少于出厂），而不是「仍然保全」。原式 `n === BASE_ON` 在
+    //   破坏副本上结构性恒假（它不是判据，是一句永远说不通的话）。
+    a(n < BASE_ON - 30,
+      'N2: 破坏「排除已开」后 lite 回滚真误关了出厂开关（' + n + ' < ' + BASE_ON + '）'
+        + ' —— 初版回收病会复现，故 D2 系列不是恒真');
   }
   // N3 摘掉幂等早退 ⇒ B3b「幂等不重复写盘」现形
   //   ⚠ 破坏不能只摘 `if` 早退：从 lite 切到 standard 时 from !== nm，即使没有幂等早退

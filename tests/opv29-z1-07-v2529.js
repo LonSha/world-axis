@@ -4,8 +4,8 @@
 // 治的病
 //   计划原文：「`tool-diag` 拆段：按注册表/诊断/面板三块拆，保留原导出面」，验收
 //   「导出面对账零变化；拆段后门禁绿」。拆前 engines/tool-diag.js 是 8425 行：
-//   四块**登记表**（磁盘模块→命名空间映射 561 条、可选面名单 23 条、渲染↔绑定
-//   校验表 69 组、26 枚引擎端口表）被八千行采集节夹在中间。改一条登记要在里面翻，
+//   四块**登记表**（磁盘模块→命名空间映射 574 条、可选面名单 26 条、渲染↔绑定
+//   校验表 70 组、26 枚引擎端口表）被八千行采集节夹在中间。改一条登记要在里面翻，
 //   而漏登记的症状是「自检看不见」而不是报错。
 //
 // 本锁钉住「表已出闸、导出面一字未变、次序硬约束还在、缺表不许静默退化」：
@@ -33,7 +33,7 @@ const TAB = 'engines/tool-diag-tables.js';
 
 // ── A. 现场 ───────────────────────────────────────────
 a(lines(ENG) <= 6100, 'A1 引擎已瘦身（实 ' + lines(ENG) + ' 行 ≤ 6100；拆前 8425）', lines(ENG));
-a(lines(TAB) === 2467, 'A2 表体量（实 ' + lines(TAB) + ' 行 = 2467）', lines(TAB));
+a(lines(TAB) === 2509, 'A2 表体量（实 ' + lines(TAB) + ' 行 = 2509）', lines(TAB));
 const tabSrc = RD(TAB);
 const namedFns = (tabSrc.match(/function\s+[A-Za-z_$]/g) || []).length;
 const iifes = (tabSrc.match(/\(function\s*\(\)/g) || []).length;
@@ -46,12 +46,12 @@ ctx0.global = ctx0;
 vm.createContext(ctx0);
 vm.runInContext(tabSrc, ctx0, { filename: TAB });
 const T0 = ctx0.window.WorldAxis.toolDiagTables || {};
-a(T0.MODULE_EXPORTS && Object.keys(T0.MODULE_EXPORTS).length === 561,
-  'A4a MODULE_EXPORTS 561 条（实 ' + (T0.MODULE_EXPORTS ? Object.keys(T0.MODULE_EXPORTS).length : 'null') + '）');
-a(Array.isArray(T0.OPTIONAL_EXPORTS) && T0.OPTIONAL_EXPORTS.length === 23,
-  'A4b OPTIONAL_EXPORTS 23 条（实 ' + (T0.OPTIONAL_EXPORTS ? T0.OPTIONAL_EXPORTS.length : 'null') + '）');
-a(Array.isArray(T0.UI_BINDINGS) && T0.UI_BINDINGS.length === 69,
-  'A4c UI_BINDINGS 69 组（实 ' + (T0.UI_BINDINGS ? T0.UI_BINDINGS.length : 'null') + '）');
+a(T0.MODULE_EXPORTS && Object.keys(T0.MODULE_EXPORTS).length === 574,
+  'A4a MODULE_EXPORTS 574 条（实 ' + (T0.MODULE_EXPORTS ? Object.keys(T0.MODULE_EXPORTS).length : 'null') + '）');
+a(Array.isArray(T0.OPTIONAL_EXPORTS) && T0.OPTIONAL_EXPORTS.length === 26,
+  'A4b OPTIONAL_EXPORTS 26 条（实 ' + (T0.OPTIONAL_EXPORTS ? T0.OPTIONAL_EXPORTS.length : 'null') + '）');
+a(Array.isArray(T0.UI_BINDINGS) && T0.UI_BINDINGS.length === 70,
+  'A4c UI_BINDINGS 70 组（实 ' + (T0.UI_BINDINGS ? T0.UI_BINDINGS.length : 'null') + '）');
 a(T0.ENGINE_PORTS && Object.keys(T0.ENGINE_PORTS).length === 26,
   'A4d ENGINE_PORTS 26 枚（实 ' + (T0.ENGINE_PORTS ? Object.keys(T0.ENGINE_PORTS).length : 'null') + '）');
 
@@ -140,8 +140,8 @@ a(!!WA2.toolDiag && !!WA2.toolDiagTables, 'C1 真宿主装载后两件都在场'
   const e230 = WA2.toolDiag.secEngines230();
   a(e230 && e230.totals && e230.totals.ns === 26,
     'C4 secEngines230 从表里取到 26 枚 ns（实 ' + (e230 && e230.totals ? e230.totals.ns : 'null') + '）');
-  a(Array.isArray(WA2.toolDiag.UI_BINDINGS) && WA2.toolDiag.UI_BINDINGS.length === 69,
-    'C5 UI_BINDINGS 导出面同源（69 组）');
+  a(Array.isArray(WA2.toolDiag.UI_BINDINGS) && WA2.toolDiag.UI_BINDINGS.length === 70,
+    'C5 UI_BINDINGS 导出面同源（70 组）');
   a(typeof WA2.toolDiag.verdict === 'function' && typeof WA2.toolDiag.summaryText === 'function',
     'C6 verdict / summaryText 仍在导出面上');
 }

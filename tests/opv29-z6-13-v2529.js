@@ -98,13 +98,18 @@ function runA() {
   //   这些数字的来源：
   //     扫描面 = reject-code-gate.scan() 命中 1905；死表 = reject-v2780.DEAD 52；在用 = 1853
   //     覆盖率 = rejectPhrase.coverage(在用码) ⇒ 837 / 1853 = 45.2%
-  a(base.json.scanned === 1905, 'A2 扫描面 = 1905（reject-code-gate.scan 命中数）', String(base.json.scanned));
+  // v2.542.8 跟位（A2/A4/A6/A7/A8 五处读数）：本锁把 v2.524.0 的现场数字钉成了字面量，
+  //   而 v2.542.x 期间新增了 10 个拒收/判不出面码（本版补登记 9 条冻结面码），扫描面
+  //   1905 → 1915、在用码 1853 → 1863；同时本版给「场上没有」家族补了簇命中，
+  //   有玩家话 837 → 845、裸码 1016 → 1018、覆盖率 45.2 → 45.4。
+  //   判据形态（五个数互相咬合：在用 = 扫描面 − 死表；covered + uncovered = total）未动。
+  a(base.json.scanned === 1915, 'A2 扫描面 = 1915（reject-code-gate.scan 命中数）', String(base.json.scanned));
   a(base.json.dead === 52, 'A3 死表 = 52（reject-v2780.DEAD 键数）', String(base.json.dead));
-  a(base.json.total === 1853, 'A4 在用码 = 1853 = 扫描面 − 死表', String(base.json.total));
+  a(base.json.total === 1863, 'A4 在用码 = 1863 = 扫描面 − 死表', String(base.json.total));
   a(base.json.base === 937, 'A5 基线表 = 937 条（ledger.base 数组长度）', String(base.json.base));
-  a(base.json.covered === 837, 'A6 有玩家话 = 837 条', String(base.json.covered));
-  a(base.json.uncovered === 1016, 'A7 裸码 = 1016 条（必须点名，不许只报百分比）', String(base.json.uncovered));
-  a(base.json.percent === 45.2, 'A8 覆盖率 = 45.2%', String(base.json.percent));
+  a(base.json.covered === 845, 'A6 有玩家话 = 845 条', String(base.json.covered));
+  a(base.json.uncovered === 1018, 'A7 裸码 = 1018 条（必须点名，不许只报百分比）', String(base.json.uncovered));
+  a(base.json.percent === 45.4, 'A8 覆盖率 = 45.4%', String(base.json.percent));
   a(base.json.baselinePercent === base.json.percent, 'A9 达标线 ≡ 实测覆盖率（冻结基线与现场同值）',
     String(base.json.baselinePercent) + ' vs ' + String(base.json.percent));
   a(Array.isArray(base.json.crossBad) && base.json.crossBad.length === 0, 'A10 交叉核对零失配', JSON.stringify(base.json.crossBad));

@@ -49,12 +49,6 @@ function rd(rel, ov) {
  *  本判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」——故读合并面
  *  （与 tests/diag-source.js 同口径）；ov 破坏覆盖仍只作用于 tool-diag.js 本身。 */
 function rdDiag(ov) {
-  return rdDiag(ov) + '\n' + rd('engines/tool-diag-tables.js', ov);
-}
-/** v2.542.6：tool-diag 的登记表已搬到 tool-diag-tables.js（v2.529.0 拆段）。
- *  本判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」——故读合并面
- *  （与 tests/diag-source.js 同口径）；ov 破坏覆盖仍只作用于 tool-diag.js 本身。 */
-function rdDiag(ov) {
   return rd('engines/tool-diag.js', ov) + '\n' + rd('engines/tool-diag-tables.js', ov);
 }
 function cnt(s, n) { return s.split(n).length - 1; }

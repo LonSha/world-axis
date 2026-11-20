@@ -38,6 +38,14 @@ function rd(rel, ov) {
   if (ov && ov[rel] !== undefined) return ov[rel];
   return fs.readFileSync(path.join(BASE, rel), 'utf8');
 }
+/** v2.542.8：tool-diag 的登记表已搬到 tool-diag-tables.js（v2.529.0 拆段）。
+ *  本判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」——故读合并面
+ *  （与 tests/diag-source.js 同口径）；ov 破坏覆盖仍只作用于 tool-diag.js 本身。
+ *  ⚠ 同批的 exp1/2/3/5/6/7 都加了这份助手，唯独 exp4 漏了 —— 全量回归当场点名
+ *    「A3: tool-diag 声明表已登记」。同一个病在同一个批次里犯两次，故此处留记录。 */
+function rdDiag(ov) {
+  return rd('engines/tool-diag.js', ov) + '\n' + rd('engines/tool-diag-tables.js', ov);
+}
 function cnt(s, n) { return s.split(n).length - 1; }
 // ── 破坏锚点（各恰 1 次，A6 逐键核）──
 const ANCHOR = {
@@ -112,9 +120,9 @@ async function runAll(a, ov) {
   a(fs.existsSync(path.join(BASE, SV)), 'A1: 引擎落到仓库里');
   a(rd('tests/run.js', ov).indexOf("'engines/survey.js'") > 0, 'A2: tests/run.js LOAD 已挂');
   a(rd('index.js', ov).indexOf("'engines/survey.js'") > 0, 'A2b: index.js LOAD_ORDER 已挂');
-  a(rd('engines/tool-diag.js', ov).indexOf("'engines/survey.js': 'survey'") > 0, 'A3: tool-diag 声明表已登记');
-  a(rd('engines/tool-diag.js', ov).indexOf('survey: secSurvey()') > 0
-    && rd('engines/tool-diag.js', ov).indexOf('function secSurvey()') > 0,
+  a(rdDiag(ov).indexOf("'engines/survey.js': 'survey'") > 0, 'A3: tool-diag 声明表已登记');
+  a(rdDiag(ov).indexOf('survey: secSurvey()') > 0
+    && rdDiag(ov).indexOf('function secSurvey()') > 0,
     'A3b: 诊断面单列一节（与 world 分列：那一节答「世界有什么」，本节答「谁知道」）');
   (function () {
     a(rd('core/store.js', ov).indexOf('survey: { spots: [], views: [], scouts: [] }') > 0,

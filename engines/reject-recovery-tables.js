@@ -464,6 +464,19 @@
     //   consequence-schedule.settle 都把它作为调用方拒收（ok:false）返回：'没给证据'从
     //   「一片读数的内部态」变成了「这次结算不成立」的真归因，故入拒收面、离开本表。（elapsed-evidence 侧的那处内部读数仍在，只是不再是它的唯一去处。）
     'not-in-text': { out: true, why: '时间证据定位读数的「证据不在正文」内部态（elapsed-evidence:165，出口拼成 evidence-not-in-text 面世），不是调用被拒' },
+    // ── v2.542.8（叙事脊柱 L1–L4 判据面收口）：四台新引擎带出的五条判不出面码 ──
+    //   它们出现在 `skipped[]` 的 reason 里、或不带 ok 的读数对象里，**没有任何一处**落在
+    //   `ok:false` 的调用返回体上，故是判不出面。键集与 NEUTRAL_FACE 逐字同（A7 咬这一条）。
+    //   档位分开写（不合成一个 absent）：
+    //     · empty-scene / none-developing / no-text —— 正常局面（开局空场 / 本幕没埋线在长 /
+    //       本回合没有可比文本），配恢复动作等于教玩家去修没坏的东西 ⇒ out:true。
+    //     · no-field / no-line —— **画像缺件**（人物卡没写该字段 / 没写底线），是可以动手补的
+    //       ⇒ request-setup，与 audit-absent / forecaster-absent 同一条边界。
+    'empty-scene': { out: true, why: '注入分档时场景里没有地点/在场人可注入（inject-tier:87 的 skipped 理由）—— 开局空场是正常局面' },
+    'none-developing': { out: true, why: '本幕没有正在发展的埋线（scene-intent:90 的 skipped 理由）—— 不是一次调用被拒' },
+    'no-text': { out: true, why: '触碰判定时本回合没有可比文本（character-drive:113 的 hit:false 读数）' },
+    'no-field': { kind: 'request-setup', why: '人物画像里没有该字段（character-drive:73-75 的三面 / group-refuse:80）—— 去补人物卡的对应字段再看' },
+    'no-line': { kind: 'request-setup', why: '人物画像里没写行为底线（character-drive:111）—— 先给这个角色写一条底线，再谈触碰' },
   };
 /* 拒收面冻结快照（v2.203.0 现场实测 740 条）：至少在 `ok:false` 对象里出现过 ——
    *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。
@@ -1070,6 +1083,12 @@
     //   年表条目说不出谁做的（no-owner）/ 还没发生就想进年表（not-happened）。
     //   四条都出现在 ok:false 对象里，逐条由 reject-v2780 真跑见证点名。
     'no-shards', 'no-readings', 'no-owner', 'not-happened',
+    // v2.542.8（叙事脊柱 L1–L4 判据面收口）：四台新引擎的**调用级**拒收 —— 全部是 ok:false
+    //   的返回体（scene-intent:182 no-agenda / inject-tier:148 apply-not-implemented /
+    //   arc-phase:95 no-tension / character-drive:63 no-such-person）。
+    //   恢复档不写 OVERRIDES：分词本就被规则表收住（no-* 与 *-implemented 都落 adjust-input，
+    //   与 no-shards / unknown-page 同一条），重复登记会和 A8 打架。
+    'apply-not-implemented', 'no-agenda', 'no-such-person', 'no-tension',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1191,6 +1210,9 @@
     //   语义是「证据找不到」这一事实记录，不是调用被拒 ⇒ 判不出面（与 cascade_bus_tick 同规）。
     //   这两条在 v2.409.0 跨参照物批带出后未同步进快照（clean HEAD 复跑同红，非本版引入）。
     'not-in-text',
+    // ── v2.542.8（叙事脊柱 L1–L4 判据面收口）：与本期 NEUTRAL_REVIEW 同批的五条 ——
+    //   键集必须逐字相同（A7 咬这一条），故两处只能同批改。
+    'empty-scene', 'no-field', 'no-line', 'no-text', 'none-developing',
   ];
 
   WA.rejectRecoveryTables = {

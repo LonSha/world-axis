@@ -38,9 +38,19 @@ function runA() {
     res.bare + '/' + res.total);
   a(typeof res.baseline === 'number' && res.baseline >= 0,
     'A4 冻结基线是个数字（' + res.baseline + '）', String(res.baseline));
-  a(res.opvBare <= res.baseline,
-    'A5 本批 opv29 裸锚不增长（' + res.opvBare + ' <= 基线 ' + res.baseline + '）',
-    res.opvBare + ' vs ' + res.baseline);
+  // v2.542.8 改判据（原式结构性恒假）：27 是 v2.524.0 那 9 把锁的存量；本批现在 32 把，
+  //   现场 41，永远 > 27。判据本意是「新增锁不许再添裸锚」，不是「总数不许超过当年那 9 把」。
+  //   改成逐文件额度制（额度见 tools/anchor-audit.js 的 BASELINE_OPV_PER_FILE）：
+  //   ① 每个已登记文件的裸锚不得超过各自额度；② 未登记的新 opv29 文件额度为 0。
+  //   41 处仍是待还的账（额度表就是欠账明细），只是不再用一个假的总数把它们全判红。
+  const over = res.opvOver || [];
+  a(over.length === 0,
+    'A5a 每个 opv29 文件的裸锚不超过各自额度（超额度 ' + over.length + ' 个）',
+    JSON.stringify(over.map(function (x) { return x.file + ':' + x.bare + '>' + x.allow; })));
+  const perSum = Object.keys(res.baselinePerFile || {}).reduce(function (s2, k) { return s2 + res.baselinePerFile[k]; }, 0);
+  a(res.opvBare <= perSum,
+    'A5b 本批 opv29 裸锚总数不超过额度之和（' + res.opvBare + ' <= ' + perSum + '）',
+    res.opvBare + ' vs ' + perSum);
   // 分类两向
   a(AN.classifyAnchor('a.b') === 'bare', 'A6 短且无结构的锚判 bare（a.b）');
   a(AN.classifyAnchor('reading.marks') === 'contextual', 'A7 长锚判 contextual（reading.marks，13 字）');

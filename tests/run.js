@@ -388,7 +388,13 @@ async function runScript(spec, opt) {
   //   纯字面量 96000 + SIGKILL，与 tests/gate-timeout.js 的 GATE_TIMEOUTS.spawnMs 同值。
   //   本仓现有 runScript 调用方**无一**传 opt.ms（已实测），故不保留可变预算的余地。
   const r = cp_spawnSync(process.execPath, [path.join(__dirname, path.basename(spec))], {
-    cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL'
+    cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL',
+    // v2.542.8 修：这里原来没给 maxBuffer，node 默认 1MB —— v11-master-matrix 正常输出
+    //   1.42MB（18 把 V11 锁的装载日志 + 逐项 PASS），于是子进程被 spawnSync 以
+    //   `spawnSync /usr/bin/node ENOBUFS` 杀掉，rc 记 -1，判据看着像「测试挂了」，
+    //   实际是**运行器吃不下的输出**。同类站点（timeout 1344000 的两处）早就是 64MB，
+    //   此处漏给属实现遗漏：与 gate-timeout 的预算口径无关，只放宽收管道的能力。
+    maxBuffer: 64 * 1024 * 1024
   });
   const ms = Date.now() - t0;
   const rc = r.status === null ? -1 : r.status;
@@ -20579,7 +20585,12 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //  (重组面 = 真实 panel.js + 段文件重拼,逐字等于拆前面;锚点跟现场走,扩输入面)
     const panelSrc2203b = require('./panel-source.js').panelSource();
     const diagSrc2203b = require('./diag-source.js')();
-    const labSrc2203 = fs.readFileSync(path.join(BASE, 'engines/world-lab.js'), 'utf8');
+    // v2.542.8 跟位：`const MAX_ROUNDS = 12;` 已随三条路径封闭集一起出闸到
+    //   engines/world-lab-tables.js（拆段），本文件里只剩 `const MAX_ROUNDS = __T.MAX_ROUNDS;`。
+    //   判据问的是「夹取上限有没有集中在一处、有没有具体值」，不是「它写在哪个文件」——
+    //   故读合并面（与 tests/diag-source.js 同一条口径）。
+    const labSrc2203 = fs.readFileSync(path.join(BASE, 'engines/world-lab.js'), 'utf8')
+      + '\n' + fs.readFileSync(path.join(BASE, 'engines/world-lab-tables.js'), 'utf8');
     // ① 四件事真取四个引擎口
     assert(panelSrc2203b.indexOf('WA.worldLab.simulate(') > 0 && panelSrc2203b.indexOf('WA.worldLab.report(') > 0,
       'v2203: 沙盒推进真取 simulate()、结果报告真取 report()（原因逐字取自副本实测差 —— 不许编）');
@@ -22644,6 +22655,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //   负控制（真破坏）：拿掉守卫 ⇒ FAIL 3/23；表给 null ⇒ FAIL 1/23；表给空对象（静默降级）⇒ FAIL 2/23。
     await runScript('./opv29-z1-07-v2529.js');
     // v2.529.0（V29 Z1）：OPV29-08 action-desk 拆段（966 条路由出闸成工厂；4123→1643 行 / 表 2530 行；拒收码三面差额 0）—— 23 项。
+    //   负控制：未做（欠账 —— 只有正向断言，无「真破坏副本 ⇒ FAIL 读数」那一段。）
     await runScript('./opv29-z1-08-v2529.js');
     // v2.529.0（V29 Z1）：OPV29-09 reject-recovery 拆段（账本与判定分离）—— 19 项。
     //   1388 行里 1162 行（84%）是冻结表（三面快照 1682/139/84 等）⇒ engines/reject-recovery-tables.js
@@ -22681,9 +22693,14 @@ await runScript('./story-window-evidence-v2518.js');
     // 形态：纯脚本体，走 runScript 档；不登记 ⇒ test-surface-gate 判 unregistered-orphan。
     await runScript('./stitch-nekotools-v2529.js');
     await runScript('./stitch-redbird-v2529.js');
-    await runScript("./opv29-z1-04-v2529.js");
-    await runScript('./opv29-z5-30-v2529.js');
+    // v2.525.0（V29 Z1）：OPV29-04 惰性装载 —— ensure/bind 契约、并发复用同一在飞 promise、
+    //   失败退回 pending 可重试。⚠ v2.542.8 修：这行此前**登记了两遍**（单双引号各一行）＝
+    //   全量里多跑一遍；test-surface-gate 只判「在不在册」不判「在册几次」，重复从未被报。
+    //   负控制：未做（欠账 —— 只有正向断言，无「真破坏副本 ⇒ FAIL 读数」那一段。）
     await runScript('./opv29-z1-04-v2529.js');
+    // 负控制：未做（欠账 —— 迁移失败/回滚未覆盖「真破坏副本」档。）
+    await runScript('./opv29-z5-30-v2529.js');
+    // 负控制：未做（欠账 —— 脆 JSON 的坏样本只在前向断言里，未做真破坏读数。）
     await runScript('./opv29-z6-factage-jsonrepair-v2529.js');
     // v2.408.0（OPV23-9）：分层回归调度器专锁 —— 四级金字塔「每档真跑它声称的那件事」。
     //   为什么必须登记：不登记 ⇒ tests/test-surface-gate.js 判 unregistered-orphan、

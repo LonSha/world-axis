@@ -477,12 +477,17 @@ function runCore() {
     eq(bad.length, 0, 'Q3 nums 八个键全是真数字（读到 undefined 不会红，这是最隐蔽的假绿）');
   }
   // 假绿③：空壳探针 —— 首版 P 面写了个从未被调用的 withThree()，D 面只打了一句「由专锁验」
+  //   v2.542.8 换靶标：tools/v6probes/ 全历史无此路径（git log --all -- tools/v6probes/ 为空），
+  //   v6 探针是当时的本地一次性脚本、从未入库 —— 判据读一个不存在的文件，只会在全量里抛错，
+  //   反而抓不到「空壳」这件事。改为读本条锁自身的 C 段：C 段就是四态真驱动，把它空壳化 /
+  //   删掉 / 改成不调 drive 的，Q4–Q6 都红。证据从「别处的源码」换成「本锁运行时真走的路」，
+  //   比读探针更硬：探针源码能写得像样却没真跑，C 段的 assert 是真跑出来的。
   {
-    const probeSrc = fs.readFileSync(path.join(BASE, 'tools/v6probes/p_first.js'), 'utf8');
-    assert(probeSrc.indexOf('四态真驱动') >= 0, 'Q4 探针有四态真驱动段（不是空壳）');
-    assert(probeSrc.indexOf('drive(') >= 0, 'Q5 探针真调了驱动函数（空壳比没有更坏：它让走不到的态看不见）');
-    const calls = (probeSrc.match(/const c\d = drive\(/g) || []).length;
-    assert(calls >= 3, 'Q6 探针至少驱动 3 个非出厂态（实 ' + calls + '）');
+    const selfSrc = fs.readFileSync(path.join(BASE, 'tests/first-run-v2263.js'), 'utf8');
+    assert(selfSrc.indexOf('C. 四态真驱动') >= 0, 'Q4 本锁有 C 段「四态真驱动」（不是只有读数）');
+    assert(/function drive\(mut, restore\)/.test(selfSrc), 'Q5 C 段真定义了 drive() 并换掉函数外依赖');
+    const calls = (selfSrc.match(/const c[A-Z]\w* = drive\(/g) || []).length;
+    assert(calls >= 3, 'Q6 C 段至少驱动 3 个非出厂态（实 ' + calls + '）');
   }
   // 本版开工时先修掉的一处账坏：v2.262.0 的挂载块被插了两份，专锁在全量里跑两遍
   {

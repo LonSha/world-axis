@@ -41,8 +41,12 @@ const IB = WA.injectBudget, TB = WA.injectBudgetTables;
 
 a(!!TB && Object.keys(TB).sort().join(',') === 'ACCOUNTS_ROWS,COST_BANDS,PRIORITY',
   'A1 表文件载荷三件齐（' + (TB ? Object.keys(TB).length : 0) + ' 块）', TB && Object.keys(TB));
-a(Object.keys(IB.PRIORITY).length === 163 && TB.ACCOUNTS_ROWS.length === 163,
-  'A2 163 个源：PRIORITY ' + Object.keys(IB.PRIORITY).length + ' 键 / 科目行 ' + TB.ACCOUNTS_ROWS.length + ' 行');
+// v2.542.8 跟位：163 -> 164。v2.542.2（L1）把「本幕（场景意图）」作为第 164 个源
+//   加进 PRIORITY 与 ACCOUNTS_ROWS（块名/显示名/科目键三处同一个字符串），本锁钉的计数
+//   没跟位；全量回归此前每次都死在这一段之前，所以红了足足 20 多个版本没人看见。
+//   判据形态（键数 == 科目行数，且等于现场真值）未动。
+a(Object.keys(IB.PRIORITY).length === 164 && TB.ACCOUNTS_ROWS.length === 164,
+  'A2 164 个源：PRIORITY ' + Object.keys(IB.PRIORITY).length + ' 键 / 科目行 ' + TB.ACCOUNTS_ROWS.length + ' 行');
 const KEYS = ['AUTO_MAX', 'AUTO_MIN', 'AUTO_RATIO', 'DEFAULT_BUDGET', 'FOLD_FLOOR_TOKENS', 'MIN_KEEP_TOKENS',
   'PRIORITY', 'apply', 'autoBudget', 'budgetView', 'costOf', 'costView', 'explain', 'foldable',
   'incrementalCost', 'plan', 'rankOf', 'resolveBudget', 'resolveContextSize', 'summaryText',

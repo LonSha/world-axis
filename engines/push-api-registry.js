@@ -122,7 +122,22 @@
     { api: 'campaign.advance', cls: 'entry', driver: null,
       reason: '战役推进需在场场景（零参拒 no-scene），场景由剧情层开启后才轮得到推进' },
     { api: 'modelCatalog.refresh', cls: 'entry', driver: null,
-      reason: '模型清单刷新是异步网络口（refresh(spec) 返回 Promise），由设置面按需拉取，不进轮次' }
+      reason: '模型清单刷新是异步网络口（refresh(spec) 返回 Promise），由设置面按需拉取，不进轮次' },
+    // ── v2.542.8 补裁决（5 条）：第三批全量回归 C2 照出来的既存欠账 ──────────────
+    //   这 5 台在运行时存在推进类方法、产品面（engines/ core/ ui/ render/）逐文件搜
+    //   `WA.<ns>.<m>(` / `<ns>.<m>(` 零命中、且不归 l3Registry 也不归 roundDrivers 基线。
+    //   四台要业务对象（id/回执/地点），一台是读口（到期清单）——都不是 drive：
+    //   零参要么直接拒（missing-id / missing-place），要么只返回空清单。故逐台按 entry 裁决。
+    { api: 'offstageQueue.step', cls: 'entry', driver: null,
+      reason: '场外回执写一步需人物与动作（step({id,action,verdict,evidence})），零参拒 missing-id；回执只能由推演结算面按人给' },
+    { api: 'consequenceSchedule.due', cls: 'entry', driver: null,
+      reason: '到期清单是读面（due({atRound})）：只返回 items、不推进状态，需调用方给出轮次坐标；正文面走 buildBlock（render/inject 的 vis 分支），本口不参与正文注入' },
+    { api: 'consequenceSchedule.settle', cls: 'entry', driver: null,
+      reason: '后果结算需后果编号与证据（settle({id,evidence})），零参拒 missing-id、无证据拒 no-evidence；编号只能由后果面产生' },
+    { api: 'appointment.settle', cls: 'entry', driver: null,
+      reason: '承诺债结算需人物编号（settle({id,atRound,showUp})），零参拒 missing-id；到场与否是剧情判定，轮次造不出' },
+    { api: 'farAccount.tick', cls: 'entry', driver: null,
+      reason: '别处在走推进需地点与事件（tick({place,what})），零参拒 missing-place；地点必须已在世界表里登记' }
   ];
 
   const CLS = ['drive', 'entry', 'ui', 'dead'];

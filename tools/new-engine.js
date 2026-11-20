@@ -4,7 +4,7 @@
 // ── 它治什么（缺口，开工前先看现场）──────────────────────────────
 //   加一台引擎现在要改七个地方，七处分散在五个文件里，彼此没有交叉校验：
 //     四路**接线**：index.js `LOAD_ORDER` / tests/run.js `LOAD` /
-//                   engines/tool-diag.js `MODULE_EXPORTS` / engines/action-desk.js `ROUTES`
+//                   engines/tool-diag-tables.js `MODULE_EXPORTS` / engines/action-desk-routes.js `ROUTES`
 //     三处**登记**：core/store.js `defaultWorldState()`（骨架出生）/ `__BOUNDED_CAPS`（上界）/
 //                   core/evict.js `SITES`（驱逐）
 //   漏掉任何一处的表现都**不是报错**，而是「引擎在位、却谁也不认它」：
@@ -59,13 +59,13 @@ function sites(name, ns, ver) {
       must: file
     },
     {
-      id: 'wire:engines/tool-diag.js/MODULE_EXPORTS', file: 'engines/tool-diag.js',
+      id: 'wire:engines/tool-diag-tables.js/MODULE_EXPORTS', file: 'engines/tool-diag-tables.js',
       anchor: '  const MODULE_EXPORTS = {\n',
       insert: "    '" + file + "': '" + ns + "',   // " + ver + ": OPV29-25 脚手架生成\n",
       must: ns
     },
     {
-      id: 'wire:engines/action-desk.js/ROUTES', file: 'engines/action-desk.js',
+      id: 'wire:engines/action-desk-routes.js/ROUTES', file: 'engines/action-desk-routes.js',
       anchor: '  const ROUTES = {\n',
       insert: "    '" + ns + ".stat': function () {   // " + ver + ": OPV29-25 脚手架生成（只读路由，无副作用）\n"
         + "      if (WA." + ns + " && typeof WA." + ns + ".stat === 'function') return WA." + ns + ".stat();\n"

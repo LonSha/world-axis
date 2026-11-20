@@ -11,6 +11,11 @@ const assert = require('assert');
 
 const BASE = path.join(__dirname, '..');
 const ACTION_DESK_PATH = path.join(BASE, 'engines/action-desk.js');
+// v2.542.8：路由表已出闸到 engines/action-desk-routes.js（拆段），`'chapter.open': …` 这类
+//   路由登记现在只在 routes 文件里。判据问的是「产品里有没有这条路由」，不是「它写在哪个
+//   文件」—— 与 tests/diag-source.js 头注释同一条口径，故读合并面。
+//   （全量回归里 A1–A8 八条就是被这一处「读单文件」一次性点着的。）
+const ACTION_DESK_ROUTES_PATH = path.join(BASE, 'engines/action-desk-routes.js');
 
 // 破坏锚点（真源码单行变异，恰好 1 次命中）
 const ANCHOR_ROLLOVER = 'p.deferCount = (p.deferCount || 0) + 1;';
@@ -73,7 +78,8 @@ function runSuite() {
   }
 
   // ── 1. 静态契约检查 ──
-  const deskSrc = fs.readFileSync(ACTION_DESK_PATH, 'utf8');
+  const deskSrc = fs.readFileSync(ACTION_DESK_PATH, 'utf8')
+    + '\n' + fs.readFileSync(ACTION_DESK_ROUTES_PATH, 'utf8');
   a(deskSrc.indexOf("'chapter.open':") > 0, 'OPV4-8/A1: 包含 chapter.open 路由');
   a(deskSrc.indexOf("'chapter.flow':") > 0, 'OPV4-8/A2: 包含 chapter.flow 路由');
   a(deskSrc.indexOf("'chapter.rollover':") > 0, 'OPV4-8/A3: 包含 chapter.rollover 路由');

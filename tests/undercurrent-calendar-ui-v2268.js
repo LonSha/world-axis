@@ -13,6 +13,11 @@ const ENG_REL = 'engines/undercurrent-calendar.js';
 const PANEL_REL = 'ui/panel.js';
 const SET_REL = 'ui/settings.js';
 const DIAG_REL = 'engines/tool-diag.js';
+// v2.542.8：UI_BINDINGS 登记表在 v2.529.0 拆段时搬到 tool-diag-tables.js。D3/D4/D5 三条
+//   问的是「产品里有没有这条登记」，不是「它写在哪个文件」—— 故读合并面（与
+//   tests/diag-source.js 头注释同一条口径）。同样的病本仓已栽过多次，
+//   凡 `rd('engines/tool-diag.js')` 做「登记在不在」判定的地方都要走这条路。
+const TABLES_REL = 'engines/tool-diag-tables.js';
 const IDX_REL = 'index.js';
 const RUN_REL = 'tests/run.js';
 const SELF_REL = 'tests/undercurrent-calendar-ui-v2268.js';
@@ -62,7 +67,7 @@ function runAll(assertFn) {
   }
   const P = rd(PANEL_REL);
   const S = rd(SET_REL);
-  const D = rd(DIAG_REL);
+  const D = rd(DIAG_REL) + '\n' + rd(TABLES_REL);
   const I = rd(IDX_REL);
   const R = rd(RUN_REL);
   // ── A 概览页渲染成型 ──────────────────────────────────────────────────

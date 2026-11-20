@@ -31,6 +31,7 @@ const NAV_REL = 'ui/panel-nav.js';
 const PANEL_REL = 'ui/panel.js';
 const IDX_REL = 'index.js';
 const DIAG_REL = 'engines/tool-diag.js';
+const TABLES_REL = 'engines/tool-diag-tables.js';   // v2.542.6：MODULE_EXPORTS / OPTIONAL_EXPORTS 已搬此（v2.529.0 拆段）
 const SELF_REL = 'tests/ev6-panel-nav-v2209.js';
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function cnt(s, n) { return s.split(n).length - 1; }
@@ -54,7 +55,7 @@ const ANCHOR = {
   loadOrder: "    'ui/panel-nav.js',",
   modExports: "    'ui/panel-nav.js': 'panelNav',",
   optionalExports: "  const OPTIONAL_EXPORTS = ['ui', 'uiSettings', 'assistant', 'compat', 'renderPerf', 'panelNav',",
-  uiNs: "    const UI_NS2800 = ['ui', 'uiSettings', 'assistant', 'renderPerf',\n      // v2.209.0（优化 6）：ui/panel-nav.js 是**第五个 UI 层模块**。本名单与\n      //   tests/export-contract.js 的 OPTIONAL 有互相比较的判据（两处口径必须一致），\n      //   故两边同批加同一项。\n      'panelNav',",
+  uiNs: "    const UI_NS2800 = ['ui', 'uiSettings', 'assistant', 'renderPerf', 'schemaView',\n      // v2.209.0（优化 6）：ui/panel-nav.js 是**第五个 UI 层模块**。本名单与\n      //   tests/export-contract.js 的 OPTIONAL 有互相比较的判据（两处口径必须一致），\n      //   故两边同批加同一项。\n      'panelNav',",
   // 三处目标页锚点（定位能落地的另一半）
   memRec: "'chronicle:' + x.ref",
   worldRec: "'places:' + r.name",
@@ -69,7 +70,7 @@ Object.keys(ANCHOR).forEach(function (k) { TGT[k] = NAV_REL; });
 ['goPageDecl', 'badPage', 'genericBind', 'navBtnDecl', 'navAttrDecl',
   'memRec', 'worldRec', 'graphRec', 'hsBtn', 'tdBtn', 'graphBtn'].forEach(function (k) { TGT[k] = PANEL_REL; });
 TGT.loadOrder = IDX_REL;
-['modExports', 'optionalExports'].forEach(function (k) { TGT[k] = DIAG_REL; });
+['modExports', 'optionalExports'].forEach(function (k) { TGT[k] = TABLES_REL; });   // v2.542.6：锚点本体在 tables
 TGT.uiNs = 'tests/run.js';
 /** 协议导出面（逐字，跟实现走）。 */
 const EXPORTS = ['parse', 'attr', 'fromAttr', 'go', 'backTo', 'locate', 'grab', 'restore', 'stat', 'diagnose'];
@@ -95,7 +96,7 @@ function runAll(a) {
   // 宿主基础桩由 tests/ui-gate-sync.js 在装载期装好（第 15 行 require('./mock.js')）——
   //   锁里不再装第二遍：本锁不自己拼环境，装载面单一真源。
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
-  const NAV = rd(NAV_REL), P = rd(PANEL_REL), IDX = rd(IDX_REL), D = rd(DIAG_REL), SELF = rd(SELF_REL);
+  const NAV = rd(NAV_REL), P = rd(PANEL_REL), IDX = rd(IDX_REL), D = rd(DIAG_REL) + '\n' + rd(TABLES_REL), SELF = rd(SELF_REL);
   function env0(ov) { return gate.fresh(ov ? { srcOverride: ov } : {}); }
   function seed(WA, fn) { WA.store.init(); return WA.store.transact(fn, 'ev6:seed'); }
   // ════ A 段：静态契约 ════════════════════════════════════════════════
