@@ -334,6 +334,26 @@ async function main() {
     assert(bad.length === 0, '六页首屏都有非空结论卡且在细节之前（异常：' + (bad.join('；') || '无') + '）');
   }
 
+  // ── G17-L「豁免 ≠ 允许腐烂」：手动探针也要有人定期跑 ───────────────────────
+  //  v2.541.2 撞出来的洞：tests/probes/p_world_pulse.js 被 test-surface 登记成
+  //  「手动诊断入口，不占自动执行面」——登记的是事实，但事实的后果是**没人跑**。
+  //  它当时红着 4 条（比的是早已按「零消费能力当场删」删掉的逐案明细能力），
+  //  以及一条一直在拿 mock 自编字段（title）当真的机会段断言：面板读的
+  //  `v.title || ... || v.id` 在真引擎上永远落到 `op:promise:xxx` 句柄，
+  //  探针却因为 mock 里编了 title 而一直是绿的。判据的输入面窄于事实，就藏在这里。
+  //  所以这里用子进程跑它一次：豁免的是「不进自动面」，不是「允许烂掉」。
+  {
+    const { spawnSync } = require('child_process');
+    const probe = path.join(__dirname, 'probes', 'p_world_pulse.js');
+    const r = spawnSync(process.execPath, [probe], { encoding: 'utf8' });
+    const txt = String((r.stdout || '') + (r.stderr || ''));
+    const tail = txt.match(/===\s*PULSE PROBE:[^=]*===/);
+    const fails = (txt.match(/^FAIL .*$/gm) || []).map(function (s) { return s.slice(0, 90); });
+    assert(r.status === 0,
+      '世界脉搏探针必须全绿（实 ' + (tail ? tail[0].trim() : ('exit=' + r.status))
+      + (fails.length ? '；红：' + fails.join(' / ') : '') + '）');
+  }
+
 
   console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
   console.log('UI 渲染路径门禁：通过 ' + pass.length + ' / 失败 ' + fail.length);

@@ -43,10 +43,14 @@ const RUN_REL = 'tests/run.js';
 //   当前为空 —— 两个不可达者各自的入口都是自解释的（export-contract 由 run.js spawn、
 //   ui-gate 的案例已被内联），判据能自己认出来，不需要人工白名单。
 const EXEMPT = [
-  // v2.416.0（OPV24-9）：p_world_pulse 自 /home/user/probes/ 收编进仓库（22 断言，手动复跑）。
+  // v2.416.0（OPV24-9）：p_world_pulse 自 /home/user/probes/ 收编进仓库（26 断言，手动复跑）。
   //   探针的本质属性就是「手动诊断入口」，不该有也不需要有自动 spawn 入口 ——
   //   与豁免表头两条注释同口径：登记的是事实（探针不进自动面），不是放过缺陷。
-  { rel: 'tests/probes/p_world_pulse.js', why: 'OPV24-9 探针收编：手动诊断入口，22 断言可单独 node 复跑，不占自动执行面' },
+  //   ⚠ v2.541.3 补一句最要紧的：**豁免的后果是没人跑**。它当时红着 4 条
+  //   （比的是早已按「零消费能力当场删」删掉的逐案明细），且机会段断言一直拿
+  //   mock 自编的 title 当真字段。所以豁免照旧，但 ui-gate 末尾的 G17-L 会用子进程
+  //   跑它一次并把 exit code 变成门禁的一部分：豁免 ≠ 允许腐烂。
+  { rel: 'tests/probes/p_world_pulse.js', why: 'OPV24-9 探针收编：手动诊断入口，26 断言可单独 node 复跑，不占自动执行面；v2.541.3 起由 ui-gate G17-L 兜底跑，防「豁免⇒烂掉」' },
   // v2.518.0（故事优先纵向切片）：ruby-card-profile 是**外部验收卡的只读画像器**。
   //   它必须由人传 RUBY_CARD=<卡路径> 才能跑（卡是外部不可变输入，不进仓库、
   //   不进自动面）：缺路径即 exitCode=2。给它加自动 spawn 入口既无意义也会红。
