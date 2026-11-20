@@ -15,6 +15,11 @@ const ENG_SH = 'engines/save-health.js';
 const PANEL_REL = 'ui/panel.js';
 const SET_REL = 'ui/settings.js';
 const DIAG_REL = 'engines/tool-diag.js';
+// v2.541.4：面板绑定表（UI_BINDINGS）自 OPV29-07 起住在 engines/tool-diag-tables.js，
+//   tool-diag.js 只是消费方（表未装载时它直接抛「诊断表未装载」）。而 D3-D7 仍在
+//   tool-diag.js 里找 'wa-sh-*' ⇒ 恒红 5 条：判据读的文件不是事实所在的文件。
+//   D 保持指向 tool-diag.js（N4/N9 负控锚在它身上），另立 DT 指向表文件。
+const DIAG_TABLES_REL = 'engines/tool-diag-tables.js';
 const IDX_REL = 'index.js';
 const RUN_REL = 'tests/run.js';
 // v2.410.0（OPV22-4/OPV23-1 拆段遗留红·同族再添一笔）：面板源码面改走 tests/panel-source.js
@@ -72,6 +77,7 @@ function runAll(assertFn) {
   const P = rd(PANEL_REL);
   const S = rd(SET_REL);
   const D = rd(DIAG_REL);
+  const DT = rd(DIAG_TABLES_REL);
   const I = rd(IDX_REL);
   const R = rd(RUN_REL);
 
@@ -207,11 +213,11 @@ function runAll(assertFn) {
   const runRc = R.indexOf("'engines/round-cost.js'");
   const runCt = R.indexOf("'engines/capability-tier.js'");
   a(runSh > runRc && runSh < runCt, 'v2270ui/D2: run.js LOAD 中同序');
-  a(D.indexOf("'wa-sh-enable'") >= 0, 'v2270ui/D3: UI_BINDINGS 登记 wa-sh-enable');
-  a(D.indexOf("'wa-sh-forecaster'") >= 0, 'v2270ui/D4: UI_BINDINGS 登记 wa-sh-forecaster（跨引擎写最易静默失效）');
-  a(D.indexOf("'wa-sh-waterline'") >= 0, 'v2270ui/D5: UI_BINDINGS 登记 wa-sh-waterline');
-  a(D.indexOf("'wa-sh-warnv'") >= 0, 'v2270ui/D6: UI_BINDINGS 登记 wa-sh-warnv（滑块读数 span）');
-  a(D.indexOf("'wa-sh-urgentv'") >= 0, 'v2270ui/D7: UI_BINDINGS 登记 wa-sh-urgentv');
+  a(DT.indexOf("'wa-sh-enable'") >= 0, 'v2270ui/D3: UI_BINDINGS 登记 wa-sh-enable');
+  a(DT.indexOf("'wa-sh-forecaster'") >= 0, 'v2270ui/D4: UI_BINDINGS 登记 wa-sh-forecaster（跨引擎写最易静默失效）');
+  a(DT.indexOf("'wa-sh-waterline'") >= 0, 'v2270ui/D5: UI_BINDINGS 登记 wa-sh-waterline');
+  a(DT.indexOf("'wa-sh-warnv'") >= 0, 'v2270ui/D6: UI_BINDINGS 登记 wa-sh-warnv（滑块读数 span）');
+  a(DT.indexOf("'wa-sh-urgentv'") >= 0, 'v2270ui/D7: UI_BINDINGS 登记 wa-sh-urgentv');
 
   // ── N 锚点纯度 + 真破坏 + 两向自证 ────────────────────────────────────
   a(cnt(P, N_ANCHOR.blockDef) === 1, 'v2270ui/N1: blockDef 恰 1 次');

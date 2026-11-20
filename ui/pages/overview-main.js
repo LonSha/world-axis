@@ -417,9 +417,15 @@
         const rows = (r.advice || []).map(function (x) {
           return '<div class="wa-save-line wa-dim">· ' + esc(x.text) + '</div>';
         }).join('');
+        //  ⚠ v2.541.4：这里原来印 `存档体检 · ' + esc(r.state)`——`r.state` 是引擎枚举
+//  （disabled / no-data / healthy / watch / urgent），玩家面上读到的就是
+//  「存档体检 · healthy」，而下一行 `r.line` 又是引擎给的那句中文真源
+//  「存档体检：状况良好」。同一件事印两遍，一遍还是英文：
+//  这既是英文枚举外泄，也是「第二措辞真源」（引擎 line() 才是唯一表态者）。
+  //  改法不是给面板补一张 state→中文映射表（那等于再抄一份真源），而是**不印枚举**：
+  //  标题就用 r.line 那句（line() 的四种状态都以「存档体检：…」开头，含 disabled）。
         return '<div class="' + cls + '" id="wa-save-block">'
-          + '<div class="wa-save-line" style="font-weight:600;margin-bottom:3px;">存档体检 · ' + esc(r.state) + '</div>'
-          + '<div class="wa-save-line">' + esc(r.line) + '</div>'
+          + '<div class="wa-save-line" style="font-weight:600;margin-bottom:3px;">' + esc(r.line) + '</div>'
           + rows
           + (r.adviceTotal > (r.advice || []).length
             ? '<div class="wa-save-line wa-dim">另有 ' + esc(String(r.adviceTotal - r.advice.length)) + ' 条建议未列出</div>' : '')
