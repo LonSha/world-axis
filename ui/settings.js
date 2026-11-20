@@ -814,7 +814,33 @@
       const bO = bd('worldaxis_opinion_settings_v1');
       const bE = bd('worldaxis_evolution_settings_v1');
       const rng = (arr, fb) => Array.isArray(arr) ? arr : fb;
+      // v2.539.6（六页内容重写 · 设置页）：结论卡 —— 333 组开关不缺，缺的是「我在改什么、现在是哪一档」。
+      //   病（现场）：首屏是车道按钮 + 一整屏开关；玩家/制作者都得自己把「世界规模档位」
+      //   和「开发者模式」两处状态拼起来才敢动手。
+      //   取数只用本页已经读到的 WA.capabilityTier（view / getSettings）与 __dev，零新增读口、零新控件。
+      const __setVerdict = (function () {
+        let tv = null;
+        try { tv = (WA.capabilityTier && typeof WA.capabilityTier.view === 'function') ? WA.capabilityTier.view() : null; } catch (e) { tv = null; }
+        let granted = 0;
+        let depth = 0;
+        try {
+          const raw = (WA.capabilityTier && typeof WA.capabilityTier.getSettings === 'function') ? WA.capabilityTier.getSettings() : null;
+          granted = ((raw && raw.granted) || []).length;
+          depth = ((raw && raw.history) || []).length;
+        } catch (e) { /* 读配置失败不阻断渲染：下面只把它当附加读数 */ }
+        const TN = { lite: '轻', standard: '标准', full: '完整' };
+        const l1 = tv
+          ? ('现在这一档：' + (TN[tv.tier] || esc(tv.tier)) + '（手动按住 ' + granted + ' 台'
+            + (depth ? ('，还能退回 ' + depth + ' 步') : '，没有可退回的档') + '）')
+          : '现在这一档：档位引擎读不到（设置照样能改，只是「我按住了几台」这个数暂时没有）';
+        const l2 = '这一页在改什么：按 5 条车道分组 —— 世界怎么转 / 人怎么活 / 故事怎么讲 / 我有多少控制权 / 界面；点上面任一按钮只看那一条';
+        const l3 = '改动立即写盘并生效；改坏了用「世界规模」里的退回，或各段自己的「恢复默认」';
+        return '<div class="wa-verdict"><b>此刻</b><ul>'
+          + [l1, l2, l3].map(function (x) { return '<li>' + x + '</li>'; }).join('')
+          + '</ul></div>';
+      })();
       return `
+        ${__setVerdict}
         ${laneNavHtml()}
         ${tierBlockHtml()}
         <div class="wa-sec" data-wa-lane="ui" data-wa-sec="界面">界面</div>

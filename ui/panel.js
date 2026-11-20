@@ -3042,12 +3042,37 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         }
       } catch (e) { rows.push('缝合读数暂不可用（不影响 API 使用）'); }
       return rows.length
-        ? '<div class="wa-sec">运行体检（只读）</div><div class="wa-dim">'
-          + rows.map(function (r) { return '· ' + r; }).join('<br/>') + '</div>'
+        ? '<details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">'
+          + '<summary style="cursor:pointer;opacity:0.75;font-size:12px;">运行体检（只读 · 点开看三份读数）</summary>'
+          + '<div class="wa-dim">'
+          + rows.map(function (r) { return '· ' + r; }).join('<br/>') + '</div></details>'
         : '';
     })();
+    // v2.539.6（六页内容重写 · 连接页）：结论卡 —— 这一页回答「我的 AI 现在能不能用，用的是谁」。
+    //   病（现场）：首屏是「API通道（未配置的通道回落default）」+ 一堆 Base URL / Key 输入框，
+    //   玩家看到的是**单据**，不是状态；真正的三个问题（配好了吗 / 走哪条 / 出问题去哪看）都不在明处。
+    //   取数全部来自本函数已读到的 chs 与三个只读引擎，零新增读口、零新状态、零新控件。
+    const __cnVerdict = (function () {
+      const ready = chs.filter(function (c) { return !!(c.cfg && (c.cfg.baseUrl || c.cfg.apiKey)); });
+      const line1 = ready.length
+        ? ('能用：已配好 ' + ready.length + ' 个通道（' + ready.map(function (c) { return c.name; }).join(' / ') + '）')
+        : '还不能用：一个通道都没配 —— 发消息会失败，先在各行的 Base URL 与 Key 上填一条真能通的';
+      const pick = ready[0] || chs[0] || null;
+      const pcfg = (pick && pick.cfg) || {};
+      const line2 = pick
+        ? ('走哪条：' + pick.name + (pcfg.model ? (' · 模型 ' + esc(pcfg.model)) : ' · 模型名还空着（空着就只能靠服务端默认，出问题不好判断是谁的锅）'))
+        : '走哪条：还没有通道可选';
+      const q = WA.apiRouter.queueLength();
+      const line3 = '出问题去哪看：同时最多 ' + WA.apiRouter.getConcurrency() + ' 个请求'
+        + (q ? ('，当前排队 ' + q + ' 个') : '，当前没有排队')
+        + '；下面的「运行体检」折叠里有叙述镜片 / 回包守卫 / 渠道探针三份只读读数';
+      return '<div class="wa-verdict"><b>此刻</b><ul>'
+        + [line1, line2, line3].map(function (x) { return '<li>' + x + '</li>'; }).join('')
+        + '</ul></div>';
+    })();
     return `
-      <div class="wa-sec">API通道（未配置的通道回落default）</div>
+      ${__cnVerdict}
+      <div class="wa-sec">通道明细（一行一个通道：Base URL / Key / 模型）</div>
       ${chs.map(c => `
         <div class="wa-chan" data-chan="${c.name}">
           <div class="wa-chan-head"><b>${c.name}</b> ${c.cfg ? '<span class="wa-badge wa-on">已配置</span>' : '<span class="wa-badge">默认</span>'}</div>
