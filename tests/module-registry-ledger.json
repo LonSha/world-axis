@@ -1,14 +1,14 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 578,
+ "loadOrderCount": 579,
  "lazyCount": 22,
- "loadedCount": 576,
+ "loadedCount": 577,
  "uiCount": 2,
- "nsCount": 587,
+ "nsCount": 588,
  "totals": {
-  "loadEdges": 470,
+  "loadEdges": 472,
   "hardEdges": 0,
-  "callRefs": 761,
+  "callRefs": 763,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -183,6 +183,7 @@
     "engines/inject-budget-tables.js",
     "engines/inject-collector.js",
     "engines/inject-delta.js",
+    "engines/inject-tier.js",
     "engines/inject-value.js",
     "engines/inline-tags.js",
     "engines/inst.js",
@@ -554,6 +555,7 @@
     "engines/hearsay-ledger.js",
     "engines/human-realism.js",
     "engines/inject-delta.js",
+    "engines/inject-tier.js",
     "engines/institutional-schism.js",
     "engines/interlude.js",
     "engines/kaleidoscope.js",
@@ -766,6 +768,7 @@
     "engines/inject-budget-tables.js",
     "engines/inject-collector.js",
     "engines/inject-delta.js",
+    "engines/inject-tier.js",
     "engines/inject-value.js",
     "engines/inline-tags.js",
     "engines/inst.js",
@@ -3302,6 +3305,29 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_scene_intent_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/inject-tier.js": {
+   "ns": [
+    "injectTier"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_inject_tier_settings_v1"
    ],
    "consumedBy": []
   },

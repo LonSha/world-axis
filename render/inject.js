@@ -2007,6 +2007,19 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       // 仅当槽位路由成功接管后才从主块移除——保证任何降级路径都不丢注入
       ctxInj.forEach(function (i) { if (i && i.content) items.push(i); });
       // v0.9.3: 注入预算裁决（pinned 保底 / optional 先折叠后丢弃；0=不限）
+      // v2.542.3（叙事脊柱 L2）：分档**影子读数** —— 按文档 §5 的位置，必须在 plan 之前算；
+      //   但**不改** items / finalItems：与 injectDelta 同规，先有读数再改行为。
+      //   它自己零写入（观测只存内存），关掉时时零开销。
+      let tierShadow = null;
+      try {
+        if (WA.injectTier && typeof WA.injectTier.observe === 'function') {
+          tierShadow = WA.injectTier.observe(items);
+          if (tierShadow && tierShadow.ok) {
+            // 只在有可省字节时打一行，避免每轮刷屏；读数另有 injectTier.stat() 可取。
+            if (tierShadow.counts && tierShadow.counts.off) WA.log('info', '注入分档：' + WA.injectTier.summaryText(tierShadow));
+          }
+        }
+      } catch (e) { /* 读数失败不影响注入本身：账是旁证，不是通路 */ }
       let planInfo = null;
       let finalItems = items;
       try {
@@ -2021,6 +2034,8 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
           }
         }
       } catch (e) { WA.log('warn', '预算裁决失败，回退全量注入', e); planInfo = null; finalItems = items; }
+      // v2.542.3：分档读数挂在裁决结果上（与 planInfo.delta 同形，纯附加字段），供诊断节与测试读。
+      if (planInfo && tierShadow) planInfo.tier = tierShadow;
       // v2.524.0 OPV27-9：信息增量账——只读注面，逐源「唯一片段 / 总片段 / 与谁重复」。
       //   刻意**不改** finalItems：去重会改正文，属产品行为变更，须先有读数作依据；
       //   保留哪一份是优先级决定（世界状态块 > 叙事摘要 > 舆情），不是片段字符串能定的。

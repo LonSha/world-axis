@@ -6898,6 +6898,38 @@
       "tref": 2,
       "own": 3
     },
+    "injectTier.classify": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/inject-tier.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "injectTier.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/inject-tier.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "injectTier.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/inject-tier.js",
+      "refs": 0,
+      "tref": 10,
+      "own": 1
+    },
+    "injectTier.stat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/inject-tier.js",
+      "refs": 0,
+      "tref": 2,
+      "own": 1
+    },
     "inlineTags.normalizeDate": {
       "reason": "self-only",
       "detail": "engines/inline-tags.js 内部自用、外部零引用（过度导出）",
@@ -12522,14 +12554,6 @@
       "tref": 0,
       "own": 3
     },
-    "sceneIntent.compose": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/scene-intent.js",
-      "refs": 0,
-      "tref": 9,
-      "own": 4
-    },
     "sceneIntent.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -16326,6 +16350,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 781
+    "dataOnly": 782
   }
 }

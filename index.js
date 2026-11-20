@@ -575,6 +575,10 @@
     // v2.542.2：叙事脊柱 L1「本幕」。须早于 render/inject.js（注入时读 sceneIntent.buildBlock()），
     //   且此刻读的 director / plotGauge / store 都已在装载面里；它自己不写世界。
     'engines/scene-intent.js',
+    // v2.542.3：叙事脊柱 L2「注入分档」（影子）。须早于 render/inject.js（applyInjections 里在 plan
+    //   之前调 observe）；此刻它读的 sceneNarrative / sceneIntent / injectBudgetTables 都已在装载面里，
+    //   它自己零写入（观测只存内存）。
+    'engines/inject-tier.js',
     'engines/epoch-tide.js',
     'engines/moral-dilemma.js',
     'engines/perception-manipulation.js',

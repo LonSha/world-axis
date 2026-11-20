@@ -94,7 +94,7 @@ const SEG_TITLE = 'engines/tool-diag v0.9.2';
 //     section 数不变 ⇒ 本常量不再动。这正是 B1 与 B2 的分工：B1 数节，B2 数断言。
 //     出处（同 countCalls 口径逐 commit 实测，git worktree 各挂一棵只读树）：
 //       56f5199 / 22f7ca5：446  →  ae7ba1c / 5012162 / 9c10dce：446  →  HEAD(352e252)：447
-const BASE_SECTION_CC = 448;  // v2.542.2 +1（叙事脊柱 L1 专锁 tests/scene-intent-v2542.js 一节，节头在 run.js）· v2.542.2 +1（叙事脊柱 L1 专锁 tests/scene-intent-v2542.js 一节，节头在 run.js）· v2.518.0 +1（story-window 专锁节（run.js），段体未拆动）；拆前 run.js 的 section( 计数（去注释面）（extractJson 专锁节 + memory-age 专锁节）；拆前 run.js 的 section( 计数（去注释面）
+const BASE_SECTION_CC = 449;  // v2.542.3 +1（叙事脊柱 L2 专锁 tests/inject-tier-v2543.js 一节）· v2.542.2 +1（叙事脊柱 L1 专锁 tests/scene-intent-v2542.js 一节，节头在 run.js）· v2.542.2 +1（叙事脊柱 L1 专锁 tests/scene-intent-v2542.js 一节，节头在 run.js）· v2.518.0 +1（story-window 专锁节（run.js），段体未拆动）；拆前 run.js 的 section( 计数（去注释面）（extractJson 专锁节 + memory-age 专锁节）；拆前 run.js 的 section( 计数（去注释面）
 //   v2.518.0：5263 → 5267（+4）。逐条来历（全部是**运行器侧的断言**，无一条是段体变动）：
 //     +3  story-window 三把专锁的 spawnSync 收尾断言（v2.518.0 节：focused / integration / people）
 //     +1  story-window evidence 专锁的 spawnSync 收尾断言（同节内追加）
@@ -109,7 +109,7 @@ const BASE_SECTION_CC = 448;  // v2.542.2 +1（叙事脊柱 L1 专锁 tests/scen
 //     「名单对了、但放行的其实是死代码」会长得像绿 —— 这正是本仓反复治的「判据宽于事实」。
 //     ⚠ 口径未变：B1 仍 5263（节数没动，只在这一节里加了一条断言）。
 //       两条基线各自独立的意义就在于「加节」与「加断言」必须分开记。
-const BASE_ASSERT_CC = 5270;  // v2.542.2 +1（L1 专锁的 assert 面；主 run.js 只加节头与一行 runScript 挂载）· v2.542.2 +1（L1 专锁的 assert 面；主 run.js 只加节头与一行 runScript 挂载）· v2.541.7 +1（v2107 零引用判据拆成「名单」+「非死文件」两条）· v2.542.0 +1（UI 移植：v2109/a11y 补「自挂载名单独成组」一条非空断言）；拆前 run.js 的 assert( 计数（去注释面）
+const BASE_ASSERT_CC = 5271;  // v2.542.3 +1（L2 专锁的 assert 面；主 run.js 只加节头与一行 runScript 挂载）· v2.542.2 +1（L1 专锁的 assert 面；主 run.js 只加节头与一行 runScript 挂载）· v2.542.2 +1（L1 专锁的 assert 面；主 run.js 只加节头与一行 runScript 挂载）· v2.541.7 +1（v2107 零引用判据拆成「名单」+「非死文件」两条）· v2.542.0 +1（UI 移植：v2109/a11y 补「自挂载名单独成组」一条非空断言）；拆前 run.js 的 assert( 计数（去注释面）
 // 测试文件面的绝对基线。它**刻意不是**「动态算出来再跟自己比」——那会变成自证空转。
 //   但它是「会长的集合」：每新增一把锁，这个数就必须跟着改一次。本轮 V22 已改三次：
 //     539（拆前）→ 541（+段文件 tests/segments/tool-diag-v092.js +本锁）
@@ -162,7 +162,7 @@ const BASE_ASSERT_CC = 5270;  // v2.542.2 +1（L1 专锁的 assert 面；主 run
 //     为什么仍然不用「>= 564」了事：下界判据对「面塌了」是瞎的（见上段原文）。代价是每加一把锁
 //     就要动这个常量 —— 而那正是它的价值：动它的人必须亲手确认「我确实新增了一个测试文件」。
 // v2.539.3：+1 tests/tpl-comment-gate.js（玩家六页真渲染的“不许出现源码注释”门禁，已挂 runScript）。
-const BASE_TEST_FILES = 634;   // v2.542.2：+1 tests/scene-intent-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）· v2.542.2：+1 tests/scene-intent-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）· v2.532~533（OPV30-R4/R5）：+2 tests/opv30-r4-arc-guide-v2532.js / opv30-r5-save-audit-v2533.js   // v2.531.0（OPV30-R3 收口）：+1 tests/budget-source.js（inject-budget 的合并面读数器，拆段后遗症的共享解法）   // v2.531.0（OPV30-R3）：+1 tests/opv30-r3-write-rehearsal-v2531.js（文件在 + 已挂 runScript 段，两件同时成立才计数）  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1 · 本轮 +1（tests/backstage-source.js：backstage 声明面的合并读数器））。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
+const BASE_TEST_FILES = 635;   // v2.542.3：+1 tests/inject-tier-v2543.js（文件在 + 已挂 run.js 的 runScript 段）· v2.542.2：+1 tests/scene-intent-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）· v2.542.2：+1 tests/scene-intent-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）· v2.532~533（OPV30-R4/R5）：+2 tests/opv30-r4-arc-guide-v2532.js / opv30-r5-save-audit-v2533.js   // v2.531.0（OPV30-R3 收口）：+1 tests/budget-source.js（inject-budget 的合并面读数器，拆段后遗症的共享解法）   // v2.531.0（OPV30-R3）：+1 tests/opv30-r3-write-rehearsal-v2531.js（文件在 + 已挂 runScript 段，两件同时成立才计数）  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1 · 本轮 +1（tests/backstage-source.js：backstage 声明面的合并读数器））。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
 //   v2.529.0：591→592（+1 tests/opv29-z5-26-v2529.js —— OPV29-26 登记一致性校验 40 项；文件在 + 已挂进 run.js 的 LOAD 段，两件同时成立才计数）。
 //   v2.529.0：592→593（+1 tests/opv29-z6-33-v2529.js —— OPV29-33 密钥扫描扩面 28 项；同上口径）。
 //   v2.529.0：593→594（+1 tests/opv29-z5-28-v2529.js —— OPV29-28 计划台账自动汇总 41 项；同上口径）。

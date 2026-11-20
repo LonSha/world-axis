@@ -853,7 +853,7 @@
     'engines/director.js': 'director',
     // v2.542.2：叙事脊柱 L1「本幕」。必载（在 index.js 的 LOAD_ORDER 里）——
     //   缺席的表现是「注入里没有本幕这一项」，不是降级行，故按必载登记。
-    'engines/scene-intent.js': 'sceneIntent',
+    'engines/scene-intent.js': 'sceneIntent', 'engines/inject-tier.js': 'injectTier',
     'engines/branch-continuity.js': 'branchContinuity',
     'engines/fact-continuity.js': 'factContinuity',
     // v2.409.0：跨参照物缝合批三个引擎。ns 名取自各文件 `WA.<ns> = {`。
