@@ -176,6 +176,58 @@
       + '<p>人物会在故事推进后出现在这里。</p>'
       + '</section>';
   }
+  /** 结论卡（v2.539.9 · 六页内容重写 · 人物页）：这一页的 ask 是「这个人为什么这样对我」。 */
+  //  病（现场）：首屏是 hero（「故事里的人」+一句泛泛文案）接一叠人物卡。每张卡里关系三档
+  //    很细，但**页面从不回答「谁最不一样」「他在追什么」** —— 玩家要逐卡读、逐项比，
+  //    才能自己拼出「为什么这样对我」。
+  //  修法：三句，只用本文件已读的 store.people（零新增读口、零新增模块依赖）：
+  //    ① 在册几个人、其中几个留下了印象
+  //    ② 离你最近的是谁 —— 按 affinity 取最大，档位措辞复用本文件的 affinityText（不另编）
+  //    ③ 他在追什么 —— `people[].intent` 就是「人物在追什么」，口径见
+  //       engines/intake-dispatch.js 第 28 行逐字：`people[].intent → life.addGoal(name,{text})`；
+  //       眼下在做的是 `action`。两个字段都在 store 里，不需要再引一个引擎。
+  //  ── 为什么不用 plan.chain()：它的 blockedBy 是**结构体**（{kind:'need'|'prereq',…}），
+  //     要在页面上说出来就得再抄一遍 chainBlock 的映射 = 第二个措辞真源。
+  //     intent/action 一句话说得清，就不去引它。
+  //  边界（与本文件同规）：`intent` 为空写「还没写下他在追什么」（这是**事实**），
+  //    绝不写成「读不到」；引擎缺席才是「读不到」。两种形态不许同形。
+  function verdictBlock(people, keys) {
+    const rows = keys.map(function (k) { return people[k]; })
+      .filter(function (p) { return p && typeof p === 'object'; });
+    if (!rows.length) return '';   // 空态由 empty() 独家负责，不给玩家两套「还没有遇见谁」
+    const lines = [];
+    const withTag = rows.filter(function (p) { return Array.isArray(p.tags) && p.tags.length; }).length;
+    lines.push('在册 ' + rows.length + ' 人'
+      + (withTag ? ('，其中 ' + withTag + ' 人已经留下了印象') : '，都还没有留下印象'));
+    // ② 离你最近的那个：affinity 是数才参与比较，NaN/缺字段一律不掺进来（不拿 0 冒充读数）
+    const rated = rows.filter(function (p) {
+      return !!p.name && isFinite(Number(p.affinity));
+    }).map(function (p) { return { name: String(p.name), aff: Number(p.affinity) }; });
+    rated.sort(function (a, b) { return b.aff - a.aff; });
+    const main = rated[0] || null;
+    lines.push(main
+      ? ('离你最近的是「' + main.name + '」—— ' + (affinityText(main.aff) || ('关系读数 ' + main.aff)))
+      : '还没有谁的亲疏读数成形（你们大概还没真正打过交道）');
+    // ③ 他在追什么 + 眼下在做什么
+    const who = main
+      ? (rows.filter(function (p) { return String(p.name || '') === main.name; })[0] || null)
+      : (rows[0] || null);
+    if (!who) {
+      lines.push('他在追什么：还没有可读的人物');
+    } else {
+      const nm = who.name || '这一位';
+      const goal = (typeof who.intent === 'string' ? who.intent.trim() : '');
+      const doing = (typeof who.action === 'string' ? who.action.trim() : '');
+      lines.push(goal
+        ? ('他在追什么：「' + nm + '」正在追「' + goal + '」' + (doing ? '，眼下在做「' + doing + '」' : ''))
+        : ('他在追什么：还没写下「' + nm + '」在追什么'
+          + (doing ? ('（眼下在做「' + doing + '」）') : '') + ' —— 这不是「他没有打算」'));
+    }
+    return '<div class="wa-verdict"><b>此刻</b><ul>'
+      + lines.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('')
+      + '</ul></div>';
+  }
+
   function render() {
     const s = store();
     const people = s && s.people && typeof s.people === 'object' ? s.people : {};
@@ -201,6 +253,9 @@
     return '<div class="wa-people-player">'
       + '<header class="wa-people-hero"><div class="wa-people-kicker">人物</div>'
       + '<h2>故事里的人</h2><p>他们如何靠近你，取决于你们一起经历过什么。</p></header>'
+      // 结论卡排在卡片墙之前：玩家先知道「谁最不一样、他在追什么」，才去看逐张卡
+      //   （顺序反了等于把结论压在细节后面）。空态时不渲染 —— 那一屏由 empty() 独家回答。
+      + (cards ? verdictBlock(people, keys) : '')
       + (cards || empty())
       + renderClues()
       + (hasNetwork ? '<details class="wa-details wa-people-network"><summary>关系正在发生变化</summary><div class="wa-people-network-body">'
