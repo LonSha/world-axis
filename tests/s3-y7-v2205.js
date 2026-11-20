@@ -37,6 +37,7 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
+const TABLES_REL = 'engines/tool-diag-tables.js';   // v2.542.6：登记表已搬此（判据读合并面，砸境锤点指向真宿主）
 const ENG_REL = 'engines/world-graph.js';
 const SET_REL = 'ui/settings.js';
 const SELF_REL = 'tests/s3-y7-v2205.js';
@@ -93,7 +94,7 @@ const ANCHOR = {
   swReg: "      'wa-sw-worldgraph',"
 };
 const TGT = { page: PANEL_REL, renderer: PANEL_REL, out: PANEL_REL, outSel: PANEL_REL, cfg: PANEL_REL,
-  guard: DIAG_REL, swLine: SET_REL, swReg: DIAG_REL,
+  guard: TABLES_REL, swLine: SET_REL, swReg: TABLES_REL,
   kinds: ENG_REL, edgeKinds: ENG_REL, caps: ENG_REL, lskey: ENG_REL, badKind: ENG_REL,
   badEdgeKind: ENG_REL, orphanKeep: ENG_REL, truncNodes: ENG_REL, locateLabel: ENG_REL,
   zeroNote: ENG_REL, factBasis: ENG_REL, degByLabel: ENG_REL, exportsFace: ENG_REL };
@@ -127,7 +128,7 @@ function runAll(a) {
   require(path.join(BASE, 'tests/mock.js'));
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
   const LS = global.localStorage;
-  const P = rd(PANEL_REL), D = rd(DIAG_REL), E = rd(ENG_REL), T = rd(SET_REL), SELF = rd(SELF_REL);
+  const P = rd(PANEL_REL), D = (rd(DIAG_REL) + '\n' + rd(TABLES_REL)), E = rd(ENG_REL), T = rd(SET_REL), SELF = rd(SELF_REL);
   function env0(ov) { return gate.fresh(ov ? { srcOverride: ov } : {}); }
   function seed(WA, fn) { WA.store.init(); return WA.store.transact(fn, 'y7:seed'); }
   /**
@@ -183,7 +184,9 @@ function runAll(a) {
   (function () {
     const iF = P.indexOf("{ id: 'find', icon:'🔍', label: '检索' },".replace("icon:", "icon: "));
     const iG = P.indexOf(ANCHOR.page);
-    const iE = P.indexOf("{ id: 'events', icon: '⚡', label: '事件' },");
+    // v2.542.6 跟位：events 页此后多了 ask 字段（页面首发提示），原锚点带尾 ` },` 就不再匹配。
+    //   判据语义是「页序」，只该钉到 id/icon/label 三件为止。
+    const iE = P.indexOf("{ id: 'events', icon: '⚡', label: '事件'");
     a(iF > 0 && iG > iF && iE > iG, 'y7v2205/A2f: 页序为 find → graph → events（实 ' + iF + ' / ' + iG + ' / ' + iE + '）');
   })();
   a(P.indexOf(ANCHOR.renderer) >= 0, 'y7v2205/A2c: RENDERERS 里有 graph → renderGraphCenter（页表与渲染器成对）');

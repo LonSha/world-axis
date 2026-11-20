@@ -39,6 +39,18 @@ function rd(rel, ov) {
   if (ov && ov[rel] !== undefined) return ov[rel];
   return fs.readFileSync(path.join(BASE, rel), 'utf8');
 }
+/** v2.542.6：tool-diag 的登记表已搬到 tool-diag-tables.js（v2.529.0 拆段）。
+ *  本判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」——故读合并面
+ *  （与 tests/diag-source.js 同口径）；ov 破坏覆盖仍只作用于 tool-diag.js 本身。 */
+function rdDiag(ov) {
+  return rdDiag(ov) + '\n' + rd('engines/tool-diag-tables.js', ov);
+}
+/** v2.542.6：tool-diag 的登记表已搬到 tool-diag-tables.js（v2.529.0 拆段）。
+ *  本判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」——故读合并面
+ *  （与 tests/diag-source.js 同口径）；ov 破坏覆盖仍只作用于 tool-diag.js 本身。 */
+function rdDiag(ov) {
+  return rd('engines/tool-diag.js', ov) + '\n' + rd('engines/tool-diag-tables.js', ov);
+}
 function cnt(s, n) { return s.split(n).length - 1; }
 // ── 破坏锚点（各恰 1 次，A6 逐键核）──
 const ANCHOR = {
@@ -91,10 +103,10 @@ async function runAll(a, ov) {
   a(fs.existsSync(path.join(BASE, TR)), 'A1: 引擎落到仓库里');
   a(rd('tests/run.js', ov).indexOf("'engines/training.js'") > 0, 'A2: tests/run.js LOAD 已挂（否则 WA.training 缺席、判据静默降级）');
   a(rd('index.js', ov).indexOf("'engines/training.js'") > 0, 'A2b: index.js LOAD_ORDER 已挂（否则真宿主不装它）');
-  a(rd('engines/tool-diag.js', ov).indexOf("'engines/training.js': 'training'") > 0,
+  a(rdDiag(ov).indexOf("'engines/training.js': 'training'") > 0,
     'A3: tool-diag 声明表已登记（漏登记 ⇒ inventory 定义面与诊断面上该模块不存在）');
-  a(rd('engines/tool-diag.js', ov).indexOf('training: secTraining()') > 0
-    && rd('engines/tool-diag.js', ov).indexOf('function secTraining()') > 0,
+  a(rdDiag(ov).indexOf('training: secTraining()') > 0
+    && rdDiag(ov).indexOf('function secTraining()') > 0,
     'A3b: 诊断面单列一节（与 life / plan 分列：那两节答「他打算做什么」，本节答「他已经会了什么」）');
   (function () {
     const st = rd('core/store.js', ov);
@@ -108,8 +120,8 @@ async function runAll(a, ov) {
     a(cnt(P, 'id="wa-tr-enabled"') === 1, 'A5: 面板渲染了能力成长段（实 ' + cnt(P, 'id="wa-tr-enabled"') + ' 处）');
     a(cnt(P, "on('#wa-tr-practice'") === 1 && cnt(P, "on('#wa-tr-cancel'") === 1,
       'A5b: 练一次 / 取消一次各恰 1 处绑定');
-    a(rd('engines/tool-diag.js', ov).indexOf("'wa-tr-practice'") > 0
-      && rd('engines/tool-diag.js', ov).indexOf("'wa-tr-out'") > 0,
+    a(rdDiag(ov).indexOf("'wa-tr-practice'") > 0
+      && rdDiag(ov).indexOf("'wa-tr-out'") > 0,
       'A5c: 守卫表登记了本段控件（渲染 + 绑定 + 守卫三件齐做）');
   })();
   const badA = Object.keys(ANCHOR).filter(function (k) { return cnt(rd(ANCHOR[k].rel, ov), ANCHOR[k].txt) !== 1; });

@@ -83,7 +83,7 @@ function runAll(assertFn) {
   };
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
   const SELF = rd(SELF_REL);
-  const P = rd(PANEL_REL), S = rd(SET_REL), D = rd(DIAG_REL);
+  const P = rd(PANEL_REL), S = rd(SET_REL), D = rd(DIAG_REL) + '\n' + rd('engines/tool-diag-tables.js');   // 登记表已搬 tables（v2.529.0）
   function freshEnv(ov) {
     try { if (global.localStorage && global.localStorage.clear) global.localStorage.clear(); } catch (e) {}
     const env = gate.fresh(ov ? { srcOverride: ov } : {});

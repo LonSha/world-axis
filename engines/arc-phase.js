@@ -38,7 +38,8 @@
   const DEF = { enabled: false, windowRounds: 5, abandonAfter: 3, crisisScore: 75, setupScore: 35, fallback: 15 };
   const __REG = { key: LS_KEY, def: DEF, module: 'arcPhase' };
   if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  const REC_PATH = 'sceneIntent.records';
+  // 站点名必须是**字面量**：evict 的站点扫描器按字面认调用点，写成常量时它读成「零调用」
+  //   （v2.542.6 全量回归照出的「零调用：sceneIntent.records」正是这个）。容量声明仍在 store/evict 两侧。
   const CAP_RECORDS = 20;
   const __stat = { phases: 0, settles: 0, fulfilled: 0, debts: 0, abandoned: 0, lastPhase: '', lastAt: 0, faults: {} };
   // 弧线峰与章节锚点只存内存（重建会话即归零，与「章节开始时归零」同义）。
@@ -46,6 +47,9 @@
   let __chapter = null;   // 上一次看到的章节标识
 
   function fault(face, e) { __stat.faults[face] = String((e && e.message) || e).slice(0, 120); }
+  // G20 口径：唯一墙钟读取点。守卫 fallback 必须与本行共现（同一行有 WA.clock. 才算「守卫」），
+  //   写成多行会让它被归为裸调。
+  function clockNow(site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } }
   function settings() {
     if (!WA.settingsBus) return Object.assign({}, DEF);
     try { return WA.settingsBus.normalize(__REG, Object.assign({}, DEF, WA.settingsBus.read(__REG) || {})); }
@@ -103,7 +107,7 @@
     else if (rising) ph = 'rising';
     else if (score < cfg.setupScore) ph = 'setup';
     else ph = 'holding';
-    __stat.phases += 1; __stat.lastPhase = ph; __stat.lastAt = Date.now();
+    __stat.phases += 1; __stat.lastPhase = ph; __stat.lastAt = clockNow('arc-phase.phase');
     return {
       ok: true, phase: ph, score: score, band: t.band || '',
       rising: rising, fellFromPeak: __peak ? (__peak.score - score) : null,
@@ -211,10 +215,10 @@
           change: { axis: entry.change.axis || '', target: String(entry.change.target || ''), why: String(entry.change.why || '').slice(0, 80) },
           callback: entry.callback ? { id: String(entry.callback.id || ''), text: String(entry.callback.text || '').slice(0, 40) } : null,
           watch: entry.watch ? { kind: entry.watch.kind, axis: entry.change.axis || '', target: String(entry.change.target || ''), value: entry.watch.value } : null,
-          at: Date.now()
+          at: clockNow('arc-phase.record')
         });
         if (typeof WA.evict === 'object' && WA.evict && typeof WA.evict.array === 'function') {
-          WA.evict.array(d.sceneIntent.records, REC_PATH, CAP_RECORDS);
+          WA.evict.array(d.sceneIntent.records, 'sceneIntent.records', CAP_RECORDS);
         } else if (d.sceneIntent.records.length > CAP_RECORDS) {
           d.sceneIntent.records = d.sceneIntent.records.slice(-CAP_RECORDS);
         }

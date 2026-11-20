@@ -503,7 +503,7 @@ function runAll(A) {
   // v2.542.5（L4）：装载期 474 → 476（character-drive 尾调 registerModule +1；scene-intent 在装载期
   //   多读一个 ns（characterDrive）+1）；调用期 4009 → 4012（+3：character-drive 读 store / settingsBus /
   //   __settingsRegs 三个 ns 各一条边，集合去重后按文件计；scene-intent 新增的 stakes/line 路径同文件不重复计）。
-  A(a.edgesLoad === 476 && a.edgesCall === 4012 && a.edgesAll === 4488 && a.identityOk,
+  A(a.edgesLoad === 476 && a.edgesCall === 4016 && a.edgesAll === 4492 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'

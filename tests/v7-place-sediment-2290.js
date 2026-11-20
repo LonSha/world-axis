@@ -25,7 +25,10 @@ const DIAG = 'engines/tool-diag.js';
 const PANEL = 'ui/panel.js';
 const RUN = 'tests/run.js';
 const SED_SRC = fs.readFileSync(path.join(BASE, SED), 'utf8');
-const DIAG_SRC = fs.readFileSync(path.join(BASE, DIAG), 'utf8');
+// v2.542.6：tool-diag 的登记表已搬到 tool-diag-tables.js（v2.529.0 拆段）。A6/A7 这类判据问的是
+//   「产品里有没有这条登记」，不是「它写在哪个文件」——故读合并面（与 tests/diag-source.js 同口径）。
+const DIAG_SRC = fs.readFileSync(path.join(BASE, DIAG), 'utf8')
+  + '\n' + fs.readFileSync(path.join(BASE, 'engines/tool-diag-tables.js'), 'utf8');
 const PANEL_SRC = fs.readFileSync(path.join(BASE, PANEL), 'utf8');
 const RUN_SRC = fs.readFileSync(path.join(BASE, RUN), 'utf8');
 let pass = 0, fail = 0;

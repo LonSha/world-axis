@@ -58,6 +58,9 @@ function runAll(assertFn) {
   }
   const S = rd(SET_REL);
   const D = rd(DIAG_REL);
+  const DT = D + '\n' + rd('engines/tool-diag-tables.js');
+  // v2.542.6：守卫表（UI_BINDINGS）已搬到 tool-diag-tables.js（v2.529.0 拆段），
+  //   DT = 声明面 + 表面的合并面；D 仍是原文件本体（下方「原文件未被改动」的自证继续用它）。
   const I = rd(IDX_REL);
   const R = rd(RUN_REL);
 
@@ -167,9 +170,9 @@ function runAll(assertFn) {
   const runFr = R.indexOf("'engines/first-run.js'");
   const runCt = R.indexOf("'engines/capability-tier.js'");
   a(runHp > runFr && runHp < runCt, 'v2273ui/D2: run.js LOAD 中同序');
-  a(D.indexOf("'wa-hp-enable'") >= 0, 'v2273ui/D3: UI_BINDINGS 登记 wa-hp-enable');
-  a(D.indexOf("'wa-hp-pack'") >= 0, 'v2273ui/D4: UI_BINDINGS 登记 wa-hp-pack');
-  a(D.indexOf("'wa-hp-restore'") >= 0, 'v2273ui/D5: UI_BINDINGS 登记 wa-hp-restore');
+  a(DT.indexOf("'wa-hp-enable'") >= 0, 'v2273ui/D3: UI_BINDINGS 登记 wa-hp-enable');
+  a(DT.indexOf("'wa-hp-pack'") >= 0, 'v2273ui/D4: UI_BINDINGS 登记 wa-hp-pack');
+  a(DT.indexOf("'wa-hp-restore'") >= 0, 'v2273ui/D5: UI_BINDINGS 登记 wa-hp-restore');
 
   // ── N 锚点纯度 + 真破坏 + 两向自证 ────────────────────────────────────
   a(cnt(S, N_ANCHOR.saveCall) === 1, 'v2273ui/N1: saveCall 恰 1 次');

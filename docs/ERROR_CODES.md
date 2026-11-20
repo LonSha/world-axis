@@ -3,13 +3,13 @@
 > 台账 version：`2.524.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **1906** 个内联拒收码：见证 917 / 死表 52 / 基线 937
+共 **1915** 个内联拒收码：见证 926 / 死表 52 / 基线 937
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
 **基线**=存量未分类（新增未分类码即红灯）。
 
-## 见证（可执行）（917）
+## 见证（可执行）（926）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -60,6 +60,7 @@
 | `anchored` | engines/vitals.js | vitals.sweep：首次见到世界钟 ⇒ 只记锚点、不追溯推进（不猜之前过了多久） |
 | `anchors-full` | engines/offline-tick.js | offlineTick.anchor：活动锚达到配置上限后拒收新锚（v2.151.0 RX2） |
 | `anonymous` | core/permissions.js | permissions.adopt：匿名即**收回**闸门当前使用者（退到未启用态），不是登记一个「什么都不许的座」（X6） |
+| `apply-not-implemented` | engines/inject-tier.js | 注入分档：mode=apply 本版未实现 ⇒ 明说拒绝（不静默当 shadow 跑） |
 | `apply-throw` | engines/offline-tick.js | offlineTick.tick：逐轮推演回调异常如实记入故障读数（v2.151.0 RX2） |
 | `archive-failed` | engines/events.js | EXV8-3 排期兑现：归档写口**当场抛错** ⇒ 该笔如实记 archive-failed（不吞成兑现成功，整批其余行照常） |
 | `archive-tail-unavailable` | engines/player-archive.js | V9 real owner rejection: archive-tail-unavailable |
@@ -247,7 +248,7 @@
 | `debts-throw` | ui/panel.js | panel：欠账读数抛错 ⇒ 回执如实报 debts-throw（B5） |
 | `deferred-full` | core/commit.js | commit.defer：单链副作用登记数达 LIMITS.DEFERRED ⇒ 拒收并给出 pending —— 无上限的待办列表等于把「事务后要做什么」变成不可预期的长尾 |
 | `digest-unavailable` | engines/action-desk-routes.js | action-desk 路由「digest.generate」在 owner digest 缺席时如实归因 digest-unavailable |
-| `disabled` | engines/act-step.js, engines/act.js, engines/action-cost-feedback.js, engines/action-desk.js, engines/action-methods.js, engines/activity.js, engines/advance-idempotence.js, engines/affect.js, engines/affection-dual-axis.js, engines/aftermath.js, engines/agency.js, engines/agenda.js, engines/anniversary-rites.js, engines/appearance.js, engines/appointment.js, engines/archive-hide.js, engines/atlas.js, engines/bathhouse-laundry.js, engines/beast-bond.js, engines/beat-ledger.js, engines/beat-mask.js, engines/beat-report.js, engines/betrothal-alliance.js, engines/binding.js, engines/bloodline-heritage.js, engines/body-anatomy.js, engines/bonds.js, engines/branch-continuity.js, engines/branch-diff.js, engines/branch-transplant.js, engines/branch-tree.js, engines/bridge.js, engines/calendar-custom.js, engines/calendar.js, engines/call-timeline.js, engines/campaign.js, engines/capacity-audit.js, engines/cartography-survey.js, engines/cataclysm-hazard.js, engines/causal.js, engines/celestial-omens.js, engines/checkpoints.js, engines/choice-board.js, engines/chronicle-view.js, engines/chrono.js, engines/cognitive-poisoning.js, engines/collab.js, engines/collateral-rupture.js, engines/commission.js, engines/consequence-schedule.js, engines/contraband.js, engines/coop.js, engines/coordinate.js, engines/counterfactual-echo.js, engines/courier-dispatch.js, engines/covert-espionage.js, engines/credit-ledger.js, engines/day-route.js, engines/degrade-audit.js, engines/dep-check.js, engines/dice-den.js, engines/difficulty.js, engines/dilemma-bargain.js, engines/director.js, engines/dormant-ladder.js, engines/dungeon-hazard-mesh.js, engines/eccentric-threads.js, engines/eco-audit.js, engines/economy.js, engines/ecosystem-cascade.js, engines/engineering-blueprint.js, engines/enigma.js, engines/ensemble.js, engines/environment-interference.js, engines/epidemic-contagion.js, engines/epochal-transition.js, engines/era-cycle.js, engines/events.js, engines/fact-continuity.js, engines/faction-graph.js, engines/faction-schism.js, engines/family.js, engines/far-account.js, engines/farfield.js, engines/first-run.js, engines/followup-gate.js, engines/fondness.js, engines/foreshadow-germination.js, engines/foreshadow.js, engines/freight.js, engines/gauge.js, engines/handoff-pack.js, engines/hazard.js, engines/hearsay-ledger.js, engines/history-batch-read.js, engines/history-provenance.js, engines/horizon.js, engines/idiosyncrasy.js, engines/incarceration-jailbreak.js, engines/inject-delta.js, engines/inject-value.js, engines/inst.js, engines/institutional-schism.js, engines/intake-dispatch.js, engines/intel.js, engines/intent-board.js, engines/interlude.js, engines/investigation.js, engines/karma.js, engines/labor-schedule.js, engines/ladder.js, engines/letter-post.js, engines/levy-corvee.js, engines/liaison.js, engines/life-profile.js, engines/life.js, engines/lifeline.js, engines/lingua-broker.js, engines/living-world.js, engines/lost-and-found.js, engines/marginal.js, engines/masks.js, engines/mend.js, engines/military-levy.js, engines/misbelief.js, engines/model-catalog.js, engines/model-pin.js, engines/model-receipt.js, engines/mood-glide.js, engines/mortuary-rites.js, engines/motif.js, engines/narrative-deduction.js, engines/narrative-dice.js, engines/narrow-consumers.js, engines/noesis.js, engines/nursing-care.js, engines/observation-projection.js, engines/offline-return.js, engines/offline-tick.js, engines/offstage-life.js, engines/offstage-queue.js, engines/one-shot-mod.js, engines/operations.js, engines/opportunity.js, engines/outsider-integration.js, engines/parallel-events.js, engines/parallel-world.js, engines/pending-center.js, engines/perf-baseline.js, engines/perf-ledger.js, engines/persona-anchor.js, engines/perspective-lock.js, engines/phone-bridge.js, engines/pilgrim-flow.js, engines/plan-audit.js, engines/plan.js, engines/playable-seed.js, engines/player-archive.js, engines/player-knowledge.js, engines/playtime.js, engines/plot-gauge.js, engines/polish.js, engines/populate.js, engines/postal-relay.js, engines/power-anchor.js, engines/preset-world.js, engines/probe.js, engines/quota.js, engines/reading-bookmark.js, engines/regiment-tactics.js, engines/region.js, engines/rehearsal.js, engines/rehearse.js, engines/relation-temp.js, engines/request-viewer.js, engines/research-closure.js, engines/research.js, engines/rewriter.js, engines/rhythm-loop.js, engines/rivalry.js, engines/round-cost.js, engines/round-drivers.js, engines/rule-pack.js, engines/rumor-cognition.js, engines/rumor.js, engines/sanctuary-scramble.js, engines/sartorial-regalia.js, engines/save-curve.js, engines/save-health.js, engines/save-throttle.js, engines/scene-budget.js, engines/scene-slice.js, engines/sediment.js, engines/session.js, engines/sim-rehearsal.js, engines/source-hints.js, engines/spotlight.js, engines/stage-presence.js, engines/stage.js, engines/stale-guard.js, engines/storage-forecast.js, engines/story-choice.js, engines/story-loop.js, engines/story-tone.js, engines/story-window.js, engines/storyclock.js, engines/storyline-advance.js, engines/summarizer-adapter.js, engines/supply-choke.js, engines/surgical-triage.js, engines/survival.js, engines/suspense-ledger.js, engines/takeover-yield.js, engines/tape-store.js, engines/temperament.js, engines/tempo.js, engines/temporal-lock.js, engines/tenancy-rent.js, engines/terrain-hazard.js, engines/theology-cult.js, engines/thread-sprout.js, engines/time-ledger.js, engines/token-budget.js, engines/tolerance.js, engines/trace-post.js, engines/undercurrent-calendar.js, engines/userlock.js, engines/warrant.js, engines/wb-inject.js, engines/weather.js, engines/whisper-backchannel.js, engines/world-autobiography.js, engines/world-blueprint.js, engines/world-bridge.js, engines/world-diary.js, engines/world-graph.js, engines/world-health.js, engines/world-lab.js, engines/world-seed.js, engines/world.js, ui/render-perf.js | EXP-7：公共活动模块关着 ⇒ 一律如实报 disabled（不排期、不结算、不注入） |
+| `disabled` | engines/act-step.js, engines/act.js, engines/action-cost-feedback.js, engines/action-desk.js, engines/action-methods.js, engines/activity.js, engines/advance-idempotence.js, engines/affect.js, engines/affection-dual-axis.js, engines/aftermath.js, engines/agency.js, engines/agenda.js, engines/anniversary-rites.js, engines/appearance.js, engines/appointment.js, engines/arc-phase.js, engines/archive-hide.js, engines/atlas.js, engines/bathhouse-laundry.js, engines/beast-bond.js, engines/beat-ledger.js, engines/beat-mask.js, engines/beat-report.js, engines/betrothal-alliance.js, engines/binding.js, engines/bloodline-heritage.js, engines/body-anatomy.js, engines/bonds.js, engines/branch-continuity.js, engines/branch-diff.js, engines/branch-transplant.js, engines/branch-tree.js, engines/bridge.js, engines/calendar-custom.js, engines/calendar.js, engines/call-timeline.js, engines/campaign.js, engines/capacity-audit.js, engines/cartography-survey.js, engines/cataclysm-hazard.js, engines/causal.js, engines/celestial-omens.js, engines/character-drive.js, engines/checkpoints.js, engines/choice-board.js, engines/chronicle-view.js, engines/chrono.js, engines/cognitive-poisoning.js, engines/collab.js, engines/collateral-rupture.js, engines/commission.js, engines/consequence-schedule.js, engines/contraband.js, engines/coop.js, engines/coordinate.js, engines/counterfactual-echo.js, engines/courier-dispatch.js, engines/covert-espionage.js, engines/credit-ledger.js, engines/day-route.js, engines/degrade-audit.js, engines/dep-check.js, engines/dice-den.js, engines/difficulty.js, engines/dilemma-bargain.js, engines/director.js, engines/dormant-ladder.js, engines/dungeon-hazard-mesh.js, engines/eccentric-threads.js, engines/eco-audit.js, engines/economy.js, engines/ecosystem-cascade.js, engines/engineering-blueprint.js, engines/enigma.js, engines/ensemble.js, engines/environment-interference.js, engines/epidemic-contagion.js, engines/epochal-transition.js, engines/era-cycle.js, engines/events.js, engines/fact-continuity.js, engines/faction-graph.js, engines/faction-schism.js, engines/family.js, engines/far-account.js, engines/farfield.js, engines/first-run.js, engines/followup-gate.js, engines/fondness.js, engines/foreshadow-germination.js, engines/foreshadow.js, engines/freight.js, engines/gauge.js, engines/handoff-pack.js, engines/hazard.js, engines/hearsay-ledger.js, engines/history-batch-read.js, engines/history-provenance.js, engines/horizon.js, engines/idiosyncrasy.js, engines/incarceration-jailbreak.js, engines/inject-delta.js, engines/inject-tier.js, engines/inject-value.js, engines/inst.js, engines/institutional-schism.js, engines/intake-dispatch.js, engines/intel.js, engines/intent-board.js, engines/interlude.js, engines/investigation.js, engines/karma.js, engines/labor-schedule.js, engines/ladder.js, engines/letter-post.js, engines/levy-corvee.js, engines/liaison.js, engines/life-profile.js, engines/life.js, engines/lifeline.js, engines/lingua-broker.js, engines/living-world.js, engines/lost-and-found.js, engines/marginal.js, engines/masks.js, engines/mend.js, engines/military-levy.js, engines/misbelief.js, engines/model-catalog.js, engines/model-pin.js, engines/model-receipt.js, engines/mood-glide.js, engines/mortuary-rites.js, engines/motif.js, engines/narrative-deduction.js, engines/narrative-dice.js, engines/narrow-consumers.js, engines/noesis.js, engines/nursing-care.js, engines/observation-projection.js, engines/offline-return.js, engines/offline-tick.js, engines/offstage-life.js, engines/offstage-queue.js, engines/one-shot-mod.js, engines/operations.js, engines/opportunity.js, engines/outsider-integration.js, engines/parallel-events.js, engines/parallel-world.js, engines/pending-center.js, engines/perf-baseline.js, engines/perf-ledger.js, engines/persona-anchor.js, engines/perspective-lock.js, engines/phone-bridge.js, engines/pilgrim-flow.js, engines/plan-audit.js, engines/plan.js, engines/playable-seed.js, engines/player-archive.js, engines/player-knowledge.js, engines/playtime.js, engines/plot-gauge.js, engines/polish.js, engines/populate.js, engines/postal-relay.js, engines/power-anchor.js, engines/preset-world.js, engines/probe.js, engines/quota.js, engines/reading-bookmark.js, engines/regiment-tactics.js, engines/region.js, engines/rehearsal.js, engines/rehearse.js, engines/relation-temp.js, engines/request-viewer.js, engines/research-closure.js, engines/research.js, engines/rewriter.js, engines/rhythm-loop.js, engines/rivalry.js, engines/round-cost.js, engines/round-drivers.js, engines/rule-pack.js, engines/rumor-cognition.js, engines/rumor.js, engines/sanctuary-scramble.js, engines/sartorial-regalia.js, engines/save-curve.js, engines/save-health.js, engines/save-throttle.js, engines/scene-budget.js, engines/scene-intent.js, engines/scene-slice.js, engines/sediment.js, engines/session.js, engines/sim-rehearsal.js, engines/source-hints.js, engines/spotlight.js, engines/stage-presence.js, engines/stage.js, engines/stale-guard.js, engines/storage-forecast.js, engines/story-choice.js, engines/story-loop.js, engines/story-tone.js, engines/story-window.js, engines/storyclock.js, engines/storyline-advance.js, engines/summarizer-adapter.js, engines/supply-choke.js, engines/surgical-triage.js, engines/survival.js, engines/suspense-ledger.js, engines/takeover-yield.js, engines/tape-store.js, engines/temperament.js, engines/tempo.js, engines/temporal-lock.js, engines/tenancy-rent.js, engines/terrain-hazard.js, engines/theology-cult.js, engines/thread-sprout.js, engines/time-ledger.js, engines/token-budget.js, engines/tolerance.js, engines/trace-post.js, engines/undercurrent-calendar.js, engines/userlock.js, engines/warrant.js, engines/wb-inject.js, engines/weather.js, engines/whisper-backchannel.js, engines/world-autobiography.js, engines/world-blueprint.js, engines/world-bridge.js, engines/world-diary.js, engines/world-graph.js, engines/world-health.js, engines/world-lab.js, engines/world-seed.js, engines/world.js, ui/render-perf.js | EXP-7：公共活动模块关着 ⇒ 一律如实报 disabled（不排期、不结算、不注入） |
 | `distorted` | engines/noesis.js | noesis.fidelity：此人接到的是**被改写过的版本** ⇒ 答 faithful:false + distorted 并带出 drift（「他记岔了」与「他不该知道」是两回事：一个更正记录，一个拦住发言） |
 | `div-zero` | engines/kaleidoscope.js | formula 除以 0 |
 | `dnd` | engines/followup-gate.js | followupGate：全局免打扰开着时 due 一律 dnd（时段与已提醒都不再判） |
@@ -276,6 +277,7 @@
 | `empty-pool` | engines/weighted-draw.js | weightedDraw：空池或非数组 ⇒ empty-pool |
 | `empty-post` | engines/inst.js | inst.vacate：这个职位本来就没人占 ⇒ 没有可离任的人（拓展④） |
 | `empty-query` | engines/settings-index.js | V27 OPV27-6：设置搜索词为空 ⇒ empty-query（不把空串当成「全部命中」） |
+| `empty-scene` | engines/inject-tier.js | 注入分档：场景实体一个都取不到 ⇒ 点名（不得在空场景上假装有焦点） |
 | `empty-seed` | engines/world-seed.js | worldSeed.importPack：四结构面（势力 / 节点 / 地名 / 时代标题）全空 ⇒ 拒收 empty-seed（空种子播出来的是空世界，与「还没开局」在读数上不可分） |
 | `empty-signature` | engines/scene-budget.js | sceneBudget：签名为空 ⇒ empty-signature，且 advance=true（照常往下走） |
 | `empty-snapshot` | engines/world-snapshot.js | Y5：点名要导的面一个都不在场 ⇒ empty-snapshot 并逐项报缺席面 |
@@ -480,6 +482,7 @@
 | `no-active-goal` | engines/agency.js | agency：无目标人物返回 no-active-goal（TX2） |
 | `no-actor` | engines/opportunity.js | opportunity.respond：take 必须点名谁来接（接了却没人做 = 悬空行）（B6） |
 | `no-aftermath` | engines/gen-gate.js | B1：上一章还没有收尾时刻 ⇒ 拒收（不把「没有那一刻」当成「已经等了很久」，那会让它当场放行） |
+| `no-agenda` | engines/scene-intent.js | 本幕：排期 / 延后 / 超编三档都空 ⇒ 如实报没有议程（不编一条出来） |
 | `no-anchor` | engines/persona-anchor.js | PA：未登记锚点的人做正文审查 ⇒ no-anchor（放行但说明依据是「没锚」） |
 | `no-anchor-registered` | engines/persona-anchor.js | PA：未登记锚点的人做转变判定 ⇒ no-anchor-registered（不猜性格） |
 | `no-audit` | engines/save-curve.js | V27 OPV27-3：store 没有 sizeAudit 读口 ⇒ 如实 no-audit（不报一份 0B 的假曲线） |
@@ -509,6 +512,7 @@
 | `no-evidence` | engines/act-step.js, engines/consequence-schedule.js, engines/elapsed-evidence.js, engines/misbelief.js | 时间证据：模型声称时长却没有给出证据原文 ⇒ 拒收（不是补默认值） |
 | `no-factions` | engines/faction-graph.js | factionGraph.buildGraph 世界无势力 ⇒ no-factions（v2.139.0 E9 新增） |
 | `no-far` | engines/farfield.js | farfield.tick：没有登记远方地区时不虚构脉搏（v2.151.0 RX3） |
+| `no-field` | engines/character-drive.js | 人物驱动力：画像没有 intent / 边界 ⇒ 逐项点名 no-field（fear 更没有） |
 | `no-goal` | engines/act.js, engines/liaison.js | act.admit：目标被撤销 ⇒ 挂在它下面的行动不得照常开工（B1） |
 | `no-grounds` | engines/ruling.js | EXP-6：证据不足不能定罪 ⇒ 如实报 no-grounds（**「他在通缉名单上」是一条记录，不是一个证据** —— 不能仅凭通缉分值定罪） |
 | `no-history` | core/audit-log.js, engines/canon.js, engines/capability-tier.js, engines/rule-pack.js | canon.position：大纲已采纳但世界侧还没历史 ⇒ 照实说「还没得对」（不编读数，v2.100.0） |
@@ -517,6 +521,7 @@
 | `no-judge` | engines/recipe.js | OPT-8：配方未声明判定面 ⇒ 如实报 no-judge（不回落成旧六属性 —— 同理） |
 | `no-lab` | engines/world-lab.js | E9：没跑过实验时读口报 no-lab（不用空数组/空对象冒充「什么都没有」） |
 | `no-legends` | engines/world-bridge.js | worldBridge.importLegends：legends 是空数组 ⇒ no-legends（来源真的什么都没传） |
+| `no-line` | engines/character-drive.js | 底线判据：画像没有底线 ⇒ 如实报 no-line（不把“想活”当底线） |
 | `no-loader-state` | index.js | Q1:loadRetry 在装载面状态**整体缺席**时如实拒收(不假装重试过) |
 | `no-mark` | engines/dream-settle.js | dreamSettle：印记串被清空 ⇒ stamp 报 no-mark（不凭空造一个标记） |
 | `no-migration` | engines/checkpoints.js, engines/dep-check.js | 信封版本更旧但没有登记对应迁移步骤（不猜） |
@@ -567,6 +572,7 @@
 | `no-such-case` | engines/ruling.js | EXP-6：这桩案子不在台账里（id 对不上）⇒ 如实报 no-such-case（不新建一案去满足调用）—— 与 case-closed 分列：一个「没这案」、一个「这案已结」 |
 | `no-such-experience` | engines/shadow.js | shadow.stanceOf：查无此事 ⇒ 不回落成「没看法」（B4） |
 | `no-such-group` | engines/settings-index.js | V27 OPV27-6：entry() 查未登记组 ⇒ no-such-group（不返回一个空组糊过去） |
+| `no-such-person` | engines/character-drive.js | 人物驱动力：查的人不在册 ⇒ 如实报 no-such-person（不凭空造一个） |
 | `no-such-project` | engines/org.js, engines/research.js | org.deliverToProject：项目不存在 ⇒ 拒收（不新建一个空项目兜住）（B5） |
 | `no-such-scene` | engines/contest.js | EXP-5：这张对抗场景不在台账里（id 对不上）⇒ 如实报 no-such-scene（不新建一场去满足调用）—— 与 scene-closed 分列：一个「没这场」、一个「这场不再收指令」 |
 | `no-such-spot` | engines/survey.js | EXP-4：这个世界没有声明过这个可勘察点 ⇒ 如实报 no-such-spot（本模块不发明地点，只声明「这个地点上有可勘察的东西」）—— 与 unknown-place 分列：一个是「没声明勘察点」、一个是「地点本身不存在」 |
@@ -575,6 +581,8 @@
 | `no-support` | engines/body-anatomy.js | 无足站不住 ⇒ no-support（腿数为 0 不许登记） |
 | `no-tape` | core/rand.js | tapeVol 在本侧无卷（无从调用的在卷、也没有留存卷）时如实拒答（v2.98.0 P2） |
 | `no-templates` | engines/rule-pack.js | E7：模板表为空 ⇒ no-templates（不是「跑了 0 条 = 成功」） |
+| `no-tension` | engines/arc-phase.js | 弧线：张力算不出 ⇒ ok:false + no-tension（不猜一个段位） |
+| `no-text` | engines/character-drive.js | 底线判据：文本为空 ⇒ no-text（空文本永不命中） |
 | `no-trace` | engines/causal.js | traceGraph 查无此事实如实拒答（v2.147.0 W1） |
 | `no-usable-keys` | engines/rule-pack.js | E7：导入的键在本侧一个都不认识 ⇒ 不写任何东西并如实点名 |
 | `no-view` | engines/shadow.js | shadow.stanceOf：认知不对称 ⇒ 客观行为在案而此人没有看法（B4） |
@@ -582,6 +590,7 @@
 | `noesis-threw` | engines/evidence-board.js | N4：玩家图谱问知情面时抛错 ⇒ 行上如实记 noesis-threw（「问不出来」与「不知道」必须分得开） |
 | `non-finite` | core/input-guard.js | 输入边界：NaN/±Infinity 不得被升格成字面量（v2.84.0 新增） |
 | `non-monotonic` | engines/storage-forecast.js | storageForecast.sample：本轮次不大于已入环的末次轮 ⇒ 拒收（序列无序即趋势无意义）（RP5） |
+| `none-developing` | engines/scene-intent.js | 本幕：伏笔表在、但没有 developing 的一条 ⇒ 点名（不当成“有回收”） |
 | `not-a-function` | core/fault-context.js, core/sandbox.js | faultContext.wrap：第二参数不是函数 ⇒ 如实拒收（不是「没抛所以成功」，v2.110.0） |
 | `not-a-number` | engines/kaleidoscope.js | 非数值参与算术 / map 输入非数 |
 | `not-a-party` | engines/mend.js, engines/shadow.js | shadow.recordExperience：写了不在场的当事人 ⇒ 拒收（认知不能凭空产生）（B4） |
@@ -739,7 +748,7 @@
 | `sandbox-failed` | engines/rehearsal.js, engines/world-lab.js | rehearsal.run：隔离快照建不起来 ⇒ 不拿真世界试演（宁可拒收）（B7） |
 | `sandbox-throw` | core/sandbox.js | sandbox.run：脚本自己抛错 ⇒ 吞成 sandbox-throw（沙箱口不许把调用方搞挂；与「Access denied」分列——前者是脚本坏了，后者是边界挡下了，v2.114.0） |
 | `sandbox-timeout` | core/sandbox.js | sandbox.run：同步体跑过 timeoutMs ⇒ sandbox-timeout（超时是读数不是崩：仍把已完成的返回值带出供调用方判，v2.114.0） |
-| `save-failed` | engines/branch-continuity.js, engines/director.js, engines/fact-continuity.js, engines/gen-timing.js, engines/mood-glide.js, engines/one-shot-mod.js, engines/output-guard.js, engines/reading-bookmark.js, engines/summarizer-adapter.js | oneShotMod：总线写盘抛错 ⇒ save-failed 并带出原文（不吞成「成功」） |
+| `save-failed` | engines/arc-phase.js, engines/branch-continuity.js, engines/character-drive.js, engines/director.js, engines/fact-continuity.js, engines/gen-timing.js, engines/inject-tier.js, engines/mood-glide.js, engines/one-shot-mod.js, engines/output-guard.js, engines/reading-bookmark.js, engines/scene-intent.js, engines/summarizer-adapter.js | oneShotMod：总线写盘抛错 ⇒ save-failed 并带出原文（不吞成「成功」） |
 | `save-threw` | engines/capability-tier.js, engines/rule-pack.js, engines/theme.js | E7：设置写路径抛出 ⇒ 如实报 save-threw（不静默当成功） |
 | `scene-closed` | engines/contest.js | EXP-5：这场对抗已经收口（已收口 / 已撤退）⇒ 如实报 scene-closed（不再动它）—— 与 no-such-scene 分列 |
 | `scenes-full` | engines/contest.js | EXP-5：场景行到上限 ⇒ 如实报 scenes-full（不静默挤掉已开的场） |
@@ -755,7 +764,7 @@
 | `self-cause` | engines/intel.js | addLink cause === effect |
 | `self-origin` | engines/world-bridge.js | worldBridge.importLegends：本世界自己的包回灌 ⇒ 硬拒收（「拒收」退化成「导入 0 条」，就与「别处刚好传了空的」长得一样） |
 | `self-parent` | engines/world.js | 地点不得以自己为父级（v2.85.0 B2） |
-| `settings-bus-absent` | engines/branch-continuity.js, engines/director.js, engines/fact-continuity.js, engines/reading-bookmark.js, engines/rule-pack.js, engines/summarizer-adapter.js | E7：切换包时发现写入口缺席 ⇒ 不逐键半写，先整体拒收 |
+| `settings-bus-absent` | engines/arc-phase.js, engines/branch-continuity.js, engines/character-drive.js, engines/director.js, engines/fact-continuity.js, engines/inject-tier.js, engines/reading-bookmark.js, engines/rule-pack.js, engines/scene-intent.js, engines/summarizer-adapter.js | E7：切换包时发现写入口缺席 ⇒ 不逐键半写，先整体拒收 |
 | `settle-failed` | core/commit.js, engines/agency.js | commit.settle：事务外补记回执时写盘失败 ⇒ 拒收 settle-failed（如实报「补账没成功」，不粉饰成 ok） |
 | `settle-not-here` | engines/liaison.js | liaison.advance：终档不许从推进面走 ⇒ 结算只有一个出口（拓展⑧） |
 | `settled` | engines/consequence-schedule.js | V28 EXV28-21：到点且条件满足、带证据才结算 ⇒ settled |
@@ -810,7 +819,7 @@
 | `theme-refused` | engines/recipe.js | recipe.apply：题材被真源拒收 ⇒ 不留半截配方名（B6） |
 | `theme-throw` | engines/recipe.js | recipe.apply：题材侧抛错 ⇒ 归因带进 themeReason，不冒充「题材不支持」（B6） |
 | `threshold-unmet` | engines/stage.js | stage.transit：门槛未达 ⇒ 带出还差多少，不硬换阶段（拓展⑦） |
-| `threw` | engines/kaleidoscope.js, engines/posthumous.js, engines/rule-pack.js, engines/tool-diag.js, engines/world-graph.js, engines/world-lab.js, engines/write-desk.js, ui/panel.js | setDerive 内部抛出 |
+| `threw` | engines/kaleidoscope.js, engines/posthumous.js, engines/rule-pack.js, engines/scene-intent.js, engines/tool-diag.js, engines/world-graph.js, engines/world-lab.js, engines/write-desk.js, ui/panel.js | setDerive 内部抛出 |
 | `time-conflict` | engines/life.js | addSchedule 与已有活动重叠 |
 | `too-deep` | engines/chrono.js, actors/registry.js | registry.bindAlias：链深超过 8 跳当场拒收（往表里放一条永远解析不出来的登记 = 在账上打个死结，v2.97.0 O9） |
 | `too-early` | engines/freight.js, engines/letter-post.js, engines/region.js, engines/thread-sprout.js | V28 EXV28-23：没到期就去催 ⇒ too-early（提前打招呼不算催收） |
@@ -926,7 +935,7 @@
 | `window-too-short` | engines/plan.js, engines/world.js | world.canBeAt：窗口容不下这件事 ⇒ 报短多少，不硬塞（B2） |
 | `world-missing` | engines/act.js, engines/action-desk-routes.js, engines/intel.js, engines/weather.js | travelOf 在 world 未装载时 |
 | `worn-out` | engines/gear.js | EXP-2：这一件已耗尽 ⇒ 如实报 worn-out（不静默当一次成功使用）—— 与「没持有」分列：一个要修、一个要拿回来 |
-| `write-failed` | core/settings-bus.js, engines/appointment.js, engines/checkpoints.js, engines/consequence-schedule.js, engines/floor-settle.js, engines/gen-gate.js, engines/interlude.js, engines/letter-post.js, engines/life.js, engines/playtime.js, engines/preset-world.js, engines/relation-graph.js, engines/rule-pack.js, engines/thread-sprout.js, engines/wb-inject.js, engines/world-snapshot.js | life.tick：游标落盘时 setItem 抛错 ⇒ 吞成 write-failed 并如实进返回值（不假装落盘成功，也不让异常穿出去把调用方搞挂；v2.132.0 O19） |
+| `write-failed` | core/settings-bus.js, engines/appointment.js, engines/arc-phase.js, engines/checkpoints.js, engines/consequence-schedule.js, engines/floor-settle.js, engines/gen-gate.js, engines/interlude.js, engines/letter-post.js, engines/life.js, engines/playtime.js, engines/preset-world.js, engines/relation-graph.js, engines/rule-pack.js, engines/thread-sprout.js, engines/wb-inject.js, engines/world-snapshot.js | life.tick：游标落盘时 setItem 抛错 ⇒ 吞成 write-failed 并如实进返回值（不假装落盘成功，也不让异常穿出去把调用方搞挂；v2.132.0 O19） |
 | `write-threw` | engines/populate.js | EXV7-9：写口抛错由 safe() 吞住并逐笔记 write-threw（整批不中断，也不吞成「播种成功」） |
 | `writes-absent` | engines/populate.js | EXV7-9：写口缺席（摘掉 world.addRoad）⇒ writes-absent 且 missing 点名 addRoad（拒绝在半套写面上播种） |
 | `wrongs-full` | engines/probe.js | probe.wrong：误指留痕达上限 ⇒ 不静默丢弃（查错人也要留下痕迹）（拓展⑤） |
@@ -992,7 +1001,7 @@
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
-| `absent` | core/settings-bus.js, core/store.js, core/unified-pending.js, engines/wb-inject.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `absent` | core/settings-bus.js, core/store.js, core/unified-pending.js, engines/inject-tier.js, engines/scene-intent.js, engines/wb-inject.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `actFromScene-missing` | ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `actionCostFeedback-unavailable` | engines/action-desk-routes.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `activeScenes-full` | engines/spatial-topology.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -1536,7 +1545,7 @@
 | `no-cache` | engines/model-catalog.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-candidates` | engines/identity-match.js, engines/opinion.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-capacity` | engines/survival.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
-| `no-change` | engines/branch-diff.js, engines/floor-settle.js, engines/shadow.js, actors/registry.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-change` | engines/arc-phase.js, engines/branch-diff.js, engines/floor-settle.js, engines/shadow.js, actors/registry.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-channel` | engines/ensemble.js, engines/opinion.js, engines/polish.js, engines/rewriter.js, actors/profile.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-characters` | engines/offstage-life.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-chat` | core/settle-guard.js, engines/chatcache.js, engines/choice-board.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -1557,7 +1566,7 @@
 | `no-idle-characters` | engines/spotlight.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-infection-source` | engines/epidemic-contagion.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-input-el` | engines/choice-board.js, render/theater.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
-| `no-items` | engines/channel-probe.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-items` | engines/channel-probe.js, engines/inject-tier.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-knowledge-or-skill` | engines/tech-lineage.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-merit` | engines/karma.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-message` | engines/choice-board.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -1588,7 +1597,7 @@
 | `nodeList-must-be-array` | engines/spatial-topology.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `nodes-full` | engines/spatial-topology.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `non-positive-delta` | engines/fondness.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
-| `none` | engines/commission.js, engines/operations.js, engines/parallel-world.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `none` | engines/commission.js, engines/inject-tier.js, engines/operations.js, engines/parallel-world.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `not-a-participant` | engines/shared-awareness.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `not-a-practitioner` | engines/tech-lineage.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `not-approved-by-inst` | engines/custom-lax.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |

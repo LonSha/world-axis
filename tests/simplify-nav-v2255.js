@@ -71,7 +71,9 @@ const A_CATALL = "        currentCat = 'all';";
 // ⑨ WA.ui 导出口（读口）
 const A_EXPORT = '    devMode() { return __devMode === true; },';
 // ⑩ 页签文案（纯展示层，id 不动）
-const A_LABEL = "    { id: 'connect', icon: '🔌', label: 'API' },";
+// v2.542.6 跟位：connect 页此后多了 ask 字段，原锚点带尾 ` },` 就命中 0 次（负控制前提失效）。
+//   判据语义是「这是那一行页签」，故只钉到 id/icon/label 三件为止。
+const A_LABEL = "    { id: 'connect', icon: '🔌', label: 'API'";
 // ⑪ 设置页开关（render 出 HTML）
 const A_SETID = 'id="wa-set-devmode"';
 // ⑫ 设置页绑定（onchange 挂事件）
@@ -127,7 +129,7 @@ function allPages(env) {
 function runA(a) {
   const P = rd(PANEL);
   const S = rd(SET);
-  const D = rd(DIAG);
+  const D = rd(DIAG) + '\n' + rd('engines/tool-diag-tables.js');   // v2.542.6：登记表已搬 tables，判据读合并面
   // A1 十三个破坏锚点各恰中 1 次（负控制的前提）
   must1(P, A_PLAYER, 'A1 玩家页清单');
   must1(P, A_INIT, 'A1 devMode 初始化');
@@ -231,7 +233,8 @@ function runB(a) {
     a(WA3.ui.devMode() === false, 'B7d: 取消勾选后开发者模式真关');
   }
   // B8 自动推演默认开（玩家动线第二条：让它自动运行就行）
-  a(cnt(rd('engines/backstage.js'), 'autoSimulate: true') === 1,
+  // v2.542.6 跟位：autoSimulate 的默认值已随协议定义搬到 backstage-protocols.js（backstage.js 只剩读取与归一化）。
+  a(cnt(rd('engines/backstage-protocols.js'), 'autoSimulate: true') === 1,
     'B8: 自动推演默认开（autoSimulate: true）—— 玩家动线第二条零操作');
 }
 // ═══ C 面：持久化 ═════════════════════════════════════════════════
@@ -272,7 +275,7 @@ function runD(a) {
     'D3: 玩家模式 goPage(memory) 不弹回（弹回只发生在关掉开关那一瞬间，机制页程序化可达）');
   a(env.WA.ui.currentPage() === 'memory', 'D3b: currentPage 如实 = memory');
   // D4 UI_BINDINGS 守卫不因玩家模式失效（settings 页控件照常纳管；注释里的提及不计——只数登记行形态）
-  const diag = rd(DIAG);
+  const diag = rd(DIAG) + '\n' + rd('engines/tool-diag-tables.js');   // v2.542.6：登记表已搬 tables
   a(cnt(diag, "'wa-set-devmode',") === 1, 'D4: 守卫表 wa-set-devmode 登记行恰一处（实 ' + cnt(diag, "'wa-set-devmode',") + '）—— 不重复登记不炸 selfCheck');
   // D5 玩家面清单是 PAGES 的子集（不含幻影页）
   const P = rd(PANEL);
@@ -295,7 +298,7 @@ function brk(src, txt, repl, tag) {
 function runNegative(a) {
   const P0 = rd(PANEL);
   const S0 = rd(SET);
-  const D0 = rd(DIAG);
+  const D0 = rd(DIAG) + '\n' + rd('engines/tool-diag-tables.js');   // v2.542.6：登记表已搬 tables
   const SELF0 = rd(SELF_REL);
   // N0 锚点纯度：全部锚点在真源码里恰 1 次（runA 已验，此处再以 must1 硬断言防 runAll 单独跑时漏检）
   must1(P0, A_PLAYER, 'N0 玩家页清单');

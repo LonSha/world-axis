@@ -30,6 +30,7 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
+const TABLES_REL = 'engines/tool-diag-tables.js';   // v2.542.6：登记表已搬此（判据读合并面，砸境锤点指向真宿主）
 const ENG_REL = 'engines/world-snapshot.js';
 const SELF_REL = 'tests/s3-y5-v2203.js';
 /** v2.230.0 收口：mini-DOM 的 `innerHTML` getter 会把**容器自身标签**也序列化进去
@@ -56,7 +57,7 @@ const ANCHOR = {
   newslot: "if (pv.mode === 'newslot') {",
   secrets: "const SECRETS = ['credentials', 'scripts', 'chatText', 'apiKey', 'session', 'binding', 'userlock'];"
 };
-const TGT = { page: PANEL_REL, renderer: PANEL_REL, out: PANEL_REL, guard: DIAG_REL,
+const TGT = { page: PANEL_REL, renderer: PANEL_REL, out: PANEL_REL, guard: TABLES_REL,
   acc: ENG_REL, ver: ENG_REL, budget: ENG_REL, badjson: ENG_REL,
   skip: ENG_REL, mergeKeep: ENG_REL, newslot: ENG_REL, secrets: ENG_REL };
 const SEG_RENDER_START = '  // v2.200.0（第四批 Y5）：世界快照与整包搬运 —— 把';
@@ -83,7 +84,7 @@ function runAll(a) {
   require(path.join(BASE, 'tests/mock.js'));
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
   const LS = global.localStorage;
-  const P = rd(PANEL_REL), D = rd(DIAG_REL), E = rd(ENG_REL), SELF = rd(SELF_REL);
+  const P = rd(PANEL_REL), D = (rd(DIAG_REL) + '\n' + rd(TABLES_REL)), E = rd(ENG_REL), SELF = rd(SELF_REL);
   function env0(ov) { return gate.fresh(ov ? { srcOverride: ov } : {}); }
   function seed(WA, fn) { WA.store.init(); return WA.store.transact(fn, 'y5:seed'); }
   function gotoPort(env) {

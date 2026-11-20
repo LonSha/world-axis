@@ -1947,7 +1947,14 @@
     //   · wa-now-back-chat / wa-people-legacy：玩家面专有（开发者面不渲染）⇒ overview / people 的 player 层。
     { page: 'events', ids: ['wa-sw-enabled', 'wa-sw-capacity', 'wa-sw-traces', 'wa-sw-view', 'wa-sw-evidence'] },
     { page: 'overview', ids: [], cond: ['wa-legacy-readings'], player: ['wa-now-back-chat'] },
-    { page: 'people', ids: [], player: ['wa-people-legacy'] }
+    { page: 'people', ids: [], player: ['wa-people-legacy'] },
+    // v2.542.6（L1-L4 收口补登）：手札壳（ui/journal.js）两枚静态容器此前从未进表 ——
+    //   全量回归的 UI 绑定门禁如实报「未覆盖：wj-out」。
+    //   why not 排除出扫描面：#wj-out 是玩家侧推演入口唯一的状态回显位（say() 直接写
+    //   textContent），绑定断了就只剩「点了没反应」。排除 = 让判据闭嘴。
+    //   故按既有口径登记，并把渲染采集面从 wa- 扩到 wa-|wj-：采集面只认前缀，缺了 wj-
+    //   就看不见它们渲染过，登记之后必被「僵尸条目」判据当场报出。
+    { page: 'journal', ids: ['wj-out', 'wj-people'] }
   ];
 
   /* ── v2.230.0（拓展 N12 接线面）：26 枚新引擎的端口表与只读采集节 ────────

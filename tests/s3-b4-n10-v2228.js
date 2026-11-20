@@ -77,6 +77,7 @@ const BASE = path.join(__dirname, '..');
 const ENG_REL = 'engines/retrieval.js';
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
+const TABLES_REL = 'engines/tool-diag-tables.js';
 const IDX_REL = 'index.js';
 const SELF_REL = 'tests/s3-b4-n10-v2228.js';
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
@@ -105,7 +106,7 @@ const ANCHOR = {
 };
 const TGT = {};
 Object.keys(ANCHOR).forEach(function (k) { TGT[k] = ENG_REL; });
-['diagMod'].forEach(function (k) { TGT[k] = DIAG_REL; });
+['diagMod'].forEach(function (k) { TGT[k] = TABLES_REL; });
 ['idxLoad'].forEach(function (k) { TGT[k] = IDX_REL; });
 ['pRenderFn', 'pRenderer', 'pPage', 'pBind', 'pSegGuard'].forEach(function (k) { TGT[k] = PANEL_REL; });
 
@@ -171,7 +172,7 @@ function seedPerson(WA, id, name, at) {
 function runAll(a) {
   require(path.join(BASE, 'tests/mock.js'));
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
-  const E = rd(ENG_REL), P = rd(PANEL_REL), D = rd(DIAG_REL), I = rd(IDX_REL), SELF = rd(SELF_REL);
+  const E = rd(ENG_REL), P = rd(PANEL_REL), D = rd(DIAG_REL) + '\n' + rd(TABLES_REL), I = rd(IDX_REL), SELF = rd(SELF_REL);
   function env0(ov) { return gate.fresh(ov ? { srcOverride: ov } : {}); }
 
   /* ══════════════════ A 静态契约 ══════════════════ */

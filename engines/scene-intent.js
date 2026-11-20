@@ -39,6 +39,9 @@
   const __stat = { composes: 0, blocks: 0, lastPace: '', lastAxis: '', lastAt: 0, faults: {} };
 
   function fault(face, e) { __stat.faults[face] = String((e && e.message) || e).slice(0, 120); }
+  // G20 口径：唯一墙钟读取点。守卫 fallback 必须与本行共现（同一行有 WA.clock. 才算「守卫」），
+  //   写成多行会让它被归为裸调。
+  function clockNow(site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } }
   function settings() {
     if (!WA.settingsBus) return Object.assign({}, DEF);
     try { return WA.settingsBus.normalize(__REG, Object.assign({}, DEF, WA.settingsBus.read(__REG) || {})); }
@@ -184,11 +187,11 @@
     // v2.542.4（L3）：弧线段位反过来约束节奏（文档 §6）。
     const ph = arcPhaseInfo();
     applyPhase(ph, pace, cb, skipped);
-    __stat.composes += 1; __stat.lastAxis = ax.axis; __stat.lastPace = pace.pace; __stat.lastAt = Date.now();
+    __stat.composes += 1; __stat.lastAxis = ax.axis; __stat.lastPace = pace.pace; __stat.lastAt = clockNow('scene-intent.compose');
     const change = { axis: ax.axis, target: String(item.who || ''), why: ax.why };
     // v2.542.5（L4）：碰到某人的底线 ⇒ 强制 press。只认**字面包含**（宁漏不冤）。
     const lt = driveLineTouch(change.target, String(item.what || '') + '|' + String(item.why || ''));
-    if (lt && lt.hit) { pace.pace = 'press'; pace.why.push('触碰底线（' + lt.line + '）⇒ press'); }
+    if (lt && lt.hit) { pace.pace = String(lt.pace || 'press'); pace.why.push('触碰底线（' + lt.line + '）⇒ press'); }
     // v2.542.5（L4）：筹码（赌的是什么）。两侧都只有真字段才出，一个都没有就仍然是 null。
     const stakes = driveStakes(change.target);
     // v2.542.4（L3）：唯一写入点 —— 记下本条意图与**变化前的底数**（下一轮核账要用它比对）。

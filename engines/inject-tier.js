@@ -42,6 +42,9 @@
   const __seen = Object.create(null);
 
   function fault(face, e) { __stat.faults[face] = String((e && e.message) || e).slice(0, 120); }
+  // G20 口径：唯一墙钟读取点。守卫 fallback 必须与本行共现（同一行有 WA.clock. 才算「守卫」），
+  //   写成多行会让它被归为裸调。
+  function clockNow(site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } }
   function settings() {
     if (!WA.settingsBus) return Object.assign({}, DEF);
     try { return WA.settingsBus.normalize(__REG, Object.assign({}, DEF, WA.settingsBus.read(__REG) || {})); }
@@ -161,7 +164,7 @@
       totalChars += len;
       if (r.tier === 'off') savedChars += len;
     }
-    __stat.observes += 1; __stat.lastAt = Date.now(); __stat.lastRound = round;
+    __stat.observes += 1; __stat.lastAt = clockNow('inject-tier.observe'); __stat.lastRound = round;
     __stat.counts = counts; __stat.rows = rows.length;
     __stat.savedChars = savedChars; __stat.totalChars = totalChars;
     if (cfg.mode === 'shadow' && !ents.length) skipped.push({ face: 'entities', reason: 'none' });

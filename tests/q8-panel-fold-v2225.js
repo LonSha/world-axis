@@ -111,7 +111,7 @@ section('A 静态契约:清单 / 导出面 / 名单同步 / 导航未动');
   // 三处名单同步(两处必须互相一致)
   const ec = RD('tests/export-contract.js');
   const rj = RD('tests/run.js');
-  const dg = RD('engines/tool-diag.js');
+  const dg = require('./diag-source.js')();   // 合并面：登记已搬 tool-diag-tables.js（读单文件会报「登记不存在」）
   a(/const OPTIONAL = \[[^\]]*'panelFold'/.test(ec), 'A6: export-contract 的 OPTIONAL 含 panelFold');
   a(/const UI_NS2800 = \[[^\]]*'panelFold'/.test(rj), 'A6b: run.js 的 UI_NS2800 含 panelFold');
   a(/const OPTIONAL_EXPORTS = \[[^\]]*'panelFold'/.test(dg), 'A6c: tool-diag 的 OPTIONAL_EXPORTS 含 panelFold');

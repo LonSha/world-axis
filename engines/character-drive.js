@@ -33,6 +33,9 @@
   const __stat = { derives: 0, withWant: 0, withLine: 0, withFear: 0, lineHits: 0, lastAt: 0, faults: {} };
 
   function fault(face, e) { __stat.faults[face] = String((e && e.message) || e).slice(0, 120); }
+  // G20 口径：唯一墙钟读取点。守卫 fallback 必须与本行共现（同一行有 WA.clock. 才算「守卫」），
+  //   写成多行会让它被归为裸调。
+  function clockNow(site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } }
   function settings() {
     if (!WA.settingsBus) return Object.assign({}, DEF);
     try { return WA.settingsBus.normalize(__REG, Object.assign({}, DEF, WA.settingsBus.read(__REG) || {})); }
@@ -70,7 +73,7 @@
     if (!want) skipped.push({ face: 'want', reason: 'no-field' });
     if (!fear) skipped.push({ face: 'fear', reason: 'no-field' });
     if (!line) skipped.push({ face: 'line', reason: 'no-field' });
-    __stat.derives += 1; __stat.lastAt = Date.now();
+    __stat.derives += 1; __stat.lastAt = clockNow('character-drive.derive');
     if (want) __stat.withWant += 1;
     if (line) __stat.withLine += 1;
     if (fear) __stat.withFear += 1;
@@ -108,7 +111,7 @@
     if (!d.ok || !d.line) return { hit: false, reason: 'no-line' };
     const t = String(text || '');
     if (!t) return { hit: false, reason: 'no-text' };
-    if (t.indexOf(d.line) >= 0) { __stat.lineHits += 1; return { hit: true, line: d.line, word: d.line }; }
+    if (t.indexOf(d.line) >= 0) { __stat.lineHits += 1; return { hit: true, line: d.line, word: d.line, pace: cfg.lineTouchPace }; }
     return { hit: false, line: d.line };
   }
 

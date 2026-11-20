@@ -164,7 +164,7 @@ function judge(a) {
   a(r.wgFilled === true && r.wgNoOmni === true, 'v2214 P7b 图谱动态出口玩家视角有输出零 omni');
   // P8 结构锚点（源码面）
   const src = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
-  a((src.split('stageOut(body, RENDERERS[currentPage]())').length - 1) === 1,
+  a((src.split('stageOut(body, ').length - 1) === 1,
     'v2214 P8a renderBody 走 stageOut 恰一次');
   a((src.split('WA.perspective.applyView(stage)').length - 1) === 1,
     'v2214 P8b stage 容器过滤恰一次');

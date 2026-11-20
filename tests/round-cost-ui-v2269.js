@@ -78,6 +78,9 @@ function runAll(assertFn) {
   const P = rd(PANEL_REL);
   const S = rd(SET_REL);
   const D = rd(DIAG_REL);
+  const DT = D + '\n' + rd('engines/tool-diag-tables.js');
+  // v2.542.6：守卫表（UI_BINDINGS）已搬到 tool-diag-tables.js（v2.529.0 拆段），
+  //   DT = 声明面 + 表面的合并面；D 仍是原文件本体（下方「原文件未被改动」的自证继续用它）。
   const I = rd(IDX_REL);
   const R = rd(RUN_REL);
 
@@ -192,10 +195,10 @@ function runAll(assertFn) {
   const runUc = R.indexOf("'engines/undercurrent-calendar.js'");
   const runCt = R.indexOf("'engines/capability-tier.js'");
   a(runRc > runUc && runRc < runCt, 'v2269ui/D2: run.js LOAD 中同序');
-  a(D.indexOf("'wa-rc-enable'") >= 0, 'v2269ui/D3: UI_BINDINGS 登记 wa-rc-enable');
-  a(D.indexOf("'wa-rc-save'") >= 0, 'v2269ui/D4: UI_BINDINGS 登记 wa-rc-save');
-  a(D.indexOf("'wa-rc-longtrend'") >= 0, 'v2269ui/D5: UI_BINDINGS 登记 wa-rc-longtrend（默认关着的项最易静默失效）');
-  a(D.indexOf("'wa-rc-topnv'") >= 0, 'v2269ui/D6: UI_BINDINGS 登记 wa-rc-topnv（滑块读数 span）');
+  a(DT.indexOf("'wa-rc-enable'") >= 0, 'v2269ui/D3: UI_BINDINGS 登记 wa-rc-enable');
+  a(DT.indexOf("'wa-rc-save'") >= 0, 'v2269ui/D4: UI_BINDINGS 登记 wa-rc-save');
+  a(DT.indexOf("'wa-rc-longtrend'") >= 0, 'v2269ui/D5: UI_BINDINGS 登记 wa-rc-longtrend（默认关着的项最易静默失效）');
+  a(DT.indexOf("'wa-rc-topnv'") >= 0, 'v2269ui/D6: UI_BINDINGS 登记 wa-rc-topnv（滑块读数 span）');
 
   // ── N 负控制锚点核验 ──────────────────────────────────────────────────
   a(cnt(P, N_ANCHOR.blockDef) === 1, 'v2269ui/N1: blockDef 恰 1 次');

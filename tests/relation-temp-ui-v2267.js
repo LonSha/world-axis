@@ -65,6 +65,9 @@ function runAll(assertFn) {
   const P = rd(PANEL_REL);
   const S = rd(SET_REL);
   const D = rd(DIAG_REL);
+  const DT = D + '\n' + rd('engines/tool-diag-tables.js');
+  // v2.542.6：守卫表（UI_BINDINGS）已搬到 tool-diag-tables.js（v2.529.0 拆段），
+  //   DT = 声明面 + 表面的合并面；D 仍是原文件本体（下方「原文件未被改动」的自证继续用它）。
   const I = rd(IDX_REL);
   const R = rd(RUN_REL);
 
@@ -155,8 +158,8 @@ function runAll(assertFn) {
   const runCt = R.indexOf("'engines/capability-tier.js'");
   a(runRt > runDr && runRt < runCt, 'v2267ui/D2: run.js LOAD 中 relation-temp 在 day-route 之后、tier 之前');
 
-  a(D.indexOf("'wa-rt-enable'") >= 0, 'v2267ui/D3: UI_BINDINGS 登记 wa-rt-enable');
-  a(D.indexOf("'wa-rt-save'") >= 0, 'v2267ui/D4: UI_BINDINGS 登记 wa-rt-save');
+  a(DT.indexOf("'wa-rt-enable'") >= 0, 'v2267ui/D3: UI_BINDINGS 登记 wa-rt-enable');
+  a(DT.indexOf("'wa-rt-save'") >= 0, 'v2267ui/D4: UI_BINDINGS 登记 wa-rt-save');
 
   // ── N 负控制锚点核验 ──────────────────────────────────────────────────
   a(cnt(P, N_ANCHOR.blockDef) === 1, 'v2267ui/N1: blockDef 恰 1 次');

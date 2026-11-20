@@ -50,6 +50,7 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
+const TABLES_REL = 'engines/tool-diag-tables.js';   // v2.542.6：登记表已搬此（判据读合并面，砸境锤点指向真宿主）
 const ENG_REL = 'engines/world-lab.js';
 /** OPV29-11：语汇常量与 settings 登记表（MAX_ROUNDS / DEF_SIM_ROUNDS / SIM_ROUND_MS /
  *  MAX_AHEAD / LS_KEY / DEF）已搬到 engines/world-lab-tables.js —— 这些锚点跟着去那边。
@@ -132,7 +133,7 @@ function runAll(a) {
   require(path.join(BASE, 'tests/mock.js'));
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
   const LS = global.localStorage;
-  const P = rd(PANEL_REL), D = rd(DIAG_REL), E = rd(ENG_REL), SELF = rd(SELF_REL),
+  const P = rd(PANEL_REL), D = (rd(DIAG_REL) + '\n' + rd(TABLES_REL)), E = rd(ENG_REL), SELF = rd(SELF_REL),
     T = rd(TAB_REL);   // OPV29-11：语汇常量与 settings 登记表所在的表文件
   function env0(ov) { return gate.fresh(ov ? { srcOverride: ov } : {}); }
   function seed(WA) {
@@ -241,7 +242,7 @@ function runAll(a) {
     'y9v2203/A10: 设置面总开关在位（setSettings 的真消费方）');
   a(cnt(D, "'wa-wl-enabled'") >= 1, 'y9v2203/A10b: 该开关已进守卫表（渲染了不登记 ⇒ 守卫永远查不到 —— H2 双红）');
   // 跨文件：两条边界分别在别的文件里也有判据（此处只声明**同一口径**在场）
-  a(cnt(rd(DIAG_REL), 'simRows') >= 1 && cnt(rd(DIAG_REL), 'writesSingle') >= 1,
+  a(cnt((rd(DIAG_REL) + '\n' + rd(TABLES_REL)), 'simRows') >= 1 && cnt((rd(DIAG_REL) + '\n' + rd(TABLES_REL)), 'writesSingle') >= 1,
     'y9v2203/A11: 诊断面（tool-diag secWorldLab）确实回带 sim 三栏与唯一写口（同一个真源，不是各算各的）');
   a(cnt(rd('tools/reject-recovery.js'), 'REJECT_FACE') >= 1,
     'y9v2203/A11b: 工具确实**读**产品那份拒收表（单一真源在产品；就地不自带第二份）');

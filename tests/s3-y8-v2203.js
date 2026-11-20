@@ -33,6 +33,7 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
+const TABLES_REL = 'engines/tool-diag-tables.js';   // v2.542.6：登记表已搬此（判据读合并面，砸境锤点指向真宿主）
 const ENG_REL = 'engines/rule-pack.js';
 const SELF_REL = 'tests/s3-y8-v2203.js';
 // v2.401.0（OPV23 拆段遗留红·同族第九次）：`ui/panel.js` 走 panel-source 的**重组面**
@@ -110,7 +111,7 @@ function runAll(a) {
   require(path.join(BASE, 'tests/mock.js'));
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
   const LS = global.localStorage;
-  const P = rd(PANEL_REL), D = rd(DIAG_REL), E = rd(ENG_REL), SELF = rd(SELF_REL);
+  const P = rd(PANEL_REL), D = (rd(DIAG_REL) + '\n' + rd(TABLES_REL)), E = rd(ENG_REL), SELF = rd(SELF_REL);
   function env0(ov) { return gate.fresh(ov ? { srcOverride: ov } : {}); }
   function seed(WA, fn) { WA.store.init(); return WA.store.transact(fn, 'y8:seed'); }
   function gotoPage(env, page) {

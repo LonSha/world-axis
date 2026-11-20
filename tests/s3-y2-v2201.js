@@ -32,6 +32,7 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
+const TABLES_REL = 'engines/tool-diag-tables.js';   // v2.542.6：登记表已搬此（判据读合并面，砸境锤点指向真宿主）
 const SELF_REL = 'tests/s3-y2-v2201.js';
 /** v2.230.0 收口：mini-DOM 的 `innerHTML` getter 会把**容器自身标签**也序列化进去
  *  （tests/ui-dom.js 的 `ser(el)`），浏览器只返回子节点。于是「空容器」的长度不是 0，
@@ -82,7 +83,7 @@ function runAll(a) {
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
   const LS = global.localStorage;
   const P = rd(PANEL_REL);
-  const D = rd(DIAG_REL);
+  const D = (rd(DIAG_REL) + '\n' + rd(TABLES_REL));
   const SELF = rd(SELF_REL);
   // ════ A 段：静态契约 ════════════════════════════════════════════════
   const segR = P.slice(P.indexOf(SEG_RENDER_START), P.indexOf(SEG_RENDER_END));
@@ -153,7 +154,7 @@ function runAll(a) {
   const anchorDecl = SELF.slice(SELF.indexOf('const ANCHOR = {'),
     SELF.indexOf('\n};', SELF.indexOf('const ANCHOR = {')));
   Object.keys(ANCHOR).forEach(function (k) {
-    const targetRel = (k === 'guard') ? DIAG_REL : PANEL_REL;
+    const targetRel = (k === 'guard') ? TABLES_REL : PANEL_REL;
     const tgt = (k === 'guard') ? D : P;
     a(cnt(tgt, ANCHOR[k]) === 1, 'y2v2201/A8: 锚点 ' + k + ' 在 ' + targetRel + ' 恰中 1 次（实 ' + cnt(tgt, ANCHOR[k]) + '）');
     a(cnt(anchorDecl, ANCHOR[k]) === 1, 'y2v2201/A8b: 锚点 ' + k + ' 在 ANCHOR 表里恰声明 1 次（表外引用不计）');
@@ -315,7 +316,7 @@ function runAll(a) {
       //   （那是提及），故「整份源码里没有该串」会在破坏后仍为假（首跑实测 N5a 红）。
       judge: function (src) { return src.indexOf("String(WA.beatReport.buildBlock()") < 0; },
       check: 'A6b' },
-    { n: 6, rel: DIAG_REL, key: 'guard', to: "{ page: 'chapterX', ids:",
+    { n: 6, rel: TABLES_REL, key: 'guard', to: "{ page: 'chapterX', ids:",
       why: '守卫表登记到不存在的页 ⇒ 守卫覆盖面查不到这一页',
       judge: function (src) { return src.indexOf("{ page: 'chapter', ids:") < 0; },
       check: 'A2c' }

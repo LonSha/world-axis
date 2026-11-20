@@ -70,6 +70,9 @@ function runAll(assertFn) {
   const P = rd(PANEL_REL);
   const S = rd(SET_REL);
   const D = rd(DIAG_REL);
+  const DT = D + '\n' + rd('engines/tool-diag-tables.js');
+  // v2.542.6：守卫表（UI_BINDINGS）已搬到 tool-diag-tables.js（v2.529.0 拆段），
+  //   DT = 声明面 + 表面的合并面；D 仍是原文件本体（下方「原文件未被改动」的自证继续用它）。
   const I = rd(IDX_REL);
   const R = rd(RUN_REL);
 
@@ -253,9 +256,9 @@ function runAll(assertFn) {
   const runSh = R.indexOf("'engines/save-health.js'");
   const runCt = R.indexOf("'engines/capability-tier.js'");
   a(runFr > runSh && runFr < runCt, 'v2271ui/E2: run.js LOAD 中同序');
-  a(D.indexOf("'wa-fr-enable'") >= 0, 'v2271ui/E3: UI_BINDINGS 登记 wa-fr-enable');
-  a(D.indexOf("'wa-fr-talk'") >= 0, 'v2271ui/E4: UI_BINDINGS 登记 wa-fr-talk（手勾口最易静默失效）');
-  a(D.indexOf("'wa-first-block'") >= 0, 'v2271ui/E5: UI_BINDINGS 登记 wa-first-block');
+  a(DT.indexOf("'wa-fr-enable'") >= 0, 'v2271ui/E3: UI_BINDINGS 登记 wa-fr-enable');
+  a(DT.indexOf("'wa-fr-talk'") >= 0, 'v2271ui/E4: UI_BINDINGS 登记 wa-fr-talk（手勾口最易静默失效）');
+  a(DT.indexOf("'wa-first-block'") >= 0, 'v2271ui/E5: UI_BINDINGS 登记 wa-first-block');
 
   // ── N 锚点纯度 + 真破坏 + 两向自证 ────────────────────────────────────
   a(cnt(P, N_ANCHOR.blockDef) === 1, 'v2271ui/N1: blockDef 恰 1 次');

@@ -121,7 +121,12 @@ const TIMEOUT_ARMED = {
   'story-window-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   'story-window-integration-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   'story-window-people-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
-  'story-window-evidence-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+    // v2.542.6：与 ARMED_SITES 同批入表（两张表各说一套时，逐站点核对与「入表了却没人核」会同时发生）。
+  'scene-intent-v2542': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'inject-tier-v2543': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'arc-phase-v2544': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'character-drive-v2545': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+'story-window-evidence-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   // v2.173.0（TX4b 收尾）：TX1–TX9 批次的 14 个子进程调用点（8 个 TX 专锁 + 6 个
   //   tx*_smoke 工具）。它们此前既未声明 timeout、也未入表 —— 正是本模块治的病
   //   （「留一个没声明的调用点就是留一条静默挂起的路径」）。全量回归第二轮暴露。
@@ -507,6 +512,17 @@ const ARMED_SITES = [
     anchor: "const rSWP2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-people-v2518.js')]," },
   { key: 'story-window-evidence-lock', mode: 'spawn', kill: true,
     anchor: "const rSWE2518 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/story-window-evidence-v2518.js')]," },
+  // v2.542.6：叙事脊柱四把专锁（L1–L4）的调用点，与 ARMED_SITES 同批入表。
+  //   它们在 v2.542.2~v2.542.5 落地时只挂了 section + spawnSync，没入武装表 ⇒
+  //   全量回归里 A6/A13b 报「4次调用点 92 vs 武装表 88」（新开调用点不入表即红）。
+  { key: 'scene-intent-v2542', mode: 'spawn', kill: true,
+    anchor: "const rSI2542 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/scene-intent-v2542.js')]," },
+  { key: 'inject-tier-v2543', mode: 'spawn', kill: true,
+    anchor: "const rIT2543 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/inject-tier-v2543.js')]," },
+  { key: 'arc-phase-v2544', mode: 'spawn', kill: true,
+    anchor: "const rAP2544 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/arc-phase-v2544.js')]," },
+  { key: 'character-drive-v2545', mode: 'spawn', kill: true,
+    anchor: "const rCD2545 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/character-drive-v2545.js')]," }
 ];
 
 /**
@@ -604,7 +620,11 @@ const GATES = [
   //   browsersRoot() 补 passwd 家目录候选后，隔离环境首次拉起真 Chromium，全锁 54 项实测 168s
   //   —— 成为本仓新的最重门禁。按口径一重算统一预算 = 168000 × 8 = 1344000（全表统一，
   //   不逐道紧贴；O9 实机层 103s 同批够用）。
-  { key: 'ui-live-2137-e2e', rel: 'tests/ui-live-v2137.js', argv: ['tests/ui-live-v2137.js'], kind: 'spawn', raw: 168000, why: 'UI 实机通道端到端（真 Chromium 冷启动 + 9 轮原版/破坏对照，V9 隔离环境实测）' }
+  { key: 'ui-live-2137-e2e', rel: 'tests/ui-live-v2137.js', argv: ['tests/ui-live-v2137.js'], kind: 'spawn', raw: 168000, why: 'UI 实机通道端到端（真 Chromium 冷启动 + 9 轮原版/破坏对照，V9 隔离环境实测）' },
+  { key: 'scene-intent-v2542', rel: 'tests/scene-intent-v2542.js', argv: ['tests/scene-intent-v2542.js'], kind: 'spawn', raw: 168000, why: '叙事脊柱 L1 专锁 48 项（纯内存）' },
+  { key: 'inject-tier-v2543', rel: 'tests/inject-tier-v2543.js', argv: ['tests/inject-tier-v2543.js'], kind: 'spawn', raw: 168000, why: '叙事脊柱 L2 专锁 41 项（影子只读）' },
+  { key: 'arc-phase-v2544', rel: 'tests/arc-phase-v2544.js', argv: ['tests/arc-phase-v2544.js'], kind: 'spawn', raw: 168000, why: '叙事脊柱 L3 专锁 46 项（含环形挤出）' },
+  { key: 'character-drive-v2545', rel: 'tests/character-drive-v2545.js', argv: ['tests/character-drive-v2545.js'], kind: 'spawn', raw: 168000, why: '叙事脊柱 L4 专锁 43 项（纯读推导）' }
 ];
 
 /** 逐门禁建议上限（仅作证据／自洽判据，不参与 run.js 现场武装）。 */

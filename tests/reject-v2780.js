@@ -9892,6 +9892,92 @@ function runWitness(WA) {
     want('not-secure-context', 'api-vault：非安全上下文时拒绝预热并明说原因（不是静默空结果）');
     tripAsync('not-secure-context', function () { return WA.apiVault.prime(['witness']); });
   }
+  // ── v2.542.6（叙事脊柱 L1–L4）：九个内联码的见证 ─────────────────────────
+  //   为什么补在这里而不是“跑一遍专锁就算”：四把专锁测的是**本模块行为**，
+  //   而本台账要的是「这个码能不能从真 API 跑出来」。两者不是同一件事 ——
+  //   专锁全绿而码面无归属，说明码是内部路径的副产品、没人验过它跑得出来。
+  //   全程只读：设置项用完即关，世界只造一个一次性的 p_w2546（不删是因为
+  //   store 的删人路径本身有判据面，为一条见证去改世界不值得）。
+  if (WA.sceneIntent && typeof WA.sceneIntent.compose === 'function') {
+    want('no-agenda', '本幕：排期 / 延后 / 超编三档都空 ⇒ 如实报没有议程（不编一条出来）');
+    trip('no-agenda', function () {
+      const keep = WA.director && WA.director.rank;
+      try {
+        WA.director = WA.director || {};
+        WA.director.rank = function () { return { ok: true, round: 1, picked: [], deferred: [], suppressed: [] }; };
+        WA.sceneIntent.setSettings({ enabled: true });
+        return WA.sceneIntent.compose().reason;
+      } finally { if (WA.director) WA.director.rank = keep; }
+    });
+    want('none-developing', '本幕：伏笔表在、但没有 developing 的一条 ⇒ 点名（不当成“有回收”）');
+    tripDeep('none-developing', function () {
+      const keep = WA.director && WA.director.rank;
+      try {
+        WA.director = WA.director || {};
+        WA.director.rank = function () { return { ok: true, round: 1, picked: [{ kind: 'foreshadow', who: '', what: '见证', bucket: 'foreshadow', why: 'w' }], deferred: [], suppressed: [] }; };
+        WA.store.transact(function (d) { d.memory = d.memory || {}; d.memory.foreshadows = []; });
+        return WA.sceneIntent.compose();
+      } finally { if (WA.director) WA.director.rank = keep; }
+    });
+    WA.sceneIntent.setSettings({ enabled: false });
+  }
+  if (WA.arcPhase && typeof WA.arcPhase.phase === 'function') {
+    want('no-tension', '弧线：张力算不出 ⇒ ok:false + no-tension（不猜一个段位）');
+    trip('no-tension', function () {
+      const keep = WA.plotGauge && WA.plotGauge.tension;
+      try {
+        WA.arcPhase.setSettings({ enabled: true });
+        WA.plotGauge = WA.plotGauge || {};
+        WA.plotGauge.tension = function () { return { ok: false, reason: 'no-signal' }; };
+        return WA.arcPhase.phase().reason;
+      } finally { if (WA.plotGauge) WA.plotGauge.tension = keep; }
+    });
+    WA.arcPhase.setSettings({ enabled: false });
+  }
+  if (WA.injectTier && typeof WA.injectTier.observe === 'function') {
+    want('apply-not-implemented', '注入分档：mode=apply 本版未实现 ⇒ 明说拒绝（不静默当 shadow 跑）');
+    trip('apply-not-implemented', function () {
+      try {
+        WA.injectTier.setSettings({ enabled: true, mode: 'apply' });
+        return WA.injectTier.observe([]).reason;
+      } finally { WA.injectTier.setSettings({ enabled: false, mode: 'shadow' }); }
+    });
+    want('empty-scene', '注入分档：场景实体一个都取不到 ⇒ 点名（不得在空场景上假装有焦点）');
+    tripDeep('empty-scene', function () {
+      const keep = WA.sceneNarrative && WA.sceneNarrative.currentScene;
+      try {
+        WA.injectTier.setSettings({ enabled: true, mode: 'shadow' });
+        WA.sceneNarrative = WA.sceneNarrative || {};
+        WA.sceneNarrative.currentScene = function () { return {}; };
+        return WA.injectTier.observe([{ source: '世界状态', content: '见证' }]);
+      } finally {
+        if (WA.sceneNarrative) WA.sceneNarrative.currentScene = keep;
+        WA.injectTier.setSettings({ enabled: false, mode: 'shadow' });
+      }
+    });
+  }
+  if (WA.characterDrive && typeof WA.characterDrive.derive === 'function') {
+    want('no-such-person', '人物驱动力：查的人不在册 ⇒ 如实报 no-such-person（不凭空造一个）');
+    trip('no-such-person', function () { return WA.characterDrive.derive('p_w2546_ghost').reason; });
+    want('no-field', '人物驱动力：画像没有 intent / 边界 ⇒ 逐项点名 no-field（fear 更没有）');
+    tripDeep('no-field', function () {
+      WA.store.transact(function (d) { d.people = d.people || {}; d.people.p_w2546 = { name: '见证甲' }; });
+      return WA.characterDrive.derive('p_w2546');
+    });
+    want('no-line', '底线判据：画像没有底线 ⇒ 如实报 no-line（不把“想活”当底线）');
+    trip('no-line', function () {
+      WA.characterDrive.setSettings({ enabled: true });
+      return WA.characterDrive.touchesLine('p_w2546', '随便什么').reason;
+    });
+    want('no-text', '底线判据：文本为空 ⇒ no-text（空文本永不命中）');
+    trip('no-text', function () {
+      // 必须先有底线才到得了这一支：引擎的判据顺序是 no-line → no-text
+      //   （没有底线时连「文本比什么」都无从谈起）⇒ 先给这条画像补一条边界。
+      WA.store.transact(function (d) { d.people.p_w2546.behaviorBoundaries = '不出卖朋友'; });
+      return WA.characterDrive.touchesLine('p_w2546', '').reason;
+    });
+    WA.characterDrive.setSettings({ enabled: false });
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 
