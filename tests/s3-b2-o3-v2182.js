@@ -93,11 +93,16 @@ function runA(a) {
   a(/frozenBudgetMs/.test(src) && /drift/.test(src), 'o3v2182/A16: 冻结副本 + 漂移检测两件都在');
   a(readOf('index.js').indexOf("'engines/perf-baseline.js'") >= 0, 'o3v2182/A17: index.js LOAD_ORDER 装载');
   a(readOf('tests/run.js').indexOf("'engines/perf-baseline.js'") >= 0, 'o3v2182/A18: tests/run.js LOAD 装载');
+  // v2.541.5：MODULE_EXPORTS / UI_BINDINGS 这两张表自 OPV29-07 起住在
+  //   engines/tool-diag-tables.js，tool-diag.js 只消费（表未装载会直接抛）。
+  //   A19/A22 原来在 tool-diag.js 里找登记项 ⇒ 永远找不到 ⇒ 恒红。
+  //   A20/A21 问的是节函数与诊断对象成员，那两个确实在 tool-diag.js —— 仍读 diag。
   const diag = readOf('engines/tool-diag.js');
-  a(diag.indexOf("'engines/perf-baseline.js': 'perfBaseline'") >= 0, 'o3v2182/A19: tool-diag MODULE_EXPORTS 登记');
+  const diagT = readOf('engines/tool-diag-tables.js');
+  a(diagT.indexOf("'engines/perf-baseline.js': 'perfBaseline'") >= 0, 'o3v2182/A19: tool-diag MODULE_EXPORTS 登记');
   a(diag.indexOf('function secPerfBaseline()') >= 0, 'o3v2182/A20: tool-diag 节函数存在');
   a(diag.indexOf('perfBaseline: secPerfBaseline()') >= 0, 'o3v2182/A21: tool-diag 诊断对象成员在位');
-  a(diag.indexOf('wa-pbl-enabled') >= 0 && diag.indexOf('wa-pbl-gap') >= 0, 'o3v2182/A22: tool-diag UI_BINDINGS 登记本模块控件');
+  a(diagT.indexOf('wa-pbl-enabled') >= 0 && diagT.indexOf('wa-pbl-gap') >= 0, 'o3v2182/A22: tool-diag UI_BINDINGS 登记本模块控件');
   const pan = readOf('ui/panel.js');
   ['wa-pbl-enabled', 'wa-pbl-bands', 'wa-pbl-budget', 'wa-pbl-readings', 'wa-pbl-gap', 'wa-pbl-diag'].forEach(function (id) {
     a(pan.indexOf(id) >= 0, 'o3v2182/A23: 面板渲染 ' + id);

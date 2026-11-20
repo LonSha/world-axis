@@ -1519,6 +1519,7 @@ const digest = ev.worldDigest;
       <details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">
         <summary style="cursor:pointer;opacity:0.75;font-size:12px;">⚙️ 外交提案、在途物流与因果调度工单（展开专家面板）</summary>
       <div class="wa-sec">势力外交（成对事实）</div>
+      <div data-omniscient>
       <div class="wa-item">
         <div class="wa-dim">与上面的「关系网」<b>不是同一个东西</b>：那一栏是<b>推导值</b>（按双方各自的对外态度算出来的图，<code>derived:true</code>），这一栏是<b>谈成的事实</b>（成对条目 / 双边态度 / 条约 / 有效期 / 履约回执）。推导结果<b>不会</b>自动迁成事实 —— 「算出来的」不许冒充「谈成的」。</div>
         ${(() => {
@@ -1552,6 +1553,7 @@ const digest = ev.worldDigest;
             + `<button class="wa-btn wa-mini" id="wa-dp-expire" aria-label="到期收敛" title="到期收敛：把到期条款标成 expired 并按剩余条款重算关系状态。幂等 —— 同一个时刻连调两次，第二次零改动（changed:0）">到期</button>`
             + `</div><div id="wa-dp-out" class="wa-out wa-dim">${esc(dr)}</div>`;
         })()}
+      </div>
       </div>
       <div class="wa-sec">行动调度（动机 / 计划 / 行动闭环）</div>
       <div class="wa-item">

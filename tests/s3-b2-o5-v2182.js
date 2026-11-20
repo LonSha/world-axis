@@ -82,11 +82,16 @@ function runA(a) {
   a(/REJECT_HINT/.test(src) && /hintKnown/.test(src), 'o5v2182/A15: 拒收码→玩家提示的映射与「已知/未知」分列');
   a(readOf('index.js').indexOf("'engines/world-health.js'") >= 0, 'o5v2182/A16: index.js LOAD_ORDER 装载');
   a(readOf('tests/run.js').indexOf("'engines/world-health.js'") >= 0, 'o5v2182/A17: tests/run.js LOAD 装载');
+  // v2.541.5：同 s3-b2-o3-v2182 / save-health-ui-v2270 —— MODULE_EXPORTS 与
+  //   UI_BINDINGS 两张表自 OPV29-07 起住在 engines/tool-diag-tables.js，
+  //   tool-diag.js 只消费。A18/A21 问的是「登记」，必须读表；A19/A20 问的是
+  //   节函数与诊断对象成员，那两个确实在 tool-diag.js。
   const diag = readOf('engines/tool-diag.js');
-  a(diag.indexOf("'engines/world-health.js': 'worldHealth'") >= 0, 'o5v2182/A18: tool-diag MODULE_EXPORTS 登记');
+  const diagT = readOf('engines/tool-diag-tables.js');
+  a(diagT.indexOf("'engines/world-health.js': 'worldHealth'") >= 0, 'o5v2182/A18: tool-diag MODULE_EXPORTS 登记');
   a(diag.indexOf('function secWorldHealth()') >= 0, 'o5v2182/A19: tool-diag 节函数存在');
   a(diag.indexOf('worldHealth: secWorldHealth()') >= 0, 'o5v2182/A20: tool-diag 诊断对象成员在位');
-  a(diag.indexOf('wa-wh-enabled') >= 0 && diag.indexOf('wa-wh-drill-go') >= 0, 'o5v2182/A21: tool-diag UI_BINDINGS 登记本模块控件');
+  a(diagT.indexOf('wa-wh-enabled') >= 0 && diagT.indexOf('wa-wh-drill-go') >= 0, 'o5v2182/A21: tool-diag UI_BINDINGS 登记本模块控件');
   const pan = readOf('ui/panel.js');
   ['wa-wh-enabled', 'wa-wh-view', 'wa-wh-sources', 'wa-wh-diag', 'wa-wh-drill', 'wa-wh-drill-go', 'wa-wh-out']
     .forEach(function (id) { a(pan.indexOf(id) >= 0, 'o5v2182/A22: 面板渲染 ' + id); });

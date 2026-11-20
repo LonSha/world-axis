@@ -182,8 +182,14 @@ function runA(a) {
     + cnt(pn, "data-omniscient>' + '<div class=\"wa-row\">") + cnt(pn, "return '<div data-omniscient><div");
   a(marked >= 6, 'A4 TX 模块区块标记在场（实 ' + marked + ' 处起——标记是**容器级**，'
     + '不用逐控件标 60 次：逐控件标记的失效模式是「新增控件忘了标」）');
-  a(cnt(pn, '<div data-omniscient>' + '\n' + '      <div class="wa-sec">势力外交（成对事实）</div>') === 1,
-    'A4 外交区块（事件页）整段标记恰 1 处');
+  // v2.541.5：这条原判据要求 `'<div data-omniscient>'` 与 `' <div class="wa-sec">势力外交（成对事实）</div>'`
+  //  逐字相邻，即让全知容器**把分节标题一起包进去**。而 v2.539.5（事件页「整页被吞」）之后，
+  //  ui-gate 的 G17 反过来铁定要求：任何 `[data-omniscient]` 容器的 innerHTML 里**不得含 class="wa-sec"**
+  //  —— 因为玩家视角靠摘除这些节点来过滤全知面，节点若吞下分节标题，摘除时整页内容一起消失。
+  //  两条判据互斥，必有一条错。以玩家视角为准：分节标题留在容器**外**，容器包住的是该节正文。
+  //  故本判据改为问「外交正文确实被标记，且标记没有把标题吞进去」。
+  a(cnt(pn, '<div class="wa-sec">势力外交（成对事实）</div>' + '\n' + '      <div data-omniscient>') === 1,
+    'A4 外交区块（事件页）整段标记恰 1 处（标记在分节标题之外，不吞标题）');
   // A5 新接缝同源（C 面靠它把页内运行态带出来）
   a(live.indexOf('opts.probeSource') > 0 && live.indexOf('out.probe = ') > 0,
     'A5 实机通道的页内探针接缝在位（O1/O9 共用：两者判的都是页内运行态）');
