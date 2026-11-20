@@ -300,7 +300,13 @@ function runAll(A) {
   //   下面七条断言里的数字是**实测回填**，逐条对应：文件面/render 面 +1、调用期边 +1
   //   （schema-view 的 stat 读点）、记账文件面 +1、ns 提供方 +1、ns 面差 54→55、
   //   登记面 36/43→37/44（UI 层 ns 登记表多一条）、账本缺项 22→23（ui 面仍不入账，如实报）。
-  A(a.files === 600 && a.aliasFiles === 600 && a.refFiles === 597,
+  // v2.542.2（叙事脊柱 L1）：新增 engines/scene-intent.js 一文件 ⇒ 文件面 / 别名面 +1、
+  //   有引用 +1（它读 director / plotGauge / dramaticTension / store 四个既有 ns，均在读面内）。
+  //   600/600/597 → 601/601/598，实测回填；覆盖率口径（有人引用即算）零变化。
+  // v2.542.2（叙事脊柱 L1）：新增 engines/scene-intent.js 一文件 ⇒ 文件面 / 别名面 +1、
+  //   有引用 +1（它读 director / plotGauge / dramaticTension / store 四个既有 ns，均在读面内）。
+  //   600/600/597 → 601/601/598，实测回填；覆盖率口径（有人引用即算）零变化。
+  A(a.files === 601 && a.aliasFiles === 601 && a.refFiles === 598,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -463,7 +469,21 @@ function runAll(A) {
   // v2.531.0（OPV30-R3）：写前预演尾调 registerModule ⇒ 装载期 466 / 合计 4430（调用期 3964 仍不动）。
   // v2.532~533（OPV30-R4/R5）：两件各尾调 registerModule ⇒ 装载期 468；同轮五台缝合件接进面板台账
   //   （ui/settings.js 新增 5 条 (file, ns) 调用期边、另两件各读 store ⇒ 3964 → 3970）、合计 4438。
-  A(a.edgesLoad === 468 && a.edgesCall === 3987 && a.edgesAll === 4455 && a.identityOk,
+  // v2.542.2（叙事脊柱 L1）：装载期 468 → 470 —— scene-intent 尾部真调 WA.registerModule
+  //   （registerModule 由 store 提供）+ 它另读 store 一 ns，与既有 (file, ns) 对去重后 +1；
+  //   render/inject.js 的注入分支在装载期读 sceneIntent ⇒ +1。
+  //   调用期 3987 → 3994（+7）：scene-intent 读 director / plotGauge / dramaticTension（+3，store 已计）、
+  //   render/inject.js 注入分支读 sceneIntent（+1）、ui/panel.js 的 VIS_NAMES（+1，ui 面计入调用期）、
+  //   engines/tool-diag-tables.js 的 MODULE_EXPORTS（+1）、tests 侧读数不计。
+  //   恒等式 470 + 3994 = 4464 当场核对。
+  // v2.542.2（叙事脊柱 L1）：装载期 468 → 470 —— scene-intent 尾部真调 WA.registerModule
+  //   （registerModule 由 store 提供）+ 它另读 store 一 ns，与既有 (file, ns) 对去重后 +1；
+  //   render/inject.js 的注入分支在装载期读 sceneIntent ⇒ +1。
+  //   调用期 3987 → 3994（+7）：scene-intent 读 director / plotGauge / dramaticTension（+3，store 已计）、
+  //   render/inject.js 注入分支读 sceneIntent（+1）、ui/panel.js 的 VIS_NAMES（+1，ui 面计入调用期）、
+  //   engines/tool-diag-tables.js 的 MODULE_EXPORTS（+1）、tests 侧读数不计。
+  //   恒等式 470 + 3994 = 4464 当场核对。
+  A(a.edgesLoad === 470 && a.edgesCall === 3994 && a.edgesAll === 4464 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -549,7 +569,11 @@ function runAll(A) {
   // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表文件各入序一档 ⇒ 567 ⇒ 567 ⇒ 568（实测回填）。
   // v2.529.0（缝合批 19 件）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +19 ⇒ **587**（实测）。
   // v2.533.0（OPV30 收口）：五台缝合件入首帧面 ⇒ LOAD_ORDER 569 → 574（实测回填）。
-  A(a.edgesLoad >= 20 && a.orderLen === 577,
+  // v2.542.2（叙事脊柱 L1）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1（紧跟 dramatic-tension、
+  //   早于 render/inject.js）⇒ 577 → 578，实测回填。order-violation 仍 0（它读的三个 ns 前置都在其前）。
+  // v2.542.2（叙事脊柱 L1）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1（紧跟 dramatic-tension、
+  //   早于 render/inject.js）⇒ 577 → 578，实测回填。order-violation 仍 0（它读的三个 ns 前置都在其前）。
+  A(a.edgesLoad >= 20 && a.orderLen === 578,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -613,7 +637,13 @@ function runAll(A) {
   // v2.531.0（OPV30-R3）：writeRehearsal 进静态提供方与账本 ⇒ 638 / 584；读面 570 不动（仍是 pending-wire）。
   // v2.532~533（OPV30-R4/R5）：两件进静态提供方与账本 ⇒ 640/586；五台缝合件接进面板 ⇒ 读面 570 → 575。
   //   B6 差仍是 640 - 586 = 54（三面同步增长，漂移口径不动）。
-  A(a.nsProvided === 643 && a.nsLedger === 586 && a.nsRead === 578,
+  // v2.542.2（叙事脊柱 L1）：sceneIntent 进静态提供方 ⇒ 643 → 644；module-registry-gate --update 后入账 ⇒
+  //   账本 586 → 587；产品读点（render/inject.js + ui/panel.js + tool-diag-tables）⇒ 读面 578 → 579。
+  //   三面同步 +1，漂移口径（静态提供方 - 账本）不动 ⇒ B6 常量不改。
+  // v2.542.2（叙事脊柱 L1）：sceneIntent 进静态提供方 ⇒ 643 → 644；module-registry-gate --update 后入账 ⇒
+  //   账本 586 → 587；产品读点（render/inject.js + ui/panel.js + tool-diag-tables）⇒ 读面 578 → 579。
+  //   三面同步 +1，漂移口径（静态提供方 - 账本）不动 ⇒ B6 常量不改。
+  A(a.nsProvided === 644 && a.nsLedger === 587 && a.nsRead === 579,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽

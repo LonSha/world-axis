@@ -26,7 +26,10 @@
   //   默认值取 **true**（与 style 的 false 不同）：这四面的总开关各自默认为关闭，注入本来就
   //   不会发生 —— 故这里默认 true 不会给老用户凭空多出任何约束，却避免了「开了模块却发现
   //   也要再开开关」的双闸困惑。style 之所以要 false，是因为它自己的总开关 `block` 默认为 on。
-  const SOURCES = ['clock', 'background', 'people', 'currents', 'echoes', 'memory', 'opinion', 'pulse', 'ledger', 'digest', 'style',
+  // v2.542.2：'sceneIntent' —— 叙事脊柱 L1「本幕」。它**必须**与注入分支、def 默认值、显示名同批增长
+  //   （v2.56.0 立的规矩：只加分支不加源表 = 开关点了零效果；只加源表不加分支 = 声明了没人消费）。
+  //   tests/inject-sources-v2560.js 的 A/B/C/D 四面同时锁。
+  const SOURCES = ['sceneIntent', 'clock', 'background', 'people', 'currents', 'echoes', 'memory', 'opinion', 'pulse', 'ledger', 'digest', 'style',
     'life', 'intel', 'org', 'longline',
     // v2.62.0: 'causal'（因果结算）。它**必须**与注入分支同时增长（v2.56.0 立的规矩）：
     //   只加分支不加源表 = 开关点了零效果（v2.38.0 的 echoes 原样复刻），
@@ -242,7 +245,7 @@
     //   默认 **true**：本模块只报「这局真长出了什么数」（vias / bookings / rows / tags），
     //   空局恒返回 ''，故默认开不会给老用户凭空多出一段约束。
     'narrowConsumers'];
-  const __REG = { key: LS_KEY, def: { clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
+  const __REG = { key: LS_KEY, def: { sceneIntent: true, clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
 style: false,
@@ -485,6 +488,7 @@ style: false,
    *   内部常量，不进接口面——避免为观测面付接口冻结的代价。
    */
   const SRC_NAME = {
+    sceneIntent: '本幕（场景意图）',
     clock: '世界时间', pulse: '世界脉搏', background: '世界背景', people: '人物此刻',
     currents: '可感知暗流', echoes: '回声',
     style: '叙事工艺', life: '人物生活', intel: '因果与情报', org: '资源与组织',
@@ -678,7 +682,7 @@ style: false,
    *   表里**没有**的源一律读成「不可判定」（null），不当作「已关」——
    *   六个快照源与 memory/ledger/digest 本来就没有模块级总开关（它们由 store 直供）。
    */
-  const SRC_MOD_SETTING = { opinion: 'worldaxis_opinion_settings_v1', life: 'worldaxis_life_settings_v1',
+  const SRC_MOD_SETTING = { sceneIntent: 'worldaxis_scene_intent_settings_v1', opinion: 'worldaxis_opinion_settings_v1', life: 'worldaxis_life_settings_v1',
     intel: 'worldaxis_intel_settings_v1', org: 'worldaxis_org_settings_v1', longline: 'worldaxis_longline_settings_v1',
     causal: 'worldaxis_causal_settings_v1', world: 'worldaxis_world_settings_v1', weather: 'worldaxis_weather_settings_v1',
     difficulty: 'worldaxis_difficulty_settings_v1', shadow: 'worldaxis_shadow_settings_v1', threads: 'worldaxis_threads_settings_v1',
@@ -1494,6 +1498,13 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
         catch (e) { return null; }
       })();
       const items = [];
+      // v2.542.2：叙事脊柱 L1 ——「本幕」必须是**第一项**（它是这一场的意图，其余事实围绕它分档）。
+      //   零 token 边界：开关关 / 模块缺席 / 合成失败 / 无排期 ⇒ 空串，**一项都不 push**，
+      //   关闭时注入字节与 v2.541.7 逐字节一致（判据见 tests/scene-intent-v2542.js 的 A 段）。
+      if (vis.sceneIntent && WA.sceneIntent) {
+        const si = engineCall('sceneIntent', function () { return WA.sceneIntent.buildBlock(); });
+        if (si) items.push({ source: '本幕', content: si });
+      }
       const snap = this.buildWorldSnapshot();
       if (snap) items.push({ source: '世界状态', content: snap });
       // v2.51.0（第三十六面）：叙事工艺约束作为**独立注入项**（不进世界状态块）。

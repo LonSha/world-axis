@@ -572,6 +572,9 @@
     'engines/conspiracy-weaver.js',
     'engines/ideology-memetics.js',
     'engines/dramatic-tension.js',
+    // v2.542.2：叙事脊柱 L1「本幕」。须早于 render/inject.js（注入时读 sceneIntent.buildBlock()），
+    //   且此刻读的 director / plotGauge / store 都已在装载面里；它自己不写世界。
+    'engines/scene-intent.js',
     'engines/epoch-tide.js',
     'engines/moral-dilemma.js',
     'engines/perception-manipulation.js',

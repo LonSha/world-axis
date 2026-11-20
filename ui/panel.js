@@ -48,6 +48,8 @@
     injectCollector: '结构汇流',
     // v2.326.0（缝合 卢克之光）：叙述层镜片。与 SOURCES 同批登记（只加源表不加显示名 ⇒ 面板裸露英文键名）。
     narrativeLens: '叙述镜片（防全知/去媚）',
+    // v2.542.2：叙事脊柱 L1「本幕」。与 render/inject.js 的 SOURCES 同批（不加显示名 ⇒ 面板裸露英文键名）。
+    sceneIntent: '本幕（场景意图）',
     life: '人物生活', intel: '因果与情报', org: '资源与组织', longline: '长线伏笔',
     // v2.62.0: 因果结算。与 SOURCES 同批登记（只加源表不加显示名 ⇒ 面板裸露英文键名）。
     causal: '因果结算',

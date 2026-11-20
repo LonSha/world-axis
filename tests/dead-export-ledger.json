@@ -4090,14 +4090,6 @@
       "tref": 1,
       "own": 1
     },
-    "director.rank": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/director.js",
-      "refs": 0,
-      "tref": 3,
-      "own": 4
-    },
     "director.setSettings": {
       "reason": "test-only",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -12530,6 +12522,38 @@
       "tref": 0,
       "own": 3
     },
+    "sceneIntent.compose": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/scene-intent.js",
+      "refs": 0,
+      "tref": 9,
+      "own": 4
+    },
+    "sceneIntent.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/scene-intent.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "sceneIntent.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/scene-intent.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 1
+    },
+    "sceneIntent.stat": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/scene-intent.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
     "sceneNarrative.reset": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -16302,6 +16326,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 780
+    "dataOnly": 781
   }
 }

@@ -1,14 +1,14 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 575,
+ "loadOrderCount": 578,
  "lazyCount": 22,
- "loadedCount": 575,
- "uiCount": 0,
- "nsCount": 586,
+ "loadedCount": 576,
+ "uiCount": 2,
+ "nsCount": 587,
  "totals": {
-  "loadEdges": 468,
+  "loadEdges": 470,
   "hardEdges": 0,
-  "callRefs": 759,
+  "callRefs": 761,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -317,6 +317,7 @@
     "engines/save-health.js",
     "engines/save-migrate.js",
     "engines/save-throttle.js",
+    "engines/scene-intent.js",
     "engines/scene-narrative.js",
     "engines/scope-tag.js",
     "engines/sediment.js",
@@ -589,6 +590,7 @@
     "engines/sanctuary-scramble.js",
     "engines/sartorial-regalia.js",
     "engines/save-curve.js",
+    "engines/scene-intent.js",
     "engines/settings-index.js",
     "engines/shadow-council.js",
     "engines/somatic-trauma.js",
@@ -890,6 +892,7 @@
     "engines/save-health.js",
     "engines/save-migrate.js",
     "engines/save-throttle.js",
+    "engines/scene-intent.js",
     "engines/scene-narrative.js",
     "engines/scope-tag.js",
     "engines/sediment.js",
@@ -3277,6 +3280,29 @@
    "callRefs": [],
    "ghostRefs": [],
    "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/scene-intent.js": {
+   "ns": [
+    "sceneIntent"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_scene_intent_settings_v1"
+   ],
    "consumedBy": []
   },
   "engines/epoch-tide.js": {
