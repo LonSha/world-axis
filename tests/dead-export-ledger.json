@@ -16276,14 +16276,6 @@
       "tref": 1,
       "own": 4
     },
-    "ui.open": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "ui/panel.js",
-      "refs": 0,
-      "tref": 55,
-      "own": 25
-    },
     "ui.renderV17DramaPsycheBoard": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",

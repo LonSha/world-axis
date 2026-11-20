@@ -1601,6 +1601,13 @@
     'ui/schema-view.js',
     'ui/settings.js',
     'ui/assistant.js',
+    // v2.542.0：玩家面「夜读手札」（ui/journal.js）与开发者面「工作台」外壳（ui/console.js）。
+    //   两者都必须排在 ui/panel.js 之后：console.js 给 #wa-panel 挂 .wc 类并观察 .wa-body 重绘，
+    //   journal.js 接管 #wa-orb 的点击（原面板 toggle 之后同步改为开手札）。面板在 init 期已 mount，
+    //   故此处装完即可找到 DOM；两者自持重试（journal 60×500ms / console 80×400ms）。
+    //   无头环境（无 doc.body 或 UA 含 jsdom/HeadlessChrome）只登记空壳命名空间、不碰 DOM。
+    'ui/journal.js',
+    'ui/console.js',
   ];
   // ── 惰性档（v2.529.0 · OPV29-04）：首帧不装，首帧后由 engines/lazy-load.js 串行补装 ──
   //   凭什么可以延迟：这每一条的产品读点都是零，定性记在 tests/ns-consumer-ledger.json 的
@@ -2193,6 +2200,11 @@
         failed: (WA.loadFailures || []).slice(0, 12).map(function (f) { return f.rel; }),
         hasUi: !!(WA.ui && WA.ui.mount),
         uiMounted: !!(WA.ui && WA.ui.mounted),
+        // v2.542.0：两个新增 UI 层的装载面。它们**不是**被别的模块读的提供方（自执行挂 DOM），
+        //   故这里是人读诊断面唯一的读数口：真机打不开 DevTools 时，读 localStorage 的
+        //   wa_diag_v1 就能分清「手札没装 / 装了但没接管 ◈」和「工作台外壳没挂上 .wc」。
+        journalReady: !!(WA.journal && WA.journal.open),
+        consoleShellReady: !!(WA.console && WA.console.tidy),
         orbInDom: !!(mainDoc.getElementById && mainDoc.getElementById('wa-orb')),
         panelInDom: !!(mainDoc.getElementById && mainDoc.getElementById('wa-panel')),
         integrity: (function () { try { return WA.loaderIntegrity ? WA.loaderIntegrity() : null; } catch (e) { return 'err'; } })()

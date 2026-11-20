@@ -232,6 +232,13 @@ const UI_NS = {
   //   本门禁的提供方集合从模块文件的赋值形态取，看不见它 ⇒ 现场报「读了无人提供的 ns（schemaView）」
   //   ⇒ 连带 B5/B6/B9/C6/N4c/N5c/N6g/N7 与 v2107 四条一起红（16 条红的总病根就在这一行缺失）。
   schemaView: 'UI 声明式视图层(ui/schema-view.js)',
+  // v2.542.0：第 18/19 个 UI 层命名空间（ui/journal.js / ui/console.js）。
+  //   与上面 6 条不同型的一点：它们的 ns **没有任何读者** —— 由 index.js 的 LOAD_ORDER
+  //   直接装载、在浏览器层自执行（手札接管 #wa-orb；工作台给 #wa-panel 挂 .wc 类）。
+  //   登记在这里是让「静态图看不见提供方」这条不被误报；同时 v2107 的零引用判据里
+  //   它们必须以「入口型零读取」出现（而不是被当成死文件）。
+  journal: 'UI 玩家面手札(ui/journal.js)',
+  console: 'UI 开发者面工作台外壳(ui/console.js)',
 };
 
 /**

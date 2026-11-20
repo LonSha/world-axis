@@ -579,6 +579,12 @@
     //   「诊断清单覆盖全部磁盘模块」当场报缺这两个文件。
     'ui/pages/now-page.js': 'panelNowPage',
     'ui/pages/people-page.js': 'panelPeoplePage',
+    // v2.542.0：玩家面手札 / 开发者面工作台外壳。登记为**必载**（都在 index.js 的 LOAD_ORDER
+    //   里、且必须先于无头环境判定就能定义命名空间）—— 但它们的 ns 是**自执行入口型**：
+    //   没有别的模块读 WA.journal / WA.console，缺席的表现是「◈ 还是老面板 / 面板还是老样子」，
+    //   不是一段降级行。故同时进 OPTIONAL_EXPORTS（无头不装载 → optionalMissing）。
+    'ui/journal.js': 'journal',
+    'ui/console.js': 'console',
     // v2.101.0（O11）：跨插件互操作验收面（三伙伴五态分列，纯读）
     'engines/interop.js': 'interop',
     // v2.102.0（A2/O12）：性能基线与分层增量。登记为**必载**——它读 render / tool-diag / canon
@@ -913,6 +919,9 @@
       // v2.518.0 收口（UI-P1）：玩家面两个页模块同款（无头环境不装载 → optionalMissing）。
       'panelNowPage',
       'panelPeoplePage',
+      // v2.542.0：手札 / 工作台外壳（无头环境不装载 → optionalMissing）。
+      'journal',
+      'console',
     ];
 
   const UI_BINDINGS = [

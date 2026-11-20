@@ -275,24 +275,46 @@ function headAt(src, lt, from) {
  *     rawHits   —— 原始 `aria-label` 命中数（含挂错元素/容器的，供对账）
  *   文件面**委托 product-files.uiFiles**（单一真源）。
  */
+// v2.542.0（UI 移植）：「自挂载」UI 文件不进源面/DOM 同宽比对。
+//   本门禁的同宽判据前提是「源面写下的名，渲染后必须能在 #wa-panel 里数到同名」。新增的两个
+//   UI 文件不满足这个前提：
+//     · ui/journal.js  —— 自建 #wa-journal 覆盖层（不在 #wa-panel 内）；无头环境走空壳分支。
+//     · ui/console.js  —— 只给 #wa-panel 挂 .wc 类；它自己的 aria-label 在页头按钮/命令面板上，
+//        而页内容永远由 panel.js 渲染（本门禁的取树面看不到它的命令面板，因为面板默认未打开）。
+//   把它们算进源面会让「DOM 归一名 199 / 源面 203」这种**结构性**差恒红，而不是漏补名字。
+//   这里不静默丢弃：它们的读数单独成一组（selfMounted），调用方必须显式断言它非空 —— 
+//   「排除」与「没扫到」在读数上仍可分辨。真机可访问性由 HANDOFF 清单里的人工项覆盖。
+const SELF_MOUNTED = {
+  'ui/journal.js': '自挂载覆盖层 #wa-journal（不在 #wa-panel 内；无头走空壳）',
+  'ui/console.js': '只给 #wa-panel 挂类；自有名在页头/命令面板，取树面不含'
+};
 function srcLabelNames(root) {
   const base = root || BASE;
-  const out = { sites: 0, names: {}, composed: 0, rawHits: 0 };
+  const out = { sites: 0, names: {}, composed: 0, rawHits: 0, selfMounted: { sites: 0, names: {}, files: {} } };
   require('./product-files.js').uiFiles(base).forEach(function (rel) {
     let src = '';
     try { src = fs.readFileSync(path.join(base, rel), 'utf8'); } catch (e) { return; }
+    const selfMount = Object.prototype.hasOwnProperty.call(SELF_MOUNTED, rel);
     const re = /aria-label(?!ledby)/g;
     let m;
     while ((m = re.exec(src)) !== null) {
       out.rawHits += 1;
+      if (selfMount) out.selfMounted.files[rel] = SELF_MOUNTED[rel];
       const lt = src.lastIndexOf('<', m.index);
       if (lt < 0) continue;
       const head = headAt(src, lt, m.index);
       if (!head) continue;                       // 跨标签 / 取不到头 ⇒ 不猜
       if (!SRC_CTRL_TAG_RE.test(head)) continue; // 容器/非控件：DOM 侧也不数
-      out.sites += 1;
       const ma = /aria-label="([^"]*)"/.exec(src.slice(m.index, m.index + 300));
       const raw = ma ? ma[1] : '';
+      if (selfMount) {
+        // 自挂载文件：只进 selfMounted 组，不进源面同宽集合（理由见上方 SELF_MOUNTED）
+        out.selfMounted.sites += 1;
+        if (isComposedLabel(raw)) out.selfMounted.composed = (out.selfMounted.composed || 0) + 1;
+        else out.selfMounted.names[normName(raw)] = 1;
+        continue;
+      }
+      out.sites += 1;
       if (isComposedLabel(raw)) out.composed += 1;
       else out.names[normName(raw)] = 1;
     }

@@ -53,6 +53,10 @@ const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf',
   //   而 tests/run.js 本块永远不会收这两项 ⇒ 「产物与 FROZEN2800 逐字一致」恒假。
   'panelNowPage',
   'panelPeoplePage',
+  // v2.542.0：ui/journal.js / ui/console.js —— 与 tests/run.js 的 UI_NS2800 成对（两处同批）。
+  //   无头环境里 ui/*.js 不装载，故属可选缺席（与 panelNowPage 同款）。
+  'journal',
+  'console',
   // v2.181.0：赛博朋克 UI 主题层 9 个 ns（与 tests/run.js 的 UI_NS2800 同口径）。
   'cyberUI',
   'cyberDashboard',
