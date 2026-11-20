@@ -1061,7 +1061,22 @@
           // 拒收码直译（只有这四个，其余按引擎原话走）——不另编措辞。
           const WHY = { 'bad-value': '档位名不认识', 'save-threw': '写盘失败', 'no-history': '没有可退回的档位', 'module-missing': '引擎未加载' };
           if (!r || r.ok === false) { o.textContent = '✗ 切换失败：' + (WHY[(r && r.reason)] || (r && r.reason) || '未知原因'); return; }
-          if (r.noop) { o.textContent = '● 已是「' + nm + '」档，没有任何改动（不重复写盘、不重复计数）'; return; }
+          // v2.539.8（capability-ui-v2257 三条红收口）：noop 有**两种**，措辞必须分开。
+          //   ① 同一档重切（labelChanged=false）：真·什么都没动 —— 不写盘、不入栈、不重绘。
+          //   ② 目标档本来就无事可做（labelChanged=true）：开关没动，**但档位读数变了**。
+          //      这一句必须走 tierSay(..., true)：重绘后档位块、按钮态、回滚按钮才跟上，
+          //      否则玩家回到顶部看到的还是旧档位（引擎存的是新的、界面说的是旧的）。
+          //      顺带，这条分支是全开装载面上**唯一**会触发重绘的路径 —— 负控制 N6
+          //      「换序后出口必空」要采的正是它（早退直写出口则破坏永远采不到）。
+          if (r.noop) {
+            if (r.labelChanged) {
+              tierSay('✓ 已记为「' + nm + '」档（从 ' + r.from + '）：本档机制本来就全开着，'
+                + '开关层面无事可做、未入回滚栈；档位读数已更新', true);
+            } else {
+              o.textContent = '● 已是「' + nm + '」档，没有任何改动（不重复写盘、不重复计数）';
+            }
+            return;
+          }
           // 部分成功就是部分成功：`notEffective` 逐条列名，绝不折成「已开启」。
           const ne = (r.notEffective || []);
           const head = (ne.length ? '⚠ 部分生效：' : '✓ 已切到「' + nm + '」档：')

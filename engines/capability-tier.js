@@ -437,11 +437,33 @@
       return !!sh && sh.on !== true && sh.hasSet;
     });
     // 幂等（边界②）：无事可做 ⇒ 不写盘、不入栈、不计数
+    // ⚠ v2.539.8（capability-ui-v2257 三条红 · 现场）：「无事可做」原来只算**开关面**
+    //   （toOn / toOff 都空），没算**标签面**（档位名本身要不要改）。ui-gate 的装载面
+    //   是「291 个引擎出厂就全开着」的全开策略，standard 的 34 个机制本来就 on
+    //   ⇒ 两个集合双双为空 ⇒ 早退 ⇒ `settings().tier` 永远停在 lite、回滚栈 0 层，
+    //   而出口照抄 r.noop 说「●已是「standard」档」——**说的和存的不是一回事**：
+    //   玩家关掉页面再回来，档位读数还是 lite。三条锁当场抓到：
+    //     B7a / D5「点 standard 后引擎档位真变了」→ 实 lite；
+    //     N6「破坏版出口必须空」→ 档位压根没切过去，破坏面无从成立。
+    //   判据拆成两条互不替代的事实：
+    //     · 开关面无事可做 且 标签已是目标档 ⇒ 真 noop（B3b 要求此时**零写盘**）
+    //     · 开关面无事可做 但 标签不是目标档 ⇒ 必须**只落标签**：不入栈
+    //       （开关层面确实没动，回滚回去也无事可退 —— B2e「全开下 standard 为 noop
+    //        不入栈」保持成立），但 tier 一定要写进盘，否则读数与提示互相说谎。
     if (!toOff.length && !toOn.length) {
       stat.noops++; stat.lastReason = 'noop'; stat.lastTier = nm;
-      return { ok: true, tier: nm, noop: true, turnedOn: [], turnedOff: [],
+      if (from !== nm) {
+        try { saveSettings({ tier: nm, granted: before }); }
+        catch (e) { stat.lastReason = 'save-threw'; return { ok: false, reason: 'save-threw', tier: from }; }
+      }
+      // labelChanged 是**给界面看的第二件事实**：开关没动（noop）、但档位名真的变了。
+      //   界面必须据此重绘（档位读数、按钮态、回滚按钮），并按同一件事实改措辞 ——
+      //   「什么都没动」在 labelChanged 时是假话（档位读数变了），两页都不许再说这句。
+      return { ok: true, tier: nm, noop: true, from: from, labelChanged: from !== nm,
+        turnedOn: [], turnedOff: [],
         notEffective: [], partial: false, granted: before, rollbackDepth: histRows().length };
     }
+
     if (from !== nm) {
       const pushed = pushHistory({ at: clockWall(), from: from, to: nm, granted: before.slice() });
       if (!pushed.ok) return { ok: false, reason: 'save-threw', tier: from };

@@ -129,13 +129,18 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //   brokerHouse / nightWatch / fireWatch / festivalFair / wardCompact / divinationCraft）。
 //   口径证据：探针 `/tmp/probe_sw.cjs` 在 f3a2706 与本树上逐名 diff，开集新增恰这 9 个键；
 //   MECH（有 buildBlock 的机制）**两树同为 117** —— 本批没有新增注入面，故 MECH 不动。
-const BASE_ON = 270;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
-const MECH = 117;           // 有注入面的机制数
+//   ⚠ v2.539.8 读数跟位（同族第二次漂移，形态与上一批逐字相同）：
+//     本面实测 **290 开 / 131 机制**，登记还写着 270 / 117。两处都涨了 20 和 14 ——
+//     这次不是新引擎批量入场，而是**有注入面的机制也涨了**（MECH 117 → 131），
+//     说明上一批 EXV27 之后又有一批带 buildBlock 的引擎进了装载面，而登记没跟。
+//     判据本身没动：仍是「本测试面的实测值写进常量，断了就红」。
+const BASE_ON = 290;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
+const MECH = 131;           // 有注入面的机制数
 const DORMANT = 0;          // 关着但有注入面的（全开策略后为 0）
-const RUNNING0 = 117;        // 出厂开 且 有注入面的
+const RUNNING0 = 131;        // 出厂开 且 有注入面的
 // full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
 // v2.294.0：= MECH(103) − L3_EXCLUDES(35)。排除名单本身未变，变的只有 MECH。
-const FULL_MECH = 117; // 全开策略后 full 与出厂一致（117）
+const FULL_MECH = 131; // 全开策略后 full 与出厂一致（131）
 const FULL_RUNNING = FULL_MECH + (BASE_ON - RUNNING0);
 
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
@@ -270,6 +275,24 @@ function runB(a) {
   a(r1.notEffective.length === 0, 'B2c: 复核零未生效（实 ' + r1.notEffective.length + '：' + r1.notEffective.join(',') + '）');
   a(r1.turnedOff.length === 0, 'B2d: 切档路上不关任何东西（实关 ' + r1.turnedOff.length + '）');
   a(r1.rollbackDepth === 0, 'B2e: 全开下 standard 为 noop 不入栈（实 ' + r1.rollbackDepth + '）');
+  // B2g 标签面（v2.539.8 新增判据）：**全开装载面上「开关无事可做」≠「档位标签无事可做」**。
+  //   原来这两件事被同一个 noop 早退吞掉：r.noop=true、开关一个没动、出口照抄 r.noop 说
+  //   「已经是 standard」，而 `getSettings().tier` 仍是 lite——**说的和存的不是一回事**，
+  //   玩家关掉面板再进来，档位读数还停在旧档；回滚栈也永远是空的。
+  //   capability-ui-v2257 的 B7a / D5 / N6 三条红就是它，但那是**界面面**的证据；
+  //   引擎面必须自己有一条，否则「界面锁绿了、引擎又悄悄变回去」无人拦。
+  //   判据拆成三件互不替代的事实（缺一条都能让同类缺陷重新长出来）：
+  //     ① 开关面确实没动：turnedOn / turnedOff 双空（B2b/B2d 已锁，此处只复核不重复计分）
+  //     ② 标签面必须落盘：getSettings().tier === 'standard'
+  //     ③ 必须自报 from 与 labelChanged —— 界面据此重绘、据此改措辞，不自报就只能靠猜
+  a(T.getSettings().tier === 'standard',
+    'B2g1: 全开下切 standard 后档位标签真落盘（要 standard，实 ' + T.getSettings().tier + '）');
+  a(r1.noop === true && r1.labelChanged === true && r1.from === 'lite',
+    'B2g2: 同一动作被分成两件事报出来：noop(开关没动) + labelChanged(标签变了)，'
+    + '实 noop=' + r1.noop + ' labelChanged=' + r1.labelChanged + ' from=' + r1.from);
+  a(T.getSettings().granted.length === 0,
+    'B2g3: 标签落盘不夹带 granted（没开过的东西不许记成「本模块开的」，实 '
+    + T.getSettings().granted.length + ' 条）');
   // B2f 逐个真开（不是只数个数）：白名单里每个引擎的 getSettings().enabled 都是 true
   const offStill = T.TIERS.standard.filter(function (k) { return env.WA[k].getSettings().enabled !== true; });
   a(offStill.length === 0, 'B2f: 白名单 34 个逐个回读 enabled===true（未开 ' + offStill.length + '：' + offStill.join(',') + '）');
