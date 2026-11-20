@@ -131,18 +131,35 @@
       + '<ul class="wa-now-list">' + rows + '</ul></section>';
   }
 
-  /** 值得留意：意图板里玩家还需要处理的事。空则不渲染。 */
+  /** 值得留意：人物意图看板 —— 「有人在往哪走、谁卡住了」。空则不渲染。 */
+  //  ⚠ v2.539.9 现场（本轮抓到的真缺陷，不是措辞问题）：
+  //    这一块原来读 `r.text || r.title || r.label`，而 `WA.intentBoard.view().rows`
+  //    的每一项来自引擎的 rowOf()，真字段是 **name / goalText / step.text / isBlocked /
+  //    blocked** —— 三个候选字段**一个都不存在**。于是 rows 明明非空，也被
+  //    `.filter(Boolean)` 滤成空串 ⇒ 整块永远 `return ''`：
+  //    这块「值得留意」是**从来没出现过一次的死面**，而它读起来像「世界很安静」。
+  //    这正是本仓反复裁决过的形态：面板按自己以为的字段名读引擎的返回 = 第二个措辞真源。
+  //  修法：按引擎真字段读；句式照引擎 buildBlock() 自己那一句
+  //    （`名字 → 目标：第 n/total 步「当前步」，卡在 原因`），面板不另编一套。
   function noticeBlock() {
     const b = safe(function () { return WA.intentBoard.view(); }, null);
     if (!b || b.ok !== true) return '';
     const rows = Array.isArray(b.rows) ? b.rows : [];
     if (!rows.length) return '';
-    const li = rows.slice(0, 4).map(function (r) {
-      const text = (r && (r.text || r.title || r.label)) || '';
-      return text ? '<li>' + esc(text) + '</li>' : '';
+    const stuck = rows.filter(function (r) { return r && r.isBlocked === true; });
+    // 有卡住的就先说卡住的 —— 那才是「值得留意」；一条没卡才退回列出在推的
+    const pick = (stuck.length ? stuck : rows).slice(0, 4);
+    const li = pick.map(function (r) {
+      if (!r) return '';
+      const at = (r.step && r.step.text)
+        ? ('第 ' + r.step.seq + '/' + r.total + ' 步「' + r.step.text + '」')
+        : '（没有当前步）';
+      const why = (Array.isArray(r.blocked) && r.blocked.length) ? ('，卡在 ' + r.blocked.join('、')) : '';
+      return '<li>' + esc((r.name || '（无名）') + ' → ' + (r.goalText || '（目标未命名）') + '：' + at + why) + '</li>';
     }).filter(Boolean).join('');
     if (!li) return '';
-    return '<section class="wa-now-card"><h3 class="wa-now-card-t">值得留意</h3>'
+    return '<section class="wa-now-card"><h3 class="wa-now-card-t">'
+      + (stuck.length ? '有人卡住了' : '人物在往哪走') + '</h3>'
       + '<ul class="wa-now-list">' + li + '</ul></section>';
   }
 
@@ -154,12 +171,66 @@
       + '</section>';
   }
 
+  /** 结论卡（v2.539.9 · 六页内容重写 · 概览页）：这一页的 ask 是「此刻该做什么」。 */
+  //  病（现场）：开局后首屏是「场景卡（时间/地点/在场）→ 刚刚 → 值得留意」，
+  //    全是**状态**。玩家读完三块，仍然得自己推断下一步——而这一页的 ask 逐字就是
+  //    「此刻该做什么 —— 时间、章节、待办、下一拍」，页面上却没有一句话直接回答它。
+  //    其中「章节」与「下一拍」在首屏**完全不存在**（章节只在事件页里出现）。
+  //  修法：三句，全部复用本文件已读的出口（store / intentBoard），零新增读口、零新控件：
+  //    ① 你在哪 —— 「时间 · 第 N 章《标题》」，没起章就明说没起（不写「无」）
+  //    ② 谁在动 —— 人物意图看板：几人在推、其中有几人卡住（有卡住的就点名）
+  //       ⚠ 这一句最初写的是「待办：你欠几件」。**写错了**：intentBoard 的 rows 来自
+  //         引擎 rowOf()，语义是 **NPC 的意图链**（读 WA.plan.chain），不是玩家的待办。
+  //         把 NPC 的打算称作「你的待办」= 面板给引擎的读数另起了一个语义（同族第二措辞真源）。
+  //         现在照引擎原义写「谁在推、谁卡住」，第③句才据此给出可执行的下一拍。
+  //    ③ 所以下一拍 —— 有人卡住就先解卡点，没人卡就说一句话推进时间
+  //  边界（与本文件头同规）：出口缺席 ⇒ 该句写成「读数不可用」，
+  //    **绝不塌成「没有」** —— 「算不出来」与「本来就没有」必须是两种形态。
+  function verdictBlock() {
+    const s = store();
+    if (!s) return '';
+    const lines = [];
+    const clockLabel = (s.clock && s.clock.label) ? String(s.clock.label) : '';
+    const ch = (s.chapters && s.chapters.current) ? s.chapters.current : null;
+    const chTxt = (ch && ch.no)
+      ? ('第 ' + ch.no + ' 章' + (ch.title ? '「' + ch.title + '」' : ''))
+      : '还没起章（去「事件」页起一章，今天/明天才有归属）';
+    lines.push(clockLabel
+      ? ('现在：' + clockLabel + ' · ' + chTxt)
+      : ('世界时间还没设定 · ' + chTxt));
+    const b = safe(function () { return WA.intentBoard.view(); }, null);
+    const rows = (b && b.ok === true && Array.isArray(b.rows)) ? b.rows : null;
+    const stuck = rows ? rows.filter(function (r) { return r && r.isBlocked === true; }) : [];
+    if (!rows) {
+      lines.push('谁在动：读数不可用（engines/intent-board.js 缺席或未返回）—— 这不是「没人有打算」');
+    } else if (!rows.length) {
+      lines.push('谁在动：眼下没有人有推进中的打算');
+    } else if (stuck.length) {
+      const who = stuck.slice(0, 2).map(function (r) { return r.name || '（无名）'; }).join('、');
+      lines.push('谁在动：' + rows.length + ' 人在推，其中 ' + stuck.length + ' 人卡住了 —— ' + who);
+    } else {
+      lines.push('谁在动：' + rows.length + ' 人在推进，暂无人卡住');
+    }
+    lines.push(stuck.length
+      ? '下一拍：先解「' + (stuck[0].name || '那一位') + '」的卡点（去「事件」页看卡在哪），或直接说一句话让世界先走一步'
+      : '下一拍：说一句话推进时间（世界只在你有动作时往前走）');
+    return '<div class="wa-verdict"><b>此刻</b><ul>'
+      + lines.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('')
+      + '</ul></div>';
+  }
+
   function render() {
     const s = store();
     const started = !!(s && s.clock && s.clock.label);
     const parts = [];
     const boot = bootCard(started);
     if (boot) parts.push(boot);
+    // 开局后先说「此刻该做什么」，再说「你在哪」（场景卡）——
+    //   顺序反了就等于把结论压在细节后面，玩家又要自己找。
+    if (started) {
+      const vd = safe(verdictBlock, '');
+      if (vd) parts.push(vd);
+    }
     const scene = sceneCard();
     if (scene) parts.push(scene);
     if (started) {
