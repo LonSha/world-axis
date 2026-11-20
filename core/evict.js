@@ -49,6 +49,7 @@
   //         kind: 'array'（默认）| 'object', why: 该容器为何必须有界 }
   // 站点名格式 模块.容器，与代码里的调用点字面量一一对应（门禁 G18 校验双向）。
   const SITES = {
+    'sceneIntent.records':  { path: 'sceneIntent.records', cap: 20, why: '本幕意图环形（L3 核账用，只由 arc-phase.js 写）' },
     'periodicals.issues': { path: 'periodicals.issues', cap: 48, why: '期刊往期有界归档' },
     // ── 结算尾部容量控制（backstage 结算段）──
     'backstage.echoes':      { path: 'echoes',      cap: 40,  why: '暗流回声环形（正文触面）' },

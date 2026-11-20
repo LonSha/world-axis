@@ -1,14 +1,14 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 579,
+ "loadOrderCount": 581,
  "lazyCount": 22,
- "loadedCount": 577,
+ "loadedCount": 579,
  "uiCount": 2,
- "nsCount": 588,
+ "nsCount": 590,
  "totals": {
-  "loadEdges": 472,
+  "loadEdges": 476,
   "hardEdges": 0,
-  "callRefs": 763,
+  "callRefs": 767,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -53,6 +53,7 @@
     "engines/api-vault.js",
     "engines/appointment.js",
     "engines/arc-guide.js",
+    "engines/arc-phase.js",
     "engines/archive-hide.js",
     "engines/artifice-degradation.js",
     "engines/atlas.js",
@@ -90,6 +91,7 @@
     "engines/celestial-omens.js",
     "engines/channel-probe.js",
     "engines/chapters.js",
+    "engines/character-drive.js",
     "engines/chat-guard.js",
     "engines/chat-recycle.js",
     "engines/choice-board.js",
@@ -511,6 +513,7 @@
     "engines/action-methods.js",
     "engines/agency.js",
     "engines/appointment.js",
+    "engines/arc-phase.js",
     "engines/artifice-degradation.js",
     "engines/backstage.js",
     "engines/betrothal-alliance.js",
@@ -522,6 +525,7 @@
     "engines/cascade-bus.js",
     "engines/celestial-omens.js",
     "engines/chapters.js",
+    "engines/character-drive.js",
     "engines/chat-recycle.js",
     "engines/cognitive-poisoning.js",
     "engines/collateral-rupture.js",
@@ -650,6 +654,7 @@
     "engines/api-vault.js",
     "engines/appointment.js",
     "engines/arc-guide.js",
+    "engines/arc-phase.js",
     "engines/archive-hide.js",
     "engines/artifice-degradation.js",
     "engines/atlas.js",
@@ -682,6 +687,7 @@
     "engines/cataclysm-hazard.js",
     "engines/celestial-omens.js",
     "engines/channel-probe.js",
+    "engines/character-drive.js",
     "engines/chat-guard.js",
     "engines/chat-recycle.js",
     "engines/choice-board.js",
@@ -3283,6 +3289,52 @@
    "callRefs": [],
    "ghostRefs": [],
    "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/character-drive.js": {
+   "ns": [
+    "characterDrive"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_character_drive_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/arc-phase.js": {
+   "ns": [
+    "arcPhase"
+   ],
+   "requires": [
+    "registerModule",
+    "settingsBus"
+   ],
+   "requiresFiles": [
+    "core/store.js",
+    "core/settings-bus.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_arc_phase_settings_v1"
+   ],
    "consumedBy": []
   },
   "engines/scene-intent.js": {

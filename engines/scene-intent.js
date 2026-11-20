@@ -120,6 +120,44 @@
     return out;
   }
 
+  /** ── ④-b v2.542.4（L3）三个桥接：核账 / 欠账 / 段位。任何一层缺席都不算错，逐条点名。 ── */
+  function arcSettle() {
+    if (!WA.arcPhase || typeof WA.arcPhase.settle !== 'function') return null;
+    try { return WA.arcPhase.settle({}); } catch (e) { fault('arcPhase.settle', e); return null; }
+  }
+  function arcDebt() {
+    if (!WA.arcPhase || typeof WA.arcPhase.debtItem !== 'function') return null;
+    try { return WA.arcPhase.debtItem(); } catch (e) { fault('arcPhase.debt', e); return null; }
+  }
+  function arcPhaseInfo() {
+    if (!WA.arcPhase || typeof WA.arcPhase.phase !== 'function') return null;
+    try { return WA.arcPhase.phase({}); } catch (e) { fault('arcPhase.phase', e); return null; }
+  }
+  function driveStakes(target) {
+    if (!WA.characterDrive || typeof WA.characterDrive.stakes !== 'function') return null;
+    try { return WA.characterDrive.stakes(target); } catch (e) { fault('drive.stakes', e); return null; }
+  }
+  function driveLineTouch(target, text) {
+    if (!WA.characterDrive || typeof WA.characterDrive.touchesLine !== 'function') return null;
+    try { return WA.characterDrive.touchesLine(target, text); } catch (e) { fault('drive.line', e); return null; }
+  }
+  /** 段位反哺节奏（文档 §6）：rising 禁 release / resolution 优先收线 / crisis 必须有回收。 */
+  function applyPhase(ph, pace, cb, skipped) {
+    if (!ph) { skipped.push({ face: 'arcPhase', reason: 'absent' }); return; }
+    if (!ph.ok) {
+      // 它只是关着 —— 那是用户选择，不是「缺席」，不该每轮在 skipped 里点名。
+      if (ph.reason !== 'disabled') skipped.push({ face: 'arcPhase', reason: ph.reason || 'not-ok' });
+      return;
+    }
+    pace.why.push('arcPhase=' + ph.phase + '(' + ph.score + ')');
+    if (ph.phase === 'rising' && pace.pace === 'release') {
+      pace.pace = 'hold';
+      pace.why.push('rising 禁止 release ⇒ hold');
+      return;
+    }
+    if (ph.phase === 'resolution') { pace.pace = 'release'; pace.why.push('resolution 优先收线 ⇒ release'); return; }
+    if (ph.phase === 'crisis' && !cb) skipped.push({ face: 'arcPhase', reason: 'crisis 要求回收，但无可回收伏笔' });
+  }
   /** ── ⑤ 戏剧问题：从条目的 who + bucket 生成，模板固定，不编情节 ── */
   const VERB = { foreshadow: '碰回这件旧事', plan: '把这一步真的走成', current: '被这件事推着动一步', opening: '走进这个窗口' };
   function questionOf(item) {
@@ -134,24 +172,43 @@
     if (!settings().enabled) return { ok: false, reason: 'disabled', skipped: skipped };
     const s = storeState();
     const round = roundOf(s, opt);
-    const pick = pickItem(skipped);
-    if (!pick) return { ok: false, reason: 'no-agenda', round: round, skipped: skipped };
+    // v2.542.4（L3）：先懒核账（比对**上一条**记录），再取本条意图 —— 顺序反了就是拿自己比自己。
+    const settled = arcSettle();
+    const debt = arcDebt();
+    const pick = debt ? { item: debt, from: 'debt' } : pickItem(skipped);
+    if (!pick) return { ok: false, reason: 'no-agenda', round: round, skipped: skipped, settled: settled };
     const item = pick.item;
     const ax = axisOf(item, s);
     const cb = callbackOf(s, skipped);
     const pace = paceOf(skipped);
+    // v2.542.4（L3）：弧线段位反过来约束节奏（文档 §6）。
+    const ph = arcPhaseInfo();
+    applyPhase(ph, pace, cb, skipped);
     __stat.composes += 1; __stat.lastAxis = ax.axis; __stat.lastPace = pace.pace; __stat.lastAt = Date.now();
+    const change = { axis: ax.axis, target: String(item.who || ''), why: ax.why };
+    // v2.542.5（L4）：碰到某人的底线 ⇒ 强制 press。只认**字面包含**（宁漏不冤）。
+    const lt = driveLineTouch(change.target, String(item.what || '') + '|' + String(item.why || ''));
+    if (lt && lt.hit) { pace.pace = 'press'; pace.why.push('触碰底线（' + lt.line + '）⇒ press'); }
+    // v2.542.5（L4）：筹码（赌的是什么）。两侧都只有真字段才出，一个都没有就仍然是 null。
+    const stakes = driveStakes(change.target);
+    // v2.542.4（L3）：唯一写入点 —— 记下本条意图与**变化前的底数**（下一轮核账要用它比对）。
+    //   只有 L3 开启时才写：arcPhase 关着时本模块仍然零写入（L1 的纪律不变）。
+    if (WA.arcPhase && typeof WA.arcPhase.record === 'function' && WA.arcPhase.getSettings && WA.arcPhase.getSettings().enabled) {
+      try { WA.arcPhase.record({ round: round, change: change, callback: cb, watch: WA.arcPhase.measure(change) }); }
+      catch (e) { fault('arcPhase.record', e); }
+    }
     return {
       ok: true,
       round: round,
       question: questionOf(item),
-      change: { axis: ax.axis, target: String(item.who || ''), why: ax.why },
+      change: change,
+      phase: (ph && ph.ok) ? { phase: ph.phase, score: ph.score, rising: !!ph.rising } : null,
+      settled: settled || null,
       callback: cb,
       pace: pace.pace,
       why: ['director.' + pick.from + '[0]', 'director.item.why=' + String(item.why || '').slice(0, 60)].concat(pace.why),
       item: { kind: item.kind, who: item.who, what: item.what, urgency: item.urgency, bucket: item.bucket },
-      // 筹码（stakes）需要 L4 的 drive{want,fear,line}；本版**不编**：没有真字段就不出这一行。
-      stakes: null,
+      stakes: stakes || null,
       skipped: skipped
     };
   }
@@ -164,6 +221,13 @@
     if (c.question) lines.push('· 戏剧问题：' + c.question);
     if (c.change && c.change.axis) lines.push('· 这一幕结束时，至少有一件事要变：' + (c.change.target ? c.change.target + ' 的' : '') + (AXIS_TEXT[c.change.axis] || '处境变化'));
     if (c.callback && c.callback.text) lines.push('· 可以用上：' + c.callback.text);
+    // v2.542.5（L4）：筹码行只写取得到的一侧（只有 want 就只写「争取到」，不补一句「失手：未知」）。
+    if (c.stakes && (c.stakes.win || c.stakes.lose)) {
+      const parts = [];
+      if (c.stakes.win) parts.push(c.stakes.win);
+      if (c.stakes.lose) parts.push(c.stakes.lose);
+      lines.push('· 筹码：' + parts.join('；'));
+    }
     const pt = PACE_TEXT[c.pace] || PACE_TEXT.hold;
     lines.push('· 节奏：' + pt);
     let text = lines.join('\n');

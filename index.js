@@ -574,6 +574,12 @@
     'engines/dramatic-tension.js',
     // v2.542.2：叙事脊柱 L1「本幕」。须早于 render/inject.js（注入时读 sceneIntent.buildBlock()），
     //   且此刻读的 director / plotGauge / store 都已在装载面里；它自己不写世界。
+    // v2.542.4：叙事脊柱 L3「弧线与核账」。必须早于 scene-intent（后者在 compose 里读
+    //   phase/settle/debtItem）；它自己在**调用期**读 plotGauge 与 chapters，两者都在装载面里。
+    // v2.542.5：叙事脊柱 L4「人物驱动力」。早于 scene-intent（后者在 compose 里取筹码），
+    //   只读 people 画像与 store，零写入。
+    'engines/character-drive.js',
+    'engines/arc-phase.js',
     'engines/scene-intent.js',
     // v2.542.3：叙事脊柱 L2「注入分档」（影子）。须早于 render/inject.js（applyInjections 里在 plan
     //   之前调 observe）；此刻它读的 sceneNarrative / sceneIntent / injectBudgetTables 都已在装载面里，

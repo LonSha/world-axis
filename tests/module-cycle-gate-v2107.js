@@ -309,7 +309,10 @@ function runAll(A) {
   // v2.542.3（叙事脊柱 L2）：新增 engines/inject-tier.js ⇒ 文件面 / 别名面 +1、有引用 +1
   //   （它读 sceneNarrative / sceneIntent / injectBudgetTables / store / evolution 五个既有 ns，均已在读面内）。
   //   601/601/598 → 602/602/599，实测回填；覆盖率口径零变化。
-  A(a.files === 602 && a.aliasFiles === 602 && a.refFiles === 599,
+  // v2.542.4（叙事脎柱 L3）：新增 engines/arc-phase.js ⇒ 文件面 / 别名面 +1、有引用 +1
+  //   （它读 plotGauge / chapters / evolution / store 四个既有 ns；另外 L1 读它）。602/602/599 → 603/603/600，实测回填。
+  // v2.542.5（L4）：engines/character-drive.js 进文件面 ⇒ 603/603/600 → 604/604/601（三数同步 +1，实测回填）。
+  A(a.files === 604 && a.aliasFiles === 604 && a.refFiles === 601,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -492,7 +495,16 @@ function runAll(A) {
   //   render/inject.js 注入面读 injectTier（+1）、engines/tool-diag-tables.js 的 MODULE_EXPORTS（+1），
   //   另 +2 是它读 store（registerModule 之外的 store.get 站点归为同一 (file, ns) 对，与既有对去重后
   //   仍是 +1）与 evolution（roundOf）各一条。恒等式 472 + 4001 = 4473 当场核对。
-  A(a.edgesLoad === 472 && a.edgesCall === 4001 && a.edgesAll === 4473 && a.identityOk,
+  // v2.542.4（叙事脎柱 L3）：装载期 472 → 474（arc-phase 尾调 registerModule +1；
+  //   scene-intent 在装载期多读一个 ns（arcPhase）+1）；调用期 4001 → 4009（+8：
+  //   arc-phase 读 plotGauge / chapters / evolution / store（4）、scene-intent 读 arcPhase（1）、
+  //   tool-diag-tables 的 MODULE_EXPORTS（1）、两处 store.transact 与 evict 归同一 ns对（1）、
+  //   scene-intent 新增的 measure/record 路径（1）。恒等式 474 + 4009 = 4483 当场核对。
+  // v2.542.5（L4）：装载期 474 → 476（character-drive 尾调 registerModule +1；scene-intent 在装载期
+  //   多读一个 ns（characterDrive）+1）；调用期 4009 → 4012（+3：character-drive 读 store / settingsBus /
+  //   __settingsRegs 三个 ns 各一条边，集合去重后按文件计；scene-intent 新增的 stakes/line 路径同文件不重复计）。
+  A(a.edgesLoad === 476 && a.edgesCall === 4012 && a.edgesAll === 4488 && a.identityOk,
+  //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -583,7 +595,9 @@ function runAll(A) {
   // v2.542.2（叙事脊柱 L1）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1（紧跟 dramatic-tension、
   //   早于 render/inject.js）⇒ 577 → 578，实测回填。order-violation 仍 0（它读的三个 ns 前置都在其前）。
   // v2.542.3（叙事脊柱 L2）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1 ⇒ 578 → 579（实测回填）。
-  A(a.edgesLoad >= 20 && a.orderLen === 579,
+  // v2.542.4（叙事脎柱 L3）：LOAD_ORDER 与 run.js LOAD 双登记各 +1 ⇒ 579 → 580。
+  // v2.542.5（L4）：LOAD_ORDER 与 run.js LOAD 双登记各 +1 ⇒ 580 → 581。
+  A(a.edgesLoad >= 20 && a.orderLen === 581,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -655,7 +669,11 @@ function runAll(A) {
   //   三面同步 +1，漂移口径（静态提供方 - 账本）不动 ⇒ B6 常量不改。
   // v2.542.3（叙事脊柱 L2）：injectTier 进静态提供方 ⇒ 644 → 645；--update 后入账 ⇒ 587 → 588；
   //   产品读点（render/inject.js + tool-diag-tables）⇒ 读面 579 → 580。三面同步 +1，漂移口径不动。
-  A(a.nsProvided === 645 && a.nsLedger === 588 && a.nsRead === 580,
+  // v2.542.4（叙事脎柱 L3）：arcPhase 进静态提供方、账本、读面各 +1 ⇒ 646/589/581。
+  // v2.542.5（L4）：characterDrive 进静态提供方、账本、读面各 +1 ⇒ 646/589/581 → 647/590/582。
+  //   读面之所以也 +1（而不是像 v2.192.0 那样只涨提供方）：scene-intent 在产品面真读它，
+  //   不是在测试里读 —— 故差恒等式 647 - 590 = 57 不变，漂移口径不动。
+  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 582,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽

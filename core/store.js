@@ -154,6 +154,10 @@
       rumors: [],
       surgicalPatients: {},
       terrainHazard: { hazards: [], logs: [] },
+      // v2.542.4（叙事脊柱 L3）：本幕意图环形 + 欠账单槽。records 的容量在本文件的容量表与
+      //   core/evict.js 的 SITES 两侧同名登记（cap 20）；唯一写入方是 engines/arc-phase.js。
+      //   物化在骨架里是硬要求：登记了却不在骨架，冷启动直写会炸事务（见 memory.smallSummaries 旧例）。
+      sceneIntent: { records: [], debt: null },
       // 暗流（未结算事件链）
       currents: [],             // {id,title,summary,visibility:hidden|trace|public,public_trace,causes:[],participants:[],stage,createdAt,updatedAt,branchId}
       // 回声（已结算结果与正文的接触面）
@@ -1837,6 +1841,7 @@
     'dynasticLineage.clans.*.elders': { cap: 32, kind: 'array', wildcard: true, site: 'store.withOwnerState write capacity' },
     'dynasticLineage.clans.*.lineageTree': { cap: 128, kind: 'object', wildcard: true, site: 'store.withOwnerState write capacity' },
     'dynasticLineage.members.*.geneticMarkers': { cap: 32, kind: 'array', wildcard: true, site: 'store.withOwnerState write capacity' },
+    'sceneIntent.records': { cap: 20, site: 'arc-phase.js evict.array(records, "sceneIntent.records")' },
     'periodicals.defs': { cap: 8, site: 'periodicals.js configure capacity guard' },
     'periodicals.issues': { cap: 48, site: 'periodicals.js evict.array' },
     'chronicle': { cap: 200, site: 'backstage.js slice(-200) + horizon.js CHRONICLE_CAP 同源（v1.3.0）' },

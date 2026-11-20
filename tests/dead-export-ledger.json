@@ -746,6 +746,30 @@
       "tref": 0,
       "own": 3
     },
+    "arcPhase.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/arc-phase.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 1
+    },
+    "arcPhase.stat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/arc-phase.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "arcPhase.view": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/arc-phase.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
     "arcSettle.stat": {
       "reason": "self-only",
       "detail": "engines/arc-settle.js 内部自用、外部零引用（过度导出）",
@@ -2153,6 +2177,38 @@
       "refs": 0,
       "tref": 0,
       "own": 4
+    },
+    "characterDrive.derive": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/character-drive.js",
+      "refs": 0,
+      "tref": 6,
+      "own": 5
+    },
+    "characterDrive.getSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/character-drive.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
+    },
+    "characterDrive.setSettings": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/character-drive.js",
+      "refs": 0,
+      "tref": 7,
+      "own": 1
+    },
+    "characterDrive.stat": {
+      "reason": "test-only",
+      "detail": "仅测试引用（tests/run.js），产品代码零引用",
+      "src": "engines/character-drive.js",
+      "refs": 0,
+      "tref": 1,
+      "own": 1
     },
     "chatRecycle.confirmPurge": {
       "reason": "self-only",
@@ -12555,19 +12611,19 @@
       "own": 3
     },
     "sceneIntent.getSettings": {
-      "reason": "unwired",
+      "reason": "self-only",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/scene-intent.js",
       "refs": 0,
       "tref": 0,
-      "own": 1
+      "own": 3
     },
     "sceneIntent.setSettings": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
       "src": "engines/scene-intent.js",
       "refs": 0,
-      "tref": 7,
+      "tref": 13,
       "own": 1
     },
     "sceneIntent.stat": {
@@ -16350,6 +16406,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 782
+    "dataOnly": 784
   }
 }
