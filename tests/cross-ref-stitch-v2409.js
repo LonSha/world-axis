@@ -332,7 +332,9 @@ function runAll(assertFn) {
   ['elapsed-evidence.js', 'source-reconcile.js', 'plan-roster.js'].forEach(function (f, i) {
     a(idx.indexOf("'engines/" + f + "'") >= 0, 'T5-' + (i + 1) + ' index.js 加载序列含 ' + f);
   });
-  const td = src('engines/tool-diag.js');
+  // v2.542.6：MODULE_EXPORTS 登记已搬到 tool-diag-tables.js（v2.529.0 拆段）——T5-4..6 问的是
+  //   「产品里有没有这条登记」，故读合并面（与 tests/diag-source.js 同口径）。
+  const td = src('engines/tool-diag.js') + '\n' + src('engines/tool-diag-tables.js');
   ['elapsedEvidence', 'sourceReconcile', 'planRoster'].forEach(function (ns, i) {
     a(td.indexOf("'" + ns + "'") >= 0, 'T5-' + (i + 4) + ' tool-diag 守卫登记 ' + ns);
   });

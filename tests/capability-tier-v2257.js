@@ -135,12 +135,17 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //     说明上一批 EXV27 之后又有一批带 buildBlock 的引擎进了装载面，而登记没跟。
 //     判据本身没动：仍是「本测试面的实测值写进常量，断了就红」。
 const BASE_ON = 290;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
-const MECH = 131;           // 有注入面的机制数
-const DORMANT = 0;          // 关着但有注入面的（全开策略后为 0）
+// v2.542.6 跟位：叙事脊柱 L1 的 sceneIntent **有 buildBlock（有注入面）但出厂 enabled:false**。
+//   为什么它必须是出厂关：L1 的零 token 边界——它被打开之前，注入字节必须与 v2.541.7 逐字节一致
+//   （判据见 tests/scene-intent-v2542.js 的 A 段）。于是它成为**第一个**「关着但有注入面」的机制，
+//   这不是漂移，是有意的设计：MECH 131→132、DORMANT 0→1、FULL_MECH 131→132，
+//   恒等式 MECH − RUNNING0 = DORMANT 仍成立（132 − 131 = 1）。
+const MECH = 132;           // 有注入面的机制数
+const DORMANT = 1;          // 关着但有注入面的（= sceneIntent：出厂关、有注入面，见上）
 const RUNNING0 = 131;        // 出厂开 且 有注入面的
 // full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
 // v2.294.0：= MECH(103) − L3_EXCLUDES(35)。排除名单本身未变，变的只有 MECH。
-const FULL_MECH = 131; // 全开策略后 full 与出厂一致（131）
+const FULL_MECH = 132; // 全开策略后 full 与出厂一致（132；v2.542.6 随 MECH 131→132 跟位）
 const FULL_RUNNING = FULL_MECH + (BASE_ON - RUNNING0);
 
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
