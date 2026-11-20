@@ -33,7 +33,7 @@ function cnt(s, sub) { return String(s).split(sub).length - 1; }
 function runA(a) {
   const SRC = srcOf();
   const pan = readOf('ui/panel.js');
-  const diag = readOf('engines/tool-diag.js');
+  const diag = readOf('engines/tool-diag-tables.js');
 
   a(/async function ask\(question, opts\)/.test(SRC), 'A1: ask(question, opts) 在源码里（带 opts，旧签名升级）');
   a(SRC.indexOf('historySearch') >= 0, 'A2: 真走 historySearch（现场检索面，不是只看快照）');

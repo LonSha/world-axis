@@ -86,10 +86,10 @@ async function runAll(a, ov) {
   a(fs.existsSync(path.join(BASE, OI_REL)), 'A1: 引擎落到仓库里');
   a(rd('tests/run.js', ov).indexOf("'engines/outline-inject.js'") > 0, 'A2: tests/run.js LOAD 已挂');
   a(rd('index.js', ov).indexOf("'engines/outline-inject.js'") > 0, 'A2b: index.js LOAD_ORDER 已挂（否则真宿主不装它）');
-  a(rd('engines/tool-diag.js', ov).indexOf("'engines/outline-inject.js': 'outlineInject'") > 0,
+  a(rd('engines/tool-diag-tables.js', ov).indexOf("'engines/outline-inject.js': 'outlineInject'") > 0,
     'A3: tool-diag 声明表已登记（漏登记 ⇒ inventory 定义面与诊断面上该模块不存在）');
   (function () {
-    const d = rd('engines/tool-diag.js', ov);
+    const d = rd('engines/tool-diag-tables.js', ov);
     const i = d.indexOf('// outlineInject: read 4 / act 8');
     const seg = i >= 0 ? d.slice(i, i + 2000) : '';
     a(i > 0, 'A4: 诊断面口径已升到 read 4 / act 8（执行面 + 预览/撤销进诊断）');
@@ -421,7 +421,7 @@ async function runAll(a, ov) {
   //   本段同时咬一条**边界**：四枚里**有且只有一个写口**（采纳注入），预览必须零写口。
   (function () {
     const P = rd('ui/panel.js', ov);
-    const D = rd('engines/tool-diag.js', ov);
+    const D = rd('engines/tool-diag-tables.js', ov);
     const IDS = ['wa-oi-text', 'wa-oi-mode', 'wa-oi-view', 'wa-oi-preview', 'wa-oi-apply', 'wa-oi-undo'];
     const badR = IDS.filter(function (id) { return cnt(P, 'id="' + id + '"') !== 1; });
     a(badR.length === 0, 'E1: 六枚控件在渲染段各恰 1 次（不合：' + (badR.join(',') || '无') + '）');

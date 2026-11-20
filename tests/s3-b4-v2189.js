@@ -100,7 +100,7 @@ function runA(A) {
   A(inj.indexOf("'beatReport'") >= 0 && inj.indexOf("'genGate'") >= 0, 'A6 SOURCES 登记 beatReport / genGate 两条注入源');
   A(inj.indexOf('WA.beatReport.buildBlock()') >= 0 && inj.indexOf('WA.genGate.buildBlock()') >= 0,
     'A6b 两条注入分支**真调** buildBlock（源表与分支同时增长）');
-  const diag = rd('engines/tool-diag.js');
+  const diag = rd('engines/tool-diag-tables.js');
   A(diag.indexOf("'engines/beat-report.js': 'beatReport'") >= 0 && diag.indexOf("'engines/gen-gate.js': 'genGate'") >= 0,
     'A7 tool-diag 诊断清单登记四引擎（漏登记＝定义面上不存在的黑盒）');
   const st = rd('core/store.js');

@@ -135,7 +135,7 @@ function runA(a) {
       a(pan.indexOf(id) >= 0, 'n4/A18: 面板控件 ' + id + ' 在位');
     });
   // 守卫表登记（渲染 + 绑定 + 守卫三件齐）
-  const diag = rd('engines/tool-diag.js');
+  const diag = rd('engines/tool-diag-tables.js');
   a(diag.indexOf("'wa-evb-board'") >= 0, 'n4/A19: 守卫表登记新控件');
   a(diag.indexOf("'engines/evidence-board.js': 'evidenceBoard'") >= 0,
     'n4/A20: 模块登记表登记（LOAD 进了不等于登记了）');

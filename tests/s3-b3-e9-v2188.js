@@ -273,13 +273,13 @@ function runA(a) {
     });
   }
   {
-    const diag = readOf('engines/tool-diag.js');
-    a(diag.indexOf("'engines/world-lab.js': 'worldLab'") >= 0, 'e9/A42: tool-diag MODULE_EXPORTS 登记');
+    const diag = readOf('engines/tool-diag.js'); const diagT = readOf('engines/tool-diag-tables.js');
+    a(diagT.indexOf("'engines/world-lab.js': 'worldLab'") >= 0, 'e9/A42: tool-diag MODULE_EXPORTS 登记');
     a(diag.indexOf('function secWorldLab()') >= 0, 'e9/A43: tool-diag secWorldLab() 存在');
     a(diag.indexOf('worldLab: secWorldLab()') >= 0, 'e9/A44: tool-diag 诊断对象成员在位');
     a(diag.indexOf('rulePack: secRulePack()') >= 0, 'e9/A44b: 同批的 rulePack 成员未被挤掉（新增不许删旧）');
-    a(diag.indexOf("page: 'tools', ids: ['wa-wl-enabled'") >= 0, 'e9/A45: UI_BINDINGS 登记在**工具页**（与渲染处同页）');
-    a(diag.indexOf("dynamic: ['wa-wl-out']") >= 0, 'e9/A45b: 动态读数出口一并登记');
+    a(diagT.indexOf("page: 'tools', ids: ['wa-wl-enabled'") >= 0, 'e9/A45: UI_BINDINGS 登记在**工具页**（与渲染处同页）');
+    a(diagT.indexOf("dynamic: ['wa-wl-out']") >= 0, 'e9/A45b: 动态读数出口一并登记');
   }
   {
     const pan = readOf('ui/panel.js');

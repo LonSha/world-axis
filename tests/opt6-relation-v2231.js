@@ -59,7 +59,7 @@ function runAll(a, ov) {
   /* ============ A 静态契约 ============ */
   a(fs.existsSync(path.join(BASE, RG_REL)), 'A1: 引擎落到仓库里');
   a(rd('tests/run.js', ov).indexOf("'engines/relation-graph.js'") > 0, 'A2: tests/run.js LOAD 已挂');
-  a(rd('engines/tool-diag.js', ov).indexOf("'engines/relation-graph.js': 'relationGraph'") > 0, 'A3: tool-diag 声明表已登记');
+  a(rd('engines/tool-diag-tables.js', ov).indexOf("'engines/relation-graph.js': 'relationGraph'") > 0, 'A3: tool-diag 声明表已登记');
   a(rd('core/store.js', ov).indexOf('relationGraph: { edges: [], events: [], directed: [] }') > 0,
     'A4: 骨架已物化（登记不等于物化：不在骨架里 registryParity 会报、冷启动直写会炸事务）');
   a(cnt(S, 'store.transact') >= 4, 'A5: 引擎里有真写口（落边/事件/删/清四处，实 ' + cnt(S, 'store.transact') + '）');

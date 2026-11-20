@@ -181,8 +181,8 @@ function runA(a) {
     'engines/worldbook.js', 'engines/campaign.js'].forEach(function (f) {
     a(idx.indexOf("'" + f + "'") >= 0 && idx.indexOf("'" + f + "'") < pos, 'e8/A25: ' + f + ' 排在 dep-check 之前');
   });
-  const diag = readOf('engines/tool-diag.js');
-  a(diag.indexOf("'engines/dep-check.js': 'depCheck'") >= 0, 'e8/A26: tool-diag MODULE_EXPORTS 登记');
+  const diag = readOf('engines/tool-diag.js'); const diagT = readOf('engines/tool-diag-tables.js');
+  a(diagT.indexOf("'engines/dep-check.js': 'depCheck'") >= 0, 'e8/A26: tool-diag MODULE_EXPORTS 登记');
   a(diag.indexOf('function secDepCheck()') >= 0, 'e8/A27: tool-diag secDepCheck() 存在');
   a(diag.indexOf('depCheck: secDepCheck()') >= 0, 'e8/A28: tool-diag 诊断对象成员在位');
   a(diag.indexOf('atlas: secAtlas(),') >= 0, 'e8/A28b: 上一版的 atlas 成员未被挤掉（新增不许删旧）');
@@ -198,7 +198,7 @@ function runA(a) {
   a(pan.indexOf("foldSec('tools', 'depcheck', '依赖体检与迁移助手") >= 0, 'e8/A31: 分区标题是折叠段形态且含模块身份词');
   a(pan.indexOf('atEsc') < 0 || pan.indexOf('const atEsc') >= 0 || pan.indexOf('atEsc = (v)') >= 0,
     'e8/A32: 本版新增区块不含未定义的 atEsc（ui-gate 抓到过的 ReferenceError 面）');
-  a(diag.indexOf("page: 'tools', ids: ['wa-dc-enabled'") >= 0, 'e8/A33: UI_BINDINGS 登记在**工具页**（与渲染处同页）');
+  a(diagT.indexOf("page: 'tools', ids: ['wa-dc-enabled'") >= 0, 'e8/A33: UI_BINDINGS 登记在**工具页**（与渲染处同页）');
   const mv = (readOf('index.js').match(/VERSION = '([0-9.]+)'/) || [])[1] || '';
   const cmp = function (x, y) {
     const A = String(x).split('.').map(Number), B = String(y).split('.').map(Number);

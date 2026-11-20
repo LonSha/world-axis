@@ -106,8 +106,8 @@ function runA(a) {
   a(readOf('index.js').indexOf("'engines/campaign.js'") >= 0, 'e4/A18: index.js LOAD_ORDER 装载');
   a(readOf('tests/run.js').indexOf("'engines/campaign.js'") >= 0, 'e4/A19: tests/run.js LOAD 装载');
   a(readOf('core/store.js').indexOf('campaign: { scene: \'\', stage: 0') >= 0, 'e4/A20: store 骨架声明 campaign 键');
-  const diag = readOf('engines/tool-diag.js');
-  a(diag.indexOf("'engines/campaign.js': 'campaign'") >= 0, 'e4/A21: tool-diag MODULE_EXPORTS 登记');
+  const diag = readOf('engines/tool-diag.js'); const diagT = readOf('engines/tool-diag-tables.js');
+  a(diagT.indexOf("'engines/campaign.js': 'campaign'") >= 0, 'e4/A21: tool-diag MODULE_EXPORTS 登记');
   a(diag.indexOf('function secCampaign()') >= 0, 'e4/A22: tool-diag secCampaign() 存在');
   a(diag.indexOf('campaign: secCampaign()') >= 0, 'e4/A23: tool-diag 诊断对象成员在位');
   const pan = readOf('ui/panel.js');

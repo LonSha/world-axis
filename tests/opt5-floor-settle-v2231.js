@@ -61,7 +61,7 @@ function runAll(a) {
   a(fs.existsSync(path.join(BASE, FS_REL)), 'A1: 引擎落到仓库里');
   a(rd('tests/run.js').indexOf("'engines/floor-settle.js'") > 0, 'A2: tests/run.js LOAD 已挂（否则整套回归根本不装它）');
   a(rd('index.js').indexOf("'engines/floor-settle.js'") > 0, 'A2b: index.js LOAD_ORDER 已挂（否则真宿主不装它）');
-  a(rd('engines/tool-diag.js').indexOf("'engines/floor-settle.js': 'floorSettle'") > 0,
+  a(rd('engines/tool-diag-tables.js').indexOf("'engines/floor-settle.js': 'floorSettle'") > 0,
     'A3: tool-diag 声明表已登记（漏登记 ⇒ inventory 定义面与诊断面上该模块不存在）');
   a(rd('core/store.js').indexOf('floorSettle: { entries: [] }') > 0, 'A3b: 骨架已物化（不在骨架里 registryParity 会报，冷启动直写会炸）');
   a(rd('core/interceptor.js').indexOf('WA.floorSettle.beginRound()') > 0, 'A4: 拦截器在轮开始抓基线');

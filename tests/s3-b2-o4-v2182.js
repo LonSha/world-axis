@@ -95,11 +95,11 @@ function runA(a) {
   a(/NON_EVICT/.test(src) && /在途豁免/.test(src), 'o4v2182/A12: 可回收/不可回收/在途三分口径在位');
   a(readOf('index.js').indexOf("'engines/capacity-audit.js'") >= 0, 'o4v2182/A13: index.js LOAD_ORDER 装载');
   a(readOf('tests/run.js').indexOf("'engines/capacity-audit.js'") >= 0, 'o4v2182/A14: tests/run.js LOAD 装载');
-  const diag = readOf('engines/tool-diag.js');
-  a(diag.indexOf("'engines/capacity-audit.js': 'capacityAudit'") >= 0, 'o4v2182/A15: tool-diag MODULE_EXPORTS 登记');
+  const diag = readOf('engines/tool-diag.js'); const diagT = readOf('engines/tool-diag-tables.js');
+  a(diagT.indexOf("'engines/capacity-audit.js': 'capacityAudit'") >= 0, 'o4v2182/A15: tool-diag MODULE_EXPORTS 登记');
   a(diag.indexOf('function secCapacityAudit()') >= 0, 'o4v2182/A16: tool-diag 节函数存在');
   a(diag.indexOf('capacityAudit: secCapacityAudit()') >= 0, 'o4v2182/A17: tool-diag 诊断对象成员在位');
-  a(diag.indexOf('wa-cap-enabled') >= 0 && diag.indexOf('wa-cap-water') >= 0, 'o4v2182/A18: tool-diag UI_BINDINGS 登记本模块控件');
+  a(diagT.indexOf('wa-cap-enabled') >= 0 && diagT.indexOf('wa-cap-water') >= 0, 'o4v2182/A18: tool-diag UI_BINDINGS 登记本模块控件');
   const pan = readOf('ui/panel.js');
   ['wa-cap-enabled', 'wa-cap-oblig', 'wa-cap-water', 'wa-cap-reclaim', 'wa-cap-migrate', 'wa-cap-diag', 'wa-cap-out'].forEach(function (id) {
     a(pan.indexOf(id) >= 0, 'o4v2182/A19: 面板渲染 ' + id);

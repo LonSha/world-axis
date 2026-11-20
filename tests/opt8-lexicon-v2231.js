@@ -112,21 +112,26 @@ async function runAll(a, ov) {
   a(rd('tests/run.js', ov).indexOf("'engines/recipe.js'") > 0 && rd('tests/run.js', ov).indexOf("'engines/economy.js'") > 0,
     'A2: tests/run.js LOAD 已挂（recipe 与 economy 都在装载面上）');
   (function () {
-    const d = rd('engines/tool-diag.js', ov);
-    a(d.indexOf("'engines/recipe.js': 'recipe'") > 0 && d.indexOf("'engines/economy.js': 'economy'") > 0
-      && d.indexOf("'engines/fate.js': 'fate'") > 0 && d.indexOf("'engines/theme.js': 'theme'") > 0,
+    // OPV29-07：MODULE_EXPORTS / UI_BINDINGS 两张表已出闸到 tool-diag-tables.js，
+    //   tool-diag.js 只剩消费方。因此「登记」类断言读 dT，「节函数 / 诊断对象成员」类仍读 d。
+    //   A3（声明表登记）、A4（诊断面口径注释）、A4b（judgeView）、A4d（守卫表控件）四条都在表里；
+    //   A4c 问的是 secWorldLexicon() 节函数与成员接线，仍在 tool-diag.js。
+    const dT = rd('engines/tool-diag-tables.js', ov);
+    a(dT.indexOf("'engines/recipe.js': 'recipe'") > 0 && dT.indexOf("'engines/economy.js': 'economy'") > 0
+      && dT.indexOf("'engines/fate.js': 'fate'") > 0 && dT.indexOf("'engines/theme.js': 'theme'") > 0,
       'A3: tool-diag 声明表已登记（漏登记 ⇒ inventory 定义面与诊断面上该模块不存在）');
   })();
   (function () {
     const d = rd('engines/tool-diag.js', ov);
-    const i = d.indexOf('// fate: read 4 / act 17');
-    const seg = i >= 0 ? d.slice(i, i + 2000) : '';
+    const dT = rd('engines/tool-diag-tables.js', ov);
+    const i = dT.indexOf('// fate: read 4 / act 17');
+    const seg = i >= 0 ? dT.slice(i, i + 2000) : '';
     a(i > 0, 'A4: 诊断面口径已升到 read 4 / act 17（判定维度读数进只读面）');
     a(seg.indexOf('judgeView:') > 0,
       'A4b: 诊断面含 judgeView（「这一局的判定维度是哪几个」必须可答 —— 这正是本项要治的不可见）');
     a(d.indexOf('worldLexicon: secWorldLexicon()') > 0 && d.indexOf('function secWorldLexicon()') > 0,
       'A4c: 世界词汇面诊断节在位（货币 / 配方 / 判定维度 / 题材目录 + 逐配方前置自洽）');
-    a(d.indexOf("'wa-lex-view'") > 0, 'A4d: 守卫表登记了面板新控件（渲染 + 绑定 + 守卫三件齐做）');
+    a(dT.indexOf("'wa-lex-view'") > 0, 'A4d: 守卫表登记了面板新控件（渲染 + 绑定 + 守卫三件齐做）');
   })();
   (function () {
     const e0 = envWith(ov);

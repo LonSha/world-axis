@@ -95,7 +95,7 @@ async function runAll(a, ov) {
   /* ============ A 静态契约 ============ */
   a(fs.existsSync(path.join(BASE, MO_REL)), 'A1: 模块落在仓库里');
   a(rd('tests/run.js', ov).indexOf("'actors/monologue.js'") > 0, 'A2: tests/run.js LOAD 已挂（否则整套回归根本不装它）');
-  a(rd('engines/tool-diag.js', ov).indexOf("'actors/monologue.js': 'monologue'") > 0,
+  a(rd('engines/tool-diag-tables.js', ov).indexOf("'actors/monologue.js': 'monologue'") > 0,
     'A3: tool-diag 声明表已登记（漏登记 ⇒ 诊断面上该模块不存在）');
   const rpLine = S.split('\n').filter(function (l) { return l.indexOf('const ROLEPLAY_SYS') === 0; })[0] || '';
   a(rpLine.indexOf('禁止「静观其变」') < 0 && rpLine.indexOf('发生明显变化') < 0,

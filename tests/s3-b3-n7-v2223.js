@@ -58,6 +58,11 @@ const path = require('path');
 const BASE = path.join(__dirname, '..');
 const PANEL_REL = 'ui/panel.js';
 const DIAG_REL = 'engines/tool-diag.js';
+/** OPV29-07：MODULE_EXPORTS / UI_BINDINGS（守卫表）已出闸到 tool-diag-tables.js，
+ *  tool-diag.js 只剩消费方（节函数 secXxx / 诊断对象成员 / 诊断面口径行）。
+ *  本锁的登记类断言（A2b 守卫表恰登记 1 次 / A4 dynamic 层 / A11b guardIds / A12 的 guardIds 锚点）
+ *  必须读表真源所在文件；A11 的 `dg.adapters` / `st.adapterProbes` 属诊断面口径行，仍读 tool-diag.js。 */
+const DIAG_TAB_REL = 'engines/tool-diag-tables.js';
 const ENG_REL = 'engines/world-lab.js';
 /** OPV29-11：ADAPTERS 等语汇常量已搬到 world-lab-tables.js —— 该锚点跟位。 */
 const TAB_REL = 'engines/world-lab-tables.js';
@@ -130,7 +135,7 @@ const TGT = {
   seedBefore: ENG_REL, scope: ENG_REL, unsafeDirect: ENG_REL, disabledOut: ENG_REL,
   restoreCfg: ENG_REL, outReason: ENG_REL, adTableCache: ENG_REL, planFilter: ENG_REL,
   seedUnchanged: ENG_REL, statOf: ENG_REL,
-  diagAdapters: DIAG_REL, diagStat: DIAG_REL, guardIds: DIAG_REL,
+  diagAdapters: DIAG_REL, diagStat: DIAG_REL, guardIds: DIAG_TAB_REL,
   pBtnAdapters: PANEL_REL, pBtnAdvance: PANEL_REL, pInputAdv: PANEL_REL,
   pBindAdapters: PANEL_REL, pBindAdvance: PANEL_REL,
   pCallTable: PANEL_REL, pCallAdvance: PANEL_REL,
@@ -173,7 +178,7 @@ function stripLineComments(s) {
   require(path.join(BASE, 'tests/mock.js'));
   const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
   const LS = global.localStorage;
-  const P = rd(PANEL_REL), D = rd(DIAG_REL), E = rd(ENG_REL), SELF = rd(SELF_REL);
+  const P = rd(PANEL_REL), D = rd(DIAG_REL), DT = rd(DIAG_TAB_REL), E = rd(ENG_REL), SELF = rd(SELF_REL);
   function env0(ov) { return gate.fresh(ov ? { srcOverride: ov } : {}); }
   /**
    * 种一份**有主体、有货源、有故事钟前置**的世界。
@@ -226,13 +231,13 @@ function stripLineComments(s) {
   // 控件「三件齐」:渲染 1 次 + 守卫表登记 1 次 + 按钮有绑定 —— 缺一件时守卫永远查不到。
   NEW_IDS.forEach(function (id) {
     a(cnt(segR, 'id="' + id + '"') === 1, 'n7/A2: ' + id + ' 在渲染段恰渲染 1 次(实 ' + cnt(segR, 'id="' + id + '"') + ')');
-    a(cnt(D, "'" + id + "'") === 1, 'n7/A2b: ' + id + ' 在守卫表里恰登记 1 次(实 ' + cnt(D, "'" + id + "'") + ')');
+    a(cnt(DT, "'" + id + "'") === 1, 'n7/A2b: ' + id + ' 在守卫表里恰登记 1 次(实 ' + cnt(DT, "'" + id + "'") + ')');
   });
   BTN_IDS.forEach(function (id) {
     a(cnt(segB, "on('#" + id + "', () => {") === 1, 'n7/A3: ' + id + ' 的 onclick 绑定恰 1 处(实 ' + cnt(segB, "on('#" + id + "', () => {") + ')');
   });
   // `wa-wl-out` 是 E9 时代就有的**既有**读数口:N7 两枚 handler 一律回写它 —— 不新开读数区。
-  a(cnt(D, "dynamic: ['wa-wl-out']") === 1, 'n7/A4: 读数出口 wa-wl-out 在守卫表 dynamic 层恰 1 处(既有出口复写)');
+  a(cnt(DT, "dynamic: ['wa-wl-out']") === 1, 'n7/A4: 读数出口 wa-wl-out 在守卫表 dynamic 层恰 1 处(既有出口复写)');
   a(cnt(segR, 'id="wa-wl-out"') === 1, 'n7/A4b: 输出容器在 N7 渲染段在场恰 1 次(否则两枚 handler 写进空气)');
   a((segR.match(/wa-[a-z]+-out/g) || []).filter(function (v, i, arr) { return arr.indexOf(v) === i; }).join() === 'wa-wl-out',
     'n7/A4d: N7 渲染段只含 wa-wl-out 这一个读数口(防与它页串切)');
@@ -266,7 +271,7 @@ function stripLineComments(s) {
   // 跨文件:诊断面回带的是**同一份**结论(不重算)
   a(D.indexOf(ANCHOR.diagAdapters) >= 0 && D.indexOf(ANCHOR.diagStat) >= 0,
     'n7/A11: 诊断面回带适配器表与两枚计数(同源同键,不各算各的)');
-  a(D.indexOf(ANCHOR.guardIds) >= 0, 'n7/A11b: 三枚新 id 已进守卫表(渲染 + 绑定 + 登记三件齐)');
+  a(DT.indexOf(ANCHOR.guardIds) >= 0, 'n7/A11b: 三枚新 id 已进守卫表(渲染 + 绑定 + 登记三件齐)');
   // 锚点纯度 + 唯一性
   const anchorDecl = SELF.slice(SELF.indexOf('const ANCHOR = {'), SELF.indexOf('\n};', SELF.indexOf('const ANCHOR = {')));
   Object.keys(ANCHOR).forEach(function (k) {

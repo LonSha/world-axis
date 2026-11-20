@@ -278,7 +278,7 @@ function judge(a) {
   const st = readSrc('core/store.js');
   const ix = readSrc('index.js');
   const rj = readSrc('tests/run.js');
-  const td = readSrc('engines/tool-diag.js')  // OPV29-07：注册表/校验表已出闸，读「引擎+表」合并面
+  const td = readSrc('engines/tool-diag-tables.js')  // OPV29-07：两张表已出闸到 tool-diag-tables.js（tool-diag.js 只剩消费方）；本文件问的正是「登记」，故读表真源
     + readSrc('engines/tool-diag-tables.js');
   const inj = readSrc('render/inject.js');
   const pn = readSrc('ui/panel.js');

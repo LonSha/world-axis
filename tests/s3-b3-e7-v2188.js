@@ -288,12 +288,12 @@ function runA(a) {
     });
   }
   {
-    const diag = readOf('engines/tool-diag.js');
-    a(diag.indexOf("'engines/rule-pack.js': 'rulePack'") >= 0, 'e7/A40: tool-diag MODULE_EXPORTS 登记');
+    const diag = readOf('engines/tool-diag.js'); const diagT = readOf('engines/tool-diag-tables.js');
+    a(diagT.indexOf("'engines/rule-pack.js': 'rulePack'") >= 0, 'e7/A40: tool-diag MODULE_EXPORTS 登记');
     a(diag.indexOf('function secRulePack()') >= 0, 'e7/A41: tool-diag secRulePack() 存在');
     a(diag.indexOf('rulePack: secRulePack()') >= 0, 'e7/A42: tool-diag 诊断对象成员在位');
     a(diag.indexOf('depCheck: secDepCheck()') >= 0, 'e7/A42b: 上一版的 depCheck 成员未被挤掉（新增不许删旧）');
-    a(diag.indexOf("page: 'tools', ids: ['wa-rp-enabled'") >= 0, 'e7/A43: UI_BINDINGS 登记在**工具页**（与渲染处同页）');
+    a(diagT.indexOf("page: 'tools', ids: ['wa-rp-enabled'") >= 0, 'e7/A43: UI_BINDINGS 登记在**工具页**（与渲染处同页）');
     a(diag.indexOf("dynamic: ['wa-rp-out']") >= 0, 'e7/A43b: 动态读数出口一并登记');
   }
   {

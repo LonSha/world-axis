@@ -120,7 +120,7 @@ function runA(a) {
   ['wa-plan-limits', 'wa-plan-autoadopt', 'wa-plan-adoptbudget', 'wa-plan-adopt']
     .forEach(function (id) { a(pan.indexOf(id) >= 0, 'n2/A19: 面板控件 ' + id + ' 在位'); });
   // 守卫表登记（渲染 + 绑定 + 守卫三件齐）
-  a(rd('engines/tool-diag.js').indexOf("'wa-plan-limits'") >= 0, 'n2/A20: 守卫表登记新控件');
+  a(rd('engines/tool-diag-tables.js').indexOf("'wa-plan-limits'") >= 0, 'n2/A20: 守卫表登记新控件');
   // 版本面：模块自报 ver = 本模块**最后一次交付**的版本（不固定跟随 index）。
   //   沿革：本锁 v2.220.0 交付时写的是「自报 ver === index.js VERSION」，但那仅在**该模块当期交付那一版**成立——
   //   plan.js 末次真改在 N2（2.220.0），之后 index 升版不应拖动它（否则每版都要改一个未变模块的自报值）。

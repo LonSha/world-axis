@@ -159,8 +159,8 @@ function runA(a) {
     'engines/faction-graph.js', 'engines/diplomacy.js', 'engines/sediment.js'].forEach(function (f) {
     a(idx.indexOf("'" + f + "'") >= 0 && idx.indexOf("'" + f + "'") < atPos, 'e6/A22: ' + f + ' 排在 atlas 之前');
   });
-  const diag = readOf('engines/tool-diag.js');
-  a(diag.indexOf("'engines/atlas.js': 'atlas'") >= 0, 'e6/A23: tool-diag MODULE_EXPORTS 登记');
+  const diag = readOf('engines/tool-diag.js'); const diagT = readOf('engines/tool-diag-tables.js');
+  a(diagT.indexOf("'engines/atlas.js': 'atlas'") >= 0, 'e6/A23: tool-diag MODULE_EXPORTS 登记');
   a(diag.indexOf('function secAtlas()') >= 0, 'e6/A24: tool-diag secAtlas() 存在');
   a(diag.indexOf('atlas: secAtlas()') >= 0, 'e6/A25: tool-diag 诊断对象成员在位');
   const pan = readOf('ui/panel.js');
@@ -171,7 +171,7 @@ function runA(a) {
   ['wa-at-enabled', 'wa-at-view', 'wa-at-places', 'wa-at-routes', 'wa-at-rel', 'wa-at-unplaced', 'wa-at-diag', 'wa-at-out']
     .forEach(function (id) { a(pan.indexOf(id) >= 0, 'e6/A27: 面板渲染 ' + id); });
   a(pan.indexOf('<div class="wa-sec">统一地图与关系视图</div>') >= 0, 'e6/A28: 分区标题是纯文本形态且含模块身份词');
-  a(diag.indexOf("page: 'world', ids: ['wa-at-enabled'") >= 0, 'e6/A29: UI_BINDINGS 登记在**世界页**（与渲染处同页）');
+  a(diagT.indexOf("page: 'world', ids: ['wa-at-enabled'") >= 0, 'e6/A29: UI_BINDINGS 登记在**世界页**（与渲染处同页）');
   const mv = (readOf('index.js').match(/VERSION = '([0-9.]+)'/) || [])[1] || '';
   const cmp = function (x, y) {
     const A = String(x).split('.').map(Number), B = String(y).split('.').map(Number);

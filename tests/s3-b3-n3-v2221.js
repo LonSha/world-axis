@@ -131,7 +131,7 @@ function runA(a) {
   ['wa-schain-order', 'wa-schain-plan', 'wa-schain-bottleneck', 'wa-schain-verify', 'wa-schain-dia', 'wa-schain-who', 'wa-schain-commit']
     .forEach(function (id) { a(pan.indexOf(id) >= 0, 'n3/A19: 面板控件 ' + id + ' 在位'); });
   // 守卫表登记（渲染 + 绑定 + 守卫三件齐）
-  const diag = rd('engines/tool-diag.js');
+  const diag = rd('engines/tool-diag-tables.js');
   a(diag.indexOf("'wa-schain-plan'") >= 0, 'n3/A20: 守卫表登记新控件');
   a(diag.indexOf("'engines/supply-chain.js': 'supplyChain'") >= 0, 'n3/A21: 模块登记表登记（LOAD 进了不等于登记了）');
   // 版本面：模块自报 ver = 本模块**最后一次交付**的版本（不固定跟随 index）。

@@ -17384,12 +17384,33 @@ assert(r2900.dead.length === 2031 && r2900.uiDead.length === 7 && r2900.dataOnly
     //   一份可读名单：纯函数基元不读别人是**事实**，不是「还没写」。放宽阈值会静默吸收
     //   第三个零引用文件（那才是缺陷：定义了命名空间却谁也不读）。
     const noRef2107 = Object.keys(a.graph.refs).filter(function (k) { return !a.graph.refs[k].length; }).sort();
+    // v2.541.7：零引用文件的第三种**同型合法形态**——纯渲染叶子。
+    //   ui/schema-view.js 只写 `WA.schemaView`、不读任何既有 ns（blocks 数据进来、HTML 出去），
+    //   与 core/sanitize.js / core/input-guard.js 是同型：无依赖的纯函数，所以「不读别人」是**事实**。
+    //   ⚠ 但「不读别人」≠「没人读它」：放行名单必须同时自证有真消费方，否则白名单会静默吸收死文件
+    //   （这正是 v2.111.0 把「至多一个」改成逐一具名的初衷）。故下面另算 orphan——
+    //   零引用且**读它的文件数为 0** = 真死文件，一条都不许有。
+    const NO_REF_OK = ['core/input-guard.js', 'core/sanitize.js', 'ui/schema-view.js'];
+    const readByOthers = {};
+    Object.keys(a.graph.refs).forEach(function (rel) {
+      a.graph.refs[rel].forEach(function (ns) { (readByOthers[ns] = readByOthers[ns] || []).push(rel); });
+    });
+    const orphan = noRef2107.filter(function (rel) {
+      // 该文件提供（赋值）的 ns 里，只要有一个被别的文件读过 ⇒ 它有消费方
+      const mine = Object.keys(a.providers).filter(function (ns) {
+        return (a.providers[ns] || []).indexOf(rel) >= 0;
+      });
+      return !mine.some(function (ns) { return (readByOthers[ns] || []).length > 0; });
+    });
     assert(a.aliasFiles === a.files && a.refFiles === a.aliasFiles - noRef2107.length,
       'v2107: 别名覆盖率 ' + a.aliasFiles + '/' + a.files + '（三种 alias 形态全认；'
       + '初版只认一种时 15 个文件被当成无引用——「扫描器瞎了」长得像「没有边」）');
-    assert(noRef2107.join(',') === 'core/input-guard.js,core/sanitize.js',
-      'v2107: 零引用文件恰是**声明过的纯函数基元**（实 ' + noRef2107.join(' / ') + '）——'
-      + '「定义了命名空间却谁也不读」只有这两处，且都是纯函数（不依赖任何既有模块）');
+    assert(noRef2107.join(',') === NO_REF_OK.join(','),
+      'v2107: 零引用文件恰是**声明过的纯函数基元 + 纯渲染叶子**（实 ' + noRef2107.join(' / ') + '）——'
+      + '「文件不读别人」只有这三处，且都是无依赖纯函数（ui/schema-view.js 的依赖是入参 blocks）');
+    assert(orphan.length === 0,
+      'v2107: 零引用文件**不是死文件**——每个都被别的文件真读过（实孤儿 ' + orphan.length
+      + (orphan.length ? '：' + orphan.join(',') : '') + '；这一条防的是「白名单放行一个没人读的定义」）');
     assert(a.unprovided.length === 0,
       'v2107: 无「读了无人提供的 ns」（实 ' + a.unprovided.length
       + (a.unprovided.length ? '：' + a.unprovided.map(function (u) { return u.ns; }).join(',') : '') + '）');
