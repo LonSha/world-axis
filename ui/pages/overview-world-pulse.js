@@ -51,12 +51,10 @@
       let out = '<div>伏笔：在途 <b>' + esc(act) + '</b> / 累计 ' + esc(st.total)
         + '（已回收 ' + esc(st.triggered || 0) + '·终局 ' + esc(st.closed || 0) + '）'
         + (st.stale ? '<span style="opacity:0.7;">，' + esc(st.stale) + ' 条已搁置过久</span>' : '') + '</div>';
-      let rows = [];
-      //  引擎零 list 导出（纪律：零消费能力当场删）——只读 stat 聚合，不猜明细
-      rows.forEach(function (f) {
-        const ttl = f.title || f.text || f.name || f.summary || '';
-        if (ttl) out += sub(ttl + '（' + f.status + '）');
-      });
+      //  引擎零 list 导出（纪律：零消费能力当场删）——只读 stat 聚合，不猜明细。
+      //  这里原先留着一个 `const rows = []` + forEach 猜字段（title/text/name/summary）的循环：
+      //  数组恒空，循环一次都不执行，是**看起来在列明细、其实永远不列**的假能力。
+      //  foreshadow 的真明细读口不存在，就不在这里编一条；将来引擎给出 list 再回来接。
       // 回收时机提示（OPV25-T2-1）：check() 是引擎的**只读**扫描口（panel.js 已有同款消费，
       //   内部只动模块内 stat 计数、不写世界）。逾期行给「超阈值未推进 N 条 + 最久一条」人话，
       //   阈值从返回值读（thresholdMs），不在此硬编码——口径单一真源。
@@ -126,13 +124,33 @@
   function opportunitySect() {
     if (!WA.opportunity || typeof WA.opportunity.list !== 'function') return '';
     return sect(function () {
-      const rows = (WA.opportunity.list() || []).slice(0, 3);
+      const allRows = (WA.opportunity.list() || []);
+      const rows = allRows.slice(0, 3);
       if (!rows.length) return DIM0 + '机会动向：暂无可选动向（世界在等你的下一步）</div>';
-      let out = '<div>机会动向：在途 <b>' + esc(rows.length) + '</b> 条</div>';
+      //  ⚠ 这一行原来拿 rows.length 报「在途 N 条」——rows 已经 slice(0,3)，
+      //  在途 7 条时会报成 3 条。判据的输入面不得窄于事实：计数用全量，只有列出才截断。
+      let out = '<div>机会动向：在途 <b>' + esc(allRows.length) + '</b> 条'
+        + (allRows.length > rows.length ? '<span style="opacity:0.7;">（下面只列最近 ' + esc(rows.length) + ' 条）</span>' : '')
+        + '</div>';
       rows.forEach(function (v) {
-        const ttl = v.title || v.text || v.name || v.summary || v.id || '';
-        if (!ttl) return;
-        out += '<div class="wa-dim" style="opacity:0.75;font-size:11px;margin-top:2px;">· ' + esc(String(ttl).slice(0, 40)) + (v.stage ? '（' + esc(v.stage) + '）' : '')
+        //  ⚠ 真字段：`rowView()`（engines/opportunity.js:478）给的是
+        //      { id, key, source, sourceLabel, from, actors, severity, stage, active, ... }
+        //  这里原读 `v.title || v.text || v.name || v.summary || v.id`——前四个**一个都不存在**，
+        //  所以永远落到 `v.id`，而 id 是 `'op:' + source + ':' + ref` 的工程句柄
+        //  （`ui/panel.js:6603` 的同一份消费也是把 id 当**编号**用、另配 sourceLabel/stage/actors 成句）。
+        //  把账本编号印给玩家 = 面板自己造了「第二措辞真源」且比真源更差。
+        //  一句话从真字段拼：类别（sourceLabel 中文）+ 事由（from 是一整句人话）+ 阶段中文 + 涉及者。
+        //  `stage` 只有 open / deferred 两种会流到这里（list() 默认只返回 active 行），
+        //  所以两值映射就够，不引引擎枚举表另起一套。
+        const cat = String(v.sourceLabel || '').trim();
+        const why = String(v.from || '').trim();
+        const who = (v.actors && v.actors.length) ? v.actors.join('、') : '未记录涉及者';
+        const stageCn = v.stage === 'deferred' ? '已缓办' : (v.stage === 'open' ? '等你回应' : String(v.stage || ''));
+        out += '<div class="wa-dim" style="opacity:0.75;font-size:11px;margin-top:2px;">· '
+          + (cat ? '<b>' + esc(cat) + '</b>：' : '')
+          //  from 缺席不静默吞行——「本来就没有描述」要说出来，不能看起来像这条不存在。
+          + (why ? esc(why.slice(0, 60)) : '<span style="opacity:0.7;">（这一条没留下描述）</span>')
+          + '<span style="opacity:0.7;">（' + esc(stageCn) + '·' + esc(who) + '）</span>'
           + ' <button type="button" data-op-act="defer" data-op-id="' + esc(v.id || '') + '" style="font-size:10px;padding:0 6px;margin-left:4px;cursor:pointer;">缓办（1天）</button>'
           + ' <button type="button" data-op-act="decline" data-op-id="' + esc(v.id || '') + '" style="font-size:10px;padding:0 6px;cursor:pointer;">放弃</button></div>';
       });
