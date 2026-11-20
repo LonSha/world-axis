@@ -281,7 +281,19 @@ function runAll(A) {
   // v2.530.0（OPV30-R1/R2）：副本族与上下文边界各 +1 文件 / +1 别名 / +1 有引用 ⇒ 592/592/590 → 594/594/592。
   // v2.531.0（OPV30-R3）：写前预演 +1 文件 / +1 别名 / +1 有引用 ⇒ 594/594/592 → 595/595/593。
   // v2.532~533（OPV30-R4/R5）：引导弧 + 存档体检各 +1 文件 / +1 别名 / +1 有引用 ⇒ 595/595/593 → 597/597/595。
-  A(a.files === 597 && a.aliasFiles === 597 && a.refFiles === 595,
+  // v2.539.7（账本工程 · 一次说清七处 +1）：v2.535.0 新增 ui/schema-view.js（声明式视图层）后，
+  //   本门禁的六处读数同批漂移，病根有三条、各自都不在读数本身：
+  //    ① 文件面 +1（598）：磁盘上多一个模块文件 —— 这是事实，读数本就该跟；
+  //    ② 别名面 +1（598）：该文件写的是 `var WA = window.WorldAxis = …`，而 ALIAS_RE 只认
+  //       const（全仓 489 个模块里只有它用 var）⇒ 整个文件从静态图里隐形。已把 ALIAS_RE
+  //       改成 const|let|var（口径不变：仍只认那一种自举形态，不对声明关键字挑食）；
+  //    ③ 提供方 +1（641）：ui/schemaView 的提供方在 ui/ 下，模块账本按设计不收 ui 面，
+  //       于是它被判成「读了无人提供的 ns」。已登记进 UI_NS（第 17 条，与 panelNav /
+  //       panelFold / panelOverviewBlocks 等前 16 条完全同型）。
+  //   下面七条断言里的数字是**实测回填**，逐条对应：文件面/render 面 +1、调用期边 +1
+  //   （schema-view 的 stat 读点）、记账文件面 +1、ns 提供方 +1、ns 面差 54→55、
+  //   登记面 36/43→37/44（UI 层 ns 登记表多一条）、账本缺项 22→23（ui 面仍不入账，如实报）。
+  A(a.files === 598 && a.aliasFiles === 598 && a.refFiles === 595,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -444,7 +456,7 @@ function runAll(A) {
   // v2.531.0（OPV30-R3）：写前预演尾调 registerModule ⇒ 装载期 466 / 合计 4430（调用期 3964 仍不动）。
   // v2.532~533（OPV30-R4/R5）：两件各尾调 registerModule ⇒ 装载期 468；同轮五台缝合件接进面板台账
   //   （ui/settings.js 新增 5 条 (file, ns) 调用期边、另两件各读 store ⇒ 3964 → 3970）、合计 4438。
-  A(a.edgesLoad === 468 && a.edgesCall === 3970 && a.edgesAll === 4438 && a.identityOk,
+  A(a.edgesLoad === 468 && a.edgesCall === 3971 && a.edgesAll === 4439 && a.identityOk,
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
     + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
@@ -530,7 +542,7 @@ function runAll(A) {
   // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表文件各入序一档 ⇒ 567 ⇒ 567 ⇒ 568（实测回填）。
   // v2.529.0（缝合批 19 件）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +19 ⇒ **587**（实测）。
   // v2.533.0（OPV30 收口）：五台缝合件入首帧面 ⇒ LOAD_ORDER 569 → 574（实测回填）。
-  A(a.edgesLoad >= 20 && a.orderLen === 574,
+  A(a.edgesLoad >= 20 && a.orderLen === 575,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -594,7 +606,7 @@ function runAll(A) {
   // v2.531.0（OPV30-R3）：writeRehearsal 进静态提供方与账本 ⇒ 638 / 584；读面 570 不动（仍是 pending-wire）。
   // v2.532~533（OPV30-R4/R5）：两件进静态提供方与账本 ⇒ 640/586；五台缝合件接进面板 ⇒ 读面 570 → 575。
   //   B6 差仍是 640 - 586 = 54（三面同步增长，漂移口径不动）。
-  A(a.nsProvided === 640 && a.nsLedger === 586 && a.nsRead === 575,
+  A(a.nsProvided === 641 && a.nsLedger === 586 && a.nsRead === 576,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -610,7 +622,7 @@ function runAll(A) {
   // v2.194.0（U2 批次④）：差**仍为 39**（与批次③持平）—— 本轮一度写成 41（照抄批次③
   //   的自证槽增量），但两个自证槽实测不可达已撤除 ⇒ 静态提供方没涨，差自然也不涨。
   // v2.401.0(OPV23):实测回填（差 46 → 50——静态提供方 +12 / 账本 +8，差额仍全有登记理由：入口/UI/内部前缀）
-  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 54,
+  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 55,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
   // v2.153.0（RX5+RX6）：零读 ns 22 → 21（plotGauge 与 branchTree 都被 tool-diag 与面板真读，
   //   从零读名单里离场）。
@@ -648,7 +660,7 @@ function runAll(A) {
   //   新增第六个 UI 层命名空间 panelFold(ui/panel-fold.js),它**有真读者**
   //   (ui/panel.js 的 foldSec() 直写 `WA.panelFold.isCollapsed(...)`),故计入「在用」而非零读。
   // v2.401.0(OPV23):实测回填（28/35 → 32/39——panelOverviewMain/panelToolsPage/uiDashboards 三段 ns 接上真读者）
-  A(a.registeredUsed === 36 && a.registeredTotal === 43,
+  A(a.registeredUsed === 37 && a.registeredTotal === 44,
     'B10 登记面在用 ' + a.registeredUsed + '/' + a.registeredTotal
     + '（未在用的 5 个是取数型入口 ns，只在 index.js 内部自用；v2.181.0：UI 主题层 9 个 ns 全部接上真读者）');
   // v2.153.0（RX5+RX6）：两个新引擎进账本 ⇒ 账本缺项文件面收缩，缺项 5 不变（UI 层仍 4 文件）。
@@ -657,7 +669,7 @@ function runAll(A) {
   //   ui 文件）。两个新表文件曾一度使缺项变 24（它们进文件面、账本还没收），
   //   `node tests/module-registry-gate.js --update` 把账本落定后即回到 22 ——
   //   这一轮记下这个中间态，是因为「+2 就该把常量写 24」会让判据在 --update 之后反而红。
-  A(a.runtimeMissing === 22 && a.ledgerAvailable,
+  A(a.runtimeMissing === 23 && a.ledgerAvailable,
     'B11 账本缺项文件 ' + a.runtimeMissing + ' 个（入口 + 十二个 ui 文件，如实报出）');
   // 次序判据方向的两向自证（用假产品面，不碰真文件）
   const fakeOk = M.audit({

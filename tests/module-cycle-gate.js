@@ -226,6 +226,12 @@ const UI_NS = {
   //   分支，不影响「谁提供这个 ns」这件静态事实。
   panelPeoplePage: 'UI 玩家面人物页(ui/pages/people-page.js)',
   panelNowPage: 'UI 玩家面此刻页(ui/pages/now-page.js)',
+  // v2.539.7（账本工程）：第 17 个 UI 层命名空间。
+  //   v2.535.0 新增 ui/schema-view.js（声明式视图层），读者在 ui/panel.js 的事件页
+  //   （`WA.schemaView` 的运行期惰性读）。与前 6 条**完全同型**：提供方是 ui/ 下的文件，
+  //   本门禁的提供方集合从模块文件的赋值形态取，看不见它 ⇒ 现场报「读了无人提供的 ns（schemaView）」
+  //   ⇒ 连带 B5/B6/B9/C6/N4c/N5c/N6g/N7 与 v2107 四条一起红（16 条红的总病根就在这一行缺失）。
+  schemaView: 'UI 声明式视图层(ui/schema-view.js)',
 };
 
 /**
@@ -326,7 +332,14 @@ const NS_FACE_EXPECT = {
 /** 别名形态：const A = ( HOST.WorldAxis = HOST.WorldAxis || {} ) ; */
 const ALIAS_RE = (function () {
   const host = '[A-Za-z_$][A-Za-z0-9_$]*';
-  return new RegExp('const\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*=\\s*\\(?\\s*' + host +
+  // v2.539.7（账本工程）：声明关键字不再只认 `const`。
+  //   病（现场）：ui/schema-view.js 写的是 `var WA = window.WorldAxis = window.WorldAxis || {};`
+  //   —— 全仓 489 个模块里**只有它**用 var，于是别名解析器认不出它：文件面 598 但
+  //   「解析出别名」只有 597，N7 的「别名覆盖率满格」当场变红，而这个文件的全部静态引用
+  //   也一并从图里消失（一个看不见的文件 = 一张看不见的边）。
+  //   判据口径不变：仍然只认「`<name>.WorldAxis = <name>.WorldAxis || {}` 这一种自举形态」，
+  //   只是不再对声明关键字（const / let / var）挑食 —— 那是风格差异，不是依赖事实差异。
+  return new RegExp('(?:const|let|var)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*=\\s*\\(?\\s*' + host +
     '\\.WorldAxis\\s*=\\s*' + host + '\\.WorldAxis\\s*\\|\\|\\s*\\{\\s*\\}\\s*\\)?\\s*;');
 })();
 
