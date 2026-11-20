@@ -257,6 +257,84 @@ async function main() {
     assert(rB.rejections.length > 0, '（负向）异步出口写回失败 → 未处理拒绝被拿到（实 ' + rB.rejections.length + ' 项）');
   }
 
+  section('G17-K 六页 ask 收口闸（每页首屏必须给一句结论，而不是一屏细节）');
+  {
+    // v2.541.1：六页内容重写（world / events / connect / settings / overview / people）之后的收口。
+    //   病（现场）：六张结论卡是分四次加的（fdd87ed → c3106be → a516763 → 3006284 → 本版），
+    //    **没有任何一条门禁要求「这一页必须有」**。代价当场就付了：设置页那张当时只加进
+    //    开发者分支，玩家面上一句都没有（探针 /tmp/probe_six2.js 实测 settings 字数 = 0），
+    //    而四轮改动里没人发现 —— 因为锁只锁了「卡里写什么」，没锁「卡在不在」。
+    //   判据三件，全部与措辞解耦（改文案不会红，丢卡必红）：
+    //     ① 带 ask 的页**恰为 6 页**，名单从 PAGES 字面量里**逐行**取（不硬编码页名）。
+    //        新增一页 ask 就红，提醒「新页也要配结论卡」；写死页名等于把理由换成陈旧清单。
+    //        ⚠ 必须逐行匹配：早一版探针用 `\{ id: '(\w+)'[\s\S]*?ask: "` 跨条目贪婪匹配，
+    //          把 memory / director 也误判成「有 ask 的页」（正则跨过了条目边界）——
+    //          判据的输入面比事实宽，会给出假绿。
+    //     ② 每页产物里必须有 .wa-verdict，且它的文字 ≥24 字（挡住空壳占位）。
+    //     ③ 它必须出现在产物前 320 字符内（挡住「结论压在细节后面」）。
+    //   为什么这一节排在**最后**：它会 transact 出一个「已开局」的世界，而 ui-gate 各用例
+    //   共用同一份 localStorage（store 落盘）——放在 G17-D/E/F 之前会把「事件页运行态」
+    //   「隐藏不重绘」几条一起弄红（实测 3 红）。独立 env 只隔离上下文，隔离不了盘。
+    //   为什么按 ask 取页：ask 就是「这一页要回答的问题」，它是这六张卡存在的**理由**。
+    //   用独立 env：这一节会把世界造成「已开局」（否则概览页走 bootCard、人物页走 empty，
+    //   两种空态合法地没有结论卡），不能污染 G17-A/B/C 已经验过的那棵树。
+    const e2 = fresh();
+    const WA2 = e2.WA, dom2 = e2.dom;
+    const panel2 = dom2.getElementById('wa-panel');
+    const psrc = fs.readFileSync(path.join(BASE, 'ui/panel.js'), 'utf8');
+    const askPages = [];
+    psrc.split('\n').forEach(function (line) {
+      if (line.indexOf('id:') < 0 || line.indexOf('ask:') < 0) return;
+      const m = /id: '([a-z]+)'/.exec(line);
+      if (m) askPages.push(m[1]);
+    });
+    assert(askPages.length === 6,
+      '带 ask 的页恰 6 页（实 ' + askPages.length + '：' + askPages.join('、') + '）—— 新增页请同时给它一张结论卡');
+    // ⚠ 顺序很要紧：**先 open() 再 transact**。反过来写实测过一次红 —— open() 之后的装载
+    //   收尾会把盘里的旧世界盖回内存，之前 transact 的 clock/people 一起消失，
+    //   于是概览页退回 bootCard、人物页退回 empty（两页合法地没有结论卡），
+    //   而 world / events / connect / settings 不读这两个字段，四条绿两条红，
+    //   看起来像「只有两页丢了卡」——**这正是最容易误诊成产品缺陷的形态**。
+    // 另外每次都先跳一个中转页：goPage 到「当前页」会短路不重绘，直接点同名页可能读到上一轮产物。
+    WA2.ui.open();
+    // ⚠ 必须显式回到**玩家面**再验：devMode=true 时概览页走 overview-main 的 __devView 分支
+    //   （渲染作者大盘 __legacyReadings），人物页同理走开发者视图 —— 两页都不渲染玩家结论卡。
+    //   这是既有设计（v2.518.0 起「开发者模式显示全部页签与分类导航」），不是缺陷。
+    //   实测踩到过一次：本 env 的 devMode 从盘里恢复成 true，于是 overview/people 两条红，
+    //   而 world/events/connect/settings 四条绿 —— 看起来像「两页丢了卡」，
+    //   实际是「判据在测另一张面」。六页 ask 是**玩家面**的事，这一节只对玩家面负责。
+    WA2.ui.setDevMode(false);
+    WA2.store.transact(function (s) {
+      s.clock.label = '第三日 · 黄昏';
+      s.chapters.current = { no: 3, title: '雨夜' };
+      s.people = { p_gate: { id: 'p_gate', name: '门禁人物', affinity: 60, tags: ['见过一面'], intent: '把话说完', action: '在门口等' } };
+    });
+    const tabOf2 = function (p) { return panel2.querySelectorAll('.wa-tab').filter(function (t) { return t.dataset.page === p; })[0]; };
+    const hop = tabOf2('inject');
+    if (hop) hop.click();   // 中转页：保证下面每一次点击都是真正的跨页切换
+    const bad = [];
+    askPages.forEach(function (id) {
+      const tab = tabOf2(id);
+      if (!tab) { bad.push(id + ':无页签'); return; }
+      tab.click();
+      const body = panel2.querySelector('.wa-body');
+      const html = String((body && body.innerHTML) || '');
+      // ⚠ 位置判据不能用 innerHTML 的字节偏移：mock DOM 的序列化器会在节点之间
+      //   插入大片缩进空白（实测设置在 bytes=1385，而它真实是页头的第二块），
+      //   量到的是排版而不是产品顺序。改用 textContent 的先后 —— 那才是玩家读到的顺序。
+      const vEl = body.querySelector('.wa-verdict');
+      if (!vEl) { bad.push(id + ':无结论卡'); return; }
+      const vTxt = String(vEl.textContent || '').replace(/\s+/g, '');
+      if (vTxt.length < 20) { bad.push(id + ':空壳(' + vTxt.length + ' 字)'); return; }
+      const allTxt = String(body.textContent || '').replace(/\s+/g, '');
+      const pos = allTxt.indexOf(vTxt.slice(0, 12));
+      if (pos < 0) { bad.push(id + ':结论卡文字不在正文里'); return; }
+      if (pos > 60) bad.push(id + ':位置太靠后(第 ' + pos + ' 字)');
+    });
+    assert(bad.length === 0, '六页首屏都有非空结论卡且在细节之前（异常：' + (bad.join('；') || '无') + '）');
+  }
+
+
   console.log('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550');
   console.log('UI 渲染路径门禁：通过 ' + pass.length + ' / 失败 ' + fail.length);
   if (fail.length) { console.log('失败项: ' + fail.join(' | ')); process.exit(1); }

@@ -724,11 +724,50 @@
 })()}
 `;
   }
+  /** 设置页结论卡（v2.539.6 立，v2.541.1 提到玩家面）：这一页回答「哪些开关会改变你看到的东西」。 */
+  //  病（现场 · 本轮实测缺口）：v2.539.6 把这张卡写成了开发者分支里的一个 IIFE ——
+  //    而设置页默认走 playerSettingsHtml()（界面简化动线），于是**真正的玩家面上一句结论都没有**。
+  //    探针 /tmp/probe_six2.js 逐页核对六页 ask 时抓到：overview / world / people / events /
+  //    connect 五页有结论卡，settings 有结论卡=false，字数=0。
+  //    这与本页注释里记过三次的旧账是同一族（tierBlock / contentPrefs / switchBlock 都曾
+  //    只拼进开发者分支，玩家面上整块消失）。
+  //  修法：抽成一个函数，**两条分支共用**（单一真源，不各写一份），只有第二句分岔 ——
+  //    因为两面的「这一页在改什么」是两件不同的事，各自说自己的真话：
+  //      开发者面：按 5 条车道分组（laneNavHtml 在那里）
+  //      玩家面：世界运行节奏 / 内容偏好 / 机制总开关 / 世界规模档位，从上往下排
+  //    第①③句两面相同（档位读数、写盘与退回），不许出现两份。
+  function setVerdictHtml(dev) {
+    let tv = null;
+    try { tv = (WA.capabilityTier && typeof WA.capabilityTier.view === 'function') ? WA.capabilityTier.view() : null; } catch (e) { tv = null; }
+    let granted = 0;
+    let depth = 0;
+    try {
+      const raw = (WA.capabilityTier && typeof WA.capabilityTier.getSettings === 'function') ? WA.capabilityTier.getSettings() : null;
+      granted = ((raw && raw.granted) || []).length;
+      depth = ((raw && raw.history) || []).length;
+    } catch (e) { /* 读配置失败不阻断渲染：下面只把它当附加读数 */ }
+    const TN = { lite: '轻', standard: '标准', full: '完整' };
+    const l1 = tv
+      ? ('现在这一档：' + (TN[tv.tier] || esc(tv.tier)) + '（手动按住 ' + granted + ' 台'
+        + (depth ? ('，还能退回 ' + depth + ' 步') : '，没有可退回的档') + '）')
+      : '现在这一档：档位引擎读不到（设置照样能改，只是「我按住了几台」这个数暂时没有）';
+    const l2 = dev
+      ? '这一页在改什么：按 5 条车道分组 —— 世界怎么转 / 人怎么活 / 故事怎么讲 / 我有多少控制权 / 界面；点上面任一按钮只看那一条'
+      : '这一页在改什么：世界运行节奏、内容偏好、机制总开关，以及「世界规模」档位 —— 都在下面从上往下排';
+    const l3 = '改动立即写盘并生效；改坏了用「世界规模」里的退回，或各段自己的「恢复默认」';
+    return '<div class="wa-verdict"><b>此刻</b><ul>'
+      + [l1, l2, l3].map(function (x) { return '<li>' + x + '</li>'; }).join('')
+      + '</ul></div>';
+  }
+
   function playerSettingsHtml() {
     let b = {};
     try { b = WA.backstage && typeof WA.backstage.getSettings === 'function' ? WA.backstage.getSettings() : {}; } catch (e) {}
     const mode = ['light', 'balanced', 'deep'].indexOf(b.simulationMode) >= 0 ? b.simulationMode : 'balanced';
     return '<div class="wa-player-settings" data-wa-player-settings="true">'
+      // v2.541.1：玩家面的结论卡 —— 与开发者分支共用 setVerdictHtml（单一真源）。
+      //   此前它只拼进开发者分支，玩家面上「这一页在改什么」一个字都没有（探针实测字数=0）。
+      + setVerdictHtml(false)
       + '<div class="wa-sec" data-wa-lane="player" data-wa-sec="世界运行">世界运行</div>'
       + '<div class="wa-dim">世界会自动推进。选择你喜欢的节奏即可，其他机制会按默认方式工作。</div>'
       // ── v2.381.0 回归修复：档位块在玩家模式下**必须仍在** ─────────────────────
@@ -814,31 +853,9 @@
       const bO = bd('worldaxis_opinion_settings_v1');
       const bE = bd('worldaxis_evolution_settings_v1');
       const rng = (arr, fb) => Array.isArray(arr) ? arr : fb;
-      // v2.539.6（六页内容重写 · 设置页）：结论卡 —— 333 组开关不缺，缺的是「我在改什么、现在是哪一档」。
-      //   病（现场）：首屏是车道按钮 + 一整屏开关；玩家/制作者都得自己把「世界规模档位」
-      //   和「开发者模式」两处状态拼起来才敢动手。
-      //   取数只用本页已经读到的 WA.capabilityTier（view / getSettings）与 __dev，零新增读口、零新控件。
-      const __setVerdict = (function () {
-        let tv = null;
-        try { tv = (WA.capabilityTier && typeof WA.capabilityTier.view === 'function') ? WA.capabilityTier.view() : null; } catch (e) { tv = null; }
-        let granted = 0;
-        let depth = 0;
-        try {
-          const raw = (WA.capabilityTier && typeof WA.capabilityTier.getSettings === 'function') ? WA.capabilityTier.getSettings() : null;
-          granted = ((raw && raw.granted) || []).length;
-          depth = ((raw && raw.history) || []).length;
-        } catch (e) { /* 读配置失败不阻断渲染：下面只把它当附加读数 */ }
-        const TN = { lite: '轻', standard: '标准', full: '完整' };
-        const l1 = tv
-          ? ('现在这一档：' + (TN[tv.tier] || esc(tv.tier)) + '（手动按住 ' + granted + ' 台'
-            + (depth ? ('，还能退回 ' + depth + ' 步') : '，没有可退回的档') + '）')
-          : '现在这一档：档位引擎读不到（设置照样能改，只是「我按住了几台」这个数暂时没有）';
-        const l2 = '这一页在改什么：按 5 条车道分组 —— 世界怎么转 / 人怎么活 / 故事怎么讲 / 我有多少控制权 / 界面；点上面任一按钮只看那一条';
-        const l3 = '改动立即写盘并生效；改坏了用「世界规模」里的退回，或各段自己的「恢复默认」';
-        return '<div class="wa-verdict"><b>此刻</b><ul>'
-          + [l1, l2, l3].map(function (x) { return '<li>' + x + '</li>'; }).join('')
-          + '</ul></div>';
-      })();
+      // v2.539.6 立、v2.541.1 抽成函数并与玩家面共用（单一真源；此前这份 IIFE 只活在开发者分支，
+      //   玩家面上一句结论都没有）。措辞与两份边界的理由见 setVerdictHtml 的注释。
+      const __setVerdict = setVerdictHtml(true);
       return `
         ${__setVerdict}
         ${laneNavHtml()}
