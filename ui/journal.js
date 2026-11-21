@@ -235,7 +235,7 @@
   const PAGES = { now: pageNow, away: pageAway, people: pagePeople, threads: pageThreads, settings: pageSettings };
 
   // ── 外壳 ──
-  let root = null, lastFocus = null, busy = false;
+  let root = null, lastFocus = null, busy = false, lastDown = null, lastTapAt = 0, lastTapKind = '';
   function build() {
     if (root) return root;
     root = doc.createElement('div');
@@ -254,9 +254,36 @@
     swipe(root.querySelector('.wj-body'));
     return root;
   }
+  // ── v2.542.27：色板自带兜底 ──
+  //   真机（TauriTavern 2.4）实测：style.css 里 `#wa-journal{...}` 这一整条（--wj-* 变量、position、z-index、color）
+  //   没有被应用，只有子选择器（#wa-journal .wj-sheet 之类）生效。后果是 sheet 的 background:var(--wj-ink)
+  //   落空 ⇒ 底色是透明的（看到后面聊天），文字颜色继承宿主 ⇒ 纸色底上「浅字压浅底」看不清。
+  //   所以两套色板改为内联钉在 root 上，随 pref.tone 现写，不再依赖 stylesheet 的层叠结果。
+  const TONES = {
+    ink: { ink: '#15120e', paper: '#1e1a15', 'paper-2': '#29241d', line: 'rgba(232,220,200,.08)', 'line-2': 'rgba(232,220,200,.14)', text: '#f2eadc', 'text-2': '#c0b5a2', 'text-3': '#948873', lamp: '#d9a35b', 'lamp-dim': 'rgba(217,163,91,.12)', ochre: '#c06b4e', moss: '#93a374' },
+    paper: { ink: '#f3ecdf', paper: '#ebe2d2', 'paper-2': '#ded2bc', line: 'rgba(60,45,25,.12)', 'line-2': 'rgba(60,45,25,.22)', text: '#1f1a13', 'text-2': '#453b2e', 'text-3': '#635745', lamp: '#8f5518', 'lamp-dim': 'rgba(143,85,24,.14)', ochre: '#8f3d22', moss: '#4c5738' }
+  };
+  function applyTone() {
+    try {
+      const t = TONES[pref.tone] || TONES.ink;
+      Object.keys(t).forEach(function (k) { root.style.setProperty('--wj-' + k, t[k]); });
+      root.style.setProperty('--wj-fs', pref.size === 's' ? '12.5px' : (pref.size === 'l' ? '15px' : '13.5px'));
+      root.style.setProperty('color', 'var(--wj-text)');
+      root.style.setProperty('font-family', '-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif');
+      const sh = root.querySelector('.wj-sheet');
+      if (sh) {
+        sh.style.setProperty('background', 'var(--wj-ink)');
+        sh.style.setProperty('color', 'var(--wj-text)');
+        sh.style.setProperty('display', 'flex');
+      }
+      const sc = root.querySelector('.wj-scrim');
+      if (sc) sc.style.setProperty('background', 'rgba(8,6,4,.82)');
+    } catch (e) {}
+  }
   function render() {
     if (!root || root.classList.contains('wj-hidden')) return;
     root.dataset.tone = pref.tone; root.dataset.size = pref.size;
+    applyTone();
     const body = root.querySelector('.wj-body');
     let html = '';
     try { html = PAGES[pref.tab](state()); } catch (e) { html = empty('这一页暂时打不开。可以在设置里打开开发者模式看看原因。'); }
@@ -278,6 +305,17 @@
     if (vis) {
       openUnread = unread(s);
       lastFocus = doc.activeElement;
+      // v2.542.26：几何自带兜底。真机（TauriTavern 2.4）实测 style.css 里的 #wa-journal{position:fixed;inset:0} 
+      // 在那套宿主里会变成「root 高 0、贴在 y=770」——手札确实开了，但整个面板被宿主的容器化布局带出屏幕，
+      // 看起来就是「点了没反应 / 还是老 UI」。这里用内联 !important 把几何钉死，不依赖 style.css 的层叠结果。
+      try {
+        root.style.setProperty('position', 'fixed', 'important');
+        root.style.setProperty('left', '0', 'important'); root.style.setProperty('top', '0', 'important');
+        root.style.setProperty('right', '0', 'important'); root.style.setProperty('bottom', '0', 'important');
+        root.style.setProperty('z-index', '10050', 'important');
+        root.style.setProperty('width', '100vw', 'important');
+        root.style.setProperty('height', '100vh', 'important');
+      } catch (ge) {}
       root.classList.remove('wj-hidden'); render();
       setTimeout(() => { try { root.querySelector('.wj-sheet').focus(); } catch (e) {} }, 30);
     } else {
@@ -288,8 +326,15 @@
   }
   function toast(t) { const o = root && root.querySelector('.wj-toast'); if (!o) return; o.textContent = t; o.classList.add('on'); clearTimeout(o.__t); o.__t = setTimeout(() => o.classList.remove('on'), 2200); }
   function say(t) { const o = root && root.querySelector('#wj-out'); if (o) o.textContent = t; }
-  function openFull(page) { open(false); try { WA.ui && WA.ui.open && WA.ui.open(); page && WA.ui.goPage && WA.ui.goPage(page); } catch (e) {} }
-
+  function openFull(page) {
+    // v2.542.26：三步各自接错 —— 先开完整面板，再合手札，最后跳页。
+    //   旧写法把三件事塞进同一个 try：open(false) 里任何一句抛错（save()/marks() 在宿主里写设置失败很常见），
+    //   后面的「开面板 + 跳页」就整段被跳过，玩家看到的就是「点了去配置，界面没变 / 停在原来那页」，
+    //   而那一页正好是带「开发者模式」开关的设置页。
+    try { if (WA.ui && WA.ui.open) WA.ui.open(); } catch (e) { if (WA.log) WA.log('warn', 'journal: 打开完整面板失败', e); }
+    try { open(false); } catch (e) { if (WA.log) WA.log('warn', 'journal: 合上手札失败', e); }
+    try { if (page && WA.ui && WA.ui.goPage) WA.ui.goPage(page); } catch (e) { if (WA.log) WA.log('warn', 'journal: 跳页失败 ' + page, e); }
+  }
   // 带进对话：追加到酒馆输入框，不自动发送（玩家自己决定怎么接）
   function citeToChat(t) {
     const ta = doc.getElementById('send_textarea');
@@ -357,26 +402,40 @@
   function badge() { const o = orb(); if (o) o.toggleAttribute('data-wj-new', unread(state()).any > 0 && !(root && !root.classList.contains('wj-hidden'))); }
   function hookOrb() {
     const o = orb();
-    if (!o || o.__wjHooked) return !!o;
-    o.__wjHooked = true;
-    // 不拦截原实现的 pointerup：拦了会让 panel.js 的 drag 标记卡在 true（之后鼠标一动球就跟着走）。
-    //   做法：让原实现照常跑完（它会 toggle 原面板），本监听器注册在其后、同一次派发内
-    //   把原面板收回、改开手札 —— 同步完成，不会闪出原面板。
-    let sx = 0, sy = 0;
-    o.addEventListener('pointerdown', e => { sx = e.clientX; sy = e.clientY; }, true);
-    o.addEventListener('pointerup', e => {
-      // v2.542.25：**开发者模式不再是「点球没反应」的死路**。
-      //   旧行为：devMode 开启时直接 return ⇒ 球交给 panel.js 的老 toggle（开完整面板）。
-      //   这在作者机上等于「手札永远打不开」，而玩家分不清「手札坏了」与「开关是开的」。
-      //   现行为：两种模式都开手札；手札设置页本来就有 openFull 通往完整面板（data-wj="open-settings"
-      //   与「开发者模式」开关本身），所以「交回机制面板」这条路一条没少。
-      //   拖拽仍不触发（|dx|+|dy| > 5），那条与模式无关。
-      if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 5) return;
-      const pnl = doc.getElementById('wa-panel');
-      if (pnl && !pnl.classList.contains('wa-hidden')) pnl.classList.add('wa-hidden');
-      open();
-    });
-    o.setAttribute('aria-label', '打开世界手札');
+    if (!o) return false;
+    if (!o.__wjHooked) { o.__wjHooked = true; o.setAttribute('aria-label', '打开世界手札'); }
+    // v2.542.26：手势判据从「球节点上的 pointerup」搬到「文档级 click / touchend」。
+    //   真机（TauriTavern 2.4 / Android WebView 157）实测：长按能弹出主题菜单（contextmenu 到达），
+    //   但球上一个 pointerdown/pointerup 都没有 ⇒ 原先只挂在 pointerup 上的开手札那条路永远不跑，
+    //   用户看到的就是「点球没反应」；同一原因下 panel.js 的 pointer 拖拽/切换也一并失效。
+    //   click / touchend 是浏览器兜底层，不依赖 Pointer Events 是否存在；用 600ms 去重，
+    //   桌面（pointerup 先到、click 后到）不会开→关→开。
+    if (!doc.__wjTapBound) {
+      doc.__wjTapBound = true;
+      doc.addEventListener('pointerdown', function (e) { lastDown = { x: e.clientX, y: e.clientY, at: Date.now() }; }, true);
+      doc.addEventListener('touchstart', function (e) { const t = e.touches && e.touches[0]; if (t) lastDown = { x: t.clientX, y: t.clientY, at: Date.now() }; }, true);
+      doc.addEventListener('pointerup', function (e) { tapOrb(e, 'pointerup'); }, false);
+      // touchend 在手札弹出的同一次派发里就把合成 click 掐掉：否则 click 的命中目标会变成刚弹出的遮罩，
+      // 手札会「开了立刻关」，看起来仍是没反应。
+      doc.addEventListener('touchend', function (e) {
+        const t = e.changedTouches && e.changedTouches[0]; if (!t) return;
+        if (tapOrb({ target: e.target, clientX: t.clientX, clientY: t.clientY }, 'touchend')) { try { e.preventDefault(); } catch (err) {} }
+      }, true);
+      doc.addEventListener('click', function (e) { tapOrb(e, 'click'); }, true);
+    }
+    return true;
+  }
+  // 一次点击的单一入路：球本身或其子节点、位移≤5（拖拽不算点击）、600ms 内只认第一路
+  function tapOrb(e, kind) {
+    const t = e && e.target;
+    if (!t || (t.id !== 'wa-orb' && !(t.closest && t.closest('#wa-orb')))) return false;
+    const now = Date.now();
+    if (now - lastTapAt < 600) return false;
+    if (lastDown && (Math.abs(e.clientX - lastDown.x) + Math.abs(e.clientY - lastDown.y) > 5)) return false;
+    lastTapAt = now; lastTapKind = kind;
+    const pnl = doc.getElementById('wa-panel');
+    if (pnl && !pnl.classList.contains('wa-hidden')) pnl.classList.add('wa-hidden');
+    try { open(); } catch (err) { if (WA.log) WA.log('warn', 'journal: 打开手札失败', err); }
     return true;
   }
   function setBusy(v, warn) {
@@ -422,5 +481,5 @@
   } catch (e) { /* 观察器不可用不阻断轮询那一道 */ }
   (function wait() { if (tryHook()) return; if (++tries < 600) setTimeout(wait, 500); })();
 
-  WA.journal = { open: open };
+  WA.journal = { open: open, ownsOrb: true };
 })();

@@ -16492,12 +16492,21 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         const r = orbEl.getBoundingClientRect();
         __orbPos = { x: Math.round(r.left), y: Math.round(r.top) };
         __persistPanel();
-      } else {
+      } else if (!(window.WorldAxis && WorldAxis.journal && WorldAxis.journal.ownsOrb)) {
+        // 手札接管了球（ui/journal.js 装载后 ownsOrb=true）⇒ 点击这件事不归 panel.js 管。
+        //   否则两条路同时开：手札刚拉起，老面板又被 toggle 出来盖在上面。
         toggle();
       }
     };
     orbEl.addEventListener('pointerup', onUp);
-    orbEl.addEventListener('pointercancel', onUp);
+    // v2.542.26：pointercancel 只负责「收拾拖拽状态」，绝不能再当一次点击。
+    //   真机（TauriTavern 2.4）会在 touch 结束时补一个 pointercancel：旧写法复用了 onUp，
+    //   wasDrag=true / moved=false 走 else 分支 ⇒ toggle() 把**老面板**打开，压在手札上面 ——
+    //   玩家看到的就是「点了弹出老 UI」。
+    orbEl.addEventListener('pointercancel', e => {
+      drag = false; moved = false;
+      if (orbEl.releasePointerCapture && e && e.pointerId) try { orbEl.releasePointerCapture(e.pointerId); } catch (err) {}
+    });
     // ── v2.542.25：球一进 DOM 就广播（ui/journal.js 靠这一个事件接管点击）──
     //   现场（真 Chromium + 真手机 UA 跑本仓 ST）：WA.ui.mount() 到 t≈15s 才建出悬浮球，
     //   而 journal 那边是一条 60×500ms 的轮询（窗口 30s）。窗口内建球 ⇒ 手札接管（点球开手札）；
