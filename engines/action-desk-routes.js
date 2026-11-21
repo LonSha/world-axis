@@ -234,7 +234,12 @@
       if (o && ((typeof o.text === 'string' && o.text) || (typeof o.evidence === 'string' && o.evidence))) q.useEvidence = true;
       return WA.moodGlide.glide(q);
     },
-    'moodGlide.miss': function (o) { return (WA.moodGlide && typeof WA.moodGlide.miss === 'function') ? WA.moodGlide.miss(o.actorId || o.who, o.axis, o.opts || o) : { ok: false, reason: 'moodGlide-unavailable' }; },
+    'moodGlide.miss': function (o) {
+      if (!WA.moodGlide || typeof WA.moodGlide.miss !== 'function') return { ok: false, reason: 'moodGlide-unavailable' };
+      // v2.542.17：签名 miss(person, amount) —— 第 2 参是**增量**，不是 set 的 axis。
+      //   此前传 o.axis（字符串），amount 恒落到默认增量；调用方给的 o.amount 被静默丢弃。
+      return WA.moodGlide.miss(o.actorId || o.who, (typeof o.amount === 'number') ? o.amount : undefined);
+    },
     'moodGlide.read': function (o) { return (WA.moodGlide && typeof WA.moodGlide.read === 'function') ? WA.moodGlide.read(o.actorId || o.who, o.opts || o) : { ok: false, reason: 'moodGlide-unavailable' }; },
     'offstageLife.mark': function (o) { return (WA.offstageLife && typeof WA.offstageLife.markOffstage === 'function') ? WA.offstageLife.markOffstage(o) : { ok: false, reason: 'offstageLife-unavailable' }; },
     'offstageLife.progress': function (o) { return (WA.offstageLife && typeof WA.offstageLife.progressOffstage === 'function') ? WA.offstageLife.progressOffstage(o) : { ok: false, reason: 'offstageLife-unavailable' }; },
@@ -1975,8 +1980,17 @@
       return { ok: false, reason: 'cascadeBus-unavailable' };
     },
     'geo.resolveKinetic': function (o) {
-      if (WA.spatialConflict && typeof WA.spatialConflict.resolveKinetic === 'function') return WA.spatialConflict.resolveKinetic(o.actorA, o.actorB, o.kineticA || o.speedA, o.kineticB || o.speedB, o.opts || o);
-      return { ok: false, reason: 'spatialConflict-unavailable' };
+      if (!WA.spatialConflict || typeof WA.spatialConflict.resolveKinetic !== 'function') return { ok: false, reason: 'spatialConflict-unavailable' };
+      // v2.542.17：签名 resolveKinetic(nodeKey, participants[], opts) —— 三个形参。
+      //   此前按 (actorA, actorB, kineticA, kineticB, opts) 传 5 个，于是
+      //   nodeKey=actorA、participants=actorB（字符串 ⇒ 引擎按空数组处理）、opts=数字
+      //   ⇒ 恒定 need_at_least_two_participants，capacity 等口径永远读不到。
+      const parts = Array.isArray(o.participants) ? o.participants
+        : ((o.actorA || o.actorB) ? [
+          { actorId: o.actorA || o.who, kinetic: o.kineticA || o.speedA },
+          { actorId: o.actorB, kinetic: o.kineticB || o.speedB }
+        ] : []);
+      return WA.spatialConflict.resolveKinetic(o.nodeKey || o.node || o.place, parts, o.opts || o);
     },
     'geo.evolveTrace': function (o) {
       if (WA.spatialTrace && typeof WA.spatialTrace.evolveTrace === 'function') return WA.spatialTrace.evolveTrace(o.traceId, o.mediumType || o.medium, o.environmentInterference || o.interference, o.opts || o);
@@ -1987,19 +2001,37 @@
       return { ok: false, reason: 'personalInventory-unavailable' };
     },
     'stealth.checkBlindspot': function (o) {
-      if (WA.socialEncounter && typeof WA.socialEncounter.checkBlindspot === 'function') return WA.socialEncounter.checkBlindspot(o.stalkerId || o.who, o.targetId || o.target, o.relativeAngle || o.angle, o.opts || o);
-      return { ok: false, reason: 'socialEncounter-unavailable' };
+      if (!WA.socialEncounter || typeof WA.socialEncounter.checkBlindspot !== 'function') return { ok: false, reason: 'socialEncounter-unavailable' };
+      // v2.542.17：签名 checkBlindspot(stalkerId, targetId, opts)，opts 里**没有**角度字段。
+      //   此前把 relativeAngle 当第 3 参传 ⇒ opts 变成数字，environmentNoiseDb /
+      //   distanceMeters / crowdDensity / isBehindTarget 全部读不到（恒走默认值）。
+      //   角度不能被静默丢弃：按引擎认的口径把它翻译成 isBehindTarget。
+      const bsOpt = Object.assign({}, o.opts || o);
+      const bsAng = (typeof o.relativeAngle === 'number') ? o.relativeAngle : o.angle;
+      if (typeof bsOpt.isBehindTarget !== 'boolean' && typeof bsAng === 'number') bsOpt.isBehindTarget = Math.abs(bsAng) > 90;
+      return WA.socialEncounter.checkBlindspot(o.stalkerId || o.who, o.targetId || o.target, bsOpt);
     },
     'routine.deviate': function (o) {
-      if (WA.universalRoutine && typeof WA.universalRoutine.deviate === 'function') return WA.universalRoutine.deviate(o.actorId || o.who, o.stressLevel || o.stress, o.cause, o.opts || o);
-      return { ok: false, reason: 'universalRoutine-unavailable' };
+      if (!WA.universalRoutine || typeof WA.universalRoutine.deviate !== 'function') return { ok: false, reason: 'universalRoutine-unavailable' };
+      // v2.542.17：签名 deviate(actorId, reason, opts) —— 第 2 参是**原因文本**，不是压力值。
+      //   此前传 (who, stressLevel, cause, opts) ⇒ reason=数字、opts=字符串 ⇒
+      //   stressRating / loyalty / deviationType / targetNode 全部读不到，
+      //   于是「高忠诚 + 低压力」这条负控制永远不可能触发。
+      const devOpt = Object.assign({}, o.opts || o);
+      if (typeof devOpt.stressRating !== 'number') {
+        if (typeof o.stressLevel === 'number') devOpt.stressRating = o.stressLevel;
+        else if (typeof o.stress === 'number') devOpt.stressRating = o.stress;
+      }
+      return WA.universalRoutine.deviate(o.actorId || o.who, o.reason || o.cause, devOpt);
     },
     'bridge.atomicTransact': function (o) {
       if (WA.bridge && typeof WA.bridge.atomicTransact === 'function') return WA.bridge.atomicTransact(o.transactionId || o.txId, o.steps, o.opts || o);
       return { ok: false, reason: 'bridge-unavailable' };
     },
     'sys.breakDeadlock': function (o) {
-      if (WA.healthPreflight && typeof WA.healthPreflight.breakDeadlock === 'function') return WA.healthPreflight.breakDeadlock(o.cycleWaitGraph || o.graph, o.timeoutTicks || o.timeout, o.opts || o);
+      // v2.542.17：签名 breakDeadlock(dependencyEdges) —— 只有一个形参，此前传的
+      //   timeoutTicks 与 opts 被静默丢弃。
+      if (WA.healthPreflight && typeof WA.healthPreflight.breakDeadlock === 'function') return WA.healthPreflight.breakDeadlock(o.cycleWaitGraph || o.graph || o.edges);
       return { ok: false, reason: 'healthPreflight-unavailable' };
     },
     'env.simulatePhase': function (o) {
