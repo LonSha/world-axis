@@ -181,7 +181,30 @@
     const cfg = settings();
     if (!cfg.enabled) return { ok: false, reason: 'disabled', rows: [] };
     const now = clockWall();
-    const fixed = num(input && input.elapsedMinutes, NaN);
+    let fixed = num(input && input.elapsedMinutes, NaN);
+    let dtSource = isFinite(fixed) ? 'caller' : 'clock';
+    // ── evidence 档（v2.542.16）：与 engines/toxic-metabolism.js 的 resolveMinutes 同一阶梯。
+    //   只在「调用方没给分钟数」且**明确要求**走证据（input.useEvidence === true）时启用：
+    //   不拿「有 text」当触发条件 —— desk 调度常把整段正文塞在 o 里，那样会把无关正文当证据。
+    if (!isFinite(fixed) && input && input.useEvidence === true) {
+      const EE = WA.elapsedEvidence;
+      const body = (typeof input.text === 'string' && input.text) ? input.text
+        : ((typeof input.source === 'string') ? input.source : '');
+      const evd = typeof input.evidence === 'string' ? input.evidence : '';
+      let r = null;
+      if (EE && typeof EE.parse === 'function') {
+        if (typeof input.deltaMinutes === 'number' && evd && typeof EE.verify === 'function') {
+          const v = EE.verify(body, evd, input.deltaMinutes);
+          r = { ok: !!v.ok, minutes: v.actual, reason: v.reason };
+        } else {
+          const p = EE.parse(body);
+          r = { ok: !!p.ok, minutes: p.minutes, reason: p.reason };
+        }
+      }
+      if (!r || !r.ok) return { ok: false, reason: (r && r.reason) || 'not-fact', rows: [] };
+      fixed = r.minutes;
+      dtSource = 'evidence';
+    }
     const rows = [];
     try {
       WA.store.transact(function (draft) {
@@ -215,7 +238,7 @@
     } catch (e) { noteFault('store-unavailable'); return { ok: false, reason: 'store-unavailable', rows: [] }; }
     stat.glides++;
     stat.lastReason = 'glide';
-    return { ok: true, rows: rows };
+    return { ok: true, rows: rows, dtSource: dtSource };
   }
 
   /** 单独记一次「想起了他」：直接抬思念（glide 之外的显式入口） */

@@ -510,7 +510,10 @@ function runAll(A) {
   // v2.542.14（引擎互校）：调用期 4018 -> 4019（+1：engines/toxic-metabolism.js 真读
   //   WA.elapsedEvidence 的 parse/verify，把「这一轮推进了多久」交回证据判定）；装载期不变 476；
   //   恒等式 476 + 4019 = 4495 当场核对。
-  A(a.edgesLoad === 476 && a.edgesCall === 4019 && a.edgesAll === 4495 && a.identityOk,
+  // v2.542.16（引擎互校③）：调用期 4019 -> 4020（+1：engines/mood-glide.js 真读
+  //   WA.elapsedEvidence 的 parse/verify —— 与 toxic-metabolism 同一阶梯，同族不再分裂）；
+  //   装载期不变 476；恒等式 476 + 4020 = 4496 当场核对。
+  A(a.edgesLoad === 476 && a.edgesCall === 4020 && a.edgesAll === 4496 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'

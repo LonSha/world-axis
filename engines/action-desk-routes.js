@@ -224,7 +224,16 @@
     'terrainHazard.forceTraverse': function (o) { return (WA.terrainHazard && typeof WA.terrainHazard.forceTraverse === 'function') ? WA.terrainHazard.forceTraverse(o) : { ok: false, reason: 'terrainHazard-unavailable' }; },
     'writeDesk.call': function (o) { return (WA.writeDesk && typeof WA.writeDesk.call === 'function') ? WA.writeDesk.call(o.namespace || o.ns, o.method, o.args || o.argv || []) : { ok: false, reason: 'writeDesk-unavailable' }; },
     'moodGlide.set': function (o) { return (WA.moodGlide && typeof WA.moodGlide.set === 'function') ? WA.moodGlide.set(o.actorId || o.who, o.axis, o.value, o.opts || o) : { ok: false, reason: 'moodGlide-unavailable' }; },
-    'moodGlide.glide': function (o) { return (WA.moodGlide && typeof WA.moodGlide.glide === 'function') ? WA.moodGlide.glide(o.actorId || o.who, o.axis, o.delta, o.opts || o) : { ok: false, reason: 'moodGlide-unavailable' }; },
+    'moodGlide.glide': function (o) {
+      if (!WA.moodGlide || typeof WA.moodGlide.glide !== 'function') return { ok: false, reason: 'moodGlide-unavailable' };
+      // v2.542.16：**签名错配修复**。glide 的签名是 `glide(input)`（单对象），不是 set 那种
+      //   `(who, axis, value)` 风格。此前这里按 set 的风格传了 4 个参数，于是 o.elapsedMinutes /
+      //   o.evidence 永远到不了引擎 —— desk 这一路只能退到墙钟差，调用方给的分钟数被静默丢弃。
+      //   现在把整个 o 当一个 input 传进去；带了正文就显式要求走证据档。
+      const q = Object.assign({}, o || {});
+      if (o && ((typeof o.text === 'string' && o.text) || (typeof o.evidence === 'string' && o.evidence))) q.useEvidence = true;
+      return WA.moodGlide.glide(q);
+    },
     'moodGlide.miss': function (o) { return (WA.moodGlide && typeof WA.moodGlide.miss === 'function') ? WA.moodGlide.miss(o.actorId || o.who, o.axis, o.opts || o) : { ok: false, reason: 'moodGlide-unavailable' }; },
     'moodGlide.read': function (o) { return (WA.moodGlide && typeof WA.moodGlide.read === 'function') ? WA.moodGlide.read(o.actorId || o.who, o.opts || o) : { ok: false, reason: 'moodGlide-unavailable' }; },
     'offstageLife.mark': function (o) { return (WA.offstageLife && typeof WA.offstageLife.markOffstage === 'function') ? WA.offstageLife.markOffstage(o) : { ok: false, reason: 'offstageLife-unavailable' }; },
