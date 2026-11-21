@@ -23,18 +23,59 @@
     catch (e) { return null; }
   }
 
+  // ── v2.547.0：轮次签名从「长度」升级为「松散指纹」──────────────────────────
+  // 病灶（可复算）：旧签名是 `长度 : 最后一条的长度 : swipe_id` —— 只比**长度**。
+  //   两条等长、内容完全不同的消息签名相同 ⇒ `sig === lastRoundSig` ⇒ 整条 before 链
+  //   被静默跳过：世界不推进，日志却写「拦截器去重：本轮before链已执行」（把故障伪装成
+  //   正常）。真实触发面：MESSAGE_EDITED 把最后一楼改成等长文本、某些宿主的 regen 不
+  //   递增 swipe_id、别的扩展替换了最后一条。
+  // 为什么用 msg-align 的 loose 归一化而不是原文比较：它的能力就是「同一段文字被标签
+  //   或空白改过一点也认得出」——去标签 / 去空白 / 小写化之后差别消失的，是同一条消息，
+  //   不该被当成新一轮而重复推进世界（那会虚增 round）。归一化后仍有差异才算另一轮。
+  //   **不夸大的边界**：它吸不掉宏展开（{{char}} → 莉莉）这类**内容级**差异 —— 那种差异
+  //   会把同一条消息判成另一轮；本签名宁可多跑一次（可由 settleGuard 挡重复推进），
+  //   也不把两条真不同的消息当成同一轮（那会静默跳过整条 before 链）。
+  function looseFp(text) {
+    let s = '';
+    try {
+      s = (WA.msgAlign && typeof WA.msgAlign.loose === 'function')
+        ? WA.msgAlign.loose(WA.msgAlign.textOf(text))
+        : String(text == null ? '' : text);
+    } catch (e) { s = String(text == null ? '' : text); }
+    // FNV-1a 32 位：只求「等长不同文不同码」，不求密码学强度（签名只在本进程内比较）
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return s.length.toString(36) + '-' + h.toString(36);
+  }
   function roundSig() {
     const ctx = getCtx();
     const len = ctx && ctx.chat ? ctx.chat.length : 0;
     const last = len && ctx.chat[len - 1];
-    // 去重签名：同一聊天长度+最后消息内容+swipe_id 视为同一轮（不含时间戳，否则永不命中）
-    return len + ':' + (last && last.mes ? String(last.mes).length : 0) + ':' + (last && last.swipe_id != null ? last.swipe_id : 0);
+    // 去重签名：聊天长度 + 最后一条的松散指纹 + swipe_id 视为同一轮（不含时间戳，否则永不命中）
+    return len + ':' + looseFp(last && last.mes) + ':' + (last && last.swipe_id != null ? last.swipe_id : 0);
   }
 
   // 主拦截：SillyTavern 在组装prompt前 await 此函数
   window.worldAxisGenerateInterceptor = async function (chat, contextSize, abort, type) {
     // quiet/impersonate 等旁路生成跳过，避免递归
     if (type && type !== 'normal' && type !== 'regenerate' && type !== 'swipe') return;
+    // v2.547.0：先对齐，再签名。位置是硬约束 —— roundSig() 读的是存档（getCtx().chat），
+    //   而本函数的 chat 是宿主真要发的那一份；两者不同批时签名本身就没有可比性，这个事实
+    //   必须在去重判定之前留证，否则查现场时只剩一句「本轮已执行」。只观测不改行为（理由见
+    //   interceptor.alignRound 的注释）。日志去抖：仅在漂移状态翻转时打一行。
+    try {
+      const al = (WA.interceptor && WA.interceptor.alignRound) ? WA.interceptor.alignRound(chat) : null;
+      if (al && al.available && WA.interceptor) {
+        WA.interceptor.__lastAlign = al;
+        const wasDrift = !!WA.interceptor.__lastDriftFlag;
+        WA.interceptor.__lastDriftFlag = !!al.drift;
+        if (al.drift && !wasDrift) {
+          WA.log('warn', '本轮发送面与存档面不对齐：发送 ' + al.sentLen + ' 条 / 存档 ' + al.hostLen
+            + ' 条，认得 ' + al.known + ' 条、逐位不同 ' + al.mismatch + ' 条、单调=' + (al.monotonic ? '是' : '否')
+            + '（世界推进仍按存档面，签名可比性存疑）');
+        }
+      }
+    } catch (eAl) { WA.log('warn', '对齐读数失败（不影响生成）', eAl); }
     const sig = roundSig();
     if (sig === lastRoundSig) { WA.log('info', '拦截器去重：本轮before链已执行'); return; }
     lastRoundSig = sig;
@@ -75,6 +116,91 @@
   };
 
   const interceptor = WA.interceptor = {
+    /**
+     * v2.547.0：注入原文洗除（engines/ephemeral-scrub.js 的产品落点）。
+     *   病：模型会把注入块（世界状态 / 叙事工艺）原样复述进正文，那段文本就进了聊天历史，
+     *   下一轮被原样喂回 —— 逐轮堆成噪声、被模型当成一直有效的设定、把上下文撑大。
+     *   判据三条，缺一不改正文：
+     *     · removed > 0     —— 真删掉了登记过的注入原文（不删而 tidy 空白 = 观测污染被观测者）；
+     *     · overMatch === 0 —— 同一段原文在正文里只出现一次；出现多处说明正文本来就有相似
+     *       段落，删下去就是误伤（引擎自陈边界②：宁可不洗，不许猜）；
+     *     · text 是字符串。
+     *   单独成方法而不是内联在事件回调里：内联时「没洗掉」与「没登记」在读数上同形。
+     */
+    scrubReply(text) {
+      const out = { adopted: false, removed: 0, missing: 0, overMatch: 0, reason: 'absent', text: text };
+      if (!WA.ephemeralScrub || typeof WA.ephemeralScrub.scrub !== 'function') return out;
+      if (typeof text !== 'string' || !text) { out.reason = 'bad-type'; return out; }
+      let sc = null;
+      try { sc = WA.ephemeralScrub.scrub(text); }
+      catch (e) { out.reason = 'error'; out.error = String((e && (e.message || e)) || e).slice(0, 120); return out; }
+      if (!sc || sc.ok !== true) { out.reason = (sc && sc.reason) || 'not-ok'; return out; }
+      out.removed = sc.removed || 0;
+      out.missing = sc.missing || 0;
+      out.overMatch = sc.overMatch || 0;
+      if (sc.skipped) { out.reason = 'skipped'; return out; }
+      if (out.removed <= 0) { out.reason = 'no-hit'; return out; }
+      if (out.overMatch > 0) { out.reason = 'over-match'; return out; }
+      if (typeof sc.text !== 'string') { out.reason = 'bad-text'; return out; }
+      out.adopted = true;
+      out.reason = 'scrubbed';
+      out.text = sc.text;
+      return out;
+    },
+    /**
+     * v2.547.0：宿主真要发的消息 vs 存档消息逐位对齐（engines/msg-align.js 的产品落点）。
+     *   病：本拦截器拿到的 `chat` 是宿主真要发的，而 roundSig() 与 after 链读的是
+     *   getCtx().chat（存档）。上游扩展可在两者之间插/删/改消息，此后两份长度不等、位置
+     *   错开 —— 签名比的是一份、世界推进读的是另一份，两边都自洽，只在「推进基于了不是本轮
+     *   的历史」时显形。
+     *   处置刻意只观测不改行为：漂移时告警并留读数。若在漂移时跳过去重，同一轮会重复跑
+     *   before 链、重复推进世界（round 虚增），比漏推进更难查；也不许为对齐去改宿主历史。
+     */
+    alignRound(chat) {
+      const out = { available: false, sentLen: 0, hostLen: 0, known: 0, unknown: 0, coverage: 0, mismatch: 0, monotonic: true, drift: false, reason: 'absent' };
+      if (!WA.msgAlign || typeof WA.msgAlign.align !== 'function') return out;
+      if (!Array.isArray(chat)) { out.reason = 'bad-sent-chat'; return out; }
+      let ctxChat = null;
+      try { const c = getCtx(); ctxChat = (c && Array.isArray(c.chat)) ? c.chat : null; } catch (e) { ctxChat = null; }
+      if (!ctxChat) { out.reason = 'no-host-chat'; return out; }
+      out.available = true;
+      out.reason = 'ok';
+      out.sentLen = chat.length;
+      out.hostLen = ctxChat.length;
+      const sentText = function (m) {
+        try { return WA.msgAlign.textOf(m && (m.content != null ? m.content : m.mes)); } catch (e) { return ''; }
+      };
+      const hostText = function (m) {
+        try { return WA.msgAlign.textOf(m && m.mes); } catch (e) { return ''; }
+      };
+      try {
+        const structured = ctxChat.map(function (m, i) { return { identifier: 'chat#' + i, content: hostText(m) }; });
+        const ids = WA.msgAlign.align(chat.map(function (m) { return { content: sentText(m) }; }), structured);
+        const st = WA.msgAlign.stat(ids, chat);
+        out.known = st.known; out.unknown = st.unknown; out.coverage = st.coverage;
+        let prev = -1;
+        ids.forEach(function (id) {
+          if (!id) return;
+          const n = parseInt(String(id).split('#')[1], 10);
+          if (!isFinite(n)) return;
+          if (n <= prev) out.monotonic = false;
+          prev = n;
+        });
+        const n = Math.min(chat.length, ctxChat.length);
+        let mm = 0;
+        for (let i = 0; i < n; i++) {
+          let a = '', b = '';
+          try { a = WA.msgAlign.loose(sentText(chat[i])); b = WA.msgAlign.loose(hostText(ctxChat[i])); } catch (e) { continue; }
+          if (a !== b) mm++;
+        }
+        out.mismatch = mm;
+        out.drift = (chat.length !== ctxChat.length) || mm > 0 || !out.monotonic;
+      } catch (e) {
+        out.reason = 'error';
+        out.error = String((e && (e.message || e)) || e).slice(0, 120);
+      }
+      return out;
+    },
     install() {
       if (installed) return;
       installed = true;
@@ -282,6 +408,20 @@
                 }
                 WA.outputGuard.checkAndRemember(out, said);
               }
+              }
+              // v2.547.0：注入原文洗除。位置是硬约束 —— 必须在净化之后（out 才是要写回历史的
+              //   文本）、写回之前（写回后再洗要再触发一次宿主重绘，且中间那一版已经进了存档）。
+              //   只采用「真删掉了登记原文且没有多处命中」的结果，其余一律不动正文。
+              if (WA.interceptor && typeof WA.interceptor.scrubReply === 'function') {
+                try {
+                  const sr = WA.interceptor.scrubReply(out);
+                  if (sr && sr.adopted && typeof sr.text === 'string') {
+                    out = sr.text;
+                    WA.log('info', '正文里的注入复述已洗除：' + sr.removed + ' 段（未命中登记原文 ' + sr.missing + ' 段）');
+                  } else if (sr && sr.reason === 'over-match') {
+                    WA.log('warn', '注入复述疑似多处命中（' + sr.overMatch + ' 处），按判据不洗：宁可不洗，不许误删正文');
+                  }
+                } catch (eSR) { WA.log('warn', '注入洗除失败（不影响生成结果）', eSR); }
               }
               if (out !== last.mes) {
                 __purifiedRaw.set(last, last.mes);   // 原文快照：世界推进仍基于原文

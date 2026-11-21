@@ -91,9 +91,16 @@ a(missIdx.length === 0 && missRun.length === 0, 'A0d 双登记齐全（index.js 
 const nsLed = JSON.parse(RD('tests/ns-consumer-ledger.json'));
 const nineNs = FILES.map(function (f) { return NS[f]; });
 const missLed = nineNs.filter(function (n) { return !nsLed.entries[n]; });
+// v2.547.0：把「接线成功」与「逃账」区开。原判据要求 9 件的 ns 全部在账本里，
+//   但账本条目会因为「接到了真读点」而注销（v2.544.0 注销 importKind：账本说零读、
+//   现场已有真读点，理由写在 _note 里）。于是原判据把「已接线」判成「逃账」——
+//   正是本仓最忌讳的那种同形。判据升级：在账本里 ⇒ 必须是 pending-wire；
+//   不在账本里 ⇒ 必须在 _note 里找得到注销理由（找不到 = 逃账，仍然红）。
+const wiredOut = missLed.slice();
+const unexplained = wiredOut.filter(function (n) { return String(nsLed._note || '').indexOf(n) < 0; });
 const wrongCls = nineNs.filter(function (n) { return nsLed.entries[n] && nsLed.entries[n].cls !== 'pending-wire'; });
-a(missLed.length === 0 && wrongCls.length === 0, 'A0e 9 个零读 ns 都在定性账本里（cls=pending-wire）',
-  { miss: missLed, wrongCls: wrongCls });
+a(unexplained.length === 0 && wrongCls.length === 0, 'A0e 9 个零读 ns 都在定性账本里（cls=pending-wire；已接线的须有注销理由）',
+  { miss: unexplained, wrongCls: wrongCls, wiredOut: wiredOut });
 
 // ── 1 store-merge ────────────────────────────────────
 const SM = WA.storeMerge;

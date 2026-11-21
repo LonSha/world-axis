@@ -2176,6 +2176,23 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       //   记一行事实（null 语义 = 没走到这一步，与「送到 0 字」区分）。
       //   刻意不在失败路径写 hosted：失败由外层 catch 落日志，两处各记一遍就是两个真源。
       let __hostedSnap = null;
+      // v2.547.0：注入原文登记（engines/ephemeral-scrub.js 的「登记」半边）。
+      //   为什么登记在落地之前而不是 items 阶段：登记的对象必须是真送出去的那一份（finalItems
+      //   已过预算裁决/折叠）。登记 items 会把「本来没发出去」的原文也算进台账，之后在正文里
+      //   找不到就报 missing —— 那是把「没发」伪装成「没洗掉」。
+      //   登记侧刻意保守：只收结构性块（含 <…> 标签或【…】条目标记，且长度 >= 40 字）。叙事句
+      //   （如本幕意图）不进台账 —— 模型恰好写出同一句话时，那会被当成复述注入而删掉玩家想看
+      //   的正文。台账在内存（引擎自陈边界⑥），不写 store。
+      try {
+        if (WA.ephemeralScrub && typeof WA.ephemeralScrub.register === 'function') {
+          (Array.isArray(finalItems) ? finalItems : []).forEach(function (it) {
+            const txt = (it && typeof it.content === 'string') ? it.content.trim() : '';
+            if (txt.length < 40) return;
+            if (!/[<【]/.test(txt)) return;
+            WA.ephemeralScrub.register(txt, { tag: (it && it.source) || '未命名' });
+          });
+        }
+      } catch (eES) { /* 登记失败不影响注入本身 */ }
       try {
         // 即使为空也要写入空串，清掉上一轮残留注入（swipe/重答场景关键）
         c.setExtensionPrompt('WorldAxis', combined, 1, 0, false);
