@@ -126,11 +126,14 @@ function runAll(assertFn) {
   a(rb.rc === 3 && rb.ev && rb.ev.refusal === 'unknown-args', 'B2 未知参数拒收 unknown-args');
   // B3 的判据**不许假设工作树是窄改动面** —— 第一版就是那么写的（断言必得 plan），
 //   而本工作树改动 20 个文件、命中 74 节 ⇒ 诚实的输出是 `wide-impact` 拒收。
-//   判据改成「两种诚实输出之一，但**永不许**是 passed」，并在读数里记录实际是哪种。
+//   判据改成「几种诚实输出之一（现为三档，见下），但**永不许**是 passed」，并在读数里记录实际是哪种。
 const rp = run(['--tier=2', '--plan']);
+// v2.542.8：第三档诚实输出 —— `no-executable-change`。隔离副本的 git 历史是单条
+//   Independent baseline、工作树无改动，于是「增量面」是空的；调度器此时拒收得完全正确。
+//   判据仍是「永不许是 passed」，只是把这一档也算进「诚实输出」。
 const b3ok = rp.ev && (rp.ev.verdict === 'plan'
-  || (rp.ev.verdict === 'refused' && ['wide-impact', 'uncovered-change'].indexOf(rp.ev.refusal) >= 0));
-a(b3ok, 'B3 `--tier=2 --plan` 的结论 ∈ {计划, wide-impact/uncovered-change 拒收}，且**永不许**是 passed'
+  || (rp.ev.verdict === 'refused' && ['wide-impact', 'uncovered-change', 'no-executable-change'].indexOf(rp.ev.refusal) >= 0));
+a(b3ok, 'B3 `--tier=2 --plan` 的结论 ∈ {计划, wide-impact/uncovered-change/no-executable-change 拒收}，且**永不许**是 passed'
   + '（现场实测：' + (rp.ev ? (rp.ev.verdict + (rp.ev.refusal ? '/' + rp.ev.refusal : '')) : '无读数') + '）');
 // B3b 定向计划：与工作树无关（点名一个必然存在的节），必须是干净的计划读数。
 const rpT = run(['--tier=2', '--plan', '--only-v-section=v2.408.0 (V23 超级史诗)']);

@@ -230,6 +230,10 @@ function main() {
   return res.ok ? 0 : 1;
 }
 
-if (require.main === module) process.exit(main());
+// v2.542.8 修：原为 `process.exit(main())` —— stdout 是管道时写入是异步的，process.exit()
+//   直接终止进程，超过管道缓冲的尾部（含「依赖合规: N 个外部包」结论行）会丢。
+//   现场：隔离副本里输出 53KB 被截到 11.6KB ⇒ opv29-z5-dep-v2529 的 G4 红；
+//   真仓输出刚好装得下所以一直没红。改为设 exitCode，由 node 正常 flush 后退出。
+if (require.main === module) process.exitCode = main();
 module.exports = { audit: audit, classify: classify, extract: extract, reportLines: reportLines,
   selfTest: selfTest, BUILTIN: BUILTIN };

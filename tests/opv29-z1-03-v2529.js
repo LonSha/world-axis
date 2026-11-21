@@ -69,9 +69,21 @@ function runA() {
   console.log('A. 真仓读数（命令：node tools/mirror-slim.js --json）');
   const p = MS.profile({ root: ROOT });
   a(p.files > 1000, 'A1 复制面文件数可读', String(p.files));
-  a(p.exclude.length > 0, 'A2 有排除项（否则本工具等于没做事）', String(p.exclude.length));
-  a(p.sizeAfter < p.sizeBefore && p.saved > 0, 'A3 瘦身后体积确实变小',
-    (p.sizeBefore / 1048576).toFixed(1) + 'M → ' + (p.sizeAfter / 1048576).toFixed(1) + 'M');
+  // v2.542.8：隔离副本是**按 mirror-slim 的排除规则建的**（tests/isolated-runner.js 的
+  //   slimSet() 直接调 mirror-slim.exclusionSet），所以副本里没有任何东西可排 ——
+  //   「有排除项」「瘦身后变小」在副本里结构性不可验（exclude 恒为 0、体积恒相等）。
+  //   判据不删也不放宽：副本上改成断言「确实无可排项（且跳过项全是 referenced 面）」，
+  //   真仓上仍要求「有排除项 + 体积真的变小」。
+  const ISO = !!process.env.WA_ISOLATED_TOKEN;
+  if (ISO) {
+    a(p.exclude.length === 0 && p.saved === 0,
+      'A2/A3（隔离副本）本趟跑在已按 mirror-slim 排过项的副本里 ⇒ 无可排项、体积不变（真仓读数见下节）',
+      p.exclude.length + ' / ' + p.saved);
+  } else {
+    a(p.exclude.length > 0, 'A2 有排除项（否则本工具等于没做事）', String(p.exclude.length));
+    a(p.sizeAfter < p.sizeBefore && p.saved > 0, 'A3 瘦身后体积确实变小',
+      (p.sizeBefore / 1048576).toFixed(1) + 'M → ' + (p.sizeAfter / 1048576).toFixed(1) + 'M');
+  }
   // 现场真例：`ITERATION_LOG.md` 被 tests/q8-panel-fold-v2225.js 提到，因此**必须被拒**。
   const iter = p.skipped.filter(function (s) { return /ITERATION_LOG\.md$/.test(s.rel); })[0];
   a(!!iter && String(iter.why).indexOf('referenced:tests/') === 0,
