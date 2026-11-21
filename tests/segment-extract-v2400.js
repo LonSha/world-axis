@@ -820,7 +820,7 @@ const PS_REL = 'tests/panel-source.js';
 //   D3a/D3f 同步 +22 ⇒ 新增确实都在 panel.js 自身，段体仍一字未动。
 // v2.539.2（玩家端语言 R1）：18390 → 18400（+10：PAGES 六页各加一句 ask + __askLine 渲染抬头）。
 // v2.539.3（六页内容重写 R1 + 裸注释真缺陷）：18400 → 18432（+32：世界页结论卡 21 行 / 诊断正常态折叠 8 行 / 事件页注释搬出模板净 +3）。
-const BASE_PANEL_LINES = 18497;  // v2.542.2：+2（ui/panel.js 的 VIS_NAMES 增 sceneIntent 条目一行 + 注释一行）· v2.542.2：+2（ui/panel.js 的 VIS_NAMES 增 sceneIntent 条目一行 + 注释一行）· v2.541.7：+8（panel.js +2：外交节 data-omniscient 包壳开合两行；
+const BASE_PANEL_LINES = 18528;  // v2.542.2：+2（ui/panel.js 的 VIS_NAMES 增 sceneIntent 条目一行 + 注释一行）· v2.542.2：+2（ui/panel.js 的 VIS_NAMES 增 sceneIntent 条目一行 + 注释一行）· v2.541.7：+8（panel.js +2：外交节 data-omniscient 包壳开合两行；
                                  //   ui/pages/overview-main.js 净 +6：存档体检标题改用引擎 line() 后注释与行合并）。
                                  //   ⚠ 这是**重组面**读数：段体（D1d/D2a）一字未动，只是两侧文件行数漂移。
 // 拆后 panel.js 自己的行数（split 口径；拆前 17421 - 段体 335 + 转发块 41 = 17127）。
@@ -853,7 +853,7 @@ const BASE_PANEL_LINES = 18497;  // v2.542.2：+2（ui/panel.js 的 VIS_NAMES �
 //       若哪天两者差额跳变，那就是段体被搬进/搬出 panel.js 了，D3 这一族必须当场复核。
 // v2.524.0（V27 OPV27-5）：16243 → 16247（+4）—— VIS_NAMES 里给「在用机制」一个中文显示名
 //   （面板上玩家唯一能开关它的地方），含注释两行；与 BASE_PANEL_LINES 同批同源。
-const BASE_PANEL_FILE_LINES = 16523;  // v2.542.2：+2，同源同批（VIS_NAMES 的 sceneIntent 条目及其注释）· v2.542.2：+2，同源同批（VIS_NAMES 的 sceneIntent 条目及其注释）· v2.541.7：+2，同源同批（外交节 data-omniscient 包壳开合两行）。
+const BASE_PANEL_FILE_LINES = 16554;  // v2.542.2：+2，同源同批（VIS_NAMES 的 sceneIntent 条目及其注释）· v2.542.2：+2，同源同批（VIS_NAMES 的 sceneIntent 条目及其注释）· v2.541.7：+2，同源同批（外交节 data-omniscient 包壳开合两行）。
 //   v2.400.0（V22 后续修正）：335 → 491。EXV22-9 把 v22OmensBlock 写在段体标记
 //   之外（重组面里定义缺席、调用在场 ⇒ 假源码），本次把段体结束标记移回函数之后，
 //   段体收编 v22 块的 156 行。段体 esc 调用同步 57 → 60（v22 块 3 处）。

@@ -112,10 +112,66 @@
     };
   }
 
+  /** 历史缺省 tick 分钟（调用方既没给分钟数、也没给正文证据时用）。 */
+  const DEFAULT_MINUTES = 15.0;
+  /**
+   * 分钟数的**来源分级**（v2.542.14）。
+   *
+   *   此前 metabolize 的签名只有 (actorId, elapsedMinutes)，缺省一律 15.0：于是
+   *   「正文里根本没写过多久」与「正文写了三小时」在算术上完全同形 —— 这正是
+   *   engines/elapsed-evidence.js 存在的理由（它自己的注释就点名了本引擎持有
+   *   已算好的 deltaMinutes、却从不从正文明文取时长）。
+   *
+   *   本函数把三档来源**显式分开**，只在调用方给出正文证据时才引入解析：
+   *     caller   调用方给了正数分钟 → 原样采用（与旧版逐字等价）
+   *     evidence 调用方给了 text/evidence → 由 elapsedEvidence 判「这句话能不能当依据」
+   *     default  两者都没给 → 用 DEFAULT_MINUTES，并如实把来源标出来
+   *
+   *   证据在场但判不出来时**不回落 default**：回 { ok:false, reason }，让调用方看见拒绝。
+   *   理由：回落默认值会把「时间未确证」悄悄变成「过了 15 分钟」，与本仓
+   *   「压下项必须可见」纪律直接冲突。
+   */
+  function resolveMinutes(elapsedMinutes, opts) {
+    const o = opts || {};
+    const want = (typeof elapsedMinutes === 'number' && isFinite(elapsedMinutes) && elapsedMinutes > 0)
+      ? elapsedMinutes : null;
+    if (want !== null) return { ok: true, minutes: want, source: 'caller', reason: 'ok', clause: '' };
+    const text = (typeof o.text === 'string' && o.text) ? o.text
+      : ((typeof o.source === 'string' && o.source) ? o.source : '');
+    const ev = typeof o.evidence === 'string' ? o.evidence : '';
+    if (!text && !ev) {
+      return { ok: true, minutes: DEFAULT_MINUTES, source: 'default', reason: 'ok', clause: '', note: 'no elapsed given' };
+    }
+    const EE = WA.elapsedEvidence;
+    if (!EE || typeof EE.parse !== 'function') {
+      // 证据面本身缺失（基础设施降级）⇒ 退回历史默认，**不让代谢停摆**，并把降级原因标出来。
+      //   v2.542.14：这一档刻意不产出新的拒收码 —— 「依赖没装」不是世界语义上的拒绝，
+      //   拿它当拒绝会让毒素永远不衰减；但也不能假装证据判过了，故 source 仍报 'default'。
+      return { ok: true, minutes: DEFAULT_MINUTES, source: 'default', reason: 'ok', clause: '', note: 'elapsedEvidence missing' };
+    }
+    let r;
+    if (typeof o.deltaMinutes === 'number' && ev && typeof EE.verify === 'function') {
+      // 调用方既给了声称的分钟数、又给了证据原文 ⇒ 走最硬的双重校验。
+      const v = EE.verify(text, ev, o.deltaMinutes);
+      r = { ok: !!v.ok, minutes: v.actual, reason: v.reason, clause: v.clause };
+    } else {
+      // 只有正文：判「这段文字本身是不是一个确凿的时长」。
+      const p = EE.parse(text);
+      r = { ok: !!p.ok, minutes: p.minutes, reason: p.reason, clause: p.anchor || '' };
+    }
+    if (!r.ok) {
+      return { ok: false, minutes: null, source: 'evidence', reason: r.reason || 'not-fact', clause: r.clause || '' };
+    }
+    return { ok: true, minutes: r.minutes, source: 'evidence', reason: 'ok', clause: r.clause || '' };
+  }
   /**
    * 角色生理半衰期自然代谢演化
+   *
+   *   v2.542.14：第三参 opts（`{text|source, evidence, deltaMinutes}`）。
+   *   不给 opts 时行为与旧版逐字一致（caller / default 两档）。
+   *   给了正文证据时，分钟数必须由证据推出；推不出就返回 ok:false + reason。
    */
-  function metabolize(actorId, elapsedMinutes) {
+  function metabolize(actorId, elapsedMinutes, opts) {
     if (!actorId || typeof actorId !== 'string') {
       return { ok: false, error: 'invalid_actor_id' };
     }
@@ -124,7 +180,14 @@
       return { ok: true, actorId: actorId, activeToxins: [], clearedAll: true };
     }
 
-    const minutes = typeof elapsedMinutes === 'number' && elapsedMinutes > 0 ? elapsedMinutes : 15.0;
+    const rm = resolveMinutes(elapsedMinutes, opts);
+    if (!rm.ok) {
+      return {
+        ok: false, actorId: actorId, reason: rm.reason,
+        minutesSource: rm.source, evidenceClause: rm.clause
+      };
+    }
+    const minutes = rm.minutes;
     const results = [];
 
     for (const [tType, rec] of tMap.entries()) {
@@ -150,6 +213,8 @@
       ok: true,
       actorId: actorId,
       elapsedMinutes: minutes,
+      minutesSource: rm.source,
+      evidenceClause: rm.clause,
       toxinStatus: results,
       totalActiveToxins: tMap.size
     };

@@ -53,7 +53,10 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 //   不能像上次那样只解释来源。19 条的 cls 全是 pending-wire，evidence 写明消费点归属。
 // v2.542.12 跟位：69 -> 68（jsonRepair 已被面板 dcPayload 的 catch 真接上 ⇒ 出表）。
 //   「补完即出表」是账本 _classes 里 wired 档的原文，这里就是第一次真的发生。
-const BASE_DEAD_NS = 68;   // v2.533.0 跟位：47 → 66（+19，缝合批）→ 69（+2，factAge / jsonRepair）→ 70/71/72（三台缝合件入库，各 +1）→ **69**（v2.533.0 收口：副本族 / 上下文边界 / 写前预演 三台已由 ui/settings.js 的「缝合件台账」读数行接线，按纪律④删行出表；本轮新增的引导弧 / 存档体检从入库起就在同一行被读，故不进表）。 七个拆段表文件（OPV29-07~11）不进本账：它们不是零读，是在调用期被同族引擎读。
+// v2.542.14 跟位：68 -> 67。elapsedEvidence 由 readonly-api 出表 —— 它不再零读：
+//   engines/toxic-metabolism.js 的 resolveMinutes 现在真调它的 parse/verify，把「代谢过了多久」
+//   从常量代劳改为证据判定（这是该账本 evidence 里写明的「独立一步」，本批落地）。
+const BASE_DEAD_NS = 67;   // v2.533.0 跟位：47 → 66（+19，缝合批）→ 69（+2，factAge / jsonRepair）→ 70/71/72（三台缝合件入库，各 +1）→ **69**（v2.533.0 收口：副本族 / 上下文边界 / 写前预演 三台已由 ui/settings.js 的「缝合件台账」读数行接线，按纪律④删行出表；本轮新增的引导弧 / 存档体检从入库起就在同一行被读，故不进表）。 七个拆段表文件（OPV29-07~11）不进本账：它们不是零读，是在调用期被同族引擎读。
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。

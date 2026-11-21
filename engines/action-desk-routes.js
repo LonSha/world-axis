@@ -1998,8 +1998,20 @@
       return { ok: false, reason: 'microclimatePhase-unavailable' };
     },
     'bio.metabolizeToxin': function (o) {
-      if (WA.toxicMetabolism && typeof WA.toxicMetabolism.metabolize === 'function') return WA.toxicMetabolism.metabolize(o.actorId || o.who, o.elapsedMinutes || o.duration);
-      return { ok: false, reason: 'toxicMetabolism-unavailable' };
+      const T = WA.toxicMetabolism;
+      if (!T || typeof T.metabolize !== 'function') return { ok: false, reason: 'toxicMetabolism-unavailable' };
+      // v2.542.14：把「这一轮到底推进了多久」的判定交回 engines/elapsed-evidence.js。
+      //   给了正文（o.source / o.text）时，分钟数必须由证据推出；推不出由引擎如实拒绝，
+      //   不再由常量代劳。没给正文时 opts 为空 ⇒ 引擎行为与旧版逐字一致（caller / default）。
+      const src = (o && typeof o.source === 'string' && o.source) ? o.source
+        : ((o && typeof o.text === 'string') ? o.text : '');
+      const opt = {};
+      if (src) {
+        opt.text = src;
+        if (typeof o.evidence === 'string') opt.evidence = o.evidence;
+        if (typeof o.deltaMinutes === 'number') opt.deltaMinutes = o.deltaMinutes;
+      }
+      return T.metabolize(o.actorId || o.who, o.elapsedMinutes || o.duration, opt);
     },
     'bio.applyToxin': function (o) {
       if (WA.toxicMetabolism && typeof WA.toxicMetabolism.applyToxin === 'function') return WA.toxicMetabolism.applyToxin(o.actorId || o.who, o.toxinType, o.dose, o.opts || o);
