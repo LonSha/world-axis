@@ -3928,7 +3928,7 @@
     },
     {
       "file": "tests/module-cycle-gate-v2107.js",
-      "sha": "097b2245715b",
+      "sha": "20729445c153",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2107",
@@ -4089,7 +4089,7 @@
     },
     {
       "file": "tests/ns-consumer-ledger-v2400.js",
-      "sha": "84ad3de93abb",
+      "sha": "0c1a9c136178",
       "version": "2.400.0",
       "versionSource": "title",
       "fileAnchor": "2400",

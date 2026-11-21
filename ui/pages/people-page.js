@@ -180,7 +180,9 @@
   //  病（现场）：首屏是 hero（「故事里的人」+一句泛泛文案）接一叠人物卡。每张卡里关系三档
   //    很细，但**页面从不回答「谁最不一样」「他在追什么」** —— 玩家要逐卡读、逐项比，
   //    才能自己拼出「为什么这样对我」。
-  //  修法：三句，只用本文件已读的 store.people（零新增读口、零新增模块依赖）：
+  //  修法：四句。前三句只用本文件已读的 store.people（零新增读口）；第四句（v2.542.12）
+  //    读 engines/character-drive.js 的 derive() —— 这页的 ask 就是「为什么这样对我」，
+  //    引擎的 want / line 才是这个问题的真源，store 里只有 intent 一句。
   //    ① 在册几个人、其中几个留下了印象
   //    ② 离你最近的是谁 —— 按 affinity 取最大，档位措辞复用本文件的 affinityText（不另编）
   //    ③ 他在追什么 —— `people[].intent` 就是「人物在追什么」，口径见
@@ -222,6 +224,36 @@
         ? ('他在追什么：「' + nm + '」正在追「' + goal + '」' + (doing ? '，眼下在做「' + doing + '」' : ''))
         : ('他在追什么：还没写下「' + nm + '」在追什么'
           + (doing ? ('（眼下在做「' + doing + '」）') : '') + ' —— 这不是「他没有打算」'));
+    }
+    // ④ v2.542.12：他为什么这样对你 —— 直接读 engines/character-drive.js 的 derive()（L4）。
+    //   本卡上一版写的是「不引第二个引擎」。这一版**推翻它**，理由是这页的 ask 逐字是
+    //   「这个人为什么这样对我」，而 want / line 是**引擎自己的语义**（他要什么、哪条线不能越），
+    //   store 里只有 intent 一句。用引擎字段、并沿用引擎的字段名与 skipped 名单，
+    //   比在页面里再拼一次强：后者会造出第二个措辞真源（本仓点过名的形态）。
+    //   边界（与本文件同规）：引擎缺席 ⇒「读数不可用」；引擎在场但某面推不出来 ⇒ 如实说那一面
+    //   （fear 在画像里没有真字段，本版永远推不出来）；两种形态都不许塌成「他没有」。
+    const whoId = (function () {
+      if (!who) return null;
+      const ks = Object.keys(people);
+      for (let i = 0; i < ks.length; i += 1) { if (people[ks[i]] === who) return ks[i]; }
+      return null;
+    })();
+    const cd = (typeof WA !== 'undefined' && WA.characterDrive) ? WA.characterDrive : null;
+    if (!cd || typeof cd.derive !== 'function') {
+      lines.push('他为什么这样对你：读数不可用（engines/character-drive.js 缺席）—— 这不是「他没有动机」');
+    } else if (!whoId) {
+      lines.push('他为什么这样对你：读数不可用（这一位没有可寻址的档案 id）—— 这不是「他没有动机」');
+    } else {
+      const d = safe(function () { return cd.derive(whoId, store()); }, null);
+      if (!d || d.ok !== true) {
+        lines.push('他为什么这样对你：读数不可用（derive 未返回可用结果）—— 这不是「他没有动机」');
+      } else {
+        const bits = [];
+        bits.push(d.want ? ('要的是「' + d.want + '」') : '要什么：画像里没有这个字段');
+        bits.push(d.line ? ('不能越的线是「' + d.line + '」') : '不能越的线：画像里还没有');
+        if (!d.fear) bits.push('怕什么：画像里没有这个字段（本版推不出来）');
+        lines.push('他为什么这样对你：' + (d.name || '这一位') + ' —— ' + bits.join('；'));
+      }
     }
     return '<div class="wa-verdict"><b>此刻</b><ul>'
       + lines.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('')

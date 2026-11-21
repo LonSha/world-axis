@@ -221,12 +221,6 @@
    "evidence": "从 JSON 形状认文件类型。消费方应是所有导入入口（现在靠后缀/按钮），还没接。",
    "recompute": "grep -rn \"importKind\" engines core ui tests | head"
   },
-  "jsonRepair": {
-   "cls": "pending-wire",
-   "provider": "engines/json-repair.js",
-   "evidence": "脆 JSON 的逐级修复：parse() 的 fixes 用来区分「差一个逗号」（可救，不用重试）与「胡写」（该重试/该丢弃）。消费点是所有解析模型结构化输出的调用点的 catch 分支 —— 现在那些地方一律回一句「解析失败」，就把两类混成同一类了。接线时刻：第一个需要区分「可修复」与「重试」的输出解析点（面板/设置导入/存档导入）。今天只有专锁同文件 B3~B16 在读。",
-   "recompute": "grep -n 'jsonRepair' engines/json-repair.js tests/opv29-z6-factage-jsonrepair-v2529.js"
-  },
   "lensCulling": {
    "cls": "stale",
    "provider": "engines/lens-culling.js",

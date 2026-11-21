@@ -7942,7 +7942,21 @@ on('#wa-desk-show', showDesk);
       const raw = wsVal('#wa-dc-in');
       if (!raw) return { ok: false, reason: 'bad-json', why: '输入框是空的 —— 先粘一份可搬物 JSON，或按「取最近一次」' };
       try { return { ok: true, value: JSON.parse(raw) }; }
-      catch (e) { return { ok: false, reason: 'bad-json', why: 'JSON 解析失败：' + (e && e.message) }; }
+      catch (e) {
+        // v2.542.12：解析失败先走 engines/json-repair.js 的阶梯（取最外层括号 / 去注释 / 去尾逗号 /
+        //   单引号转双 / 裸键补引号）。为什么值得接：玩家粘进来的多半是「差一个逗号」，
+        //   原来一律报 bad-json —— 与「胡写」同形，玩家不知道该改哪里。修好了就说修了几处，
+        //   修不好仍是 bad-json，但带上阶梯走到哪一步（不把「修不了」伪装成「粘错了」）。
+        const JR = (typeof WA !== 'undefined' && WA.jsonRepair && typeof WA.jsonRepair.parse === 'function')
+          ? WA.jsonRepair.parse(raw) : null;
+        if (JR && JR.ok === true) return { ok: true, value: JR.value, repaired: JR.fixes || [] };
+        return {
+          ok: false,
+          reason: 'bad-json',
+          why: 'JSON 解析失败：' + (e && e.message)
+            + (JR ? ('（自动修复试过 ' + ((JR.fixes || []).length) + ' 步，仍不合法）') : '')
+        };
+      }
     };
     // 体检报告渲染（check / plan 共用同一段：两处各拼一遍必然漂移）。
     const dcReport = function (r) {

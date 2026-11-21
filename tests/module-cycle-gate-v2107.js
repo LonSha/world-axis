@@ -503,7 +503,11 @@ function runAll(A) {
   // v2.542.5（L4）：装载期 474 → 476（character-drive 尾调 registerModule +1；scene-intent 在装载期
   //   多读一个 ns（characterDrive）+1）；调用期 4009 → 4012（+3：character-drive 读 store / settingsBus /
   //   __settingsRegs 三个 ns 各一条边，集合去重后按文件计；scene-intent 新增的 stakes/line 路径同文件不重复计）。
-  A(a.edgesLoad === 476 && a.edgesCall === 4016 && a.edgesAll === 4492 && a.identityOk,
+  // v2.542.12（UI 读引擎）：调用期 4016 -> 4017（+1：人物页结论卡新增 WA.characterDrive.derive
+  //   一处真调用，属“UI 直接读引擎字段”的首例；装载期不变 476）；恒等式 476 + 4017 = 4493 当场核对。
+  // v2.542.12（UI 接 jsonRepair）：调用期 4017 -> 4018（+1：面板 dcPayload 的 catch 改走
+  //   engines/json-repair.js 的阶梯）；装载期不变 476；恒等式 476 + 4018 = 4494 当场核对。
+  A(a.edgesLoad === 476 && a.edgesCall === 4018 && a.edgesAll === 4494 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -673,7 +677,9 @@ function runAll(A) {
   // v2.542.5（L4）：characterDrive 进静态提供方、账本、读面各 +1 ⇒ 646/589/581 → 647/590/582。
   //   读面之所以也 +1（而不是像 v2.192.0 那样只涨提供方）：scene-intent 在产品面真读它，
   //   不是在测试里读 —— 故差恒等式 647 - 590 = 57 不变，漂移口径不动。
-  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 582,
+  // v2.542.12：读面 582 -> 583（面板 dcPayload 真读 jsonRepair ⇒ 它从零读面进读面）。
+  //   提供方与账本不变（647/590），漂移口径不动。
+  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 583,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -711,7 +717,8 @@ function runAll(A) {
   //   在读，产品面静态读集合里还没出现 —— 这是**如实增长**，不是判据放宽；消费面登记见 OPV27-5）。
   // v2.530.0（OPV30-R1/R2）：副本族与上下文边界都还没有产品读点 ⇒ 零读 ns 69 → 71
   //   （与 tests/ns-consumer-ledger.json 的 BASE_DEAD_NS 同源，两处必须一起动）。
-  A(a.deadNs.length === 69, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  // v2.542.12：69 -> 68（jsonRepair 接线后出零读面；账本同批出表，见 ns-consumer-ledger.json）。
+  A(a.deadNs.length === 68, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
