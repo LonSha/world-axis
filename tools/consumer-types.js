@@ -207,6 +207,23 @@ function classify(opt) {
     seenKey[k] = true;
     members.push({ ns: rec.ns, mem: rec.mem, src: fileOfNs[rec.ns] || '' });
   });
+  // v2.550.0：登记表里的键若**真的在导出面上**（运行时自有成员），也必须进成员清单。
+  //   病灶：上面两条来源是「产品引用 ∪ dead/dataOnly/uiDead」，而 programmatic 登记项按定义正是
+  //   「产品面与测试面都零引用」的那一类 —— 它既不会被扫进 refs，也不一定进 dead（dead 的口径只收
+  //   产品/测试都零引用的**导出**，而它此前压根不在成员面里，于是永远轮不到它）。结果：三条真导出
+  //   反被判 ghost-entry（现场：personalInventory.addItem / narrativeLens.stat / replyGuard.stat）。
+  //   判据改成「导出在不在」而不是「有没有被引用过」：登记项要证的是导出存在，不是它被读过。
+  const WA0 = global.WorldAxis || {};
+  Object.keys(programmatic).forEach(function (k) {
+    if (seenKey[k]) return;
+    const ns0 = k.split('.')[0];
+    const mem0 = k.slice(ns0.length + 1);
+    if (!fileOfNs[ns0]) return;
+    const obj0 = WA0[ns0];
+    if (!obj0 || !Object.prototype.hasOwnProperty.call(obj0, mem0)) return;
+    seenKey[k] = true;
+    members.push({ ns: ns0, mem: mem0, src: fileOfNs[ns0] });
+  });
   // 整段分类跑在门禁的 `walkPass` 里：同一趟内产品/测试面只核一次签名（门禁自带三层缓存），
   //   实测 entry 数从「每条核一次全量签名 = 每趟 40 秒」降到毫秒级。
   DE.walkPass(function () {

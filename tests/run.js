@@ -22566,6 +22566,23 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //     删 screen 里的 d.near ⇒ B1 红（丢弃项只剩 name/why）；
   //     nearNames 去掉阈值判断 ⇒ B2 红（「隔壁老张」也被报成 near，score 0）。
   await runScript('./narrative-depth-wire-v2549.js');
+  // v2.550.0（零读引擎裁决）：五台「零故事面读点」引擎 —— 21 段。
+  //   病灶（比「没接线」更根本的一件）：
+  //     ① preflight / polish / archiveHide 在 ui/settings.js 有面板开关，且 getSettings().enabled
+  //        默认就是 true —— 面板一开始就是勾上的，勾掉也不改变任何注入内容（故事面零读点）。
+  //        这比「默认关着、没人开」更难发现：读数（checked）是对的，面板自己也看不出真因。
+  //     ② autoHide 有 tool-diag 工具表 11 处 + 行动台路由 7 条（14 处引用），读起来最「热」，
+  //        但缺的是宿主动作 —— timeline 注释明写「不实现 syncHidden（隐藏楼层涉及 /hide 副作用）」。
+  //     ③ ensemble 连开关都没有，只剩 tool-diag 里一行「文件 → 命名空间」注册。
+  //   落点：不硬接。写 docs/ORPHAN_ENGINES_ADJUDICATION.md（结论表 + 逐台为什么不能硬接 +
+  //     改判触发器 + 复算命令），并用本锁把「可达但零故事面」钉成可复算读数。
+  //   读数：21 段全绿 —— A 定义面（五台在 WA 上 / 关键方法 / `WA.<ns> = {` 恰一处 / enabled 默认 true）、
+  //     B 可达面（开关行数 / 工具表条目 / 路由引用 / 注册行 的精确计数，ensemble 三项全 0）、
+  //     C 故事面（除自身 + tool-diag* + narrow-consumers + action-desk-routes 外零命中，主判据）、
+  //     D 文档面（五台名字 + 改判触发器 + 开关≠读点 + 复算命令）、
+  //     E 非空转（合成 WA.polish 必红 / WA.polishExtra 不误伤 / 三个排除面存在 / autoHide 仍在窄台账）。
+  //   负控一条：在 render/inject.js 追加一行提到 WA.polish 的注释 ⇒ C·polish 红并点名该文件；还原即绿。
+  await runScript('./orphan-engine-adjudication-v2550.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
