@@ -4126,6 +4126,7 @@ ${emptyDrill}
         <button class="wa-btn" id="wa-wps-json" title="纯读：把快照序列化成可读 JSON（带 wsVer 与 schema 版本）—— 复制走或落文件用">出 JSON</button>
         <button class="wa-btn" id="wa-wps-check" title="纯读：导入前兼容检查（格式版本 / schema 差 / 未知面 / 冲突键）—— 差异逐项列出，不做尽力而为的静默降级">兼容检查</button>
         <button class="wa-btn" id="wa-wps-preview" title="纯读：导入预览（将要新增什么 / 冲突什么 / 跳过什么）—— 真源 previewImport()，不写任何东西">导入预览</button>
+        <button class="wa-btn" id="wa-wps-kind" title="纯读：从 JSON **形状**认出这段文本是哪一类酒馆文件（预设/世界书/正则/角色卡/美化/脚本）。酒馆导出的文件大量都是 .json，后缀一点信息量都没有；把美化当预设导入不会报错，只会静默写进错的槽位 —— 认不出就说认不出，不猜">这是哪种文件？</button>
       </div>
       <div class="wa-row">
         <select id="wa-wps-mode" class="wa-input" aria-label="导入模式">
@@ -15369,6 +15370,34 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
       wpsOut('<div class="wa-log wa-log-info">可读 JSON 已生成：' + Math.round(r.bytes / 1024) + 'KB　指纹 <code>'
         + esc(String(r.sig)) + '</code>　（文本已回填到下面的输入框，可直接复制）</div>');
     });
+    // ── v2.542.25：从**形状**认文件类型（engines/import-kind.js 的首个真消费点）──
+    //   为什么本页需要它：本页是导入面，而酒馆的导出文件大量都是 `.json`（预设 / 世界书 /
+    //   正则 / 角色卡 / 美化 / 脚本全一样），后缀一点信息量都没有。用户把美化粘到快照口，
+    //   importSnapshot 只会回一句 bad-json ——「被拒了」与「你拿的是别家的文件」不是一件事。
+    //   三条边界：① 只认形状、不抬 JSON 解析失败（认不出就 unknown，不猜）；
+    //   ② 本仓自己的快照/蓝图（wsVer / bpVer）不归它判，照实说「这是本仓的，直接导」；
+    //   ③ 本页仍是纯读：这个按钮零写盘、零世界键。
+    on('#wa-wps-kind', () => {
+      const K = WA.importKind;
+      if (!K || typeof K.detectText !== 'function') return wpsMiss('文件类型识别面（importKind.detectText 口）');
+      const raw = wpsRaw();
+      if (!raw) return wpsOut('<div class="wa-log wa-log-warn">文本框是空的 —— 先粘一段 JSON / 出 JSON / 取槽回填，再认。</div>');
+      const own = /"wsVer"|"bpVer"/.test(raw);
+      const kind = WA.importKind.detectText(raw);
+      if (own) {
+        return wpsOut('<div class="wa-log wa-log-info">这是<b>本仓自己的</b>快照/蓝图 JSON（带 wsVer / bpVer）—— 直接走上面的兼容检查 / 导入预览 / 导入。</div>'
+          + '<div class="wa-dim">形状识别在这里只是旁证：own 判据是字符串 wsVer/bpVer，真假由 checkCompat() 复算。</div>');
+      }
+      if (kind === 'unknown') {
+        return wpsOut('<div class="wa-log wa-log-warn">认不出这是哪类文件 —— 本页<b>不猜</b>。</div>'
+          + '<div class="wa-dim">若它确实是别家的文件，请到对应入口去导；若它是本仓快照，先看下面的兼容检查怎么说。</div>');
+      }
+      wpsOut('<div class="wa-log wa-log-warn">这段的<b>形状</b>是：' + esc(WA.importKind.describe(kind))
+        + '　<code>' + esc(String(kind)) + '</code></div>'
+        + '<div class="wa-dim">它不是本仓快照/蓝图 —— 粘到这里导入会被拒（本仓不认这套形状）。'
+        + '去对应导入入口：世界书 / 正则 / 预设 / 角色卡各有自己的页。</div>'
+        + '<div class="wa-dim">判据按「越不容易被别的类型冒充」排序（正则 → 脚本 → 卡 → 世界书 → 美化 → 预设），认不出就 unknown。</div>');
+    });
     on('#wa-wps-check', () => {
       const S = WA.worldSnapshot;
       if (!S || typeof S.checkCompat !== 'function') return wpsMiss('世界快照面（checkCompat 口）');
@@ -15420,8 +15449,17 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
       const conf = (function () { const c = $('#wa-wps-conf'); return c ? c.value : 'skip'; })();
       const ovr = !!(function () { const o = $('#wa-wps-ovr'); return o && o.checked; })();
       const r = WA.worldSnapshot.importSnapshot(raw, { mode: mode, onConflict: conf, overwrite: ovr });
-      if (!r.ok) return wpsOut('<div class="wa-log wa-log-err">导入被拒：' + esc(String(r.reason)) + '　' + esc(String(r.detail || '')) + '</div>'
-        + '<div class="wa-dim">被拒就是没写进去 —— 本页不提供「再来一次」的旁路。</div>');
+      if (!r.ok) {
+        // v2.542.25：被拒时补一句「这段其实是别家的文件」—— 认得出来才说，认不出不猜。
+        let hint = '';
+        try {
+          const own = /"wsVer"|"bpVer"/.test(raw);
+          const kd = (!own && WA.importKind && typeof WA.importKind.detectText === 'function') ? WA.importKind.detectText(raw) : 'unknown';
+          if (kd !== 'unknown') hint = '<div class="wa-dim">形状上看它是' + esc(WA.importKind.describe(kd)) + ' —— 本页只导入本仓自己的快照/蓝图，换到对应入口去导。</div>';
+        } catch (e) { hint = ''; }
+        return wpsOut('<div class="wa-log wa-log-err">导入被拒：' + esc(String(r.reason)) + '　' + esc(String(r.detail || '')) + '</div>'
+          + hint + '<div class="wa-dim">被拒就是没写进去 —— 本页不提供「再来一次」的旁路。</div>');
+      }
       if (r.mode === 'newslot') {
         return wpsOut('<div class="wa-log wa-log-info">已另开槽：<code>' + esc(String(r.slot)) + '</code>　'
           + Math.round(r.bytes / 1024) + 'KB　指纹 <code>' + esc(String(r.sig)) + '</code></div>'
@@ -16460,6 +16498,13 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
     };
     orbEl.addEventListener('pointerup', onUp);
     orbEl.addEventListener('pointercancel', onUp);
+    // ── v2.542.25：球一进 DOM 就广播（ui/journal.js 靠这一个事件接管点击）──
+    //   现场（真 Chromium + 真手机 UA 跑本仓 ST）：WA.ui.mount() 到 t≈15s 才建出悬浮球，
+    //   而 journal 那边是一条 60×500ms 的轮询（窗口 30s）。窗口内建球 ⇒ 手札接管（点球开手札）；
+    //   窗口外建球 ⇒ 永不能接管，球永久停在 panel.js 的老行为（点开的是老面板）——
+    //   用户看到的就是「UI 还是老的 / 点了像没反应」。事件把「建球」与「接管」解耦：
+    //   谁先到都行，球一出现就有人接。
+    try { if (typeof WA.emit === 'function') WA.emit('wa:orb-ready', { at: Date.now() }); } catch (e) {}
   }
 
   function toggle(force) {

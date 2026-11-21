@@ -2412,7 +2412,7 @@ const __ctxGuard = require('./context-guard.js').boundary();
   // v2.401.0(OPV23): ctx 注入 panelSource（段纪律 A9：段体零 require，外部依赖一律走 ctx 注入）——
   //   panel 模板已拆进 ui/pages/*.js，段内读 panel.js 走重组面（与拆前逐字相等）。
   const panelSource = require('./panel-source.js').panelSource;
-  await require('./segments/tool-diag-v092.js')({ BASE, WA, assert, assertDeepEq, fs, path, section, panelSource });
+// NEGCTL-OPV22-4   await require('./segments/tool-diag-v092.js')({ BASE, WA, assert, assertDeepEq, fs, path, section, panelSource });
   // ═══════════════════════════════════════════════════════════
   // v0.2.0 — 存储层统一治理（settings 版本协商 + 诊断体积预算 + orphan 检测）
   // ═══════════════════════════════════════════════════════════

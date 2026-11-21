@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.524.0';
+  const VERSION = '2.542.25';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -433,6 +433,10 @@
     //   vault 留在惰性档里时，首帧保存 API Key 会静默退回明文（安全升级被降级）。
     //   尾部调 WA.registerModule（由 store 提供）⇒ 装载期边在惰性档时就已计入，移回首帧不增。
     'engines/api-vault.js',
+    // v2.542.25：import-kind 同病同批回首帧。面板「这是哪种文件？」按钮真调
+    //   WA.importKind.detectText / describe —— 惰性档里时首帧点它会静默少功能（D1 拦的就是这个）。
+    //   惰性档只放「产品源面零出现」的模块；面板要读它，它就得在首帧面。
+    'engines/import-kind.js',
     'engines/kaleidoscope.js',
     'engines/calendar.js',
     // v2.302.0（缝 World Chronicle）：正文内联状态回报标签 <time>/<choice>/<flag>。
@@ -1652,7 +1656,6 @@
     'engines/floor-hide.js',
     'engines/floor-scrub.js',
     'engines/green-keys.js',
-    'engines/import-kind.js',
     'engines/macro-guard.js',
     'engines/mixed-index.js',
     'engines/msg-align.js',
@@ -1676,7 +1679,7 @@
   //   同一构建标识下取到的模块与本地是同一次产物,这才谈得上「同版容灾」。
   //   纪律:升版时 BUILD_ID 与 VERSION 同批推进(判据见 tests/index-build-v2211.js),
   //   不允许只改其一 —— 只改 VERSION 会让回退源指向旧代码,只改 BUILD_ID 会让版本账对不上现场。
-  const BUILD_ID = '2fd1cb069d4495d5829bdee09d752c1fa94649d3';
+  const BUILD_ID = '2898ad2d224b307bc3f9a583653da71adafc1796';
   const CDN_BASES = [
     'https://cdn.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
     'https://fastly.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,

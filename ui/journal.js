@@ -13,7 +13,7 @@
  *   ⑦ 推演按钮有忙碌态，不能连点。
  *
  * 边界：只读世界（不写 store）；唯一的外部写是酒馆输入框（玩家主动点击）。
- *   开发者模式下 ◈ 交回原面板。所有字段读取带兜底。
+ *   ◈ 一律开手札（含开发者模式）；手札设置页里有通往完整面板的入口。所有字段读取带兜底。
  */
 (function () {
   'use strict';
@@ -230,7 +230,7 @@
     return sec('推演', '<button class="wj-btn wj-btn-primary" data-wj="simulate">让世界走一步</button><p class="wj-hint">平时每轮回复后会自动推演，这里可以手动补一次。</p><div class="wj-out" id="wj-out" role="status"></div>')
       + sec('阅读', '<div class="wj-field"><span>底色</span>' + seg('tone', [['ink', '墨'], ['paper', '纸']]) + '</div><div class="wj-field"><span>字号</span>' + seg('size', [['s', '小'], ['m', '中'], ['l', '大']]) + '</div>')
       + sec('连接与机制', '<button class="wj-btn" data-wj="open-connect">配置 API 通道<span>›</span></button><button class="wj-btn" data-wj="open-settings">机制开关与强度<span>›</span></button>')
-      + sec('高级', '<label class="wj-switch"><input type="checkbox" data-wj="dev" ' + (devMode() ? 'checked' : '') + '/><span></span>开发者模式</label><p class="wj-hint">开启后，◈ 会打开完整的机制面板（给作者和调试用：世界的每一个零件都在这里）。</p>');
+      + sec('高级', '<label class="wj-switch"><input type="checkbox" data-wj="dev" ' + (devMode() ? 'checked' : '') + '/><span></span>开发者模式</label><p class="wj-hint">开启后仍从 ◈ 进手札，但会多出「打开完整面板」这一条路（给作者和调试用：世界的每一个零件都在那里）。</p>');
   }
   const PAGES = { now: pageNow, away: pageAway, people: pagePeople, threads: pageThreads, settings: pageSettings };
 
@@ -365,7 +365,13 @@
     let sx = 0, sy = 0;
     o.addEventListener('pointerdown', e => { sx = e.clientX; sy = e.clientY; }, true);
     o.addEventListener('pointerup', e => {
-      if (devMode() || Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 5) return;
+      // v2.542.25：**开发者模式不再是「点球没反应」的死路**。
+      //   旧行为：devMode 开启时直接 return ⇒ 球交给 panel.js 的老 toggle（开完整面板）。
+      //   这在作者机上等于「手札永远打不开」，而玩家分不清「手札坏了」与「开关是开的」。
+      //   现行为：两种模式都开手札；手札设置页本来就有 openFull 通往完整面板（data-wj="open-settings"
+      //   与「开发者模式」开关本身），所以「交回机制面板」这条路一条没少。
+      //   拖拽仍不触发（|dx|+|dy| > 5），那条与模式无关。
+      if (Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 5) return;
       const pnl = doc.getElementById('wa-panel');
       if (pnl && !pnl.classList.contains('wa-hidden')) pnl.classList.add('wa-hidden');
       open();
@@ -385,8 +391,36 @@
     ['clock:changed', 'registry:changed', 'chapters:changed'].forEach(ev => WA.on(ev, () => { badge(); render(); }));
     WA.on('chat:changed', () => { pref.seen = null; save(); badge(); render(); });   // 换聊天 = 换世界，刻度重置
   }
-  let tries = 0;
-  (function wait() { if (hookOrb()) { listen(); if (!pref.seen) { pref.seen = marks(state()); save(); } badge(); return; } if (++tries < 60) setTimeout(wait, 500); })();
+  // ── v2.542.25：接管不再只靠一条 60×500ms（30s）的轮询 ──
+  //   现场实测（真 Chromium + 真手机 UA 跑本仓 ST）：WA.ui.mount() 到 t≈15s 才建出 #wa-orb，
+  //   窗口内用户点球 → 面板照旧被人知道；但一旦建球晚于窗口（真机更慢时完全可能），
+  //   hookOrb 永久失败 ⇒ 球停在 panel.js 的原行为（点开的是老面板），玩家看到的是
+  //   「UI 还是老的、点了像没反应」。四条进门，任一先到都接上，接上就停：
+  //     ① 事件：panel.js 建完球广播 'wa:orb-ready'（零延迟，已就绪时立刻派发）；
+  //     ② 观察：MutationObserver 等 #wa-orb 进 DOM（事件早于本模块装载时的兜底）；
+  //     ③ 轮询：窗口 30s → 5min（不是判据，只是最后一道保险，不承载「该不该接管」的事实）；
+  //     ④ listen() 只在首次接上时跑一次（重复调用会重复订阅同一批事件）。
+  let hooked = false, tries = 0;
+  function tryHook() {
+    if (hooked) return true;
+    if (!hookOrb()) return false;
+    hooked = true;
+    listen();
+    if (!pref.seen) { pref.seen = marks(state()); save(); }
+    badge();
+    return true;
+  }
+  if (typeof WA.on === 'function') WA.on('wa:orb-ready', function () { tryHook(); });
+  try {
+    const MO = (typeof MutationObserver !== 'undefined') ? MutationObserver
+      : (typeof win !== 'undefined' && win.MutationObserver ? win.MutationObserver : null);
+    if (MO && doc.body) {
+      const mo = new MO(function () { if (tryHook() && mo && mo.disconnect) mo.disconnect(); });
+      mo.observe(doc.body, { childList: true, subtree: true });
+      if (tryHook() && mo.disconnect) mo.disconnect();
+    }
+  } catch (e) { /* 观察器不可用不阻断轮询那一道 */ }
+  (function wait() { if (tryHook()) return; if (++tries < 600) setTimeout(wait, 500); })();
 
   WA.journal = { open: open };
 })();

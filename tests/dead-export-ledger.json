@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.524.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。",
-  "version": "2.524.0",
+  "_note": "WorldAxis 死子面冻结账本（v2.524.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。　v2.542.25：版本面跟位。此前 index.js/manifest/台账一起停在 上一版的号 ——扩展列表与诊断面读到的版本号落后现场代码十八版，「装上去了但看着像老版」因此无从自证；本次同批推进，三本台账与 index.js VERSION 再次逐字同源。",
+  "version": "2.542.25",
   "dead": {
     "act.diceVerdict": {
       "reason": "self-only",
