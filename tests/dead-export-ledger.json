@@ -1,6 +1,6 @@
 {
-  "_note": "WorldAxis 死子面冻结账本（v2.524.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。　v2.542.25：版本面跟位。此前 index.js/manifest/台账一起停在 上一版的号 ——扩展列表与诊断面读到的版本号落后现场代码十八版，「装上去了但看着像老版」因此无从自证；本次同批推进，三本台账与 index.js VERSION 再次逐字同源。 v2.542.26：手札在 TauriTavern 2.4 上的四连修 —— 点击改走 document 级 click / touchend（宿主里 pointer 事件到不了球上）、root 几何与墨/纸两套色板内联兜底（styles 里 #wa-journal 那条规则在宿主里不生效）、pointercancel 不再当成点击、openFull 先开面板再合手札并逐步接错。台账与 index.js VERSION 逐字同源。",
-  "version": "2.542.26",
+  "_note": "WorldAxis 死子面冻结账本（v2.524.0）。dead / uiDead 两面由 tests/dead-export-gate.js 冻结：出现新条目即红灯（须显式 --update 登记，或给导出接上消费方、或删除它）。advisory 面只记计数、不拦截。每条证据 refs/tref 为现场实测的引用数，判定时会复算比对。判据口径与 tests/inventory.js 同源。　v2.542.25：版本面跟位。此前 index.js/manifest/台账一起停在 上一版的号 ——扩展列表与诊断面读到的版本号落后现场代码十八版，「装上去了但看着像老版」因此无从自证；本次同批推进，三本台账与 index.js VERSION 再次逐字同源。 v2.542.26：手札在 TauriTavern 2.4 上的四连修 —— 点击改走 document 级 click / touchend（宿主里 pointer 事件到不了球上）、root 几何与墨/纸两套色板内联兜底（styles 里 #wa-journal 那条规则在宿主里不生效）、pointercancel 不再当成点击、openFull 先开面板再合手札并逐步接错。台账与 index.js VERSION 逐字同源。 v2.543.0：引擎深度第一批 —— dream-settle 的空稿闸接进入卷口。此前 WA.dreamSettle.screen 全仓零调用（index.js 连装载位都按「那里管线，这里管稿」摆好了），模板句与二三十字的敷衍稿照样占梦卷卷位；现在入卷前判一次，不合格退回并带 retryHint，卷位不动，闸门关掉时如实 skipped。 v2.544.0：引擎深度第一批收官 —— 叙事侧两处零调用引擎接进主链。① spatial-acoustics.eavesdrop 的「隔墙听到什么」改由 lensCulling 三级裁决：旧实现 partial 档隔一词插「微弱气声」，仍能拼出原句；现在非 full 档零原词。② regional 的区域突发事件抽取改由 weightedDraw 抽：seen 为空时全员同乘 softPity，分布与旧线性抽取等价（首轮手感不变），出过的类型才被相对压低；出过的类型在 applyIncident 记账（最近 8 条），roll 仍只读。",
+  "version": "2.544.0",
   "dead": {
     "act.diceVerdict": {
       "reason": "self-only",

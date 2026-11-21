@@ -22469,6 +22469,37 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //        ok:false 是被「清单缺项」触发的、不是「版本不一致」，B7 整条判据是假的。
     //        补 makeSample 把两边的文件全搬齐，并加 B7a/B12a 「样本自身清单齐」自检。
     await runScript('./opv29-z5-27-v2529.js');
+    // v2.543.0（引擎深度·零调用接线第一批）：dream-settle 的空稿闸真接进入卷口 —— 5 项。
+    //   病：engines/dream-settle.js 从 v2.251.0 起就是「管稿」的那一半，index.js 第 319 行
+    //     的装载注释写着「须晚于 word-budget；与 dream.js 正交：那里管线，这里管稿」——
+    //     装载位摆好了、分工写清了，**入卷口一行调用都没有**。模块账本把 dream-settle 记为
+    //     产品面零消费（本轮实测：全仓 `WA.dreamSettle` 引用 0 处），于是模板句与
+    //     二三十字的敷衍稿照样占卷位，把有内容的梦挤出 maxVolumes=40。
+    //   落点：`WA.dream.archive()` 在 `clean()` 之后、占卷之前判一次
+    //     `WA.dreamSettle.screen(sum, { minChars })`：判不合格 ⇒ 退回
+    //     `{ ok:false, reason:'settle-too-short'|'settle-template-only', chars, floor,
+    //       retryHint }`，**卷位不动**；闸门关着 ⇒ `skipped` 照常入卷（不把没筛过当筛过）。
+    //   读数：`node tests/dream-settle-wire-v2543.js` ⇒ pass（5 项：A 太短拒收且不占卷位 /
+    //     B 模板句拒收 / C 合格稿入卷 / D 关闭态 skipped 照常入卷 / E 退回首带 retryHint）。
+    //   负控制一向（真破坏 engines/dream.js 后重跑：闸门条件置假 `if (false && …)`）：
+    //     ⇒ FAIL 1/5（A1 太短的梦必须被拒 —— 闸门不接时 A 段当场红，
+    //       而 C/D 仍绿，证明这条锁判的是闸门本身、不是被别的东西带着红）。
+    await runScript('./dream-settle-wire-v2543.js');
+  // v2.544.0 引擎深度第一批（2/3）：叙事侧两处零调用引擎接进主链
+  //   病灶：① spatial-acoustics.eavesdrop 自己算衰减，partial 档把原句隔一词插「微弱气声」，
+  //           等于把密谈半数原词交给隔墙的耳朵；② regional 的突发事件抽取是硬编码 weight 的
+  //           线性抽，长局里同一类反复吐，weighted-draw 的三元权重（稀有度/未得补偿/幸运封顶）零调用。
+  //   落点：① eavesdrop 的 partial 档不再「隔一词露一词」——只向 lensCulling 借「隔墙听到的
+  //           是什么动静」的叙事句，并保留 ……[微弱气声]…… 畸变标记；**可闻/不可闻仍由本模块
+  //           的 partition 判决**（registerPartition 注册的是玩家真实隔断，不能让 lens 的默认墙替掉；
+  //           先前整段交给 lens 时，木门后的 partial 被误判成 inaudible，v13 专锁当场红）。
+  //         ② regional.weightedPick 改走 weightedDraw.draw（baseOf=item.weight / idOf=type），
+  //           出过的类型在 applyIncident 记进 regionalSeen（最近 8 条），roll 仍只读。
+  //   读数：专锁 tests/narrative-depth-wire-v2544.js 7 段全绿；负控两条分别置假分支后
+  //         A2 报「cullAcousticEvent 调用次数=0」、B4 报「draws 0 -> 0」，恢复后 md5 一致。
+  //         定向回归：scenario-v13-room-acoustics 50 项、v18-acoustic-whisper 8 项全绿。
+  //   为什么不改首轮手感：seen 为空时所有候选同乘 softPity，归一化后与旧线性抽取同分布。
+  await runScript('./narrative-depth-wire-v2544.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

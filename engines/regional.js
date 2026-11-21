@@ -73,6 +73,27 @@
   }
 
   function weightedPick(items) {
+    // v2.544.0（引擎深度第一批·3）：区域突发事件的抽取交给 weightedDraw。
+    //   为什么值得：这 8 类的 weight 是「稀有度」的硬编码拷贝，长局里同一类会反复吐，
+    //   而 weighted-draw 的未得补偿（softPity）正是治这个的；它缺席时退回下面的原线性抽取。
+    //   为什么接线不改首轮手感：seen 为空时**所有**候选同乘 softPity，归一化后与旧实现同分布；
+    //   只有「已经出过的类型」才会相对压低、没出过的相对抬升。
+    if (WA.weightedDraw && typeof WA.weightedDraw.draw === 'function') {
+      let seen = [];
+      try {
+        const st = WA.store.get();
+        seen = (st && st.evolution && Array.isArray(st.evolution.regionalSeen)) ? st.evolution.regionalSeen : [];
+      } catch (e) { seen = []; }
+      const seenIdx = {};
+      seen.forEach(function (t) { seenIdx[t] = true; });
+      const got = WA.weightedDraw.draw(items, {
+        rank: 'N',
+        baseOf: function (it) { return it && it.weight; },
+        idOf: function (it) { return it && it.type; },
+        seen: { has: function (id) { return !!seenIdx[id]; } }
+      });
+      if (got && got.ok && got.item) return got.item;
+    }
     const total = items.reduce((s, i) => s + i.weight, 0);
     let roll = WA.rand.next('regional.pick') * total;
     for (const item of items) { roll -= item.weight; if (roll <= 0) return item; }
@@ -142,6 +163,12 @@
     applyIncident(draft, incident) {
       if (!incident || !incident.active) return;
       const found = INCIDENT_TYPES.find(t => t.type === incident.type);
+      // v2.544.0：记下「出过的类型」，下轮抽取据此做未得补偿（只留最近 8 条，够一圈）。
+      //   写在结算里而不是 roll 里：roll 是只读投影，不能为了抽签顺手改存档。
+      if (found) {
+        const prev = Array.isArray(draft.evolution.regionalSeen) ? draft.evolution.regionalSeen : [];
+        draft.evolution.regionalSeen = prev.concat([found.type]).slice(-8);
+      }
       draft.evolution.regionalIncident = {
         active: true, title: incident.title || '区域异动', type: incident.type || 'bandit',
         typeLabel: found ? found.label : incident.type,

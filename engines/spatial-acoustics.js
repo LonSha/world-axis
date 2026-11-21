@@ -126,8 +126,20 @@
     } else if (effectiveSignal >= 0.08) {
       clarity = 'partial';
       // 提取局部关键词与断续拼音
-      const words = conv.content.split(/([，。！？；\s]+)/).filter(Boolean);
-      interceptedText = words.map((w, idx) => (idx % 2 === 0 ? w : '……[微弱气声]……')).join('');
+      // v2.544.0：partial 档不再「隔一词露一词」—— 原句半数原词已经足够拼出内容（隔墙有耳）。
+      //   这里只向 lensCulling 借「隔墙听到的是什么动静」的叙事句；**可闻/不可闻仍由本模块的
+      //   partition 判决**：eavesdrop 的阻尼是调用方 registerPartition 注册的真实隔断，
+      //   不能让 lens 内部的默认墙把它替掉（那会把「木门后低声说话」误判成不可闻）。
+      let noiseLine = '';
+      if (WA.lensCulling && typeof WA.lensCulling.cullAcousticEvent === 'function') {
+        const lv = conv.volume === 'whisper' ? 'whisper' : (conv.volume === 'shout' ? 'scream' : 'talk');
+        const cut = WA.lensCulling.cullAcousticEvent(
+          { sourceRoomId: targetRoomId, soundLevel: lv, speechText: conv.content },
+          { listenerActorId: listenerId, listenerRoomId: listenerRoomId, backgroundNoiseDb: 40 }
+        );
+        if (cut && cut.ok && cut.action === 'muffled' && cut.audibleText) noiseLine = cut.audibleText;
+      }
+      interceptedText = '……[微弱气声]……' + (noiseLine || '隔墙只余含混闷响，听不清字句');
     } else {
       clarity = 'inaudible';
       interceptedText = '……（隐约有细微动静，但无法听清字句）……';
@@ -141,6 +153,7 @@
       clarity: clarity,
       signalLevel: Math.round(effectiveSignal * 100) / 100,
       interceptedContent: interceptedText,
+      noiseSource: clarity === 'partial' ? (WA.lensCulling ? 'lens-culling' : 'fallback') : null,
       dampingUsed: partition.damping,
       barrierType: partition.type,
       at: clockNow('eavesdrop')

@@ -204,6 +204,22 @@
     const o = opts || {};
     const sum = clean(summary, 400);
     if (!sum) return refuse('empty-summary');
+    // v2.543.0（引擎深度·零调用接线第一批）：入卷前的空稿闸。
+    //   病灶：engines/dream-settle.js 从 v2.251.0 起就是「管稿」的那一半，index.js 里连装载位
+    //   都按「须晚于 word-budget、与 dream.js 正交」摆好了，但**入卷口一行调用都没有** ——
+    //   `WA.dreamSettle.screen` 全仓零调用，模块账本把 dream-settle 记为产品面零消费。
+    //   后果：模板句（「意象围绕着雨与旧屋浮动」）与二三十字的敷衍稿照样占卷位，
+    //   一等再等把有内容的梦挤出卷上限。
+    //   判据：闸门开着且判不合格 ⇒ 拒收并**带 retryHint 退回**（卷位不动、stat 不增）；
+    //   闸门关着 ⇒ screen 返回 skipped，照常入卷 —— 不把「没筛过」当成「筛过了」。
+    //   边界：不重掷（重掷要再跑一次模型，这一步在注入链之外），由调用方决定。
+    if (WA.dreamSettle && typeof WA.dreamSettle.screen === 'function') {
+      const g = WA.dreamSettle.screen(sum, { minChars: o.minChars });
+      if (g && g.ok === false) {
+        return { ok: false, reason: 'settle-' + (g.reason || 'unknown'), chars: g.chars,
+          floor: g.floor, retryHint: g.retryHint };
+      }
+    }
     const b0 = bucket();
     const kb = Math.max(1, Math.ceil((sum.length + 64) / 1024));
     const totalKB = b0.volumes.reduce(function (n, v) { return n + (Number(v && v.kb) || 0); }, 0);

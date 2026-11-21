@@ -76,11 +76,15 @@
     const cfg = settings();
     const o = ctx || {};
     const rank = typeof o.rankOf === 'function' ? o.rankOf(item) : (item && item.rank);
-    const ri = rankIndex(cfg, rank);
-    if (ri < 0) { stat.refused++; stat.lastReason = 'unknown-rank'; return { ok: false, reason: 'unknown-rank', rank: rank }; }
-    const base = Number(cfg.ranks[rank]);
+    let ri = rankIndex(cfg, rank);
+    // v2.544.0：调用方自带基数（如 regional 的 INCIDENT_TYPES.weight 就是它的稀有度）
+    //   时，不要求候选再挂一个 rank；此时 rank 只用于幸运指数，缺省按第一档（指数 0）。
+    const hasBase = typeof o.baseOf === 'function';
+    if (ri < 0 && !hasBase) { stat.refused++; stat.lastReason = 'unknown-rank'; return { ok: false, reason: 'unknown-rank', rank: rank }; }
+    if (ri < 0) ri = 0;
+    const base = hasBase ? Number(o.baseOf(item)) : Number(cfg.ranks[rank]);
     if (!isFinite(base) || base <= 0) { stat.refused++; stat.lastReason = 'bad-base'; return { ok: false, reason: 'bad-base', rank: rank }; }
-    const id = item && (item.id !== undefined ? item.id : item.key);
+    const id = typeof o.idOf === 'function' ? o.idOf(item) : (item && (item.id !== undefined ? item.id : item.key));
     const seen = o.seen || null;
     const known = !!(seen && id !== undefined && (typeof seen.has === 'function' ? seen.has(id) : seen.indexOf(id) >= 0));
     let luck = 0;
