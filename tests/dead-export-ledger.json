@@ -146,14 +146,6 @@
       "tref": 1,
       "own": 6
     },
-    "activity.awards": {
-      "reason": "self-only",
-      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/activity.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 14
-    },
     "activity.cancel": {
       "reason": "self-only",
       "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
@@ -161,22 +153,6 @@
       "refs": 0,
       "tref": 0,
       "own": 4
-    },
-    "activity.getSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/activity.js",
-      "refs": 0,
-      "tref": 7,
-      "own": 3
-    },
-    "activity.list": {
-      "reason": "self-only",
-      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/activity.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 18
     },
     "activity.open": {
       "reason": "test-only",
@@ -242,14 +218,6 @@
       "tref": 9,
       "own": 11
     },
-    "activity.rounds": {
-      "reason": "self-only",
-      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/activity.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 23
-    },
     "activity.setSettings": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -274,14 +242,6 @@
       "tref": 31,
       "own": 4
     },
-    "activity.signups": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/activity.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 19
-    },
     "activity.start": {
       "reason": "test-only",
       "detail": "仅测试引用（tests/run.js），产品代码零引用",
@@ -289,14 +249,6 @@
       "refs": 0,
       "tref": 7,
       "own": 3
-    },
-    "activity.stat": {
-      "reason": "self-only",
-      "detail": "engines/activity.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/activity.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 40
     },
     "activity.view": {
       "reason": "self-only",
@@ -434,36 +386,12 @@
       "tref": 0,
       "own": 3
     },
-    "aftermath.diagnose": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
-    "aftermath.getSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 14
-    },
     "aftermath.reset": {
       "reason": "self-only",
       "detail": "engines/aftermath.js 内部自用、外部零引用（过度导出）",
       "src": "engines/aftermath.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
-    },
-    "aftermath.stat": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/aftermath.js",
-      "refs": 0,
-      "tref": 1,
       "own": 3
     },
     "aftermathImpact.inspectImpact": {
@@ -2658,36 +2586,12 @@
       "tref": 0,
       "own": 22
     },
-    "commission.diagnose": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
-    "commission.getSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 4,
-      "own": 13
-    },
     "commission.reset": {
       "reason": "self-only",
       "detail": "engines/commission.js 内部自用、外部零引用（过度导出）",
       "src": "engines/commission.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
-    },
-    "commission.stat": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/commission.js",
-      "refs": 0,
-      "tref": 1,
       "own": 3
     },
     "commodityCirculation.getSettings": {
@@ -3025,14 +2929,6 @@
       "refs": 0,
       "tref": 0,
       "own": 33
-    },
-    "contest.view": {
-      "reason": "self-only",
-      "detail": "engines/contest.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/contest.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "contest.withdraw": {
       "reason": "test-only",
@@ -3625,22 +3521,6 @@
       "refs": 0,
       "tref": 0,
       "own": 20
-    },
-    "creditLedger.transfer": {
-      "reason": "self-only",
-      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/credit-ledger.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "creditLedger.unclaimable": {
-      "reason": "self-only",
-      "detail": "engines/credit-ledger.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/credit-ledger.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "creditLedger.writeOff": {
       "reason": "self-only",
@@ -4490,14 +4370,6 @@
       "tref": 1,
       "own": 3
     },
-    "economy.bandOf": {
-      "reason": "self-only",
-      "detail": "engines/economy.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/economy.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 8
-    },
     "economy.stat": {
       "reason": "self-only",
       "detail": "engines/economy.js 内部自用、外部零引用（过度导出）",
@@ -4690,14 +4562,6 @@
       "tref": 0,
       "own": 4
     },
-    "elapsedEvidence.parse": {
-      "reason": "self-only",
-      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/elapsed-evidence.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 5
-    },
     "elapsedEvidence.parseNum": {
       "reason": "self-only",
       "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
@@ -4745,14 +4609,6 @@
       "refs": 0,
       "tref": 0,
       "own": 1
-    },
-    "elapsedEvidence.verify": {
-      "reason": "self-only",
-      "detail": "engines/elapsed-evidence.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/elapsed-evidence.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 5
     },
     "elapsedEvidence.verifyTracked": {
       "reason": "self-only",
@@ -4841,14 +4697,6 @@
       "refs": 0,
       "tref": 0,
       "own": 1
-    },
-    "enigma.outsiders": {
-      "reason": "test-only",
-      "detail": "engines/enigma.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/enigma.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 3
     },
     "enigma.setSettings": {
       "reason": "test-only",
@@ -6306,14 +6154,6 @@
       "tref": 9,
       "own": 3
     },
-    "hazard.setSettings": {
-      "reason": "test-only",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/hazard.js",
-      "refs": 0,
-      "tref": 13,
-      "own": 1
-    },
     "hazard.targetFor": {
       "reason": "self-only",
       "detail": "engines/hazard.js 内部自用、外部零引用（过度导出）",
@@ -7394,36 +7234,12 @@
       "tref": 0,
       "own": 5
     },
-    "investigation.diagnose": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
-    "investigation.getSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 14
-    },
     "investigation.reset": {
       "reason": "self-only",
       "detail": "engines/investigation.js 内部自用、外部零引用（过度导出）",
       "src": "engines/investigation.js",
       "refs": 0,
       "tref": 0,
-      "own": 3
-    },
-    "investigation.stat": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/investigation.js",
-      "refs": 0,
-      "tref": 1,
       "own": 3
     },
     "jsonRepair.repair": {
@@ -8082,14 +7898,6 @@
       "tref": 0,
       "own": 5
     },
-    "localGrid.peekVenue": {
-      "reason": "self-only",
-      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/local-grid.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 4
-    },
     "localGrid.preheat": {
       "reason": "self-only",
       "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
@@ -8154,22 +7962,6 @@
       "tref": 0,
       "own": 3
     },
-    "localGrid.selfCheck": {
-      "reason": "self-only",
-      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/local-grid.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
-    "localGrid.settings": {
-      "reason": "self-only",
-      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/local-grid.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 15
-    },
     "localGrid.solveZone": {
       "reason": "self-only",
       "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
@@ -8177,14 +7969,6 @@
       "refs": 0,
       "tref": 0,
       "own": 4
-    },
-    "localGrid.stats": {
-      "reason": "self-only",
-      "detail": "engines/local-grid.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/local-grid.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "lonshaReader.clockDateString": {
       "reason": "self-only",
@@ -9010,14 +8794,6 @@
       "tref": 0,
       "own": 3
     },
-    "narrativeLens.diagnose": {
-      "reason": "self-only",
-      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/narrative-lens.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "narrativeLens.getSettings": {
       "reason": "self-only",
       "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
@@ -9089,14 +8865,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "narrativeLens.stat": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/narrative-lens.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
     },
     "narrativeLens.tagOf": {
       "reason": "self-only",
@@ -9481,22 +9249,6 @@
       "refs": 0,
       "tref": 0,
       "own": 18
-    },
-    "operations.diagnose": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
-    "operations.getSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/operations.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 15
     },
     "operations.reset": {
       "reason": "self-only",
@@ -10162,14 +9914,6 @@
       "tref": 0,
       "own": 4
     },
-    "permissions.has": {
-      "reason": "self-only",
-      "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
-      "src": "core/permissions.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 7
-    },
     "permissions.matrix": {
       "reason": "self-only",
       "detail": "core/permissions.js 内部自用、外部零引用（过度导出）",
@@ -10251,14 +9995,6 @@
       "own": 18
     },
     "personalInventory.addCash": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/personal-inventory.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
-    },
-    "personalInventory.addItem": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
       "src": "engines/personal-inventory.js",
@@ -11729,14 +11465,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "replyGuard.stat": {
-      "reason": "unwired",
-      "detail": "产品与测试均零引用（能力未接线）",
-      "src": "engines/reply-guard.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 1
     },
     "replyGuard.unlock": {
       "reason": "self-only",
@@ -13290,14 +13018,6 @@
       "tref": 0,
       "own": 5
     },
-    "spatialBridge.diagnose": {
-      "reason": "self-only",
-      "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/spatial-bridge.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "spatialBridge.mirrorStatus": {
       "reason": "self-only",
       "detail": "engines/spatial-bridge.js 内部自用、外部零引用（过度导出）",
@@ -13833,14 +13553,6 @@
       "refs": 0,
       "tref": 1,
       "own": 3
-    },
-    "storyChoice.getSettings": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/story-choice.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 11
     },
     "storyChoice.reset": {
       "reason": "self-only",
@@ -16318,6 +16030,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 786
+    "dataOnly": 782
   }
 }

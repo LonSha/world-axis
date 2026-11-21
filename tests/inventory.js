@@ -54,6 +54,37 @@ const PROD = productFiles();
 // 引用面正则：`WA.x.y` 与可选链 `WA.x?.y` 都算真引用；私有成员（`_` 前缀）与
 // 非接口命名空间（宿主级导出、数组下标）在下面两道 guard 里挡掉。
 const REF_RE = /WA\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.|\.)\s*([A-Za-z_$][\w$]*)/g;
+// v2.542.22 — 别名面：`const nl = WA.narrativeLens; nl.diagnose()` 这种写法此前被算成「零引用」——
+//   静态面只认 `WA.ns.mem` 两级前缀，别名一律漏。实测 106 处 / 59 个导出因此假死（含
+//   ui/panel.js 真在调的 narrativeLens.diagnose / stat）。
+//   为什么必须补：假死会把人引向「再补一条路由」——同一个能力接两遍，而真缺口（没人喂账、
+//   没人叫）反而没人看。
+//   两条边界（都是否定式）：① 只认 `= WA.ns` / `= window.WorldAxis.ns` 这种整值绑定，
+//   不做作用域推断；别名名在本文件必须只被赋值一次（计数 == 1），被重新赋值过就放弃解析。
+//   ② 别名面只减假死、不造悬空：命中的成员不在该 ns 接口面上时不计进 refs——别名证据
+//   本就比两级前缀弱，用它去定罪会把真悬空淹没在假阳性里。
+const ALIAS_DECL_RE = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:window\s*\.\s*WorldAxis\s*\.\s*|WA\s*\.\s*)([A-Za-z_$][\w$]*)\s*(?=[;,)\s\n])/g;
+function aliasMap(src) {
+  const map = Object.create(null);
+  ALIAS_DECL_RE.lastIndex = 0;
+  let m;
+  while ((m = ALIAS_DECL_RE.exec(src))) {
+    const name = m[1], ns = m[2];
+    if (name === 'WA' || name === ns) continue;
+    map[name] = ns;
+  }
+  Object.keys(map).forEach(function (name) {
+    const re = new RegExp('\\b' + name.replace(/\$/g, '\\$') + '\\s*=(?!=)', 'g');
+    if ((src.match(re) || []).length !== 1) delete map[name];
+  });
+  return map;
+}
+function aliasRe(map) {
+  const names = Object.keys(map).sort(function (a, b) { return b.length - a.length; });
+  if (!names.length) return null;
+  const alt = names.map(function (n) { return n.replace(/\$/g, '\\$'); }).join('|');
+  return new RegExp('\\b(' + alt + ')\\s*(?:\\?\\.|\\.)\\s*([A-Za-z_$][\\w$]*)', 'g');
+}
 
 // v2.29.0 — 真代码面提取器（codeFace）。
 // 为什么需要它：引用面的**输入**必须是「真会被执行的代码」，不能是「文件里出现过的字符」。
@@ -211,6 +242,8 @@ const refs = [];              // { ns, mem, file, line }
 for (const rel of PROD) {
   const src = codeFace(fs.readFileSync(path.join(BASE, rel), 'utf8'));
   const lines = src.split('\n');
+  const amap = aliasMap(src);          // v2.542.22 别名面（见上方 aliasMap 注释）
+  const are = aliasRe(amap);
   lines.forEach(function (line, idx) {
     REF_RE.lastIndex = 0;
     let m;
@@ -219,6 +252,17 @@ for (const rel of PROD) {
       if (!MODULE_NS.has(ns)) continue;                        // 只审模块接口面
       if (mem.charAt(0) === '_') continue;                     // 私有成员不属承诺面
       refs.push({ ns: ns, mem: mem, file: rel, line: idx + 1 });
+    }
+    if (are) {                          // 同一行里的 `nl.diagnose()` 也是真引用
+      are.lastIndex = 0;
+      let q;
+      while ((q = are.exec(line))) {
+        const ans = amap[q[1]], amem = q[2];
+        if (!ans || !MODULE_NS.has(ans)) continue;
+        if (amem.charAt(0) === '_') continue;
+        if (!hasMember(ans, amem)) continue;     // 只减假死，不造悬空
+        refs.push({ ns: ans, mem: amem, file: rel, line: idx + 1 });
+      }
     }
   });
 }
