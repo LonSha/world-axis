@@ -164,6 +164,40 @@
     return tokensOf(out) <= maxTokens ? out : null;      // 兜底：不满足上限即回退
   }
 
+  /**
+   * v2.549.0：折叠点不许停在半句（缝合「迷雾之外」Interlude v4.7.2 的 `mjClip` 口径）。
+   *   旧行为退到「\n / 。 / ； / ，」四者中**最靠后**的一个，于是常见两种半句：
+   *   ① 停在逗号上（`因果：A、B，`）—— 模型拿到一个悬空的并列，会自己补完那一条；
+   *   ② 停在字上（预算小到连标点都不在前半段）。
+   *   新口径：先退到**句末**（。！？；…」』）或行末；退不到就退到逗号并
+   *   **把尾标点换成句号**（不留半句）；连逗号都没有就硬切补句号。
+   *   边界：① 只改字符级裁切（结构化块走 trimStructured，整行整舍，不受影响）；
+   *   ② 补句号后仍须满足 `tokensOf(out) <= maxTokens`，不满足就再缩一字；
+   *   ③ 折叠标记不变（它本身是读者可见的「已折叠」声明）。
+   */
+  const SENT_END = ['。', '！', '？', '；', '…', '」', '』', '）'];
+  function foldHead(head, maxTokens, markTokens) {
+    let cut = head.lastIndexOf('\n');
+    for (let i = 0; i < SENT_END.length; i++) {
+      const at = head.lastIndexOf(SENT_END[i]);
+      if (at > cut) cut = at;
+    }
+    // 主体与尾标点分开算：预算不够时只能缩**正文**，不能把勇气句号自己缩掉
+    //   （否则看起来「补了句号」，实际还是半句）。
+    let body, tailTxt = '';
+    if (cut >= 0 && cut + 1 > head.length * 0.5) {
+      body = head.slice(0, cut + 1);
+    } else {
+      const comma = Math.max(head.lastIndexOf('，'), head.lastIndexOf('、'), head.lastIndexOf(','));
+      body = comma >= 0 && comma + 1 > head.length * 0.5
+        ? head.slice(0, comma)
+        : head.replace(/[\s，、,；;：:]+$/, '');
+      tailTxt = '。';
+    }
+    while (body.length > 0 && tokensOf(body + tailTxt) + markTokens > maxTokens) body = body.slice(0, -1);
+    if (!body) return '';
+    return body + tailTxt;
+  }
   function trim(text, maxTokens) {
     const s = String(text == null ? '' : text);
     if (tokensOf(s) <= maxTokens) return s;
@@ -180,10 +214,8 @@
       if (tokensOf(s.slice(0, mid)) <= allow) { best = mid; lo = mid + 1; }
       else hi = mid - 1;
     }
-    let head = s.slice(0, best);
-    const cut = Math.max(head.lastIndexOf('\n'), head.lastIndexOf('。'), head.lastIndexOf('；'), head.lastIndexOf('，'));
-    if (cut > best * 0.5) head = head.slice(0, cut + 1);
-    return head + mark;
+    // v2.549.0：交给 foldHead（句末回退 + 不留半句），不再在这里各自算一遍切点。
+    return foldHead(s.slice(0, best), maxTokens, markTokens) + mark;
   }
 
   /**

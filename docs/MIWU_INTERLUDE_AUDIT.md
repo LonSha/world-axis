@@ -23,8 +23,8 @@ spotlight.buildBlock 在真要提的那一刻 fire（幂等）—— fire 的第
 
 | # | 它的实现 | 本仓现状 | 裁决 |
 |---|---|---|---|
-| 1 | `mjSimilarText` / `mjPlanDup`（二字片段 Dice ≥0.52/0.6 + LCS ≥0.65 判重） | `refine.merge` 只在**规范化后完全相同**时合并 | **不缝（判据方向相反）** |
-| 2 | `mjClip`（写世界书专用截断：绝不出现省略号，退到最近句末，否则硬切补句号） | 无世界书写入面；注入侧有更优折叠 | **不缝（无消费者 + 已有更优）** |
+| 1 | `mjSimilarText` / `mjPlanDup`（二字片段 Dice ≥0.52/0.6 + LCS ≥0.65 判重） | `refine.merge` 只在**规范化后完全相同**时合并 | **缝了「只报不并」那一半**（v2.549.0，落 prefilter-gate 的丢弃分支） |
+| 2 | `mjClip`（写世界书专用截断：绝不出现省略号，退到最近句末，否则硬切补句号） | 无世界书写入面；注入侧有更优折叠 | **缝了「句末回退」那一半**（v2.549.0，落 inject-budget 字符级折叠） |
 | 3 | `mjCaptureSnapshot` / `mjMaybeRollbackSnapshots`（删楼/回退自动退快照） | `floorChanges` + `floorSettle` 已在删楼/编辑事件上退回结算 | **不缝（已覆盖）** |
 | 4 | 四轴（吸/信/舒/张）× 五阶 + 边际递减 + 单轮上限 + 升阶冷却 | `fondness`（步进白名单 / 上限 / 段顶授权）+ `marginal`（衰减 + 冷却） | **不缝（已覆盖且更严）** |
 | 5 | `mjParsePlanTime`（明天上午 / 下周三 → 绝对日 + 时段） | 计划是**时长制**（`remainingMinutes`），不是日历制 | **不缝（模型不同构）** |
@@ -85,4 +85,23 @@ grep -rn 'floorSettle' --include=*.js core engines render | wc -l    # ⇒ 26
 
 # 本版专锁
 node tests/narrative-depth-wire-v2548.js    # ⇒ pass (14)
+node tests/narrative-depth-wire-v2549.js    # ⇒ pass (10)
 ```
+
+## 八、v2.549.0：两条候选的「改造后缝法」
+
+第三、四节的「不缝」针对的是**原样搬**。改造后各缝一半，且都落在现有函数上（零新增导出）：
+
+| 候选 | 缝法 | 落点 | 边界 |
+|---|---|---|---|
+| `mjSimilarText` | 只报不并：丢弃项带 `near`（二字片段 Dice 分） | `prefilter-gate.resolveName` 的丢弃分支 | 不进 `characters`、不改 `ROSTER`、低于阈值不报 |
+| `mjClip` | 句末回退 + 没有句末就补句号 | `inject-budget.trim` 的字符级折叠（`foldHead`） | 不动结构化块（整行整舍）；补句号不破预算 |
+
+为什么只缝这一半：
+
+- 并条仍然不能缝（丢一条不可撤销）；但「丢弃时告诉我疑似拼错」不付任何不可逆代价，反而把一条**静默失败**
+  变成可查的读数（名字差一字 ⇒ 整轮被念略是最难查的一类故障）。
+- 世界书写入面仍然不存在；但「不留半句」这条口径对**任何截断**都成立，而本仓的注入折叠正好是截断。
+
+负控三条全部见红后还原：折叠退回旧四者取靠后 ⇒ A1 报「甲去城东，乙去城西，」；
+删 `d.near` ⇒ B1 报丢弃项只剩 name/why；`nearNames` 去掉阈值 ⇒ B2 报「隔壁老张」也被报成 near（score 0）。

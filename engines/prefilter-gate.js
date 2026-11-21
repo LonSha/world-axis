@@ -24,6 +24,15 @@
  *   · observe —— 「观测窗口切片」，本模块不做切片；
  *   · 本模块 —— **候选集封闭 + 名字对齐 + 两档分诊 + 戏份排序截断 + 回复契约校验**。
  *
+ * ── v2.549.0：近邻姓名只报不并（缝合「迷雾之外」的 `mjSimilarText` 口径）──────
+ *   旧行为对「名字差一个字」是**静默丢弃**：`resolveName` 只认逐字相等与显式别名，
+ *   其余一律 `out-of-roster` 进 `dropped`，于是「和泉纱雾」写成「和泉纱零」
+ *   时，这个角色整轮被忽略，而读数只写「丢了 1 个」—— 丢的是不是错字，看不出来。
+ *   现在：丢弃时齐一份**近邻候选**（二字片段 Dice），只报不并：
+ *   ① 候选不进 `characters`/`picked`，也不改 `ROSTER`（不代替、不补齐、不自动采纳）；
+ *   ② 只在 `dropped[].near` 里给名字与分数，供面板与日志回答「这一个是不是拼错了」；
+ *   ③ 分数低于 `nearThreshold`（百分数整数，默认 60）一律不报 —— 宁漏不猜。
+ *
  * ── 八条否定式边界（本模块存在的全部理由）────────────────────────────
  *   ① 总开关默认关闭。关闭时 `screen` 一律 `disabled`。
  *   ② **候选集封闭**：名单外的名字 ⇒ `out-of-roster` 丢弃（不扩候选集）。
@@ -38,9 +47,9 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
   const LS_KEY = 'worldaxis_prefilter_gate_settings_v1';
-  const DEF = { enabled: true, roleplayCap: 6, maxRoster: 512, maxAlias: 512 };
+  const DEF = { enabled: true, roleplayCap: 6, maxRoster: 512, maxAlias: 512, nearThreshold: 60 };
   const __REG = { key: LS_KEY, def: DEF, module: 'prefilterGate',
-    bounds: { roleplayCap: [1, 64], maxRoster: [1, 4096], maxAlias: [0, 4096] } };
+    bounds: { roleplayCap: [1, 64], maxRoster: [1, 4096], maxAlias: [0, 4096], nearThreshold: [30, 100] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
   const KINDS = ['archive', 'roleplay'];
@@ -97,13 +106,42 @@
     ALIAS[k] = v;
     return { ok: true, reason: 'ok', nick: k, full: v };
   }
+  /** 二字片段集（小写归一后）：中英文都能用，不依赖分词。 */
+  function bigrams(v) {
+    const t = String(v == null ? '' : v).toLowerCase().replace(/[\s\u00b7\-_.,，。、]/g, '');
+    const out = {};
+    for (let i = 0; i + 1 < t.length; i++) { const g = t.slice(i, i + 2); out[g] = (out[g] || 0) + 1; }
+    return { grams: out, size: Math.max(0, t.length - 1), text: t };
+  }
+  /** Dice 相似度（乘 100 取整）。任一一方不足 2 字 ⇒ 0（不拿短串猜）。 */
+  function diceOf(a, b) {
+    const A = bigrams(a), B = bigrams(b);
+    if (A.size <= 0 || B.size <= 0) return 0;
+    let hit = 0;
+    Object.keys(A.grams).forEach(function (g) { if (B.grams[g]) hit += Math.min(A.grams[g], B.grams[g]); });
+    return Math.round((2 * hit / (A.size + B.size)) * 100);
+  }
+  /** 近邻候选：只报不并。返回最多 2 个，按分数降序。 */
+  function nearNames(n, cfg) {
+    const th = Number(cfg && cfg.nearThreshold) || DEF.nearThreshold;
+    const hits = [];
+    for (let i = 0; i < ROSTER.names.length; i++) {
+      const cand = ROSTER.names[i];
+      const sc = diceOf(n, cand);
+      if (sc >= th) hits.push({ name: cand, score: sc });
+    }
+    hits.sort(function (a, b) { return b.score - a.score || (a.name < b.name ? -1 : 1); });
+    return hits.slice(0, 2);
+  }
   function resolveName(raw) {
     const n = clean(raw, 60);
     if (!n) return { why: 'empty-name' };
     if (ROSTER.names.indexOf(n) >= 0) return { name: n, why: 'exact' };
     const target = ALIAS[n];
     if (target && ROSTER.names.indexOf(target) >= 0) return { name: target, why: 'alias-mapped', via: n };
-    return { why: ROSTER.names.length ? 'out-of-roster' : 'no-roster' };
+    if (!ROSTER.names.length) return { why: 'no-roster' };
+    const near = nearNames(n, settings());
+    return near.length ? { why: 'out-of-roster', near: near } : { why: 'out-of-roster' };
   }
   function normSignals(list) {
     const arr = Array.isArray(list) ? list : [list];
@@ -130,7 +168,11 @@
     const seen = {}; const picked = []; const dropped = []; const aliasMapped = [];
     rows.forEach(function (s) {
       const r = resolveName(s.name);
-      if (!r.name) { dropped.push({ name: clean(s.name, 60), why: r.why }); return; }
+      if (!r.name) {
+        const d = { name: clean(s.name, 60), why: r.why };
+        if (r.near && r.near.length) { d.near = r.near; stat.nearMiss = (stat.nearMiss || 0) + 1; }
+        dropped.push(d); return;
+      }
       if (r.why === 'alias-mapped') aliasMapped.push({ nick: r.via, full: r.name });
       if (seen[r.name]) { dropped.push({ name: r.name, why: 'duplicate' }); return; }
       seen[r.name] = 1;
@@ -180,7 +222,7 @@
     const cfg = settings();
     return { enabled: cfg.enabled, kinds: KINDS.slice(), kindLabel: KIND_LABEL, signals: SIGNALS,
       keep: { archive: RULES.archive.keep.slice(), roleplay: RULES.roleplay.keep.slice() },
-      roleplayCap: cfg.roleplayCap, maxRoster: cfg.maxRoster, maxAlias: cfg.maxAlias,
+      roleplayCap: cfg.roleplayCap, maxRoster: cfg.maxRoster, maxAlias: cfg.maxAlias, nearThreshold: cfg.nearThreshold,
       rosterSize: ROSTER.names.length, aliasSize: Object.keys(ALIAS).length,
       contract: '{ "characters": ["全名", ...] }' };
   }
