@@ -607,8 +607,13 @@ function scan() {
   const engineFiles = productFiles.filter((f) => f.dir === 'engines').map((f) => f.rel);
   const deskSrc = srcOf.get('engines/action-desk.js');
   if (!deskSrc) throw new Error('engines/action-desk.js not readable');
-
-  const routes = parseRoutes(deskSrc);
+  // v2.542.11：OPV29 拆段后 ROUTES 表本体已搬到 engines/action-desk-routes.js，
+  //   action-desk.js 只剩 `const ROUTES = __AR({...})` 的别名投影 ⇒ 原锚点 `const ROUTES = {`
+  //   恒失配，本工具直接抛 'ROUTES table not found'（--check 恒红，等于这面读数长期没有）。
+  //   修法同 tools/new-engine.js 的锚点搬迁：**表在哪读哪**，老树（表仍在 action-desk.js）保留回退。
+  const routesRel = 'engines/action-desk-routes.js';
+  const routesSrc = (srcOf.get(routesRel) || '').indexOf('const ROUTES = {') >= 0 ? srcOf.get(routesRel) : deskSrc;
+  const routes = parseRoutes(routesSrc);
   const dupes = findDuplicateRouteKeys(routes);
 
   // ── 先建引擎记录：ns + 源码，供写口判定 ──
