@@ -114,6 +114,8 @@
 
   /** 历史缺省 tick 分钟（调用方既没给分钟数、也没给正文证据时用）。 */
   const DEFAULT_MINUTES = 15.0;
+  /** clock 档的天然上界：一天。超过它说明中间断档太久，按一天结算而不是无限吃满。 */
+  const MINUTES_CAP_DAY = 1440;
   /**
    * 分钟数的**来源分级**（v2.542.14）。
    *
@@ -131,7 +133,7 @@
    *   理由：回落默认值会把「时间未确证」悄悄变成「过了 15 分钟」，与本仓
    *   「压下项必须可见」纪律直接冲突。
    */
-  function resolveMinutes(elapsedMinutes, opts) {
+  function resolveMinutes(elapsedMinutes, opts, tMap) {
     const o = opts || {};
     const want = (typeof elapsedMinutes === 'number' && isFinite(elapsedMinutes) && elapsedMinutes > 0)
       ? elapsedMinutes : null;
@@ -140,6 +142,29 @@
       : ((typeof o.source === 'string' && o.source) ? o.source : '');
     const ev = typeof o.evidence === 'string' ? o.evidence : '';
     if (!text && !ev) {
+      // ── clock 档（v2.542.15）：引擎自己一直记着每条毒素的 lastTick（77/95/199 三处写），
+      //    却从不用它算间隔 —— 缺省一律 15 分钟。而「上次 tick 到现在真的过了多久」是可测的，
+      //    比常量准得多，也和 engines/mood-glide.js 的 `now - cur.at` 同一条口径。
+      //    只在**每条**毒素都能算出有限非负 dt 时启用；缺一条就整档不用（不做部分推算）。
+      let oldest = null;
+      let allHave = true;
+      if (tMap && typeof tMap.forEach === 'function') {
+        tMap.forEach(function (rec) {
+          const t = rec && rec.lastTick;
+          if (!(typeof t === 'number' && isFinite(t))) { allHave = false; return; }
+          if (oldest === null || t < oldest) oldest = t;
+        });
+      }
+      if (allHave && oldest !== null) {
+        const now = clockNow('toxic-metabolism');
+        const dt = (now - oldest) / 60000;
+        if (isFinite(dt) && dt >= 0) {
+          return {
+            ok: true, minutes: Math.min(dt, MINUTES_CAP_DAY), source: 'clock',
+            reason: 'ok', clause: '', note: 'from lastTick'
+          };
+        }
+      }
       return { ok: true, minutes: DEFAULT_MINUTES, source: 'default', reason: 'ok', clause: '', note: 'no elapsed given' };
     }
     const EE = WA.elapsedEvidence;
@@ -180,7 +205,7 @@
       return { ok: true, actorId: actorId, activeToxins: [], clearedAll: true };
     }
 
-    const rm = resolveMinutes(elapsedMinutes, opts);
+    const rm = resolveMinutes(elapsedMinutes, opts, tMap);
     if (!rm.ok) {
       return {
         ok: false, actorId: actorId, reason: rm.reason,
