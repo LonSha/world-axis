@@ -115,6 +115,21 @@
       return k || null;
     });
     return `
+      <div class="wa-sec">导出正文<span class="wa-dim">（纯文本 · 剥掉结构化块与标签）</span></div>
+      <div class="wa-row">
+        <button class="wa-btn" id="wa-story-dl" title="把本聊天的故事导成 .txt：剥掉 ws_*/nekotools 块、[[NT_STATUS]] 状态行、〔WA-LENS〕镜片块与宿主 HTML。只读：不写世界、不改楼层">导出 .txt</button>
+        <button class="wa-btn" id="wa-story-copy" title="同一条剥净链，结果放进剪贴板（投稿 / 贴群）">复制正文</button>
+      </div>
+      <div class="wa-row">
+        <input id="wa-story-from" class="wa-input" placeholder="起始楼层（可空，从 0 数）"/>
+        <input id="wa-story-to" class="wa-input" placeholder="结束楼层（可空，含）"/>
+      </div>
+      <div class="wa-row">
+        <label><input id="wa-story-fav" type="checkbox"/> 只导收藏楼层</label>
+        <label><input id="wa-story-hidden" type="checkbox"/> 跳过隐藏楼层</label>
+        <label><input id="wa-story-names" type="checkbox" checked/> 带说话人</label>
+      </div>
+      <div id="wa-story-out" class="wa-out"></div>
       <div data-omniscient>
       <div class="wa-sec">世界态势分析（纯只读体检）</div>
       <button class="wa-btn" id="wa-an-run">立即分析</button>

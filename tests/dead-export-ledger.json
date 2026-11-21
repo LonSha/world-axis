@@ -8826,14 +8826,6 @@
       "tref": 0,
       "own": 6
     },
-    "narrativeLens.lensStrip": {
-      "reason": "self-only",
-      "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/narrative-lens.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 4
-    },
     "narrativeLens.nextTier": {
       "reason": "self-only",
       "detail": "engines/narrative-lens.js 内部自用、外部零引用（过度导出）",

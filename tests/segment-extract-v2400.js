@@ -162,7 +162,8 @@ const BASE_ASSERT_CC = 5273;  // v2.542.5 +1（L4 专锁的 assert 面）· v2.5
 //     为什么仍然不用「>= 564」了事：下界判据对「面塌了」是瞎的（见上段原文）。代价是每加一把锁
 //     就要动这个常量 —— 而那正是它的价值：动它的人必须亲手确认「我确实新增了一个测试文件」。
 // v2.539.3：+1 tests/tpl-comment-gate.js（玩家六页真渲染的“不许出现源码注释”门禁，已挂 runScript）。
-const BASE_TEST_FILES = 638;   // v2.542.22：+1 tests/alias-face-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）·    // v2.542.5：+1 tests/character-drive-v2545.js（文件在 + 已挂 run.js 的 runScript 段）· v2.542.4：+1 tests/arc-phase-v2544.js· v2.542.3：+1 tests/inject-tier-v2543.js（文件在 + 已挂 run.js 的 runScript 段）· v2.542.2：+1 tests/scene-intent-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）· v2.542.2：+1 tests/scene-intent-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）· v2.532~533（OPV30-R4/R5）：+2 tests/opv30-r4-arc-guide-v2532.js / opv30-r5-save-audit-v2533.js   // v2.531.0（OPV30-R3 收口）：+1 tests/budget-source.js（inject-budget 的合并面读数器，拆段后遗症的共享解法）   // v2.531.0（OPV30-R3）：+1 tests/opv30-r3-write-rehearsal-v2531.js（文件在 + 已挂 runScript 段，两件同时成立才计数）  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1 · 本轮 +1（tests/backstage-source.js：backstage 声明面的合并读数器））。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
+// v2.542.23：+1 tests/story-export-wire-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）。
+const BASE_TEST_FILES = 639;   // v2.542.22：+1 tests/alias-face-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）·    // v2.542.5：+1 tests/character-drive-v2545.js（文件在 + 已挂 run.js 的 runScript 段）· v2.542.4：+1 tests/arc-phase-v2544.js· v2.542.3：+1 tests/inject-tier-v2543.js（文件在 + 已挂 run.js 的 runScript 段）· v2.542.2：+1 tests/scene-intent-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）· v2.542.2：+1 tests/scene-intent-v2542.js（文件在 + 已挂 run.js 的 runScript 段，两件同时成立才计数）· v2.532~533（OPV30-R4/R5）：+2 tests/opv30-r4-arc-guide-v2532.js / opv30-r5-save-audit-v2533.js   // v2.531.0（OPV30-R3 收口）：+1 tests/budget-source.js（inject-budget 的合并面读数器，拆段后遗症的共享解法）   // v2.531.0（OPV30-R3）：+1 tests/opv30-r3-write-rehearsal-v2531.js（文件在 + 已挂 runScript 段，两件同时成立才计数）  // v2.529.0（V29 Z1/Z2/Z3/Z4）：605→614（+1 opv29-z1-01 · +1 opv29-z2-12 · +1 opv29-z3-17 · +1 opv29-z4-22 · 其后 Z1 逐项专锁递增至 613，本批 OPV29-11 再 +1 · OPV29-07/08 再 +1 · 本轮 +1（tests/backstage-source.js：backstage 声明面的合并读数器））。文件在 + 已挂进 run.js 的 runScript 段，两件同时成立才计数。现场实测：`node -e "require('./tests/product-files.js').testFiles().length"` ⇒ 617。
 //   v2.529.0：591→592（+1 tests/opv29-z5-26-v2529.js —— OPV29-26 登记一致性校验 40 项；文件在 + 已挂进 run.js 的 LOAD 段，两件同时成立才计数）。
 //   v2.529.0：592→593（+1 tests/opv29-z6-33-v2529.js —— OPV29-33 密钥扫描扩面 28 项；同上口径）。
 //   v2.529.0：593→594（+1 tests/opv29-z5-28-v2529.js —— OPV29-28 计划台账自动汇总 41 项；同上口径）。
@@ -820,7 +821,8 @@ const PS_REL = 'tests/panel-source.js';
 //   D3a/D3f 同步 +22 ⇒ 新增确实都在 panel.js 自身，段体仍一字未动。
 // v2.539.2（玩家端语言 R1）：18390 → 18400（+10：PAGES 六页各加一句 ask + __askLine 渲染抬头）。
 // v2.539.3（六页内容重写 R1 + 裸注释真缺陷）：18400 → 18432（+32：世界页结论卡 21 行 / 诊断正常态折叠 8 行 / 事件页注释搬出模板净 +3）。
-const BASE_PANEL_LINES = 18528;  // v2.542.2：+2（ui/panel.js 的 VIS_NAMES 增 sceneIntent 条目一行 + 注释一行）· v2.542.2：+2（ui/panel.js 的 VIS_NAMES 增 sceneIntent 条目一行 + 注释一行）· v2.541.7：+8（panel.js +2：外交节 data-omniscient 包壳开合两行；
+const BASE_PANEL_LINES = 18623;  // v2.542.23：+95（panel.js +80：「导出正文」两个按钮的绑定与剥净链；tools-page.js +15：三个控件行 + 选项行 + 输出行）。+95 同时出现在 D3a 与 D3f 两数上，故「拆后须显著小于拆前」的口径不动 —— 这是跟位不是放宽。
+//   v2.542.2：+2（ui/panel.js 的 VIS_NAMES 增 sceneIntent 条目一行 + 注释一行）· v2.542.2：+2（ui/panel.js 的 VIS_NAMES 增 sceneIntent 条目一行 + 注释一行）· v2.541.7：+8（panel.js +2：外交节 data-omniscient 包壳开合两行；
                                  //   ui/pages/overview-main.js 净 +6：存档体检标题改用引擎 line() 后注释与行合并）。
                                  //   ⚠ 这是**重组面**读数：段体（D1d/D2a）一字未动，只是两侧文件行数漂移。
 // 拆后 panel.js 自己的行数（split 口径；拆前 17421 - 段体 335 + 转发块 41 = 17127）。
@@ -853,7 +855,8 @@ const BASE_PANEL_LINES = 18528;  // v2.542.2：+2（ui/panel.js 的 VIS_NAMES �
 //       若哪天两者差额跳变，那就是段体被搬进/搬出 panel.js 了，D3 这一族必须当场复核。
 // v2.524.0（V27 OPV27-5）：16243 → 16247（+4）—— VIS_NAMES 里给「在用机制」一个中文显示名
 //   （面板上玩家唯一能开关它的地方），含注释两行；与 BASE_PANEL_LINES 同批同源。
-const BASE_PANEL_FILE_LINES = 16554;  // v2.542.2：+2，同源同批（VIS_NAMES 的 sceneIntent 条目及其注释）· v2.542.2：+2，同源同批（VIS_NAMES 的 sceneIntent 条目及其注释）· v2.541.7：+2，同源同批（外交节 data-omniscient 包壳开合两行）。
+const BASE_PANEL_FILE_LINES = 16634;  // v2.542.23：+80，与 BASE_PANEL_LINES 同源同批（面板的导出正文绑定）。
+//   v2.542.2：+2，同源同批（VIS_NAMES 的 sceneIntent 条目及其注释）· v2.542.2：+2，同源同批（VIS_NAMES 的 sceneIntent 条目及其注释）· v2.541.7：+2，同源同批（外交节 data-omniscient 包壳开合两行）。
 //   v2.400.0（V22 后续修正）：335 → 491。EXV22-9 把 v22OmensBlock 写在段体标记
 //   之外（重组面里定义缺席、调用在场 ⇒ 假源码），本次把段体结束标记移回函数之后，
 //   段体收编 v22 块的 156 行。段体 esc 调用同步 57 → 60（v22 块 3 处）。

@@ -371,12 +371,6 @@
    "evidence": "设置文件合并（每条谁新留谁 + 墓碑）。消费方应是设置持久化层，还没接。",
    "recompute": "grep -rn \"storeMerge\" engines core ui tests | head"
   },
-  "storyExport": {
-   "cls": "pending-wire",
-   "provider": "engines/story-export.js",
-   "evidence": "纯正文导出（剥块/宏/HTML）。消费方应是导出按钮与「复制正文」，还没接。",
-   "recompute": "grep -rn \"storyExport\" engines core ui tests | head"
-  },
   "streamGate": {
    "cls": "pending-wire",
    "provider": "engines/stream-gate.js",

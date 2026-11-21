@@ -10805,6 +10805,86 @@ on('#wa-desk-show', showDesk);
           Object.entries(r.load.blocks).map(([k, v]) => '<div class="wa-dim">' + esc(k) + '：' + (v.tokens || 0) + 't / ' + (v.chars || 0) + '字</div>').join('') +
           r.risks.map(x => '<div class="wa-log wa-log-' + x.level + '">[' + x.level + '] ' + esc(x.detail) + '</div>').join('');
       };
+      // ── v2.542.23（导出正文）：`engines/story-export.js` 自 v2.529.0 入库后产品面零读 ──
+      //   它的两个出口（build 组纯正文 / strip 剥结构化块）都没有按钮叫得到。
+      //   玩家想把自己这局的故事拿出来复读/投稿时，全仓**没有一条路**（「纯正文」零命中）。
+      //   数据源只有一样：`ctx.chat[].mes` —— 宿主已经呈现给玩家的正文。
+      //   本仓派生的全知读数（世界状态/诊断/审计）一个都不进这条路，所以不新造第三条出口：
+      //   照走既有的 outletGate，玩家视角下被拦时给出「切到全知」这句可执行的下一步。
+      //   与 narrative-lens 的分工：storyExport 剥 ws_* / nekotools / NT_STATUS / HTML，
+      //   但 〔WA-LENS〕镜片块它不知道也不该知道（那是 narrative-lens 的格式）。
+      //   故调用点把两个引擎各管的一半拼成一条链：先 build 再 lensStrip ——
+      //   少任一半都会把内部标记漏进导出的正文里。
+      const storyPick = function () {
+        const ctx = (mainWin.SillyTavern && mainWin.SillyTavern.getContext) ? mainWin.SillyTavern.getContext() : null;
+        const chat = (ctx && ctx.chat) || [];
+        if (!chat.length) return { ok: false, reason: 'no-chat' };
+        if (!WA.storyExport || typeof WA.storyExport.build !== 'function') return { ok: false, reason: 'engine-missing' };
+        const numAt = function (sel) {
+          const el = $(sel); if (!el) return null;
+          const sv = String(el.value == null ? '' : el.value).trim();
+          if (!sv) return null;
+          const n = Number(sv);
+          return Number.isFinite(n) ? n : null;
+        };
+        const fromN = numAt('#wa-story-from');
+        const r = WA.storyExport.build(chat, {
+          from: fromN == null ? 0 : fromN,
+          to: numAt('#wa-story-to'),
+          favoritesOnly: !!($('#wa-story-fav') && $('#wa-story-fav').checked),
+          skipHidden: !!($('#wa-story-hidden') && $('#wa-story-hidden').checked),
+          includeNames: !!($('#wa-story-names') && $('#wa-story-names').checked)
+        });
+        let text = String(r.text || '');
+        if (WA.narrativeLens && typeof WA.narrativeLens.lensStrip === 'function') text = WA.narrativeLens.lensStrip(text);
+        return { ok: !!text, reason: text ? '' : 'empty', text: text, floors: r.floors, skipped: r.skipped };
+      };
+      const storyOut = function (r) {
+        const out = $('#wa-story-out'); if (!out) return;
+        if (r.ok) {
+          out.textContent = '已取正文 ' + r.floors + ' 层、' + r.text.length + ' 字'
+            + (r.skipped ? ('（跳过 ' + r.skipped + ' 层：系统消息/空正文/范围外）') : '');
+          return;
+        }
+        out.textContent = r.reason === 'no-chat' ? '当前聊天没有楼层可导'
+          : r.reason === 'engine-missing' ? '导出引擎未装载（story-export 缺席）'
+            : r.reason === 'empty' ? '按当前选项导出来是空的（范围填反了？还是全被剥空？）'
+              : '导出失败：' + r.reason;
+      };
+      const storyDl = $('#wa-story-dl');
+      if (storyDl) storyDl.onclick = () => {
+        const g = outletGate('export-file');
+        if (!g.allowed) { outletBlocked($('#wa-story-out')); return; }
+        const r = storyPick();
+        storyOut(r);
+        if (!r.ok) return;
+        try {
+          const blob = new Blob([r.text], { type: 'text/plain;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'worldaxis-story-' + clockWall() + '.txt';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (e) { const o = $('#wa-story-out'); if (o) o.textContent = '下载失败：' + (e && e.message); }
+      };
+      const storyCopy = $('#wa-story-copy');
+      if (storyCopy) storyCopy.onclick = () => {
+        const g = outletGate('clipboard');
+        if (!g.allowed) { outletBlocked($('#wa-story-out')); return; }
+        const r = storyPick();
+        storyOut(r);
+        if (!r.ok) return;
+        const o = $('#wa-story-out');
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(r.text).then(function () {
+              if (o) o.textContent = '已复制 ' + r.floors + ' 层、' + r.text.length + ' 字';
+            }, function () {
+              if (o) o.textContent = '复制失败：浏览器拒绝（需 https 或已授权剪贴板）';
+            });
+          } else if (o) o.textContent = '复制失败：当前环境没有 clipboard';
+        } catch (e) { if (o) o.textContent = '复制失败：' + (e && e.message); }
+      };
       const dl = $('#wa-snap-dl');
       if (dl && WA.toolSnapshot) dl.onclick = () => {
         const g = outletGate('export-file');

@@ -423,6 +423,11 @@
     //   面板那一块会静默少功能（opv29-z1-04 的 D1 就是拦这个）。惰性档只能放
     //   「产品源面零出现」的模块；要面板读它，就得回首帧。
     'engines/json-repair.js',
+    // v2.542.23：story-export 同病同批回首帧。工具页「导出正文 / 复制正文」两个按钮
+    //   真调 WA.storyExport.build —— 它在惰性档里时，首帧点按钮会静默少功能（D1 拦的就是这个）。
+    //   惰性档只放「产品源面零出现」的模块；既然面板要读它，它就得在首帧面。尾部
+    //   调 WA.registerModule（由 store 提供）⇒ 装载期边 +1；store 在下标之前，order-violation 仍 0。
+    'engines/story-export.js',
     'engines/kaleidoscope.js',
     'engines/calendar.js',
     // v2.302.0（缝 World Chronicle）：正文内联状态回报标签 <time>/<choice>/<flag>。
@@ -1651,7 +1656,6 @@
     'engines/setup-plan.js',
     'engines/slot-format.js',
     'engines/store-merge.js',
-    'engines/story-export.js',
     'engines/stream-gate.js',
     'engines/write-serial.js',
   ];
