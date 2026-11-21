@@ -205,8 +205,20 @@
           }),
           '存档体检 ' + one('engines/save-audit.js', 'saveAudit', function () {
             const s = WA.saveAudit.stat();
-            // v2.552.0（读数真实性）：同「写前预演」—— 读真计数器，但 `audit()` 零产品调用。
-            return s.calls === 0 ? '从未调用' : (s.calls + '次');
+            // v2.552.0（读数真实性）：原来是 `s.ok + '通过/' + s.rejected + '拒'`，读真计数器，
+            //   但 `audit()` 零产品调用 ⇒ 恒「0 通过 / 0 拒」，读起来像「体检都通过了」。
+            //   v2.552.0 先改成「没调用过就直说」，不再报一个看起来正常的 0。
+            // v2.553.0：`audit()` 已接在 `core/store.js` 的载入点（每次读档跑一次，**在迁移之前**），
+            //   于是这一格第一次有真读数。但只报「N 次」仍然不回答玩家的问题（「这份存档有没有问题」），
+            //   故把载入体检的结论一并读出：`loadStat().lastAudit` 是**治疗前**那份。
+            //   null 的含义是「本次载入不是从盘上读出来的」（新聊天）——那种情况不编结论，只报次数。
+            if (s.calls === 0) return '从未调用';
+            let la = null;
+            try { la = (WA.store && WA.store.loadStat) ? WA.store.loadStat().lastAudit : null; } catch (e) { la = null; }
+            if (!la) return s.calls + '次';
+            if (la.source === 'engine-absent') return s.calls + '次/体检引擎缺席';
+            if (la.source === 'audit-error') return s.calls + '次/体检本身出错';
+            return s.calls + '次/' + (la.problemCount ? (la.problemCount + '项问题') : '0项问题');
           })
         ];
         return '<div class="wa-dim" id="wa-eng-ledger-view">缝合件台账：' + esc(parts.join('｜')) + '</div>';

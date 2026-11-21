@@ -1519,7 +1519,16 @@
     // v2.162.0（TP7）：未来档拒收的可见面——「拒收了」与「没迁移」绝不可同形（后者静默）。
     //   为什么必须有独立字段：migrateRefused 是**累计计数**，而 lastRefused 带 from/current/at，
     //   诊断要答得出「哪一份档、对哪一版代码、什么时候」。只有计数时两次拒收之间无法区分。
-    migrateRefused: 0, lastRefused: null };
+    migrateRefused: 0, lastRefused: null,
+    // v2.553.0：**载入体检**（诊断先于治疗）。init() 的次序是 load → migrate → ensureShape，
+    //   而 migrate 的第一行是 `Object.assign(defaultWorldState(), state)` —— 缺的键在这一步就被
+    //   默认骨架**静默补齐**，ensureShape 随后什么也发现不了。实测（tests/load-audit-wire-v2553.js）：
+    //   一份缺 30+ 键、含 1 处类型错、版本号 0 的旧档，载入后 lastFix.filled=0 / missingTotal=0
+    //   —— 「这份档缺了哪几个键」**一个字都没有留下**，只有类型冲突那 1 处进了 shapeConflicts。
+    //   所以体检必须跑在 migrate **之前**：治过之后再量，量到的永远是「健康」。
+    lastAudit: null };
+  // v2.553.0：载入体检告警的指纹（同一结论只报一次；理由见 init 里的调用点注释）。
+  let __lastAuditSig = '';
   // v2.30.0: 镜像命中台账（最近一次回落的完整归因，UI/诊断据此说「这份世界从哪来」）
   let __lastMirror = null;
   // v0.1.46: 版本链迁移步注册表（fromVersion -> fn(state)）
@@ -2422,6 +2431,83 @@
       bloat: bloat.map(function (a) { return { path: a.path, len: a.len, cap: a.cap, bytes: a.bytes, site: a.site }; })
     };
   }
+// ── v2.553.0：载入体检（诊断先于治疗）──────────────────────────────
+/**
+ * 体检规格：以 `defaultWorldState()` 为「应该有什么」，不另抄一份键名单。
+ * 为什么不能抄：抄一份 = 第三处真源；骨架加一个键而表没跟，体检就永远报「健康」，
+ *   而且是**看起来正常的那种健康**（本仓反复治理的形态）。
+ * 默认值是 null / undefined 的键**不猜类型**：null 的意思是「这里可以没有」，
+ *   任何类型都不该被判成错（否则一载入就先冤枉一份好档）。
+ */
+function loadAuditSpec() {
+  const d = defaultWorldState();
+  const keys = Object.keys(d);
+  const types = {};
+  keys.forEach(function (k) {
+    const v = d[k];
+    if (v === null || typeof v === 'undefined') return;
+    types[k] = Array.isArray(v) ? 'array' : typeof v;
+  });
+  return { require: keys, types: types, versionKey: 'schemaVersion', knownVersions: [SCHEMA_VERSION] };
+}
+/**
+ * 载入体检：**只读、只记、不修**。
+ *
+ * 三条口径（缺一不可）：
+ *   ① **在治疗之前**：调用点必须在 migrate / ensureShape 之前（顺序即语义，锁里用行号钉住）。
+ *      治过之后再量，量到的永远是「健康」——这正是本仓既有 `lastFix` 的问题：
+ *      它记的是「补了哪几个键」，而缺键在 migrate 的 `Object.assign` 里就被补完了，于是它恒报 0。
+ *   ② **不在载入路径上做决定**：体检结论**不阻断**载入、不改 memCache、不写盘。
+ *      `save-audit` 的设计边界是「只说话不动手」，这里也不许越界。
+ *   ③ **缺席要明说**：`WA.saveAudit` 没装载时记 `source:'engine-absent'` 并**不**写 ok:true ——
+ *      「没有体检」与「体检通过」在读数上必须可分，否则又是一个看起来正常的绿。
+ */
+function auditLoadedArchive(payload) {
+  const rec = { at: clockWall(), ok: null, problemCount: 0, problems: [], codes: {},
+    version: null, bytes: null, truncated: false, codesCapped: false, source: null, error: null };
+  const A = WA.saveAudit;
+  // 守卫用别名，调用**用全名**：本仓的调用点计数是按字面量扫的（v2.552.0 那把锁
+  //   数的就是 `saveAudit.audit`），写成 `A.audit(...)` 会让「真调用」与「零调用」
+  //   在读数上同形 —— 本批第一版正是这么写的，于是 v2552 的 B4 报 0 而实际已经接了线。
+  if (!A || typeof A.audit !== 'function') {
+    rec.source = 'engine-absent';
+    __loadStat.lastAudit = rec;
+    return rec;
+  }
+  try {
+    const r = WA.saveAudit.audit(payload, loadAuditSpec());
+    rec.source = 'save-audit';
+    rec.ok = r.ok === true;
+    rec.problemCount = r.problemCount;
+    rec.version = r.version;
+    rec.bytes = r.counts ? r.counts.bytes : null;
+        rec.problems = (r.problems || []).slice(0, 12);   // 只留前 12 条：再多的档已经坏了，列几百行没人看
+        // 归因取**全量**（r.codeCounts），不是从 problems 里数：
+        //   明细会被 MAX_PROBLEMS 截断，而 missing 是**先**推入的，于是排后面的
+        //   bad-type / unknown-version 会被整体挤出统计 ——「237项问题，全都是缺键」这种
+        //   看起来很确定的错读数，比不报更坏。恒等式（各码之和 === problemCount）由锁钉住。
+        const __cc = (r.codeCounts && typeof r.codeCounts === 'object') ? r.codeCounts : null;
+        if (__cc) {
+          Object.keys(__cc).forEach(function (c) { rec.codes[c] = __cc[c]; });
+        } else {
+          // 老引擎（无 codeCounts）：退回按明细数，并**明确记下这是截断口径**
+          (r.problems || []).forEach(function (p) {
+            const c = String(p.code || 'unknown');
+            rec.codes[c] = (rec.codes[c] || 0) + 1;
+          });
+          rec.codesCapped = true;
+        }
+    rec.truncated = r.problemCount > rec.problems.length;
+  } catch (e) {
+    // 体检自身炸了：记下来但**不阻断载入**（载入是主路径，体检是观测）。
+    rec.source = 'audit-error';
+    rec.ok = null;
+    rec.error = String((e && e.message) || e);
+    try { WA.log('error', 'store.init：载入体检自身异常（本次不阻断载入，但「体检结论」不可用）', e); } catch (e2) {}
+  }
+  __loadStat.lastAudit = rec;
+  return rec;
+}
   const store = WA.store = {
     SCHEMA_VERSION,
     /** v0.1.44: 有界容器登记表只读副本（测试反查源码一致性用）；v1.0.0: 透传 kind（array|object） */
@@ -2652,7 +2738,39 @@
         __batch.orphaned = true; __batch.dirty = false;
         WA.log('warn', '聊天切换时存在在飞写合并批：已作废其未落盘改动（防跨聊天污染）');
       }
-      memCache = this.load() || defaultWorldState();
+      // v2.553.0：留下「这次是不是从盘上读出来的」——体检只对**真读出来的那份**做。
+      //   全新聊天拿到的是 defaultWorldState()，对它体检恒绿，那条绿没有任何信息量，
+      //   却会让面板上的「存档体检」显示「N 次」（把「新建」读成「体检过」）。
+      const __loadedFromDisk = this.load();
+      memCache = __loadedFromDisk || defaultWorldState();
+      // v2.553.0：**诊断先于治疗**。这一行必须在下面 migrate / ensureShape **之前**跑完。
+      //   病（实测）：migrate 的第一句是 `Object.assign(defaultWorldState(), state)`，缺的键在这一步
+      //   就被默认骨架补齐；随后 ensureShape 面对的是「已经补齐的」对象，于是 lastFix 恒报
+      //   filled=0 / missingTotal=0。一份缺 30+ 键的旧档载入之后，「它缺过键」这件事**零记录**——
+      //   `save-audit` 的头注释把这种结构叫「既诊断又治疗的器官」，这里就是它最典型的一处。
+      //   体检结论落 __loadStat.lastAudit（诊断面可读）+ 有议题时一行 warn（只报一次，不刷屏）。
+      //   它不阻断载入、不改 memCache、不写盘：载入是主路径，体检只负责说话。
+      try {
+        if (__loadedFromDisk) {
+          const __ar = auditLoadedArchive(__loadedFromDisk);
+          // 同一条结论只报一次（指纹 = 聊天 + 版本 + 各项计数）。
+          //   为什么必须节流：init() 在**每次切聊天**都会跑，而旧档在修好之前会一直报同一组数
+          //   —— 本仓对存储卫生那条告警用的就是同一套指纹幂等（`__keyHygieneScanSig`）。
+          //   不节流的后果不是「多一行日志」，是用户把整类告警当背景音（告警疲劳），
+          //   于是真正的新议题也看不见了。
+          const __sig = [getChatId(), String(__ar.version), __ar.problemCount,
+            Object.keys(__ar.codes).sort().map(function (c) { return c + '=' + __ar.codes[c]; }).join(',')].join('|');
+          if (__ar.problemCount > 0 && __sig !== __lastAuditSig) {
+            __lastAuditSig = __sig;
+            const __brief = Object.keys(__ar.codes).map(function (c) { return c + ':' + __ar.codes[c]; }).join(' / ');
+            WA.log('warn', 'store.init：载入体检发现 ' + __ar.problemCount + ' 项存档结构问题（' + __brief + '）'
+              + '，版本=' + String(__ar.version) + ' —— 这是**治疗前**的记录；接下来的 migrate / ensureShape 会把它们补好，'
+              + '补好之后再次载入就看不到了（明细见 store.loadStat().lastAudit）');
+          } else if (__ar.problemCount === 0) {
+            __lastAuditSig = __sig;   // 干净档也记指纹：之后若同一聊天变脏，指纹变了才会报
+          }
+        }
+      } catch (eAL2) { try { WA.log('error', 'store.init：载入体检调用点异常（不阻断载入）', eAL2); } catch (e3) {} }
       __committed = memCache;   // v2.113.0（A1）：新纪元以磁盘为准，内存与已确认态同步
       try {
         if (WA.plugin && typeof WA.plugin.fire === 'function') {
@@ -4497,6 +4615,19 @@
         //   「缺了哪几个键」又在出口处被抹掉一次（这正是本项要修的那种「存了但看不见」）。
         missing: (__loadStat.lastFix && __loadStat.lastFix.missing) || [],
         missingTotal: (__loadStat.lastFix && __loadStat.lastFix.missingTotal) || 0 }, migrated: __migrateReport ? { from: __migrateReport.from, to: __migrateReport.to, steps: __migrateReport.steps, failed: (__migrateReport.failed || []).length, refused: __migrateReport.refused || null, current: __migrateReport.current || null, at: __migrateReport.at } : null,
+      // v2.553.0：载入体检结论（**治疗前**那份）。投影是**拷贝**不是引用：
+      //   诊断面板拿到的东西不许能把账本改掉（本仓对取证面的一贯要求）。
+      //   null 的含义是「本次载入不是从盘上读出来的」（新聊天），**不是**「体检通过」。
+      lastAudit: __loadStat.lastAudit ? {
+        at: __loadStat.lastAudit.at, ok: __loadStat.lastAudit.ok,
+        problemCount: __loadStat.lastAudit.problemCount,
+        codes: Object.assign({}, __loadStat.lastAudit.codes || {}),
+        problems: (__loadStat.lastAudit.problems || []).map(function (p) { return { path: p.path, code: p.code, expected: p.expected, actual: p.actual }; }),
+        truncated: __loadStat.lastAudit.truncated === true,
+        codesCapped: __loadStat.lastAudit.codesCapped === true,
+        version: __loadStat.lastAudit.version, bytes: __loadStat.lastAudit.bytes,
+        source: __loadStat.lastAudit.source, error: __loadStat.lastAudit.error
+      } : null,
       // v2.30.0: 镜像回落三计数同域可见——「本地 miss 但镜像救回」此前在诊断上全无痕迹
       mirrorHits: __loadStat.mirrorHits, mirrorMisses: __loadStat.mirrorMisses, mirrorErrors: __loadStat.mirrorErrors,
       // v2.108.0 (plan-1 #18): repair metrics visible in the same domain (zero new exports --

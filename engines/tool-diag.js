@@ -3585,10 +3585,35 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
             if (WA.store && WA.store.loadStat) {
               const ls = WA.store.loadStat();
               const lf = (ls && ls.lastFix) || {};
+              // v2.553.0：**这个读数此前会说假话**。
+              //   `migrate` 的第一句就把缺键补齐，`ensureShape` 随后面对的是**已补齐**的对象
+              //   ⇒ `missingTotal` 恒 0 ⇒ 这里永远打印「本次载入骨架完整（缺 0 键）」，
+              //   哪怕这份存档进来时缺了 235 个键。治疗跑在体检之前，诊断就被治疗抹平了。
+              //   现在把 `lastAudit`（**治疗前**那份，见 core/store.js 的 auditLoadedArchive）
+              //   并列出来：audit 说进来时什么样，shape 说补过之后什么样，两者不许互相顶替。
+              const la = (ls && ls.lastAudit) || null;
+              const codes = (la && la.codes) || {};
+              // 归因码的中文名：只在本处用；未知码原样透出（不猜）。
+              const codeZh = { missing: '缺键', 'missing-version': '缺版本键', 'bad-type': '类型错',
+                forbidden: '禁用键存在', 'unknown-version': '版本未知', unserializable: '不可序列化',
+                'bad-blob': '非对象存档' };
+              const brk = Object.keys(codes)
+                .sort(function (a, b) { return codes[b] - codes[a] || (a < b ? -1 : 1); })
+                .map(function (k) { return (codeZh[k] || k) + ' ' + codes[k]; })
+                .join(' / ');
               r.shape = { filled: lf.filled || 0, conflicts: lf.conflicts || 0,
                 missingTotal: lf.missingTotal || 0, missing: (lf.missing || []).slice(0, 8),
-                text: (lf.missingTotal ? ('本次载入缺 ' + lf.missingTotal + ' 键（已按默认补齐，清单见上）')
-                  : '本次载入骨架完整（缺 0 键）') };
+                // 治疗前（载入体检）；null = 本次载入不是从盘上读出来的（新聊天），**不是**「没问题」
+                audit: la ? { at: la.at, ok: la.ok, problemCount: la.problemCount, codes: codes,
+                  codesCapped: la.codesCapped === true, truncated: la.truncated === true,
+                  version: la.version, bytes: la.bytes, source: la.source, error: la.error } : null,
+                text: !la
+                  ? ('这次载入不是从盘上读出来的（新聊天）⇒ 没有载入体检读数；'
+                    + (lf.missingTotal ? ('骨架缺 ' + lf.missingTotal + ' 键（已补齐）') : '骨架无缺键'))
+                  : (la.problemCount > 0
+                    ? ('载入体检：' + la.problemCount + ' 项（' + brk + '）——这是**补齐之前**的样子；'
+                      + '补齐之后骨架缺 ' + (lf.missingTotal || 0) + ' 键（只看 shape 会以为没事）')
+                    : ('载入体检：0 项问题（' + (la.bytes || 0) + ' 字节）')) };
             }
           } catch (e) { r.shape = { text: '读不到：' + String(e && e.message) }; }
           return r;

@@ -1,7 +1,7 @@
 {
   "tool": "plan-ledger",
   "schema": 1,
-  "version": "2.552.0",
+  "version": "2.553.0",
   "sourceDigest": "41acb9e7a158d376d971ac872ec9e5322fe054ffc58b38c00e3ff811b3f64ecb",
   "sourceCommits": 35,
   "total": 36,

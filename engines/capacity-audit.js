@@ -385,6 +385,10 @@
       refusedCount: loadStat ? (loadStat.migrateRefused || 0) : null,
       lastRefused: loadStat ? (loadStat.lastRefused || null) : null,
       shapeFix: loadStat ? (loadStat.lastFix || null) : null,
+      // v2.553.0：`shapeFix` 是**治疗之后**的读数（migrate 先把缺键补齐，所以它恒 filled=0），
+      //   单看它永远答不出「这份存档是坏了还是只是旧」。并列给出 `loadAudit`（治疗前那份），
+      //   两问才各有各的答案。null = 本次载入不是从盘上读出来的（新聊天），**不是**「没问题」。
+      loadAudit: loadStat ? (loadStat.lastAudit || null) : null,
       // 形态补齐的冲突数与「填了多少格」分列：前者是**真冲突**（类型对不上），后者是缺字段补齐。
       //   合成一个数就再也答不出「存档是坏了还是只是旧」。
       note: direction === 'future-schema-will-refuse'

@@ -22625,6 +22625,26 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     //     N 真源码负控两条（改回 stat([]) ⇒ A1 现形；摘掉纠正标记 ⇒ A4 现形，各逐字节还原 + sha256）、
     //     E 账本历史不被抹（build 不含历史 / refresh 接回 / 无 MARK 不瞎猜 / 接线与 fail-closed）。
 await runScript('./stitch-ledger-truthfulness-v2552.js');
+    // v2.553.0：存档「载入体检」接线 —— 18 段。
+    //   病：`core/store.js` 的 init() 是「既诊断又治疗的器官」。
+    //     load → migrate（第一句 Object.assign(defaultWorldState(), state) 把缺键**当场补完**）
+    //          → ensureShape（面对已补齐的对象，filled 恒 0）→ save
+    //     实测：一份缺 235 键 / 1 处类型错 / 版本号 0 的旧档，载入后 lastFix.filled=0、
+    //     missingTotal=0 —— 「缺了 235 个键」一个字都不留。治过之后再量，量到的永远是「健康」。
+    //   本批做的不是「给引擎加个调用点」，是改一处**顺序**：把体检挪到治疗之前，
+    //     结论落 store.loadStat().lastAudit（rec 形状见 core/store.js 的三条口径注释）。
+    //   连带修掉归因截断：引擎 MAX_PROBLEMS=64 且 missing 先入栈 ⇒ 排在后面的
+    //     bad-type / unknown-version 被整段挤出统计，读数变成「237 项，全都是缺键」这种
+    //     看起来很确定的错答案。故加 codeCounts 全量计数（明细可截断，归因不可截断）。
+    //   读数：18 段全绿 —— A 接线与顺序（恰 1 处调用且形参是 __loadedFromDisk、绝不喂 memCache）、
+    //     B 行为（坏档三码齐全 / 恒等式 / 先治后量必更少 / 干净档 / 同一结论只报一遍）、
+    //     C 只读不变式（不写盘、不阻断载入、新聊天 lastAudit===null）、
+    //     D 缺席与异常（engine-absent 不写 ok:true / audit-error 不拖死载入）、
+    //     E 结论有读面（诊断包 / 迁移预检 / 面板；同刻 shapeFix 说 0、loadAudit 说 237）、
+    //     N 真源码负控两条（治完再量 ⇒ 归因消失；退回截断口径 ⇒ 恒等式必现形）。
+    //   同批更新：tests/stitch-ledger-truthfulness-v2552.js 的 B4/C2 判据（saveAudit.audit 由
+    //     零调用变 1 个产品调用点，改成精确值 1 而不是放宽），并给 A3 补负控 N3。
+await runScript('./load-audit-wire-v2553.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

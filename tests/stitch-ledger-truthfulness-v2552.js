@@ -118,12 +118,55 @@ ok('A2 两台的 stat 在 settings.js 里零引用（它们因此如实回到零
   });
 });
 
-ok('A3 读数改成直说：「无数据源」×2 / 「从未调用」×2', function () {
+/** 取出某一格读数的正文（从 `one(...)` 到该格的 `})` 收口）。找不到返回 null。 */
+function cellOf(text, rel, ns) {
+  const key = "one('" + rel + "', '" + ns + "'";
+  const i = text.indexOf(key);
+  if (i < 0) return null;
+  // 收口锚点是 `\n          })`，**不带逗号**：数组最后一个元素（本文件里就是 saveAudit）没有尾逗号。
+  //   第一版写死了 `}),`，于是 saveAudit 那格永远取不到 —— 判据报「找不到这一格」，
+  //   看起来像现场被改了，其实是判据自己漏了一种正当写法。
+  const tail = text.indexOf('\n          })', i);
+  if (tail < 0) return null;
+  return text.slice(i, tail);
+}
+/**
+ * A3 的判据本体（抽成函数是为了让 N3 对**同一条**判据做负控，而不是另写一份近似物）。
+ *
+ * 口径难点：v2.552.0 这里数的是三元式 `? '从未调用'` —— 数的是**写法**，不是**事实**。
+ *   v2.553.0 的 saveAudit 那格因为要分「引擎缺席 / 体检出错 / N 项问题」三种情形，
+ *   三元式写不下，改成 `if (s.calls === 0) return '从未调用';` —— 语义一字未变，判据却报红。
+ *   这是本仓反复踩的那一类错：判据一旦钉在形式上，现场每次正当的改写都会把它撞红，
+ *   而撞红的噪声会让后来者去改判据而不是看现场。故改成按格取正文、查语义：
+ *   每格必须 ① 有 `calls === 0` 守卫（不许把「没调用过」与「算出来是 0」混成一句）；
+ *   ② 守卫里直说「从未调用」（不许把初值渲染成一个看起来正常的读数）。
+ */
+function unsafeReadoutCells(text) {
+  const out = [];
+  [['engines/write-rehearsal.js', 'writeRehearsal'],
+    ['engines/save-audit.js', 'saveAudit']].forEach(function (p) {
+    const cell = cellOf(text, p[0], p[1]);
+    if (cell === null) { out.push(p[1] + ': 找不到这一格（读数面被改名/拆掉 ⇒ 判据需要随现场更新）'); return; }
+    if (!/calls\s*===\s*0/.test(cell)) out.push(p[1] + ': 缺 calls === 0 守卫（「没调用过」与「算出来是 0」又混了）');
+    if (cell.indexOf("'从未调用'") < 0) out.push(p[1] + ': calls === 0 时没有直说「从未调用」');
+  });
+  return out;
+}
+ok('A3 读数改成直说：「无数据源」×2 / 两格都「没调用过就直说」', function () {
   const cnt = function (s) { return SET.split(s).length - 1; };
   assert.strictEqual(cnt("return '无数据源';"), 2,
     '应有 2 处「无数据源」（ctxBoundary / arcGuide）');
-  assert.strictEqual(cnt("? '从未调用'"), 2,
-    '应有 2 处「从未调用」（writeRehearsal / saveAudit）');
+  const bad = unsafeReadoutCells(SET);
+  assert.deepStrictEqual(bad, [], '读数格没做到「没调用过就直说」: ' + JSON.stringify(bad));
+  // 收尾断言原来写的是「全仓不许出现 `s.ok + '通过/'`」—— 写宽了：writeRehearsal 那格里它是**正当**的
+  //   （calls > 0 表示真的预演过，那时「N 通过 / N 拒」就是现场）。判据一旦钉在形式而不是语义上，
+  //   就会把兄弟格子的正当写法一起判死。故改为只钉 saveAudit 那格的**语义**：
+  //   它报的是「问题」不是「通过/拒」，所以必须给出体检结论，且三种非正常情形不许并成一个 0。
+  const cellSA = cellOf(SET, 'engines/save-audit.js', 'saveAudit') || '';
+  assert.ok(cellSA.indexOf('problemCount') >= 0,
+    'saveAudit 那格没有报体检结论（problemCount）—— 只报「N 次」不回答「这份存档有没有问题」');
+  assert.ok(cellSA.indexOf('engine-absent') >= 0 && cellSA.indexOf('audit-error') >= 0,
+    'saveAudit 那格没有把「引擎缺席 / 体检本身出错」与「0 项问题」分开（三种情形不许合并成一个看起来正常的 0）');
 });
 
 /**
@@ -158,16 +201,26 @@ ok('A4 头注释不再断言「本行就是接线点」（它允许被引用，�
 
 // ── B 四台核心调用点计数 ──────────────────────────────────────
 const CORES = [
-  { expr: 'arcGuide.plan', excl: 'engines/arc-guide.js', what: '引导弧 plan' },
-  { expr: 'ctxBoundary.scrub', excl: 'engines/ctx-boundary.js', what: '上下文边界 scrub' },
-  { expr: 'writeRehearsal.rehearse', excl: 'engines/write-rehearsal.js', what: '写前预演 rehearse' },
-  { expr: 'saveAudit.audit', excl: 'engines/save-audit.js', what: '存档体检 audit' }
+  { expr: 'arcGuide.plan', excl: 'engines/arc-guide.js', what: '引导弧 plan', expect: 0 },
+  { expr: 'ctxBoundary.scrub', excl: 'engines/ctx-boundary.js', what: '上下文边界 scrub', expect: 0 },
+  { expr: 'writeRehearsal.rehearse', excl: 'engines/write-rehearsal.js', what: '写前预演 rehearse', expect: 0 },
+  // v2.553.0：`saveAudit.audit` 在 `core/store.js` 的载入点接了线，期望值 0 → 1。
+  //   **这是精确值，不是放宽**：写成「至少 1」就再也发现不了它又被摘掉；
+  //   多一处、少一处都必须红。表里记的是「这一刻有几处产品调用点」，不是「允许有几处」。
+  { expr: 'saveAudit.audit', excl: 'engines/save-audit.js', what: '存档体检 audit', expect: 1,
+    why: 'v2.553.0 接在 store.init() 的 migrate 之前（见 tests/load-audit-wire-v2553.js）' }
 ];
 CORES.forEach(function (c, i) {
-  ok('B' + (i + 1) + ' ' + c.what + ' 的产品调用点 = 0（去注释、排除自身文件）', function () {
+  ok('B' + (i + 1) + ' ' + c.what + ' 的产品调用点 = ' + c.expect + '（去注释、排除自身文件）', function () {
     const hits = countCalls(c.expr, c.excl);
-    assert.deepStrictEqual(hits, [],
-      c.what + ' 已经有产品调用点 ⇒ 本条读数应更新（现场变了，不是判据放宽）: ' + JSON.stringify(hits));
+    assert.strictEqual(hits.length, c.expect,
+      c.what + ' 的产品调用点数变了 ⇒ 本条读数应更新（现场变了，不是判据放宽）: 期望 '
+      + c.expect + '，实 ' + hits.length + ' ' + JSON.stringify(hits));
+    if (c.expect === 0) {
+      // 0 的场合顺带把「确实一处都没有」也钉住：strictEqual 已经保证，这里留显式断言是为了
+      //   报错时能直接看到命中的几行，省去二次排查。
+      assert.deepStrictEqual(hits, [], c.what + ' 仍有产品调用点: ' + JSON.stringify(hits));
+    }
   });
 });
 
@@ -193,18 +246,26 @@ ok('C1 账本已登记 arcGuide / ctxBoundary（两条都是 pending-wire）', f
   });
 });
 
-ok('C2 判据边界的正面证据：后两台**不**在账本里，也没有产品调用点', function () {
+ok('C2 判据边界的正面证据：writeRehearsal 仍零调用、saveAudit 已毕业，两台都不在账本里', function () {
   // 这一条不是在夸账本，是在钉住判据的边界：ns 级零读判据对
   //   「stat 被读、核心零调用」这一类**无感**。所以它们既不在零读清单里，
   //   也不在账本里 —— 两个读数都看不见它们。本锁是唯一提这件事的地方。
-  ['writeRehearsal', 'saveAudit'].forEach(function (k) {
-    assert.ok(!LEDGER.entries[k],
-      k + ' 出现在零读账本里了 —— 那说明 stat 的引用被去掉了（现场变了，本条判据需要更新）');
-  });
+  //
+  // v2.553.0 之后这一条分成两半，因为现场分成两半：
+  //   ① writeRehearsal 仍是「stat 被读、核心零调用」⇒ 原来的判据原样保留；
+  //   ② saveAudit 已经毕业（store 载入点接上 1 处调用）—— 但接线**不蕴含**「账本该登记它」：
+  //      账本登记的是**零读 ns**，而 saveAudit 的 stat 一直有 ui/settings.js 那行读面，
+  //      它本来就不该进账本。把「有调用点」与「在零读账本里」钉成互不蕴含，是这一条的新职责。
+  assert.ok(!LEDGER.entries['writeRehearsal'],
+    'writeRehearsal 出现在零读账本里了 —— 那说明 stat 的引用被去掉了（现场变了，本条判据需要更新）');
+  assert.ok(!LEDGER.entries['saveAudit'],
+    'saveAudit 出现在零读账本里了 —— 它的 stat 有读面，登记进去是记账错误');
   const r1 = countCalls('writeRehearsal.rehearse', 'engines/write-rehearsal.js');
+  assert.strictEqual(r1.length, 0,
+    'writeRehearsal 仍应零调用（否则「账本看不见它」这件事就不再是问题）: ' + JSON.stringify(r1));
   const r2 = countCalls('saveAudit.audit', 'engines/save-audit.js');
-  assert.ok(r1.length === 0 && r2.length === 0,
-    '两台核心仍应零调用（否则「账本看不见它」这件事就不再是问题）');
+  assert.strictEqual(r2.length, 1,
+    'saveAudit.audit 应恰有 1 处产品调用（v2.553.0 的 store 载入点）: ' + JSON.stringify(r2));
 });
 
 ok('C3 deadNs 与账本双向一致（arcGuide / ctxBoundary 在，另两台不在）', function () {
@@ -322,6 +383,21 @@ ok('N2 真改 ui/settings.js：摘掉纠正标记 ⇒ A4 必须现形（随后�
  *
  * 判据分两层：口径（carryNote 的行为）+ 接线（refresh 真的调它，且写盘前 fail-closed）。
  */
+ok('N3 负控：把「从未调用」换回「0 通过 / 0 拒」⇒ A3 的同一条判据必须现形', function () {
+  // 负控**不写盘**（纯函数喂投毒文本）：A3 的判据是 `unsafeReadoutCells(text)`，
+  //   所以这里改的是喂给它的东西，测的仍是 A3 用的那一条判据，不是另写一份近似物。
+  const poisoned = SET.replace(
+    "if (s.calls === 0) return '从未调用';",
+    "if (s.calls === 0) return (s.ok + '通过/' + s.rejected + '拒');");
+  assert.notStrictEqual(poisoned, SET, '负控没改到东西（锚点失配）⇒ 这条负控本身失效');
+  assert.ok(unsafeReadoutCells(poisoned).length > 0,
+    '把「从未调用」换回「0 通过 / 0 拒」之后 A3 居然还通过 ⇒ 判据不认这个病灶');
+  // 反向：只删守卫、保留「从未调用」，也必须现形（那会把「算出来是 0」当读数）
+  const poisoned2 = SET.replace("if (s.calls === 0) return '从未调用';", "if (false) return '从未调用';");
+  assert.notStrictEqual(poisoned2, SET, '第二条负控没改到东西（锚点失配）');
+  assert.ok(unsafeReadoutCells(poisoned2).length > 0, '去掉 calls === 0 守卫之后 A3 居然还通过');
+});
+
 ok('E1 dead-export-gate 的 --update 不再抹掉 _note 历史（口径 + 接线 + 负控）', function () {
   const G = require(path.join(BASE, 'tests', 'dead-export-gate.js'));
   assert.equal(typeof G.carryNote, 'function', 'carryNote 应被导出（否则本锁无法对口径做行为测试）');

@@ -162,7 +162,10 @@ negCtl(ENG, '    problems.sort(function (a, b) { return a.path < b.path ? -1 : (
   a(r.problems.map(function (p) { return p.path; }).join(',') === 'q,b,y',
     'E3 负控制：不去排序时顺序随入参漂（B10 不是空断言）', r.problems.map(function (p) { return p.path; }));
 });
-negCtl(ENG, "      if (has(k)) problems.push(four(String(k), 'forbidden', '不含该键', 'present'));", '      void 0;', function (mm) {
+// v2.553.0：这里原来锚的是 `problems.push(` —— 引擎为「明细可截断、归因不可截断」把推入收口成
+//   `push(` 包装器（problems 仍直推，但只有包装器自己那一处），锚点随之要跟。判据意图一字未变：
+//   把 forbid 分支整段挖掉之后，「污染存档被放行」必须现形。
+negCtl(ENG, "      if (has(k)) push(four(String(k), 'forbidden', '不含该键', 'present'));", '      void 0;', function (mm) {
   const r = mm.wa.saveAudit.audit({ cheat: 1 }, { forbid: ['cheat'] });
   a(r.ok === true, 'E4 负控制：不查禁用键时污染存档被放行（B7 不是空断言）', r.problems);
 });

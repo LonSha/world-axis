@@ -59,11 +59,21 @@
 
     const has = function (k) { return Object.prototype.hasOwnProperty.call(blob, k); };
     const problems = [];
+    // v2.553.0：**明细可截断，归因不可截断**。
+    //   现场：一份缺 235 个键的旧档，problemCount=237，但 problems 被 MAX_PROBLEMS 截到 64 条，
+    //   而 missing 是**先**推入的 ⇒ 排在后面的 bad-type / unknown-version 被整体挤出统计。
+    //   后果：store.init 的载入体检会如实报「237 项」，却把归因读成「全是缺键」，
+    //   于是「版本未知」这个最需要人看一眼的结论**在读数里消失**——正是本仓反复治的那种失真。
+    //   故：codeCounts 在全量上计，problems 仍按上限截断（明细是给人看的，统计是给判据用的）。
+    const codeCounts = {};
+    // 注意：这里的 problems.push 是**唯一**一处直接推入（包装器自己必须直推，
+    //   否则会变成自递归——本批第一次批量替换时真踩到了，锁里因此有一条 N 段钉它）。
+    const push = function (p) { const c = String(p.code || 'unknown'); codeCounts[c] = (codeCounts[c] || 0) + 1; problems.push(p); };
     const missingSet = {};   // ② 同一个病因只报一次：这里记下「已按 missing 报过」的键
 
     // ② 缺必填键 ⇒ missing（缺的键此后不再报类型）
     need.forEach(function (k) {
-      if (!has(k)) { missingSet[String(k)] = 1; problems.push(four(String(k), 'missing', '必填顶层键', 'absent')); }
+      if (!has(k)) { missingSet[String(k)] = 1; push(four(String(k), 'missing', '必填顶层键', 'absent')); }
     });
 
     // ② 类型面：只查「在的键」，缺的已由 missing 说过一遍
@@ -71,12 +81,12 @@
       if (!has(k)) return;
       const want = String(types[k]);
       const got = typeOf(blob[k]);
-      if (want !== got) problems.push(four(k, 'bad-type', want, got));
+      if (want !== got) push(four(k, 'bad-type', want, got));
     });
 
     // 禁用键：存在即说明存档来自别处（不猜它为什么在）
     forbid.forEach(function (k) {
-      if (has(k)) problems.push(four(String(k), 'forbidden', '不含该键', 'present'));
+      if (has(k)) push(four(String(k), 'forbidden', '不含该键', 'present'));
     });
 
     // ③ 版本不猜
@@ -84,11 +94,11 @@
     if (versionKey) {
       if (!has(versionKey)) {
         // 版本键若已在 require 面报过 missing，就不再报第二条（缺 ≠ 坏，也不许一病两报）
-        if (!missingSet[versionKey]) problems.push(four(versionKey, 'missing-version', '带版本号', 'absent'));
+        if (!missingSet[versionKey]) push(four(versionKey, 'missing-version', '带版本号', 'absent'));
       } else {
         version = blob[versionKey];
         if (known && known.indexOf(version) < 0) {
-          problems.push(four(versionKey, 'unknown-version', known.join('|'), String(version)));
+          push(four(versionKey, 'unknown-version', known.join('|'), String(version)));
         }
       }
     }
@@ -100,7 +110,7 @@
       bytes = JSON.stringify(blob).length;
     } catch (e) {
       bytes = -1;
-      problems.push(four('', 'unserializable', '可序列化', String((e && e.message) || e)));
+      push(four('', 'unserializable', '可序列化', String((e && e.message) || e)));
     }
 
     problems.sort(function (a, b) { return a.path < b.path ? -1 : (a.path > b.path ? 1 : 0); });
@@ -112,6 +122,8 @@
       ok: ok,
       problems: capped,
       problemCount: problems.length,
+      // v2.553.0：全量归因（与 problemCount 恒等：各码计数之和 === problemCount）
+      codeCounts: codeCounts,
       truncated: problems.length > capped.length,
       counts: { keys: keys.length, bytes: bytes },
       version: version
