@@ -131,9 +131,16 @@ const rp = run(['--tier=2', '--plan']);
 // v2.542.8：第三档诚实输出 —— `no-executable-change`。隔离副本的 git 历史是单条
 //   Independent baseline、工作树无改动，于是「增量面」是空的；调度器此时拒收得完全正确。
 //   判据仍是「永不许是 passed」，只是把这一档也算进「诚实输出」。
+// v2.542.9：第三档诚实输出是 **verdict 层**的 `no-executable-change`（tools/smart-runner.js:410，
+//   exit 0 / sectionsRun 0），不是 refusal —— 拒收语（refusal）的取值集仍只有
+//   wide-impact / uncovered-change。第一稿把它塞进 refusal 名单 ⇒ 在副本里照样红
+//   （现场实测 verdict 就是 no-executable-change，与 refusal 无关），这一版按协议改对。
+//   额外钉住「exit === 0 且 sectionsRun === 0」：否则「确实没东西可跑」会与「跑了但全挂」
+//   在读数上同形（后者 exit 非 0）。判据仍是「**永不许**是 passed」。
 const b3ok = rp.ev && (rp.ev.verdict === 'plan'
-  || (rp.ev.verdict === 'refused' && ['wide-impact', 'uncovered-change', 'no-executable-change'].indexOf(rp.ev.refusal) >= 0));
-a(b3ok, 'B3 `--tier=2 --plan` 的结论 ∈ {计划, wide-impact/uncovered-change/no-executable-change 拒收}，且**永不许**是 passed'
+  || (rp.ev.verdict === 'no-executable-change' && rp.ev.exit === 0 && rp.ev.sectionsRun === 0)
+  || (rp.ev.verdict === 'refused' && ['wide-impact', 'uncovered-change'].indexOf(rp.ev.refusal) >= 0));
+a(b3ok, 'B3 `--tier=2 --plan` 的结论 ∈ {计划, no-executable-change（空增量）, wide-impact/uncovered-change 拒收} 三档之一，且**永不许**是 passed'
   + '（现场实测：' + (rp.ev ? (rp.ev.verdict + (rp.ev.refusal ? '/' + rp.ev.refusal : '')) : '无读数') + '）');
 // B3b 定向计划：与工作树无关（点名一个必然存在的节），必须是干净的计划读数。
 const rpT = run(['--tier=2', '--plan', '--only-v-section=v2.408.0 (V23 超级史诗)']);

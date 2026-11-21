@@ -4089,7 +4089,7 @@
     },
     {
       "file": "tests/ns-consumer-ledger-v2400.js",
-      "sha": "3e21f7bd3c6d",
+      "sha": "84ad3de93abb",
       "version": "2.400.0",
       "versionSource": "title",
       "fileAnchor": "2400",
@@ -9400,7 +9400,7 @@
     },
     {
       "file": "tests/smart-runner-v2408.js",
-      "sha": "4be444b4f386",
+      "sha": "f2b0e9e3a314",
       "version": "2.408.0",
       "versionSource": "head",
       "fileAnchor": "2408",
