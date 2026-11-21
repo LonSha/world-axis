@@ -2426,14 +2426,6 @@
       "tref": 0,
       "own": 7
     },
-    "choiceBoard.mount": {
-      "reason": "self-only",
-      "detail": "engines/choice-board.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/choice-board.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 5
-    },
     "choiceBoard.refresh": {
       "reason": "self-only",
       "detail": "engines/choice-board.js 内部自用、外部零引用（过度导出）",
@@ -2465,14 +2457,6 @@
       "refs": 0,
       "tref": 0,
       "own": 3
-    },
-    "choiceBoard.unmount": {
-      "reason": "self-only",
-      "detail": "engines/choice-board.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/choice-board.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 6
     },
     "choices.generateGraded": {
       "reason": "self-only",
@@ -7440,6 +7424,14 @@
       "src": "engines/investigation.js",
       "refs": 0,
       "tref": 1,
+      "own": 3
+    },
+    "jsonRepair.repair": {
+      "reason": "self-only",
+      "detail": "engines/json-repair.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/json-repair.js",
+      "refs": 0,
+      "tref": 0,
       "own": 3
     },
     "judicialInquest.captureFugitive": {
@@ -16326,6 +16318,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 784
+    "dataOnly": 786
   }
 }

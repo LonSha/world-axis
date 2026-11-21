@@ -25,6 +25,10 @@
     //   所以在出口契约串里也确实有它 ⇒ 该进表。其余 22 个惰性项零读、不进表
     //   （理由见 tests/segments/tool-diag-v092.js 的覆盖判据注释）。
     'engines/lazy-load.js': 'lazyLoad',
+    // v2.542.21：`engines/json-repair.js` 从惰性档归位首帧面（ui/panel.js 真读 WA.jsonRepair.parse，
+    //   首帧未装时面板会静默少功能）⇒ 它不再是「零读的惰性项」，必须进诊断清单，
+    //   否则自检/契约面对它没有出口（判据「诊断清单覆盖全部磁盘模块」正是为这一格设的）。
+    'engines/json-repair.js': 'jsonRepair',
     // v2.533.0（OPV30 收口）：五台缝合件引擎。此前它们是惰性档（零读、按设计不进表），
     //   本轮在 ui/settings.js 的「缝合件台账」接了产品读点 ⇒ 退出惰性档进首帧面 ⇒
     //   诊断清单必须登记（判据「诊断清单覆盖全部磁盘模块」正是为这一格设的；

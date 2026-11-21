@@ -521,7 +521,10 @@ function runAll(A) {
   // v2.542.20（narrative-deduction 五个导出接入 routes）：调用期 4021 -> 4022（+1：
   //   (engines/action-desk-routes.js, narrativeDeduction) 是一对**新**的 (file, ns) 边；五个成员引用
   //   只计进 refs，边以 ns 对去重）。装载期不变 476；恒等式 476 + 4022 = 4498 当场核对。
-  A(a.edgesLoad === 476 && a.edgesCall === 4022 && a.edgesAll === 4498 && a.identityOk,
+  // v2.542.21（choice-board 接进 interceptor 的已有监听位 + json-repair 回首帧）：
+  //   调用期 4022 -> 4023（+1：(core/interceptor.js, choiceBoard) 新边）；装载期仍 476（json-repair 的
+  //   registerModule 边在惰性档时就已计入，移回首帧不增）；恒等式 476 + 4023 = 4499 当场核对。
+  A(a.edgesLoad === 476 && a.edgesCall === 4023 && a.edgesAll === 4499 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -615,7 +618,8 @@ function runAll(A) {
   // v2.542.3（叙事脊柱 L2）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1 ⇒ 578 → 579（实测回填）。
   // v2.542.4（叙事脎柱 L3）：LOAD_ORDER 与 run.js LOAD 双登记各 +1 ⇒ 579 → 580。
   // v2.542.5（L4）：LOAD_ORDER 与 run.js LOAD 双登记各 +1 ⇒ 580 → 581。
-  A(a.edgesLoad >= 20 && a.orderLen === 581,
+  // v2.542.21：L OAD_ORDER 581 -> 582（json-repair 从惰性档回首帧：面板真读它，不能迟装）。
+  A(a.edgesLoad >= 20 && a.orderLen === 582,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');

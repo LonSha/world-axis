@@ -228,6 +228,24 @@
                 }
               }
             } catch (e) { WA.log && WA.log('warn', '内联标签解析异常', e); }
+            // v2.542.21（正文待选按钮接通）：choice-board 的 mount() 此前**全库零调用**——
+            //   引擎能兑现（story-choice → branchTree → commit 三段都在），玩家却在聊天里
+            //   一个按钮都点不到，只能切到机制页手输选择点 ID。
+            //   复用**已有的** MESSAGE_RECEIVED 监听位（不新增订阅、不占监听位），
+            //   延后一帧再挂：DOM 渲染略晚于本回调。挂不上由引擎自己如实报 reason，
+            //   这里只把非预期码记 warn（no-pending / disabled / no-chat / no-doc / no-message 是正常环境缺失）。
+            if (WA.choiceBoard && typeof WA.choiceBoard.mount === 'function') {
+              try {
+                const later = function () {
+                  try {
+                    const mr = WA.choiceBoard.mount();
+                    const calm = ['no-pending', 'disabled', 'no-chat', 'no-doc', 'no-message'];
+                    if (mr && mr.ok === false && calm.indexOf(mr.reason) < 0) WA.log && WA.log('warn', '待选按钮未挂载：' + mr.reason);
+                  } catch (e2) { WA.log && WA.log('warn', '待选按钮挂载异常', e2); }
+                };
+                if (typeof setTimeout === 'function') setTimeout(later, 60);
+              } catch (e) { WA.log && WA.log('warn', '待选按钮调度失败', e); }
+            }
             if (WA.periodicals) Promise.resolve().then(() => WA.periodicals.checkAndPublish()).catch(e => WA.log('warn', '期刊调度异常', e));
             try {
               if (!WA.purifier || typeof WA.purifier.applySafe !== 'function') return;
@@ -286,6 +304,10 @@
             catch (e) { WA.log('warn', '切聊天重建关系图谱索引失败', e); }
             try { if (WA.monologue && typeof WA.monologue.resetMemo === 'function') WA.monologue.resetMemo(); }
             catch (e) { WA.log('warn', '切聊天清独白缓存失败', e); }
+            // v2.542.21：切聊天 = 换了一份存档 ⇒ 上个存档的待选按钮必须下架，
+            //   否则它会在新聊天里冲当本聊天的选项（与关系图谱重建同一条“单一持久来源”）。
+            try { if (WA.choiceBoard && typeof WA.choiceBoard.unmount === 'function') WA.choiceBoard.unmount(); }
+            catch (e) { WA.log('warn', '切聊天清理待选按钮失败', e); }
             WA.emit && WA.emit('chat:changed');
           });
         }

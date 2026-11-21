@@ -418,6 +418,11 @@
     // v2.46.0: 变量驱动条款（世界状态 → 派生量 → 按变量值确定性注入正文）。
     //   须在 core/store 之后（它只读 store 快照），与本模块的 before 节点位置无关
     //   （节点顺序由 workflow 的 order 决定，不由装载顺序决定）。
+    // v2.542.21：json-repair 从惰性档移回首帧。理由是现场矛盾：
+    //   ui/panel.js:7950 真读 WA.jsonRepair.parse，而它又在 LAZY_ORDER 里 —— 首帧未装时
+    //   面板那一块会静默少功能（opv29-z1-04 的 D1 就是拦这个）。惰性档只能放
+    //   「产品源面零出现」的模块；要面板读它，就得回首帧。
+    'engines/json-repair.js',
     'engines/kaleidoscope.js',
     'engines/calendar.js',
     // v2.302.0（缝 World Chronicle）：正文内联状态回报标签 <time>/<choice>/<flag>。
@@ -1639,7 +1644,6 @@
     'engines/floor-scrub.js',
     'engines/green-keys.js',
     'engines/import-kind.js',
-    'engines/json-repair.js',
     'engines/macro-guard.js',
     'engines/mixed-index.js',
     'engines/msg-align.js',

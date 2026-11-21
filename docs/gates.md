@@ -30,14 +30,14 @@ node tests/run.js          # 全量回归：通过数 / 失败数现场打印；
 
 | 门禁 | 退出码 | 耗时 | 现场读数 |
 |---|---|---|---|
-| `node tests/export-contract.js` | 0 ✓ | 901ms | `514 / 3132 / 37511` |
-| `node tests/inventory.js` | 0 ✓ | 2098ms | `604` |
-| `node tests/test-surface-gate.js` | 0 ✓ | 3128ms | `637 / 573 / 635` |
-| `node tests/reject-code-gate.js` | 0 ✓ | 7885ms | `597 / 1919` |
-| `node tests/module-registry-gate.js` | 0 ✓ | 712ms | `579 / 590` |
-| `node tests/module-cycle-gate.js` | 0 ✓ | 1388ms | `604 / 4498` |
-| `node tests/dead-export-gate.js` | 0 ✓ | 4761ms | `2034 / 6` |
-| `node tests/readings-v2106.js` | 0 ✓ | 94877ms | `12854 / 574 / 6054` |
+| `node tests/export-contract.js` | 0 ✓ | 615ms | `516 / 3135 / 37554` |
+| `node tests/inventory.js` | 0 ✓ | 1505ms | `604` |
+| `node tests/test-surface-gate.js` | 0 ✓ | 2620ms | `637 / 573 / 635` |
+| `node tests/reject-code-gate.js` | 0 ✓ | 6375ms | `597 / 1919` |
+| `node tests/module-registry-gate.js` | 0 ✓ | 482ms | `579 / 590` |
+| `node tests/module-cycle-gate.js` | 0 ✓ | 1128ms | `604 / 4499` |
+| `node tests/dead-export-gate.js` | 0 ✓ | 3962ms | `2033 / 6` |
+| `node tests/readings-v2106.js` | 0 ✓ | 76876ms | `12860 / 575 / 6058` |
 <!-- GATES-READINGS:END -->
 > **怎么读这张表**：下面那一块是 `node tools/gen-gates-doc.js --write`
 > **现场跑门禁回填**的，不是手写。修改产品面后若读数变了，

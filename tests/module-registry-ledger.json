@@ -1,7 +1,7 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 581,
- "lazyCount": 22,
+ "loadOrderCount": 582,
+ "lazyCount": 21,
  "loadedCount": 579,
  "uiCount": 24,
  "nsCount": 590,
@@ -1943,6 +1943,25 @@
    "callRefs": [
     "clock",
     "settingsBus"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/json-repair.js": {
+   "ns": [
+    "jsonRepair"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
    ],
    "ghostRefs": [],
    "stateKeys": [],
@@ -11351,25 +11370,6 @@
   "engines/import-kind.js": {
    "ns": [
     "importKind"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/json-repair.js": {
-   "ns": [
-    "jsonRepair"
    ],
    "requires": [
     "registerModule"

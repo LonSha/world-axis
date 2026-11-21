@@ -139,10 +139,10 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const mLazy = idxSrc.match(/const LAZY_ORDER = \[([\s\S]*?)\n  \];/);
   const parse = function (mm) { return mm ? (mm[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); }) : null; };
   const eager = parse(mOrd), lazy = parse(mLazy);
-  a(!!eager && eager.length === 581, 'B1 首帧清单 LOAD_ORDER 解析出 581 条（v2.542.8 跟位：575 → 581 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目）', eager && eager.length);
+  a(!!eager && eager.length === 582, 'B1 首帧清单 LOAD_ORDER 解析出 582 条（v2.542.21 跟位：575 → 581 → 582 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目 + json-repair 归位）', eager && eager.length);
   // A0b / A0e：惰性档非空 ——防「删空档换下降」
   a(!!lazy && lazy.length >= 10, 'B2 惰性档**非空**且成规模（≥10 条；删空换下降会在这里红）', lazy && lazy.length);
-  a(!!lazy && lazy.length === 22, 'B3 惰性档 22 条（实测回填，静默漂移会红；五台缝合件已按 B16 退出惰性档）', lazy && lazy.length);
+  a(!!lazy && lazy.length === 21, 'B3 惰性档 21 条（v2.542.21 跟位：22 → 21；json-repair 在产品面被 ui/panel.js 真读，不能再懒）', lazy && lazy.length);
   const inter = (eager || []).filter(function (x) { return (lazy || []).indexOf(x) >= 0; });
   a(inter.length === 0, 'B4 首帧清单与惰性档**零交集**（不双登记：否则「下降」是假的）', inter);
   a((lazy || []).every(function (x) { return x.indexOf('ui/') !== 0; }), 'B5 惰性档不含 ui/*（UI 层本来就不在装载序）');
@@ -153,16 +153,16 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const led = JSON.parse(RD('tests/module-registry-ledger.json'));
   const notInLedger = (lazy || []).filter(function (x) { return !led.modules[x]; });
   a(notInLedger.length === 0, 'B8 惰性档每条仍在 registry 账本里（门禁眼里没有「消失的模块」）', notInLedger);
-  a(led.lazyCount === 22, 'B9 账本记录 lazyCount=22（registry 报告的惰性面读数）', led.lazyCount);
+  a(led.lazyCount === 21, 'B9 账本记录 lazyCount=21（registry 报告的惰性面读数）', led.lazyCount);
   // v2.542.8：原判据「loadedCount === loadOrderCount」是 v2.529 之前的巧合 —— 那时
   //   LOAD 只等于 LOAD_ORDER、且首帧表里没有 ui/*，两数自然相等。v2.529.0（OPV29-04）把
   //   契约面改成 `LOAD_ORDER ∪ LAZY_ORDER` 并剔掉 ui/* 之后，这两个数**各有定义**：
-  //     契约面 = (首帧 581 − ui 24) ∪ 惰性 22 = 579
+  //     契约面 = (首帧 582 − ui 24) ∪ 惰性 21 = 579
   //   于是恒等式变成 `loaded = loadOrder − ui + lazy`。原式在结构上再也不可能成立，
   //   继续留着一个必然为假的等式只会逼后来人改数字骗过它。这里换成真恒等式：
   //   任何一项漂移（少一台引擎 / 惰性档被删空 / ui 条目被塞进契约面）都会在这里红。
-  a(led.loadedCount === 579 && led.loadOrderCount === 581 && led.lazyCount === 22 && led.uiCount === 24,
-    'B10 契约面 579 = 首帧 581 − ui 24 + 惰性 22（契约面 = 首帧非 ui ∪ 惰性；实测 '
+  a(led.loadedCount === 579 && led.loadOrderCount === 582 && led.lazyCount === 21 && led.uiCount === 24,
+    'B10 契约面 579 = 首帧 582 − ui 24 + 惰性 21（契约面 = 首帧非 ui ∪ 惰性；实测 '
       + [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount].join(' / ') + '）',
     [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount]);
   // 首帧装载边 vs 全量装载边（验收原话的读数）
