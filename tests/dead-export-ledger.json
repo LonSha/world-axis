@@ -13914,30 +13914,6 @@
       "tref": 0,
       "own": 1
     },
-    "storyRhythm.pov": {
-      "reason": "self-only",
-      "detail": "engines/story-rhythm.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/story-rhythm.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 5
-    },
-    "storyRhythm.release": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/story-rhythm.js",
-      "refs": 0,
-      "tref": 1,
-      "own": 3
-    },
-    "storyRhythm.repetition": {
-      "reason": "self-only",
-      "detail": "engines/story-rhythm.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/story-rhythm.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "storyRhythm.setSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -13953,14 +13929,6 @@
       "refs": 0,
       "tref": 0,
       "own": 13
-    },
-    "storyRhythm.tone": {
-      "reason": "self-only",
-      "detail": "engines/story-rhythm.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/story-rhythm.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
     },
     "storyRhythm.view": {
       "reason": "self-only",

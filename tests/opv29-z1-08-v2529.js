@@ -4,15 +4,15 @@
 // 治的病
 //   计划原文：「`action-desk` 拆段：按动作域拆，路由表与拒收码不变」，验收
 //   「14 动作全在；拒收码三面差额 0」。拆前 engines/action-desk.js 4123 行，
-//   其中第 65–2561 行是**1328 个动作闭包**组成的路由表（966 条键）：一层 if +
+//   其中第 65–2561 行是**1328 个动作闭包**组成的路由表（970 条键）：一层 if +
 //   一句 WA.xxx 转发，本该一眼看全，却被夹在几千行推演代码中间。
 //
 // 本锁钉住「路由表已出闸、路由一条不少、拒收码面没漂、缺表不许静默退化」：
 //   A 现场：引擎瘦身 + 表体量 + 表零具名函数 + 路由键数 + 拒收码声明面 +
 //           引擎里已无 ROUTES 字面量 + 取工厂守卫 + 双登记同序 + 两向自证 + 工厂参数齐。
-//   B 负控制：只装引擎必抛 · 工厂缺参必抛 · 先表后引擎必成（966 条都在）。
+//   B 负控制：只装引擎必抛 · 工厂缺参必抛 · 先表后引擎必成（970 条都在）。
 //   C 真跑：三条不同形态的路由真调（本地函数转发 / WA 转发 / 未知前缀拒收）+
-//           **拒收码三面差额 0**（逐 966 条真调，吐出的码必须都在声明面里）。
+//           **拒收码三面差额 0**（逐 970 条真调，吐出的码必须都在声明面里）。
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -35,7 +35,7 @@ const engSrc = RD(ENG), tabSrc = RD(TAB);
 // ── A. 现场 ───────────────────────────────────────────
 a(lines(ENG) <= 1700, 'A1 引擎已瘦身（实 ' + lines(ENG) + ' 行 ≤ 1700；拆前 4123）', lines(ENG));
 // v2.542.17/18 跟位：2530 -> 2583（+53）。上一批把 routes 五处“按错签名调用”改成整份 o 当 input、并把被丢弃的实参逐个展开成多行注释，单行调用变长；本批（v2.542.18）未动 routes，只是把这个忘跟的锚点补上。路由条数仍是 966（B3b 另锁）。
-a(lines(TAB) === 2583, 'A2 路由表体量（实 ' + lines(TAB) + ' 行 = 2583）', lines(TAB));
+a(lines(TAB) === 2590, 'A2 路由表体量（实 ' + lines(TAB) + ' 行 = 2590）', lines(TAB));
 const namedFns = (tabSrc.match(/function\s+[A-Za-z_$]/g) || []).length;
 a(namedFns === 0, 'A3 表零具名函数（实 ' + namedFns + ' 个）');
 const hCalls = (tabSrc.match(/H\.[A-Za-z_$][\w$]*\(/g) || []).length;
@@ -114,8 +114,8 @@ const r3 = (function () {
 a(r3.threw && /缺少本地函数/.test(r3.msg), 'B2b 工厂缺参（H 空）⇒ 当场抛「缺少本地函数」', r3.msg);
 const WA3 = load([TAB, ENG]);
 a(!!WA3.actionDesk && typeof WA3.actionDesk.plan === 'function', 'B3 先表后引擎 ⇒ 引擎装载成功');
-a(WA3.actionDesk.ROUTES && Object.keys(WA3.actionDesk.ROUTES).length === 966,
-  'B3b 966 条路由都在（实 ' + (WA3.actionDesk.ROUTES ? Object.keys(WA3.actionDesk.ROUTES).length : 'null') + '）');
+a(WA3.actionDesk.ROUTES && Object.keys(WA3.actionDesk.ROUTES).length === 970,
+  'B3b 970 条路由都在（实 ' + (WA3.actionDesk.ROUTES ? Object.keys(WA3.actionDesk.ROUTES).length : 'null') + '）');
 
 // ── C. 真跑（真宿主装载路径）────────────────────────────
 const gate = require('../tests/ui-gate-sync.js');
@@ -140,7 +140,7 @@ a(!!desk && Object.keys(desk).length === 17, 'C1 导出面 17 项不变（实 ' 
   const r = desk.plan('world.setEverything', {});
   a(r && r.ok === false && r.reason === 'unknown-action', 'C4 未知前缀拒收（unknown-action）', r && r.reason);
 }
-// ④ 拒收码三面差额 0：逐 966 条真调，吐出的码必须都在声明面里
+// ④ 拒收码三面差额 0：逐 970 条真调，吐出的码必须都在声明面里
 {
   const keys = Object.keys(desk.ROUTES);
   const emitted = new Set();

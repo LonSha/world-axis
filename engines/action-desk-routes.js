@@ -741,6 +741,13 @@
     'controllability.confirm': function (o) { return WA.controllability.confirm(o); },
     'storyRhythm.options': function (o) { return WA.storyRhythm.options(o && o.list ? o.list : o); },
     'storyRhythm.payback': function () { return WA.storyRhythm.payback(); },
+    // v2.542.19（叙事节奏六件接齐）：story-rhythm 早就算好六件，产品面只接了 options/payback 两件，
+    //   剩下四件（repetition / release / pov / tone）**一条 route 都没有** —— 引擎在，模型叫不到。
+    //   此处只补入口，不改引擎语义（判据仍在 story-rhythm 里）。
+    'storyRhythm.repetition': function (o) { return WA.storyRhythm.repetition(o && typeof o === 'object' ? (o.text || o.draft || '') : o); },
+    'storyRhythm.release': function (o) { return WA.storyRhythm.release(o && Array.isArray(o.facts) ? o.facts : (Array.isArray(o) ? o : [])); },
+    'storyRhythm.pov': function (o) { return WA.storyRhythm.pov(o); },
+    'storyRhythm.tone': function (o) { return WA.storyRhythm.tone(o); },
     'creditLedger.checkCredit': function (o) { return WA.creditLedger.checkCredit(o.borrower || o.who, o.at); },
     'anniversaryRites.register': function (o) { return WA.anniversaryRites.register(o.spec || o); },
     'anniversaryRites.markObserved': function (o) { return WA.anniversaryRites.markObserved(o.id, o.spec || o); },
