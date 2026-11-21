@@ -2,7 +2,7 @@
 // WorldAxis tests/opv29-z5-27-v2529.js — OPV29-27 版本面跟位 + OPV29-35 发布清单化 专锁
 //
 // ── 现场读数（可复算：`node tools/release-manifest.js`）──────────────────
-// 版本面 **9** 个载体（1 真源 + 8 必须跟位的副本），当前全部 = 2.524.0，不同值 1 种；
+// 版本面 **9** 个载体（1 真源 + 8 必须跟位的副本），当前全部同号，不同值 1 种；
 // BUILD_ID = 2fd1cb069d4495d5829bdee09d752c1fa94649d3；发布必检 4 项全 ✓。
 // 题外读数：全仓 **164** 个文件提到 2.524.0，其中绝大多数是历史注释 —— 这正是本项
 // 不扫「全仓字符串」而扫「有名字的版本面」的理由（扫全仓会逼人改注释）。
@@ -38,7 +38,8 @@ function runA() {
   a(res.surface.length === 9, 'A1 版本面登记 9 个载体', String(res.surface.length));
   a(res.unreadable.length === 0, 'A2 九个载体全部读得到（读不到不许当通过）',
     JSON.stringify(res.unreadable.map(function (x) { return x.id + ':' + x.why; })));
-  a(res.canonical === '2.524.0', 'A3 真源 index.js:VERSION = 2.524.0', String(res.canonical));
+  // 不再钉死具体号：真源随版本面推进，钉死会让每次升版都红一次（v2.542.26 起）
+  a(/^\d+\.\d+\.\d+$/.test(String(res.canonical || '')), 'A3 真源 index.js:VERSION 可读且是语义化版本', String(res.canonical));
   a(res.drift.length === 0, 'A4 无载体与真源不一致（跟位）',
     JSON.stringify(res.drift.map(function (x) { return x.id + '=' + x.version; })));
   a(res.distinct.length === 1, 'A5 全版本面只有一种值（不是"两个相同就算跟位"）',
@@ -92,7 +93,8 @@ function runB() {
     files.forEach(function (rel) {
       if (rel !== 'manifest.json') return;
       const p = path.join(dir, rel);
-      fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('"version": "2.524.0"', '"version": "2.523.0"'));
+      const cur = RM.audit(ROOT).canonical;
+      fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('"version": "' + cur + '"', '"version": "0.0.1"'));
     });
   });
   const pm = RM.audit(partial);
