@@ -527,7 +527,9 @@ function runAll(A) {
   // v2.542.23（导出正文接进面板）：调用期 4023 -> 4024（+1：(ui/panel.js, storyExport) 是一对**新**的
   //   (file, ns) 边 —— 该 ns 自 v2.529.0 入库后产品面零读，本版起有真消费者）。装载期仍 476
   //   （story-export 在 LOAD_ORDER 里的 registerModule 边早就计入）；恒等式 476 + 4024 = 4500 当场核对。
-  A(a.edgesLoad === 476 && a.edgesCall === 4024 && a.edgesAll === 4500 && a.identityOk,
+  // v2.542.24（API Key 迁进加密仓）：调用期 4024 -> 4025（+1：(core/api-router.js, apiVault) 新边）；
+  //   装载期仍 476（api-vault 的 registerModule 边在惰性档时就已计入）；恒等式 476 + 4025 = 4501。
+  A(a.edgesLoad === 476 && a.edgesCall === 4025 && a.edgesAll === 4501 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -623,7 +625,8 @@ function runAll(A) {
   // v2.542.5（L4）：LOAD_ORDER 与 run.js LOAD 双登记各 +1 ⇒ 580 → 581。
   // v2.542.21：L OAD_ORDER 581 -> 582（json-repair 从惰性档回首帧：面板真读它，不能迟装）。
   // v2.542.23：LOAD_ORDER 582 -> 583（story-export 从惰性档回首帧：工具页两个按钮真调它）。
-  A(a.edgesLoad >= 20 && a.orderLen === 583,
+  // v2.542.24：LOAD_ORDER 583 -> 584（api-vault 从惰性档回首帧：api-router 首帧就调它）。
+  A(a.edgesLoad >= 20 && a.orderLen === 584,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -707,7 +710,9 @@ function runAll(A) {
   //   storyExport.build）。提供方与账本不变（647/590），差恒等式 647 - 590 = 57 不动 ——
   //   注意「账本」这一格**没动**：nsLedger 是静态提供清单，不是零读定性账（后者是
   //   tests/ns-consumer-ledger.json，storyExport 那一条已按纪律④删除，66 -> 65）。
-  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 586,
+  // v2.542.24：读面 586 -> 587（apiVault 从零读面进读面：core/api-router.js 真调它）。
+  //   提供方与账本不变（647/590），差恒等式不动。
+  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 587,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -748,7 +753,8 @@ function runAll(A) {
   // v2.542.12：69 -> 68（jsonRepair 接线后出零读面；账本同批出表，见 ns-consumer-ledger.json）。
   // v2.542.20：零读 ns 67 -> 66（narrativeDeduction 已接线，按纪律四从 ns 账本删行出表）。
   // v2.542.23：66 -> 65（storyExport 出零读面：panel 的「导出正文」两个按钮真调 storyExport.build）。
-  A(a.deadNs.length === 65, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  // v2.542.24：65 -> 64（apiVault 出零读面：api-router 的读写链真调它）。
+  A(a.deadNs.length === 64, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

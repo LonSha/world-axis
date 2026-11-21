@@ -428,6 +428,11 @@
     //   惰性档只放「产品源面零出现」的模块；既然面板要读它，它就得在首帧面。尾部
     //   调 WA.registerModule（由 store 提供）⇒ 装载期边 +1；store 在下标之前，order-violation 仍 0。
     'engines/story-export.js',
+    // v2.542.24：api-vault 同病同批回首帧。api-router 是首帧装载的核心件，本版起它
+    //   在**唯一的**读写路径上真调 WA.apiVault（vaultOn / save / peek / prime）——
+    //   vault 留在惰性档里时，首帧保存 API Key 会静默退回明文（安全升级被降级）。
+    //   尾部调 WA.registerModule（由 store 提供）⇒ 装载期边在惰性档时就已计入，移回首帧不增。
+    'engines/api-vault.js',
     'engines/kaleidoscope.js',
     'engines/calendar.js',
     // v2.302.0（缝 World Chronicle）：正文内联状态回报标签 <time>/<choice>/<flag>。
@@ -1638,7 +1643,6 @@
   //   惰性档非空、首帧装载边严格小于全量、每条都能 ensure 装回来、失败可重试。
   //   本节注释同样不放方括号 —— 门禁用正则从本段取清单。
   const LAZY_ORDER = [
-    'engines/api-vault.js',
     'engines/card-file.js',
     'engines/chat-guard.js',
     'engines/contrast.js',

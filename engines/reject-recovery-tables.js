@@ -477,6 +477,17 @@
     'no-text': { out: true, why: '触碰判定时本回合没有可比文本（character-drive:113 的 hit:false 读数）' },
     'no-field': { kind: 'request-setup', why: '人物画像里没有该字段（character-drive:73-75 的三面 / group-refuse:80）—— 去补人物卡的对应字段再看' },
     'no-line': { kind: 'request-setup', why: '人物画像里没写行为底线（character-drive:111）—— 先给这个角色写一条底线，再谈触碰' },
+    // ── v2.542.18：engines/time-ledger.js 的四种「读不到」（与 NEUTRAL_FACE 同批，键集逐字同）──
+    //   四条都是「读数这一格没成」，不是「调用被拒」⇒ 分档不合成一个 absent：
+    //     · no-stamp / storyclock-disabled —— 真没写 / 总开关关：正常局面，配恢复动作等于教人去修没坏的东西 ⇒ out:true；
+    //     · no-messages / no-storyclock —— 拿不到楼层 / storyclock 未装载：**环境缺件**，
+    //       与 audit-absent / forecaster-absent 同一条边界，也是 out:true（本仓不替宿主装依赖）。
+    //   为什么都不给 request-setup：玩家能动的是「正文里写出时间标签」，那是叙事动作；
+    //   把「没写标签」登记成可修的请求面，会让恢复建议变成「去补一条你没打算写的时间」。
+    'no-stamp': { out: true, why: 'time-ledger:63 扫过楼层但正文没写时间标签（`{known:false, reason:"no-stamp", scanned:n}`）—— 是「本来就没有」，不是调用被拒' },
+    'storyclock-disabled': { out: true, why: 'time-ledger: 注桩总开关关着（storyclock 未启用）—— 关掉的功能不出读数，不是失败' },
+    'no-messages': { out: true, why: 'time-ledger:57 拿不到楼层（无头环境 / 宿主未就绪）—— 算不出来，环境缺件而非玩家该动手' },
+    'no-storyclock': { out: true, why: 'time-ledger: storyclock 未装载（依赖缺席）—— 本仓不替宿主装依赖' },
   };
 /* 拒收面冻结快照（v2.203.0 现场实测 740 条）：至少在 `ok:false` 对象里出现过 ——
    *  只有这一面**才配恢复动作**。与现场的逐条一致性由 tests/reject-recovery-lock-v2192.js 核对。
@@ -1213,6 +1224,13 @@
     // ── v2.542.8（叙事脊柱 L1–L4 判据面收口）：与本期 NEUTRAL_REVIEW 同批的五条 ——
     //   键集必须逐字相同（A7 咬这一条），故两处只能同批改。
     'empty-scene', 'no-field', 'no-line', 'no-text', 'none-developing',
+    // ── v2.542.18：engines/time-ledger.js 「正文时间」读面的四种「读不到」（现场对账漏同步，本版补齐）──
+    //   四个码都出现在 `read().story` / `read().reconcile` 这类**不带 ok 的读数对象**里
+    //   （`{ known:false, reason:'no-stamp', scanned:n }`），语义是「这一格读不出来 / 本来就没有」，
+    //   而不是「调用被拒」⇒ 判不出面。
+    //   `no-messages`（拿不到楼层 = 算不出来）/ `no-stamp`（扫过了，正文真没写标签）/ `no-storyclock`（依赖缺席）/ `storyclock-disabled`（总开关关）四态分离。
+    //   为什么进快照而不进 REJECT_FACE：它们的产品出口是**读数**，生成链不会因为「算不出时间」而拒收。
+    'no-messages', 'no-stamp', 'no-storyclock', 'storyclock-disabled',
   ];
 
   WA.rejectRecoveryTables = {

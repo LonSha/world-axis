@@ -24,6 +24,95 @@
   function loadCfg() { return WA.settingsBus.read(__REG); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function saveCfg(cfg) { WA.settingsBus.save(__REG, cfg); }
+  // ══ v2.542.24：API Key 从明文迁进设备本地加密仓（apiVault 的**真消费点**）══
+  //   病（apiVault 自陈的现场事实）：本文件把五个通道的配置整份写进 localStorage，其中
+  //   `apiKey` 是**明文** —— 同源脚本读得到、浏览器备份/导出会带出去、也不受 https 约束。
+  //   `engines/api-vault.js` 自 v2.529.0 入库时就把消费方点名成「填 API Key 的设置面」，
+  //   但一直零读。本版把它接在这条**唯一的**读写路径上。
+  // 三条纪律（全部是「宁可退回旧行为，也不让用户配了 key 却不能用」）：
+  //   ① 不可用即退：非安全上下文 / 无 IndexedDB / 无 WebCrypto ⇒ vaultOn()=false，
+  //      写入读出一概走旧明文路径，行为与上一版逐字一致（不降级、不抛错）。
+  //   ② 存不进就退回明文：save() 失败时把明文写回通道配置并记 warn —— 安全升级
+  //      不能变成「配了 key 却一直 401」。
+  //   ③ 存量迁移只做一次：装载时把已躺在 localStorage 里的明文搬进仓、占位符落盘。
+  const KEY_REF = '@vault';
+  const __vaultStat = { on: false, migrated: 0, migrateFail: 0, writeFail: 0, notReady: 0, bootedAt: 0, boot: '' };
+
+  function vaultOn() {
+    __vaultStat.on = !!(WA.apiVault && typeof WA.apiVault.available === 'function' && WA.apiVault.available());
+    return __vaultStat.on;
+  }
+  /** 同步解出该通道该用的 key：占位符就去仓里取（内存缓存），否则原样返回（旧明文）。 */
+  function resolveKey(name, stored) {
+    if (stored !== KEY_REF) return stored || '';
+    const V = WA.apiVault;
+    if (!V || typeof V.peek !== 'function') return '';
+    const v = V.peek(name) || V.peek('default') || '';
+    if (!v) __vaultStat.notReady++;
+    return v;
+  }
+  /** 退回明文（纪律②）。不递归 setChannel —— 那会绕回本函数。 */
+  function writeBackPlain(name, plain, why) {
+    try {
+      const cfg = loadCfg();
+      cfg[name] = Object.assign({}, cfg[name] || {}, { apiKey: String(plain) });
+      saveCfg(cfg);
+      if (WA.log) WA.log('warn', 'apiRouter：密钥仓不可用（' + why + '），通道[' + name + '] 退回明文存储 —— 安全升级不阻断生成');
+    } catch (e) { if (WA.log) WA.log('error', 'apiRouter：退回明文也失败 ' + ((e && e.message) || e)); }
+  }
+  /** 存进仓；失败就退回明文（纪律②）。 */
+  function stashKey(name, plain) {
+    const V = WA.apiVault;
+    if (!V || typeof V.save !== 'function') { writeBackPlain(name, plain, 'no-vault'); return; }
+    const onFail = function (e) { __vaultStat.writeFail++; writeBackPlain(name, plain, (e && e.message) || e || 'save-failed'); };
+    try {
+      const r = V.save(name, plain);
+      if (r && typeof r.then === 'function') r.then(null, onFail);
+      else if (r !== true) onFail('save-false');
+    } catch (e) { onFail(e); }
+  }
+  /** 装载时一次：预热缓存 + 存量明文迁移。永不抛（装载期不能停摆），失败只记账。 */
+  function vaultBoot() {
+    // ※ 两种「预热没成」在这里只记**状态**（`__vaultStat.boot`），不造 reject 码：
+    //   本函数的返回体**没有任何调用方透传**（装载期那一处不 await、也不读结果），
+    //   写成 `reason:` 就是「构造了却没人看得见」的码 —— 那正是 reject-code-gate 里
+    //   `store-absent` 的旧账形态（构造在 mutate 里、没有调用方透传 ⇒ 不可观测）。
+    //   真正对用户说话的地方是生成链：`_callInner` 拿到空 key 时抛 `kind:'vault-not-ready'`，
+    //   并把这里的 boot 状态原样带在 error 上（`e.vaultBoot`）当作成因，
+    //   同时 `cfgStat().vault.boot` 让诊断面读得到同一格 —— 一个状态，两处出口。
+    if (!vaultOn()) { __vaultStat.boot = 'unavailable'; return Promise.resolve({ ok: false }); }
+    __vaultStat.bootedAt = clockWall();
+    const V = WA.apiVault;
+    const cfg = loadCfg() || {};
+    const migrate = [];
+    Object.keys(cfg).forEach(function (n) {
+      const k = cfg[n] && cfg[n].apiKey;
+      if (typeof k === 'string' && k && k !== KEY_REF) migrate.push(n);
+    });
+    let p = Promise.resolve({ ok: true });
+    try {
+      const r = V.prime(CHANNELS.slice());
+      if (r && typeof r.then === 'function') p = r;
+      else p = Promise.resolve({ ok: r !== false });   // 同步返回也认（引擎侧不抛，改报 ok:false）
+    } catch (e) { p = Promise.resolve({ ok: false }); }
+    return Promise.resolve(p).then(function (pr) {
+      // 预热没成（引擎自报 ok:false）与抛错同归一格：缓存里没有 key，下一次生成链会说话。
+      __vaultStat.boot = (pr && pr.ok === false) ? 'prime-failed' : 'ready';
+      migrate.forEach(function (n) {
+        const plain = cfg[n].apiKey;
+        const commit = function () {
+          const c2 = loadCfg();
+          if (c2[n] && c2[n].apiKey === plain) { c2[n].apiKey = KEY_REF; saveCfg(c2); __vaultStat.migrated++; }
+        };
+        try {
+          const r = V.save(n, plain);
+          if (r && typeof r.then === 'function') r.then(commit, function () { __vaultStat.migrateFail++; });
+          else if (r === true) commit(); else __vaultStat.migrateFail++;
+        } catch (e) { __vaultStat.migrateFail++; }
+      });
+      return { ok: true, pending: migrate.length };
+    }, function () { __vaultStat.boot = 'prime-failed'; return { ok: false }; });
+  }
 
   // 并发限制（默认3，可改）
   let maxConcurrent = 3;
@@ -65,7 +154,8 @@
       const c = cfg[name] || cfg.default || {};
       return {
         baseUrl: (c.baseUrl || '').replace(/\/+$/, ''),
-        apiKey: c.apiKey || '',
+        // v2.542.24：落盘值可能是占位符 @vault ⇒ 从仓里同步解（旧明文原样返回）
+        apiKey: resolveKey(name, c.apiKey),
         model: c.model || '',
         temperature: c.temperature != null ? c.temperature : 0.8,
         maxTokens: c.maxTokens || 4000,
@@ -86,6 +176,14 @@
       const dropped = [];
       Object.keys(obj || {}).forEach(function (k) { if (ALLOWED.indexOf(k) >= 0) picked[k] = obj[k]; else dropped.push(k); });
       if (dropped.length && WA.log) WA.log('warn', 'apiRouter: 通道[' + name + '] 丢弃未消费字段 ' + dropped.join('/') + '（getChannel 不读这些键）');
+      // v2.542.24：明文 key 不进 localStorage —— 存进加密仓，落盘只留占位符 KEY_REF。
+      //   注意这里是**异步**的：save() 失败会走 writeBackPlain 把明文写回（纪律②），
+      //   所以「按下保存」的那一刻即使 vault 挂了，用户也不会丢 key。
+      if (vaultOn() && typeof picked.apiKey === 'string' && picked.apiKey && picked.apiKey !== KEY_REF) {
+        const __plain = picked.apiKey;
+        picked.apiKey = KEY_REF;
+        stashKey(name, __plain);
+      }
       cfg[name] = Object.assign({}, cfg[name] || {}, picked);
       saveCfg(cfg);
       // v0.1.41: 配置变更计量 + 总线广播（热切换可观测；payload 不含 apiKey）
@@ -95,7 +193,9 @@
     },
     listChannels() { const cfg = loadCfg(); return CHANNELS.map(n => ({ name: n, cfg: cfg[n] || null, effective: this.getChannel(n) })); },
     /** v0.1.41: 配置变更计量只读视图 */
-    cfgStat() { return { changes: __cfgStat.changes, baseUrlChanges: __cfgStat.baseUrlChanges, lastAt: __cfgStat.lastAt, lastChannel: __cfgStat.lastChannel }; },
+    /** v2.542.24：vault 段是同一读口的**新增键**（不新增导出 —— 出口面契约 FROZEN 不动）。 */
+    cfgStat() { return { changes: __cfgStat.changes, baseUrlChanges: __cfgStat.baseUrlChanges, lastAt: __cfgStat.lastAt, lastChannel: __cfgStat.lastChannel,
+      vault: { on: __vaultStat.on, migrated: __vaultStat.migrated, migrateFail: __vaultStat.migrateFail, writeFail: __vaultStat.writeFail, notReady: __vaultStat.notReady, bootedAt: __vaultStat.bootedAt, boot: __vaultStat.boot } }; },
     setConcurrency(n) { maxConcurrent = Math.max(1, Math.min(10, n | 0)); },
     getConcurrency() { return maxConcurrent; },
     queueLength() { return queue.length; },
@@ -121,6 +221,15 @@
       const cfg = this.getChannel(channel);
       if (!cfg.baseUrl) { const e = new Error('通道[' + channel + ']未配置Base URL'); e.kind = 'not-configured'; throw e; }
       if (!cfg.model) { const e = new Error('通道[' + channel + ']未配置模型'); e.kind = 'not-configured'; throw e; }
+      // v2.542.24：占位符落盘但缓存还没解出来 ⇒ 给出可执行成因，而不是一个没头没脑的 401。
+      if (!cfg.apiKey) {
+        let refd = false;
+        try { const raw = loadCfg() || {}; refd = !!((raw[channel] && raw[channel].apiKey === KEY_REF) || (raw.default && raw.default.apiKey === KEY_REF)); } catch (e) { /* 读不出配置走通用错误 */ }
+        if (refd) {
+          const e = new Error('通道[' + channel + '] 的 API Key 在加密仓里尚未解出（密钥仓未就绪）—— 稍候重试，或用面板重填一次该通道的 Key');
+          e.kind = 'vault-not-ready'; e.vaultBoot = __vaultStat.boot; throw e;
+        }
+      }
 
       await acquire();
       const ac = new AbortController();
@@ -413,4 +522,8 @@
       return (data.data || []).map(m => m.id).filter(Boolean);
     }
   };
+  // v2.542.24：装载即预热（异步、不 await：装载期不能被 IndexedDB 拖住）。
+  //   失败的两种形态都只记账：vault 不可用 ⇒ 全链退回旧明文；prime 失败 ⇒ notReady 计数，
+  //   下一次 getChannel 拿到空 key 时由 _callInner 抛 vault-not-ready（可执行成因）。
+  try { vaultBoot(); } catch (e) { if (WA.log) WA.log('warn', 'apiRouter：密钥仓预热失败 ' + ((e && e.message) || e)); }
 })();

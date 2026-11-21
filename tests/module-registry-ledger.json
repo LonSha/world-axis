@@ -1,14 +1,14 @@
 {
  "version": "2.524.0",
- "loadOrderCount": 583,
- "lazyCount": 20,
+ "loadOrderCount": 584,
+ "lazyCount": 19,
  "loadedCount": 579,
  "uiCount": 24,
  "nsCount": 590,
  "totals": {
   "loadEdges": 476,
   "hardEdges": 0,
-  "callRefs": 767,
+  "callRefs": 768,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -1080,7 +1080,9 @@
    "requires": [],
    "requiresFiles": [],
    "providerOrderOk": true,
-   "callRefs": [],
+   "callRefs": [
+    "apiVault"
+   ],
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_api_channels_v1"
@@ -1985,6 +1987,27 @@
    "ghostRefs": [],
    "stateKeys": [],
    "consumedBy": []
+  },
+  "engines/api-vault.js": {
+   "ns": [
+    "apiVault"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": [
+    "core/api-router.js"
+   ]
   },
   "engines/kaleidoscope.js": {
    "ns": [
@@ -11194,25 +11217,6 @@
    "stateKeys": [
     "worldaxis_degrade_audit_settings_v1"
    ],
-   "consumedBy": []
-  },
-  "engines/api-vault.js": {
-   "ns": [
-    "apiVault"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
    "consumedBy": []
   },
   "engines/card-file.js": {

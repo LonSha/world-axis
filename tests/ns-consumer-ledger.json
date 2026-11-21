@@ -59,12 +59,6 @@
    "evidence": "输入闸门的内部句柄，对外暴露仅为让 tests/input-guard-v2840.js 能直接驱动内部判定而不必走完整链路。产品面走公开入口。",
    "recompute": "grep -n '__inputGuardInternal' core/input-guard.js tests/input-guard-v2840.js"
   },
-  "apiVault": {
-   "cls": "pending-wire",
-   "provider": "engines/api-vault.js",
-   "evidence": "IndexedDB + AES-GCM 的密钥仓（不可导出 CryptoKey）。消费方应是「填 API Key 的设置面」：存/取/删都走它；当前设置面还没接，故零读。",
-   "recompute": "grep -rn \"apiVault\" engines core ui tests | head"
-  },
   "archiveHide": {
    "cls": "stale",
    "provider": "engines/archive-hide.js",

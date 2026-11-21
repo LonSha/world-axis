@@ -22851,7 +22851,7 @@ await runScript('./story-window-evidence-v2518.js');
     await runScript('./test-advanced-maps.js');
     await runScript('./test-affection-nexus.js');
     await runScript('./test-intimate-arbiter.js');
-    await runScript('./test-inventory-metabolism.js'); await runScript('./alias-face-v2542.js'); await runScript('./story-export-wire-v2542.js');   // v2.542.22：第二项是引用面的别名专锁（正控 + 四条负控）；v2.542.23：第三项是「导出正文」接线的端到端锁（build → lensStrip 拼链 + 前提钉住），与前者同档脚本体
+    await runScript('./test-inventory-metabolism.js'); await runScript('./alias-face-v2542.js'); await runScript('./story-export-wire-v2542.js'); await runScript('./api-vault-wire-v2542.js');   // v2.542.22：第二项是引用面的别名专锁（正控 + 四条负控）；v2.542.23：第三项是「导出正文」接线的端到端锁（build → lensStrip 拼链 + 前提钉住），与前者同档脚本体
   }
   // ── v2.277.0（V7 OPV7-1）：入口版本**不早于**（历史段，防回退）──────────────
   //   ⚠ 形态必须是「不早于」而不是「等于」：上一段（v2.276.0）踩过前缀锁，本段若写成

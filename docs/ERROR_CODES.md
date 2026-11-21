@@ -1250,7 +1250,7 @@
 | `empty-text` | engines/calendar-custom.js, engines/canon.js, engines/gen-gate.js, engines/history-search.js, engines/one-shot-mod.js, engines/polish.js, engines/preset-world.js, engines/purify-scope.js, engines/reasoning.js, engines/request-viewer.js, engines/rewriter.js, engines/storyclock.js, engines/wb-search.js, engines/word-budget.js, render/theater.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `empty-transition` | engines/dream.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `engine-absent` | engines/hazard.js, engines/org.js, engines/rule-pack.js, engines/world.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
-| `engine-missing` | engines/write-desk.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `engine-missing` | engines/write-desk.js, ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `entry-miss` | engines/modelink.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `entry-not-found` | engines/worldbook.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `entryRouter-unavailable` | engines/action-desk-routes.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
@@ -1552,7 +1552,7 @@
 | `no-change` | engines/arc-phase.js, engines/branch-diff.js, engines/floor-settle.js, engines/shadow.js, actors/registry.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-channel` | engines/ensemble.js, engines/opinion.js, engines/polish.js, engines/rewriter.js, actors/profile.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-characters` | engines/offstage-life.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
-| `no-chat` | core/settle-guard.js, engines/chatcache.js, engines/choice-board.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
+| `no-chat` | core/settle-guard.js, engines/chatcache.js, engines/choice-board.js, ui/panel.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-combat-clash-data` | engines/tactical-combat.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-companion` | engines/wb-inject.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `no-conclusion` | engines/channel-probe.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |

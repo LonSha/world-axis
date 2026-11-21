@@ -59,7 +59,8 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 // v2.542.20：67 -> 66（narrativeDeduction 已接线：它的五个导出被 action-desk-routes 真调，按纪律四从 ns 账本删行出表）。
 // v2.542.23：66 -> 65（storyExport 按纪律④出表：panel「导出正文」真调 storyExport.build，
 //   接线完成即删除本行——这正是 _classes.pending-wire 的原文，不是判据放宽）。
-const BASE_DEAD_NS = 65;   // v2.533.0 跟位：47 → 66（+19，缝合批）→ 69（+2，factAge / jsonRepair）→ 70/71/72（三台缝合件入库，各 +1）→ **69**（v2.533.0 收口：副本族 / 上下文边界 / 写前预演 三台已由 ui/settings.js 的「缝合件台账」读数行接线，按纪律④删行出表；本轮新增的引导弧 / 存档体检从入库起就在同一行被读，故不进表）。 七个拆段表文件（OPV29-07~11）不进本账：它们不是零读，是在调用期被同族引擎读。
+// v2.542.24：65 -> 64（apiVault 按纪律④出表：api-router 的读写链真调它）。
+const BASE_DEAD_NS = 64;   // v2.533.0 跟位：47 → 66（+19，缝合批）→ 69（+2，factAge / jsonRepair）→ 70/71/72（三台缝合件入库，各 +1）→ **69**（v2.533.0 收口：副本族 / 上下文边界 / 写前预演 三台已由 ui/settings.js 的「缝合件台账」读数行接线，按纪律④删行出表；本轮新增的引导弧 / 存档体检从入库起就在同一行被读，故不进表）。 七个拆段表文件（OPV29-07~11）不进本账：它们不是零读，是在调用期被同族引擎读。
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。
