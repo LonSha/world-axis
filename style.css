@@ -1701,6 +1701,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .wa-toast-bad { border-color: #f43f5e; color: #ffe4e6; }
 @media (prefers-reduced-motion: reduce) { .wa-toast { transition: none; } }
 
+/* ── v2.542.12（UI 审计 P2 · 骨架态）────────────────────────────────────
+   出口文案以「…」结尾时由 setOut 挂上 .wa-skel + aria-busy="true"，落地成终态时摘掉。
+   为什么用背景条纹而不是插入假行：插入假行会改变文本内容（读屏会念出来），
+   而背景条纹只改视觉，语义上靠 aria-busy 表达「正在动」——两者各管一层，不互相冒充。 */
+.wa-skel {
+  position: relative;
+  border-radius: 4px;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.10) 37%, rgba(255,255,255,0.04) 63%);
+  background-size: 400% 100%;
+  animation: wa-skel-shift 1.4s ease-in-out infinite;
+  color: transparent;
+  text-shadow: none;
+  min-height: 1em;
+}
+@keyframes wa-skel-shift { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) {
+  .wa-skel { animation: none; background: rgba(255,255,255,0.06); color: inherit; }
+}
+
 /* v2.539.0（P4 视觉语法 R1）：区块节奏与空态 —— 不动任何 DOM，只给已有元素分层。
    病：192 个 .wa-sec 与 47 个 .wa-empty 是同一个视觉重量，眼睛无处停；*. 空态全是灰色一行字，
    读起来像“页面没加载完”而不是“这里本来就没东西”。

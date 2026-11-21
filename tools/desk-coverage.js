@@ -604,7 +604,14 @@ function scan() {
   const srcOf = new Map();
   for (const f of productFiles) srcOf.set(f.rel, fs.readFileSync(f.abs, 'utf8'));
 
-  const engineFiles = productFiles.filter((f) => f.dir === 'engines').map((f) => f.rel);
+  // v2.542.12：ROUTES 表本体（engines/action-desk-routes.js）**不计引擎**。
+  //   它是一条条路由的**数据表**，路由体里的 `WA.store.transact` 与 action-desk.js 的 ROUTES
+  //   是同一批写入的手抄两处；把它当引擎会让每条路由的写盘被数两遍，并在 orphan 档里
+  //   冒出一个「有写盘 · 零入口 · 零入站」的假缺口（现场即 actionDeskRoutes 1/6）。
+  //   口径：表只在 action-desk.js 这一侧计一次（那才是被调度的那台）。
+  const TABLE_MODULES = new Set(['engines/action-desk-routes.js']);
+  const engineFiles = productFiles.filter((f) => f.dir === 'engines').map((f) => f.rel)
+    .filter((rel) => !TABLE_MODULES.has(rel));
   const deskSrc = srcOf.get('engines/action-desk.js');
   if (!deskSrc) throw new Error('engines/action-desk.js not readable');
   // v2.542.11：OPV29 拆段后 ROUTES 表本体已搬到 engines/action-desk-routes.js，

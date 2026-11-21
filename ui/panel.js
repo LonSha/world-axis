@@ -517,10 +517,17 @@
         (mainDoc.body || mainDoc.documentElement).appendChild(__toastEl);
       }
       __toastEl.textContent = String(msg == null ? '' : msg);
-      __toastEl.className = 'wa-toast wa-toast-on' + (bad ? ' wa-toast-bad' : '');
+      // v2.542.12：进场跨两帧 —— 同一帧里「挂上节点」与「加 wa-toast-on」会让 CSS transition
+      //   没有起点，视觉上等于瞬移。UI 审计里「requestAnimationFrame 0 处」的实质代价不是
+      //   缺 API，是缺「有起点」这个事实。先挂基类，下一帧再加 on（无头环境无 rAF ⇒ setTimeout 兜底）。
+      __toastEl.className = 'wa-toast' + (bad ? ' wa-toast-bad' : '');
+      const __raf = (typeof requestAnimationFrame === 'function')
+        ? requestAnimationFrame
+        : function (f) { return setTimeout(f, 16); };
+      __raf(function () { if (__toastEl) __toastEl.classList.add('wa-toast-on'); });
       if (__toastTimer) clearTimeout(__toastTimer);
       __toastTimer = setTimeout(function () {
-        if (__toastEl) __toastEl.className = 'wa-toast';
+        if (__toastEl) __toastEl.classList.remove('wa-toast-on');
       }, bad ? 4200 : 1800);
     } catch (e) { /* 无 DOM 环境（无头测试）⇒ 静默：反馈层缺席不是产品面缺席 */ }
   }
@@ -4909,7 +4916,17 @@ ${emptyDrill}
     //   之后才写回，其间任意状态事件都会触发面板重绘、目标节点从树中消失 ⇒ 重查得 null ⇒
     //   写 `textContent` 抛 TypeError（用户视角「点了没反应」）。统一出口 + 判空 = 静默降级为
     //   「本轮结果无处可显」，而不是把 DOM 异常抛进事件循环。
-    const setOut = function (sel, text) { const el = $(sel); if (el) el.textContent = text; };
+    // v2.542.12（UI 审计 P2）：进行中三态的最小实现 —— 出口文案以「…」结尾即视为「进行中」，
+    //   挂 aria-busy + `.wa-skel`（CSS 里是骨架条纹）；落地成终态时摘掉。
+    //   为什么改在这里而不是逐个调用点：本仓有大量 `setOut(sel,'xx中…')` 的写法，
+    //   逐处加等于把「三态」这件事抄几十遍 —— 抄的那份必然有的地方忘（本仓点过名）。
+    const setOut = function (sel, text) {
+      const el = $(sel); if (!el) return;
+      el.textContent = text;
+      const busy = /(…|\.\.\.)\s*$/.test(String(text == null ? '' : text));
+      el.setAttribute('aria-busy', busy ? 'true' : 'false');
+      if (busy) el.classList.add('wa-skel'); else el.classList.remove('wa-skel');
+    };
     // v2.209.0（优化 6）：出口写完**立刻**补绑 —— 这是出口自己的责任，
     //   不指望每个调用方都记得（三处现场恰恰就是「没人记得」）。
     const setHtml = function (sel, html) { const el = $(sel); if (el) { el.innerHTML = html; bindNavs(el); } };
@@ -16171,7 +16188,7 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
     return { ok: true, devMode: __devMode };
   }
   function buildPanel() {
-    panelEl = h(`<div id="wa-panel" class="wa-hidden">
+    panelEl = h(`<div id="wa-panel" class="wa-hidden" role="region" aria-label="世界枢轴面板">
       <div class="wa-head"><span class="wa-title">◈ 世界枢轴 <span class="wa-ver">v${WA.version}</span></span><span class="wa-view">${(() => {
         // ── v2.149.0（P3）：观测视角选择器（面板顶部常驻）──
         //   为什么常驻头部而不放进某一页：视角回答「这个面板给谁看」，它属于面板而不是任何
@@ -16194,7 +16211,7 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
           + views.map(function (v) { return '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + esc(vn(v)) + '</option>'; }).join('')
           + '</select><span id="wa-view-out" class="wa-dim"></span>';
       })()}</span><span class="wa-close">✕</span></div>
-      <div class="wa-nav-bar"><span id="wa-nav-out" class="wa-dim"></span>
+      <div class="wa-nav-bar" role="navigation" aria-label="面板导航"><span id="wa-nav-out" class="wa-dim"></span>
         <button class="wa-btn wa-mini" id="wa-nav-back" title="回到上一页，并按离开时的样子还原输入与滚动位（ui/panel-nav.js 的回程栈，有界 8 层）">← 返回</button></div>
       <div class="wa-cat-bar wa-cat-nav" role="tablist" aria-label="面板分类">
         <button class="wa-cat-btn wa-cat-pill active" data-cat="core" role="tab" aria-selected="true">◈ 核心</button>
@@ -16206,7 +16223,7 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
       <div class="wa-row wa-page-q-row" style="display:none;"><input id="wa-page-q" class="wa-input" type="search" placeholder="搜页签：输入即跳到第一个匹配（如 记忆 / 伏笔 / 账）" aria-label="搜索页签"/><span id="wa-page-q-hint" class="wa-dim" aria-live="polite"></span></div>
       <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}" data-cat="${PAGE_CAT[p.id] || 'core'}">${p.icon} ${p.label}</button>`).join('')}</div>
       <div id="wa-search-bar" class="wa-row" style="display:none;"><label for="wa-setting-search">设置检索（当前页）</label><input id="wa-setting-search" type="search" class="wa-input" placeholder="按标签、中文名或设置键筛选"/><span id="wa-setting-search-count" class="wa-dim" aria-live="polite"></span></div>
-      <div class="wa-body"></div>
+      <div class="wa-body" role="main" aria-label="面板正文"></div>
     </div>`);
     mainDoc.body.appendChild(panelEl);
     panelEl.querySelector('.wa-close').onclick = () => toggle(false);
