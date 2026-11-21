@@ -299,6 +299,22 @@ function buildInner(result, version) {
 }
 // 保留账本中已有条目的**人工修正**（detail 人工改过的措辞），其余（reason/证据）一律按现场重算。
 // v2.28.0 起不再保留旧 reason：reserved 的语义是「理由文本可人工润色」，不是「归因可脱离测量」。
+//
+// v2.552.0：`_note` 的**历史尾巴**也必须留住。
+//   此前 build() 每次都用模板常量整段重建 _note，于是每跑一次 `--update` 就把历代批次说明
+//   抹成同一句话：v2.551.0 提交时 _note 有 787 字历史，本批 --update 之后只剩 197 字模板原文。
+//   这和「账本失真」是同一类病：**账本越用越薄**，读它的人以为历次登记都只是「同值」。
+//   口径：模板句仍在最前（元数据三级同源要读它里面的版本词），模板句之后的旧内容原样接回。
+const NOTE_TAIL_MARK = '判据口径与 tests/inventory.js 同源。';
+function carryNote(next, ledger) {
+  const old = (ledger && typeof ledger._note === 'string') ? ledger._note : '';
+  const i = old.indexOf(NOTE_TAIL_MARK);
+  if (i < 0) return next;                       // 旧账本没有模板句 ⇒ 没有可carry 的口径
+  const tail = old.slice(i + NOTE_TAIL_MARK.length);
+  if (!tail) return next;                       // 只有模板句、没有历史 ⇒ 无事可做
+  next._note = next._note + tail;
+  return next;
+}
 function refresh(result, ledger, version) {
   const next = build(result, version);
   if (ledger) {
@@ -308,6 +324,16 @@ function refresh(result, ledger, version) {
         if (old[k] && typeof old[k].detail === 'string' && old[k].detail) next[kind][k].detail = old[k].detail;
       });
     });
+  }
+  carryNote(next, ledger);
+  // fail-closed：旧历史若存在，新 note 必须以它结尾。这条断言就写在写盘前，
+  // 于是「未来谁把 carryNote 改坏了」会当场炸在 --update 上，而不是静默变薄。
+  const oldNote = (ledger && typeof ledger._note === 'string') ? ledger._note : '';
+  const at = oldNote.indexOf(NOTE_TAIL_MARK);
+  const oldTail = at < 0 ? '' : oldNote.slice(at + NOTE_TAIL_MARK.length);
+  if (oldTail && next._note.slice(-oldTail.length) !== oldTail) {
+    throw new Error('[dead-export-gate] _note 历史丢失：旧账本尾部 ' + oldTail.length
+      + ' 字未出现在新账本里（carryNote 失效 ⇒ 拒绝写盘）');
   }
   return next;
 }
@@ -507,6 +533,7 @@ function main() {
 if (require.main === module) main();
 module.exports = { LEDGER_PATH: LEDGER_PATH, FROZEN_KINDS: FROZEN_KINDS, ADVISORY_KINDS: ADVISORY_KINDS,
   REASON_CODES: REASON_CODES, EVIDENCE_KEYS: EVIDENCE_KEYS, loadLedger: loadLedger, build: build, refresh: refresh,
+  carryNote: carryNote, NOTE_TAIL_MARK: NOTE_TAIL_MARK,
   walkPass: walkPass, beginPass: beginPass, endPass: endPass, snapshotRebuilds: function () { return __snap.rebuilds || 0; },
   judge: judge, classify: classify, detailOf: detailOf, selfUsed: selfUsed, nsToFile: nsToFile, keyOf: keyOf,
   versionOf: versionOf, versionNotes: versionNotes, metadataProblems: metadataProblems, evidenceDrift: evidenceDrift,

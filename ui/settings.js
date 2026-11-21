@@ -148,10 +148,15 @@
           + (on ? '' : '（关闭时一次账都不建）') + '</div>';
       })()
       // v2.533.0（OPV30 收口）：缝合件台账 —— 三台先入库的引擎 + 两台本轮入库的，共五行读数。
-      //   病：副本族 / 上下文边界 / 写前预演 入库后产品面零读，零读账本只能把它们定性成
-      //   pending-wire（「等接线」），而「等」没有期限。本行就是接线点：面板如实显示
-      //   **它们各自算出来的数**（未装载时显示「装载中」并顺手 ensure 一次，不假装在跑）。
-      //   五台全是纯函数引擎 ⇒ 本行只读不写，不改任何世界状态。
+      // v2.552.0（读数真实性）：这行此前被写成「本行就是接线点」，并据此让三台按纪律④出表。
+      //   实测那句话不成立 —— 本行是**读数面**，不是**消费面**：
+      //     · 两台传常量空参数（ctxBoundary.stat([]) / arcGuide.stat([])）⇒ 读数恒 0；
+      //     · 后两台读真计数器，但 rehearse() / audit() 产品调用点为 0 ⇒ 计数器恒初值；
+      //     · 五台的核心函数（plan / scrub / rehearse / audit）产品调用点全是 0。
+      //   「0 条 / 0 通过 / 0 次」读起来都像「一切正常」，实际含义是「这条链没人喂」。
+      //   读数不实比缺读数更坏（缺读数至少知道去看），所以本行改成**直说**：
+      //   无数据源的写「无数据源」，从没调用过的写「从未调用」。
+      //   代价如实记：两台的 stat 引用从此消失 ⇒ 它们回到零读面并重新登记（见 ns-consumer-ledger）。
       + (function () {
         const one = function (rel, ns, fn) {
           if (WA[ns]) { try { return fn(); } catch (e) { return '读数失败'; } }
@@ -176,17 +181,32 @@
             return s.family + '族/活跃' + s.active;
           }),
           '边界规则 ' + one('engines/ctx-boundary.js', 'ctxBoundary', function () {
-            return WA.ctxBoundary.stat([]).count + '条';
+            // v2.552.0（读数真实性）：这里原来读 `stat([]).count + '条'` —— 传的是**常量空数组**，
+            //   读数恒 0。而「0 条」在面板上读起来是「没有坏规则」，实际含义却是「这个数没人喂」。
+            //   读数不实比缺读数更坏：它让人以为这条链在跑（而且它让本 ns 从此不被判为零读）。
+            //   ctxBoundary 的规则必须由调用方提供（DEFAULTS 里只有 maxMarkLen、没有规则），
+            //   而全仓没有任何产品级调用方给过规则 ⇒ 如实标注，不再报一个看起来正常的 0。
+            return '无数据源';
           }),
           '写前预演 ' + one('engines/write-rehearsal.js', 'writeRehearsal', function () {
             const s = WA.writeRehearsal.stat();
-            return s.ok + '通过/' + s.rejected + '拒';
+            // v2.552.0（读数真实性）：这里的 stat 读的是**真计数器**（不是常量空参数），
+            //   但 `rehearse()` 全仓零产品调用 ⇒ 计数器永远是初值。
+            //   「0 通过 / 0 拒」读起来像「预演都通过了」，实际含义是「一次都没预演过」。
+            //   没有调用过就直说，不报一个看起来正常的 0。
+            return s.calls === 0 ? '从未调用' : (s.ok + '通过/' + s.rejected + '拒');
           }),
           '引导弧 ' + one('engines/arc-guide.js', 'arcGuide', function () {
-            return WA.arcGuide.stat([]).arcs + '条';
+            // v2.552.0（读数真实性）：同上 —— 原来读 `stat([]).arcs + '条'`，传常量空数组 ⇒ 恒 0。
+            //   arcs 的真源本该由调用方提供，而 engines/arc-phase.js 的头注释自己写着
+            //   「plan(arcs, opts) 的 arcs 由调用方提供，全仓没有产品级调用方」。
+            //   所以那个「0 条」不是读数，是一个永远为 0 的常数。
+            return '无数据源';
           }),
           '存档体检 ' + one('engines/save-audit.js', 'saveAudit', function () {
-            return WA.saveAudit.stat().calls + '次';
+            const s = WA.saveAudit.stat();
+            // v2.552.0（读数真实性）：同「写前预演」—— 读真计数器，但 `audit()` 零产品调用。
+            return s.calls === 0 ? '从未调用' : (s.calls + '次');
           })
         ];
         return '<div class="wa-dim" id="wa-eng-ledger-view">缝合件台账：' + esc(parts.join('｜')) + '</div>';
