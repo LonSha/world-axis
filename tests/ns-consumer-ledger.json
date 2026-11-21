@@ -263,12 +263,6 @@
    "evidence": "最终 messages 与结构化消息列表对齐。消费方是提示词归因线（还没做），故零读。",
    "recompute": "grep -rn \"msgAlign\" engines core ui tests | head"
   },
-  "narrativeDeduction": {
-   "cls": "stale",
-   "provider": "engines/narrative-deduction.js",
-   "evidence": "双轨推演导出全部在 dead-export-ledger 冻结（9 条）。产品面零读，仅 tests/ 有 auditDualTrack 用例。与 desk-coverage 的 orphan 档交叉确认。",
-   "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('narrativeDeduction.')).length)\""
-  },
   "nightWatch": {
    "cls": "readonly-api",
    "provider": "engines/night-watch.js",

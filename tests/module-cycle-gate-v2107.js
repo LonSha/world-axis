@@ -518,7 +518,10 @@ function runAll(A) {
   //   同批新增的 WA.storyclock.readLatest / audit 只加**成员引用**（refs +3），storyclock 这个 ns 与 time-ledger
   //   的边在旧版就已存在（discipline），集合去重后不再计边 —— 这正与 v2.124.0 记过的「改了两处、边只多一条」同款）。
   //   装载期不变 476；恒等式 476 + 4021 = 4497 当场核对。
-  A(a.edgesLoad === 476 && a.edgesCall === 4021 && a.edgesAll === 4497 && a.identityOk,
+  // v2.542.20（narrative-deduction 五个导出接入 routes）：调用期 4021 -> 4022（+1：
+  //   (engines/action-desk-routes.js, narrativeDeduction) 是一对**新**的 (file, ns) 边；五个成员引用
+  //   只计进 refs，边以 ns 对去重）。装载期不变 476；恒等式 476 + 4022 = 4498 当场核对。
+  A(a.edgesLoad === 476 && a.edgesCall === 4022 && a.edgesAll === 4498 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -690,7 +693,9 @@ function runAll(A) {
   //   不是在测试里读 —— 故差恒等式 647 - 590 = 57 不变，漂移口径不动。
   // v2.542.12：读面 582 -> 583（面板 dcPayload 真读 jsonRepair ⇒ 它从零读面进读面）。
   //   提供方与账本不变（647/590），漂移口径不动。
-  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 584,
+  // v2.542.20：读面 584 -> 585（narrativeDeduction 从零读面进读面：它的五个导出被
+  //   action-desk-routes 真调）。提供方与账本不变（647/590），差恒等式不动。
+  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 585,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -729,7 +734,8 @@ function runAll(A) {
   // v2.530.0（OPV30-R1/R2）：副本族与上下文边界都还没有产品读点 ⇒ 零读 ns 69 → 71
   //   （与 tests/ns-consumer-ledger.json 的 BASE_DEAD_NS 同源，两处必须一起动）。
   // v2.542.12：69 -> 68（jsonRepair 接线后出零读面；账本同批出表，见 ns-consumer-ledger.json）。
-  A(a.deadNs.length === 67, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  // v2.542.20：零读 ns 67 -> 66（narrativeDeduction 已接线，按纪律四从 ns 账本删行出表）。
+  A(a.deadNs.length === 66, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

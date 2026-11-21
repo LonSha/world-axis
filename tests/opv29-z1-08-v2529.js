@@ -35,7 +35,7 @@ const engSrc = RD(ENG), tabSrc = RD(TAB);
 // ── A. 现场 ───────────────────────────────────────────
 a(lines(ENG) <= 1700, 'A1 引擎已瘦身（实 ' + lines(ENG) + ' 行 ≤ 1700；拆前 4123）', lines(ENG));
 // v2.542.17/18 跟位：2530 -> 2583（+53）。上一批把 routes 五处“按错签名调用”改成整份 o 当 input、并把被丢弃的实参逐个展开成多行注释，单行调用变长；本批（v2.542.18）未动 routes，只是把这个忘跟的锚点补上。路由条数仍是 966（B3b 另锁）。
-a(lines(TAB) === 2590, 'A2 路由表体量（实 ' + lines(TAB) + ' 行 = 2590）', lines(TAB));
+a(lines(TAB) === 2607, 'A2 路由表体量（实 ' + lines(TAB) + ' 行 = 2607）', lines(TAB));
 const namedFns = (tabSrc.match(/function\s+[A-Za-z_$]/g) || []).length;
 a(namedFns === 0, 'A3 表零具名函数（实 ' + namedFns + ' 个）');
 const hCalls = (tabSrc.match(/H\.[A-Za-z_$][\w$]*\(/g) || []).length;
@@ -50,7 +50,10 @@ function codes(src) {
 }
 const tabCodes = codes(tabSrc), engOnly = codes(engSrc);
 const declared = new Set([...tabCodes, ...engOnly]);
-a(tabCodes.size === 171, 'A5a 路由表声明的拒收码 171 个（实 ' + tabCodes.size + '）', tabCodes.size);
+// v2.542.20：171 -> 172（+1：narrativeDeduction.compensateStall 的包装层引入
+  //   `below-threshold`（引擎返 null = 未到滞留阈值，**不是**「没有死胡同」，
+  //   故必须给一个能读的结论而不是 null）。补证见 reject-v2780 的对应 trip。
+  a(tabCodes.size === 172, 'A5a 路由表声明的拒收码 172 个（实 ' + tabCodes.size + '）', tabCodes.size);
 a(declared.size >= 190 && declared.size <= 210, 'A5b 两面合并的声明码 ' + declared.size + ' 个（须 190–210）');
 
 a(engSrc.indexOf('const ROUTES = {') < 0, 'A6 引擎里已无 ROUTES 字面量');
@@ -114,8 +117,8 @@ const r3 = (function () {
 a(r3.threw && /缺少本地函数/.test(r3.msg), 'B2b 工厂缺参（H 空）⇒ 当场抛「缺少本地函数」', r3.msg);
 const WA3 = load([TAB, ENG]);
 a(!!WA3.actionDesk && typeof WA3.actionDesk.plan === 'function', 'B3 先表后引擎 ⇒ 引擎装载成功');
-a(WA3.actionDesk.ROUTES && Object.keys(WA3.actionDesk.ROUTES).length === 970,
-  'B3b 970 条路由都在（实 ' + (WA3.actionDesk.ROUTES ? Object.keys(WA3.actionDesk.ROUTES).length : 'null') + '）');
+a(WA3.actionDesk.ROUTES && Object.keys(WA3.actionDesk.ROUTES).length === 975,
+  'B3b 975 条路由都在（实 ' + (WA3.actionDesk.ROUTES ? Object.keys(WA3.actionDesk.ROUTES).length : 'null') + '）');
 
 // ── C. 真跑（真宿主装载路径）────────────────────────────
 const gate = require('../tests/ui-gate-sync.js');

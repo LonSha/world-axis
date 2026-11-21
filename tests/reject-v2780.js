@@ -10010,6 +10010,16 @@ function runWitness(WA) {
     try { return WA.timeLedger.read().story.reason; }
     finally { WA.storyclock.readLatest = savedRead; WA.storyclock = savedSc; WA.mainWin = savedWin; }
   });
+  // ── v2.542.20：narrativeDeduction.compensateStall 的包装层结论码 ──
+  //   引擎本身未到滞留阈值时返 null（不是一个码），而路由层必须给一个能读的结论：
+  //   「还没到线」与「现场没有死胡同」是两回事，不能同一个回返值说完。
+  want('below-threshold', 'narrativeDeduction.compensateStall：未到滞留阈值 ⇒ 结构化 below-threshold（不是「没有死胡同」）');
+  trip('below-threshold', function () {
+    const R = WA.actionDesk && WA.actionDesk.ROUTES ? WA.actionDesk.ROUTES['narrativeDeduction.compensateStall'] : null;
+    if (typeof R !== 'function') return null;
+    const r = R({ unresolvedRounds: 0 });
+    return r && r.reason;
+  });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

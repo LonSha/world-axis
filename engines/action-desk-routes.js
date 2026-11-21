@@ -748,6 +748,23 @@
     'storyRhythm.release': function (o) { return WA.storyRhythm.release(o && Array.isArray(o.facts) ? o.facts : (Array.isArray(o) ? o : [])); },
     'storyRhythm.pov': function (o) { return WA.storyRhythm.pov(o); },
     'storyRhythm.tone': function (o) { return WA.storyRhythm.tone(o); },
+    // v2.542.20（双轨推演台接入）：narrative-deduction 的四件判据与时间线在整个产品面
+    //   **零读**（dead-export 账本 9 条全在、ns 零读账本 cls=stale）：越权全知穿帮 / 死胡同补偿 /
+    //   规则互斥 / 番外视角—— 全部算得出结论，却一个入口都没有。此处只补入口，
+    //   判据仍在引擎里；compensateStall 返 null 的语义是「未到滞留阈值」，
+    //   包一层结构化结果并写明——不能让它和「现场没有死胡同」混成一回事。
+    'narrativeDeduction.auditDualTrack': function (o) { o = o || {}; return WA.narrativeDeduction.auditDualTrack(o.actor || o.who || null, o.claim || o.text || '', o.known || o.clues || [], o.truth || o.facts || []); },
+    'narrativeDeduction.compensateStall': function (o) {
+      o = o || {};
+      const n = Number.isFinite(o.unresolvedRounds) ? o.unresolvedRounds : (Number.isFinite(o.rounds) ? o.rounds : 0);
+      const ctx = o.context || (o.place ? { place: o.place } : null);
+      const r = WA.narrativeDeduction.compensateStall(n, ctx);
+      return r || { triggered: false, reason: 'below-threshold', stalledRounds: n,
+        note: '未到滞留阈值：不是「现场没有死胡同」，是还没到线' };
+    },
+    'narrativeDeduction.auditRuleClash': function (o) { return WA.narrativeDeduction.auditRuleClash((o && (o.rules || o.list)) || o); },
+    'narrativeDeduction.generateSpinOffSnapshot': function (o) { o = o || {}; return WA.narrativeDeduction.generateSpinOffSnapshot(o.actor || o.who || null, o.scene || o.context || {}); },
+    'narrativeDeduction.timeline': function (o) { return WA.narrativeDeduction.timeline(o && Number.isFinite(o.n) ? o.n : 10); },
     'creditLedger.checkCredit': function (o) { return WA.creditLedger.checkCredit(o.borrower || o.who, o.at); },
     'anniversaryRites.register': function (o) { return WA.anniversaryRites.register(o.spec || o); },
     'anniversaryRites.markObserved': function (o) { return WA.anniversaryRites.markObserved(o.id, o.spec || o); },
