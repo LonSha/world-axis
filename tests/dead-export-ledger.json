@@ -14002,14 +14002,6 @@
       "tref": 0,
       "own": 15
     },
-    "storyclock.audit": {
-      "reason": "self-only",
-      "detail": "engines/storyclock.js 内部自用、外部零引用（过度导出）",
-      "src": "engines/storyclock.js",
-      "refs": 0,
-      "tref": 0,
-      "own": 3
-    },
     "storyclock.getSettings": {
       "reason": "unwired",
       "detail": "产品与测试均零引用（能力未接线）",
@@ -14707,11 +14699,11 @@
       "own": 3
     },
     "timeLedger.read": {
-      "reason": "self-only",
-      "detail": "engines/time-ledger.js 内部自用、外部零引用（过度导出）",
+      "reason": "test-only",
+      "detail": "engines/time-ledger.js 的读面出口。产品面目前只经 buildBlock() 消费对账结果（v2.542.18 起该块真读正文锚点）；read() 留供面板/诊断接，现仅 tests 引用（reject-v2780 见证 4 处）",
       "src": "engines/time-ledger.js",
       "refs": 0,
-      "tref": 0,
+      "tref": 4,
       "own": 4
     },
     "timeLedger.season": {

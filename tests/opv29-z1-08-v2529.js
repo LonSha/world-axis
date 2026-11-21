@@ -34,7 +34,8 @@ const engSrc = RD(ENG), tabSrc = RD(TAB);
 
 // ── A. 现场 ───────────────────────────────────────────
 a(lines(ENG) <= 1700, 'A1 引擎已瘦身（实 ' + lines(ENG) + ' 行 ≤ 1700；拆前 4123）', lines(ENG));
-a(lines(TAB) === 2530, 'A2 路由表体量（实 ' + lines(TAB) + ' 行 = 2530）', lines(TAB));
+// v2.542.17/18 跟位：2530 -> 2583（+53）。上一批把 routes 五处“按错签名调用”改成整份 o 当 input、并把被丢弃的实参逐个展开成多行注释，单行调用变长；本批（v2.542.18）未动 routes，只是把这个忘跟的锚点补上。路由条数仍是 966（B3b 另锁）。
+a(lines(TAB) === 2583, 'A2 路由表体量（实 ' + lines(TAB) + ' 行 = 2583）', lines(TAB));
 const namedFns = (tabSrc.match(/function\s+[A-Za-z_$]/g) || []).length;
 a(namedFns === 0, 'A3 表零具名函数（实 ' + namedFns + ' 个）');
 const hCalls = (tabSrc.match(/H\.[A-Za-z_$][\w$]*\(/g) || []).length;

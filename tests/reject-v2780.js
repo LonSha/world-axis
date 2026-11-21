@@ -9978,6 +9978,38 @@ function runWitness(WA) {
     });
     WA.characterDrive.setSettings({ enabled: false });
   }
+  // ── v2.542.18：time-ledger「正文时间」读面的三种「读不到」 ──────────────────
+  //   这四个码不是世界语义上的拒绝，而是**读面状态**：拿不到楼层 / 正文真没写锚点 /
+  //   storyclock 未装载 / 总开关关着。它们必须**能跑出来**（否则用户看到 unknown 时无从归因，
+  //   而「算不出来」与「本来就没有」正是本仓纪律要分开的两件事），故进见证，不列死表。
+  want('no-messages', 'timeLedger.read：拿不到楼层（宿主未就绪）⇒ no-messages，不塌成「正文没写」');
+  trip('no-messages', function () {
+    const saved = WA.mainWin;
+    WA.mainWin = {};
+    try { return WA.timeLedger.read().story.reason; } finally { WA.mainWin = saved; }
+  });
+  want('no-stamp', 'timeLedger.read：扫过楼层但正文没有时间标签 ⇒ no-stamp（扫了几层也报出来）');
+  trip('no-stamp', function () {
+    const saved = WA.mainWin;
+    WA.mainWin = { SillyTavern: { getContext: function () { return { chat: [{ mes: '没有标签的正文' }] }; } } };
+    try { return WA.timeLedger.read().story.reason; } finally { WA.mainWin = saved; }
+  });
+  want('no-storyclock', 'timeLedger.read：storyclock 未装载 ⇒ no-storyclock（缺依赖，不是「没写」）');
+  trip('no-storyclock', function () {
+    const savedWin = WA.mainWin, savedSc = WA.storyclock;
+    WA.mainWin = { SillyTavern: { getContext: function () { return { chat: [{ mes: 'x' }] }; } } };
+    WA.storyclock = {};
+    try { return WA.timeLedger.read().story.reason; }
+    finally { WA.storyclock = savedSc; WA.mainWin = savedWin; }
+  });
+  want('storyclock-disabled', 'timeLedger.read：storyclock 总开关关 ⇒ storyclock-disabled（注桩没开，回读也不算）');
+  trip('storyclock-disabled', function () {
+    const savedWin = WA.mainWin, savedSc = WA.storyclock, savedRead = WA.storyclock.readLatest;
+    WA.mainWin = { SillyTavern: { getContext: function () { return { chat: [{ mes: 'x' }] }; } } };
+    WA.storyclock.readLatest = function () { return { ok: false, reason: 'disabled' }; };
+    try { return WA.timeLedger.read().story.reason; }
+    finally { WA.storyclock.readLatest = savedRead; WA.storyclock = savedSc; WA.mainWin = savedWin; }
+  });
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

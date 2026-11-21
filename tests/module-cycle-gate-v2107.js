@@ -513,7 +513,12 @@ function runAll(A) {
   // v2.542.16（引擎互校③）：调用期 4019 -> 4020（+1：engines/mood-glide.js 真读
   //   WA.elapsedEvidence 的 parse/verify —— 与 toxic-metabolism 同一阶梯，同族不再分裂）；
   //   装载期不变 476；恒等式 476 + 4020 = 4496 当场核对。
-  A(a.edgesLoad === 476 && a.edgesCall === 4020 && a.edgesAll === 4496 && a.identityOk,
+  // v2.542.18（引擎互校③：time-ledger 接真锚点）：调用期 4020 -> 4021（+1：engines/time-ledger.js 新增
+  //   hostChat()，真读 WA.mainWin —— (engines/time-ledger.js, mainWin) 是一对**新**的 (file, ns) 边；
+  //   同批新增的 WA.storyclock.readLatest / audit 只加**成员引用**（refs +3），storyclock 这个 ns 与 time-ledger
+  //   的边在旧版就已存在（discipline），集合去重后不再计边 —— 这正与 v2.124.0 记过的「改了两处、边只多一条」同款）。
+  //   装载期不变 476；恒等式 476 + 4021 = 4497 当场核对。
+  A(a.edgesLoad === 476 && a.edgesCall === 4021 && a.edgesAll === 4497 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'

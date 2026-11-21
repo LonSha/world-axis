@@ -215,6 +215,66 @@ const np2 = load('engines/narrative-preset.js', {
 });
 eq(np2.narrativePreset.silence().health, 'health-absent', 'B15 健康面不在场 ⇒ 如实说缺席');
 
+// ══════════════════ v2.542.18：「正文时间」栏接真锚点 ══════════════════
+// 【它治的病】read().rows 的「正文时间」曾取 `storyclock.discipline()` —— 那是**给模型的注桩指令**，
+//   不是正文里写着的时间；而 storyclock 的 parseStamp / readLatest / audit 在整条读面上一次没被调过
+//   （audit refs=0）。buildBlock() 的对账也惨：它只调 deviation()，而后者必须由调用方传 spec.storyRound，
+//   buildBlock 从不传 ⇒ 「差了几轮」那句在整条注入链上**从未可能触发**。
+// 【本节的判据】真锚点能读出来 / 三类「读不到」各自说得清 / 漂移真能报出 / 无数据时不编。
+function loadInto(WA, file) {
+  const sandbox = { window: { WorldAxis: WA }, console: { log() {}, warn() {}, error() {} },
+    Date: Date, Math: Math, JSON: JSON, Number: Number, Array: Array, Object: Object,
+    String: String, Boolean: Boolean, parseInt: parseInt, parseFloat: parseFloat,
+    isNaN: isNaN, setTimeout: setTimeout, clearTimeout: clearTimeout };
+  vm.createContext(sandbox);
+  vm.runInContext(src(file), sandbox, { filename: file });
+  return WA;
+}
+function tlEnv(o) {
+  o = o || {};
+  const WA = load('engines/storyclock.js', {
+    settingsBus: SETTINGS_BUS,
+    mainWin: o.mainWin === undefined ? {} : o.mainWin,
+    store: { get() { return o.doc === undefined ? { clock: { label: '第3日·黄昏' } } : o.doc; } }
+  });
+  loadInto(WA, 'engines/time-ledger.js');
+  return WA;
+}
+function host(msgs) { return { SillyTavern: { getContext() { return { chat: msgs }; } } }; }
+// B20 拿不到楼层：算不出来 ≠ 正文没写
+const tl1 = tlEnv({});
+eq(tl1.timeLedger.read().rows[1].value, 'unknown', 'B20 无楼层 ⇒ 正文栏 unknown（不再是一段指令文本）');
+eq(tl1.timeLedger.read().story.reason, 'no-messages', 'B20b 理由 no-messages（算不出来）');
+ok(String(tl1.timeLedger.read().rows[1].why).indexOf('拿不到楼层') >= 0, 'B20c why 说清了是哪一种读不到');
+ok(String(tl1.timeLedger.read().hints).length > 20, 'B20d 原注桩指令没丢（挪到 hints）');
+ok(tl1.timeLedger.buildBlock().indexOf('时间标签') < 0, 'B20e 无楼层时注入块不编任何时间行');
+// B21 有楼层、正文没写标签：真没写
+const tl2 = tlEnv({ mainWin: host([{ mes: '普通正文' }]) });
+eq(tl2.timeLedger.read().story.reason, 'no-stamp', 'B21 无标签 ⇒ no-stamp（扫过了）');
+ok(String(tl2.timeLedger.read().story.why).indexOf('扫了 1 层') >= 0, 'B21b 报出扫了几层');
+ok(tl2.timeLedger.buildBlock().indexOf('还没有时间标签') >= 0, 'B21c 注入块提示「还没有时间标签」');
+// B22 真锚点读得出来，且与世界钟一致
+const tl3 = tlEnv({ mainWin: host([{ mes: '<!-- SDC-start 第3日·黄昏 -->正文<!-- SDC-end -->' }]) });
+const tlR3 = tl3.timeLedger.read();
+ok(tlR3.story.known === true, 'B22 真锚点读到了');
+eq(tlR3.rows[1].value, '第3日·黄昏', 'B22b 三栏「正文时间」= 真锚点');
+eq(tlR3.reconcile.drift, false, 'B22c 与世界钟一致 ⇒ 不报漂移');
+// B23 漂移：真的报出来（旧版这条线恒不触发）
+const tl4 = tlEnv({ doc: { clock: { label: '第9日·正午' } },
+  mainWin: host([{ mes: '<!-- SDC-start 第3日·黄昏 -->x' }]) });
+eq(tl4.timeLedger.read().reconcile.drift, true, 'B23 判定漂移');
+const b4 = tl4.timeLedger.buildBlock();
+ok(b4.indexOf('两处不一致') >= 0 && b4.indexOf('第3日·黄昏') >= 0 && b4.indexOf('第9日·正午') >= 0,
+  'B23b 注入块把两个标签都写出来（不再只说「差了 N 轮」）');
+// B24 世界钟为空：两个空值不构成证据
+eq(tlEnv({ doc: {}, mainWin: host([{ mes: '<!-- SDC-start 第1日·清晨 -->x' }]) })
+  .timeLedger.read().reconcile.reason, 'no-calendar', 'B24 世界钟未设定 ⇒ no-calendar（不是「一致」）');
+// B25 第四种读不到：storyclock 总开关关（stub 成 disabled，与 reject-v2780 的见证同款）
+const tl5 = tlEnv({ mainWin: host([{ mes: 'x' }]) });
+tl5.storyclock.readLatest = function () { return { ok: false, reason: 'disabled' }; };
+eq(tl5.timeLedger.read().story.reason, 'storyclock-disabled', 'B25 总开关关 ⇒ 单独一种理由，不并进 no-stamp');
+// B26 负控制：真没装 storyclock 时也不能崩、要如实说
+eq(tlEnv({ mainWin: host([{ mes: 'x' }]) }).timeLedger.read().ok, true, 'B26 负控制：读取永不抛（ok 恒真）');
 // ══════════════════ 收尾 ══════════════════
 if (fail) {
   console.log('══ v2.529.0 悬空成员收口专锁（costguard-timeledger-v2529）══');
