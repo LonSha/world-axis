@@ -126,32 +126,53 @@
       + '<% var _v = (typeof variables !== \'undefined\' && variables.' + k + ') || (typeof SillyTavern !== \'undefined\' && SillyTavern.TavernHelper && SillyTavern.TavernHelper.getVariables({type:\'chat\'}).' + k + ') || \'\'; %><%- _v %>';
   }
 
+  /**
+   * v2.551.0（写回收口批）：把「查 → 建 → 复查」整段放进**按书**串行队列。
+   *
+   * 为什么连「查」也要在队列里：ensure 是两段式（先查有没有、没有才建）。只包「建」的话，
+   *   两次并发 ensure 会各自查到「还没有」，然后各建一条 —— 台面上出现两条同 order 的条目，
+   *   变量镜像被注入两遍，而每一步都「调用成功」（照本仓口径：「调用成功」≠「台上只有一条」）。
+   *
+   * 为什么与 outline-inject 用同一条 key（`wb:<书名>`）：两者写的是**同一本书**。
+   *   分两条队列 = 本引擎要治的病原样保留（见 engines/write-serial.js serial() 的 ⓐⓑ）。
+   *
+   * 降级：write-serial 未加载时直跑（不静默失败，只是没有排队）。
+   */
+  function withBook(name, fn) {
+    const WS = WA.writeSerial;
+    const q = (WS && typeof WS.serial === 'function') ? WS.serial('wb:' + String(name)) : null;
+    if (!q || typeof q.runStrict !== 'function') return fn();
+    return q.runStrict(fn);
+  }
   async function ensureEntry(order) {
     if (!validOrder(order)) return { ok: false, reason: 'bad-order' };
     const TH = getTH();
     if (!TH || !TH.getWorldbook || !TH.createWorldbookEntries) return { ok: false, reason: 'no-th' };
     const wbName = findCompanionName();
     if (!wbName) return { ok: false, reason: 'no-companion' };
-    try {
-      const entries = await TH.getWorldbook(wbName);
-      const exists = (entries || []).some(e => e && e.position && e.position.type === 'before_character_definition' && Number(e.position.order) === order);
-      if (exists) return { ok: true, reason: 'exists' };
-      await TH.createWorldbookEntries(wbName, [{
-        name: 'WorldAxis 槽位 ' + order,
-        enabled: true,
-        strategy: { type: 'constant', keys: [], keys_secondary: { logic: 'and_any', keys: [] } },
-        position: { type: 'before_character_definition', order: order, depth: 4 },
-        content: wbEntryContent(order),
-        probability: 100,
-        recursion: { prevent_incoming: true, prevent_outgoing: true, delay_until: null }
-      }]);
-      // 创建后复查（防静默失败）
-      const after = await TH.getWorldbook(wbName);
-      const ok2 = (after || []).some(e => e && e.position && e.position.type === 'before_character_definition' && Number(e.position.order) === order);
-      return { ok: ok2, reason: ok2 ? 'created' : 'create-verify-failed' };
-    } catch (e) {
-      return { ok: false, reason: 'error', error: e };
-    }
+    // v2.551.0（写回收口批）：查-建-复查整段进队列（理由见 withBook 头注释）。
+    return withBook(wbName, async function () {
+      try {
+        const entries = await TH.getWorldbook(wbName);
+        const exists = (entries || []).some(e => e && e.position && e.position.type === 'before_character_definition' && Number(e.position.order) === order);
+        if (exists) return { ok: true, reason: 'exists' };
+        await TH.createWorldbookEntries(wbName, [{
+          name: 'WorldAxis 槽位 ' + order,
+          enabled: true,
+          strategy: { type: 'constant', keys: [], keys_secondary: { logic: 'and_any', keys: [] } },
+          position: { type: 'before_character_definition', order: order, depth: 4 },
+          content: wbEntryContent(order),
+          probability: 100,
+          recursion: { prevent_incoming: true, prevent_outgoing: true, delay_until: null }
+        }]);
+        // 创建后复查（防静默失败）
+        const after = await TH.getWorldbook(wbName);
+        const ok2 = (after || []).some(e => e && e.position && e.position.type === 'before_character_definition' && Number(e.position.order) === order);
+        return { ok: ok2, reason: ok2 ? 'created' : 'create-verify-failed' };
+      } catch (e) {
+        return { ok: false, reason: 'error', error: e };
+      }
+    });
   }
 
   /** 找配套世界书名（容忍改名，含关键词即视为配套） */

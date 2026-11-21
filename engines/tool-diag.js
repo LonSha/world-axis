@@ -4315,6 +4315,38 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       };
     }, {});
   }
+  // ── 13. v2.551.0: 世界书写回队列（按书串行 + 积压/失败读数）──
+  //   为什么诊断要看它：本仓的世界书写回是「读整本 → 改一条 → 写整本」，三个写入口
+  //   （outline-inject.apply / .undo 的 flip / wb-inject.ensureEntry）在 v2.551.0 起排同一条
+  //   `wb:<书名>` 队列。它失败时**不会抛给用户**（队列必须继续），只记 lastError ——
+  //   也就是说「写失败了」这件事只活在这里。诊断面不读它，就等于这条链没有读数。
+  //   分级：failed > 0 ⇒ 上游会再看到一次「条目没落地」，但原因只在 lastError 里。
+  function secWriteSerial() {
+    return safe(function () {
+      if (!WA.writeSerial || typeof WA.writeSerial.serials !== 'function') {
+        return { error: 'engines/write-serial.js 未加载（世界书写回没有串行队列）' };
+      }
+      const list = WA.writeSerial.serials() || [];
+      let pending = 0, failed = 0;
+      let lastError = null;
+      list.forEach(function (q) {
+        pending += (q.pending || 0);
+        failed += (q.failed || 0);
+        if (q.lastError && (!lastError || String(q.lastError.at) > String(lastError.at))) {
+          lastError = { queue: q.name, at: q.lastError.at, message: q.lastError.message };
+        }
+      });
+      return {
+        queues: list.map(function (q) {
+          return { name: q.name, pending: q.pending, done: q.done, failed: q.failed };
+        }),
+        queueCount: list.length,
+        pendingTotal: pending,
+        failedTotal: failed,
+        lastError: lastError
+      };
+    }, {});
+  }
   // ── 14. v2.16.0: 对外只读互操作桥（worldaxis_bridge_v1）──
   //   为什么诊断要看它：本仓库此前**没有任何对外接口**，「世界状态有没有被外部读走」既不可见
   //   也不可归因——外部问得太早（store 未就绪）、宿主没挂上、ctx 下挂载点被删，四种处境在
@@ -4786,7 +4818,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       horizon: secHorizon(), enemies: secEnemies(), parallelWorld: secParallelWorld(),
       inject: secInject(), worldState: secWorldState(), runtime: secRuntime(),
       ui: secUi(), capabilities: secCapabilities(),
-      host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), bus: secBus(),
+      host: secHost(), uninjectLedger: secUninjectLedger(), wbChannel: secWbChannel(), writeSerial: secWriteSerial(), bus: secBus(),
       bridge: secBridge(),
       phoneBridge: secPhoneBridge(),
       lonsha: secLonsha(),

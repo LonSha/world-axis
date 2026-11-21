@@ -53,7 +53,10 @@ const ANCHOR = {
   oiExport: { rel: OI_REL, txt: 'apply: apply, updateCapability: updateCapability,' },
   // v2.231.0 收尾：预览的**零写入**与撤销的**对称交换**各一锚（破坏要打在语义上，不打在语法上）
   oiPreviewZero: { rel: OI_REL, txt: "applied: 0, writes: 0 };" },
-  oiUndoSwap: { rel: OI_REL, txt: "    const e2 = await flip(prev.comment, true);\n    if (e2) return applyNote(e2);" }
+  // v2.551.0（写回收口批）跟位：undo 的「读-改-写」整段进了按书串行队列（withBook），
+  //   于是这两行的缩进从 4 空格变为 8 空格。**破坏点没变**——仍是「启用上一版」那一半，
+  //   判据也没变（N9 要的是「对称交换少一向 ⇒ 台面 0 条生效」），挪的只是字面缩进。
+  oiUndoSwap: { rel: OI_REL, txt: "        const e2 = await flip(prev.comment, true);\n        if (e2) return applyNote(e2);" }
 };
 const EXPORTS = ['getSettings', 'setSettings', 'view', 'plan', 'extractFromEnd', 'parseEntries',
   'apply', 'updateCapability', 'preview', 'undo', 'stat', 'resetStat', 'MODES', 'MODE_LABEL'];
@@ -573,7 +576,7 @@ async function runNegative(a, S) {
   })();
   // N9 破坏：撤销不再做对称交换（把「启用上一版」这一半去掉）⇒ 台面上一条都不生效
   await (async function () {
-    const S9 = brk(S, ANCHOR.oiUndoSwap.txt, '    // （破坏：撤销不再启用上一版本）');
+    const S9 = brk(S, ANCHOR.oiUndoSwap.txt, '        // （破坏：撤销不再启用上一版本）');
     const ov = {}; ov[OI_REL] = S9;
     const W = envWith(ov).WA;
     await W.outlineInject.apply(TAG_IN, [], { worldbookName: BOOK });

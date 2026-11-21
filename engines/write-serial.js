@@ -54,11 +54,67 @@
       return { name: stats.name, pending: pending, done: done, failed: failed, lastError: lastError };
     }
 
+    /**
+     * 与 `run` 同一队列，但**不吞调用方的异常**。
+     *
+     * `run` 的行为是把失败吞成 `undefined`（队列必须继续，这一点是对的）；但它同时让
+     *   调用方**无法区分**「fn 返回了 undefined」与「fn 抛了」。批量任务能用返回值表达失败时
+     *   这没问题；而「读-改-写」这类事务必须让失败抛出去 —— 否则调用方会把异常路径静默
+     *   当成成功（照本仓口径：「没报错」≠「写成了」）。
+     *
+     * 做法：队列尾巴只等「这一步什么时候结束」，不看结果（`tail = step.then(noop, noop)`）；
+     *   记账挂在这条尾巴上；交给调用方的仍是 fn 自己的 promise（照常可抛）。
+     * 队列本身**永不断**：前一项失败不卡后一项，lastError 照记 —— 与 `run` 同一纪律。
+     */
+    function runStrict(fn) {
+      pending++;
+      const step = tail.then(function () {
+        return Promise.resolve().then(fn);
+      });
+      // 队列尾巴：成功/失败都往下走，且**先记账再放行** —— 这样 await idle() 之后
+      //   读 stat() 一定已经是「这一步结束」的账，不会出现 pending 还挂在 1 的错觉。
+      tail = step.then(function (v) {
+        done++; pending--;
+        return v;
+      }, function (e) {
+        failed++; pending--;
+        lastError = { at: new Date().toISOString(), message: String(e && e.message ? e.message : e) };
+        return undefined;
+      });
+      return step;
+    }
     function idle() {
       return tail;
     }
-
-    return { run: run, stat: stat, idle: idle };
+    return { run: run, runStrict: runStrict, stat: stat, idle: idle };
+  }
+  /**
+   * 按名取**同一条**队列实例。
+   *
+   * ⓐ 为什么必须有这一层：`createSerial(name)` **每次都新建一条队列**。两个调用方各自
+   *   `createSerial('wb')` 拿到的是两条互不相干的队列 —— 串行在读数上「已启用」，在行为上
+   *   完全失效。本引擎治的病恰恰是「两处同时写」，所以「按名共享」不是便利，是判据的一部分。
+   *
+   * ⓑ 名字即唯一键：同一本书必须用同一个 key（约定 `wb:<书名>`）；不同书之间**不互相排队**
+   *   —— 两本书的写入本来就互不干扰，单条全局队列只会让不相干的书互相拖慢，还会把
+   *   「谁慢了」在读数上搅成一团。
+   *
+   * ⓒ 本函数返回的是**缓存里的那一个**，因此调用方**不许**在它上面另建状态：要加统计就改
+   *   `createSerial` 内部的记账（单点），不要在调用点自己数一遍 —— 两个计数点必然对不上。
+   */
+  const SERIALS = new Map();
+  function serial(name) {
+    const key = String(name == null || name === '' ? 'default' : name);
+    let s = SERIALS.get(key);
+    if (!s) { s = createSerial(key); SERIALS.set(key, s); }
+    return s;
+  }
+  /** 队列清单读数（诊断面用）：每个 key 各积压多少、各失败几次。只读，不改任何状态。 */
+  function serials() {
+    const out = [];
+    SERIALS.forEach(function (s, k) { out.push(s.stat()); });
+    out.sort(function (a, b) { return String(a.name) < String(b.name) ? -1 : 1; });
+    return out;
   }
 
   /** 配置条目形态：永不注入。故意不带 constant —— 由调用方漏写，而不是由这里「顺手加」。 */
@@ -140,10 +196,15 @@
 
   WA.writeSerial = {
     createSerial: createSerial,
+    // v2.551.0（写回收口批）：按名共享的队列入口 + 队列清单读数。
+    //   加这两个的理由见 serial() 的 ⓐⓑⓒ：`createSerial` 每次新建一条队列，
+    //   而本引擎治的病是「两处同时写」—— 没有共享入口，串行在行为上不可能生效。
+    serial: serial,
+    serials: serials,
     configEntry: configEntry,
     isConfigEntry: isConfigEntry,
     auditBook: auditBook,
     patchEntry: patchEntry
   };
-  if (typeof WA.registerModule === 'function') WA.registerModule('engines/write-serial.js', { kind: 'engine', ver: '2.529.0' });
+  if (typeof WA.registerModule === 'function') WA.registerModule('engines/write-serial.js', { kind: 'engine', ver: '2.551.0' });
 })();

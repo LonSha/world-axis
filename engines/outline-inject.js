@@ -269,6 +269,31 @@
     return { ok: false, reason: reason, applied: 0, writes: 0, landed: [], verified: false };
   }
   /**
+   * v2.551.0（写回收口批）：把「读整本 → 改 → 写整本」**整段**放进按书串行队列。
+   *
+   * 为什么包整段而不是只包每次写入：竞态发生在「读到旧整本」与「写回整本」之间。
+   *   只包写入的话，两次 apply 仍会各自拿着同一份旧快照，后者把前者建的条目覆盖掉
+   *   —— 写入确实排队了、数据照样丢，而读数上完全看不出（照本仓口径：
+   *   「排队了」≠「没丢」）。
+   *
+   * 为什么按书分行：两本书的写入本来就互不干扰。单条全局队列只会让不相干的书互相
+   *   拖慢，并把「谁慢了」在读数上搅成一团（见 engines/write-serial.js serial() 的 ⓑ）。
+   *
+   * 为什么用 runStrict 而不是 run：本模块每一处宿主调用都靠 catch 产出具名拒收码
+   *   （create-failed / update-failed / verify-failed）。`run` 会把异常吞成 undefined，
+   *   调用方就拿不到失败原因 —— 那等于把「具名拒收」退化成「静默什么都没做」。
+   *   runStrict 保证队列永不断（内部仍记 lastError），但异常照常抛给调用方。
+   *
+   * 降级：write-serial 未加载时直跑。加载顺序不该变成功能开关 —— 但降级时**没有**排队，
+   *   所以专锁会钉住「真队列在场时必须走队列」这条，避免降级路径悄悄变成常态。
+   */
+  function withBook(name, fn) {
+    const WS = WA.writeSerial;
+    const q = (WS && typeof WS.serial === 'function') ? WS.serial('wb:' + String(name)) : null;
+    if (!q || typeof q.runStrict !== 'function') return fn();
+    return q.runStrict(fn);
+  }
+  /**
    * 真写宿主世界书：按 `plan` 的动作逐条落地，**每步写后复查**（ⓑ）。
    *
    * @param {string} outlineText  含模板标签的大纲原文
@@ -298,84 +323,89 @@
     //   只建新的、把旧的留着，正是本模块要治的「两份大纲并存」。
     const needsUpdate = p.actions.some(function (a) { return a.action !== 'create'; });
     if (needsUpdate && !cap) return applyNote('no-update-api');
-    let list;
-    try { list = await TH.getWorldbook(wbName); } catch (e) { return applyNote('read-failed'); }
-    list = Array.isArray(list) ? list.slice() : [];
-
-    // ── 动手前核对（ⓓ）：set / disable 的目标必须**在真读到的列表里** ──
-    //   拦在这里而不是「写一半才发现」：部分写入后报失败，台面上会留下一份半成品
-    //   ——而本模块要治的正是「台面上多出一份」。create 的目标**允许**不存在。
-    for (let i = 0; i < p.actions.length; i++) {
-      const a = p.actions[i];
-      if (a.action === 'create') continue;
-      if (indexOfEntry(list, a.comment) < 0) return applyNote('entry-missing');
-    }
-
-    const landed = [];
-    const disabledNow = [];
-    for (let i = 0; i < p.actions.length; i++) {
-      const a = p.actions[i];
-      // replaceWorldbook 是**整表回写**：每次动手前重新读一次真源。不重读的话，
-      //   本循环先前建/改的那一条会被上一轮的快照覆盖回去 —— 新条目当场消失，
-      //   而「我调用过 API」这件事仍然成立（本仓口径：「我写了」≠「它真在那儿」）。
-      if (cap && cap.kind === 'replaceWorldbook') {
+    // v2.551.0（写回收口批）：整段「读-改-写」进**按书**串行队列。
+    //   包整段的理由见 withBook() 的头注释；这一行是队列的起点，
+    //   从这里到函数返回之间每一次 await 都在队列里 —— 中途不插队。
+    return withBook(wbName, async function () {
+        let list;
         try { list = await TH.getWorldbook(wbName); } catch (e) { return applyNote('read-failed'); }
         list = Array.isArray(list) ? list.slice() : [];
-      }
-      const at = indexOfEntry(list, a.comment);
-      if (a.action === 'create') {
-        // 已存在同名条目 ⇒ 不重复建（重复条目会让「单一生效」在台面上失守），改走更新
-        if (at >= 0) {
-          if (!cap) return applyNote('no-update-api');
-          try {
-            const shape = entryShape(a, cfg);
-            if (cap.kind === 'replaceWorldbook') { list[at] = Object.assign({}, list[at], shape); await cap.fn(wbName, list); }
-            else { await cap.fn(wbName, function (arr) { const t = indexOfEntry(arr, a.comment); if (t >= 0) arr[t] = Object.assign({}, arr[t], shape); return arr; }); }
-          } catch (e) { return applyNote('update-failed'); }
-          landed.push({ action: 'create', comment: a.comment, via: 'update-existing' });
-        } else {
-          try { await TH.createWorldbookEntries(wbName, [entryShape(a, cfg)]); } catch (e) { return applyNote('create-failed'); }
-          landed.push({ action: 'create', comment: a.comment, via: 'create' });
+
+        // ── 动手前核对（ⓓ）：set / disable 的目标必须**在真读到的列表里** ──
+        //   拦在这里而不是「写一半才发现」：部分写入后报失败，台面上会留下一份半成品
+        //   ——而本模块要治的正是「台面上多出一份」。create 的目标**允许**不存在。
+        for (let i = 0; i < p.actions.length; i++) {
+          const a = p.actions[i];
+          if (a.action === 'create') continue;
+          if (indexOfEntry(list, a.comment) < 0) return applyNote('entry-missing');
         }
-      } else {
-        // set / disable：必须**定位到真条目**再改（ⓓ 找不到就拒收，不许改写成 create）
-        if (at < 0) return applyNote('entry-missing');
-        const patch = a.action === 'set'
-          ? entryShape(Object.assign({}, a, { enabled: true }), cfg)
-          : { enabled: false };
-        try {
-          if (cap.kind === 'replaceWorldbook') { list[at] = Object.assign({}, list[at], patch); await cap.fn(wbName, list); }
-          else { await cap.fn(wbName, function (arr) { const t = indexOfEntry(arr, a.comment); if (t >= 0) arr[t] = Object.assign({}, arr[t], patch); return arr; }); }
-        } catch (e) { return applyNote('update-failed'); }
-        landed.push({ action: a.action, comment: a.comment, via: cap.kind });
-        if (a.action === 'disable') disabledNow.push(a.comment);
-      }
-    }
 
-    // ── 写后复查（ⓑ）：三件事逐条复核，任一不满足即 verify-failed ──
-    let after;
-    try { after = await TH.getWorldbook(wbName); } catch (e) { return applyNote('verify-failed'); }
-    after = Array.isArray(after) ? after : [];
-    const base = p.bookSuffix;
-    const live = after.filter(function (e) {
-      const c = clean((e && e.comment) || (e && e.name), 60);
-      if (!c) return false;
-      if (c !== base && !new RegExp('^' + base + '(\\d+)$').test(c)) return false;
-      return (e && e.enabled !== false);
+        const landed = [];
+        const disabledNow = [];
+        for (let i = 0; i < p.actions.length; i++) {
+          const a = p.actions[i];
+          // replaceWorldbook 是**整表回写**：每次动手前重新读一次真源。不重读的话，
+          //   本循环先前建/改的那一条会被上一轮的快照覆盖回去 —— 新条目当场消失，
+          //   而「我调用过 API」这件事仍然成立（本仓口径：「我写了」≠「它真在那儿」）。
+          if (cap && cap.kind === 'replaceWorldbook') {
+            try { list = await TH.getWorldbook(wbName); } catch (e) { return applyNote('read-failed'); }
+            list = Array.isArray(list) ? list.slice() : [];
+          }
+          const at = indexOfEntry(list, a.comment);
+          if (a.action === 'create') {
+            // 已存在同名条目 ⇒ 不重复建（重复条目会让「单一生效」在台面上失守），改走更新
+            if (at >= 0) {
+              if (!cap) return applyNote('no-update-api');
+              try {
+                const shape = entryShape(a, cfg);
+                if (cap.kind === 'replaceWorldbook') { list[at] = Object.assign({}, list[at], shape); await cap.fn(wbName, list); }
+                else { await cap.fn(wbName, function (arr) { const t = indexOfEntry(arr, a.comment); if (t >= 0) arr[t] = Object.assign({}, arr[t], shape); return arr; }); }
+              } catch (e) { return applyNote('update-failed'); }
+              landed.push({ action: 'create', comment: a.comment, via: 'update-existing' });
+            } else {
+              try { await TH.createWorldbookEntries(wbName, [entryShape(a, cfg)]); } catch (e) { return applyNote('create-failed'); }
+              landed.push({ action: 'create', comment: a.comment, via: 'create' });
+            }
+          } else {
+            // set / disable：必须**定位到真条目**再改（ⓓ 找不到就拒收，不许改写成 create）
+            if (at < 0) return applyNote('entry-missing');
+            const patch = a.action === 'set'
+              ? entryShape(Object.assign({}, a, { enabled: true }), cfg)
+              : { enabled: false };
+            try {
+              if (cap.kind === 'replaceWorldbook') { list[at] = Object.assign({}, list[at], patch); await cap.fn(wbName, list); }
+              else { await cap.fn(wbName, function (arr) { const t = indexOfEntry(arr, a.comment); if (t >= 0) arr[t] = Object.assign({}, arr[t], patch); return arr; }); }
+            } catch (e) { return applyNote('update-failed'); }
+            landed.push({ action: a.action, comment: a.comment, via: cap.kind });
+            if (a.action === 'disable') disabledNow.push(a.comment);
+          }
+        }
+
+        // ── 写后复查（ⓑ）：三件事逐条复核，任一不满足即 verify-failed ──
+        let after;
+        try { after = await TH.getWorldbook(wbName); } catch (e) { return applyNote('verify-failed'); }
+        after = Array.isArray(after) ? after : [];
+        const base = p.bookSuffix;
+        const live = after.filter(function (e) {
+          const c = clean((e && e.comment) || (e && e.name), 60);
+          if (!c) return false;
+          if (c !== base && !new RegExp('^' + base + '(\\d+)$').test(c)) return false;
+          return (e && e.enabled !== false);
+        });
+        const liveAfter = live.length;
+        const target = p.created || p.overwritten;
+        const ti = indexOfEntry(after, target);
+        const bodyOK = ti >= 0 && String(after[ti].content == null ? '' : after[ti].content) === p.body;
+        const disOK = disabledNow.every(function (c) { const k = indexOfEntry(after, c); return k >= 0 && after[k].enabled === false; });
+        const singleOK = liveAfter <= 1;
+        if (!bodyOK || !disOK || !singleOK) return applyNote('verify-failed');
+
+        stat.applied++; stat.appliedActions += landed.length; stat.verified++;
+        stat.lastApply = { ok: true, reason: 'ok', book: wbName, target: target, liveAfter: liveAfter, at: stat.applied };
+        return { ok: true, reason: 'ok', book: wbName, cap: cap ? cap.kind : 'create-only',
+          applied: landed.length, writes: landed.length, landed: landed, disabled: disabledNow,
+          target: target, liveAfter: liveAfter, singleLive: liveAfter <= 1, verified: true, plan: p };
     });
-    const liveAfter = live.length;
-    const target = p.created || p.overwritten;
-    const ti = indexOfEntry(after, target);
-    const bodyOK = ti >= 0 && String(after[ti].content == null ? '' : after[ti].content) === p.body;
-    const disOK = disabledNow.every(function (c) { const k = indexOfEntry(after, c); return k >= 0 && after[k].enabled === false; });
-    const singleOK = liveAfter <= 1;
-    if (!bodyOK || !disOK || !singleOK) return applyNote('verify-failed');
-
-    stat.applied++; stat.appliedActions += landed.length; stat.verified++;
-    stat.lastApply = { ok: true, reason: 'ok', book: wbName, target: target, liveAfter: liveAfter, at: stat.applied };
-    return { ok: true, reason: 'ok', book: wbName, cap: cap ? cap.kind : 'create-only',
-      applied: landed.length, writes: landed.length, landed: landed, disabled: disabledNow,
-      target: target, liveAfter: liveAfter, singleLive: liveAfter <= 1, verified: true, plan: p };
   }
 
   /**
@@ -446,70 +476,74 @@
     const cap = updateCapability(TH);
     // 撤销必然要改旧条目 ⇒ 无更新能力时如实拒收（ⓒ），不做「建一条新条目冒充回退」
     if (!cap) return applyNote('no-update-api');
-    let list;
-    try { list = await TH.getWorldbook(wbName); } catch (e) { return applyNote('read-failed'); }
-    list = Array.isArray(list) ? list.slice() : [];
-    const rows = parseEntries(list);
-    const live = rows.filter(function (r) { return r.enabled; });
-    const dead = rows.filter(function (r) { return !r.enabled; });
-    if (!dead.length) return applyNote('no-previous');
-    const cur = live.length ? live[live.length - 1] : null;
-    const prev = dead[dead.length - 1];
-    if (!String(prev.content || '').trim()) return applyNote('empty-body');
-    const disabledNow = [];
-    /**
-     * 翻转一条条目的启用位，按**能力种类**分列（与 `apply` 同规）。
-     *   · updateWorldbookWith —— 递改写函数，函数拿到**真数组**，原地改写即生效；
-     *   · replaceWorldbook    —— 收的是**完整条目列表**，递函数进去等于递了个错类型。
-     * 能力探测到了**不等于用法对**：这条分支必须自己走，否则在只有 replaceWorldbook
-     * 的宿主上，撤销会以「调用成功」的样子什么也没改（本仓口径：「我调用过」≠「它变了」）。
-     * @returns {Promise<string|null>} null = 成功，否则具名原因
-     */
-    async function flip(comment, enabled) {
-      if (cap.kind === 'replaceWorldbook') {
-        let now;
-        try { now = await TH.getWorldbook(wbName); } catch (e) { return 'read-failed'; }
-        const arr = Array.isArray(now) ? now.slice() : [];
-        const t = indexOfEntry(arr, comment);
-        if (t < 0) return 'entry-missing';
-        arr[t] = Object.assign({}, arr[t], { enabled: enabled });
-        try { await cap.fn(wbName, arr); } catch (e) { return 'update-failed'; }
-        return null;
-      }
-      try { await cap.fn(wbName, function (arr) { const t = indexOfEntry(arr, comment); if (t >= 0) arr[t] = Object.assign({}, arr[t], { enabled: enabled }); return arr; }); }
-      catch (e) { return 'update-failed'; }
-      return null;
-    }
-    // 先禁当前生效的那条（若有），再启用上一版本；顺序固定，便于复查与失败定位
-    if (cur) {
-      const e1 = await flip(cur.comment, false);
-      if (e1) return applyNote(e1);
-      disabledNow.push(cur.comment);
-    }
-    const e2 = await flip(prev.comment, true);
-    if (e2) return applyNote(e2);
+    // v2.551.0（写回收口批）：同上 —— 撤销同样是「读整本 → 翻转两条 → 写回整本」，
+    //   必须与 apply 排**同一条**队（都按 wb:<书名>），否则撤销会踩在 apply 的半成品上。
+    return withBook(wbName, async function () {
+        let list;
+        try { list = await TH.getWorldbook(wbName); } catch (e) { return applyNote('read-failed'); }
+        list = Array.isArray(list) ? list.slice() : [];
+        const rows = parseEntries(list);
+        const live = rows.filter(function (r) { return r.enabled; });
+        const dead = rows.filter(function (r) { return !r.enabled; });
+        if (!dead.length) return applyNote('no-previous');
+        const cur = live.length ? live[live.length - 1] : null;
+        const prev = dead[dead.length - 1];
+        if (!String(prev.content || '').trim()) return applyNote('empty-body');
+        const disabledNow = [];
+        /**
+         * 翻转一条条目的启用位，按**能力种类**分列（与 `apply` 同规）。
+         *   · updateWorldbookWith —— 递改写函数，函数拿到**真数组**，原地改写即生效；
+         *   · replaceWorldbook    —— 收的是**完整条目列表**，递函数进去等于递了个错类型。
+         * 能力探测到了**不等于用法对**：这条分支必须自己走，否则在只有 replaceWorldbook
+         * 的宿主上，撤销会以「调用成功」的样子什么也没改（本仓口径：「我调用过」≠「它变了」）。
+         * @returns {Promise<string|null>} null = 成功，否则具名原因
+         */
+        async function flip(comment, enabled) {
+          if (cap.kind === 'replaceWorldbook') {
+            let now;
+            try { now = await TH.getWorldbook(wbName); } catch (e) { return 'read-failed'; }
+            const arr = Array.isArray(now) ? now.slice() : [];
+            const t = indexOfEntry(arr, comment);
+            if (t < 0) return 'entry-missing';
+            arr[t] = Object.assign({}, arr[t], { enabled: enabled });
+            try { await cap.fn(wbName, arr); } catch (e) { return 'update-failed'; }
+            return null;
+          }
+          try { await cap.fn(wbName, function (arr) { const t = indexOfEntry(arr, comment); if (t >= 0) arr[t] = Object.assign({}, arr[t], { enabled: enabled }); return arr; }); }
+          catch (e) { return 'update-failed'; }
+          return null;
+        }
+        // 先禁当前生效的那条（若有），再启用上一版本；顺序固定，便于复查与失败定位
+        if (cur) {
+          const e1 = await flip(cur.comment, false);
+          if (e1) return applyNote(e1);
+          disabledNow.push(cur.comment);
+        }
+        const e2 = await flip(prev.comment, true);
+        if (e2) return applyNote(e2);
 
-    // ── 写后复查（同 ⓑ）：恢复的那条真启用了、内容还在、台面仍单一生效 ──
-    let after;
-    try { after = await TH.getWorldbook(wbName); } catch (e) { return applyNote('verify-failed'); }
-    after = Array.isArray(after) ? after : [];
-    const ri = indexOfEntry(after, prev.comment);
-    const backOK = ri >= 0 && after[ri].enabled !== false && String(after[ri].content == null ? '' : after[ri].content) === String(prev.content || '');
-    const disOK = disabledNow.every(function (c) { const k = indexOfEntry(after, c); return k >= 0 && after[k].enabled === false; });
-    const liveAfter = after.filter(function (e) {
-      const c = clean((e && e.comment) || (e && e.name), 60);
-      if (!c) return false;
-      if (c !== cfg.bookSuffix && !new RegExp('^' + cfg.bookSuffix + '(\\d+)$').test(c)) return false;
-      return (e && e.enabled !== false);
-    }).length;
-    if (!backOK || !disOK || liveAfter > 1) return applyNote('verify-failed');
+        // ── 写后复查（同 ⓑ）：恢复的那条真启用了、内容还在、台面仍单一生效 ──
+        let after;
+        try { after = await TH.getWorldbook(wbName); } catch (e) { return applyNote('verify-failed'); }
+        after = Array.isArray(after) ? after : [];
+        const ri = indexOfEntry(after, prev.comment);
+        const backOK = ri >= 0 && after[ri].enabled !== false && String(after[ri].content == null ? '' : after[ri].content) === String(prev.content || '');
+        const disOK = disabledNow.every(function (c) { const k = indexOfEntry(after, c); return k >= 0 && after[k].enabled === false; });
+        const liveAfter = after.filter(function (e) {
+          const c = clean((e && e.comment) || (e && e.name), 60);
+          if (!c) return false;
+          if (c !== cfg.bookSuffix && !new RegExp('^' + cfg.bookSuffix + '(\\d+)$').test(c)) return false;
+          return (e && e.enabled !== false);
+        }).length;
+        if (!backOK || !disOK || liveAfter > 1) return applyNote('verify-failed');
 
-    stat.applied++; stat.verified++; stat.undone++;
-    // 成功与 `apply` **同码**（`reason:'ok'`）：「这是一次撤销」记在 `mode` 上，
-    //   不另起一个 `reason:'undo'` —— 成功值不是拒收码，混进拒收码账本只会让账变脏。
-    stat.lastApply = { ok: true, reason: 'ok', mode: 'undo', book: wbName, restored: prev.comment, liveAfter: liveAfter, at: stat.applied };
-    return { ok: true, reason: 'ok', mode: 'undo', book: wbName, restored: prev.comment,
-      disabled: disabledNow, verified: true, liveAfter: liveAfter, singleLive: liveAfter <= 1 };
+        stat.applied++; stat.verified++; stat.undone++;
+        // 成功与 `apply` **同码**（`reason:'ok'`）：「这是一次撤销」记在 `mode` 上，
+        //   不另起一个 `reason:'undo'` —— 成功值不是拒收码，混进拒收码账本只会让账变脏。
+        stat.lastApply = { ok: true, reason: 'ok', mode: 'undo', book: wbName, restored: prev.comment, liveAfter: liveAfter, at: stat.applied };
+        return { ok: true, reason: 'ok', mode: 'undo', book: wbName, restored: prev.comment,
+          disabled: disabledNow, verified: true, liveAfter: liveAfter, singleLive: liveAfter <= 1 };
+    });
   }
 
   WA.outlineInject = {

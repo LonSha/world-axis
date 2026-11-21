@@ -22583,6 +22583,29 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //     E 非空转（合成 WA.polish 必红 / WA.polishExtra 不误伤 / 三个排除面存在 / autoHide 仍在窄台账）。
   //   负控一条：在 render/inject.js 追加一行提到 WA.polish 的注释 ⇒ C·polish 红并点名该文件；还原即绿。
   await runScript('./orphan-engine-adjudication-v2550.js');
+  // v2.551.0（写回收口）：世界书写回三处收口到同一条按书串行队列 —— 18 段。
+  //   病灶（比「没接线」更具体的一件）：
+  //     writeSerial 自 v2.529.0 入库起零读，evidence 写的是「没有统一写回点」。本批实测把它量清楚了：
+  //     写回点不是没有，是**有三个且互不知情** —— outline-inject.apply（面板「采纳」+ AI 工具）、
+  //     outline-inject.undo 内部的 flip（绕过 apply 直接调 cap.fn）、wb-inject.ensureEntry
+  //     （before 链 order 17，autoEnsure 打开时每轮可能触发）。形态都是「读整本 → 改一条 → 写整本」：
+  //     谁先读到旧整本，谁就在写回时覆盖掉别人刚建的条目，而每一步都「调用成功」。
+  //   为什么不能只包「写入」：竞态在「读到旧整本」与「写回整本」之间。只包写入的话两次 apply
+  //     仍会各自拿着同一份旧快照互相覆盖 —— 写入排队了、数据照样丢，读数上还看不出。
+  //   引擎侧补的两半（它自己缺的那一半）：
+  //     ① serial(name)：按名取**同一条**队列。此前只有 createSerial，而它每次都新建
+  //        —— 两个调用方各自 createSerial('wb') 得到两条互不相干的队列，串行在读数上启用、
+  //        在行为上完全失效。
+  //     ② runStrict(fn)：不吞异常、队列不断。三个调用方都靠 catch 产出具名拒收码
+  //        （create-failed / update-failed / verify-failed），而 run 会把异常吞成 undefined
+  //        ⇒ 把「具名拒收」退化成「静默什么都没做」。
+  //   读数：18 段全绿 —— A 静态契约（幂等 / 空参归一 / serials 只读）、
+  //     B 真接线（三个写入口整段在 withBook 内、同一 key 形态、无绕道写点、引擎侧 Map 缓存）、
+  //     C 行为实测（并发 apply 恰 1 条 / 并发 ensure 同 order 恰 1 条 / 不同 order 2 条 /
+  //       同队列 FIFO / 跨书不互斥 / runStrict 异常穿透 / run 对照吞错）、
+  //     D 运行时负控（serial 换成每次新建、serial 摘成 undefined，两向都必须现形）、
+  //     E 真源码破坏（withBook 的走队列改回直跑 ⇒ 并发 ensure 必建出 2 条同 order，随后逐字节还原 + sha256）。
+  await runScript('./worldbook-write-serial-v2551.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
