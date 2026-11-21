@@ -29,6 +29,17 @@
  *   全静默，理由由 LLM 写、失败走模板兜底）。许可 PolyForm NC ⇒ **搬算法不搬代码**，
  *   并且把原文隐含的东西显式化：闸门顺序固定、拒收分名、窗可跨零点、日上限可配。
  *
+ * ── v2.548.0：冷落分级与追人上限（缝合「迷雾之外」Interlude v4.7.2）──────
+ *   旧版只有一条静默阈值：300 分钟与三天得到同一句「该开口了」，久断联反而更热络——
+ *   正是「倒贴」的形状。同时追人**没有上限**：跨天累计的 `count` 一直在记，却没有任何
+ *   一处拿它当判据（冷战永远不收敛）。
+ *   可缝的是两条口径（原文是世界书里的提示词约束，本仓落成判据）：
+ *   ① **冷落分级**：轻重不是形容词，是静默时长的三档（`mediumAt` / `heavyAt`）；
+ *      `level` 随 due 一起返回，措词由调用方（spotlight 轻提）按档位换。
+ *   ② **追人上限**：同一对象累计追到 `chaseCap` 次仍无回应 ⇒ `chase-cap` 拒收，
+ *      不再主动开口（原文「冷战最多四五轮」，默认 4）。
+ *   级别是**读数**不是按钮：它不推进关系、不改 bonds，只回答「这一句该多热」。
+ *
  * ── 边界（全是否定式）──────────────────────────────────────────
  *   ① 总开关默认关闭。关闭时一律 `disabled`，不落账。
  *   ② **不看正文、不判「该说什么」**：只答「现在该不该响」。理由文案（原文那 25 字
@@ -44,9 +55,13 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_followupgate_settings_v1';
-  const DEF = { enabled: true, idleThreshold: 300, hoursFrom: 12, hoursTo: 23, perDayCap: 2, maxItems: 24, dnd: false };
+  const DEF = { enabled: true, idleThreshold: 300, hoursFrom: 12, hoursTo: 23, perDayCap: 2, maxItems: 24, dnd: false,
+    // v2.548.0：冷落三档的下界（分钟）与追人上限（次）。heavyAt 不设上限是因为
+    //   「多久算彻底断联」随题材变（末日三十天与校园三天不是一回事）。
+    mediumAt: 1440, heavyAt: 4320, chaseCap: 4 };
   const __REG = { key: LS_KEY, def: DEF, module: 'followupGate',
-    bounds: { idleThreshold: [10, 4320], hoursFrom: [0, 23], hoursTo: [0, 24], perDayCap: [1, 12], maxItems: [4, 64] } };
+    bounds: { idleThreshold: [10, 4320], hoursFrom: [0, 23], hoursTo: [0, 24], perDayCap: [1, 12], maxItems: [4, 64],
+      mediumAt: [60, 10080], heavyAt: [60, 43200], chaseCap: [1, 12] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
@@ -68,6 +83,23 @@
   function dayKey(at) {
     const d = new Date(Number.isFinite(at) ? at : clockNow('followupGate.day'));
     return d.getUTCFullYear() + '-' + (d.getUTCMonth() + 1) + '-' + d.getUTCDate();
+  }
+  /**
+   * 冷落分级：静默时长 → light / medium / heavy。
+   *   三档下界都可配；`heavyAt` 被抬到 `≥ mediumAt`（不让配置把重档变成永远不到的档）。
+   *   两个下界**相等**时，中档是空档、重档接管（这是配置错误，
+   *   不是隐藏行为：view() 把 mediumAt / heavyAt 两项都如实给出，可核）。
+   */
+  function levelBounds(cfg) {
+    const c = cfg || settings();
+    const mid = Number(c.mediumAt) || DEF.mediumAt;
+    const high = Math.max(mid, Number(c.heavyAt) || DEF.heavyAt);
+    return { mid: mid, high: high };
+  }
+  function levelOf(idle, cfg) {
+    const b = levelBounds(cfg);
+    const m = Number(idle) || 0;
+    return m >= b.high ? 'heavy' : (m >= b.mid ? 'medium' : 'light');
   }
   function hourOf(at) {
     return new Date(Number.isFinite(at) ? at : clockNow('followupGate.hour')).getUTCHours();
@@ -93,12 +125,17 @@
     const row = b.items && b.items[item] ? b.items[item] : null;
     const dayBucket = (b.days && b.days[today]) || 0;
     const lastDay = row && row.lastDay ? String(row.lastDay) : '';
+    const level = levelOf(idle, cfg);
+    const chase = row ? (Number(row.count) || 0) : 0;
+    // v2.548.0：追人上限排在时段之前——「追太多次」不取决于现在几点，
+    //   也不该因为「今天还没提过」而被重置（那就是无限追）。
     const reason = idle < cfg.idleThreshold ? 'still-quiet'
-      : !inWindow(hour, cfg.hoursFrom, cfg.hoursTo) ? 'out-of-window'
-        : lastDay === today ? 'already-today'
-          : dayBucket >= cfg.perDayCap ? 'day-cap' : '';
-    if (reason) { stat.blocked++; return { ok: false, reason: reason }; }
-    return { ok: true, item: item, day: today, hour: hour };
+      : chase >= cfg.chaseCap ? 'chase-cap'
+        : !inWindow(hour, cfg.hoursFrom, cfg.hoursTo) ? 'out-of-window'
+          : lastDay === today ? 'already-today'
+            : dayBucket >= cfg.perDayCap ? 'day-cap' : '';
+    if (reason) { stat.blocked++; return { ok: false, reason: reason, level: level, chase: chase }; }
+    return { ok: true, item: item, day: today, hour: hour, level: level, chase: chase };
   }
   function fire(item, at) {
     const cfg = settings();
@@ -133,6 +170,7 @@
     return {
       enabled: cfg.enabled, dnd: cfg.dnd, idleThreshold: cfg.idleThreshold,
       window: [cfg.hoursFrom, cfg.hoursTo], perDayCap: cfg.perDayCap,
+      mediumAt: levelBounds(cfg).mid, heavyAt: levelBounds(cfg).high, chaseCap: cfg.chaseCap,
       items: Object.keys(b.items || {}).length
     };
   }

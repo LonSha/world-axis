@@ -22531,6 +22531,26 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //         负控三条：指纹退回只比长度 ⇒ B1 报「等长不同文被当成同一楼（去重命中）：1 -> 2」；
   //         去掉 removed>0 判据 ⇒ E2 报 true !== false；去掉 overMatch 判据 ⇒ E3 红。
   await runScript('./narrative-depth-wire-v2547.js');
+  // v2.548.0（引擎深度第五批）：冷落三分级 + 追人上限 + 轻提真落账 —— 14 段。
+  //   病灶（三条，都是「判据在、落点不在」）：
+  //     ① followupGate.fire 全仓零产品调用 ⇒ due 的「今天已提过 / 每日上限」两道闸
+  //       恒无账可判（每轮都重新放行）：承诺了「一天最多几次」，生产里一次都没执行过。
+  //     ② spotlight.resolveIntervention 同样只有测试在调 ⇒ 静默闸、防全知拦截、在场熟人线索全是「判了没人用」；
+  //       v2.545.0 注销 followupGate 时把这条**测试读点**当成了产品读点（账目更正已写进 ns-consumer-ledger 的 _note）。
+  //     ③ 静默只有一条阈值：300 分钟与三天得到同一句「该开口了」，久断联反而更热络 ——
+  //       正是倒贴；追人也没有上限，冷战不收敛。缝合来源：「迷雾之外」Interlude v4.7.2 的冷落分级与「冷战最多四五轮」。
+  //   落点：followupGate 增 level（light/medium/heavy，mediumAt / heavyAt 可配）+ chaseCap；
+  //     spotlight.buildBlock 真调 resolveIntervention，把 level 译成三种措词，并在真要提的那一刻 fire
+  //     （幂等：同日同人只记一次）。
+  //   读数：专锁 narrative-depth-wire-v2548 14 段全绿 ——
+  //     分级边界 1439/1440/4319/4320；chaseCap=4 追满即拒、=1 一轮即收、且排在时段之前；
+  //     久缺 ⇒ 注入块出现「顺口提一句」，刚见过 ⇒ 没有；perDayCap=1 ⇒ 第二个只读数不提；
+  //     heavy ⇒ 「暂不打扰」；闸门缺席 ⇒ 退回旧行为不崩；buildBlock 不改 spotlight.rows。
+  //   负控三条（真破坏后单打，各自还原）：
+  //     删 due 里的 chase 判据 ⇒ B1 红（ok:true, chase:4 —— 追满了还放行）；
+  //     删 buildBlock 里的 fire（连 catch 一起删，避免只是语法错）⇒ D1 红（账本仍 {"items":{},"days":{}}）；
+  //     把 level→措词写死 light ⇒ E 红（heavy 档仍写「顺口提一句」）。
+  await runScript('./narrative-depth-wire-v2548.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

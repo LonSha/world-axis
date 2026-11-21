@@ -15,6 +15,18 @@
  * 与 actors/observe.js 的分工：observe 从正文切片观察「谁出现在场景里」（文本面）；
  * 本模块是叙事者**显式登记**的登场账（声明面），不读正文、不猜。两账可互相印证。
  *
+ * ── v2.548.0：轻提三分级（缝合「迷雾之外」的冷落分级）─────────
+ *   两个真病在这一步被照出来：
+ *   ① `resolveIntervention` 此前**全仓只有测试在调**（产品零消费者）——
+ *      静默闸、防全知拦截、在场熟人线索全都是「判了没人用」。
+ *   ② `followupGate.fire` 同样零产品调用 ⇒ due 的「今天已提过」与「每日上限」
+ *      两道闸恒无账可判（每轮都会重新放行）。
+ *   现在：buildBlock 按 resolveIntervention 的结论写一行提示，level（followupGate 给）
+ *   译成三种措词：顺口提一句 / 只留痕迹 / 暂不打扰；并在真要提的那一刻
+ *   调一次 `fire`（幂等：同日同人只记一次，构建两次不会吃多日额度）。
+ *   冷落不分级的后果是「越久没见越热络」——正是倒贴；三档是为了让
+ *   久断联的人只留痕迹、不给台词（直到玩家去找）。
+ *
  * 边界（全是否定式）：
  *   1 总开关默认关闭。关闭时写路径报 reason:'disabled'，不出读数。
  *   2 名字缺或空整次拒收（bad-who）——空名登场不是登场。
@@ -179,13 +191,17 @@
     //   治什么：本口原来只要「missed 够多」就每轮轻提一次，于是读者读到的是
     //   「刚见过的人又被顺口带一句」——催办感。followup-gate 回答的正是
     //   「什么都没发生、只是很久没动静了，谁该先开口、多久、一天最多几次」。
-    //   本口仍保持**零写**：只问 due（静默/时段两闸），fire 的当日记账交给结算侧
-    //   （这里写 store 会把只读投影变成写路径）。
+    //   本口只问 due，**不在这里 fire**：这个函数被测试与面板当只读探针调，写账会污染读数。
+    //   v2.548.0 起 fire 落在 buildBlock 里「真的要提」的那一处（注入构建侧、幂等），
+    //   于是 due 的「今天已提过 / 每日上限」两道闸第一次有账可判。
     const gateAt = clockNow('spotlight.followup');
+    let gateLevel = 'light', gateChase = 0;
     if (WA.followupGate && typeof WA.followupGate.due === 'function') {
       const lastAt = Number(target.at) || 0;
       const idleMinutes = lastAt > 0 ? Math.max(0, Math.round((gateAt - lastAt) / 60000)) : 99999;
       const gate = WA.followupGate.due({ item: who, idleMinutes: idleMinutes, at: gateAt });
+      if (gate && gate.level) gateLevel = gate.level;
+      if (gate && Number(gate.chase) > 0) gateChase = Number(gate.chase);
       if (!gate || gate.ok !== true) {
         return {
           ok: true,
@@ -224,6 +240,8 @@
       action: 'presence-trace',
       target: who,
       missed: target.missed,
+      level: gateLevel,
+      chase: gateChase,
       allowedSpeakers: presentAcquaintances.slice(),
       itemTrace: items[0] || null,
       cue: cue,
@@ -231,7 +249,7 @@
     };
   }
 
-  function buildBlock() {
+  function buildBlock(opt) {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
     const all = rows();
     if (!all.length) return '';
@@ -242,6 +260,39 @@
     const lines = ['[焦点分配] 登场均衡读数：'];
     if (idleList.length) lines.push('· 久未登场：' + idleList.map(function (r) { return r.who + '（缺 ' + r.missed + ' 轮）'; }).join('、'));
     if (hotList.length) lines.push('· 连续在场：' + hotList.map(function (r) { return r.who + '（连 ' + r.streak + ' 轮）'; }).join('、'));
+    // v2.548.0：轻提三分级 —— resolveIntervention 的第一个产品消费者。
+    //   只提**最该被提的那一个**：这里不是名单渲染器，一行就够。
+    //   三种措词对应 followupGate 的 level：light 随口提、medium 只留痕迹、
+    //   heavy 不再主动开口。heavy 仍然写进去：「别让他开口」是一条约束，
+    //   不是没有提示（没有提示时模型会自己猜「该轮到他了吧」）。
+    const traces = [];
+    if (idleList.length) {
+      const o = opt || {};
+      let res = null;
+      try {
+        res = resolveIntervention({ busy: !!o.busy, inScene: Array.isArray(o.inScene) ? o.inScene : [],
+          mentioner: o.mentioner, relations: o.relations, registeredTraces: o.registeredTraces });
+      } catch (e) { noteFault('trace-exception'); }
+      if (res && res.ok === true && res.action === 'presence-trace' && res.target) {
+        const lvl = (res.level === 'medium' || res.level === 'heavy') ? res.level : 'light';
+        const missed = Number(res.missed) || 0;
+        if (lvl === 'light') lines.push('· 顺口提一句：' + res.target + '（缺 ' + missed + ' 轮）—— 一句带过即可，不必让他本人出场');
+        else if (lvl === 'medium') lines.push('· 只留痕迹：' + res.target + '（缺 ' + missed + ' 轮）—— 由在场的熟人带一句，不给他台词');
+        else lines.push('· 暂不打扰：' + res.target + '（缺 ' + missed + ' 轮）—— 这一轮别让他主动开口，等玩家去找');
+        let fired = null;
+        // fire 是幂等的（同日同人只记一次），所以落在构建侧不会因为
+        //   「一次生成里构建两次」而多吃日额度；不落账则 due 的
+        //   「今天已提过」与「每日上限」两道闸永远没有账可判。
+        try { if (WA.followupGate && typeof WA.followupGate.fire === 'function') fired = WA.followupGate.fire(res.target, clockNow('spotlight.fire')); }
+        catch (e) { noteFault('fire-exception'); }
+        traces.push({ who: res.target, level: lvl, missed: missed, fired: !!(fired && fired.ok === true) });
+        stat.lastTrace = traces[traces.length - 1];
+      } else if (res && res.ok === true && res.action === 'none') {
+        stat.lastTrace = { who: '', level: '', missed: 0, fired: false, hold: res.reason || 'none' };
+      } else if (res && res.ok === false) {
+        noteFault(res.reason || 'trace-refused');
+      }
+    }
     lines.push('均衡铁律：各角色有自己的事务与目的，不强制人人表态，也不让配角只负责附和；镜头外的角色可以继续与主线无关的活动，交集必须具有合理的因果来源。');
     return lines.join('\n') + '\n';
   }
