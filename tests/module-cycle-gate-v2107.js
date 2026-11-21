@@ -536,7 +536,10 @@ function runAll(A) {
   //   +1 (engines/spotlight.js, followupGate)         轻提静默闸
   //   = 4025 + 4 = 4029。另：HEAD 65713bc 实测已是 4027（v2.542.25/2.542.26 有两条未跟位），
   //   本版一并补账 ⇒ 4031；恒等式 476 + 4031 = 4507。
-  A(a.edgesLoad === 476 && a.edgesCall === 4031 && a.edgesAll === 4507 && a.identityOk,
+  // v2.546.0：调用期 4031 → 4032（+1：(engines/inject-collector.js, compactTiming) 是一对**新**的
+  //   (file, ns) 边 —— compactTiming.plan 自入库起产品面零读，本版在装配后真判一次折叠时机）。
+  //   装载期仍 476；恒等式 476 + 4032 = 4508。
+  A(a.edgesLoad === 476 && a.edgesCall === 4032 && a.edgesAll === 4508 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -722,7 +725,8 @@ function runAll(A) {
   //   提供方与账本不变（647/590），差恒等式不动。
   // v2.545.0 跟位：读面 587 → 592。HEAD 65713bc 实测 588（存量 +1 未跟位）；
   //   本会话 +4：dreamSettle / lensCulling / weightedDraw / followupGate 各一对新 (file, ns) 边。
-  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 592,
+  // v2.546.0：读面 592 → 593（compactTiming 由 inject-collector 真读）。
+  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 593,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -767,7 +771,8 @@ function runAll(A) {
   // v2.545.0 跟位：零读 ns 64 → 59。HEAD 65713bc 实测 63（存量 -1 未跟位）；
   //   本会话 -4：dreamSettle（dream.archive）/ lensCulling（eavesdrop）/ weightedDraw（regional.roll）/
   //   followupGate（spotlight.resolveIntervention）四条零读 ns 出表。
-  A(a.deadNs.length === 59, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  // v2.546.0：零读 ns 59 → 58（compactTiming 出表）。
+  A(a.deadNs.length === 58, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

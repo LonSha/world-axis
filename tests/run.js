@@ -22508,6 +22508,15 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   读数：专锁 narrative-depth-wire-v2545 4 段全绿；负控置假分支后 A 段报 presence-trace。
   //   边界：本口保持零写（fire 的当日记账交给结算侧），只读投影不变写路径。
   await runScript('./narrative-depth-wire-v2545.js');
+  // v2.546.0 引擎深度第二批（1）：折叠时机判据（compactTiming.plan）接进注入装配
+  //   病灶：inject-collector 按预算硬折，缓存还热也照折 —— 省下的读量要几十轮才回本；
+  //         而回答「什么时候折」的 compactTiming.plan 全仓零调用。
+  //   落点：装配完把「本轮折掉的 token 量 + 上次回复时刻」交给 plan 判一次，
+  //         读数挂 stat().fold 与 diagnose().fold（同源）；本轮不改折叠结果（预算仍归 injectBudget）。
+  //   读数：专锁 narrative-depth-wire-v2546 5 段全绿（热→hold / 冷→fold / 无折→none / 缺席→null）；
+  //         负控置假分支后 B 段报「折的量应过触发线：null」。
+  //   坑：plan 的 lastReplyMs 是「时刻」不是「距今差」——传差值会被当成 1970 年，一律判冷。
+  await runScript('./narrative-depth-wire-v2546.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

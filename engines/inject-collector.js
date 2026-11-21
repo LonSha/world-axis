@@ -506,8 +506,32 @@
     const block = compose(picked, candidates.length - picked.length);
     const inputs = candidates.map(function(r){return {source:'结构汇流',content:'· '+r.label+'：'+r.text};});
     const volume = WA.injectBudget.volumeView(inputs, block ? [{source:'结构汇流',content:block}] : []);
+    // v2.546.0（引擎深度）：折叠时机判据接上 compactTiming —— 折了多少、当时缓存热不热、值不值。
+    //   此前 compact-timing.plan 全仓零调用：预算到了就折，缓存还热也照折（省下的读量
+    //   要几十轮才回本）。这里只出**读数**，不改本轮折叠结果（预算仍归 injectBudget）；
+    //   谁要按建议改，读 diagnose().fold 即可，判据只有这一处。
+    let foldAdvice = null;
+    try {
+      if (WA.compactTiming && typeof WA.compactTiming.plan === 'function') {
+        const foldedText = candidates.filter(function (r) { return picked.indexOf(r) < 0; })
+          .map(function (r) { return '· ' + r.label + '：' + r.text; }).join('\n');
+        let lastReplyMs = null;
+        try {
+          const li = WA.store.get().lastInjection;
+          // 注意：compactTiming.plan 的 lastReplyMs 是「上次回复的时刻」而不是「距今差」——
+          //   它内部用 now - last 算 age。传差值会被当成 1970 年附近的时刻，一律判成「冷」。
+          if (li && Number(li.at) > 0) lastReplyMs = Number(li.at);
+        } catch (e2) { lastReplyMs = null; }
+        foldAdvice = WA.compactTiming.plan({
+          foldTokens: foldedText ? tokenCost(foldedText) : 0,
+          tailTokens: tokenCap > 0 ? tokenCap : cap,
+          lastReplyMs: lastReplyMs,
+          messages: candidates.length
+        });
+      }
+    } catch (e) { foldAdvice = { ok: false, action: 'error', reason: 'compact-timing-error:' + (e && e.message) }; }
     last = { enabled: true, selected: picked.length, folded: candidates.length - picked.length,
-      chars: block.length, cap: cap, tokenCap: tokenCap, tokens: tokenCost(block), candidateCount: candidates.length, inputTokens: inputs.reduce(function(n,r){return n+tokenCost(r.content);},0), volume: volume, rows: picked, skipped: skipped, faults: faults, chatId: WA.store.chatId() };
+      chars: block.length, cap: cap, tokenCap: tokenCap, tokens: tokenCost(block), candidateCount: candidates.length, inputTokens: inputs.reduce(function(n,r){return n+tokenCost(r.content);},0), volume: volume, rows: picked, skipped: skipped, faults: faults, fold: foldAdvice, chatId: WA.store.chatId() };
     return block;
   }
   WA.injectCollector = {
@@ -522,7 +546,7 @@
       const populated=Object.keys(s.people||{}).length>0||(s.currents||[]).length>0||(s.events&&s.events.rows||[]).length>0;
       const faults=last.faults.slice();
       if(populated&&last.candidateCount===0)faults.push({fault:'state-but-no-candidate',scope:'collector-five-owners',note:'可能是源关闭/可见性过滤或无适用材料，不代表整个世界注入失败'});
-      return {ok:faults.length===0,status:faults.length?'attention':'ok',candidateCount:last.candidateCount,selected:last.selected,faults:faults,routine:Object.assign({},routineTrace)};
+      return {ok:faults.length===0,status:faults.length?'attention':'ok',candidateCount:last.candidateCount,selected:last.selected,fold:last.fold||null,faults:faults,routine:Object.assign({},routineTrace)};
     },
     noteScene: function (info) {
       const i = info || {};
