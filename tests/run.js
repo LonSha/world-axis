@@ -22500,6 +22500,14 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //         定向回归：scenario-v13-room-acoustics 50 项、v18-acoustic-whisper 8 项全绿。
   //   为什么不改首轮手感：seen 为空时所有候选同乘 softPity，归一化后与旧线性抽取同分布。
   await runScript('./narrative-depth-wire-v2544.js');
+  // v2.545.0 叙事深度第一批（4/5）：spotlight 轻提接 followup-gate 静默闸
+  //   病灶：spotlight 只看 missed 轮数就每轮轻提一次 —— 刚见过的人也被「顺口带一句」，
+  //         读者读到的是催办感；followup-gate 的静默阈值/时段/日上限全仓零调用。
+  //   落点：resolveIntervention 的 presence-trace 分支先问 due({item, idleMinutes, at})，
+  //         不过闸返回 action none / reason followup-hold（带 gateReason）；gate 缺席退回原行为。
+  //   读数：专锁 narrative-depth-wire-v2545 4 段全绿；负控置假分支后 A 段报 presence-trace。
+  //   边界：本口保持零写（fire 的当日记账交给结算侧），只读投影不变写路径。
+  await runScript('./narrative-depth-wire-v2545.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

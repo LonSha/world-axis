@@ -60,7 +60,7 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 // v2.542.23：66 -> 65（storyExport 按纪律④出表：panel「导出正文」真调 storyExport.build，
 //   接线完成即删除本行——这正是 _classes.pending-wire 的原文，不是判据放宽）。
 // v2.542.24：65 -> 64（apiVault 按纪律④出表：api-router 的读写链真调它）。
-const BASE_DEAD_NS = 60;   // v2.544.0：64 → 60 —— dreamSettle（入卷口空稿闸）、importKind（ui/panel.js 导入面 detectText/describe）、lensCulling（spatial-acoustics.eavesdrop 真读 cullAcousticEvent）、weightedDraw（regional.weightedPick 真读 draw / weightOf）四条已真接产品读点，按纪律④删行出表；零读面确实变了 4 条，故此处同步改基线并写明原因。   // v2.533.0 跟位：47 → 66（+19，缝合批）→ 69（+2，factAge / jsonRepair）→ 70/71/72（三台缝合件入库，各 +1）→ **69**（v2.533.0 收口：副本族 / 上下文边界 / 写前预演 三台已由 ui/settings.js 的「缝合件台账」读数行接线，按纪律④删行出表；本轮新增的引导弧 / 存档体检从入库起就在同一行被读，故不进表）。 七个拆段表文件（OPV29-07~11）不进本账：它们不是零读，是在调用期被同族引擎读。
+const BASE_DEAD_NS = 59;   // v2.545.0：60 → 59 —— followupGate（spotlight 轻提闸）已真接产品读点，按纪律④出表；零读面确实又少 1 条，故基线同步。   // v2.544.0：64 → 60 —— dreamSettle（入卷口空稿闸）、importKind（ui/panel.js 导入面 detectText/describe）、lensCulling（spatial-acoustics.eavesdrop 真读 cullAcousticEvent）、weightedDraw（regional.weightedPick 真读 draw / weightOf）四条已真接产品读点，按纪律④删行出表；零读面确实变了 4 条，故此处同步改基线并写明原因。   // v2.533.0 跟位：47 → 66（+19，缝合批）→ 69（+2，factAge / jsonRepair）→ 70/71/72（三台缝合件入库，各 +1）→ **69**（v2.533.0 收口：副本族 / 上下文边界 / 写前预演 三台已由 ui/settings.js 的「缝合件台账」读数行接线，按纪律④删行出表；本轮新增的引导弧 / 存档体检从入库起就在同一行被读，故不进表）。 七个拆段表文件（OPV29-07~11）不进本账：它们不是零读，是在调用期被同族引擎读。
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。

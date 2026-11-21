@@ -130,7 +130,7 @@
     const t = Number(threshold);
     const th = isFinite(t) && t > 0 ? Math.floor(t) : cfg.idleThreshold;
     const list = rows().filter(function (r) { return (r.missed || 0) >= th; })
-      .map(function (r) { return { who: r.who, missed: r.missed, seen: r.seen || 0 }; });
+      .map(function (r) { return { who: r.who, missed: r.missed, seen: r.seen || 0, at: Number(r.at) || 0 }; });
     list.sort(function (a, b) { return b.missed - a.missed; });
     return { ok: true, threshold: th, rows: list };
   }
@@ -175,6 +175,29 @@
     }
 
     // 2. 弱介入：轻提 (Presence Trace)
+    //   v2.545.0（引擎深度第一批·4）：轻提前先过 followup-gate 的静默阈值。
+    //   治什么：本口原来只要「missed 够多」就每轮轻提一次，于是读者读到的是
+    //   「刚见过的人又被顺口带一句」——催办感。followup-gate 回答的正是
+    //   「什么都没发生、只是很久没动静了，谁该先开口、多久、一天最多几次」。
+    //   本口仍保持**零写**：只问 due（静默/时段两闸），fire 的当日记账交给结算侧
+    //   （这里写 store 会把只读投影变成写路径）。
+    const gateAt = clockNow('spotlight.followup');
+    if (WA.followupGate && typeof WA.followupGate.due === 'function') {
+      const lastAt = Number(target.at) || 0;
+      const idleMinutes = lastAt > 0 ? Math.max(0, Math.round((gateAt - lastAt) / 60000)) : 99999;
+      const gate = WA.followupGate.due({ item: who, idleMinutes: idleMinutes, at: gateAt });
+      if (!gate || gate.ok !== true) {
+        return {
+          ok: true,
+          action: 'none',
+          reason: 'followup-hold',
+          target: who,
+          missed: target.missed,
+          idleMinutes: idleMinutes,
+          gateReason: (gate && gate.reason) || 'no-gate-result'
+        };
+      }
+    }
     const rels = (ctx.relations && Array.isArray(ctx.relations[who])) ? ctx.relations[who] : [];
     const presentAcquaintances = inScene.filter(function (p) { return rels.indexOf(p) >= 0; });
 
