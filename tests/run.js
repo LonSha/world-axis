@@ -22673,6 +22673,17 @@ await runScript('./patch-rehearsal-wire-v2554.js');
 //   N 四条负控（改回插入顺序 / 删 !mark 分支 / stale 全让位 / 读数不拷贝）。
 //   单独跑：node tests/foreshadow-quota-v2555.js
 await runScript('./foreshadow-quota-v2555.js');
+// v2.556.0：暗线注入名额专锁 —— `dormant-ladder.buildBlock` 的三处病（同一个病的第二处）：
+//   ① 伏笔那一支读的是 `d.foreshadow`（顶层键，永远 undefined）⇒「埋着的」从来没产出过一行；
+//   ② `project({limit:8})` **先截候选再筛四态** ⇒ 配额被会被筛掉的条目占掉；
+//   ③ 剩下 `slice(0, blockLimit)` 按数组顺序取 ⇒ 实测 8 条「听闻」（最弱档）把名额全占，
+//      「已介入」「已错过」一条都进不来。
+//   改法：读真源 memory.foreshadows / 先筛后截 / pickBlock 按引擎自己的六态 LADDER 位次降序
+//   （不新造优先级表）+ 同档按 ladderAt 越近越先 + 名额够就原样全进；名额面读数进 stat().block，
+//   并由 tool-diag 的 secDormantLadder 节真读。
+//   20 段：A 静态 / B 行为（含伏笔真进场、防泄露、两端态不进）/ C 读数 / N 四条负控。
+//   单独跑：node tests/dormant-quota-v2556.js
+await runScript('./dormant-quota-v2556.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
