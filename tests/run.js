@@ -22732,6 +22732,20 @@ await runScript('./act-quota-v2559.js');
 //   23 段：A 静态 / B 行为 / C 读数 / N 四条负控（含删 IN_TRANSIT 登记）。
 //   单独跑：node tests/probe-cases-quota-v2560.js
 await runScript('./probe-cases-quota-v2560.js');
+// v2.561.0：机会注入名额专锁 —— `opportunity.buildBlock`（同一个病的第八处，换了一条腿）：
+//   前七处病在「按追加顺序截断 N 条」，这一处多了一层：机会是**会过期的**。
+//   `all.filter(isActive).concat(lapsed.slice(-2)).slice(0, maxOpen)` 按插入顺序取前 4 条 ⇒
+//   一条「还有 3 天」的窗占着名额，一条「5 分钟后关」的窗一个字都进不来，
+//   而后者这一轮不进就永远不再有机会（实测 4 条 3 天窗 + 2 条 5 分钟/1 小时窗：列出的正是那四条）。
+//   更硬的一处：窗口**已关**（endAt < now）但 sweep 还没标 lapsed 的行阶段仍是 open，
+//   于是照常参与竞争，占掉 4 个名额的前两名，而它自己的行文里写着「已错过（不可再参与）」。
+//   改法：pickBlock（名额够就原样返回 / 还开着的窗优先按「谁先关」/ 已关的排全部开着的之后 /
+//   同刻按 id 字典序可复算）；名额面读数进 stat().block（七栏 + 三态）；
+//   tool-diag 的 secOpportunity 补 block（仍不调 buildBlock）。
+//   29 段：A 静态 / B 行为（含「名额够顺序不变」「lapsed 不挤在途」两条不许碰坏的既有判据）/
+//   C 读数 / N 四条负控。
+//   单独跑：node tests/opportunity-quota-v2561.js
+await runScript('./opportunity-quota-v2561.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

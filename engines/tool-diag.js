@@ -2680,7 +2680,10 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         total: v.total, active: v.active, open: v.open, taken: v.taken, declined: v.declined,
         deferred: v.deferred, lapsed: v.lapsed, sweeps: v.sweeps, formed: v.formed,
         candidates: found, lapses: v.lapses, reopens: v.reopens, refused: v.refused,
-        lastReason: v.lastReason, sources: (WA.opportunity.SOURCES || []).slice(), faults: v.faults };
+        lastReason: v.lastReason, sources: (WA.opportunity.SOURCES || []).slice(), faults: v.faults,
+        // v2.561.0：注入面名额读数（`null` = 本进程从没构建过；`picked:0` = 构建过但空表）。
+        //   本节仍**不调 buildBlock**（与「不 board」「不 sweep」同一条纪律：诊断零副作用）。
+        block: v.block || null };
     });
   }
   // v2.117.0（计划二 B6）：配方面——「这一局按哪张配方跑 / 静态核对有没有漂移」。

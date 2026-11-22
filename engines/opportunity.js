@@ -80,7 +80,10 @@
   const MAX_WINDOW = 604800000;
 
   const stat = { sweeps: 0, formed: 0, added: 0, updated: 0, lapses: 0, reopens: 0,
-    taken: 0, declined: 0, deferred: 0, blocked: 0, refused: 0, lastReason: '', faults: {} };
+    taken: 0, declined: 0, deferred: 0, blocked: 0, refused: 0, lastReason: '', faults: {},
+    // v2.561.0：注入面名额读数（**覆盖式**：最近一次 buildBlock 的选材现场，不是累计）。
+    //   `null` = 本进程从没构建过；`picked: 0` = 构建过但一条都没选中 —— 两件事不许混。
+    block: null };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function str(v, max) { return WA.inputGuard.text(v, max || 40); }
@@ -519,7 +522,43 @@
       open: cnt('open'), deferred: cnt('deferred'), taken: cnt('taken'), declined: cnt('declined'), lapsed: cnt('lapsed'),
       sweeps: stat.sweeps, formed: stat.formed, added: stat.added, lapses: stat.lapses, reopens: stat.reopens,
       takenNow: stat.taken, declinedNow: stat.declined, deferredNow: stat.deferred, refused: stat.refused,
-      lastReason: stat.lastReason, faults: Object.assign({}, stat.faults) };
+      lastReason: stat.lastReason, faults: Object.assign({}, stat.faults),
+      // v2.561.0：注入面名额读数（拷贝，外部改返回值不得污染下一次读数）
+      block: stat.block ? Object.assign({}, stat.block) : null };
+  }
+  /**
+   * v2.561.0：注入面名额的**唯一**分配判据。
+   *
+   *   旧写法 `all.filter(isActive).concat(...).slice(0, cfg.maxOpen)` 按**插入顺序**取前 N 条。
+   *   而机会与清单不同：它是**会过期的**。一条「还有 3 天」的窗占着名额，一条「5 分钟后关」
+   *   的窗一个字都进不来 —— 而后者这一轮不进就**永远不再有机会**。
+   *   实测（/tmp/probe561.js s1）：4 条 3 天窗 + 2 条「5 分钟 / 1 小时」窗 ⇒ 列出的正是那四条 3 天窗。
+   *
+   *   还有一处更硬：窗口**已经关了**（endAt < now）但 `sweep()` 还没把它标成 lapsed 的行，
+   *   阶段仍是 `open`／`deferred`，于是照常参与竞争 —— 它自己的行文里写着「已错过（不可再参与）」，
+   *   却把两个正开着的窗挤出注入面（s3：x1/x2 占掉 4 个名额的前两名）。
+   *
+   * 判据三条：
+   *   ① 名额够就**原样返回**（顺序不变）—— 名额不是瓶颈时不该重排（与 v2.558.0 同一条纪律）；
+   *   ② 名额不够：**还开着的窗优先**，按「谁先关」升序（先关的先占位）；
+   *   ③ 已关的窗排在所有还开着的窗之后（它们只是在等 `sweep` 标记），按「最近关的」在前；
+   *   同刻一律按 id 字典序 —— 旧写法同刻时按数组顺序，换个插入顺序结论就变（s7）。
+   */
+  function pickBlock(live, cfg, t) {
+    if (!live.length) return [];
+    if (live.length <= cfg.maxOpen) return live.slice();
+    const openW = [], closedW = [];
+    live.forEach(function (r) { (endOf(r, cfg) > t ? openW : closedW).push(r); });
+    const byEnd = function (a, b) {
+      const d = endOf(a, cfg) - endOf(b, cfg);
+      if (d !== 0) return d;
+      const x = String((a && a.id) || ''), y = String((b && b.id) || '');
+      return x < y ? -1 : (x > y ? 1 : 0);
+    };
+    const byEndDesc = function (a, b) { return -byEnd(a, b); };
+    openW.sort(byEnd);
+    closedW.sort(byEndDesc);
+    return openW.concat(closedW).slice(0, cfg.maxOpen);
   }
   /**
    * 注入块：优先展示在途机会，最多附两条明确标记的已错过历史。已答不进正文——
@@ -531,8 +570,20 @@
     if (!cfg.enabled || !WA.store) return '';
     const t = clockNow('opportunity');
     // Live windows take priority; bounded historical reminders must not crowd them out.
+    //   v2.561.0：「在途优先」这条意图此前**只是** concat 顺序的副作用；现在它是 pickBlock 的判据。
     const all = rows();
-    const rs = all.filter(isActive).concat(all.filter(function (r) { return r.stage === 'lapsed'; }).slice(-2));
+    const live = all.filter(isActive);
+    const picked = pickBlock(live, cfg, t);
+    let openW = 0;
+    live.forEach(function (r) { if (endOf(r, cfg) > t) openW++; });
+    stat.block = {
+      candidates: live.length, picked: picked.length, quota: cfg.maxOpen,
+      openWindow: openW, closedWindow: live.length - openW,
+      deferred: live.filter(function (r) { return r && r.stage === 'deferred'; }).length,
+      // 三态各自可分辨：名额够（不做取舍）/ 名额不够（按谁先关取舍）/ 没有在途行
+      mode: live.length === 0 ? 'empty' : (live.length <= cfg.maxOpen ? 'all-fit' : 'ending-first')
+    };
+    const rs = picked.concat(all.filter(function (r) { return r.stage === 'lapsed'; }).slice(-2));
     if (!rs.length) return '';
     const lines = rs.slice(0, cfg.maxOpen).map(function (r) {
       const v = rowView(r, t);
@@ -559,7 +610,10 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     collect: collect, sweep: sweep, respond: respond,
     view: view, list: list, buildBlock: buildBlock, statView: statView,
-    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
+    // v2.561.0：`stat` 是计数器对象的浅拷贝，`block` 是**对象** ⇒ 必须单独再拷一份，
+    //   否则外部改返回值会污染下一次读数（与 v2.559.0 act 同一条纪律）。
+    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults),
+      block: stat.block ? Object.assign({}, stat.block) : null }); }
   };
   if (WA.log) WA.log('info', '机会形成已加载');
 })();
