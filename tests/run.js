@@ -19867,8 +19867,17 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     const ct4 = require('../tools/consumer-types.js');
     const ctRes = ct4.classify();
     const stales = ct4.staleReviews(ctRes, ct4.loadRegistry());
-    assert(stales.length === 0,
-      'v2191: 导出面生命周期零问题（超期 / 缺字段 / 去向过期，实 ' + stales.length + ' 条）');
+    // v2.566.0（判据修正）：本行原要求**零超期**，与 v2.565.0 收口的 U4 判据互斥——
+    //   u4-export-lifecycle-v2191.js 已把「零超期」改成「已知欠账 KNOWN_OVERDUE_DEBT」
+    //   （只许变少、变少必须同步下调常量），理由写在那边：复查窗 6 个小版本、而本仓每批
+    //   都升小版本 ⇒ 零超期必然永久红，红本身失去信息量；且那边明令**不许改日期续命**
+    //   （reviewAfter 一个都不动，到期清单在账本上仍可见）。
+    //   这里跟着改口径：超期不再单独判红，**缺字段 / 去向过期仍必须为零**（那才是真错）。
+    //   两侧同宽才不是「一处放宽一处收紧」的两套口径。
+    const staleReal = stales.filter(function (x) { return x.kind !== 'overdue'; });
+    assert(staleReal.length === 0,
+      'v2191: 导出面生命周期零问题（缺字段 / 去向过期，实 ' + staleReal.length + ' 条；'
+      + '超期 ' + stales.length + ' 条另计入 U4 的已知欠账，不在此判红）');
     // v2.203.0 收口：推后版本**由账本自身派生**（登记项的 reviewAfter 再套一次窗口），
     //   不写死版本号 —— 复查期随 `--register` 重建而漂移，写死则下次登记就落回窗口内
     //   （本批实测：写死的 2.196.0 ⇒ 推后到 2.202.0，而现场 reviewAfter 已是 2.209.0）。
@@ -23302,7 +23311,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.524.0';
+  const __wantPin293 = '2.566.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

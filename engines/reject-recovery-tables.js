@@ -319,6 +319,9 @@
    *  扫描面的词法视角只能看到前缀，真码运行期才成形（`store-unavailable` 等）。
    *  如实登记，**不猜它该给什么恢复动作**。 */
   const ARTIFACTS = {
+    // v2.566.0：engines/dream.js:219 的 `reason: 'settle-' + (g.reason || 'unknown')` 同款拼接式。
+    //   扫描面只看到前缀 `settle-`，真码在运行期成形（settle-*）—— 不是码，不猜恢复动作。
+    'settle-': "拼接式 reason（`'settle-' + (g.reason || 'unknown')`，engines/dream.js 梦卷结算）：词法面只能看到前缀",
     'store-': "拼接式 reason（`'store-' + String((r2 && r2.error) || '?')`）：词法面只能看到前缀，真码在运行期成形"
   };
   /** 判不出面（源码里那个对象不带 `ok`）的**逐条人工判定**。
@@ -1100,6 +1103,12 @@
     //   恢复档不写 OVERRIDES：分词本就被规则表收住（no-* 与 *-implemented 都落 adjust-input，
     //   与 no-shards / unknown-page 同一条），重复登记会和 A8 打架。
     'apply-not-implemented', 'no-agenda', 'no-such-person', 'no-tension',
+    // v2.566.0：core/store.js:5608 的 `type-conflict`（同一路径上旧值类型与写入值冲突，
+    //   写入已被拒、状态未动）。它是 ok:false 的真拒收，此前漏进面快照。
+    'type-conflict',
+    // v2.566.0：`settle-` 是 ARTIFACTS 登记的词法碎片（dream.js 拼接前缀），
+    //   而 A8 要求 ARTIFACTS 的键必须在拒收面快照里（它确实出现在 ok:false 对象里）。
+    'settle-',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1174,6 +1183,9 @@
     //   `ok-empty`（这 5 轮没有值得说的事：安静是合法结果，不是错误）/
     //   `listed`（年表收下一条：有 owner、已发生）。两者都不配恢复动作。
     'ok-empty', 'listed',
+    // v2.566.0：engines/spotlight.js:209 的 `followup-hold`（轻提静默闸：本轮先按住、
+    //   等下一轮再说）—— 它是 ok:true 的**成功回执**，不是被拒，故归成功面、不配恢复档。
+    'followup-hold',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',

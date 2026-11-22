@@ -233,7 +233,10 @@ function runAll(a) {
     //   v2.542.8 跟位：36 → 41。v11-push-api-coverage 的 C2 复算出 5 条推进口（offstageQueue.step /
     //   consequenceSchedule.due / consequenceSchedule.settle / appointment.settle / farAccount.tick）
     //   「真零调用且未裁决」，逐台核过签名与零参行为后补进本表（5 entry，理由见各条目）。
-    a(s.total === 41, 'v11push: [A10a] 登记总数 == 41（实 ' + s.total + '；v2.542.8 归口 5 条推进口）');
+    // v2.566.0：41 → 40。`followupGate.due` 已有真产品调用点（engines/spotlight.js:202），
+    //   按本表纪律「有调用点 ⇒ 裁决过期」从 ENTRIES 移除，总数随之 -1（只许减，
+    //   减少必须同步下调本常量，不许悄悄少报）。
+    a(s.total === 40, 'v11push: [A10a] 登记总数 == 40（实 ' + s.total + '；v2.566.0 移出 followupGate.due）');
     a(sum === s.total, 'v11push: [A10b] 各裁决之和 == 总数（' + sum + ' vs ' + s.total + '）');
   }
 }

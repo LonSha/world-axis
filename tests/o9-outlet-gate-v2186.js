@@ -46,7 +46,14 @@ const OUTLETS = [
   { tag: 'clipboard:配置包', needle: "const __gc = outletGate('clipboard')" },
   { tag: 'clipboard:番外', needle: "const __gt = outletGate('clipboard')" },
   { tag: 'clipboard:记忆采样', needle: "const __gs = outletGate('clipboard')" },
-  { tag: 'export-file:快照', needle: "outletGate('export-file')" },
+  // v2.566.0：原先这两条用**裸通道名**做锚点（`outletGate('export-file')` / `outletGate('diagnostics')`）。
+  //   故事导出（#wa-story-dl / #wa-story-copy）落地后，`export-file` 出现两处 ⇒ 裸锚点
+  //   计到 2，A3 报「多一处」；而按总量判据该多出来的确实是**一条新出口**，不是接错了闸。
+  //   故改用「通道 + 被拒时写哪个回显节点」的复合锚点：它同时证明「接了闸」与「接在哪个控件上」，
+  //   比裸通道名更能分辨「多一条出口」。
+  { tag: 'export-file:故事导出下载', needle: "outletGate('export-file');\n        if (!g.allowed) { outletBlocked($('#wa-story-out'))" },
+  { tag: 'export-file:快照下载', needle: "outletGate('export-file');\n        if (!g.allowed) { outletBlocked($('#wa-snap-out'))" },
+  { tag: 'clipboard:故事导出复制', needle: "outletGate('clipboard');\n        if (!g.allowed) { outletBlocked($('#wa-story-out'))" },
   { tag: 'diagnostics:诊断包', needle: "outletGate('diagnostics')" },
 ];
 /** C 面控制点：每个 TX 模块「开关键」所在的容器都必须随观测视角摘除。 */

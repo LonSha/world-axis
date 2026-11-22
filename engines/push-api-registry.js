@@ -45,8 +45,9 @@
       reason: '危机窗口推进会写存档，不属于纯状态推进，需剧情事件触发' },
     { api: 'farfield.tick', cls: 'drive', driver: { method: 'tick' },
       reason: '远方在途推进：零参，自带 enabled 开关，实测 wrote:false' },
-    { api: 'followupGate.due', cls: 'drive', driver: { method: 'due' },
-      reason: '跟进闸门到期检查：零参，读自身到期表' },
+    // v2.566.0 裁决过期：`followupGate.due` 已有**真产品调用点** ——
+    //   engines/spotlight.js:202 的轻提静默闸每轮 `WA.followupGate.due({ item, idleMinutes, at })`。
+    //   按本表自身纪律（「有产品调用点 ⇒ 裁决过期」），条目移除。
     { api: 'activity.settle', cls: 'entry', driver: null,
       reason: '结算需表演对象：settle(idOrOpts) 的入参是具体活动编号，只能由剧情事件提供' },
     { api: 'liaison.advance', cls: 'entry', driver: null,

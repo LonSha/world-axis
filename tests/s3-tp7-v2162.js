@@ -134,7 +134,7 @@ function runA(a) {
       + countOcc(wd, "{ ok: false, reason: 'in-transit-full'") + ' 处）');
   a(countOcc(st, A_GUARD_INIT) === 1 && countOcc(st, "if (fromV > SCHEMA_VERSION && (typeof targetVersion") === 1,
     'v2162/tp7 A9: 未来档守卫两处（init 载入路径 + migrate 内部）各恰 1 处');
-  a(countOcc(st, A_GUARD_READ) === 1 && st.indexOf('migrateRefused: 0, lastRefused: null }') > 0,
+  a(countOcc(st, A_GUARD_READ) === 1 && st.indexOf('migrateRefused: 0, lastRefused: null,') > 0,
     'v2162/tp7 A10: 拒收在读数面留痕（计数 + 带 from/current/at 的最近一次）');
   a(st.indexOf('if (__migRep && __migRep.refused) {') > 0,
     'v2162/tp7 A11: init 的迁移分支在拒收时早退不落盘（「迁不动」与「迁失败」不可同形）');

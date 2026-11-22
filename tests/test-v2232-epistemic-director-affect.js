@@ -79,6 +79,12 @@ test('TEST-2: 不在场痕迹轻提 (Presence-Trace) 与防全知穿帮硬拦截
   W.store.init();
   W.store.transact(function (d) { d.spotlight = { rows: [], pending: [] }; });
   W.spotlight.setSettings({ enabled: true, idleThreshold: 2 });
+  // v2.566.0（测试前置补齐）：v2.545.0 起 spotlight 的轻提前先问 followup-gate 的 due，
+  //   而 due 的默认放行窗是 **UTC 12~23 点**（followup-gate DEF.hoursFrom/hoursTo）。
+  //   本用例不断言「时段」这件事，却依赖了按钟点变化的闸 —— 于是白天绿、夜里红，
+  //   正是本仓反复点名的「靠运行时刻活着的判据」。这里把窗口拉到全天、阈值压低，
+  //   让本用例只测它自己要测的 epistemic 语义（presence-trace / 防全知拦截）。
+  W.followupGate.saveSettings({ enabled: true, hoursFrom: 0, hoursTo: 24, idleThreshold: 10, dnd: false, perDayCap: 12 });
 
   W.spotlight.note('张三');
   W.spotlight.note('苏雅');
@@ -88,6 +94,10 @@ test('TEST-2: 不在场痕迹轻提 (Presence-Trace) 与防全知穿帮硬拦截
     W.spotlight.note('张三');
     W.spotlight.seal();
   }
+  // v2.566.0：followup-gate 的静默阈值是「多久没动静」（idleMinutes），而本用例刚写完档案，
+  //   idle≈0 ⇒ 正是「刚见过，别再顺口提」的合法拦截（still-quiet）。本用例要测的是
+  //   epistemic 语义，故把档案的 at 置为 0（=无最近动静）——走的是产品自己的「无 at ⇒ 视为极久」口径。
+  W.store.transact(function (d) { (d.spotlight.rows || []).forEach(function (r) { r.at = 0; }); });
 
   // 1. 地点不匹配时，禁止瞬移出场，转为 presence-trace（熟人顺带提及）
   const traceRes = W.spotlight.resolveIntervention({
