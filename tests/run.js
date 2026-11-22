@@ -22746,6 +22746,21 @@ await runScript('./probe-cases-quota-v2560.js');
 //   C 读数 / N 四条负控。
 //   单独跑：node tests/opportunity-quota-v2561.js
 await runScript('./opportunity-quota-v2561.js');
+// v2.562.0：约期注入名额专锁 —— `appointment.buildBlock`（同一个病的第九处）：
+//   旧写法把「筛候选」与「数名额」塞进同一个双重循环（`if (lines.length >= 3) return;`），
+//   于是名额由**遍历顺序**决定：Object.keys(actors) 的注册顺序 × 每人 appointments 的追加顺序。
+//   实测：同一个人 4 条约期（3 条 r+3 + 1 条 r+1）⇒ 列出那三条 r+3，
+//   「下一轮就要赴的约」一个字都没有；`from = r-2`（已过轮未结算，最紧急）同样被挤掉。
+//   后果比前八处都直接：约期不是清单，是下一轮就要照着做的事，模型不知道就会让人物无故不去。
+//   改法：候选只按「未到 + 视野内」筛（不看名额）→ pickBlock 按 from 升序
+//   （已过轮的排最前）→ 同 from 按 to → place → id（可复算）；
+//   两个硬上限提成 BLOCK_QUOTA/BLOCK_HORIZON 并写明刻意不进设置面；
+//   读数进 stat().block（candidates/picked/quota/horizon/dueNow/mode）；
+//   tool-diag 新增 secAppointment 作真读者（只读 stat/getSettings，不 buildBlock）。
+//   29 段：A 静态 / B 行为（含视野判据不变、名额够顺序不变、只读、同刻可复算）/
+//   C 读数 / N 四条负控。
+//   单独跑：node tests/appointment-quota-v2562.js
+await runScript('./appointment-quota-v2562.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

@@ -333,6 +333,25 @@
       };
     });
   }
+  // v2.562.0：约期面 ——「这一轮模型看得到哪几条还没结的约」。
+  //   纯读：只调 stat()/getSettings()，**不调 buildBlock**（与「不 board」「不 sweep」同一条纪律：
+  //   诊断零副作用，而 buildBlock 会覆盖 stat.block 这个读数本身）。
+  //   三档如实：模块缺席报不可用，不回落成「没有约」（那正是本模块要治的病）。
+  function secAppointment() {
+    return safe(function () {
+      if (!WA.appointment || typeof WA.appointment.stat !== 'function') return { error: 'engines/appointment.js 未加载（约期读数缺席）' };
+      const st = WA.appointment.stat();
+      const cfg = (typeof WA.appointment.getSettings === 'function') ? WA.appointment.getSettings() : null;
+      return {
+        enabled: !!(cfg && cfg.enabled === true),
+        settings: cfg ? { maxPerActor: cfg.maxPerActor, lateGrace: cfg.lateGrace } : null,
+        made: st.made, kept: st.kept, late: st.late, missed: st.missed, refused: st.refused,
+        lastReason: st.lastReason,
+        // null = 还没构建过注入块；picked: 0 = 构建过但一条都没有（两件事）
+        block: st.block || null
+      };
+    });
+  }
   function secDormantLadder() {
     return safe(function () {
       if (!WA.dormantLadder || typeof WA.dormantLadder.view !== 'function') return { error: 'dormantLadder 模块不可用' };
@@ -4864,7 +4883,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), perfLedger: secPerfLedger(), tapeStore: secTapeStore(), intel: secIntel(), perspective: secPerspective(), sediment: secSediment(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), dormantLadder: secDormantLadder(), act: secAction(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), perfLedger: secPerfLedger(), tapeStore: secTapeStore(), intel: secIntel(), perspective: secPerspective(), sediment: secSediment(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), dormantLadder: secDormantLadder(), act: secAction(), appointment: secAppointment(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       // v2.231.0（OPT-8）：世界词汇面（货币 / 配方 / 判定维度 / 题材目录 + 逐配方前置自洽）。
       //   与 recipe 节分列：那一节答「这一局按哪张配方跑」，本节答「这一局用哪些词」。
       playerArchive: safe(function () { const v = WA.playerArchive.view(); return { settings: WA.playerArchive.getSettings(), count: v.works.length, rounds: v.works.map(function (x) { return x.round; }), note: v.note }; }, {}),
