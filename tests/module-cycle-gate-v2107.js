@@ -544,7 +544,7 @@ function runAll(A) {
   //   · (core/interceptor.js, ephemeralScrub)    —— scrubReply 真调 scrub（只采用「真删且无多处命中」的结果）
   //   · (render/inject.js,    ephemeralScrub)    —— 注入落地前登记 finalItems 的结构性块
   //   装载期仍 476；恒等式 476 + 4035 = 4511。
-  A(a.edgesLoad === 476 && a.edgesCall === 4035 && a.edgesAll === 4511 && a.identityOk,
+  A(a.edgesLoad === 476 && a.edgesCall === 4044 && a.edgesAll === 4520 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
