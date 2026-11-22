@@ -753,49 +753,15 @@
     'engines/round-drivers.js': 'roundDrivers',
     'engines/write-desk.js': 'writeDesk',
     'engines/inject-collector.js': 'injectCollector',
-    // v2.294.0（V8 收口）：玩家归档（EXV8-6 带离包）此前漏登记在本表。
-    //   后果正是本表注释写的那个：inventory 的定义面与出口面契约都从本表取，
-    //   漏了就等于它在定义面上不存在（自检看不见的黑盒）—— 回归里
-    //   「store 台账的每个归因来源都有可读标签（实缺 1：playerArchive）」就是它现形。
-    'engines/player-archive.js': 'playerArchive',
-    // v2.381.0（诊断清单全部磁盘模块收口）：12 个漏登记模块。
-    //   判据是 tests/run.js 的「诊断清单覆盖全部磁盘模块」——它按 core/engines/actors/
-    //   direction/render/compat/ui 七个目录逐个 listdir 再与本表求差集。本批 12 个全部
-    //   是**引擎已落地、注入链已接、本表未登记**：后果不是「少一行字」，而是它们在
-    //   inventory 的定义面上不存在——而 inventory 正是出口面契约与死子面账本的唯一来源。
-    //   更直接的后果是自检（secModules / 诊断包）看不见它们：模块装载失败、契约漂移
-    //   这两类故障对它们**没有出口**。ns 名逐一取自各文件 `WA.<ns> = ` 的实测导出面。
-    'core/unified-pending.js': 'unifiedPending',
-    'engines/bloodline-heritage.js': 'bloodlineHeritage',
-    'engines/cataclysm-hazard.js': 'cataclysmHazard',
-    'engines/court-intrigue.js': 'courtIntrigue',
-    'engines/dungeon-hazard-mesh.js': 'dungeonHazardMesh',
-    'engines/ecosystem-cascade.js': 'ecosystemCascade',
-    'engines/engineering-blueprint.js': 'engineeringBlueprint',
-    'engines/epochal-transition.js': 'epochalTransition',
-    'engines/financial-contagion.js': 'financialContagion',
-    'engines/incarceration-jailbreak.js': 'incarcerationJailbreak',
-    'engines/regiment-tactics.js': 'regimentTactics',
-    'engines/theology-cult.js': 'theologyCult',
-    // v2.381.0（诊断清单全部磁盘模块收口）：12 个漏登记模块。
-    //   判据是 tests/run.js 的「诊断清单覆盖全部磁盘模块」——它按 core/engines/actors/
-    //   direction/render/compat/ui 七个目录逐个 listdir 再与本表求差集。本批 12 个全部
-    //   是**引擎已落地、注入链已接、本表未登记**：后果不是「少一行字」，而是它们在
-    //   inventory 的定义面上不存在——而 inventory 正是出口面契约与死子面账本的唯一来源。
-    //   更直接的后果是自检（secModules / 诊断包）看不见它们：模块装载失败、契约漂移
-    //   这两类故障对它们**没有出口**。ns 名逐一取自各文件 `WA.<ns> = ` 的实测导出面。
-    'core/unified-pending.js': 'unifiedPending',
-    'engines/bloodline-heritage.js': 'bloodlineHeritage',
-    'engines/cataclysm-hazard.js': 'cataclysmHazard',
-    'engines/court-intrigue.js': 'courtIntrigue',
-    'engines/dungeon-hazard-mesh.js': 'dungeonHazardMesh',
-    'engines/ecosystem-cascade.js': 'ecosystemCascade',
-    'engines/engineering-blueprint.js': 'engineeringBlueprint',
-    'engines/epochal-transition.js': 'epochalTransition',
-    'engines/financial-contagion.js': 'financialContagion',
-    'engines/incarceration-jailbreak.js': 'incarcerationJailbreak',
-    'engines/regiment-tactics.js': 'regimentTactics',
-    'engines/theology-cult.js': 'theologyCult',
+    // v2.566.0（技术债收敛）：此处原有**两个整块重复粘贴**——
+    //   ① v2.294.0 的 playerArchive（它在上文 v2.286~v2.292 批里已登记过一次）；
+    //   ② v2.381.0 那批 12 枚漏登记模块：12 条条目 + 同一段 6 行注释被整块粘了两遍，
+    //      而该批在 v2.381.0 原位（上一条注释之后）其实已经逐条登记过了。
+    //   对象字面量后写覆盖前写 ⇒ 重复**不报错、行为完全不变**，但「字面量条数」长期虚高：
+    //   603 条字面量 / 578 个生效键（13 个键各 2~3 遍，冗余 25 条），使 opv29-z1-07 的
+    //   A4a 只能按 Object.keys 站，「重复登记」与「新登记」在字面量上分不开。
+    //   本走去重只删副本，不改任何 ns、不动条目顺序；注释留档，免得下轮又按同一段历史补一遍。
+    //   （v2.294.0 / v2.381.0 两批的登记理由见上文原注释，一字未删。）
     // ── v2.400.0（V22 拓展线 EXV22-1～8）：八项制度性引擎 ──
     //   与上段同一病（引擎已落地、本表未登记），后果也同一个：
     //   inventory 的定义面上不存在它们 ⇒ 出口面契约与死子面账本都看不见；
@@ -888,7 +854,19 @@
     'engines/model-pin.js': 'modelPin',
     'engines/call-timeline.js': 'callTimeline',
     'engines/model-catalog.js': 'modelCatalog',
-    'engines/degrade-audit.js': 'degradeAudit'
+    'engines/degrade-audit.js': 'degradeAudit',
+    // v2.566.0（OPV32-补登）：三台首帧面引擎补进表。它们既不在本表，也不在 index.js 的
+    //   18 条 LAZY_ORDER 惰性档里 —— 它们在 LOAD_ORDER（首帧装载），因此拿不到「零读惰性项」
+    //   的豁免，判据「诊断清单覆盖全部磁盘模块」直接把它们报成未覆盖。
+    //   三者都有真实产品读点，按本表先例（json-repair 归位首帧、五台缝合件接台账）必须进表：
+    //     · api-vault    → core/api-router.js 读 WA.apiVault.available()
+    //     · import-kind  → ui/panel.js 读 WA.importKind.detectText / describe
+    //     · story-export → ui/panel.js 读 WA.storyExport.build()
+    //   漏登记的后果同 world-reader：secModules 报 missing（假缺席）、export-contract 的 OWNER
+    //   不认这三个 ns ⇒ 调用点被静默跳过。ns 名取自各文件 `WA.<ns> = {`。
+    'engines/api-vault.js': 'apiVault',
+    'engines/import-kind.js': 'importKind',
+    'engines/story-export.js': 'storyExport'
   };
 
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选
@@ -939,6 +917,11 @@
       //   本控件是它们的真消费方 —— 同 v2.2.0 三条的理由：新出口必须「渲染 + 绑定 + 守卫登记」
       //   三件齐做，否则「渲染了但绑定 id 写错」永远不会被守卫表发现。
       'wa-gauge-reset',
+      // v2.566.0（守卫表补齐）：剧情导出（storyExport）在 tools 页有 8 枚真控件，此前只渲染、
+      //   未进守卫表 ⇒「panel 渲染的每个控件都在守卫表内」把它们报成未覆盖。
+      //   与 v2.2.0 那三条同规格：新控件必须「渲染 + 绑定 + 守卫登记」三件齐做。
+      'wa-story-dl', 'wa-story-copy', 'wa-story-from', 'wa-story-to',
+      'wa-story-fav', 'wa-story-hidden', 'wa-story-names', 'wa-story-out',
       // v2.2.0 块5：存档恢复点 / 设置键卫生
       'wa-recovery-view', 'wa-orphan-view', 'wa-undo-btn', 'wa-mirror-view',
       // v2.83.0（B6）：配置包出口。与 v2.2.0/v2.34.0 新增控件同规格——
@@ -1861,7 +1844,11 @@
     { page: 'port', ids: ['wa-wps-snap', 'wa-wps-json', 'wa-wps-check', 'wa-wps-preview',
       'wa-wps-mode', 'wa-wps-conf', 'wa-wps-ovr', 'wa-wps-import',
       'wa-wps-lib', 'wa-wps-slot', 'wa-wps-take', 'wa-wps-drop',
-      'wa-wps-blue', 'wa-wps-graph', 'wa-wps-round', 'wa-wps-diag', 'wa-wps-text'],
+      'wa-wps-blue', 'wa-wps-graph', 'wa-wps-round', 'wa-wps-diag', 'wa-wps-text',
+      // v2.566.0（守卫表补齐）：`wa-wps-kind`（纯读：从 JSON 形状认文本类别）在 panel 里
+      //   有渲染 + on() 绑定，但本组 ids 漏了它 ⇒ 被判「渲染了却不在守卫表内」。
+      //   只读承诺不变：它不写 store、不触写口。
+      'wa-wps-kind'],
       dynamic: ['wa-wps-out'] },
     // ── v2.201.0（Y6）：检索页（find）────────────────────────────────
     //   「世界历史检索」的一个入口查六处（编年史 / 人物 / 地点 / 组织 / 规则 /

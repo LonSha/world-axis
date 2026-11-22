@@ -16513,7 +16513,7 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
     //   窗口外建球 ⇒ 永不能接管，球永久停在 panel.js 的老行为（点开的是老面板）——
     //   用户看到的就是「UI 还是老的 / 点了像没反应」。事件把「建球」与「接管」解耦：
     //   谁先到都行，球一出现就有人接。
-    try { if (typeof WA.emit === 'function') WA.emit('wa:orb-ready', { at: Date.now() }); } catch (e) {}
+    try { if (typeof WA.emit === 'function') WA.emit('wa:orb-ready', { at: clockWall() }); } catch (e) {}
   }
 
   function toggle(force) {

@@ -1609,10 +1609,36 @@ module.exports = async function toolDiagV092(ctx) {
   const bill = (dg24.inject || {}).budget || null;
   assert(bill && bill.droppedCount === li24.budget.dropped.length && bill.droppedCount >= 1, '诊断账单 droppedCount 与快照一致');
   assert(bill.foldedCount === li24.budget.folded.length && bill.keptCount >= 1, '诊断账单 folded/kept 计数一致');
-  assert(bill.overBudget === false && bill.used <= bill.cap, '诊断账单未超支');
+  // v2.566.0（判据修正）：本条原断言 `overBudget === false && used <= cap` —— 那是按
+  //   「注入链只喂上面两条源」的旧假设写的。现在 applyInjections 把 product 真实源
+  //   （世界状态等 pinned 项，render/inject.js:2028 的 items）**一并**纳入预算裁决，
+  //   budget=80 时 pinned 核心源本身就装不下 ⇒ 真实超支。
+  //   过度严格的是原文，不是产品：此处改成「账单如实反映超支」——overBudget 必须与
+  //   used/cap 的自洽关系一致，且本场景确实落在超支侧（不是靠放宽判据蒙过去）。
+  assert(bill.overBudget === (bill.used > bill.cap), '诊断账单 overBudget 与 used/cap 自洽（实 ' + bill.used + '/' + bill.cap + '）');
+  assert(bill.used > bill.cap && bill.overBudget === true, '小预算 80 下确实超支（pinned 核心源不可裁），账单如实报 overBudget');
   assert(bill.summary && String(bill.summary).indexOf('t') >= 0, '诊断账单带 summary 文本');
+  // v2.566.0（判据修正）：分级告警是**优先序**，不是两条独立期望——
+  //   engines/tool-diag.js:5257 是 if (overBudget) error / else if (droppedCount) warn。
+  //   上面已证明本场景超支 ⇒ 只可能是 error，永远轮不到 warn。原文同时要求
+  //   「未超支」与「warn 点名舆情」，两个前置互斥，故必红。
+  //   现在按优先序分两测：真实场景验 error，warn 分支用快照直测（与下面 1617 的 error
+  //   构造同法，都是手工快照），这样两条分支都被覆盖，且不依赖「只喂两条源」的假设。
   const bgtIssues = (dg24.verdict.issues || []).filter(i => i.key === 'budget');
-  assert(bgtIssues.length === 1 && bgtIssues[0].level === 'warn' && bgtIssues[0].detail.indexOf('舆情') >= 0, '丢弃源触发 budget warn 并点名');
+  assert(bgtIssues.length === 1 && bgtIssues[0].level === 'error'
+    && String(bgtIssues[0].detail).indexOf(bill.used + '/' + bill.cap) >= 0,
+    '超支时 budget 走 error 优先序，并给出 used/cap（实 ' + JSON.stringify(bgtIssues) + '）');
+  // warn 分支：有丢弃但不超支（真实账单形态，只把 used/cap/overBudget/dropped 换成该形态）
+  const liWarn = Object.assign({}, li24, { budget: Object.assign({}, li24.budget, {
+    used: 53, cap: 300, overBudget: false, remain: 247, inputTokens: 422, saved: 369,
+    dropped: [{ source: '舆情', reason: 'no_budget', tokens: 209 }], folded: []
+  }) });
+  WA.store.transact(d => { d.lastInjection = liWarn; });
+  const dgWarn = WA.toolDiag.collect();
+  const bgtWarn = (dgWarn.verdict.issues || []).filter(i => i.key === 'budget');
+  assert(bgtWarn.length === 1 && bgtWarn[0].level === 'warn' && bgtWarn[0].detail.indexOf('舆情') >= 0,
+    '未超支但有丢弃 → budget warn 并点名（实 ' + JSON.stringify(bgtWarn) + '）');
+  WA.store.transact(d => { d.lastInjection = li24; });   // 恢复真实快照，后续步骤读的是真账单
   // 超预算场景 → error 级（手工构造快照）
   WA.store.transact(d => { d.lastInjection = Object.assign({}, d.lastInjection, { budget: { used: 500, cap: 100, source: 'manual', remain: 0, inputTokens: 500, saved: 0, overBudget: true, keptCount: 2, folded: [], dropped: [] } }); });
   const dg24b = WA.toolDiag.collect();

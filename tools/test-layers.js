@@ -103,6 +103,36 @@ const EVIDENCE_FORMS = [
   /^s3-b\d+-(o|e)(\d)-v2\d{3}\.js$/,
   /^(o|e)(\d)-[a-z0-9-]+-v2\d{3}\.js$/];
 
+/** 段文件里的节（v2.568.0）。
+ *  为什么要进归属表：这些节的 section() 写在 tests/segments/*.js 里、不在
+ *  tests/run.js 本体，而 v2.566.0 已让 isolated-runner 对**同一份段文件**跑同一个
+ *  prune ⇒ 它们确实能被 --only-v-section 定向执行。不进表的后果不是「安全」而是
+ *  **两头不一致**：裁剪侧把它当选中节执行了，而 run.js 的__layerRan 里没有它
+ *  ⇒ buildOutcome 走「一节都没跑到」分支 ⇒ exit 3 —— 真跑完了却被判成算不出来。
+ *  一致性约束：`opt.src` 注入时不扫段文件（A11a/A11b 钉的是 run.js 的形态判据）。
+ */
+function segmentSections() {
+  const seg = path.join(path.dirname(RUN), 'segments');
+  const out = [];
+  if (!fs.existsSync(seg)) return out;
+  fs.readdirSync(seg).sort().forEach(function (nm) {
+    if (/\.js$/.test(nm) === false) return;
+    const rel = 'tests/segments/' + nm;
+    const lines = fs.readFileSync(path.join(seg, nm), 'utf8').split('\n');
+    lines.forEach(function (l, i) {
+      const m = l.match(/^ {0,2}section\((['\"])(.*)\1\);\s*$/);
+      if (!m) return;
+      out.push({
+        name: m[2], line: i + 1, endLine: lines.length,
+        locks: [], requires: [], evidence: [rel], shared: [],
+        selfContained: true, item: null,
+        mark: 'v' + (m[2].match(/v2\.(\d+)\.0/) ? m[2].match(/v2\.(\d+)\.0/)[1] : '0000'),
+        segment: rel
+      });
+    });
+  });
+  return out;
+}
 function readRun() { return fs.readFileSync(RUN, 'utf8'); }
 function testFiles() {
   return fs.readdirSync(path.join(ROOT, 'tests')).filter(function (f) { return /\.js$/.test(f); }).sort();
@@ -163,11 +193,15 @@ function analyze(opt) {
       mark: 'v' + (mk.name.match(/v2\.(\d+)\.0/) ? mk.name.match(/v2\.(\d+)\.0/)[1] : '0000')
     };
   });
-  const selectable = sections.filter(function (s) { return s.selfContained; });
+  // v2.568.0：段文件里的节也入表（仅在读真仓时；opt.src 注入不扫）。
+  const __segSections = (opt && opt.src !== undefined) ? [] : segmentSections();
+  const allSections = sections.concat(__segSections);
+  const selectable = allSections.filter(function (s) { return s.selfContained; });
   return {
     runLines: lines.length,
-    sectionCount: sections.length,
-    sections: sections,
+    sectionCount: allSections.length,
+    sections: allSections,
+    segmentCount: __segSections.length,
     selectable: selectable,
     note: 'selfContained 只表示「可被 --only-v-section 单独选中」；耗时读数在 tools/slow-sections.js'
   };

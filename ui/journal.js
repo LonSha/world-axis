@@ -18,6 +18,11 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.566.0（G20 门禁收口）：产品代码零裸调 Date.now()。本模块 3 处（手势打点两处 + 去重窗口
+  //   一处）此前直接裸调，被「产品代码零裸调 Date.now()（去注释后）」判据点名。全仓惯例是
+  //   一个带回退的薄壳：优先走 WA.clock.wallNow()（墙钟单一出口），clock 未装载时才回退。
+  //   回退分支留在本 helper 体内，正是判据认可的形态（同 ui/panel.js 的 clockWall）。
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
   const doc = WA.mainDoc || (typeof document !== 'undefined' ? document : null);
   // 对外只留一个**真消费**的入口（index.js 的 wa_diag_v1 装载面自证读它）。
   //   v2.542.0 收口：原稿导出的 render / tabs / go / unread 四个成员全仓零读取 —— 本仓口径是
@@ -412,8 +417,8 @@
     //   桌面（pointerup 先到、click 后到）不会开→关→开。
     if (!doc.__wjTapBound) {
       doc.__wjTapBound = true;
-      doc.addEventListener('pointerdown', function (e) { lastDown = { x: e.clientX, y: e.clientY, at: Date.now() }; }, true);
-      doc.addEventListener('touchstart', function (e) { const t = e.touches && e.touches[0]; if (t) lastDown = { x: t.clientX, y: t.clientY, at: Date.now() }; }, true);
+      doc.addEventListener('pointerdown', function (e) { lastDown = { x: e.clientX, y: e.clientY, at: clockWall() }; }, true);
+      doc.addEventListener('touchstart', function (e) { const t = e.touches && e.touches[0]; if (t) lastDown = { x: t.clientX, y: t.clientY, at: clockWall() }; }, true);
       doc.addEventListener('pointerup', function (e) { tapOrb(e, 'pointerup'); }, false);
       // touchend 在手札弹出的同一次派发里就把合成 click 掐掉：否则 click 的命中目标会变成刚弹出的遮罩，
       // 手札会「开了立刻关」，看起来仍是没反应。
@@ -429,7 +434,7 @@
   function tapOrb(e, kind) {
     const t = e && e.target;
     if (!t || (t.id !== 'wa-orb' && !(t.closest && t.closest('#wa-orb')))) return false;
-    const now = Date.now();
+    const now = clockWall();
     if (now - lastTapAt < 600) return false;
     if (lastDown && (Math.abs(e.clientX - lastDown.x) + Math.abs(e.clientY - lastDown.y) > 5)) return false;
     lastTapAt = now; lastTapKind = kind;

@@ -285,6 +285,40 @@ async function launch(root, options) {
         else if (fwd[i].indexOf('--only-v-section=') === 0) sel.push(fwd[i].slice(17));
       }
       const runPath = path.join(prepared.work, 'tests/run.js');
+        // ── v2.568.0：**段内节必须连带其宿主节**──────────────
+        //   段调用行（await require('./segments/x.js')({…})）物理上住在 run.js 的**某个节体里**
+        //   （tool-diag-v092 住 engines/inject-inspector v0.9.2，实测行 2410）。wrap 会把宿主节
+        //   整节包裹 ⇒ guardRun=false 时连段也不执行 ⇒「选中了段内节却一节没跑」。
+        //   治法：把宿主节名并入选区（**如实记账**：note 里点名连带执行了谁）。
+        //   这不是放宽判据：那一段代码物理上就住在宿主节里，切不出来。
+        const segHosts = [];
+        try {
+          const P0 = require(path.join(prepared.work, 'tools/prune-sections.js'));
+          const runSrc0 = fs.readFileSync(runPath, 'utf8');
+          const secs0 = P0.scan(runSrc0);
+          const srcLines0 = runSrc0.split('\n');
+          const segDir0 = path.join(prepared.work, 'tests/segments');
+          if (fs.existsSync(segDir0)) {
+            fs.readdirSync(segDir0).sort().forEach(function (nm) {
+              if (!/\.js$/.test(nm)) return;
+              const st = fs.readFileSync(path.join(segDir0, nm), 'utf8');
+              const hitsSel = st.split('\n').some(function (l) {
+                const m = l.match(/^ {0,2}section\((['\"])(.*)\1\);\s*$/);
+                return m && sel.some(function (q) { return m[2].indexOf(q) >= 0; });
+              });
+              if (!hitsSel) return;
+              let ln = -1;
+              srcLines0.forEach(function (l, i) { if (ln < 0 && l.indexOf('./segments/' + nm) >= 0) ln = i + 1; });
+              if (ln < 0) return;
+              let own = null;
+              secs0.forEach(function (x) { if (x.line + 1 <= ln && ln <= x.nextLine) own = x; });
+              if (own && sel.indexOf(own.name) < 0) {
+                sel.push(own.name);
+                segHosts.push(nm + ' 的宿主节=' + own.name);
+              }
+            });
+          }
+        } catch (eH) { segHosts.push('宿主节推导失败：' + eH.message); }
       try {
         const P = require(path.join(prepared.work, 'tools/prune-sections.js'));
         const r = P.prune(fs.readFileSync(runPath, 'utf8'), sel, { mode: 'wrap' });
@@ -314,7 +348,8 @@ async function launch(root, options) {
           pruneNote = 'wrap 裁剪：选中 ' + r.stats.selected + ' 节 · 包裹 ' + r.stats.wrappedCount
             + ' 节 / ' + r.stats.wrappedLines + ' 行（运行期哨兵裁定，未选中节体不执行）'
             + ' · 最后一节不包（尾部汇总段边界） · 跨节结构降级不包 ' + (r.stats.wrapUnsafe || 0) + ' 节' + (r.stats.markedCount ? ' · 只标不包 ' + r.stats.markedCount + ' 节' : '')
-            + (segKept.length ? ' ·段文件裁剪 ' + segKept.join(' / ') : '');
+            + (segKept.length ? ' ·段文件裁剪 ' + segKept.join(' / ') : '')
+            + (segHosts.length ? ' ·连带宿主节 ' + segHosts.join(' / ') : '');
         } else {
           // v2.253.0：**节名写错时必须显式点名**。现场实证（沙箱 UKFBEG）：选区传了
           //   「…不再取决于开关」，而真源节名是「…不再取决于开发机装没装 npm 包」——
