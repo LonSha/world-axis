@@ -917,6 +917,11 @@
       //   本控件是它们的真消费方 —— 同 v2.2.0 三条的理由：新出口必须「渲染 + 绑定 + 守卫登记」
       //   三件齐做，否则「渲染了但绑定 id 写错」永远不会被守卫表发现。
       'wa-gauge-reset',
+      // v2.566.0（守卫表补齐）：剧情导出（storyExport）在 tools 页有 8 枚真控件，此前只渲染、
+      //   未进守卫表 ⇒「panel 渲染的每个控件都在守卫表内」把它们报成未覆盖。
+      //   与 v2.2.0 那三条同规格：新控件必须「渲染 + 绑定 + 守卫登记」三件齐做。
+      'wa-story-dl', 'wa-story-copy', 'wa-story-from', 'wa-story-to',
+      'wa-story-fav', 'wa-story-hidden', 'wa-story-names', 'wa-story-out',
       // v2.2.0 块5：存档恢复点 / 设置键卫生
       'wa-recovery-view', 'wa-orphan-view', 'wa-undo-btn', 'wa-mirror-view',
       // v2.83.0（B6）：配置包出口。与 v2.2.0/v2.34.0 新增控件同规格——
@@ -1839,7 +1844,11 @@
     { page: 'port', ids: ['wa-wps-snap', 'wa-wps-json', 'wa-wps-check', 'wa-wps-preview',
       'wa-wps-mode', 'wa-wps-conf', 'wa-wps-ovr', 'wa-wps-import',
       'wa-wps-lib', 'wa-wps-slot', 'wa-wps-take', 'wa-wps-drop',
-      'wa-wps-blue', 'wa-wps-graph', 'wa-wps-round', 'wa-wps-diag', 'wa-wps-text'],
+      'wa-wps-blue', 'wa-wps-graph', 'wa-wps-round', 'wa-wps-diag', 'wa-wps-text',
+      // v2.566.0（守卫表补齐）：`wa-wps-kind`（纯读：从 JSON 形状认文本类别）在 panel 里
+      //   有渲染 + on() 绑定，但本组 ids 漏了它 ⇒ 被判「渲染了却不在守卫表内」。
+      //   只读承诺不变：它不写 store、不触写口。
+      'wa-wps-kind'],
       dynamic: ['wa-wps-out'] },
     // ── v2.201.0（Y6）：检索页（find）────────────────────────────────
     //   「世界历史检索」的一个入口查六处（编年史 / 人物 / 地点 / 组织 / 规则 /

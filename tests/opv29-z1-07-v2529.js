@@ -42,7 +42,7 @@ const ENG_MAX_SECS = 130;
 const secCount = (RD(ENG).match(/function sec[A-Za-z0-9_]*\s*\(/g) || []).length;
 a(lines(ENG) <= ENG_MAX_LINES, 'A1 引擎行数在上限内（实 ' + lines(ENG) + ' ≤ ' + ENG_MAX_LINES + '；拆前 8425）', lines(ENG));
 a(secCount <= ENG_MAX_SECS, 'A1b 诊断节数在上限内（实 ' + secCount + ' ≤ ' + ENG_MAX_SECS + '）', secCount);
-a(lines(TAB) === 2491, 'A2 表体量（实 ' + lines(TAB) + ' 行 = 2491；v2.542.21 登记 json-repair 时 +4；v2.566.0 补登三台首帧面引擎 +12、技术债去重 -34', lines(TAB));
+a(lines(TAB) === 2500, 'A2 表体量（实 ' + lines(TAB) + ' 行 = 2500；v2.542.21 登记 json-repair 时 +4；v2.566.0 补登三台首帧面引擎 +12、技术债去重 -34、守卫表补 9 枚 id +10', lines(TAB));
 const tabSrc = RD(TAB);
 const namedFns = (tabSrc.match(/function\s+[A-Za-z_$]/g) || []).length;
 const iifes = (tabSrc.match(/\(function\s*\(\)/g) || []).length;
