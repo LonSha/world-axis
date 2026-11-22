@@ -695,7 +695,12 @@
     'world.journeys':    function (x) { return !!x && x.status === 'in-transit'; },
     'farfield.pending':  function (x) { return !!x && x.deliveredAt == null; },
     'collab.queue':      function (x) { return !!x && x.flushedAt == null; },
-    'liaison.deals':     function (x) { return !!x && (x.status === 'pending' || x.status === 'due'); }
+    'liaison.deals':     function (x) { return !!x && (x.status === 'pending' || x.status === 'due'); },
+    // v2.560.0：**未结案的调查卷宗**是「未完成的义务」——`probe.cases` 的准入闸门此前数的是
+    //   全部卷宗条数，而定案后行不删，于是办完的案子把名额永久占死（实测：8 条全结案、
+    //   open=0，第 9 个案子仍被 cases-full 拒收）。登记在这里之后，挤出先保 open 行，
+    //   剩余额度才给已结案行 —— 「办完的给新案让位，正在办的永不被静默丢弃」。
+    'probe.cases':       function (x) { return !!x && x.status === 'open'; }
   };
   // 在途保护的读数（**不**进 evictFailed / failedBy —— 超限不是实现缺陷，是容量裁决；
   //   混进 failedBy 会让「挤出器坏了」与「世界真的满了」在诊断上长得一样）。

@@ -27,6 +27,10 @@
  *   ⑥ **对质需成本**：手上证据不够就不能去对质。
  *   ⑦ **误指留痕**：错的指控也进卷宗，不静默删。
  *   ⑧ **容量有界且挤出有账**：三个站点（cases / evidence / wrongs）都走 evict 单一出口。
+ *      v2.560.0：这一条此前只在 cases 上是**空话**——准入闸门数的是「全部卷宗」的条数，
+ *      而定案后行不删，于是 `cases-full` 的提前 return 让 cases 站的 evict 每次都只是 noop；
+ *      名额一满就**拒收新案**，而不是让办完的案子腾位置。本批把闸门改成数「未结案」条数，
+ *      并给 `core/evict.js` 的 IN_TRANSIT 登记 `probe.cases` 的「未结案」行（在途豁免的正用）。
  *
  * ── 边界（如实写明，不假称完备）────────────────────────────────
  *   · 本模块**不判定真伪**：真相的真源是 `intel.truthOf`；本模块只算「卷宗里支持/反驳各有多少」。
@@ -58,7 +62,7 @@
   const VERDICT = ['guilty', 'clear', 'undecided'];
 
   const stat = { cases: 0, evidence: 0, confronts: 0, decided: 0, wrongs: 0,
-    blocked: 0, lastReason: '', faults: {} };
+    blocked: 0, recycled: 0, lastReason: '', faults: {} };
   function noteFault(reason) {
     stat.faults[reason] = (stat.faults[reason] || 0) + 1;
     stat.blocked++; stat.lastReason = reason;
@@ -78,6 +82,22 @@
     const key = clean(hid, 40);
     if (!c || !Array.isArray(c.hypotheses)) return null;
     return c.hypotheses.filter(function (h) { return h && clean(h.id, 40) === key; })[0] || null;
+  }
+  /**
+   * v2.560.0：卷宗序号的唯一正身。
+   *   旧写法用 `pr.cases.length` 当尾号 —— 在「挤出从不生效」的年代它恰好单调（因为永不删行）；
+   *   一旦挤出真的把办完的案子回收掉，`length` 会变小，同毫秒内连开两案就撞号。
+   *   实测（/tmp/probe560.js r7）：手工删一条后再开，两条 id 都是 `case_1700000000000_7`。
+   *   撞号的后果不是「id 难看」：`findCase` 按 id 取**第一条**，`decide`/`wrong`/`addEvidence`
+   *   会全部打到那条更老的卷宗上，而新案永远结不了。
+   */
+  function nextCaseSeq(cases) {
+    let mx = -1;
+    (Array.isArray(cases) ? cases : []).forEach(function (c) {
+      const m = /^case_\d+_(\d+)$/.exec(String((c && c.id) || ''));
+      if (m) { const n = parseInt(m[1], 10); if (isFinite(n) && n > mx) mx = n; }
+    });
+    return mx + 1;
   }
   function openProbe(draft, cfg) {
     draft.probe = (draft.probe && typeof draft.probe === 'object' && !Array.isArray(draft.probe)) ? draft.probe : { cases: [] };
@@ -113,13 +133,29 @@
     let out = null;
     WA.store.transact(function (draft) {
       const pr = openProbe(draft, cfg);
-      if (pr.cases.length >= cfg.maxCases) { out = { ok: false, reason: 'cases-full', cap: cfg.maxCases }; return false; }
+      // v2.560.0：名额按**未结案**条数卡，不按总条数卡。
+      //   旧写法 `pr.cases.length >= cfg.maxCases` 数的是**全部卷宗**，而 `decide()` 定案后
+      //   行留着不删（见 STATUS 注释：「closed = 定案或误指留痕，行不删」）——
+      //   于是「8 条全办完」与「8 条全压着没办」在准入面上**逐字相同**：
+      //   都是 `{ok:false, reason:'cases-full', cap:8}`，而前者的真值是 open = 0。
+      //   实测（/tmp/probe560.js r1/r2/r3）：全结案之后 open=0、cases=8、第 9 条仍被拒。
+      //   这不是容量裁决，是**拿拒收代替挤出**：头部⑧承诺 cases 站走 evict，而这条提前
+      //   return 让该站的 evict 每次都只是 noop（实测 8 次调用，dropped 恒为 0）。
+      const openN = pr.cases.filter(function (c) { return c && c.status === 'open'; }).length;
+      if (openN >= cfg.maxCases) {
+        out = { ok: false, reason: 'cases-full', cap: cfg.maxCases, open: openN, cases: pr.cases.length };
+        return false;
+      }
       const now = clockNow('probe');
-      const row = { id: 'case_' + now + '_' + pr.cases.length, question: q, note: clean(o.note, 60),
+      const row = { id: 'case_' + now + '_' + nextCaseSeq(pr.cases), question: q, note: clean(o.note, 60),
         status: 'open', verdict: '', hypotheses: list, evidence: [], wrongs: [],
         at: now, updatedAt: now };
       pr.cases.push(row);
-      WA.evict.array(pr.cases, 'probe.cases', cfg.maxCases);
+      // 挤出真正生效：`core/evict.js` 的 IN_TRANSIT 已把 `probe.cases` 的**未结案**行登记为
+      //   在途（「未完成的义务」），于是挤出先保 open、剩余额度才给已结案行（终态仍环形退场）。
+      //   语义即「办完的案子给新案子让位，正在办的永不被静默丢弃」。
+      const ev = WA.evict.array(pr.cases, 'probe.cases', cfg.maxCases);
+      if (ev && ev.dropped > 0) { stat.recycled += ev.dropped; stat.lastReason = 'recycled'; }
       out = { ok: true, id: row.id, question: q, hypotheses: list.length };
     }, 'probe:open');
     if (out && out.ok) { stat.cases++; stat.lastReason = 'opened'; }
@@ -402,11 +438,16 @@
     return { enabled: settings().enabled, cases: rows.length, open: rows.filter(function (c) { return c && c.status === 'open'; }).length,
       byVerdict: byVerdict,
       evidence: rows.reduce(function (n, c) { return n + ((c.evidence || []).length); }, 0),
-      wrongs: rows.reduce(function (n, c) { return n + ((c.wrongs || []).length); }, 0) };
+      wrongs: rows.reduce(function (n, c) { return n + ((c.wrongs || []).length); }, 0),
+      recycled: stat.recycled, openCap: settings().maxCases };
   }
   /** 注入块：只报「卷宗里支持/反驳各有多少」与「能不能定案」，不替任何人定案。 */
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
+    // v2.560.0：这里的 `.slice(0, cfg.maxCases)` **不是**名额分配的第二个真源——
+    //   名额的唯一真源是 `openCase` 的准入闸门（按未结案条数卡）。留着它只为
+    //   兼容旧存档里可能已经超限的卷宗（那时它是防御，不是裁决）。
+    //   本仓库反复踩的坑是「同一件事两处各写一遍判据」，故在此写明各自的职责边界。
     const rows = casesOf().filter(function (c) { return c && c.status === 'open'; }).slice(0, cfg.maxCases);
     if (!rows.length) return '';
     const lines = rows.map(function (c) {

@@ -22718,6 +22718,20 @@ await runScript('./budget-pinned-order-v2558.js');
 //   18 段：A 静态 / B 行为（含 running 压过更早的 planned、终态不进、只读）/ C 读数 / N 三条负控。
 //   单独跑：node tests/act-quota-v2559.js
 await runScript('./act-quota-v2559.js');
+// v2.560.0：调查卷宗准入名额专锁 —— `probe.openCase`（同一个病的第七处，但换了一条腿）：
+//   前六处病在「注入面按追加顺序截断 N 条」，这一处病在**准入闸门数错了对象**：
+//   `pr.cases.length >= cfg.maxCases` 数的是**全部卷宗**，而定案后行不删（卷宗是复盘材料），
+//   于是 8 条案子全办完之后，第 9 个案子永远开不出来——而现场 `open = 0`。
+//   实测：全结案与全未结两种局面的拒收返回值**逐字相同**（`cases-full`），
+//   且 `probe.cases` 站的 evict 被调用 8 次、dropped 恒为 0 ——
+//   引擎头部⓼承诺「三站都走 evict 挤出」，实际有界靠的是**拒收**。
+//   改法：闸门按未结案条数卡（cases-full 交出 open/cases 自证）；
+//   core/evict.js 的 IN_TRANSIT 登记「未结案卷宗」（挤出先保 open、已结案按最旧回收）；
+//   序号改取「现存最大尾号+1」（旧写法用 length，挤出一生效就撞号）；
+//   读数新增 stat.recycled / statView().openCap。
+//   23 段：A 静态 / B 行为 / C 读数 / N 四条负控（含删 IN_TRANSIT 登记）。
+//   单独跑：node tests/probe-cases-quota-v2560.js
+await runScript('./probe-cases-quota-v2560.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
