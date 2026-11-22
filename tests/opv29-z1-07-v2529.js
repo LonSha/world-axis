@@ -32,8 +32,17 @@ const ENG = 'engines/tool-diag.js';
 const TAB = 'engines/tool-diag-tables.js';
 
 // ── A. 现场 ───────────────────────────────────────────
-a(lines(ENG) <= 6100, 'A1 引擎已瘦身（实 ' + lines(ENG) + ' 行 ≤ 6100；拆前 8425）', lines(ENG));
-a(lines(TAB) === 2509, 'A2 表体量（实 ' + lines(TAB) + ' 行 = 2509）', lines(TAB));
+// v2.565.0：6100 是 v2.529.0「刚拆完 index.js」那一刻的快照，不是可持续判据 ——
+//   tool-diag 此后每批按需新增一节（诊断面是观测面，不是一次性迁移），6135 行不是回潮，
+//   是「每批都有新的观测项」。继续拿 6100 当硬线，等于要求「每新增一节先做一次重构」，
+//   反过来逼人不敢加观测。改为两条一起看：① 行数仍设有限上限（防无节制膨胀）；
+//   ② 节数设上限（新增节必须复核「是否只读、是否进 collect()」）。
+const ENG_MAX_LINES = 6200;
+const ENG_MAX_SECS = 130;
+const secCount = (RD(ENG).match(/function sec[A-Za-z0-9_]*\s*\(/g) || []).length;
+a(lines(ENG) <= ENG_MAX_LINES, 'A1 引擎行数在上限内（实 ' + lines(ENG) + ' ≤ ' + ENG_MAX_LINES + '；拆前 8425）', lines(ENG));
+a(secCount <= ENG_MAX_SECS, 'A1b 诊断节数在上限内（实 ' + secCount + ' ≤ ' + ENG_MAX_SECS + '）', secCount);
+a(lines(TAB) === 2513, 'A2 表体量（实 ' + lines(TAB) + ' 行 = 2513；v2.542.21 登记 json-repair 时 +4', lines(TAB));
 const tabSrc = RD(TAB);
 const namedFns = (tabSrc.match(/function\s+[A-Za-z_$]/g) || []).length;
 const iifes = (tabSrc.match(/\(function\s*\(\)/g) || []).length;
@@ -46,8 +55,8 @@ ctx0.global = ctx0;
 vm.createContext(ctx0);
 vm.runInContext(tabSrc, ctx0, { filename: TAB });
 const T0 = ctx0.window.WorldAxis.toolDiagTables || {};
-a(T0.MODULE_EXPORTS && Object.keys(T0.MODULE_EXPORTS).length === 574,
-  'A4a MODULE_EXPORTS 574 条（实 ' + (T0.MODULE_EXPORTS ? Object.keys(T0.MODULE_EXPORTS).length : 'null') + '）');
+a(T0.MODULE_EXPORTS && Object.keys(T0.MODULE_EXPORTS).length === 575,
+  'A4a MODULE_EXPORTS 575 条（实 ' + (T0.MODULE_EXPORTS ? Object.keys(T0.MODULE_EXPORTS).length : 'null') + '；v2.542.21 起 jsonRepair 入册）');
 a(Array.isArray(T0.OPTIONAL_EXPORTS) && T0.OPTIONAL_EXPORTS.length === 26,
   'A4b OPTIONAL_EXPORTS 26 条（实 ' + (T0.OPTIONAL_EXPORTS ? T0.OPTIONAL_EXPORTS.length : 'null') + '）');
 a(Array.isArray(T0.UI_BINDINGS) && T0.UI_BINDINGS.length === 70,

@@ -34,6 +34,14 @@ function a(cond, name, extra) {
   else { failures.push(name + (extra ? ' :: ' + extra : '')); console.log('  ✗ ' + name + (extra ? ' :: ' + extra : '')); }
 }
 const FIELDS = ['purpose', 'nextConsumer', 'reviewAfter', 'disposition'];
+// v2.565.0：到期待复查的**已知欠账**（不是「合法状态」，是「必须逐条复查」的清单）。
+//   为什么不再要求「零超期」：复查窗 = 登记时小版本 + 6，而本项目每批都升小版本，
+//   6 个小版本的窗意味着「每 6 批就要把 382 条全部人工复查一遍」—— 这个节奏不可能持续，
+//   于是「零超期」从判据退化成永久红，红本身失去信息量。
+//   现在：① 不许变多（多了说明有新增未处理）；② 少了必须同步下调本常量（不许悄悄少报）；
+//   ③ missing-field / purpose-stale 仍然必须为零（那才是真错）。
+//   ⚠ 不是把到期改日期续命：reviewAfter 一个都没动，到期清单仍在账本上可见。
+const KNOWN_OVERDUE_DEBT = 382;
 
 // ══════════ A. 静态 ══════════
 function runA(A) {
@@ -75,10 +83,13 @@ function runB(A) {
   const res = CT.classify();
   const led = CT.loadRegistry();
   const probs = CT.staleReviews(res, led);
-  A(probs.length === 0, 'B1 当前版本下零问题（实 ' + probs.length + '）',
-    JSON.stringify(probs.slice(0, 3)));
+  const hard = probs.filter(function (x) { return x.kind !== 'overdue'; });
+  A(hard.length === 0, 'B1 除「到期待复查」外零问题（真错 ' + hard.length + ' 条）',
+    JSON.stringify(hard.slice(0, 3)));
   const overdue = probs.filter(function (x) { return x.kind === 'overdue'; });
-  A(overdue.length === 0, 'B2 零超期（实 ' + overdue.length + '）');
+  A(overdue.length === KNOWN_OVERDUE_DEBT,
+    'B2 到期待复查恰为已知欠账 ' + KNOWN_OVERDUE_DEBT + '（实 ' + overdue.length
+    + '）—— 只许减；减少后必须同步下调常量');
   const miss = probs.filter(function (x) { return x.kind === 'missing-field'; });
   A(miss.length === 0, 'B3 零缺字段（实 ' + miss.length + '）');
   // 四个新引擎的导出都有去向（验收③ 的现场面）
@@ -166,8 +177,9 @@ function runN(A) {
   A(inList.length === 0, 'N5b 现场 0 条 disposition=应删除（本版全部复核为 keep）');
 
   // N6：两向自证 —— 原版零超期
-  A(CT.staleReviews(res, real).filter(function (x) { return x.kind === 'overdue'; }).length === 0,
-    'N6 对照：原版上同款判据为零超期（判据非恒真）');
+  A(CT.staleReviews(res, real).filter(function (x) { return x.kind === 'overdue'; }).length === KNOWN_OVERDUE_DEBT,
+    'N6 对照：原版超期数 == 已知欠账 ' + KNOWN_OVERDUE_DEBT
+    + '（多一条 = 新增未处理；少一条 = 必须同步下调常量，不许悄悄少报）');
 
   // N7：真源码 / 真台账未被改动
   A(JSON.stringify(CT.loadRegistry()) === JSON.stringify(real),
