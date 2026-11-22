@@ -23,6 +23,8 @@
  *   6 不重复推进近场/远场——不重建 region 的传播链。
  *   7 不为未知地点制造物理状态——placeId 必须在 region.places 中存在。
  *   8 效果到期、工期中断、取消、并发修复与重载结果一致。
+ *   9 注入面按「最该先知道的」排序（快过期的 → 新的 → id），名额只截断不参与筛选；
+ *     截断必须自证「另有几条未列」——否则模型不知道自己看到的是全部还是抽样。(v2.563.0)
  */
 (function () {
   'use strict';
@@ -282,15 +284,55 @@
   }
 
   // ── 7. buildBlock ──
+  // v2.563.0：旧写法 cur.slice(0, maxEffects/2) 取的是数组最旧的一半。
+  //   探针：31 条里最新一条是「议事厅刚被烧」，注面一个字都没有。
+  //   把数组顺序倒过来，列出的 24 条就全变了 —— 结果由插入顺序决定。
+  //   现在：候选只按 active 筛，排序后再截断，并自证「另有几条未列」。
+  var BLOCK_SHARE = 0.5; // 注面名额占一半，另一半留给别的注入面预算
+  function blockQuota(cfg) {
+    return Math.max(1, Math.floor(cfg.maxEffects * BLOCK_SHARE));
+  }
+  // 排序键：① 快过期的先 ② registeredAt 新的先 ③ id 字典序（同刻可复算）
+  function pickBlock(rows, quota) {
+    var arr = (rows || []).slice().sort(function (a, b) {
+      var ea = a && a.expiresAt ? a.expiresAt : 0;
+      var eb = b && b.expiresAt ? b.expiresAt : 0;
+      var ha = ea > 0 ? 0 : 1;
+      var hb = eb > 0 ? 0 : 1;
+      if (ha !== hb) return ha - hb;
+      if (ha === 0 && ea !== eb) return ea - eb;
+      var ra = (a && a.registeredAt) || 0;
+      var rb = (b && b.registeredAt) || 0;
+      if (ra !== rb) return rb - ra;
+      var ia = String((a && a.id) || '');
+      var ib = String((b && b.id) || '');
+      return ia.localeCompare(ib);
+    });
+    return { picked: arr.slice(0, quota),
+      hidden: Math.max(0, arr.length - quota), candidates: arr.length };
+  }
   function buildBlock() {
     var cfg = getSettings();
     if (!cfg.enabled) return '';
-    var cur = effects().filter(function (x) { return x && x.status === 'active'; });
-    if (!cur.length) return '';
-    var lines = ['[地点后果]'];
-    cur.slice(0, Math.max(1, Math.floor(cfg.maxEffects / 2))).forEach(function (x) {
-      lines.push('· ' + x.placeId + '：' + x.effectType + (x.repairProgress > 0 ? '（修复中 ' + x.repairProgress + '/' + (x.repairTime || 1) + '）' : ''));
+    var cur = effects().filter(function (x) {
+      return x && x.status === 'active';
     });
+    var quota = blockQuota(cfg);
+    var pk = pickBlock(cur, quota);
+    var mode = !pk.candidates ? 'empty' : (pk.hidden ? 'newest-first' : 'all-fit');
+    _stat.block = { candidates: pk.candidates, picked: pk.picked.length,
+      quota: quota, hidden: pk.hidden, mode: mode };
+    if (!pk.picked.length) return '';
+    var lines = ['[地点后果]'];
+    pk.picked.forEach(function (x) {
+      var tail = x.repairProgress > 0
+        ? '（修复中 ' + x.repairProgress + '/' + (x.repairTime || 1) + '）' : '';
+      lines.push('· ' + x.placeId + '：' + x.effectType + tail);
+    });
+    if (pk.hidden > 0) {
+      lines.push('· 另有 ' + pk.hidden + ' 条地点后果未列出'
+        + '（本面只念最该先说的 ' + pk.picked.length + ' 条）');
+    }
     return lines.join('\n');
   }
 
@@ -320,7 +362,8 @@
       // v2.194.0（U2 批次④）：修复闭环的**实测读数** —— repair 报「已修好」而渠道仍受阻的次数。
       //   它必须恒为 0（修好时在同一层同步解除）；非 0 即这两个模块又各说了一遍。
       bridgeMiss: _stat.bridgeMiss,
-      faults: Object.assign({}, _stat.faults) };
+      faults: Object.assign({}, _stat.faults),
+      block: _stat.block ? Object.assign({}, _stat.block) : null };
   }
 
   // ── 10. cancel ──

@@ -22761,6 +22761,18 @@ await runScript('./opportunity-quota-v2561.js');
 //   C 读数 / N 四条负控。
 //   单独跑：node tests/appointment-quota-v2562.js
 await runScript('./appointment-quota-v2562.js');
+    // v2.563.0（按序截断第十一处）：地点后果注入名额 —— 旧写法取的是「最旧」的一半。
+    //   病：engines/aftermath.js 的 buildBlock 用 cur.slice(0, maxEffects/2)，
+    //   而 effects 是 push 追加（旧在前）⇒ 注面念的是最早那批后果。
+    //   实测（/tmp/probe563.js）：31 条里最新一条是「议事厅刚被烧」⇒ 注面一个字都没有；
+    //   把数组顺序倒过来，列出的 24 条就全变了（不可复算）；
+    //   截断没有自证（读者不知道还有几条）；stat() 无 block 读数。
+    //   改法：名额具名（BLOCK_SHARE/blockQuota）→ pickBlock 排序
+    //   （快过期的 → 新的 → id）→ 截断自证「另有 N 条未列」
+    //   → 读数进 stat().block（五栗 + 单独拷贝）。
+    //   26 段：A 静态 / B 行为 / C 读数 / N 四条负控。
+    //   单独跑：node tests/aftermath-block-quota-v2563.js
+await runScript('./aftermath-block-quota-v2563.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
