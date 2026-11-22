@@ -1439,6 +1439,10 @@
         planAvailable: st.planAvailable === true,
         // 看板链面：压了几张 / 出行几人 / 跳过几人 / 其中受阻几人
         boards: st.boards, rows: st.rows, skipped: st.skipped, blocked: st.blocked,
+        // v2.557.0：名额面（最近一次注入单）。`blocked: 3` 说的是「最近一张看板里有 3 人受阻」，
+        //   `block: { candidates: 3, picked: 2 }` 说的是「注入面只提 2 个」—— 两个数不许互相顶替。
+        //   null = 还没构建过注入块；picked: 0 = 构建过但没人受阻（两件事，不许混成一个读数）。
+        block: st.block || null,
         faults: Object.assign({}, st.faults || {}),
         note: (cfg && cfg.enabled !== true)
           ? '意图看板关着 —— 这一栏零读数是「关着」，不是「没人有计划」'

@@ -22684,6 +22684,18 @@ await runScript('./foreshadow-quota-v2555.js');
 //   20 段：A 静态 / B 行为（含伏笔真进场、防泄露、两端态不进）/ C 读数 / N 四条负控。
 //   单独跑：node tests/dormant-quota-v2556.js
 await runScript('./dormant-quota-v2556.js');
+// v2.557.0：人物意图注入名额专锁 —— `intent-board.buildBlock`（同一个病的第三处，且最极端）：
+//   它借 `board()` 的截断当候选池 —— board 按**人物在场顺序**取前 maxRows 个有链的人，
+//   再筛 isBlocked、再 slice(0, maxRows)。两处截断都在筛之前 ⇒ 实测
+//   （甲/乙不卡、丙卡着，maxRows=2）：候选是甲乙 ⇒ stuck 空 ⇒ **注入块整块消失**，
+//   真正卡着的丙一个字都进不来。
+//   改法：不再借 board（面板语义不动，B2 钉这件事）；自己遍历全部人物只留受阻；
+//   pickBlock 按 `tries` 降序（卡得最久优先，链上现成字段，不新造评分）+ 同 tries 按 name；
+//   名额够就原样全进；名额面读数进 stat().block（本模块无时钟 ⇒ 不造 at），
+//   并由 tool-diag 的 secIntentBoard 节真读。
+//   21 段：A 静态 / B 行为（含丙进得来、面板语义不变、只读）/ C 读数（含 reset 清零）/ N 三条负控。
+//   单独跑：node tests/intent-quota-v2557.js
+await runScript('./intent-quota-v2557.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

@@ -55,7 +55,7 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).filter(function (r) { return !r || r.key !== LS_KEY; }).concat([__REG]);
 
-  const __stat = { boards: 0, rows: 0, skipped: 0, blocked: 0, faults: {}, lastReason: '' };
+  const __stat = { boards: 0, rows: 0, skipped: 0, blocked: 0, faults: {}, lastReason: '', block: null };
   function fault(k) { __stat.faults[k] = (__stat.faults[k] || 0) + 1; __stat.lastReason = k; }
 
   /** 只读、失败即降级（观察层失败不许影响主链）。 */
@@ -186,14 +186,55 @@
    *   但本模块的注入面**必须极短**，且只列**受阻**的人（没卡点的不用提醒）。
    *   开关关着 / plan 缺席 ⇒ 空串（零 token）。
    */
+  /**
+   * v2.557.0：注入名额的**分配判据**（此前是 `board()` 先按人物顺序截到 maxRows，
+   *   再 `filter(isBlocked)`，再 `slice(0, maxRows)`）。两处截断都在筛之前，
+   *   后果比「提错人」更极端：**整块消失**。
+   *   实测：people = 甲(不卡) / 乙(不卡) / 丙(卡着)，maxRows = 2 ⇒
+   *     board() 只取到甲乙 ⇒ stuck 为空 ⇒ buildBlock 返回空串，
+   *     而真正卡着的丙一个字都进不来（正文模型永远不知道有人卡在那一步）。
+   *
+   * 判据三条（缺一不可）：
+   *   ① **先筛后截**：候选 = 全部人物里**所有受阻**的，筛完才谈名额；
+   *   ② **卡得最久优先**：`tries` 降序（试过几次还没过）—— 这个字段是链上现成的，
+   *      **不新造评分**（不把「缺几个银元」折算成权重那种事，一折就要有人维护口径）；
+   *   ③ 同 `tries` 按 name 字典序（同输入同输出，可复算）；
+   *   名额够时（候选 ≤ maxRows）**原样全进、顺序不变**（fail-open）。
+   *   纯函数：不改入参、不读 store。
+   */
+  function pickBlock(stuck, cap) {
+    const all = Array.isArray(stuck) ? stuck.slice() : [];
+    const quota = Math.max(0, Math.floor(Number(cap) || 0));
+    if (!all.length || !quota) return { picked: [], mode: 'empty', quota: quota };
+    if (all.length <= quota) return { picked: all.slice(), mode: 'all-fit', quota: quota };
+    const sorted = all.slice().sort(function (a, b) {
+      const d = (Number(b.tries) || 0) - (Number(a.tries) || 0);
+      if (d !== 0) return d;
+      const an = String(a.name || ''), bn = String(b.name || '');
+      return an < bn ? -1 : (an > bn ? 1 : 0);
+    });
+    return { picked: sorted.slice(0, quota), mode: 'most-stuck', quota: quota };
+  }
   function buildBlock() {
     const cfg = settings();
     if (!cfg.enabled) return '';
-    const b = board();
-    if (!b.ok || !b.rows.length) return '';
-    const stuck = b.rows.filter(function (r) { return r.isBlocked; });
-    if (!stuck.length) return '';
-    return '【人物意图（只列受阻）】' + stuck.slice(0, cfg.maxRows).map(function (r) {
+    // 与 board() 同口径：plan 缺席要**留痕**（fault），不是静静地返回空串。
+    if (!WA.plan || typeof WA.plan.chain !== 'function') { fault('no-plan-engine'); return ''; }
+    const names = personNames();
+    const stuck = [];
+    for (let i = 0; i < names.length; i++) {
+      const r = rowOf(names[i].name, cfg);
+      if (r && r.isBlocked) stuck.push(r);
+    }
+    const pick = pickBlock(stuck, cfg.maxRows);
+    // 读数先落账（**空表也留读数**）：`picked: 0` 与「从没构建过（null）」是两件事。
+    //   本模块是纯读取（没有时钟），所以这里**不造时间戳** —— 不猜。
+    __stat.block = {
+      people: names.length, candidates: stuck.length,
+      picked: pick.picked.length, quota: pick.quota, mode: pick.mode
+    };
+    if (!pick.picked.length) return '';
+    return '【人物意图（只列受阻）】' + pick.picked.map(function (r) {
       const at = r.step ? ('第 ' + r.step.seq + '/' + r.total + ' 步「' + r.step.text + '」') : '（无当前步）';
       return r.name + ' → ' + r.goalText + '：' + at + '，卡在 ' + r.blocked.join('、');
     }).join('；');
@@ -202,6 +243,10 @@
   function stat() {
     return { boards: __stat.boards, rows: __stat.rows, skipped: __stat.skipped,
       blocked: __stat.blocked, lastReason: __stat.lastReason,
+      // v2.557.0：名额面读数（最近一次注入单）。null = 还没构建过；picked: 0 = 构建过但空表。
+      //   与上面的 blocked 并列：`blocked: 3` 是「最近一次看板里有 3 人受阻」，
+      //   `block.blocked` 那一路的读数在 block 里（candidates/picked）—— 两个数不许互相顶替。
+      block: __stat.block ? Object.assign({}, __stat.block) : null,
       faults: Object.assign({}, __stat.faults),
       // 自证面：两源在场与否（「没装」与「没内容」必须分得开）
       planAvailable: !!(WA.plan && typeof WA.plan.chain === 'function'),
@@ -210,7 +255,7 @@
 
   function reset() {
     __stat.boards = 0; __stat.rows = 0; __stat.skipped = 0; __stat.blocked = 0;
-    __stat.lastReason = ''; __stat.faults = {};
+    __stat.lastReason = ''; __stat.faults = {}; __stat.block = null;
     return true;
   }
 
