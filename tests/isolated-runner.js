@@ -288,12 +288,33 @@ async function launch(root, options) {
       try {
         const P = require(path.join(prepared.work, 'tools/prune-sections.js'));
         const r = P.prune(fs.readFileSync(runPath, 'utf8'), sel, { mode: 'wrap' });
-        if (r.kept.length) {
+        // ── v2.566.0：**段文件也必须裁**（O6 Q4 第六刀）──────────────────
+        //   现场病灶：仓里 3544 行的那一节住在 tests/segments/tool-diag-v092.js，它的 section() 不在
+        //   tests/run.js 本体 —— 而剪裁只扫 run.js ⇒「选区未命中任何节」⇒ 拒裁 ⇒ 退回全量；
+        //   而未选中节的裸语句体在没有夹具的世界里成片假红（实测 22 条全挂在「已跳过 /
+        //   拒绝」的节上，读数不可采信）。治法不是放宽判据：对**同一份段文件**跑同一个 prune ——
+        //   段文件里的 section() 行就是节头，未选中节体被 if (guardRun('名')) 包裹（运行期同源裁定），
+        //   require 行本身不动 ⇒ test-surface-gate 的静态可达性仍看得见这条边。
+        const segKept = [];
+        const segDir = path.join(prepared.work, 'tests/segments');
+        if (fs.existsSync(segDir)) {
+          fs.readdirSync(segDir).sort().forEach(function (nm) {
+            if (!/\.js$/.test(nm)) return;
+            const sp = path.join(segDir, nm);
+            const sr = P.prune(fs.readFileSync(sp, 'utf8'), sel, { mode: 'wrap' });
+            if (!sr.kept.length) return;
+            fs.writeFileSync(sp, sr.text);
+            P.check(sp);
+            segKept.push(nm + ':' + sr.kept.length + '节');
+          });
+        }
+        if (r.kept.length || segKept.length) {
           fs.writeFileSync(runPath, r.text);
           P.check(runPath);   // 拒裁兜底：check 抛 ⇒ catch 照跑原版
           pruneNote = 'wrap 裁剪：选中 ' + r.stats.selected + ' 节 · 包裹 ' + r.stats.wrappedCount
             + ' 节 / ' + r.stats.wrappedLines + ' 行（运行期哨兵裁定，未选中节体不执行）'
-            + ' · 最后一节不包（尾部汇总段边界） · 跨节结构降级不包 ' + (r.stats.wrapUnsafe || 0) + ' 节' + (r.stats.markedCount ? ' · 只标不包 ' + r.stats.markedCount + ' 节' : '');
+            + ' · 最后一节不包（尾部汇总段边界） · 跨节结构降级不包 ' + (r.stats.wrapUnsafe || 0) + ' 节' + (r.stats.markedCount ? ' · 只标不包 ' + r.stats.markedCount + ' 节' : '')
+            + (segKept.length ? ' ·段文件裁剪 ' + segKept.join(' / ') : '');
         } else {
           // v2.253.0：**节名写错时必须显式点名**。现场实证（沙箱 UKFBEG）：选区传了
           //   「…不再取决于开关」，而真源节名是「…不再取决于开发机装没装 npm 包」——

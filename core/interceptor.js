@@ -12,7 +12,11 @@
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
   let installed = false;
-  let lastRoundSig = '';           // 去重：同一轮生成只跑一次before链
+  let lastRoundSig = '';
+  // v2.567.0：日志去抖用的「上一轮漂移态」。原先它是 WA.interceptor.__lastDriftFlag，
+  //   等于在运行时往导出面上加字段（member-surface-gate 判「产品侧越界 2 种 / 3 处」）。
+  //   状态归模块自己，导出面一字不加 —— 与该文件「导出面即契约」的既有口径一致。
+  let lastDriftSeen = false;           // 去重：同一轮生成只跑一次before链
   let afterHooked = false;
   let purifyHooked = false;   // v2.1.0: 输出净化挂载哨兵
   // v2.1.0: 净化原文快照（WeakMap：不写进 chat 存档，随消息对象回收）
@@ -66,9 +70,12 @@
     try {
       const al = (WA.interceptor && WA.interceptor.alignRound) ? WA.interceptor.alignRound(chat) : null;
       if (al && al.available && WA.interceptor) {
-        WA.interceptor.__lastAlign = al;
-        const wasDrift = !!WA.interceptor.__lastDriftFlag;
-        WA.interceptor.__lastDriftFlag = !!al.drift;
+        // v2.567.0：原先这里写 WA.interceptor.__lastAlign 留证，但全仓没有一处读它
+        //   （grep __lastAlign 只命中这一行写入点）—— 死写 + 污染导出面，故删。
+        //   对齐读数已由本分支下面那条 warn 日志逐项报出（发送 / 存档 / 认得 / 不同 / 单调），
+        //   查现场要的证据在日志里，不靠导出面上的一个私有字段。
+        const wasDrift = lastDriftSeen;
+        lastDriftSeen = !!al.drift;
         if (al.drift && !wasDrift) {
           WA.log('warn', '本轮发送面与存档面不对齐：发送 ' + al.sentLen + ' 条 / 存档 ' + al.hostLen
             + ' 条，认得 ' + al.known + ' 条、逐位不同 ' + al.mismatch + ' 条、单调=' + (al.monotonic ? '是' : '否')
