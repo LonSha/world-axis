@@ -2508,6 +2508,89 @@ function auditLoadedArchive(payload) {
   __loadStat.lastAudit = rec;
   return rec;
 }
+
+// ── v2.554.0：写前预演（只判「形态漂移」）──────────────────────────────
+// 为什么落在这里：`engines/write-rehearsal.js`（v2.531.0）的契约是「把结构校验挪到落盘之前」，
+//   而它到 v2.554.0 之前**零产品调用**。勘察时量到两件事，缺一不可：
+//     ① `WA.schema.list() === []` —— 全仓没有任何 schema 登记，所以 rehearse 拿不到 validator，
+//        直接接只会整单拒 `no-validator`（等于没接）；
+//     ② 反过来，随手塞一个「永远放行」的 validator 会让它 `ok:true`（实测 accepted=['people.p1.name']）
+//        —— **假接线长得和真接线一样绿**。这一条已在 tests/patch-rehearsal-wire-v2554.js 里钉成负控。
+// 故本批先做两件最小的事：落下第一个真 schema（`storePatch`），再把预演接到**唯一的按路径写口**
+//   `store.patch`（11 个产品调用点，路径形态都是 a.b）。
+//
+// 口径（写进注释，因为它就是判据）：
+//   ① **只拦容器级形态漂移**：array / object / 标量 三类之间互改 ⇒ 拒。这才是 save-audit 在载入时
+//      报的 `bad-type` 那类腐蚀（把分区写成字符串、把数组写成对象）的正身；**标量↔标量不拦** ——
+//      宽松代码里 `''` → 0 到处都是，拦它会立刻引发一片误伤，那是另一件事，要单独量它有多少、该不该改。
+//   ② **预演不判「值好不好」**：只判形态。字段级语义（长度 / 枚举 / 范围）不在本口，别在这里长。
+//   ③ **缺席要如实标**：引擎没装载 / schema 没装载 / 路径形态不合法 / 预演自己炸了 ⇒ `skipped` 写明，
+//      **放行**并保持旧行为（fail-open）。预演是新增的观测 + 闸门，不许把「原本能写」变成「写不了」；
+//      `patch` 对坏 path 的旧契约是「不引入新的抛出路径」，这条就是守它。
+//   ④ 只有 `code === 'type-conflict'` 才拒写；其余拒收一律走 skipped，不改行为。
+const PATCH_SCHEMA = {
+  type: 'object',
+  fields: {
+    path: { type: 'string', required: true, pattern: '^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$' },
+    value: { type: 'any' }
+  },
+  // 未知字段保留（本仓纪律：未知字段保留不执行，不因多字段而拒）
+  unknown: 'keep'
+};
+/** 形态三分类。null / undefined 一律 **absent**：不存在的节点没有形态，故「缺席 → 任意」永远放行。 */
+function patchClassOf(v) {
+  if (v === null || v === undefined) return 'absent';
+  if (Array.isArray(v)) return 'array';
+  if (typeof v === 'object') return 'object';
+  return 'scalar';
+}
+/** 让 `storePatch` 进注册表（幂等）。schema 模块缺席 ⇒ false，预演走 skipped，不假装通过。 */
+function ensurePatchSchema() {
+  const S = WA.schema;
+  if (!S || typeof S.define !== 'function' || typeof S.list !== 'function') return false;
+  try {
+    const has = (S.list() || []).some(function (x) { return x && x.name === 'storePatch'; });
+    if (!has) S.define('storePatch', PATCH_SCHEMA);
+    return true;
+  } catch (e) { return false; }
+}
+/**
+ * 写前预演一次 `store.patch`。
+ * 返回 `{skipped, ok, code, rejected}`：`skipped` 非空 = **没判**（放行）；`ok === false` 才是真拒。
+ */
+function rehearsePatch(path, value, before) {
+  const rec = { skipped: '', ok: null, code: '', rejected: [] };
+  try {
+    const WR = WA.writeRehearsal;
+    if (!WR || typeof WR.rehearse !== 'function') { rec.skipped = 'engine-absent'; return rec; }
+    if (typeof WR.checkPath === 'function' && WR.checkPath(path)) { rec.skipped = 'bad-path'; return rec; }
+    if (!ensurePatchSchema()) { rec.skipped = 'schema-absent'; return rec; }
+    const was = patchClassOf(before);
+    const now = patchClassOf(value);
+    // 口径①：标量↔标量放行；任一侧缺席放行。
+    const conflict = (was !== 'absent' && now !== 'absent' && was !== now
+      && !(was === 'scalar' && now === 'scalar'));
+    const verdict = function () {
+      if (conflict) return { ok: false, errors: [{ field: '', code: 'type-conflict', expected: was, actual: now }] };
+      return { ok: true };
+    };
+    const known = function (n) {
+      try { return (WA.schema.list() || []).some(function (x) { return x && x.name === n; }); }
+      catch (e) { return false; }
+    };
+    const r = WR.rehearse({ schema: 'storePatch', ops: [{ path: path, value: value }] },
+      { validate: verdict, known: known });
+    rec.ok = !!(r && r.ok === true);
+    rec.rejected = (r && r.rejected) ? r.rejected.slice(0, 4) : [];
+    rec.code = rec.rejected.length ? String(rec.rejected[0].code || '') : '';
+    return rec;
+  } catch (e) {
+    // 预演自己炸了：如实标，放行（口径③）—— 观测不许把主路径拖死。
+    rec.skipped = 'rehearse-error';
+    rec.error = String((e && e.message) || e);
+    return rec;
+  }
+}
   const store = WA.store = {
     SCHEMA_VERSION,
     /** v0.1.44: 有界容器登记表只读副本（测试反查源码一致性用）；v1.0.0: 透传 kind（array|object） */
@@ -5511,6 +5594,20 @@ function auditLoadedArchive(payload) {
       let before;
       try { before = this.read(path, undefined); }
       catch (_e) { before = undefined; }
+      // v2.554.0：写前预演（口径见文件内 rehearsePatch 的注释）。
+      //   只拒 `type-conflict` 一种；其余（坏 path / 引擎缺席 / schema 缺席 / 预演自己炸了）一律放行并保持旧行为。
+      //   为什么拒在 transact **之前**：这一段一旦进 transact，draft 已经改了，写回也已经开始，
+      //   「拒收」就只能是「写进去再道歉」——那正是本仓反复治的「读数不实」的写法。
+      const pr = rehearsePatch(path, value, before);
+      if (pr.ok === false && pr.code === 'type-conflict') {
+        const why = pr.rejected[0] || {};
+        try {
+          WA.log('warn', 'store.patch 被写前预演拒绝：' + path + ' 现有形态 ' + why.expected
+            + '，本次写入的是 ' + why.actual + '（未写入；要换形态请先清空该节点，或在 transact 里重建）');
+        } catch (eLog) { /* 日志缺席不影响拒收本身 */ }
+        return { ok: false, reason: 'type-conflict', path: path,
+          expected: String(why.expected || ''), actual: String(why.actual || '') };
+      }
       const r = this.transact(draft => {
         const segs = path.split('.');
         let node = draft;

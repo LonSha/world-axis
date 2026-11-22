@@ -191,9 +191,12 @@
           '写前预演 ' + one('engines/write-rehearsal.js', 'writeRehearsal', function () {
             const s = WA.writeRehearsal.stat();
             // v2.552.0（读数真实性）：这里的 stat 读的是**真计数器**（不是常量空参数），
-            //   但 `rehearse()` 全仓零产品调用 ⇒ 计数器永远是初值。
+            //   但当时 `rehearse()` 全仓零产品调用 ⇒ 计数器永远是初值。
             //   「0 通过 / 0 拒」读起来像「预演都通过了」，实际含义是「一次都没预演过」。
             //   没有调用过就直说，不报一个看起来正常的 0。
+            // v2.554.0：`rehearse()` 已接在 `core/store.js` 的 `patch()` 写口上（每次按路径写前跑一次，
+            //   只拦容器级形态漂移）。于是这一格第一次会随写操作动；「从未调用」那条分支仍然保留 ——
+            //   没有写过任何东西时它确实是「没预演过」，不能因为接上了线就假装它在跑。
             return s.calls === 0 ? '从未调用' : (s.ok + '通过/' + s.rejected + '拒');
           }),
           '引导弧 ' + one('engines/arc-guide.js', 'arcGuide', function () {

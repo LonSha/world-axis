@@ -22645,6 +22645,24 @@ await runScript('./stitch-ledger-truthfulness-v2552.js');
     //   同批更新：tests/stitch-ledger-truthfulness-v2552.js 的 B4/C2 判据（saveAudit.audit 由
     //     零调用变 1 个产品调用点，改成精确值 1 而不是放宽），并给 A3 补负控 N3。
 await runScript('./load-audit-wire-v2553.js');
+    // v2.554.0：写前预演接线（store.patch）—— 15 段。
+    //   病：`engines/write-rehearsal.js`（v2.531.0）的契约是「把结构校验挪到落盘之前」，
+    //     而它到本批之前**零产品调用**。勘察量到两件事，缺一不可：
+    //     ① `WA.schema.list() === []` —— 全仓没有任何 schema 登记，此时接 rehearse 只会整单拒
+    //        `no-validator`（等于没接，还长得像在拒收）；
+    //     ② 反过来塞一个「永远放行」的 validator 会让它 `ok:true`（实测 accepted=['people.p1.name']）
+    //        —— **假接线长得和真接线一样绿**。本锁 N1 就钉这个：换掉 validator 之后 B2 必须消失。
+    //   本批做的两件最小的事：落下第一个真 schema（`storePatch`），把预演接到**唯一的按路径写口**
+    //     `store.patch`（11 个产品调用点，路径都是 a.b），只拦**容器级形态漂移**
+    //     （array / object / 标量 互改）；标量↔标量放行（`''`→0 那种写法到处都是，拦它会一片误伤）。
+    //   缺席一律 fail-open：引擎没装载 / schema 没装载 / 路径形态不合法 / 预演自己炸了 ⇒ 写进 skipped
+    //     并保持旧行为 —— `patch` 对坏 path 的旧契约是「不引入新的抛出路径」，这条守着它。
+    //   与 v2.553.0 是一对：上一批让载入时**看见** bad-type，本批在写入口**不让它产生**。
+    //   读数：15 段全绿 —— A 接线与口径（恰 1 处调用 / storePatch 字段口径 / 拒写只认 type-conflict /
+    //     三分类 + 标量互放）、B 行为（calls+1 / object→array 被拒且 state 不变 / 缺席放行 /
+    //     标量互放 / 返回体四栏）、C 只读不变式（不写盘、拒后照常可用）、D 缺席（引擎缺席 / schema 缺席
+    //     都放行，恢复后重新拒）、N 负控两条（恒真 validator ⇒ B2 现场消失；放宽拒写范围 ⇒ A3 现形）。
+await runScript('./patch-rehearsal-wire-v2554.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

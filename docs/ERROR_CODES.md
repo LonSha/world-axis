@@ -1,9 +1,9 @@
 # WorldAxis 拒收码手册（自动生成：`node tools/gen-error-codes.js`）
 
-> 台账 version：`2.553.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
+> 台账 version：`2.554.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **1921** 个内联拒收码：见证 930 / 死表 52 / 基线 937 / **未分类 2**
+共 **1922** 个内联拒收码：见证 930 / 死表 52 / 基线 937 / **未分类 3**
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
@@ -1943,10 +1943,11 @@
 | `writeDesk-unavailable` | engines/action-desk-routes.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `zone-unsolved` | engines/local-grid.js, engines/spatial-bridge.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 
-## 未分类（门禁红灯）（2）
+## 未分类（门禁红灯）（3）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
 | `followup-hold` | engines/spotlight.js | 未分类 —— 门禁红灯 |
 | `settle-` | engines/dream.js | 未分类 —— 门禁红灯 |
+| `type-conflict` | core/store.js | 未分类 —— 门禁红灯 |
 
