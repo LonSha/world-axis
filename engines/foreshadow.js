@@ -81,6 +81,21 @@
   function isTerminal(f) { return !!f && TERMINAL.indexOf(f.status) >= 0; }
   function ts(v) { const n = Number(v); return isFinite(n) && n > 0 ? Math.floor(n) : 0; }
 
+  /**
+   * v2.555.0：「上次动作时刻」的**唯一正身**。此前这段 `ts(f.updatedAt) || ts(f.at) || 0`
+   *   在 check / stat3 / buildBlock 里各内联写了一遍（四处），四处各写一遍就意味着
+   *   「改一处忘三处」—— 本批要动的正是它，所以先收成一口。
+   */
+  function markOf(f) { return ts(f && f.updatedAt) || ts(f && f.at) || 0; }
+  /**
+   * v2.555.0：`stale` 的**唯一正身**。口径：**mark 缺失一律算 stale** ——
+   *   它连「什么时候埋的」都不知道，这正是最需要被看见的那一类（与 check 的原口径同向）。
+   *   修的病：buildBlock 此前自己写了一遍 `mark && (t - mark) > staleMs`，于是
+   *   「mark 缺失」这件事在作者面是 stale、在注入面**看起来新鲜**（不打标）——
+   *   同一件事两条读数互相顶替。现在三处读的是同一个函数，不许再各写一遍。
+   */
+  function isStaleAt(f, cfg, t) { const mark = markOf(f); return !mark || (t - mark) > cfg.staleMs; }
+
   /** ① 标记一条伏笔（显式 id；已存在则只刷新文本与时间，不重置状态）。 */
   function track(hintId, text, opts) {
     const cfg = settings();
@@ -204,12 +219,11 @@
     const t = ts(now) || clockNow('foreshadow');
     const rows = list().filter(function (f) {
       if (!isActive(f)) return false;
-      const mark = ts(f.updatedAt) || ts(f.at) || 0;
-      // 「未推进」＝ 自上次动作以来没动过。没有时间戳的行**不猜**：如实算作过期
-      // （它连「什么时候埋的」都不知道，这正是最需要被看见的那一类）。
-      return !mark || (t - mark) > cfg.staleMs;
+      // 「未推进」＝ 自上次动作以来没动过。判据只有一口（isStaleAt）：
+      //   没有时间戳的行**不猜**，如实算作过期 —— 它连「什么时候埋的」都不知道。
+      return isStaleAt(f, cfg, t);
     }).map(function (f) {
-      const mark = ts(f.updatedAt) || ts(f.at) || 0;
+      const mark = markOf(f);
       return { id: f.id, content: clean(f.content, 60), status: f.status, at: ts(f.at), updatedAt: ts(f.updatedAt), staleBy: mark ? (t - mark) : -1 };
     }).sort(function (a, b) { return b.staleBy - a.staleBy; });
     stat.stale = rows.length;
@@ -225,10 +239,7 @@
     const closed = arr.filter(isTerminal);
     const cfg = settings();
     const t = clockNow('foreshadow');
-    const stale = active.filter(function (f) {
-      const mark = ts(f.updatedAt) || ts(f.at) || 0;
-      return !mark || (t - mark) > cfg.staleMs;
-    });
+    const stale = active.filter(function (f) { return isStaleAt(f, cfg, t); });
     const durs = resolved.map(function (f) { return ts(f.resolveMs); }).filter(function (n) { return n > 0; });
     const avg = durs.length ? Math.round(durs.reduce(function (a, b) { return a + b; }, 0) / durs.length) : 0;
     return {
@@ -242,16 +253,66 @@
     };
   }
 
+  /**
+   * v2.555.0：注入名额的**分配判据**（此前是 `filter(isActive).slice(0, maxItems)` ——
+   *   **按插入顺序**截断）。那个写法有一个只在读数上才看得见的后果：
+   *   先埋的永远占满名额，后埋 / 刚推进的**在注入面上根本不存在** ——
+   *   实测 7 条 active（5 条 stale + 2 条刚推进）、maxItems=5 时，
+   *   刚推进的两条一条都进不去，注入单全是两小时没动过的账。
+   *   这就是「该退场的拍一直注入、该在场的拍没人注入」的真身。
+   *
+   * 判据四条（缺一不可）：
+   *   ① **名额够就全进**：active ≤ maxItems ⇒ 原样全进（行为不变，fail-open）；
+   *   ② **fresh 优先**：按「最近推进」降序 —— 刚动过的那条才是这一轮该提的；
+   *   ③ **stale 让位但保底 1 条**（取最老的那条）：最老的过期伏笔存在感最低、最容易被忘，
+   *      而它在作者面（check）与容量面（prune 的挤出侧）都已/即将被处理，注入面不必再占满；
+   *      名额只有 1 个时不保底（保底会把唯一名额给一条过期账，那比不注还坏）；
+   *   ④ **全 stale 时 stale 占满**（绝不空表）；同刻按 id 字典序（同输入同输出，可复算）。
+   * 纯函数：不改入参、不读 store、不写任何东西。
+   */
+  function pickForBlock(active, cfg, t) {
+    const all = Array.isArray(active) ? active.slice() : [];
+    const cap = Math.max(0, Math.floor(Number(cfg && cfg.maxItems) || 0));
+    const idOf = function (f) { return String((f && f.id) || ''); };
+    const byId = function (a, b) { return idOf(a) < idOf(b) ? -1 : (idOf(a) > idOf(b) ? 1 : 0); };
+    const fresh = [], stale = [];
+    all.forEach(function (f) { (isStaleAt(f, cfg, t) ? stale : fresh).push(f); });
+    fresh.sort(function (a, b) { const d = markOf(b) - markOf(a); return d !== 0 ? d : byId(a, b); });
+    stale.sort(function (a, b) { const d = markOf(a) - markOf(b); return d !== 0 ? d : byId(a, b); });
+    if (!all.length || !cap) return { picked: [], fresh: fresh, stale: stale, deferred: all, mode: cap ? 'empty' : 'no-quota' };
+    if (all.length <= cap) return { picked: all.slice(), fresh: fresh, stale: stale, deferred: [], mode: 'all-fit' };
+    let picked;
+    if (!fresh.length) picked = stale.slice(0, cap);            // ④ 全 stale：占满，不空表
+    else {
+      const keepStale = (cap >= 2 && stale.length) ? 1 : 0;     // ③ stale 保底 1 条
+      picked = fresh.slice(0, cap - keepStale).concat(stale.slice(0, keepStale));
+    }
+    const keys = picked.map(idOf);
+    const deferred = all.filter(function (f) { return keys.indexOf(idOf(f)) < 0; });
+    return { picked: picked, fresh: fresh, stale: stale, deferred: deferred, mode: fresh.length ? 'fresh-first' : 'all-stale' };
+  }
+  /** 最近一次注入单的读数（供 stat().block 投影；**拷贝**出去，不是引用）。 */
+  let __lastBlock = null;
   /** 注入块：把「埋了没收」的伏笔送回上下文（只在其超过阈值时提示，不逐条念全部）。 */
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
-    const arr = list().filter(isActive).slice(0, cfg.maxItems);
-    if (!arr.length) return '';
     const t = clockNow('foreshadow');
-    const lines = arr.map(function (f) {
-      const mark = ts(f.updatedAt) || ts(f.at) || 0;
+    const active = list().filter(isActive);
+    const pick = pickForBlock(active, cfg, t);
+    // 读数先落账（**空表也留读数**）：`picked: 0` 与「从没构建过（null）」是两件事。
+    __lastBlock = {
+      at: t, active: active.length, picked: pick.picked.length,
+      fresh: pick.fresh.length, stale: pick.stale.length, deferred: pick.deferred.length,
+      quota: Math.max(0, Math.floor(Number(cfg.maxItems) || 0)), mode: pick.mode, staleMs: cfg.staleMs
+    };
+    if (!pick.picked.length) return '';
+    const lines = pick.picked.map(function (f) {
+      const mark = markOf(f);
       const mins = mark ? Math.round((t - mark) / 60000) : 0;
-      const tag = (mark && (t - mark) > cfg.staleMs) ? '（已 ' + mins + ' 分钟未推进）' : '';
+      // mark 缺失时**如实说**「按过期处理」—— 它不是新鲜，只是不知道多旧（见 isStaleAt）。
+      //   两个分支都问同一个 isStaleAt：本文件里 `> cfg.staleMs` 只许出现在它里面一次。
+      const tag = !mark ? '（无推进时间戳，按过期处理）'
+        : (isStaleAt(f, cfg, t) ? '（已 ' + mins + ' 分钟未推进）' : '');
       return '- ' + (f.id || '未命名') + '：' + clean(f.content, 60) + tag;
     });
     const head = '[伏笔台账]' + String.fromCharCode(10)
@@ -268,7 +329,14 @@
     buildBlock: buildBlock,
     // 三桶读数挂在**既有成员** stat() 的返回里（零新增导出：本仓纪律「零消费能力当场删」，
     //   为读一个计数新开一口会立即变成死导出 —— v2.132.0 的 life 游标即此先例）。
-    stat: function () { return Object.assign({}, stat3(), { counters: Object.assign({}, stat), faults: Object.assign({}, stat.faults) }); }
+    stat: function () {
+      // v2.555.0：`block` 是「最近一次注入单」的名额面读数（拷贝出去，不是引用）。
+      //   null = 本进程还没构建过；picked: 0 = 构建过但空表 —— 这两件事不许混成一个读数。
+      return Object.assign({}, stat3(), {
+        counters: Object.assign({}, stat), faults: Object.assign({}, stat.faults),
+        block: __lastBlock ? Object.assign({}, __lastBlock) : null
+      });
+    }
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/foreshadow.js', { kind: 'engine', ver: '2.135.0' });
 })();

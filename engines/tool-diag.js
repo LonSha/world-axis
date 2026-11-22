@@ -311,6 +311,10 @@
         total: st.total || 0, active: st.active || 0, resolved: st.resolved || 0, closed: st.closed || 0,
         stale: st.stale || 0, avgResolveMs: st.avgResolveMs || 0, resolveSamples: st.resolveSamples || 0,
         byStatus: st.byStatus || {}, counters: st.counters || {}, faults: st.faults || {},
+        // v2.555.0：名额面读数（最近一次注入单）。null = 本进程还没构建过；picked 0 = 构建过但空表。
+        //   与 stale 并列报出：`stale: 5` 说的是「作者面有 5 条过期」，
+        //   `block: { stale: 5, picked: 1 }` 说的是「注入面只提 1 条」—— 两个数不许互相顶替。
+        block: st.block || null,
         // 三个封闭集合一并报出（五态枚举是判据的比对基准，不是装饰）。
         statuses: (WA.foreshadow.STATUS || []).slice(),
         activeStates: (WA.foreshadow.ACTIVE || []).slice(),
