@@ -1,0 +1,69 @@
+'use strict';
+// TX3 冒烟脚本：最小装载序下验证 freight 模块 + 守恒运输链成立
+const fs = require('fs');
+const path = require('path');
+const BASE = path.resolve(__dirname, '..');
+process.chdir(BASE);
+const sync = require('../tests/ui-gate-sync.js');
+
+var pass = 0, fail = 0;
+function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log('SMOKE FAIL: ' + name); } }
+
+var WA = sync.fresh({}).WA;
+
+// 1. freight loaded
+ok('freight loaded', typeof WA.freight === 'object');
+
+// 2. 11 exports
+//   v2.253.0：这里原写 10，而 `engines/freight.js` 自 v2.243.0（`issueShadowRation` 入导出面）
+//   起真源就是 11（本文件下面的自证块 EXPECTED 也是 11 项）⇒ 本冒烟从那天起**恒红**，
+//   却在批次里被当成「该节本身有病」而不是「这条读数过期」。值改成真源数并写明来处。
+var ex = Object.keys(WA.freight);
+ok('exports 11', ex.length === 11);
+
+// 3. SOURCES has freight
+var inj = fs.readFileSync('render/inject.js', 'utf8');
+ok('SOURCES has freight', inj.indexOf("'freight'") >= 0);
+
+// 4. PRIORITY has 货运在途
+// v2.531.0：科目表（PRIORITY / ACCOUNTS）在 OPV29-10 已出闸到 inject-budget-tables.js，
+//   本判据问的是「产品里有没有这条登记」，故读合并面（表在前、引擎在后）。
+var bud = fs.readFileSync('engines/inject-budget-tables.js', 'utf8')
+  + '\n' + fs.readFileSync('engines/inject-budget.js', 'utf8');
+ok('PRIORITY has 货运在途', bud.indexOf("'货运在途'") >= 0);
+
+// 5. disabled by default
+// v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true
+//   （玩家装好即见全量世界），而本冒烟钉的是「闸关着时的行为」（下面几条 disabled
+//   拒收判据）。断言「出厂默认是关」等于把一条已经不存在的口径钉下去 —— 保留它
+//   只会让整条冒烟恒红，而真正的判据（关了就拒）反而没人看了。改为**显式关闸**
+//   再验拒收：判据本身一个字未改，改的只是「谁来关」。
+WA.freight.setSettings({ enabled: false });
+ok('default off', WA.freight.getSettings().enabled === false);
+
+// 6. Enable and test dispatch守恒
+WA.freight.setSettings({ enabled: true });
+WA.store.transact(function(d) {
+  d.economy = { goods: [], orders: [], routes: [] };
+  d.economy.routes.push({ id: 'r1', lane: 'road', from: 'A', to: 'B', cost: 5, status: 'open', reason: '', at: 1000, updatedAt: 1000 });
+  d.economy.goods.push({ place: 'A', resource: 'iron', base: 10, stock: 50, price: 10, demand: 0, consumed: 0, tickedAt: '', at: 1000, updatedAt: 1000 });
+}, 'smoke:setup');
+
+var dp = WA.freight.dispatch('r1', 'A', 'iron', 20, { transitDays: 2, base: 10 });
+ok('dispatch ok', dp && dp.ok === true);
+ok('source deducted 50->30', WA.store.get().economy.goods[0].stock === 30);
+
+var ar = WA.freight.arrive(dp.id, { force: true });
+ok('arrive ok', ar && ar.ok === true);
+var destG = WA.store.get().economy.goods.filter(function(g) { return g.place === 'B'; })[0];
+ok('dest stock 20', destG && destG.stock === 20);
+
+// 7. diagnose closedLoop
+var dg = WA.freight.diagnose();
+ok('diagnose closedLoop', dg && typeof dg.closedLoop === 'boolean');
+
+// 8. __freightWarn not triggered
+ok('no __freightWarn', typeof WA.__freightWarn === 'undefined');
+
+console.log('\nTX3 SMOKE: ' + pass + ' / ' + fail);
+if (fail > 0) process.exit(1);

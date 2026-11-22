@@ -1,0 +1,178 @@
+{
+  "ver": 1,
+  "note": "OPV29-01 锁级分片账本：每把锁「能不能在子进程里独立判」由现场实测决定，不是猜的。并行段必须经 tools/lock-child.js（rc=0 ≠ 判了：本仓 11 把锁没有 require.main 块）；判据逐条回灌宿主，条数 ≠ 子进程自报即红。 并行/串行划分以 tests/shard-locks-v2529.json 为单一真源；test-surface-gate 的 shardEdges 只在「工具真 spawn lock-child + 子入口存在 + 账本可解析」三样都在时才认这条边。",
+  "groups": {
+    "v2.82.0 checkpoints snapshots-discipline lock": {
+      "sharedSection": "v2.82.0 checkpoints snapshots-discipline lock (lib-outside-state x guard-key x branch-must-land x wiring)",
+      "sharedMs": 792224,
+      "sharedCriteria": 2843,
+      "parallelMs": 263600,
+      "parallelCriteria": 2019,
+      "parallelPrintedRows": 2661,
+      "serialCriteria": 91,
+      "inSectionInlineCriteria": 91,
+      "measuredAt": "2026-11-19",
+      "source": "实测：共享世界该节 ⏱ 792.22s（回归日志 /tmp/worldaxis-regression-gNKneb/run.log，38 把顺序挂载）；34 把经 tools/lock-child.js 8 路并行（jobs=8）并行后单节实跑 ⏱ 445.64s（日志 /tmp/worldaxis-regression-1ntXPt/run.log），并行段墙钟 263.6s（三次 244/244/263.6）；串行 4 把：b6-b7（顺序依赖 38 行）、state-repair（首判即崩）、settle-v2841（额外方法 runCompat）、render-pre-v2108（宿主内前置 + aWire 锚点要求 run.js 保留真挂载行，实测 42 条/13.154s）。判据三口径：并行回灌行 2661 + 串行 91 = 2752；与共享世界 2843 差 91 条，即节内内联 assert 未搬走、仍留宿主执行。",
+      "parallel": [
+        {
+          "file": "settle-v2820.js",
+          "criteria": 160
+        },
+        {
+          "file": "settle-v2850.js",
+          "criteria": 60
+        },
+        {
+          "file": "settle-v2860.js",
+          "criteria": 22
+        },
+        {
+          "file": "identity-v2860.js",
+          "criteria": 36
+        },
+        {
+          "file": "causal-view-v2870.js",
+          "criteria": 17
+        },
+        {
+          "file": "cost-v2880.js",
+          "criteria": 58
+        },
+        {
+          "file": "replay-v2890.js",
+          "criteria": 68
+        },
+        {
+          "file": "explain-v2900.js",
+          "criteria": 53
+        },
+        {
+          "file": "switch-matrix-v2910.js",
+          "criteria": 73
+        },
+        {
+          "file": "resource-ledger-v2920.js",
+          "criteria": 47
+        },
+        {
+          "file": "transit-v2930.js",
+          "criteria": 74
+        },
+        {
+          "file": "journal-v2940.js",
+          "criteria": 40
+        },
+        {
+          "file": "org-econ-v2950.js",
+          "criteria": 59
+        },
+        {
+          "file": "hazard-weather-v2960.js",
+          "criteria": 61
+        },
+        {
+          "file": "hazard-trigger-v2138.js",
+          "criteria": 213
+        },
+        {
+          "file": "life-e8-v2139.js",
+          "criteria": 26
+        },
+        {
+          "file": "faction-graph-v2139.js",
+          "criteria": 44
+        },
+        {
+          "file": "collab-tasks-v2139.js",
+          "criteria": 48
+        },
+        {
+          "file": "canon-deviation-v2139.js",
+          "criteria": 29
+        },
+        {
+          "file": "noesis-v2140.js",
+          "criteria": 34
+        },
+        {
+          "file": "lifeline-v2141.js",
+          "criteria": 54
+        },
+        {
+          "file": "perspective-lock-v2142.js",
+          "criteria": 76
+        },
+        {
+          "file": "duty-v2143.js",
+          "criteria": 30
+        },
+        {
+          "file": "fidelity-v2144.js",
+          "criteria": 45
+        },
+        {
+          "file": "rumor-v2960.js",
+          "criteria": 84
+        },
+        {
+          "file": "phone-bridge-v2970.js",
+          "criteria": 47
+        },
+        {
+          "file": "alias-trace-v2970.js",
+          "criteria": 58
+        },
+        {
+          "file": "coord-v2970.js",
+          "criteria": 41
+        },
+        {
+          "file": "tape-vol-v2980.js",
+          "criteria": 72
+        },
+        {
+          "file": "canon-v2990.js",
+          "criteria": 53
+        },
+        {
+          "file": "canon-align-v2100.js",
+          "criteria": 43
+        },
+        {
+          "file": "interop-v2101.js",
+          "criteria": 51
+        },
+        {
+          "file": "perf-trace-v2102.js",
+          "criteria": 88
+        },
+        {
+          "file": "settle-v2830.js",
+          "criteria": 55
+        }
+      ],
+      "serial": [
+        {
+          "file": "b6-b7-v2870.js",
+          "why": "独立跑 FAIL 1/38：`[B7-F] 清空题材连自己开的机制一并收回（实收回 0 个）`—— 依赖前序节先把机制开起来（靠顺序活着）"
+        },
+        {
+          "file": "state-repair-v2108.js",
+          "why": "独立跑崩溃 rc=2：`Cannot read properties of undefined (reading 'store')` @tests/state-repair-v2108.js:89 —— 读的全局 store 由共享宿主提供"
+        },
+        {
+          "file": "settle-v2841.js",
+          "why": "该节对它的调用是 runAll + runNegative + runCompat（额外方法）；lock-child 默认入口只跑前两个，并行会漏 runCompat 的判据 ⇒ 保守留串行。实测独立跑 rows=11 / 34.9s。"
+        },
+        {
+          "file": "render-pre-v2108.js",
+          "why": "切换后现场实测两条红：①它自己的 aWire 锚点要求 run.js 里恰出现 1 次 `await require('./render-pre-v2108.js').runAll(assert)`，移进子进程后实 0；②它在宿主内给后续锁装前置，移走后 v2870 的 [B7-F] 实收回 0 个（应 1）。⇒ 两个入口必须留在宿主串行、且先于数组执行。实测 42 条 / 13.154s / 0 红。"
+        }
+      ],
+      "serialMsEst": 48054,
+      "sectionAfterMs": 344600,
+      "totalAfterMs": 344600,
+      "savedPct": 56.5
+    }
+  }
+}

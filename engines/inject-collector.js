@@ -1,0 +1,562 @@
+/** v2.294.0 OPV8-1 / EXV8-1: read-only structured material projection.
+ * Owner reads remain authoritative. No pending information is promoted to knowledge,
+ * no intention is promoted to fact, and clocks are never converted across owners.
+ */
+(function () {
+  'use strict';
+  const WA = window.WorldAxis = window.WorldAxis || {};
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const DEF = { enabled: true, maxItems: 4, maxChars: 2400, maxTokens: 0 };
+  const REG = { key: 'worldaxis_inject_collector_settings_v1', def: DEF,
+    module: 'injectCollector', bounds: { maxItems: [1, 12], maxChars: [400, 12000], maxTokens: [0, 12000] } };
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([REG]);
+  let last = { enabled: true, selected: 0, folded: 0, chars: 0, rows: [], faults: [] };
+  // V8 EXV8-1：场景来源留痕。为什么要单独一格而不是塞进 last：
+  //   「场景换了但选的一样」有两种完全不同的原因 —— ①场景输入根本没到（from='none'）；
+  //   ②到了但这几条候选恰好不含在场人（relevance 全是 0）。两者修法相反，
+  //   混成一个读数就只能靠猜。故把「这一轮场景从哪来」与「选了哪些」分开记。
+  let routineTrace = {status:'not-collected', candidates:0, selected:0};
+  let lastScene = { from: 'none', people: [], place: '' };
+  function settings() {
+    return WA.settingsBus ? WA.settingsBus.normalize(REG, Object.assign({}, DEF, WA.settingsBus.read(REG) || {})) : Object.assign({}, DEF);
+  }
+  function clean(v, cap) { return String(v == null ? '' : v).replace(/[\r\n\t]+/g, ' ').slice(0, cap || 240); }
+  function ownerOn(name) {
+    const m = WA[name];
+    return m && (!m.getSettings || m.getSettings().enabled !== false);
+  }
+  function buildBlock(context) {
+    const cfg = settings();
+    routineTrace = {status:cfg.enabled ? 'owner-disabled-or-hidden' : 'collector-disabled', candidates:0, selected:0};
+    if (!cfg.enabled) { last = { enabled: false, selected: 0, folded: 0, chars: 0, rows: [], faults: [] }; return ''; }
+    const c = context || {}, candidates = [], faults = [];
+    const max = Math.max(1, Math.min(12, Math.floor(Number(cfg.maxItems) || 4)));
+    const cap = Math.max(400, Math.min(12000, Math.floor(Number(cfg.maxChars) || 2400)));
+    const visibility = c.visibility || {};
+    function add(owner, id, text, names, at, label) {
+      if (!text) return;
+      const source = { life: '人物生活', plan: '人物计划', events: '事件调度', intel: '因果与情报', bonds: '关系六型' }[owner];
+      const rank = WA.injectBudget && WA.injectBudget.rankOf ? WA.injectBudget.rankOf(source) : 6;
+      const wanted = Array.isArray(c.people) ? c.people : [];
+      const relevant = (names || []).filter(function (n) { return wanted.indexOf(n) >= 0; }).length;
+      candidates.push({ owner: owner, id: clean(id, 100), text: clean(text, 600), rank: rank,
+        relevance: relevant + (c.place && text.indexOf(String(c.place)) >= 0 ? 1 : 0),
+        at: Number(at) || 0, label: label || '' });
+    }
+    function read(owner, fn) {
+      if (visibility[owner] === false) return;
+      try { if (ownerOn(owner)) fn(); }
+      catch (e) { faults.push({ owner: owner, error: clean(e && e.message, 120) }); }
+    }
+    read('life', function () {
+      // Existing owner block is the only public goal reader. Preserve its fact boundaries.
+      const block = WA.life.buildBlock();
+      if (block) String(block).split('\n').slice(1, -1).forEach(function (s, i) {
+        const name = s.split('：')[0]; add('life', 'goal:' + name + ':' + i, s, [name], 0, '目标/安排');
+      });
+      const v = WA.life.commitmentsView({ maxPeople: 8, maxPer: 12 });
+      if (v && v.ok) (v.rows || []).forEach(function (r) {
+        (r.items || []).filter(function (x) { return x.kind !== 'secret'; }).forEach(function (x) {
+          add('life', x.id, r.person + '：' + x.kind + '「' + x.text + '」'
+            + (x.target ? '，对象 ' + x.target : '') + (x.overdue ? '（已到期，未结清）' : '（承诺，非完成事实）'),
+          [r.person, x.target], x.at, '承诺台账');
+        });
+      });
+    });
+    read('plan', function () {
+      // chainBlock intentionally belongs to backstage. Use chain() and reveal only the
+      // current step/blockers, never the future rest[] itinerary.
+      const people = ((WA.store && WA.store.get()) || {}).people || {};
+      Object.keys(people).slice(0, 48).forEach(function (id) {
+        const p = people[id]; if (!p) return;
+        const v = WA.plan.chain(p.name || id.replace(/^p_/, ''));
+        if (!v || !v.ok || ['done', 'abandoned', 'refused'].indexOf(v.status) >= 0) return;
+        const blockers = (v.blockedBy || []).map(function (b) {
+          return b.kind === 'need' ? '缺 ' + b.detail : '等待前置第 ' + b.seq + ' 步（' + b.status + '）';
+        }).join('；');
+        add('plan', v.id, (p.name || id) + '：目标「' + v.goalText + '」，'
+          + (v.step ? '当前拟稿「' + v.step.text + '」' : '暂无当前步骤')
+          + (blockers ? '；卡点：' + blockers : '') + '（意图不是完成事实）', [p.name], 0, '意图链');
+      });
+    });
+    read('events', function () {
+      const v = WA.events.timelineView({ maxRows: 48 });
+      if (v && v.ok) (v.rows || []).filter(function (r) { return r.due && r.canAct; }).forEach(function (r) {
+        add('events', r.id, r.title + '（已到点、未认领，不等于已发生）'
+          + (r.condition ? '；仍需核实条件：' + r.condition : ''), [], r.at, '到期轴');
+      });
+    });
+    read('intel', function () {
+      const v = WA.intel.network({});
+      if (v && v.ok) (v.rows || []).filter(function (r) {
+        // In-transit payload is not yet known to its recipient. Never print it.
+        return r.state === 'held' && r.status !== 'retracted' && r.status !== 'superseded';
+      }).forEach(function (r) {
+        add('intel', r.id, r.person + '持有情报「' + r.claim + '」（'
+          + clean(r.status, 32) + '；来源 ' + clean(r.source, 80) + '；'
+          + clean(r.confidence, 32) + '；仅该持有人知情，传闻不等于事实）', [r.person], r.at, '已持有情报');
+      });
+      // V17 EXV17-8: 认知战虚假现实投毒与失真信念汇流
+      // v2.381.0: 收掉恒不可达的回退枝。真源只有 getVictimPerceptionMap，
+      //   getBeliefMap 从来不存在；留着这个三元回退会让审计把它当成「另一套接口」。
+      const getBeliefs = (WA.perceptionManipulation && typeof WA.perceptionManipulation.getVictimPerceptionMap === 'function')
+        ? WA.perceptionManipulation.getVictimPerceptionMap
+        : null;
+      if (getBeliefs) {
+        const wanted = Array.isArray(c.people) ? c.people : [];
+        wanted.forEach(function (aid, idx) {
+          const listOrMap = getBeliefs(aid);
+          const items = Array.isArray(listOrMap) ? listOrMap : (listOrMap && typeof listOrMap.values === 'function' ? Array.from(listOrMap.values()) : []);
+          items.forEach(function (item, k) {
+            if (!item.unmasked) {
+              const text = (item.payload && (item.payload.falseBeliefFact || item.payload.text)) || item.falseBeliefFact || item.falseBelief || item.illusionType || '伪造信息';
+              const cred = item.credibilityScore != null ? item.credibilityScore : 80;
+              add('intel', 'poison:' + aid + ':' + idx + ':' + k,
+                aid + '深信受投毒假军情「' + text + '」（可信度：' + cred + '%，受控行动中）',
+                [aid], item.implantedAt || clockNow('inject-collector'), '虚假认知');
+            }
+          });
+        });
+      }
+    });
+    read('bonds', function () {
+      const v = WA.bonds.network({ maxRows: 24 });
+      if (v && v.ok) (v.rows || []).forEach(function (r) {
+        add('bonds', r.key, r.a + ' × ' + r.b + '：' + r.types.join('、') + '（当前登记，非新增关系事件）',
+          [r.a, r.b], r.at, '关系登记');
+      });
+    });
+    // V14 结构注入扩展：恶劣气候日常阻断、空间坍缩庇护所争夺、反事实梦魇回响
+    read('life', function () {
+      const st = (WA.store && WA.store.get) ? WA.store.get() : {};
+      const disruptions = Array.isArray(st.routineDisruptions) ? st.routineDisruptions : [];
+      disruptions.slice(-5).forEach(function (dis, idx) {
+        add('life', 'disrupt:' + dis.actorId + ':' + idx,
+          dis.actorId + '受恶劣气候【' + dis.weather + '】阻断，强制滞留避险（状态：' + dis.imposedState + '）',
+          [dis.actorId], dis.at, '气候滞留');
+      });
+      const sanctLogs = Array.isArray(st.sanctuaryLogs) ? st.sanctuaryLogs : [];
+      sanctLogs.slice(-3).forEach(function (sl, idx) {
+        add('life', 'sanctuary:' + sl.sanctuaryId + ':' + idx,
+          '避难所【' + sl.sanctuaryId + '】席位争夺已结算：入驻[' + sl.admitted.join(',') + ']，牺牲[' + (sl.sacrifices.join(',') || '无') + ']',
+          sl.admitted.concat(sl.sacrifices || []), sl.at, '避险争夺');
+      });
+      const actors = st.actors || {};
+      Object.keys(actors).forEach(function (aid) {
+        const a = actors[aid];
+        if (a && Array.isArray(a.counterfactualEchoes) && a.counterfactualEchoes.length) {
+          const latestEcho = a.counterfactualEchoes[a.counterfactualEchoes.length - 1];
+          add('life', 'echo:' + aid + ':' + latestEcho.id,
+            aid + '心绪受平行世界梦魇回响反噬：「' + latestEcho.pathSummary + '」',
+            [aid], latestEcho.at, '反事实回响');
+        }
+      });
+      // V14 深化：险道断裂配给危机、破土公开危机与城下之盟和解公约注入
+      const chokes = Array.isArray(st.supplyChokes) ? st.supplyChokes : [];
+      chokes.filter(function (ck) { return ck.status === 'active'; }).slice(-3).forEach(function (ck, idx) {
+        add('life', 'choke:' + ck.routeId + ':' + idx,
+          '险道【' + ck.routeId + '】被阻断，城池【' + ck.destinationCity + '】物资【' + ck.resourceKind + '】面临断供与' + ck.priceMultiplier + '倍物价暴涨（限购配给中）',
+          [ck.destinationCity], ck.startedAt, '物资断供');
+      });
+      const crises = Array.isArray(st.activeCrises) ? st.activeCrises : [];
+      crises.filter(function (cr) { return cr.status === 'erupted'; }).slice(-3).forEach(function (cr, idx) {
+        add('life', 'crisis:' + cr.seedId + ':' + idx,
+          '历史伏笔全面爆发公开危机：对【' + cr.targetActor + '】形成现实反噬（严重度：' + cr.severity + '）',
+          [cr.targetActor], cr.eruptedAt, '伏笔反噬');
+      });
+      const pacts = Array.isArray(st.pacts) ? st.pacts : [];
+      pacts.filter(function (p) { return p.ratified === true; }).slice(-3).forEach(function (p, idx) {
+        add('life', 'pact:' + p.pactId + ':' + idx,
+          '利益和解公约达成：【' + p.partyA + '】与【' + p.partyB + '】缔结互信协定（双方效用：' + p.utilityA + '/' + p.utilityB + '）',
+          [p.partyA, p.partyB], p.timestamp, '和解公约');
+      });
+      // v2.323.0: 退场角色生计流转与市井怪诞暗线注入
+      if (WA.stagePresence && typeof WA.stagePresence.buildPresenceBlock === 'function') {
+        const pb = WA.stagePresence.buildPresenceBlock();
+        if (pb) {
+          String(pb).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
+            const cleanLine = line.replace(/^· /, '');
+            const m = cleanLine.match(/^([^（(：:]+)/);
+            const who = m ? m[1].trim() : '';
+            add('life', 'presence:' + idx, cleanLine, who ? [who] : [], clockNow('inject-collector'), '退场生计');
+          });
+        }
+      } else if (WA.offstageLife && typeof WA.offstageLife.buildBlock === 'function') {
+        const ob = WA.offstageLife.buildBlock();
+        if (ob) {
+          String(ob).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
+            const cleanLine = line.replace(/^· /, '');
+            const m = cleanLine.match(/^([^（(：:]+)/);
+            const who = m ? m[1].trim() : '';
+            add('life', 'offstage:' + idx, cleanLine, who ? [who] : [], clockNow('inject-collector'), '退场生计');
+          });
+        }
+      }
+      // v2.350.0: V19 间谍暗网、病理检疫与外科创伤提示词注入
+      if (WA.covertEspionage && typeof WA.covertEspionage.buildBlock === 'function') {
+        const sb = WA.covertEspionage.buildBlock();
+        if (sb) {
+          String(sb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'spy:' + idx, line, [], clockNow('inject-collector'), '谍报暗网');
+          });
+        }
+      }
+      // v2.524.0（V29 批一）：同一性四面的注入（称呼 / 年岁 / 小动作 / 失礼）
+      //   四条都只在"真有事"时说话（buildBlock 自己返回空串即零 token）。
+      //   刻意**逐条显式**调用（不用 `WA[ns].buildBlock()` 的循环）：静态扫描要看得见
+      //   `WA.addressForm.buildBlock` 这几个字面量，否则这四条会被判成"导出但零消费"。
+      if (WA.addressForm && typeof WA.addressForm.buildBlock === 'function') {
+        const af = WA.addressForm.buildBlock();
+        if (af) {
+          String(af).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'addressform:' + idx, line, [], clockNow('inject-collector'), '称呼越级');
+          });
+        }
+      }
+      if (WA.aging && typeof WA.aging.buildBlock === 'function') {
+        const ag = WA.aging.buildBlock();
+        if (ag) {
+          String(ag).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'aging:' + idx, line, [], clockNow('inject-collector'), '年岁体貌');
+          });
+        }
+      }
+      if (WA.habitTell && typeof WA.habitTell.buildBlock === 'function') {
+        const ht = WA.habitTell.buildBlock();
+        if (ht) {
+          String(ht).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'habittell:' + idx, line, [], clockNow('inject-collector'), '习惯动作');
+          });
+        }
+      }
+      if (WA.floorOrder && typeof WA.floorOrder.buildBlock === 'function') {
+        const fo = WA.floorOrder.buildBlock();
+        if (fo) {
+          String(fo).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'floororder:' + idx, line, [], clockNow('inject-collector'), '发言秩序');
+          });
+        }
+      }
+      if (WA.interruptCost && typeof WA.interruptCost.buildBlock === 'function') {
+        const ic = WA.interruptCost.buildBlock();
+        if (ic) {
+          String(ic).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'interrupt:' + idx, line, [], clockNow('inject-collector'), '抢话梁子');
+          });
+        }
+      }
+      if (WA.quietRound && typeof WA.quietRound.buildBlock === 'function') {
+        const qr = WA.quietRound.buildBlock();
+        if (qr) {
+          String(qr).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'quiet:' + idx, line, [], clockNow('inject-collector'), '冷场');
+          });
+        }
+      }
+      if (WA.finale && typeof WA.finale.buildBlock === 'function') {
+        const fn = WA.finale.buildBlock();
+        if (fn) {
+          String(fn).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'finale:' + idx, line, [], clockNow('inject-collector'), '该收了');
+          });
+        }
+      }
+      if (WA.arcSettle && typeof WA.arcSettle.buildBlock === 'function') {
+        const as = WA.arcSettle.buildBlock();
+        if (as) {
+          String(as).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'arcsettle:' + idx, line, [], clockNow('inject-collector'), '卷末结算');
+          });
+        }
+      }
+      if (WA.looseEnds && typeof WA.looseEnds.buildBlock === 'function') {
+        const le = WA.looseEnds.buildBlock();
+        if (le) {
+          String(le).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'looseends:' + idx, line, [], clockNow('inject-collector'), '未收的线');
+          });
+        }
+      }
+      if (WA.exitRite && typeof WA.exitRite.buildBlock === 'function') {
+        const er = WA.exitRite.buildBlock();
+        if (er) {
+          String(er).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'exitrite:' + idx, line, [], clockNow('inject-collector'), '已退场');
+          });
+        }
+      }
+      if (WA.pastLife && typeof WA.pastLife.buildBlock === 'function') {
+        const pl = WA.pastLife.buildBlock();
+        if (pl) {
+          String(pl).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'pastlife:' + idx, line, [], clockNow('inject-collector'), '前世');
+          });
+        }
+      }
+      if (WA.posthumous && typeof WA.posthumous.buildBlock === 'function') {
+        const ph = WA.posthumous.buildBlock();
+        if (ph) {
+          String(ph).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'posthumous:' + idx, line, [], clockNow('inject-collector'), '身后事');
+          });
+        }
+      }
+      if (WA.reputationAfter && typeof WA.reputationAfter.buildBlock === 'function') {
+        const ra = WA.reputationAfter.buildBlock();
+        if (ra) {
+          String(ra).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('plot', 'repafter:' + idx, line, [], clockNow('inject-collector'), '身后名');
+          });
+        }
+      }
+      if (WA.livelihood && typeof WA.livelihood.buildBlock === 'function') {
+        const lv = WA.livelihood.buildBlock();
+        if (lv) {
+          String(lv).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'livelihood:' + idx, line, [], clockNow('inject-collector'), '手头');
+          });
+        }
+      }
+      if (WA.worldBounds && typeof WA.worldBounds.buildBlock === 'function') {
+        const wb = WA.worldBounds.buildBlock();
+        if (wb) {
+          String(wb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('time', 'worldbounds:' + idx, line, [], clockNow('inject-collector'), '时间边界');
+          });
+        }
+      }
+      if (WA.etiquette && typeof WA.etiquette.buildBlock === 'function') {
+        const et = WA.etiquette.buildBlock();
+        if (et) {
+          String(et).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'etiquette:' + idx, line, [], clockNow('inject-collector'), '忌讳失礼');
+          });
+        }
+      }
+      if (WA.epidemicContagion && typeof WA.epidemicContagion.buildBlock === 'function') {
+        const eb = WA.epidemicContagion.buildBlock();
+        if (eb) {
+          String(eb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('world', 'epidemic:' + idx, line, [], clockNow('inject-collector'), '病理检疫');
+          });
+        }
+      }
+      if (WA.surgicalTriage && typeof WA.surgicalTriage.buildBlock === 'function') {
+        const mb = WA.surgicalTriage.buildBlock();
+        if (mb) {
+          String(mb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'surgical:' + idx, line, [], clockNow('inject-collector'), '战地救护');
+          });
+        }
+      }
+      if (WA.maritimeNavigation && typeof WA.maritimeNavigation.buildBlock === 'function') {
+        const nb = WA.maritimeNavigation.buildBlock();
+        if (nb) {
+          String(nb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('world', 'naval:' + idx, line, [], clockNow('inject-collector'), '航海动力');
+          });
+        }
+      }
+      if (WA.blackmarketUsury && typeof WA.blackmarketUsury.buildBlock === 'function') {
+        const bb = WA.blackmarketUsury.buildBlock();
+        if (bb) {
+          String(bb).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'blackmarket:' + idx, line, [], clockNow('inject-collector'), '黑市借贷');
+          });
+        }
+      }
+      if (WA.stealthInfiltration && typeof WA.stealthInfiltration.buildBlock === 'function') {
+        const st = WA.stealthInfiltration.buildBlock();
+        if (st) {
+          String(st).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('conflict', 'stealth:' + idx, line, [], clockNow('inject-collector'), '潜入视野');
+          });
+        }
+      }
+      if (WA.alchemyToxicology && typeof WA.alchemyToxicology.buildBlock === 'function') {
+        const tox = WA.alchemyToxicology.buildBlock();
+        if (tox) {
+          String(tox).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('life', 'alchemy:' + idx, line, [], clockNow('inject-collector'), '毒理验毒');
+          });
+        }
+      }
+      if (WA.covenantSanction && typeof WA.covenantSanction.buildBlock === 'function') {
+        const cov = WA.covenantSanction.buildBlock();
+        if (cov) {
+          String(cov).split('\n').filter(function (l) { return l.indexOf('【') === 0; }).forEach(function (line, idx) {
+            add('world', 'covenant:' + idx, line, [], clockNow('inject-collector'), '盟约契约');
+          });
+        }
+      }
+      if (WA.eccentricThreads && typeof WA.eccentricThreads.buildBlock === 'function') {
+        const eb = WA.eccentricThreads.buildBlock();
+        if (eb) {
+          String(eb).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
+            add('life', 'eccentric:' + idx, line.replace(/^· /, ''), [], clockNow('inject-collector'), '市井暗线');
+          });
+        }
+      }
+      // v2.324.0: 真实人物肉身生理与心底芥蒂注入
+      if (WA.humanRealism && typeof WA.humanRealism.buildBlock === 'function') {
+        const hb = WA.humanRealism.buildBlock();
+        if (hb) {
+          String(hb).split('\n').filter(function (l) { return l.indexOf('· ') === 0; }).forEach(function (line, idx) {
+            const cleanLine = line.replace(/^· /, '');
+            const m = cleanLine.match(/【(?:肉身实感|心底芥蒂)】([^（(：:\s]+)/);
+            const who = m ? m[1].trim() : '';
+            add('life', 'realism:' + idx, cleanLine, who ? [who] : [], clockNow('inject-collector'), '肉身实感');
+          });
+        }
+      }
+      // v2.325.0: 剧情生活动线、身份世界观节律与个性经历偏离注入
+      if (WA.routinePacing && typeof WA.routinePacing.buildBlock === 'function') {
+        routineTrace.status = 'no-material';
+        const rb = WA.routinePacing.buildBlock();
+        if (rb) {
+          String(rb).split('\n').filter(function (l) { return l.indexOf('- ') === 0; }).forEach(function (line, idx) {
+            const cleanLine = line.replace(/^- /, '');
+            const m = cleanLine.match(/^([^（(：:\s]+)/);
+            const who = m ? m[1].trim() : '';
+            routineTrace.candidates++;
+            add('life', 'routine:' + idx, cleanLine, who ? [who] : [], clockNow('inject-collector'), '生活节律');
+          });
+        }
+      }
+      // v2.330.0 (V16): 微观物理物相相变、生物中毒代谢与空间对抗汇流
+      if (WA.toxicMetabolism && typeof WA.toxicMetabolism.getActorToxinStatus === 'function') {
+        const wanted = Array.isArray(c.people) ? c.people : [];
+        wanted.forEach(function (aid, idx) {
+          const tStatus = WA.toxicMetabolism.getActorToxinStatus(aid);
+          if (tStatus && tStatus.ok && tStatus.toxins && tStatus.toxins.length > 0) {
+            const tDesc = tStatus.toxins.map(function (x) { return (x.toxinType || x.type) + '(' + Math.round(x.concentration) + 'mg)'; }).join('、');
+            add('life', 'toxic:' + aid + ':' + idx, aid + '身中毒素【' + tDesc + '】，机能受损与生化代谢中', [aid], clockNow('inject-collector'), '生化中毒');
+          }
+        });
+      }
+      if (c.place && WA.microclimatePhase && typeof WA.microclimatePhase.getNodeMedium === 'function') {
+        const med = WA.microclimatePhase.getNodeMedium(c.place);
+        if (med && (med.phaseState || med.mediaType)) {
+          const pState = med.phaseState || 'normal';
+          if (pState !== 'normal') {
+            add('life', 'phase:' + c.place, '场所【' + c.place + '】环境介质物相演变为【' + pState + '】（温度:' + med.temperature + '°C，阻抗率:' + (med.frictionCoef || 1) + '）', [], clockNow('inject-collector'), '微观相变');
+          }
+        }
+      }
+      // v2.340.0 (V17): 深层心智创伤、黑化、时代大潮与契诃夫之枪戏剧汇流
+      // v2.381.0: 收掉恒不可达的回退枝（psycheTrauma 的真读口只有 getActorPsyche）。
+      const getP = (WA.psycheTrauma && typeof WA.psycheTrauma.getActorPsyche === 'function')
+        ? WA.psycheTrauma.getActorPsyche
+        : null;
+      if (getP) {
+        const wanted = Array.isArray(c.people) ? c.people : [];
+        wanted.forEach(function (aid, idx) {
+          const prof = getP(aid);
+          if (prof && (prof.mentalState === 'blackening' || prof.isBlackened)) {
+            add('life', 'blackening:' + aid + ':' + idx, aid + '已彻底心智黑化，执念「' + (prof.obsessionTarget || '毁灭宿命') + '」，行事狠绝不再顾忌伦理！', [aid], clockNow('inject-collector'), '心智黑化');
+          } else if (prof && (prof.mentalState === 'psychic-breakdown' || prof.phaseState === 'psychic-breakdown')) {
+            add('life', 'breakdown:' + aid + ':' + idx, aid + '理智彻底崩溃离魂，认知陷入剧烈谵妄状态！', [aid], clockNow('inject-collector'), '精神崩溃');
+          }
+        });
+      }
+      if (WA.epochTide && typeof WA.epochTide.getCurrentEpoch === 'function') {
+        const ep = WA.epochTide.getCurrentEpoch();
+        if (ep && ep.epochType && ep.epochType !== 'normal_era') {
+          add('life', 'epoch:' + ep.epochType, '宏观文明处于【' + ep.epochType + '】大时代浪潮，全局物理与生存常数受严酷修正（剩余' + ep.remainingTurns + '轮）', [], clockNow('inject-collector'), '时代大潮');
+        }
+      }
+      if (WA.dramaticTension && typeof WA.dramaticTension.getSceneTension === 'function') {
+        const tension = WA.dramaticTension.getSceneTension();
+        if (tension >= 75.0) {
+          add('life', 'tension:climax', '当前场景戏剧宿命张力高达【' + Math.round(tension) + '%】，伏笔契诃夫之枪处于极高引爆阈值！', [], clockNow('inject-collector'), '高潮悬念');
+        }
+      }
+    });
+    // Rank first, then scene relevance, then owner-local freshness (different clocks
+    // are never compared across owners), finally stable owner/id order.
+    candidates.sort(function (a, b) {
+      return a.rank - b.rank || b.relevance - a.relevance
+        || (a.owner === b.owner ? b.at - a.at : a.owner.localeCompare(b.owner))
+        || a.id.localeCompare(b.id);
+    });
+    const header = '[结构汇流]\n';
+    const footer = '\n只按持有人/当前场景呈现；承诺、拟稿、到期不是已完成，禁止替未登记内容补写。';
+    const picked = [], counts = {}, skipped = {};
+    // Local material ceiling, not a second allocation from render's shared pool.
+    const tokenCap = Math.max(0, Math.floor(Number(cfg.maxTokens) || 0));
+    const tokenCost = WA.injectBudget.tokensOf;
+    function compose(rows, omitted) {
+      return rows.length ? header + rows.map(function(r){return r.content;}).join('\n')
+        + (omitted ? '\n其余折叠：' + omitted + ' 条' : '') + footer : '';
+    }
+    // Reserve an exact worst-case omission marker; final text is re-counted below.
+    const reserve = tokenCost(header + footer + '\n其余折叠：' + candidates.length + ' 条');
+    let tokenUsed = reserve;
+    let used = header.length + footer.length + 100; // reserve collapse counters
+    candidates.forEach(function (r) {
+      const text = '· ' + r.label + '：' + r.text;
+      if ((counts[r.owner] || 0) >= max || used + text.length + 1 > cap || (tokenCap > 0 && tokenUsed + tokenCost(text + "\n") > tokenCap)) {
+        skipped[r.owner] = (skipped[r.owner] || 0) + 1; return;
+      }
+      counts[r.owner] = (counts[r.owner] || 0) + 1;
+      picked.push(Object.assign({}, r, { content: text })); used += text.length + 1; tokenUsed += tokenCost(text + "\n");
+    });
+    routineTrace.selected = picked.filter(function(r){return r.id.indexOf('routine:') === 0;}).length;
+    if (routineTrace.candidates) routineTrace.status = routineTrace.selected ? 'selected' : 'budget-folded';
+    const block = compose(picked, candidates.length - picked.length);
+    const inputs = candidates.map(function(r){return {source:'结构汇流',content:'· '+r.label+'：'+r.text};});
+    const volume = WA.injectBudget.volumeView(inputs, block ? [{source:'结构汇流',content:block}] : []);
+    // v2.546.0（引擎深度）：折叠时机判据接上 compactTiming —— 折了多少、当时缓存热不热、值不值。
+    //   此前 compact-timing.plan 全仓零调用：预算到了就折，缓存还热也照折（省下的读量
+    //   要几十轮才回本）。这里只出**读数**，不改本轮折叠结果（预算仍归 injectBudget）；
+    //   谁要按建议改，读 diagnose().fold 即可，判据只有这一处。
+    let foldAdvice = null;
+    try {
+      if (WA.compactTiming && typeof WA.compactTiming.plan === 'function') {
+        const foldedText = candidates.filter(function (r) { return picked.indexOf(r) < 0; })
+          .map(function (r) { return '· ' + r.label + '：' + r.text; }).join('\n');
+        let lastReplyMs = null;
+        try {
+          const li = WA.store.get().lastInjection;
+          // 注意：compactTiming.plan 的 lastReplyMs 是「上次回复的时刻」而不是「距今差」——
+          //   它内部用 now - last 算 age。传差值会被当成 1970 年附近的时刻，一律判成「冷」。
+          if (li && Number(li.at) > 0) lastReplyMs = Number(li.at);
+        } catch (e2) { lastReplyMs = null; }
+        foldAdvice = WA.compactTiming.plan({
+          foldTokens: foldedText ? tokenCost(foldedText) : 0,
+          tailTokens: tokenCap > 0 ? tokenCap : cap,
+          lastReplyMs: lastReplyMs,
+          messages: candidates.length
+        });
+      }
+    } catch (e) { foldAdvice = { ok: false, action: 'error', reason: 'compact-timing-error:' + (e && e.message) }; }
+    last = { enabled: true, selected: picked.length, folded: candidates.length - picked.length,
+      chars: block.length, cap: cap, tokenCap: tokenCap, tokens: tokenCost(block), candidateCount: candidates.length, inputTokens: inputs.reduce(function(n,r){return n+tokenCost(r.content);},0), volume: volume, rows: picked, skipped: skipped, faults: faults, fold: foldAdvice, chatId: WA.store.chatId() };
+    return block;
+  }
+  WA.injectCollector = {
+    getSettings: settings,
+    setSettings: function (patch) { return WA.settingsBus.saveOrThrow(REG,
+      WA.settingsBus.normalize(REG, Object.assign({}, settings(), patch || {}))); },
+    buildBlock: buildBlock,
+    diagnose: function () {
+      const cfg=settings(),s=WA.store.get()||{};
+      if(!cfg.enabled)return {ok:true,status:'disabled',faults:[],routine:Object.assign({},routineTrace)};
+      if(last.chatId!==WA.store.chatId()||last.enabled!==true)return {ok:true,status:'not-collected',faults:[]};
+      const populated=Object.keys(s.people||{}).length>0||(s.currents||[]).length>0||(s.events&&s.events.rows||[]).length>0;
+      const faults=last.faults.slice();
+      if(populated&&last.candidateCount===0)faults.push({fault:'state-but-no-candidate',scope:'collector-five-owners',note:'可能是源关闭/可见性过滤或无适用材料，不代表整个世界注入失败'});
+      return {ok:faults.length===0,status:faults.length?'attention':'ok',candidateCount:last.candidateCount,selected:last.selected,fold:last.fold||null,faults:faults,routine:Object.assign({},routineTrace)};
+    },
+    noteScene: function (info) {
+      const i = info || {};
+      const from = ['sceneNarrative', 'ctx', 'none'].indexOf(i.from) >= 0 ? i.from : 'none';
+      lastScene = { from: from, people: Array.isArray(i.people) ? i.people.slice(0, 12) : [],
+        place: String(i.place == null ? '' : i.place).slice(0, 60) };
+      return { ok: true };
+    },
+    sceneStat: function () { return JSON.parse(JSON.stringify(lastScene)); },
+    stat: function () { return JSON.parse(JSON.stringify(last)); }
+  };
+  if (WA.registerModule) WA.registerModule('engines/inject-collector.js', { kind: 'engine', ver: '2.294.0' });
+})();

@@ -1,0 +1,320 @@
+#!/usr/bin/env node
+// WorldAxis tests/exp35-chapter-branch-play-v2233.js
+// OPV4-8 专锁：章节、事件与分支的连续游玩（长局进退、承诺延期、分支比对与快照恢复）
+
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const assert = require('assert');
+
+const BASE = path.join(__dirname, '..');
+const ACTION_DESK_PATH = path.join(BASE, 'engines/action-desk.js');
+// v2.542.8：路由表已出闸到 engines/action-desk-routes.js（拆段），`'chapter.open': …` 这类
+//   路由登记现在只在 routes 文件里。判据问的是「产品里有没有这条路由」，不是「它写在哪个
+//   文件」—— 与 tests/diag-source.js 头注释同一条口径，故读合并面。
+//   （全量回归里 A1–A8 八条就是被这一处「读单文件」一次性点着的。）
+const ACTION_DESK_ROUTES_PATH = path.join(BASE, 'engines/action-desk-routes.js');
+
+// 破坏锚点（真源码单行变异，恰好 1 次命中）
+const ANCHOR_ROLLOVER = 'p.deferCount = (p.deferCount || 0) + 1;';
+
+function runSuite() {
+  require(path.join(BASE, 'tests/mock.js'));
+  const gate = require(path.join(BASE, 'tests/ui-gate-sync.js'));
+  const env = gate.fresh({});
+  const WA = env.WA;
+
+  let tested = 0;
+  function a(cond, msg) {
+    assert(cond, msg);
+    tested++;
+  }
+  /**
+   * 净场：清掉 `worldaxis_ckpt_v1_*` 快照库残留。
+   *
+   * 为什么必须清：快照库落在**独立 localStorage 键**（`engines/checkpoints.js` 的
+   *   `LS_PREFIX + chatId()`），而 mock 的 localStorage 是**模块级共享 store**
+   *   （`tests/mock.js`）—— 它在同一进程里跨节存活。于是前序节存下的手动档会活到本节，
+   *   而 `checkpoints.save()` 的手动档配额是 `maxSlots`（出厂 12）且**满了就拒收**
+   *   （v2.196.0 起的 Y3 口径：不替玩家丢档）。
+   *   实测（/tmp/probe_exp35_b4.js）：净场下 `chapter.open({checkpoint:true})` ⇒ `ok:true`；
+   *   把库预填到 12 份后再开章 ⇒ `{ok:false, reason:'slots-full'}` —— 而 B4 断言的正是
+   *   `openRes.checkpoint.ok === true`。**单跑绿、全量红**的分野就在这里：单跑没有前序节。
+   *   这不是产品缺陷：库满拒收是正确行为。缺的是本锁的**前置净场**。
+   *
+   * 为什么不改 B4 的口径（比如容忍 slots-full）：那就把「开章连带生成快照」这项功能
+   *   在库满时判成「无需快照也算过」——判据失去咬合力。前置条件该由前置净场保证。
+   */
+  function scrubCkptSettings() {
+    //   设置面也得归位：很多专锁会临时把 `maxSlots` 调小来验「满了能拒收」，而
+    //   `worldaxis_ckpt_settings_v1`（engines/checkpoints.js 的 `LS_KEY`）是跨节存活的。
+    //   实测（/tmp/probe_exp35_e5b.js）：脏前置 `maxSlots = 1` 时，E5 的收章快照当场读到
+    //   `slots-full` —— 与库满同一条链，只是这次被占满的是**配额本身**。
+    //   修法是**删键让它回出厂 DEF**（`enabled:false, maxSlots:12, autoEvery:0, autoSlots:4`），
+    //   而不是写一组「我认为的默认值」—— 写死默认值就是第三份真源，DEF 改了这里会悄悄漂。
+    try {
+      const ls = ((WA && WA.mainWin) || global).localStorage || null;
+      if (ls) ls.removeItem('worldaxis_ckpt_settings_v1');
+    } catch (e) { /* 删键失败就让下面的断言去现形，不在这里吞结论 */ }
+    //   本锁要验的是「开章/收章连带生成快照」，故总开关必须打开（出厂默认是关的）。
+    try {
+      WA.checkpoints.setSettings({ enabled: true });
+    } catch (e) {}
+  }
+  function scrubCkptLib() {
+    let ls = null;
+    try { ls = ((WA && WA.mainWin) || global).localStorage || null; } catch (e) { ls = null; }
+    if (!ls) return 0;
+    let n = 0;
+    try {
+      const dump = (typeof ls._dump === 'function') ? ls._dump() : {};
+      Object.keys(dump).forEach(function (k) {
+        if (/^worldaxis_ckpt_v1_/.test(k)) { try { ls.removeItem(k); n += 1; } catch (e) {} }
+      });
+    } catch (e) {}
+    return n;
+  }
+
+  // ── 1. 静态契约检查 ──
+  const deskSrc = fs.readFileSync(ACTION_DESK_PATH, 'utf8')
+    + '\n' + fs.readFileSync(ACTION_DESK_ROUTES_PATH, 'utf8');
+  a(deskSrc.indexOf("'chapter.open':") > 0, 'OPV4-8/A1: 包含 chapter.open 路由');
+  a(deskSrc.indexOf("'chapter.flow':") > 0, 'OPV4-8/A2: 包含 chapter.flow 路由');
+  a(deskSrc.indexOf("'chapter.rollover':") > 0, 'OPV4-8/A3: 包含 chapter.rollover 路由');
+  a(deskSrc.indexOf("'chapter.close':") > 0, 'OPV4-8/A4: 包含 chapter.close 路由');
+  a(deskSrc.indexOf("'chapter.saveBranch':") > 0, 'OPV4-8/A5: 包含 chapter.saveBranch 路由');
+  a(deskSrc.indexOf("'chapter.restore':") > 0, 'OPV4-8/A6: 包含 chapter.restore 路由');
+  a(deskSrc.indexOf("'chapter.diff':") > 0, 'OPV4-8/A7: 包含 chapter.diff 路由');
+  a(deskSrc.indexOf("'chapter.inspect':") > 0, 'OPV4-8/A8: 包含 chapter.inspect 路由');
+  // A9 导出面「恒定」= 自证块在场（**不钉具体口数**）。
+  //   v2.381.0 回归修复：原判据写死字面量 `var EXPORT_COUNT = 14;`，而 v14 提交 4050cbe
+  //   把它改成了 16（OPV14 系列新增两枚导出）却没同批改本测试 —— 于是源码正常长出口数，
+  //   这里报「导出面泄漏」。那不是泄漏，那是**陈旧常量**：判据钉住了一种形态，
+  //   等于给其它形态发通行证（tests/ui-gate.js:48-52 为同款前车）。
+  //   真判据在源码里：action-desk 装载时自行比对 `Object.keys(WA.actionDesk).length`
+  //   与 EXPORT_COUNT，多一口少一口**当场抛**。测试只需保证那段自证块还在、且数字是具体值。
+  const mExp = deskSrc.match(/var EXPORT_COUNT = (\d+);/);
+  a(!!mExp && Number(mExp[1]) > 0,
+    'OPV4-8/A9: actionDesk 导出面有具体口数自证（实 ' + (mExp ? mExp[1] : '缺') + '）');
+  a(deskSrc.indexOf('var _exported = Object.keys(WA.actionDesk).length;') > 0
+    && deskSrc.indexOf('actionDesk: export count mismatch') > 0,
+    'OPV4-8/A9b: 导出数由产品自证（声明口数 vs 实际导出，缺一即抛）—— 零泄漏不靠本测试的数');
+
+  // 初始化世界状态与环境
+  WA.actionDesk.setSettings({ enabled: true });
+  WA.store.transact(function (d) {
+    d.chapters = { active: false, current: null, history: [], seq: 0 };
+    d.customLax = { rules: [], precedents: [], favors: [], guarantees: [], promises: [], penalties: [] };
+  });
+  if (WA.checkpoints && WA.checkpoints.setSettings) {
+    WA.checkpoints.setSettings({ enabled: true });
+  }
+  // 净场（前置条件，必须先于本节任何 save）：清掉前序节留下的快照库残留。
+  //   不清的话本节的手动档配额从「别人的存档」起算，B4 会读到 slots-full（见 scrubCkptLib 头注）。
+  scrubCkptSettings();
+  scrubCkptLib();
+  a(WA.checkpoints.list().count === 0,
+    'OPV4-8/B0: 净场：快照库为空（实 ' + WA.checkpoints.list().count + ' 份）'
+    + '——手动档配额是 maxSlots=' + WA.checkpoints.getSettings().maxSlots
+    + '，不能继承前序节那几份（配额本身也已按出厂 DEF 归位）');
+
+  // ── 2. 开章流程与目标/边界约束（chapter.open） ──
+  const openRes = WA.actionDesk.plan('chapter.open', {
+    title: '青石关破局',
+    script: '查清商队走私矿石的幕后主使',
+    notes: '切勿在未拿到契据前公然动手；严防守卫警觉',
+    checkpoint: true,
+    checkpointName: 'ckpt_ch1_open'
+  });
+  a(openRes.ok === true, 'OPV4-8/B1: chapter.open 成功');
+  a(openRes.chapter && openRes.chapter.title === '青石关破局', 'OPV4-8/B2: 章节标题正确设置');
+  a(openRes.chapter && openRes.chapter.script === '查清商队走私矿石的幕后主使', 'OPV4-8/B3: 章节脚本目标正确记录');
+  a(openRes.checkpoint && openRes.checkpoint.ok === true,
+    'OPV4-8/B4: 连带生成开章快照（实 checkpoint=' + JSON.stringify(openRes.checkpoint)
+    + '）—— 若 reason=slots-full 说明前置净场没生效（手动档配额被前序节占满）');
+
+  // 登记若干民间承诺与债务（含活跃、违约与待履行）
+  const commitP = WA.customLax['commit' + 'Promise'].bind(WA.customLax);
+  const defaultP = WA.customLax['default' + 'Promise'].bind(WA.customLax);
+  const fulfillP = WA.customLax['fulfill' + 'Promise'].bind(WA.customLax);
+
+  const p1 = commitP({
+    promiser: '陆远', beneficiary: '客栈老板', subject: '两日后结算马料与草料银子', dueDay: 2
+  }).promise;
+  const p2 = commitP({
+    promiser: '陆远', beneficiary: '铁匠', subject: '换取新马掌一付', dueDay: 1
+  }).promise;
+  const p3 = commitP({
+    promiser: '林掌柜', beneficiary: '陆远', subject: '交付私下账簿一页', dueDay: 3
+  }).promise;
+
+  // 铁匠承诺判定违约，产生历史违约痕迹
+  defaultP(p2.id, '遭遇盘查未能如约交付');
+
+  // ── 3. 推进中长局流态收束与义务盘点（chapter.flow） ──
+  const flow1 = WA.actionDesk.plan('chapter.flow', {});
+  a(flow1.ok === true, 'OPV4-8/C1: chapter.flow 查询成功');
+  a(flow1.currentChapter && flow1.currentChapter.title === '青石关破局', 'OPV4-8/C2: 正确识别当前章');
+  a(flow1.pendingObligations.active === 2, 'OPV4-8/C3: 正确统计 2 笔未结活跃承诺');
+  a(flow1.pendingObligations.defaulted === 1, 'OPV4-8/C4: 正确统计 1 笔违约历史');
+
+  // ── 4. 未结义务带入与延期（chapter.rollover） ──
+  const rollRes = WA.actionDesk.plan('chapter.rollover', {
+    promiseId: p1.id,
+    newDueDay: 5,
+    reason: '商队延期抵关，顺延付清银两'
+  });
+  a(rollRes.ok === true, 'OPV4-8/D1: chapter.rollover 执行成功');
+  a(rollRes.promise.dueDay === 5, 'OPV4-8/D2: dueDay 正确延期至第 5 天');
+  a(rollRes.promise.deferCount === 1, 'OPV4-8/D3: deferCount 增加为 1');
+  a(rollRes.promise.status === 'active', 'OPV4-8/D4: 状态仍为 active，无非法终结');
+
+  // 尝试延期不存在的承诺应被拒绝
+  const rollFail = WA.actionDesk.plan('chapter.rollover', { promiseId: 'non_existent_pid' });
+  a(rollFail.ok === false && rollFail.reason === 'promise-not-found-or-inactive', 'OPV4-8/D5: 非法 promiseId 被如实拒绝');
+
+  // ── 5. 收章结算与历史保留（chapter.close） ──
+  const closeRes = WA.actionDesk.plan('chapter.close', {
+    note: '顺利查清账簿，但留下违约口舌',
+    checkpoint: true,
+    checkpointName: 'ckpt_ch1_closed'
+  });
+  a(closeRes.ok === true, 'OPV4-8/E1: chapter.close 成功');
+  a(closeRes.closedChapter.no === 1, 'OPV4-8/E2: 正确关闭第 1 章');
+  a(closeRes.pendingActiveRetained === 2, 'OPV4-8/E3: 未结承诺完整保留未被抹除');
+  a(closeRes.defaultedHistoryRetained === 1, 'OPV4-8/E4: 违约失败历史未被抹去');
+  a(closeRes.checkpoint && closeRes.checkpoint.ok === true, 'OPV4-8/E5: 收章快照正常落盘');
+
+  // ── 6. 分支保存与语义比对（chapter.saveBranch & chapter.diff） ──
+  // 在当前收章节点保存分支 A
+  const bResA = WA.actionDesk.plan('chapter.saveBranch', {
+    name: 'branch_ch1_reconciled',
+    note: '第1章结账分支：保留承诺与违约'
+  });
+  a(bResA.ok === true, 'OPV4-8/F1: 保存分支 A 成功');
+
+  // 开第2章并履行 p1 承诺，同时产生新局面保存为分支 B
+  WA.actionDesk.plan('chapter.open', { title: '南市暗潮' });
+  fulfillP(p1.id);
+  const bResB = WA.actionDesk.plan('chapter.saveBranch', {
+    name: 'branch_ch2_fulfilled',
+    note: '第2章履约分支'
+  });
+  a(bResB.ok === true, 'OPV4-8/F2: 保存分支 B 成功');
+
+  // 比对两个分支
+  const diffRes = WA.actionDesk.plan('chapter.diff', {
+    baseId: bResA.id,
+    targetId: bResB.id
+  });
+  a(diffRes.ok === true, 'OPV4-8/F3: 分支差异比对成功');
+  a(diffRes.classes && diffRes.classes.obligation, 'OPV4-8/F4: 差异包含具体四类语义结构（实体/关系/义务/事件）');
+
+  // ── 7. 快照恢复与快照库隔离（chapter.restore） ──
+  const beforeListCount = (WA.checkpoints.list().slots || []).length;
+  // 恢复回第1章刚刚开章的快照
+  const restoreRes = WA.actionDesk.plan('chapter.restore', {
+    id: openRes.checkpoint.id
+  });
+  a(restoreRes.ok === true, 'OPV4-8/G1: 恢复历史快照成功');
+  const restoredCur = WA.chapters.current();
+  a(restoredCur && restoredCur.title === '青石关破局', 'OPV4-8/G2: 世界状态成功还原到青石关破局开章状态');
+  const afterListCount = (WA.checkpoints.list().slots || []).length;
+  a(afterListCount === beforeListCount, 'OPV4-8/G3: 快照库独立存在，恢复旧状态未抹除任何快照');
+
+  // ── 8. 纯读零写入不变式 ──
+  const stBefore = JSON.stringify(WA.store.get());
+  const lsBefore = JSON.stringify(global.localStorage || {});
+  for (let i = 0; i < 10; i++) {
+    WA.actionDesk.plan('chapter.flow', {});
+    WA.actionDesk.plan('chapter.inspect', {});
+  }
+  const stAfter = JSON.stringify(WA.store.get());
+  const lsAfter = JSON.stringify(global.localStorage || {});
+  a(stBefore === stAfter, 'OPV4-8/H1: chapter.flow/inspect 连续调用 10 次 store 零写入');
+  a(lsBefore === lsAfter, 'OPV4-8/H2: chapter.flow/inspect 连续调用 10 次 localStorage 零写入');
+
+  // ── 9. 真源码变异负控制（negative control） ──
+  a(deskSrc.indexOf(ANCHOR_ROLLOVER) > 0, 'OPV4-8/N0: 破坏锚点在 action-desk.js 恰好存在');
+  a(deskSrc.split(ANCHOR_ROLLOVER).length === 2, 'OPV4-8/N0b: 破坏锚点唯一出现 1 次');
+
+  // 构造破坏版：跳过 deferCount 自增与延期标记
+  const corruptDeskSrc = deskSrc.replace(ANCHOR_ROLLOVER, '/* corrupt rollover */');
+  const gateNeg = require(path.join(BASE, 'tests/ui-gate-sync.js'));
+  const envNeg = gateNeg.fresh({});
+  const WANeg = envNeg.WA;
+
+  // 使用 VM 将破坏版 deskCode 执行在新的作用域中覆盖 WANeg.actionDesk
+  const vmDeskCtx = {
+    window: { WorldAxis: WANeg },
+    console: console,
+    Date: Date,
+    Math: Math,
+    String: String,
+    Number: Number,
+    Boolean: Boolean,
+    Array: Array,
+    Object: Object,
+    RegExp: RegExp,
+    JSON: JSON
+  };
+  vmDeskCtx.global = vmDeskCtx.window;
+  vm.createContext(vmDeskCtx);
+  vm.runInContext(corruptDeskSrc, vmDeskCtx);
+
+  WANeg.actionDesk.setSettings({ enabled: true });
+  WANeg.store.transact(function (d) {
+    d.chapters = { active: false, current: null, history: [], seq: 0 };
+    d.customLax = { rules: [], precedents: [], favors: [], guarantees: [], promises: [] };
+  });
+  const commitPNeg = WANeg.customLax['commit' + 'Promise'].bind(WANeg.customLax);
+  const pNeg = commitPNeg({
+    promiser: '破坏测试A', beneficiary: '破坏测试B', subject: '欠条', dueDay: 1
+  }).promise;
+
+  const testRoll = WANeg.actionDesk.plan('chapter.rollover', {
+    promiseId: pNeg.id,
+    newDueDay: 3
+  });
+  // 正常版中 deferCount 应当为 1；破坏版中未自增，deferCount 为 undefined
+  const negativePassed = (testRoll.ok === true && testRoll.promise.deferCount === 1);
+  a(!negativePassed, 'OPV4-8/N1: 负控制生效（破坏版中 deferCount 未自增，判据必败）');
+
+  console.log('exp35-chapter-branch-play-v2233: ' + tested + ' 项断言全部通过（含真源码负控制）');
+}
+
+// ── v2.233.0 收口：对齐 tests/run.js 的 runLock 调用约定 ──────────────────
+//   病灶：runLock 是 `require(spec)[method](assert)`，method 默认 'runAll'。
+//     本文件主体用的是 runSuite()（内有本地 t(desc,cond)→assert，失败即 throw），
+//     于是「装进来」与「跑起来」之间缺了一层。缺这层时红灯长成
+//     「没有导出 runAll」——看起来像锁坏了，而不像「断言根本没跑」，
+//     这正是本仓点名的「绿是运气」：单独 `node tests/exp35-chapter-branch-play-v2233.js` 绿，
+//     全量路径却在 require 处红，两个读数谁也证不了谁。
+//   修法：补 runAll(assert)，把真相（throw）原样上抛给 runLock ——
+//     它已按「锁自己抛的 → 记一条红并继续跑」处理，不会打断后续节。
+function runAll(a) {
+  var assertFn = (typeof a === 'function') ? a : require('assert');
+  runSuite();
+  assertFn(true, 'exp35-chapter-branch-play-v2233.js: 主体断言全部通过');
+  return true;
+}
+module.exports = {
+  runAll: runAll,
+  runSuite: runSuite,
+  runNegative: null,
+};
+
+// ── 直接运行入口（`node tests/exp35-chapter-branch-play-v2233.js`）──────────────────────────────
+//   上一轮补丁删掉了裸调用却没补守卫，直接运行会变成「装进来、什么也不做、exit 0」——
+//   一条退出码是绿的静默空跑。这里补回显式入口：跑 runAll，失败以非零码退出。
+if (require.main === module) {
+  try {
+    runAll(require('assert'));
+    console.log('exp35-chapter-branch-play-v2233.js: 直接运行通过');
+  } catch (e) {
+    console.error('exp35-chapter-branch-play-v2233.js: 直接运行失败 → ' + (e && e.message ? e.message : e));
+    process.exit(1);
+  }
+}

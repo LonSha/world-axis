@@ -1,0 +1,264 @@
+/**
+ * WorldAxis engines/commodity-circulation.js (v2.408.0) — EXV23-1 多代理人物资流转、大宗商路与债务违约清算
+ *
+ * ── 它治什么（缺口）──────────────────────────────────────────────────
+ *   G1 实测：全域 408 个核心引擎中，经贸模块仅占 2 个（economy/market），
+ *   缺乏实体物资储量（stockpile）、运力损耗（transitLoss）与信用借据（promissoryNote）违约清算。
+ *   在长程推进中，物资凭空转移、无物流成本、债务违约无资产清算。
+ *
+ * ── 机制（一句说完）──────────────────────────────────────────────────
+ *   `commodityCirculation.transferCargo` 模拟物资在两个节点间的实物运输与损耗结算；
+ *   `commodityCirculation.issueDebtInstrument` 发行具有信用评级与到期轮次的商业借据；
+ *   `commodityCirculation.settleDefault` 对逾期未兑付的债务进行清算，扣押担保资产或将违约人列入失信黑名单。
+ *
+ * ── 边界 ────────────────────────────────────────────────────────────
+ *   ① 纯内存计算 + 状态投影，支持通过 actionDesk 写入或外部状态驱动。
+ *   ② 实体库存不可为负数，超量转移拒绝（refusal: cargo-exceeds-physical-stockpile）。
+ *   ③ 借据必须具备合法担保物与到期轮次，清算时如实按比例折抵。
+ */
+(function () {
+  'use strict';
+  const WA = window.WorldAxis = window.WorldAxis || {};
+
+  const LS_KEY = 'worldaxis_commodity_circulation_settings_v1';
+  const DEF = {
+    enabled: true,
+    defaultSpoilageRate: 0.05, // 默认运输损耗 5%
+    defaultInterestRate: 0.1,  // 默认借据利息 10%
+    maxActiveDebts: 50
+  };
+
+  const __REG = {
+    module: 'commodityCirculation',
+    key: 'commodityCirculation',
+    name: '物资流转与债务清算 (EXV23-1)',
+    desc: '物资实物库存、商路损耗运输与商业信用借据违约清算',
+    settingsKey: LS_KEY,
+    schema: {
+      enabled: { type: 'boolean', default: true },
+      defaultSpoilageRate: { type: 'number', default: 0.05 },
+      defaultInterestRate: { type: 'number', default: 0.1 },
+      maxActiveDebts: { type: 'number', default: 50 }
+    }
+  };
+  if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+
+  let STATE = null;
+
+  let stat = null;
+
+  function settings() {
+    // v2.408.0（OPV23-9 回归逮到）：本函数此前调 `WA.settingsBus.getModuleSettings(key, DEF)` ——
+    //   该成员在 settingsBus 的真实导出面上**不存在**（真实读口是 `read(reg)`）。
+    //   因为带 `typeof === 'function'` 守卫，调用**静默落空**：本引擎的开关恒等于 DEF，
+    //   「关闭引擎」这件事在宿主里从来没生效过。它是 HEAD 上就存在的预存缺陷
+    //   （tests/gates.js / member-surface-gate / settings-bus-api-gate 三处同时点名），
+    //   不是本批引入；本批按既有库内口径修正（与 engines/affect.js 逐字同规）。
+    const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
+    return WA.settingsBus
+      ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {}))
+      : Object.assign({}, DEF, raw || {});
+  }
+
+  /** v2.409.0: 时钟守卫（**单行式**，声明与 fallback 同行共现）。
+   *  旧写法是跨四行的 `if (WA.clock && ...) return WA.clock.now(); return Date.now();` ——
+   *  语义对（兜底不裸调），但右侧不在**同一行**，v2.22.0 的静态判据只认「同行有 WA.clock.」
+   *  这一事实（守卫 vs 绕过的区别正在于它），于是 9 个模块的合法兜底全被归到裸调。
+   *  改成本仓既有的单行式（intel/life/coop 等 12 个引擎同款），并补站点名 —— 站点名让
+   *  「冻结之后时间还从哪漏」能定位到具体引擎。 */
+  function clockNow(site) { try { return WA.clock.now(site || 'commodity-circulation'); } catch (e) { return Date.now(); } }
+
+  function setStockpile(nodeId, commodity, amount) {
+    if (!nodeId || !commodity) return false;
+    if (!STATE.stockpiles[nodeId]) STATE.stockpiles[nodeId] = {};
+    const n = Math.max(0, Number(amount) || 0);
+    STATE.stockpiles[nodeId][commodity] = n;
+    return true;
+  }
+
+  function getStockpile(nodeId, commodity) {
+    if (!nodeId || !STATE.stockpiles[nodeId]) return 0;
+    return STATE.stockpiles[nodeId][commodity] || 0;
+  }
+
+  /**
+   * 转移物资
+   * @param {Object} spec - { fromNode, toNode, commodity, amount, hazardRate }
+   */
+  function transferCargo(spec) {
+    const cfg = settings();
+    if (!cfg.enabled) {
+      stat.lastReason = 'disabled';
+      return { ok: false, refusal: 'commodity-circulation-disabled' };
+    }
+    const o = spec || {};
+    const from = o.fromNode, to = o.toNode, comm = o.commodity;
+    const qty = Number(o.amount) || 0;
+    if (!from || !to || !comm || qty <= 0) {
+      stat.lastReason = 'invalid-params';
+      return { ok: false, refusal: 'invalid-cargo-spec' };
+    }
+    const current = getStockpile(from, comm);
+    if (current < qty) {
+      stat.lastReason = 'cargo-exceeds-physical-stockpile';
+      return {
+        ok: false,
+        refusal: 'cargo-exceeds-physical-stockpile',
+        hint: '节点 ' + from + ' 物资 ' + comm + ' 库存仅 ' + current + '，无法调出 ' + qty
+      };
+    }
+    const hazard = typeof o.hazardRate === 'number' ? Math.max(0, Math.min(1, o.hazardRate)) : cfg.defaultSpoilageRate;
+    const loss = Math.floor(qty * hazard);
+    const delivered = qty - loss;
+
+    setStockpile(from, comm, current - qty);
+    setStockpile(to, comm, getStockpile(to, comm) + delivered);
+
+    stat.transfers++;
+    return {
+      ok: true,
+      fromNode: from,
+      toNode: to,
+      commodity: comm,
+      dispatched: qty,
+      delivered: delivered,
+      loss: loss,
+      at: clockNow()
+    };
+  }
+
+  /**
+   * 发行借据
+   * @param {Object} spec - { debtId, issuerId, holderId, principal, collateral, dueRound, interestRate }
+   */
+  function issueDebtInstrument(spec) {
+    const cfg = settings();
+    if (!cfg.enabled) {
+      return { ok: false, refusal: 'commodity-circulation-disabled' };
+    }
+    const o = spec || {};
+    const debtId = o.debtId || (WA.rand ? WA.rand.id('debt_', 7, 'id') : 'debt_0000000');
+    const issuer = o.issuerId, holder = o.holderId;
+    const principal = Number(o.principal) || 0;
+    if (!issuer || !holder || principal <= 0) {
+      return { ok: false, refusal: 'invalid-debt-spec' };
+    }
+    const rate = typeof o.interestRate === 'number' ? o.interestRate : cfg.defaultInterestRate;
+    const totalDue = Math.round(principal * (1 + rate));
+    const record = {
+      id: debtId,
+      issuerId: issuer,
+      holderId: holder,
+      principal: principal,
+      totalDue: totalDue,
+      collateral: o.collateral || null,
+      dueRound: Number(o.dueRound) || 0,
+      status: 'active',
+      issuedAt: clockNow()
+    };
+    STATE.debts[debtId] = record;
+    stat.debtsIssued++;
+    return { ok: true, debt: record };
+  }
+
+  /**
+   * 债务结算 / 违约清算
+   * @param {string} debtId
+   * @param {number} currentRound
+   * @param {number} paidAmount
+   */
+  function settleDefault(debtId, currentRound, paidAmount) {
+    const debt = STATE.debts[debtId];
+    if (!debt) return { ok: false, refusal: 'debt-not-found' };
+    if (debt.status !== 'active') return { ok: false, refusal: 'debt-already-closed', status: debt.status };
+
+    const paid = Number(paidAmount) || 0;
+    if (paid >= debt.totalDue) {
+      debt.status = 'settled';
+      stat.debtsSettled++;
+      return { ok: true, status: 'settled', debtId: debtId, paid: paid };
+    }
+
+    // 逾期判断
+    const curRound = Number(currentRound) || 0;
+    if (curRound >= debt.dueRound) {
+      debt.status = 'defaulted';
+      stat.defaultsCount++;
+      const issuer = debt.issuerId;
+      if (!STATE.blacklists[issuer]) {
+        STATE.blacklists[issuer] = { defaultedCount: 0, totalDefaultedAmount: 0, lastDefaultedAt: 0 };
+      }
+      STATE.blacklists[issuer].defaultedCount++;
+      STATE.blacklists[issuer].totalDefaultedAmount += (debt.totalDue - paid);
+      STATE.blacklists[issuer].lastDefaultedAt = clockNow();
+
+      return {
+        ok: true,
+        status: 'defaulted',
+        debtId: debtId,
+        issuerId: issuer,
+        unpaid: debt.totalDue - paid,
+        claimedCollateral: debt.collateral,
+        hint: '债务违约，触发失信记录与抵押品清算'
+      };
+    }
+
+    return {
+      ok: true,
+      status: 'active',
+      debtId: debtId,
+      remaining: debt.totalDue - paid,
+      hint: '尚未到期，保持存续'
+    };
+  }
+
+  function view() {
+    return {
+      ok: true,
+      stockpilesCount: Object.keys(STATE.stockpiles).length,
+      activeDebtsCount: Object.values(STATE.debts).filter(function (d) { return d.status === 'active'; }).length,
+      blacklistsCount: Object.keys(STATE.blacklists).length,
+      stat: Object.assign({}, stat)
+    };
+  }
+
+  function reset() {
+    STATE.stockpiles = {};
+    STATE.debts = {};
+    STATE.blacklists = {};
+    stat.transfers = 0;
+    stat.debtsIssued = 0;
+    stat.debtsSettled = 0;
+    stat.defaultsCount = 0;
+    stat.lastReason = '';
+    return { ok: true };
+  }
+
+  function ownerCall(fn, args, readOnly) {
+    if (!WA.store || typeof WA.store.withOwnerState !== 'function') return { ok: false, refusal: 'owner-store-unavailable' };
+    return WA.store.withOwnerState('commodityCirculation', function (owned) {
+      const prevState = STATE, prevStat = stat;
+      STATE = owned; stat = owned._stats;
+      try { return fn.apply(null, args); }
+      finally { STATE = prevState; stat = prevStat; }
+    }, { readOnly: readOnly });
+  }
+
+  WA.commodityCirculation = {
+    transferCargo: function () { return ownerCall(transferCargo, arguments, false); },
+    issueDebtInstrument: function () { return ownerCall(issueDebtInstrument, arguments, false); },
+    settleDefault: function () { return ownerCall(settleDefault, arguments, false); },
+    setStockpile: function () { return ownerCall(setStockpile, arguments, false); },
+    getStockpile: function () { return ownerCall(getStockpile, arguments, true); },
+    view: function () { return ownerCall(view, arguments, true); },
+    reset: function () { return ownerCall(reset, arguments, false); },
+    getSettings: settings
+  };
+
+  if (typeof WA.registerModule === 'function') {
+    WA.registerModule('engines/commodity-circulation.js', { kind: 'engine', ver: '2.408.0' });
+  }
+  if (typeof console !== 'undefined' && console.log) {
+    console.log('[WorldAxis] engines/commodity-circulation 已加载（2.408.0）');
+  }
+})();

@@ -1,0 +1,12 @@
+{
+  "_note": "替身与真源边界台账（OPV29-22）。口径：`require.cache[X] = 非空` 是替身注入（须逐文件登记）；`delete require.cache[X]` 是清缓存重读真源（安全，免登记）；注入目标解析到 engines/core/ui/render/index.js 一律红，无白名单。",
+  "version": "2.529.0",
+  "entries": [
+    {
+      "file": "tests/negative-control-audit-v2104.js",
+      "sites": 2,
+      "targetIsProduct": false,
+      "why": "两处注入的都是本锁自己在 /tmp 造出来的 pending-lock.js 夹具（loaded=false），用途是测「正在装载中」这一档是否被如实记为 pending；且每处注入之后紧随 delete require.cache 复原。它替换的不是任何产品源，故不属于替身顶替真源。"
+    }
+  ]
+}

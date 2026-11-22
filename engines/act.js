@@ -1,0 +1,1030 @@
+/**
+ * WorldAxis engines/act.js (v2.117.0) — 行动执行（计划二 B1 主体 + B2 前半）
+ *
+ * ── 它治什么（缺口原句）────────────────────────────────────
+ *   计划二 B1 原文：「现有 life.tick 主要写意图与 lastDecision。新增行动执行要接住这些意图，
+ *   形成**目标—候选行动—准入—安排—执行—完成或失败—后果**的过程。」
+ *   本仓库此前这段**后半截完全不存在**：life.js 只写 `lastDecision`（「他决定怎么做」），
+ *   而「他真做成了吗」没有任何落点——于是「决定去做」与「做成了」在状态里长得一样。
+ *   这正是本仓库反复治理的「两态不可分」，只是这次落在人物行动上。
+ *
+ * ── 责任分工（计划原文点名，不得混）──────────────────────
+ *   目标表达**想实现什么**（life.goals，真源仍在 life.js）；
+ *   行动表达**怎么做**（本模块）；
+ *   events 负责**何时可执行**（engines/events.js 的排期面）。
+ *   故本模块的行动记录**不复制整份人物档案**，只带：人物 id / 目标 id / 动作种类 /
+ *   对象 / 地点 / 必要条件（资源）/ 时间需求（时长、窗口）/ 是否可中断 / 结果依据 / 操作 id。
+ *
+ * ── 四条否定式（本模块存在的全部理由）──────────────────────
+ *   ① **不凭一句话创造世界**。`meet` / `tell` / `work` 三类**没有内置确认器**，
+ *      在没有业务确认器时一律以 `unconfirmed` 落成**可见失败**——不得冒充完成。
+ *      （计划原文：「不能凭模型一句『已完成』直接创造钱、改变位置或完成任务」。）
+ *   ② **不凭空建人**。行动主体必须已在册（`registry` 是唯一写者）；本模块只会
+ *      拒收 `missing-person`，不会因为「要写一条行动」顺手多出一个人。
+ *   ③ **不凭空生目标**。`admit` 要求行动的目标来源**当场仍是 active**——目标被撤销之后，
+ *      挂在它下面的行动不得照常开工（`no-goal`）。
+ *   ④ **位置只由世界给**。移动的完成判据是 `world` 的行程表（`departed` / `arrived`），
+ *      不是本模块自己算出来的钟点；路不通就是不通（`unreachable`），**不瞬移**。
+ *
+ * ── 与 A2（v2.116.0）同一套恢复纪律 ────────────────────────
+ *   · 每笔行动在**准入**时钉 `opId = id@开工时刻#第几次尝试`（每次重钉、序号自增）；
+ *   · 结算台账 `acts.res` 持久化「已完成本地副作用 + 该 opId 的确认」；
+ *   · **调用方显式给的 opId 优先**（`wantOp || have`，与 events 同口径）；
+ *     `res` 台账里已有同一 opId ⇒ `duplicate-receipt` 拒收且零变化——
+ *     「执行后、回报前」崩溃后重试，不得重复扣资源。
+ *   · 本轮结算预算 `maxRun`（与 events 的 `maxClaims` 同形）：超额者进 `deferred`
+ *     **显式留痕**，不静默跳过。
+ *
+ * ── 边界（如实写明，不假称完备）────────────────────────────
+ *   · `meet` 的确认器看的是**世界证据**（双方在该地点该时刻都可容纳，`canBeAt`），
+ *     不是「一边说了算」；它证明的是「两人都有条件到场」，不是「两人真的谈成了什么」。
+ *   · 「知不知道备用路线」属于认知面（B3），本模块只承认**可达性**证据：
+ *     不知道路的人在框架上不会因此自动选对——但「按认知选路」由 B3 落地。
+ *   · 租约 / 崩溃恢复只覆盖本模块自己的状态机；跨进程互斥不在范围内（同 events 的口径）。
+ *   · **合法不行动**（v2.141.0 F2）：`verdict()` 判**这一笔的结果属于哪一档**
+ *     （action / refuse / delay / status-quo，四档不可合并）。它是只读判定面，
+ *     **不是写口** —— 本模块的写口仍然只有 add / admit / advance / abort / replan。
+ *     本仓此前的现场：准入制答得出「能不能开工」，答不出「他合法地什么都没做」，
+ *     于是「没动」与「没算」在状态里同形（缝合自 BSW 推演原则的「行动、拒绝行动、
+ *     延迟行动与状态维持均为合法的推演结果」）。
+ *   · 总开关默认关闭；关闭时不登记、不准入、不结算、不注入。
+ */
+(function () {
+  'use strict';
+  const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.118.0（计划二 B7）：墙钟读取改走**显式执行上下文**（试演期指向隔离时钟）。
+  //   形态必须保持 `catch (e) { return Date.now(); }` —— run.js 的 K20 判据只认这一种守卫写法，
+  //   换成三元或别的兜底会被判成「产品代码裸调墙钟」（裸调绕过冻结，回放对不上时只能全库通读）。
+  // v2.119.0：本行必须同时满足两件事 —— ①`WA.clock.` 与本行的 catch 兜底同行共现
+  //   （run.js 的 G20/K20 只认这种写法：走独立取值口时锁**看不见**这条墙钟旁路）；
+  //   ② exec 上下文在场时取隔离时钟（试演期是冻结的故事钟）。与原先经取值口的写法
+  //   逐字等价：整条表达式同被本 try/catch 包住。
+  const clockNow = function (site) { try { return exec() ? exec().now(site || 'act', function () { return WA.clock ? WA.clock.now(site || 'act') : Date.now(); }) : (WA.clock ? WA.clock.now(site || 'act') : Date.now()); } catch (e) { return Date.now(); } };
+  const LS_KEY = 'worldaxis_act_settings_v1';
+  const DEF = { enabled: true, maxActs: 8, maxRun: 4, defaultDurationMs: 60000 };
+  const __REG = { key: LS_KEY, def: DEF, module: 'act',
+    bounds: { maxActs: [1, 24], maxRun: [1, 12], defaultDurationMs: [1000, 3600000] } };
+  function settings() {
+    const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
+    return WA.settingsBus ? WA.settingsBus.normalize(__REG, Object.assign({}, DEF, raw || {})) : Object.assign({}, DEF, raw || {});
+  }
+  function saveSettings(next) {
+    return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
+  }
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+
+  // 第一批动作种类（计划原文点名六类，`wait`/`rest` 合并计一条、`move` 单列成两条语义）：
+  //   等待/休息、移动、会面/邀约、传话/通知、工作或准备、交付资源。
+  const KINDS = ['wait', 'rest', 'move', 'meet', 'tell', 'work', 'deliver'];
+  // 状态：活动态与终态**穷尽互斥**（与 events.js 的 ACTIVE/TERMINAL 同口径）。
+  const ACTIVE = ['planned', 'running'];
+  const TERMINAL = ['done', 'failed', 'aborted', 'replanned'];
+  // 一次行动的时长上限（防「排一个跨年的行动」把队列钉死）：7 天。
+  const MAX_DURATION = 7 * 24 * 3600 * 1000;
+  // **内置确认器**。表里没有的种类 = 没有确认器 ⇒ `unconfirmed` 可见失败。
+  //   为什么只有两个：世界能确认「人到了」与「货转了」；其余三类（会面谈成什么、
+  //   传话是否被听懂、工作成果如何）需要业务侧确认器，本版**不假装有**。
+  //   v2.231.0（OPT-2）：`tell` / `work` **不再一律落 unconfirmed** —— 业务确认器已接线：
+  //     tell → 世界消息面（消息真送达）**且** 情报面（接收者真获知）；
+  //     work → 委托面（业务成果与工时结算的真实状态）。
+  //   「无确认器」这条否定式没有取消：**面缺席时照样如实落 unconfirmed**（不冒充完成）。
+  const CONFIRMERS = { move: 'world.journey', deliver: 'org.transfer', meet: 'world.canBeAt',
+    tell: 'world.sendMessage+intel.addIntel', work: 'commission.view' };
+  // 需要外部确认器、但本版未接的种类（如实登记，供诊断与文档引用同一份真源）。
+  //   v2.231.0（OPT-2）：**静态表已清空** —— 传话与工作接上了业务确认器
+  //   （见 CONFIRMERS 的 `world.sendMessage+intel.addIntel` 与 `commission.view`）。
+  //   常量本身保留：它是「哪些种类没接确认器」的单一真源，将来新增种类没接就加回这里。
+  //   ⚠ 与 `view().noConfirmer` 的分工：本常量是**静态接线表**，view 报的是**运行时判定**
+  //     —— 面当轮缺席时那一类会临时出现在读数里（「代码里接了」≠「这一刻真能确认」）。
+  const NO_CONFIRMER = [];
+  // ── 合法不行动（v2.141.0 F2）────────────────────────────────────────
+  //   缝合来源：BSW 动态受力推演约束引擎的推演原则（原文逐字）：
+  //     「行动、拒绝行动、延迟行动与状态维持（即维持现状）均为合法的推演结果。」
+  //     「当当前受力形成稳定僵局时，不强行制造角色行动；允许时间流逝、环境变化、
+  //      外部事件或关系互动作为新的输入。」
+  //   本仓此前的现场：`admit` 是**准入制**——它答得出「这一笔能不能开工」，
+  //   却答不出「他这一轮**合法地什么都没做**」；于是「他没动」在状态里只能表现为
+  //   「行数没变」，与「这一轮根本没算」长得一模一样（本仓反复治的两态不可分）。
+  //   四种结果的处置完全不同，故**不合并成一个「没行动」**：
+  //     action      真做了（本轮有可观察的行动落地）；
+  //     refuse      拒绝了（有能力、路也通，但按性格/立场/代价不愿做）——要写理由与代价；
+  //     delay       延后了（时辰未到/窗口不合/条件不齐）——条件变了会自动重新显现；
+  //     status-quo  维持现状（他在忙别的、目标已撤、或有更重的事）——这一轮合法地没有变化。
+  //   边界（如实写明）：本函数只**判定与归类**，不写世界、不改行动状态。
+  //   它刻意不是第四个写口 —— 本模块的写口仍然只有 add / admit / advance / abort / replan。
+  const VERDICTS = ['action', 'refuse', 'delay', 'status-quo'];
+  /** 未受阻的活体行动按种类落档：等待/休息就是「延后」，其余是「真做了」。 */
+  function verdictOfRow(row) {
+    const k = str((row && typeof row === 'object') ? row.kind : row, 20);
+    if (k === 'wait' || k === 'rest') return 'delay';
+    return 'action';
+  }
+  /**
+   * 受阻断时的档位映射。**只映射本模块自己的拒收原因**（别处的码不猜）。
+   *   不在这张表里的一律落 `refuse` 兜底，并把原码逐字带出（`original`），
+   *   而不是悄悄塞进某一档 —— 「为什么没做成」必须能从读数反推回那句拒收。
+   */
+  const BLOCKED_VERDICT = {
+    'busy': 'status-quo',            // 他在做别的事：这一轮合法地没有新变化
+    'no-goal': 'status-quo',         // 目标已撤：不是他拒绝，是这件事不再算他的事
+    'missing-person': 'status-quo',  // 人不在册：谈不上行动，也谈不上拒绝
+    'not-planned': 'status-quo',     // 这一笔本就不在待开工态
+    'need-unmet': 'refuse',          // 资源不够：做不了（要写代价与替代）
+    'org-missing': 'refuse',         // 连库存真源都没有：做不了
+    'unreachable': 'refuse',         // 路不通
+    'missing-route': 'refuse',
+    'closed': 'delay',               // 门关着：时辰不对，不是不愿
+    'window-too-short': 'delay',
+    'scheduled-elsewhere': 'status-quo',
+    'bad-time': 'delay',
+    'world-missing': 'refuse'
+  };
+  /**
+   * 判定面（只读）：**这一笔的合法结果是什么档**。
+   *   两种入参形态，都是调用方实际会拿到的东西：
+   *     · 传一个动作种类（'wait'/'move'/…）⇒ 未受阻时的档位；
+   *     · 传 opts.blockedReason（admit / advance 的拒收码）⇒ 受阻断时的档位。
+   *   返回体里 `allowed` 四档齐带 —— 「有哪几档合法」本身是纪律的一部分，
+   *   不许让它只活在注释里（本仓点名过的「声明了却没有产生方」）。
+   */
+  function verdict(kind, opts) {
+    const k = str(kind, 20);
+    if (KINDS.indexOf(k) < 0) return { ok: false, reason: 'bad-kind', kinds: KINDS.slice() };
+    const o = opts || {};
+    const hit = str(o.blockedReason, 40);
+    let v = verdictOfRow(k), blocked = false;
+    if (hit) {
+      blocked = true;
+      v = BLOCKED_VERDICT[hit] || 'refuse';
+    }
+    return { ok: true, kind: k, verdict: v, blocked: blocked,
+      reason: hit || null, original: hit || null, allowed: VERDICTS.slice(),
+      note: '行动、拒绝行动、延迟行动与状态维持都是合法结果：「他没动」不等于「这一轮没算」。' };
+  }
+
+  /**
+   * v2.524.0（S1 接线）：骰子只**降档**，不加严——五档 → 四档的单向表。
+   *   critical / extreme / success ⇒ 不动（null = 保持原档）
+   *   fail                        ⇒ 'delay'（没办成：耗掉窗口，不是拒绝）
+   *   fumble                      ⇒ 'refuse'（办砸了：他这一手砸了）
+   *   关键边界：**只在原本该动（'action'）时才降**。原本就 refuse/delay/status-quo 的，
+   *   骰子不得把它变严或变松 —— 否则同一件事会被判两次。
+   */
+  const DICE_VERDICT = { critical: null, extreme: null, hard: null, success: null, fail: 'delay', fumble: 'refuse' };
+  function diceVerdict(band, base) {
+    const b = str(base, 20) || 'action';
+    if (VERDICTS.indexOf(b) < 0) return b;
+    const to = DICE_VERDICT[str(band, 20)];
+    if (!to) return b;
+    return b === 'action' ? to : b;
+  }
+  /**
+   * v2.524.0（S1）：**判定面接骰子**。入参 `opts.check = {target, ticket, who, what}` 时
+   * 先掷（走 outcome-dice，开关关着则原样通过），再把五档单向降到四档。
+   * 本函数仍然**不是写口**：它不 add / admit / advance，只回"这一笔该落哪档"。
+   */
+  function judge(kind, opts) {
+    const o = opts || {};
+    const base = verdict(kind, { blockedReason: o.blockedReason });
+    if (!base.ok) return base;
+    const spec = (o.check && typeof o.check === 'object') ? o.check : null;
+    if (!spec) return Object.assign({}, base, { check: null, diceAdjusted: false });
+    let r = null;
+    try { r = (WA.outcomeDice && typeof WA.outcomeDice.resolve === 'function') ? WA.outcomeDice.resolve(spec) : null; }
+    catch (e) { r = null; }
+    if (!r) return Object.assign({}, base, { check: null, diceAdjusted: false, checkReason: 'outcome-dice-absent' });
+    if (r.ok !== true || !r.band) {
+      return Object.assign({}, base, { baseVerdict: base.verdict, diceAdjusted: false,
+        check: { reason: r.reason || 'unknown' } });
+    }
+    const v = diceVerdict(r.band, base.verdict);
+    return Object.assign({}, base, {
+      verdict: v, baseVerdict: base.verdict, diceAdjusted: v !== base.verdict,
+      check: { band: r.band, label: r.label, roll: r.roll, die: r.die, need: r.need,
+        ticket: r.ticket, replay: r.replay === true, reason: r.reason }
+    });
+  }
+  const stat = { added: 0, admitted: 0, completed: 0, failed: 0, aborted: 0, replanned: 0,
+    deferred: 0, duplicates: 0,
+    // v2.231.0（OPT-2）：确认面三栏 ——
+    //   unconfirmed：落成「无确认器」的笔数（**此前这一栏从未被累加过**，是死计数；
+    //     本轮接活：口径 ① 的可见失败要有自己的账，否则「没做成」在读数上只剩 failed 一个总数）；
+    //   confirmed ：**靠业务确认器做成**的笔数（与「自己就完成了」的 wait/move 分开计）；
+    //   awaiting  ：到期但**业务侧还没交付**、如实留在待确认的笔数（不是失败，也不是完成）。
+    unconfirmed: 0, confirmed: 0, awaiting: 0, lastReason: '', faults: {},
+    // v2.216.0（优化 Q7）：**凭据摘要面三个读数各自成栏**，不并进 duplicates ——
+    //   ① archived：命中摘要、完整回执已被挤出（幂等**仍然生效**，不是失败）；
+    //   ② digestSkipped：指纹面缺席因而未能留痕（如实降级，不假造一个可能撞的键）；
+    //   ③ digestCollision：哈希撞键且 opId 原文不符（碰撞**不**当命中，如实计）。
+    //   与 core/commit.js 的 archivedReuse/digestSkipped/digestCollision 逐字同口径。
+    archived: 0, digestSkipped: 0, digestCollision: 0 };
+  // v2.216.0（优化 Q7）：**幂等下限表**（本模块持有的那一半）。
+  //   与 core/evict.js 的 IDEMPOTENT 同域：挤出侧负责「旋钮拧不到下限以下」，
+  //   本模块负责「长局越过下限退场时留凭据」。两处缺一，去重真源仍会被静默掏空。
+  const IDEM_FLOOR = { 'acts.res': 8 };
+  const DIGEST_CAP = 64;      // 摘要台账自身的上界（一条摘要 ≈ 完整回执的 1/5，取 8 倍下限）
+  // ── 计数器门面 S（v2.118.0 · B7）──────────────────────────────────────
+  //   `stat` 是**模块自己的**累计读数。试演跑的是同一套执行路径，但它不许在任何面上留痕，
+  //   所以计数器也必须跟着执行上下文走。门面按 stat 的键集合用 defineProperty 生成 ——
+  //   将来给 stat 添字段时门面自动跟上，不会出现「新字段漏改、试演从此开始污染真计数器」。
+  //   getter/setter 双向转发，`S.x++` / `S.x += n` 这类既有写法逐字不改。
+  function statOf() { const c = ctxOf(); return (c && c.stat) ? c.stat : stat; }
+  const S = (function () {
+    const f = {};
+    Object.keys(stat).forEach(function (k) {
+      Object.defineProperty(f, k, {
+        enumerable: true,
+        get: function () { return statOf()[k]; },
+        set: function (v) { statOf()[k] = v; }
+      });
+    });
+    return f;
+  })();
+  function noteFault(reason) {
+    const tag = String(reason == null ? 'unknown' : reason);
+    S.faults[tag] = (S.faults[tag] || 0) + 1;
+    return tag;
+  }
+  /** 字符串字段受控收窄（与 events.js 的 str 同口径：非字符串一律视为空，不做字符串化兜底）。 */
+  function str(v, max) {
+    if (typeof v !== 'string') return '';
+    return v.replace(/\s+/g, ' ').trim().slice(0, max || 60);
+  }
+  /** 有限数收窄：NaN / ±Infinity / 空串 / 布尔一律 NaN（`Number('')===0` 是陷阱）。 */
+  function finite(v) {
+    if (v === undefined || v === null || v === '' || typeof v === 'boolean') return NaN;
+    const n = Number(v);
+    return isFinite(n) ? n : NaN;
+  }
+  function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 60) : str(v, max); }
+  // ── 显式执行上下文（v2.118.0 · 计划二 B7 的承重结构）────────────────────────
+  //   计划二 B7 原文：「真实运行与试演使用同样的准入、冲突与效果处理，**执行上下文显式传入**。」
+  //   此前本模块把执行上下文**隐式钉死在全局**（直呼 `WA.store` / `WA.clock`），于是
+  //   「在副本上跑一遍真规则」这件事没有立足点：要么另写一套推进规则（两份实现必然漂移），
+  //   要么把真世界改掉（试演就不是试演了）。两种都不是本仓接受的答案。
+  //
+  //   本段只做一件事：把「这一次执行在世界、时钟、副作用上的去向」收成**一个显式对象**。
+  //   上下文栈本体在 `core/exec.js`（正式格，与 world.js 的行程面共用同一份栈 ——
+  //   共用是关键：试演期 action 写「人已出发」，世界必须能看见那趟行程）。
+  //
+  //   为什么不用「模块级临时变量」：临时变量是不可见的全局状态，一次 early return 就能
+  //   把后续整局的执行都指向副本（v2.89.0 O2 的录制态漏出是同一形态的病）。显式传入
+  //   在调用点就看得见，stack 上也看得见。
+  //
+  //   降级可见：`core/exec.js` 缺席时**一律按真世界执行**（与 v2.117.0 逐字一致）——
+  //   此时试演入口会以 `exec-absent` 拒收，而不是在真世界上跑一次假试演。
+  function exec() { return (WA.exec && typeof WA.exec.withContext === 'function') ? WA.exec : null; }
+  function ctxOf() {
+    const e = exec();
+    return e ? e.current() : null;
+  }
+  function worldOf() {
+    const e = exec();
+    return e ? e.worldOf(WA.world) : WA.world;
+  }
+  function storeOf() {
+    const e = exec();
+    return e ? e.storeOf(WA.store) : WA.store;
+  }
+  /** 副作用去向：真跑走 store.transact，试演写进调用方给的 sink（唯一分岔点，在 core/exec.js）。 */
+  function mutate(facade, fn, opt) {
+    const e = exec();
+    if (!e) return (facade && typeof facade.transact === 'function')
+      ? facade.transact(fn, opt) : { ok: false, reason: 'store-absent' };
+    return e.mutate(facade, fn, opt);
+  }
+  function state() { const s = storeOf(); return s && s.get ? (s.get() || {}) : {}; }
+  function acts() {
+    const a = state().acts;
+    const rows = (a && typeof a === 'object' && Array.isArray(a.rows)) ? a.rows : [];
+    return rows;
+  }
+  function receipts() {
+    const a = state().acts;
+    return (a && typeof a === 'object' && Array.isArray(a.res)) ? a.res : [];
+  }
+  /**
+   * v2.117.0：**活动候选**里是否已有同一幂等键。
+   *   只看结算台账 `res` 会漏掉「已登记、未结算」的那一笔 —— 于是同一个键能反复登记，
+   *   候选表长出 N 条同键行，而它们共享（最后一条的）回执：两态不可分在候选表上的形态。
+   *   终态行在结算/中止时已清空 opId，故此处命中必是活动候选。
+   */
+  function hotOpId(rows, op) {
+    return rows.filter(function (x) { return x && x.opId && x.opId === op; })[0] || null;
+  }
+  // ── v2.216.0（优化 Q7）：**凭据摘要面**（被挤出的回执在这里留一条「做过」的凭据）──
+  //   与 core/commit.js 的 commit.digests 同一治法、同一分工：
+  //     · 完整回执 `acts.res` 仍按原 cap 环形退场（既有契约逐字不动）；
+  //     · 被挤出**之前**把 `(opId, at)` 落进 `acts.digests`（摘要台账）；
+  //     · `add()` 命中摘要 ⇒ 仍拒 `duplicate-receipt`，但带 `archived:true`、`on:'archived'`；
+  //     · `advance()` 命中摘要 ⇒ 仍计 duplicates，但带 `archived:true`。
+  //   两本账的分工一句话：`res` 答「这一笔长什么样」，`digests` 答「这一笔做过没有」。
+  //   为什么摘要键用哈希：opId 是**调用方可控字符串**，直接当对象键会开一个原型面
+  //   （`__proto__` 一类）；碰撞不会造成误判 —— 值里留着 opId 原文，命中后逐字复核。
+  function digestKey(opId) {
+    try {
+      if (!WA.store || typeof WA.store.fnv1a !== 'function') return null;
+      return 'd' + WA.store.fnv1a(String(opId));
+    } catch (e) { return null; }
+  }
+  function readDigests() {
+    const a = state().acts;
+    const d = (a && typeof a === 'object') ? a.digests : null;
+    return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};
+  }
+  /** 查凭据摘要。命中要求哈希键**与** opId 原文同时对上（否则算碰撞，不当命中）。 */
+  function findDigest(opId) {
+    const k = digestKey(opId);
+    if (!k) return null;
+    const row = readDigests()[k];
+    if (!row) return null;
+    if (String(row.opId == null ? '' : row.opId) !== String(opId)) { S.digestCollision++; return null; }
+    return row;
+  }
+  /** 在**当前 draft** 上落摘要（与结算回执同事务）。 */
+  function writeDigests(draft, res, cfg) {
+    if (!WA.evict) return;
+    const floor = IDEM_FLOOR['acts.res'] || 0;
+    const cap = Math.max(floor, finite(cfg && cfg.maxActs) || 0);
+    const over = res.length - cap;
+    if (over <= 0) return;
+    if (!draft.acts.digests || typeof draft.acts.digests !== 'object'
+      || Array.isArray(draft.acts.digests)) draft.acts.digests = {};
+    for (let i = 0; i < over; i++) {
+      const old = res[i];
+      if (!old || !old.opId) continue;
+      const dk = digestKey(old.opId);
+      if (!dk) { S.digestSkipped++; continue; }
+      draft.acts.digests[dk] = { opId: String(old.opId), at: finite(old.at) || 0 };
+    }
+    // 摘要台账自身也要有界（只增不减的容器本仓一贯判红灯）；
+    //   对象形态走 evict.object，丢键顺序 = 插入顺序（最老的先退场）。
+    WA.evict.object(draft.acts.digests, 'acts.digests', Object.keys(draft.acts.digests));
+  }
+  function find(id) {
+    const k = clean(id, 60);
+    return acts().filter(function (x) { return x && x.id === k; })[0] || null;
+  }
+  /**
+   * 终态判据。**接受行对象或状态字符串两种形态**。
+   *   v2.117.0 修复：此前只认行对象（读 `x.status`），而 `replan` 的两处调用点传的是状态字符串
+   *   ⇒ `'aborted'.status === undefined` ⇒ 判据**恒假**。表现：已中止/已完成的行动还能被改计划
+   *   并复活成新的 planned 行 ——「这一笔已经结束了」与「这一笔还能改」两态不可分。
+   */
+  function isTerminal(x) {
+    const s = (x && typeof x === 'object') ? x.status : x;
+    return TERMINAL.indexOf(s) >= 0;
+  }
+  function personRow(name) {
+    const k = 'p_' + clean(name, 60);
+    const p = (state().people || {})[k];
+    return (p && typeof p === 'object') ? p : null;
+  }
+  /** 人物当前有个**在册且 active** 的目标？——行动的目标来源判据（否定式 ③）。 */
+  function activeGoal(p, goalId) {
+    if (!p) return null;
+    const lf = p.life;
+    const goals = (lf && Array.isArray(lf.goals)) ? lf.goals : [];
+    return goals.filter(function (x) { return x && x.id === goalId && x.status === 'active'; })[0] || null;
+  }
+  /** 该人物此刻是否已有 running 行动（同一时刻只能做一件事）。 */
+  function runningOf(name) {
+    const who = clean(name, 60);
+    return acts().filter(function (x) { return x && x.person === who && x.status === 'running'; })[0] || null;
+  }
+  function stock(person) {
+    const p = personRow(person);
+    if (!p) return null;
+    if (WA.org && typeof WA.org.stockOf === 'function') return WA.org.stockOf(p);
+    // org 缺席时**不猜库存**：返回 null 由调用方拒收 `org-missing`（本仓最贵的一类默认值）。
+    return null;
+  }
+
+  /**
+   * 登记一条候选行动。**只登记，不开工**——准入是 admit 的事。
+   *   拒收一律零变化（与 events.schedule 的「先纯校验、后落地」同规）。
+   */
+  function add(person, spec) {
+    const cfg = settings();
+    if (!cfg.enabled) { S.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const who = clean(person, 60), it = spec || {};
+    if (!who) return { ok: false, reason: 'missing-person' };
+    const kind = str(it.kind, 20);
+    if (KINDS.indexOf(kind) < 0) return { ok: false, reason: 'bad-kind', kinds: KINDS.slice() };
+    const p = personRow(who);
+    if (!p) return { ok: false, reason: 'missing-person', person: who };   // 否定式 ②：不凭空建人
+    const goalId = str(it.goalId, 60);
+    if (!goalId) return { ok: false, reason: 'missing-goal' };
+    if (!activeGoal(p, goalId)) return { ok: false, reason: 'unknown-goal', goalId: goalId };
+    // 时长：显式给的优先（clamp 到上限），否则用设置里的默认「一件事大概多久」。
+    const rawDur = finite(it.duration);
+    const duration = (rawDur > 0) ? Math.min(Math.round(rawDur), MAX_DURATION) : cfg.defaultDurationMs;
+    const need = it.need && typeof it.need === 'object' ? it.need : {};
+    const amount = finite(need.amount);
+    const resource = str(need.resource, 30);
+    if (resource && !(amount > 0)) return { ok: false, reason: 'bad-need' };
+    // **调用方显式给的 opId 优先**（与 events.complete 的 `wantOp || have` 同口径）。
+    //   台账里已有同一 opId ⇒ 这是「重放」，拒收且零变化（重复不重复扣资源）。
+    const wantOp = str(it.opId, 80);
+    if (wantOp) {
+      // 幂等键查**两处**：活动候选（已登记未结算）与结算台账（已完成）。
+      //   只查台账 ⇒ 同一个键可以反复登记，候选表里长出同键的 N 条行，
+      //   而它们共享一条回执；「执行后、回报前」的重试于是二次落账。
+      const hot = hotOpId(acts(), wantOp);
+      const cold = receipts().some(function (q) { return q && q.opId === wantOp; });
+      // v2.216.0（优化 Q7）：**第三处**——完整回执已被环形挤出后，凭据落在摘要台账里。
+      //   只查前两处 ⇒ 长局里同一 opId 会重新放行（「做过」退化成「没做过」）。
+      //   命中摘要仍答 duplicate-receipt，但带 archived:true —— 「做过、只是完整回执不在台账里了」可判。
+      const arch = (hot || cold) ? null : findDigest(wantOp);
+      if (hot || cold || arch) {
+        S.duplicates++;
+        if (arch && !hot && !cold) S.archived++;
+        return { ok: false, reason: 'duplicate-receipt', opId: wantOp,
+          on: hot ? hot.status : (cold ? 'receipt' : 'archived'), archived: !!arch };
+      }
+    }
+    let out = null;
+    mutate(storeOf(), function (draft) {
+      draft.acts = (draft.acts && typeof draft.acts === 'object' && !Array.isArray(draft.acts))
+        ? draft.acts : { rows: [], res: [] };
+      draft.acts.rows = Array.isArray(draft.acts.rows) ? draft.acts.rows : [];
+      const now = clockNow('act');
+      const row = {
+        id: 'act_' + now + '_' + draft.acts.rows.length,
+        person: who, goalId: goalId, kind: kind,
+        text: str(it.text, 80), with: str(it.with, 60), target: str(it.target, 60),
+        item: str(it.item, 30), amount: amount > 0 ? Math.round(amount) : 0,
+        from: str(it.from, 40), to: str(it.to, 40),
+        place: str(it.place, 40), use: str(it.use, 30),
+        need: resource ? { resource: resource, amount: Math.round(amount) } : null,
+        duration: duration, interruptible: it.interruptible !== false,
+        status: 'planned', attempts: 0, opId: wantOp,
+        spent: 0, left: duration, dueAt: 0, startedAt: 0, endedAt: 0,
+        departed: false, arriveAt: 0,
+        // v2.231.0（OPT-2）：工作类可**显式挂钩**一份委托；没挂钩 ⇒ 到期落「待业务侧确认」。
+        //   msgId 是传话那一笔对应的世界消息 id（按 id 复查状态，不重发 —— 防同一条话发多份）。
+        contractId: str(it.contractId, 60), msgId: '',
+        result: '', reason: '', evidence: '', blockedBy: '', from_: str(it.from_, 60),
+        at: now
+      };
+      draft.acts.rows.push(row);
+      // 挤出走单一出口（cap 的单一真源是 core/evict.js 的 SITES，与 store.__BOUNDED_CAPS 同源）。
+      WA.evict.array(draft.acts.rows, 'acts.rows', cfg.maxActs);
+      out = { ok: true, id: row.id, duration: duration };
+    }, 'act:add');
+    if (out && out.ok) { S.added++; S.lastReason = 'added'; } else if (!out) S.lastReason = 'store-unavailable';
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * 准入：这一刻这个人**能不能开始做这件事**。
+   *   全部判据只读，拒收不进事务（「拒收却推进 rev / 半条记录落盘」没有立足点）。
+   *   顺序刻意从「这件事本身」到「世界条件」：行动不存在 → 目标失效 → 忙 → 资源 → 地点/窗口 → 路线。
+   */
+  function admit(id, at, opts) {
+    const cfg = settings();
+    if (!cfg.enabled) { S.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const row = find(id);
+    if (!row) return { ok: false, reason: 'missing', id: clean(id, 60) };
+    if (row.status !== 'planned') return { ok: false, reason: 'not-planned', status: row.status };
+    const t = finite(at);
+    if (!isFinite(t)) return { ok: false, reason: 'bad-time' };
+    // 目标来源（否定式 ③）：目标被撤销 ⇒ 挂在它下面的行动不得照常开工。
+    const p = personRow(row.person);
+    if (!p) return { ok: false, reason: 'missing-person', person: row.person };
+    if (!activeGoal(p, row.goalId)) return { ok: false, reason: 'no-goal', goalId: row.goalId };
+    // 同一时刻只能做一件事（第二条被拒并归因，不静默覆盖先前的安排）。
+    const busy = runningOf(row.person);
+    if (busy) return { ok: false, reason: 'busy', running: busy.id, kind: busy.kind };
+    // 必要条件：资源不够就是不够，不把负数伪装成成功。
+    if (row.need) {
+      const st = stock(row.person);
+      if (st === null) return { ok: false, reason: 'org-missing' };
+      const have = finite(st[row.need.resource]);
+      if (!(have >= row.need.amount)) return { ok: false, reason: 'need-unmet', resource: row.need.resource, have: isFinite(have) ? have : 0, want: row.need.amount };
+    }
+    // 移动：先把「路走得通吗」问清楚，并把耗时钉在行上（时长不得短于路的耗时）。
+    let travel = null;
+    if (row.kind === 'move') {
+      if (!row.from || !row.to) return { ok: false, reason: 'missing-route' };
+      if (!worldOf() || typeof worldOf().reach !== 'function') return { ok: false, reason: 'world-missing' };
+      const r = worldOf().reach(row.from, row.to);
+      if (!r || r.ok === false) return { ok: false, reason: (r && r.reason) || 'unreachable', from: row.from, to: row.to };
+      if (!r.reachable) return { ok: false, reason: 'unreachable', from: row.from, to: row.to };
+      travel = r;
+    }
+    // 地点与时间窗口：地点必须先登记；窗口必须容得下这一件事（含路上的时间）。
+    let win = null;
+    if (row.place) {
+      if (!worldOf() || typeof worldOf().canBeAt !== 'function') return { ok: false, reason: 'world-missing' };
+      const needMs = (travel ? travel.minutes * 60000 : 0) + row.duration;
+      // v2.117.0（B2 前半）：把 `row.use` 一并传下去。此前这里只传 4 参 ——
+      //   于是「办公室值班」与「随便哪会儿去办公室」在准入上**完全同形**，
+      //   场所用途窗口在准入路径上等于不存在（声明了、没人消费）。
+      //   第五参是给程序的（只回 ok/reason）；作者要看的「几点开、差多少」走面板的用途窗口入口。
+      const w = worldOf().canBeAt(row.person, row.place, t, needMs, row.use);
+      if (!w || w.ok !== true) return { ok: false, reason: (w && w.reason) || 'unknown-place', detail: w || null };
+      win = w;
+    }
+    // 落盘：状态、开工时刻、到期时刻、操作 id（**每次尝试重钉、序号自增**）。
+    let out = null;
+    mutate(storeOf(), function (draft) {
+      const rows = (draft.acts && Array.isArray(draft.acts.rows)) ? draft.acts.rows : [];
+      const x = rows.filter(function (y) { return y && y.id === row.id; })[0];
+      if (!x || x.status !== 'planned') { out = { ok: false, reason: 'not-planned', status: x ? x.status : 'missing' }; return false; }
+      x.attempts = (x.attempts || 0) + 1;
+      x.status = 'running';
+      x.startedAt = t;
+      x.duration = travel ? travel.minutes * 60000 : x.duration;
+      x.left = x.duration;
+      x.dueAt = t + x.duration;
+      // v2.117.0（B2「旅行中的改道和中止」）：**离开的那一刻就是出发那一刻**。
+      //   旧写法把 `world.depart` 推迟到 `resolve()`（只在 `t >= dueAt` 时才被调用），
+      //   而 dueAt = 离场时刻 + 全程、depart 给出的 arriveAt 也是 离场时刻 + 全程 ⇒ 两式必然相等：
+      //     人「已经在路上」这段时间在状态里的**宽度恒为 0**，行程永不落盘，
+      //     `abort → world.stop`（中止在途者、标 halted、不猜位置）那整支**不可达**。
+      //   世界拒绝出发 ⇒ 本笔零变化拒收（事务整体回滚：状态/开工时刻/到期时刻一格都不落）。
+      // v2.119.0（出口面信号修复）：真跑支**逐字写全** `WA.world.depart/arrive/stop`，并保持
+      //   `WA` `.` `world` `.` `<mem>` 三 token 相邻 —— 本仓引用面正则只认这一种形态
+      //   （README v2.11.0 的既定先例：`_S.html(s)` 被改回 `WA.sanitize.html(s)`，
+      //    判词是「真在用的东西不许看起来像死的」）。此前只经 `worldOf()` 取值，
+      //   成员名字面落在 core/exec.js，于是这三项在静态面上「零产品引用」，
+      //   契约会记下**与事实相反**的证据。
+      //   语义逐字不变：exec 上下文缺席时 `worldOf()` 恒等于 `WA.world`（「降级可见」口径），
+      //   两支同值；上下文在场时（试演）仍取隔离世界，路径与改前一致。
+      if (travel && worldOf() && typeof worldOf().depart === 'function') {
+        const d = (exec() ? worldOf().depart : WA.world.depart)(x.person, x.from, x.to, t);
+        if (!d || d.ok !== true) {
+          out = { ok: false, reason: (d && d.reason) || 'depart-failed', detail: (d && d.reason) || 'unknown' };
+          return false;
+        }
+        x.departed = true;
+        // 到达时刻由**世界**给出（否定式 ④：位置与钟点只由世界给，本模块不自算）。
+        x.arriveAt = finite(d.arriveAt) || (t + x.duration);
+        x.dueAt = x.arriveAt;
+      }
+      // opId：调用方显式给过就沿用（幂等键由调用方持有），否则按次重钉。
+      if (!x.opId) x.opId = x.id + '@' + Math.floor(t) + '#' + x.attempts;
+      out = { ok: true, id: x.id, opId: x.opId, dueAt: x.dueAt, duration: x.duration,
+        travel: travel ? { minutes: travel.minutes, path: travel.path.slice() } : null,
+        window: win ? { place: win.place, at: win.at, until: win.until } : null };
+    }, 'act:admit');
+    // 出发被世界拒绝（路封了、人在别处、开关关了）⇒ **零变化拒收**，且必须记成 fault：
+    //   这一笔没有开工，把它算进 admitted 是最贵的一类谎。
+    if (out && out.ok) { S.admitted++; S.lastReason = 'admitted'; }
+    else if (out && out.reason) { noteFault(out.reason); S.lastReason = out.reason; }
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /** 写一条结算回执：**已完成本地副作用 + 该 opId 的确认一起持久化**。 */
+  function receipt(draft, row, status, result, evidence, t, cfg) {
+    draft.acts.res = Array.isArray(draft.acts.res) ? draft.acts.res : [];
+    draft.acts.res.push({ opId: row.opId || '', id: row.id, person: row.person, kind: row.kind,
+      status: status, result: str(result, 120), evidence: str(evidence, 40), at: t });
+    // v2.216.0（优化 Q7）：**挤出之前先留凭据**（与 core/commit.js 的 writeReceipt 同规）。
+    //   环形挤出丢的是最老的完整回执，而它答的正是「这一笔做过没有」——
+    //   丢了之后同一 opId 会重新放行（「重放已忽略」变成「重新扣费」）。
+    //   故在调挤出器**之前**把即将退场那几笔的 (opId, at) 落进摘要台账；
+    //   完整回执仍按原 cap 退场（既有契约零改动），摘要只补「做过没有」这一问。
+    writeDigests(draft, draft.acts.res, cfg);
+    WA.evict.array(draft.acts.res, 'acts.res', cfg.maxActs);
+  }
+  /**
+   * 结算一条到期的活动作。返回 `{ status, result, evidence }` 形态的结论；**不改世界**的部分
+   *   一律委托出去：移动问 world，交付问 org，会面问 world 的证据面。
+   */
+  function resolve(row, t) {
+    const kind = row.kind;
+    if (kind === 'wait' || kind === 'rest') return { status: 'done', result: '到时结束', evidence: 'self' };
+    if (kind === 'move') {
+      if (!worldOf()) return { status: 'failed', result: 'world 缺席', evidence: '' };
+      if (!row.departed) {
+        // v2.117.0：**兜底**路径。出发本应在 `admit` 时发生；走到这里的是升级前登记的 running 行
+        //   （没有 `departed` 标记）。升级不该让在途的人消失，故保留一次补出发。
+        const d = (exec() ? worldOf().depart : WA.world.depart)(row.person, row.from, row.to, row.startedAt);
+        if (!d || d.ok !== true) return { status: 'failed', result: '出发被拒：' + ((d && d.reason) || 'unknown'), evidence: 'world.depart', reason: (d && d.reason) || 'unknown' };
+        row.departed = true; row.arriveAt = d.arriveAt;
+        // 兜底路径同样让「在途段」有宽度：到期时刻不得早于世界给出的到达时刻。
+        if (isFinite(d.arriveAt) && d.arriveAt > row.dueAt) row.dueAt = d.arriveAt;
+        return { status: 'running', result: '已在途中', evidence: 'world.depart' };
+      }
+      if (t < row.arriveAt) return { status: 'running', result: '仍在途中', evidence: 'world.journey' };
+      const a = (exec() ? worldOf().arrive : WA.world.arrive)(row.person, t);
+      if (a && a.ok === true && a.arrived === true) return { status: 'done', result: '到达 ' + row.to, evidence: 'world.journey' };
+      return { status: 'running', result: '行程未结算', evidence: 'world.journey' };
+    }
+    if (kind === 'deliver') {
+      if (!WA.org || typeof WA.org.transfer !== 'function') return { status: 'failed', result: 'org 缺席', evidence: '' };
+      const r = WA.org.transfer('person', row.person, 'person', row.target, row.item, row.amount);
+      if (!r || r.ok !== true) return { status: 'failed', result: '交付被拒：' + ((r && r.reason) || 'unknown'), evidence: 'org.transfer', reason: (r && r.reason) || 'unknown' };
+      return { status: 'done', result: row.item + '×' + row.amount + ' → ' + row.target, evidence: 'org.transfer' };
+    }
+    if (kind === 'meet') {
+      if (!worldOf() || typeof worldOf().canBeAt !== 'function') return { status: 'failed', result: 'world 缺席', evidence: '' };
+      if (!row.with || !row.place) return { status: 'failed', result: '会面缺对方或地点', evidence: 'world.canBeAt', reason: 'missing-fields' };
+      // 世界能确认的是「两人都有条件到场」——**不是**「两人谈成了什么」（边界如实写在此处）。
+      const a = worldOf().canBeAt(row.person, row.place, t);
+      const b = worldOf().canBeAt(row.with, row.place, t);
+      if (a && a.ok === true && b && b.ok === true) return { status: 'done', result: '双方到场条件成立（' + row.place + '）', evidence: 'world.canBeAt' };
+      return { status: 'failed', result: '会面条件不成立：' + ((b && b.reason) || (a && a.reason) || 'unknown'), evidence: 'world.canBeAt', reason: (b && b.reason) || (a && a.reason) || 'unknown' };
+    }
+    if (kind === 'tell') {
+      // v2.231.0（OPT-2）：传话的确认器是**两件事**，缺一不可 ——
+      //   ① 世界消息面：这条话真发出去了，并且**已送达**（在途不算做成）；
+      //   ② 情报面：接收者真的**获知**了（送达 ≠ 获知）。
+      //   两件都真 ⇒ done；消息在途 ⇒ running（**在途不是失败**，不谎报也不冒充）；面缺席 ⇒ unconfirmed。
+      const to = row.to || row.place;
+      if (!to) return { status: 'failed', result: '传话缺收件人', evidence: 'world.sendMessage', reason: 'missing-fields' };
+      if (!worldOf() || typeof worldOf().sendMessage !== 'function') {
+        return { status: 'failed', result: '无确认器：tell 需要世界消息面', evidence: '', reason: 'unconfirmed' };
+      }
+      // 发件地由**世界**答（`world.where`）：人可能已走到别处，拿行动登记时的地点会发错起点。
+      //   世界答不出（无行程）⇒ 退回行动登记的地点/人物；两者都没有 ⇒ 如实报 missing-fields，
+      //   不猜一个地名（「猜」与「查不到」在读数上必须分得开）。
+      const from = whereOf(row.person) || row.from || row.place || row.person;
+      const sent = messageOf(row, from, to);
+      if (!sent || sent.ok !== true) {
+        return { status: 'failed', result: '消息发不出：' + ((sent && sent.reason) || 'unknown'),
+          evidence: 'world.sendMessage', reason: (sent && sent.reason) || 'unknown' };
+      }
+      if (String(sent.status || '') !== 'arrived') {
+        return { status: 'running', result: '消息在途（' + to + '）', evidence: 'world.sendMessage' };
+      }
+      if (!WA.intel || typeof WA.intel.addIntel !== 'function') {
+        return { status: 'failed', result: '无确认器：tell 需要情报面', evidence: '', reason: 'unconfirmed' };
+      }
+      //   level 必须落在 intel.LEVELS 白名单内（`rumor|report|witness|record`）——
+      //   亲耳听到的第一手转告用 `witness`（confidence 75 ⇒ believed）；写词表外的值会被
+      //   intel 如实拒收 missing-fields，那不是「获知失败」而是「我们递了个非法档位」。
+      const item = { claim: row.text || (row.person + '有话带到'), source: row.person, level: 'witness' };
+      if (row.target) item.about = row.target;
+      const got = WA.intel.addIntel(to, item);
+      if (!got || got.ok !== true) {
+        return { status: 'failed', result: '获知未被接受：' + ((got && got.reason) || 'unknown'),
+          evidence: 'intel.addIntel', reason: (got && got.reason) || 'unknown' };
+      }
+      return { status: 'done', result: '已送达 ' + to + ' 并获知', evidence: 'world.sendMessage+intel.addIntel' };
+    }
+    if (kind === 'work') {
+      // v2.231.0（OPT-2）：工作的确认器是**委托面的真实状态**（业务成果与工时结算）。
+      //   没挂钩委托 ⇒ 到期落「待业务侧确认」（running）—— 不冒充完成，也不谎称失败：
+      //   「他做了活、交付还没走完」与「这件事没做成」是两回事（上游原文：判不了的自由文本工作保持待确认）。
+      if (!WA.commission || typeof WA.commission.view !== 'function') {
+        return { status: 'failed', result: '无确认器：work 需要委托面', evidence: '', reason: 'unconfirmed' };
+      }
+      const cv = workContractOf(row);
+      if (!cv) return { status: 'running', result: '工作已做，待业务侧交付确认', evidence: 'commission.pending' };
+      if (cv.status === 'settled') return { status: 'done', result: '委托已结清：' + cv.title, evidence: 'commission.view' };
+      if (cv.status === 'cancelled') {
+        return { status: 'failed', result: '委托已取消：' + cv.title, evidence: 'commission.view', reason: 'contract-cancelled' };
+      }
+      return { status: 'running', result: '委托进行中（' + cv.status + '）', evidence: 'commission.view' };
+    }
+    // 其余种类（将来新增、未接确认器）：**没有内置确认器** ⇒ 可见失败，不冒充完成（否定式 ①）。
+    return { status: 'failed', result: '无确认器：' + kind + ' 需要业务侧确认', evidence: '', reason: 'unconfirmed' };
+  }
+  /**
+   * v2.231.0（OPT-2）：这一笔传话对应的世界消息。
+   *   已发过（`row.msgId`）就**按 id 复查状态**，不重发 —— 否则每次 advance 都再发一条，
+   *   收件人那边会收到同一句话的多份副本（「重放」在消息面上的形态）。
+   */
+  function messageOf(row, from, to) {
+    const mid = str(row.msgId, 60);
+    if (mid) {
+      const m = messages().filter(function (x) { return x && x.id === mid; })[0];
+      if (!m) return { ok: false, reason: 'message-missing' };
+      return { ok: true, id: m.id, status: m.status };
+    }
+    const w = worldOf();
+    const sent = w.sendMessage(from, to, { text: row.text || '', at: row.startedAt || undefined });
+    if (sent && sent.ok === true) row.msgId = sent.id;
+    return sent;
+  }
+  /** 这个人此刻在哪（世界答；答不出就是 null —— 不猜）。 */
+  function whereOf(person) {
+    const w = worldOf();
+    if (!w || typeof w.where !== 'function') return '';
+    try {
+      const r = w.where(person);
+      return (r && r.ok === true && r.place) ? String(r.place) : '';
+    } catch (e) { return ''; }
+  }
+  /** 世界消息表（只读；world 缺席即空表 —— 缺席由上层如实报，不在这里猜）。 */
+  function messages() {
+    const w = worldOf();
+    if (!w || typeof w.messages !== 'function') return [];
+    try { return w.messages() || []; } catch (e) { return []; }
+  }
+  /** 这一笔工作挂钩的委托读数。**没挂钩就是 null**（不按标题猜是哪一份委托）。 */
+  function workContractOf(row) {
+    const id = str(row.contractId, 60);
+    if (!id) return null;
+    try {
+      const cv = WA.commission.view(id);
+      return (cv && cv.ok === true) ? cv : null;
+    } catch (e) { return null; }
+  }
+
+  /**
+   * 结算所有到点的活动作（世界心跳调用）。预算 `maxRun` 之外的一律进 `deferred` 显式留痕。
+   * 已终态的行不动；台账里已有同一 opId 的回执 ⇒ 视为重放，**零变化**并计入 duplicates。
+   */
+  function advance(at, opts) {
+    const cfg = settings();
+    if (!cfg.enabled) { S.lastReason = 'disabled'; return { ok: true, changed: 0, reason: 'disabled' }; }
+    const t = finite(at);
+    if (!isFinite(t)) return { ok: false, reason: 'bad-time' };
+    const o = opts || {};
+    const budget = (finite(o.max) > 0 && finite(o.max) <= cfg.maxRun) ? Math.floor(finite(o.max)) : cfg.maxRun;
+    let out = { changed: 0, completed: 0, failed: 0, still: 0, unconfirmed: 0, awaiting: 0, confirmed: 0,
+      deferred: [], duplicates: 0, archived: 0 };
+    mutate(storeOf(), function (draft) {
+      const rows = (draft.acts && Array.isArray(draft.acts.rows)) ? draft.acts.rows : [];
+      const res = (draft.acts && Array.isArray(draft.acts.res)) ? draft.acts.res : [];
+      // v2.216.0（优化 Q7）：重放守卫的**第三处**查证面 —— 完整回执已被环形挤出时，
+      //   凭据落在摘要台账里。只查 `res` ⇒ 长局里同一 opId 会被二次结算（重复扣费）。
+      const digests = (draft.acts && draft.acts.digests && typeof draft.acts.digests === 'object'
+        && !Array.isArray(draft.acts.digests)) ? draft.acts.digests : {};
+      let used = 0;
+      rows.forEach(function (x) {
+        if (!x || x.status !== 'running') return;
+        if (!(t >= x.dueAt)) return;
+        // 重放守卫：这一笔的操作 id 已在台账里 ⇒ 不得二次结算（重复不重复扣资源）。
+        const dupRes = !!(x.opId && res.some(function (q) { return q && q.opId === x.opId; }));
+        let dupArch = false;
+        if (!dupRes && x.opId) {
+          const dk = digestKey(x.opId);
+          const drow = dk ? digests[dk] : null;
+          if (drow && String(drow.opId == null ? '' : drow.opId) === String(x.opId)) dupArch = true;
+          else if (drow) S.digestCollision++;
+        }
+        if (dupRes || dupArch) {
+          x.status = 'done'; x.endedAt = t; x.result = '重放已忽略'; x.evidence = 'receipt';
+          x.spent = x.duration; x.left = 0; x.opId = '';
+          if (dupArch) { out.archived = (out.archived || 0) + 1; S.archived++; }
+          out.duplicates++;
+          return;
+        }
+        if (used >= budget) { out.deferred.push({ id: x.id, person: x.person, kind: x.kind, reason: 'budget', dueAt: x.dueAt }); return; }
+        used++;
+        const r = resolve(x, t) || { status: 'failed', result: 'unknown', evidence: '' };
+        // v2.231.0（OPT-2）：待业务侧确认的笔数与普通「仍在途中」**分开计** ——
+        //   「话已到、交付还没走完」与「人还在路上」是两件事，合并成一个 still 就分不出来了。
+        if (r.status === 'running') {
+          out.still++;
+          if (x.kind === 'tell' || x.kind === 'work') out.awaiting++;
+          return;
+        }
+        // 靠业务确认器做成（evidence 不是本模块自产的那几种）⇒ 单列一栏，与 wait/move 分开。
+        if (r.status === 'done' && r.evidence
+          && ['self', 'world.journey', 'org.transfer', 'world.canBeAt'].indexOf(r.evidence) < 0) out.confirmed++;
+        x.status = r.status;
+        x.result = str(r.result, 120);
+        x.evidence = str(r.evidence, 40);
+        if (r.status === 'failed') {
+          x.reason = str(r.reason || 'failed', 40); out.failed++;
+          // v2.231.0（OPT-2）：口径 ① 的「可见失败」要有自己的账（此前该计数从未累加过）。
+          if (x.reason === 'unconfirmed') out.unconfirmed++;
+        } else { x.reason = ''; out.completed++; }
+        x.spent = Math.max(0, Math.min(x.duration, t - x.startedAt));
+        x.left = Math.max(0, x.duration - x.spent);
+        x.endedAt = t;
+        receipt(draft, x, r.status, r.result, r.evidence, t, cfg);
+        // 终态清空 opId（与 v2.116.0 的第 ③ 条同规：台账老化后终态不得被回卷重跑）。
+        x.opId = '';
+      });
+    }, 'act:advance');
+    out.changed = out.completed + out.failed;
+    S.completed += out.completed; S.failed += out.failed;
+    S.unconfirmed += out.unconfirmed; S.confirmed += out.confirmed; S.awaiting += out.awaiting;
+    S.deferred += out.deferred.length; S.duplicates += out.duplicates;
+    S.lastReason = out.changed ? 'settled' : (out.still ? 'in-progress' : (out.deferred.length ? 'budget' : 'nothing-to-do'));
+    return Object.assign({ ok: true, reason: S.lastReason }, out);
+  }
+
+  /**
+   * 中止（B2 的「旅行中的改道和中止」）：**已消耗部分与未执行部分分别落账**，
+   *   `spent` / `left` 各记一格。在途者中止时交给 `world.stop`——
+   *   世界侧把行程标成 `halted` 并**不猜位置**（既不停在出发地，也不假装已到达）。
+   */
+  function abort(id, why, at) {
+    const cfg = settings();
+    if (!cfg.enabled) { S.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const row = find(id);
+    if (!row) return { ok: false, reason: 'missing', id: clean(id, 60) };
+    if (row.status !== 'running') return { ok: false, reason: 'not-running', status: row.status };
+    const t = finite(at);
+    if (!isFinite(t)) return { ok: false, reason: 'bad-time' };
+    let halt = null;
+    if (row.departed && worldOf() && typeof worldOf().stop === 'function') {
+      halt = (exec() ? worldOf().stop : WA.world.stop)(row.person, t, str(why, 40) || 'aborted');
+    }
+    let out = null;
+    mutate(storeOf(), function (draft) {
+      const rows = (draft.acts && Array.isArray(draft.acts.rows)) ? draft.acts.rows : [];
+      const x = rows.filter(function (y) { return y && y.id === row.id; })[0];
+      if (!x || x.status !== 'running') { out = { ok: false, reason: 'not-running', status: x ? x.status : 'missing' }; return false; }
+      x.status = 'aborted';
+      x.endedAt = t;
+      x.reason = str(why, 40) || 'aborted';
+      x.spent = Math.max(0, Math.min(x.duration, t - x.startedAt));
+      x.left = Math.max(0, x.duration - x.spent);
+      x.result = '中止（已消耗 ' + x.spent + 'ms / 未执行 ' + x.left + 'ms）';
+      // v2.117.0 修复：终态清空 opId 必须**排在回执之后**。
+      //   旧序（先清后写）让中止回执永远带空 opId —— 而 opId 是那一笔去重键的唯一载体，
+      //   于是「执行后、回报前」崩溃重放会在中止路径上二次落账（与 v2.116.0 第 ③ 条同族）。
+      receipt(draft, x, 'aborted', x.result, halt ? 'world.stop' : 'self', t, cfg);
+      x.opId = '';
+      out = { ok: true, id: x.id, spent: x.spent, left: x.left, halted: !!(halt && halt.ok) };
+    }, 'act:abort');
+    if (out && out.ok) { S.aborted++; S.lastReason = 'aborted'; }
+    return out || { ok: false, reason: 'store-unavailable' };
+  }
+
+  /**
+   * 重规划（B1 的「受阻后改计划」）：旧行变 `replanned` 并留痕，新行带 `from_` 指回旧行。
+   *   在途者**不得**用本入口改道——那时人或货已经在路上，必须走 `abort` 把已消耗部分落账，
+   *   否则「改道」会把一段真实走过的路抹成没发生。
+   */
+  function replan(id, spec, at) {
+    const cfg = settings();
+    if (!cfg.enabled) { S.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }
+    const row = find(id);
+    if (!row) return { ok: false, reason: 'missing', id: clean(id, 60) };
+    if (isTerminal(row.status)) return { ok: false, reason: 'not-active', status: row.status };
+    if (row.status === 'running' && row.departed) return { ok: false, reason: 'in-transit', id: row.id };
+    const t = finite(at);
+    if (!isFinite(t)) return { ok: false, reason: 'bad-time' };
+    const it = Object.assign({}, row, spec || {});
+    it.goalId = row.goalId; it.opId = str((spec || {}).opId, 80);
+    let out = null;
+    mutate(storeOf(), function (draft) {
+      const rows = (draft.acts && Array.isArray(draft.acts.rows)) ? draft.acts.rows : [];
+      const x = rows.filter(function (y) { return y && y.id === row.id; })[0];
+      if (!x || isTerminal(x.status)) { out = { ok: false, reason: 'not-active', status: x ? x.status : 'missing' }; return false; }
+      if (x.status === 'running' && x.departed) { out = { ok: false, reason: 'in-transit', id: x.id }; return false; }
+      x.status = 'replanned'; x.endedAt = t; x.reason = 'replanned';
+      x.spent = x.startedAt ? Math.max(0, Math.min(x.duration, t - x.startedAt)) : 0;
+      x.left = Math.max(0, x.duration - x.spent);
+      x.result = '改计划'; x.opId = '';
+      out = { ok: true, id: x.id };
+    }, 'act:replan');
+    if (!out || !out.ok) return out || { ok: false, reason: 'store-unavailable' };
+    S.replanned++;
+    // v2.117.0 修复（专锁 tests/act-b1-v2117.js 抓出）：thunk **必须带 goalId**。
+    //   上面那句 `it.goalId = row.goalId` 只管到了 it —— 而 add() 只从 spec 里读 goalId，
+    //   于是改计划永远以 missing-goal 失败：B1 的「受阻后改计划」这条能力整条不存在。
+    //   改计划继承**原计划的目标来源**（新计划不是新目标），这是唯一正确的取值。
+    const thunk = { kind: it.kind, text: it.text, with: it.with, target: it.target, item: it.item,
+      amount: it.amount, from: it.from, to: it.to, place: it.place, use: it.use,
+      goalId: row.goalId,
+      need: it.need, duration: it.duration, interruptible: it.interruptible, from_: row.id };
+    const n = add(row.person, thunk);
+    if (n && n.ok) { S.lastReason = 'replanned'; n.replannedFrom = row.id; }
+    return n;
+  }
+
+  /**
+   * v2.231.0（OPT-2）：**此刻真的没有可用确认器**的种类。
+   *   静态表（`NO_CONFIRMER`）答「代码里接没接」；本函数答「这一刻能不能确认」。
+   *   两者必须分开：world / intel / commission 任一缺席时对应种类照样落 unconfirmed，
+   *   而那时静态表是空的 —— 只报静态表会把「跑不起来」显示成「一切正常」。
+   */
+  function effectiveNoConfirmer() {
+    const out = NO_CONFIRMER.slice();
+    if (KINDS.indexOf('tell') >= 0 && !(worldOf() && typeof worldOf().sendMessage === 'function'
+      && WA.intel && typeof WA.intel.addIntel === 'function')) out.push('tell');
+    if (KINDS.indexOf('work') >= 0 && !(WA.commission && typeof WA.commission.view === 'function')) out.push('work');
+    return out;
+  }
+  /** 只读视图（面板 / 诊断消费）：按状态分列，只报事实，不做解释。 */
+  function view(opts) {
+    const o = opts || {};
+    const lim = (finite(o.limit) > 0) ? Math.floor(finite(o.limit)) : 12;
+    const rows = acts();
+    const byStatus = {};
+    rows.forEach(function (x) { if (x && x.status) byStatus[x.status] = (byStatus[x.status] || 0) + 1; });
+    const open = rows.filter(function (x) { return x && ACTIVE.indexOf(x.status) >= 0; });
+    const recent = rows.slice(-lim).map(function (x) {
+      return { id: x.id, person: x.person, kind: x.kind, status: x.status, place: x.place,
+        startedAt: x.startedAt, dueAt: x.dueAt, spent: x.spent, left: x.left,
+        result: x.result, evidence: x.evidence, reason: x.reason };
+    });
+    return { ok: true, total: rows.length, open: open.length, byStatus: byStatus,
+      receipts: receipts().length,
+      // v2.216.0（优化 Q7）：凭据摘要面读数（「做过没有」的那一本账有多少条）。
+      digests: Object.keys(readDigests()).length, digestCap: DIGEST_CAP,
+      recent: recent,
+      // 哪些种类**没有**确认器，如实带出（诊断不许把它显示成「正常无事」）。
+      //   v2.231.0（OPT-2）：这一栏改成**运行时判定** —— 静态表已清空，但「代码里接了」
+      //   与「这一刻真能确认」是两件事：面缺席时那一类会临时出现在这里，而不是被显示成正常。
+      noConfirmer: effectiveNoConfirmer(), noConfirmerStatic: NO_CONFIRMER.slice(),
+      confirmers: Object.assign({}, CONFIRMERS),
+      confirmed: stat.confirmed, awaiting: stat.awaiting };
+  }
+
+  /**
+   * v2.559.0：注入名额的**分配判据**（此前是 `filter(ACTIVE).slice(0, cfg.maxRun)` ——
+   *   **按登记顺序**截断）。`maxActs` 是 8（候选表上界），`maxRun` 是 4（名额），
+   *   于是「同时活着 5 条以上」是常态可达的局面，而注入面永远只列**最早登记的那 4 条**。
+   *   实测（6 条 active：4 条很早登记、一直停在 `planned`；2 条刚登记、`running`、5 秒后结束）：
+   *     注入块 = 甲 work「修屋顶」planned / 乙 work「打水」planned /
+   *              丙 wait「等回信」planned / 丁 wait「等船」planned
+   *     两条 `running`（正在发生、马上要变）**一条都没进**。
+   *   这正是本引擎头部边界③治的形态的另一面：那里说「拟稿不冒充事实」，
+   *   而注入面把 4 条**拟稿**（planned）排在了 2 条**事实**（running）前面 ——
+   *   **「他打算做」压掉了「他正在做」**。
+   *
+   * 判据三条（缺一不可）：
+   *   ① **名额够就全进**（active ≤ maxRun ⇒ 原样，顺序不变；fail-open）；
+   *   ② **running 优先**：正在发生的比计划中的先入文（`status` 现成字段，不新造评分）；
+   *   ③ 同档按 `dueAt` 升序（快结束的先 —— 模型该先知道「马上要变」的那条），
+   *      再按 `at` 升序（登记早的在前，卡住的更该被看见），最后按 id 字典序（可复算）。
+   *   纯函数：不改入参、不读 store。
+   */
+  function pickRun(active, cap) {
+    const all = Array.isArray(active) ? active.slice() : [];
+    const quota = Math.max(0, Math.floor(Number(cap) || 0));
+    if (!all.length || !quota) return { picked: [], mode: 'empty', quota: quota };
+    if (all.length <= quota) return { picked: all.slice(), mode: 'all-fit', quota: quota };
+    const atOf = function (x) { const n = Number(x && x.at); return isFinite(n) && n > 0 ? n : Infinity; };
+    const dueOf = function (x) { const n = Number(x && x.dueAt); return isFinite(n) && n > 0 ? n : Infinity; };
+    const sorted = all.slice().sort(function (a, b) {
+      const ra = (a && a.status === 'running') ? 1 : 0;
+      const rb = (b && b.status === 'running') ? 1 : 0;
+      if (ra !== rb) return rb - ra;                       // ② running 先
+      const d = dueOf(a) - dueOf(b);                        // ③ 快结束的先
+      if (d !== 0) return d;
+      const t = atOf(a) - atOf(b);                          //    登记早的先
+      if (t !== 0) return t;
+      const ai = String((a && a.id) || ''), bi = String((b && b.id) || '');
+      return ai < bi ? -1 : (ai > bi ? 1 : 0);
+    });
+    return { picked: sorted.slice(0, quota), mode: 'running-first', quota: quota };
+  }
+  /** 最近一次注入单的读数（供 stat().block 投影；**拷贝**出去，不是引用）。 */
+  let __lastBlock = null;
+  function buildBlock() {
+    const cfg = settings();
+    if (!cfg.enabled || !WA.store) return '';
+    const active = acts().filter(function (x) { return x && ACTIVE.indexOf(x.status) >= 0; });
+    const pick = pickRun(active, cfg.maxRun);
+    // 读数先落账（**空表也留读数**）：`picked: 0` 与「从没构建过（null）」是两件事。
+    __lastBlock = {
+      at: clockNow('act'), active: active.length, candidates: active.length, picked: pick.picked.length,
+      running: active.filter(function (x) { return x.status === 'running'; }).length,
+      planned: active.filter(function (x) { return x.status !== 'running'; }).length,
+      quota: pick.quota, mode: pick.mode
+    };
+    if (!pick.picked.length) return '';
+    const rows = pick.picked;
+    const lines = rows.map(function (x) {
+      const left = (x.status === 'running' && x.dueAt) ? '，预计 ' + Math.max(0, x.dueAt - clockNow('act')) + 'ms 后结束' : '';
+      const where = x.place ? '（' + x.place + '）' : (x.departed ? '（在途中，位置未知）' : '');
+      return x.person + '：' + x.kind + (x.text ? '「' + x.text + '」' : '') + where + ' ' + x.status + left;
+    });
+    return '[人物行动]\n' + lines.join('\n')
+      + '\n行动必须有目标来源；**没有确认器的行动不得写成已完成**，在途者的位置未知时不得替他指定所在。\n';
+  }
+
+  WA.act = {
+    KINDS: KINDS, ACTIVE: ACTIVE, TERMINAL: TERMINAL, CONFIRMERS: CONFIRMERS, NO_CONFIRMER: NO_CONFIRMER,
+    // v2.141.0（F2）：四档合法结果同表导出（面板与诊断都要判档，各写一份必然漂移）。
+    VERDICTS: VERDICTS.slice(),
+    getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
+    add: add, admit: admit, advance: advance, abort: abort, replan: replan, view: view, buildBlock: buildBlock,
+    // 判定面（只读）：这一笔的合法结果落在哪一档。**不是写口**，不动行动状态（见头部边界）。
+    verdict: verdict,
+    // v2.524.0（S1 接线）：判定面接骰子（只降档）+ 五档→四档纯映射（可整表核）。
+    judge: judge, diceVerdict: diceVerdict, DICE_VERDICT: Object.assign({}, DICE_VERDICT),
+    stat: function () {
+      // v2.559.0：`block` 是「最近一次注入单」的名额面读数（拷贝出去，不是引用）。
+      //   null = 本进程还没构建过；picked: 0 = 构建过但空表 —— 这两件事不许混成一个读数。
+      //   running/planned 与 active 并列：`active: 6` 说的是「六条行动活着」，
+      //   `block: { running: 2, picked: 4 }` 说的是「注入面提了 4 条」—— 不许互相顶替。
+      const o = Object.assign({}, stat, { faults: Object.assign({}, stat.faults) });
+      o.block = __lastBlock ? Object.assign({}, __lastBlock) : null;
+      return o;
+    }
+  };
+  // Automatic cycle consumes the previous committed snapshot before backstage.simulate (20).
+  // Current inference results participate next turn; do not mistake asynchronous launch
+  // order for completion. A still-running previous inference explicitly defers this node.
+  if (WA.workflow && typeof WA.workflow.register === 'function') {
+    WA.workflow.register({
+      id: 'act.advance', chain: 'after', order: 19, critical: false,
+      label: '人物行动结算',
+      async run() {
+        // 时刻取**真实墙钟**：与 events / calendar 的自动推进同口径（推演时刻由那些模块写进状态，
+        //   此处要的是「现在该结算了」，不是「故事里第几天」）。
+        //   v2.117.0：本行原先写的是 `WA.clock && typeof WA.clock.now === 'function' ? … : Date.now()`
+        //   —— 那是**全库唯一一种不被 K20 判据认下的墙钟写法**（判据只放行 `WA.clock ?` 这一种三元）。
+        //   裸调绕过冻结，回放对不上时只能全库通读；此处改回与 core/rand.js 同规的写法。
+        // Background inference is asynchronous; workflow order is not a completion barrier.
+        if (WA.backstage && typeof WA.backstage.isRunning === 'function' && WA.backstage.isRunning()) return {ok:false, reason:'backstage-running', deferred:true};
+        const t = (WA.clock ? WA.clock.now('act.advance') : Date.now());
+        return WA.act.advance(t, { max: 2 });
+      }
+    });
+  }
+})();

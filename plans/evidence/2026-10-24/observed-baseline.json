@@ -1,0 +1,152 @@
+[
+  {
+    "name": "repair-unknown-effect",
+    "status": "observed",
+    "observed": {
+      "ok": true,
+      "effectId": "never-created-effect",
+      "repaired": true,
+      "status": "repaired",
+      "costsIncurred": {
+        "who": "甲",
+        "days": 1,
+        "cost": 10
+      },
+      "historyIrreversible": true,
+      "aftermathResult": {
+        "ok": false,
+        "reason": "not-found",
+        "id": "never-created-effect"
+      }
+    },
+    "interpretation": "外层报已修复，实际 owner 拒收；不是成功修复"
+  },
+  {
+    "name": "scene-observer-and-place",
+    "status": "observed",
+    "scene": {
+      "ok": true,
+      "storyLabel": "",
+      "place": "home",
+      "present": [
+        "甲",
+        "乙"
+      ],
+      "pendingChanges": [],
+      "availableActions": [
+        "research.supply",
+        "research.advance",
+        "research.disseminate",
+        "research.abandon",
+        "family.contribute",
+        "family.spend",
+        "family.assignCare",
+        "family.transferCare",
+        "family.inherit",
+        "production.open",
+        "production.staff",
+        "production.advance"
+      ],
+      "note": "本帧按实际状态聚合，不复制上一场快照；场外秘密不泄露"
+    },
+    "horizon": {
+      "ok": true,
+      "who": "甲",
+      "perceivedItems": [],
+      "horizonEvents": [
+        {
+          "ref": "distant-note",
+          "title": "远地刚发生的停工",
+          "summary": "未给甲设置获知记录",
+          "at": 0
+        }
+      ],
+      "note": "场外变化只经实际感知/传讯进入视角；未收到的消息不出现"
+    },
+    "interpretation": "场景人物未按传入地点过滤；远方公开条目未核对该观察者获知"
+  },
+  {
+    "name": "blueprint-ready-with-disabled-owner",
+    "status": "observed",
+    "dep": {
+      "ok": true,
+      "sampleId": "town-workshop",
+      "requiredMissing": [],
+      "optionalEngines": [
+        {
+          "engine": "inst",
+          "available": true
+        },
+        {
+          "engine": "customLax",
+          "available": true
+        }
+      ],
+      "canStart": true,
+      "note": "所有必要引擎已就绪，可以开始。"
+    },
+    "trainingEnabled": false,
+    "exportKeys": [
+      "ok",
+      "sampleId",
+      "theme",
+      "playDefs",
+      "initConditions",
+      "openingScene",
+      "note"
+    ],
+    "interpretation": "canStart 是对象存在性检查，不是样例已安装可玩"
+  },
+  {
+    "name": "labor-clock-is-separate",
+    "status": "observed",
+    "labor": {
+      "ok": true,
+      "currentDay": 2
+    },
+    "storyBefore": {
+      "ok": true,
+      "label": "第七日",
+      "dayIndex": 7,
+      "source": "author"
+    },
+    "storyAfter": {
+      "ok": true,
+      "label": "第七日",
+      "dayIndex": 7,
+      "source": "author"
+    },
+    "interpretation": "推进预约日不推进剧情日；须制定统一结算语义"
+  },
+  {
+    "name": "method-accepts-missing-target-and-recharges",
+    "status": "observed",
+    "first": {
+      "ok": true,
+      "taskId": "task:repair",
+      "who": "甲",
+      "methodId": "novice_tool",
+      "methodName": "新手照图检修",
+      "path": "path:novice_guided",
+      "desc": "按说明书使用专业工具逐步排查，耗时较长且工具磨损较大",
+      "wear": 2,
+      "gearId": "gr_1792811316904_0",
+      "gearRemaining": 8,
+      "timestamp": 1792811316906
+    },
+    "second": {
+      "ok": true,
+      "taskId": "task:repair",
+      "who": "甲",
+      "methodId": "novice_tool",
+      "methodName": "新手照图检修",
+      "path": "path:novice_guided",
+      "desc": "按说明书使用专业工具逐步排查，耗时较长且工具磨损较大",
+      "wear": 2,
+      "gearId": "gr_1792811316904_0",
+      "gearRemaining": 6,
+      "timestamp": 1792811316906
+    },
+    "interpretation": "方法接口可无目标成立并重复扣工具；尚无目标兑现/操作身份语义，不代表已有幂等契约被违反"
+  }
+]

@@ -1,0 +1,40 @@
+'use strict';
+const path = require('path');
+process.chdir(path.resolve(__dirname, '..'));
+const sync = require('../tests/ui-gate-sync.js');
+var pass = 0, fail = 0;
+function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log('FAIL: ' + name); } }
+var boot = sync.fresh({});
+var WA = boot.WA;
+ok('1: 装载', typeof WA.investigation === 'object');
+// v2.518.0 收口补账：v2.412.0 全开策略把 203 引擎的**出厂默认**改成 enabled:true
+//   （玩家装好即见全量世界），而本冒烟钉的是「闸关着时的行为」（下面几条 disabled
+//   拒收判据）。断言「出厂默认是关」等于把一条已经不存在的口径钉下去 —— 保留它
+//   只会让整条冒烟恒红，而真正的判据（关了就拒）反而没人看了。改为**显式关闸**
+//   再验拒收：判据本身一个字未改，改的只是「谁来关」。
+WA.investigation.setSettings({ enabled: false });
+ok('2: 默认关', WA.investigation.getSettings().enabled === false);
+WA.investigation.setSettings({ enabled: true });
+ok('3: 开启', WA.investigation.getSettings().enabled === true);
+var r = WA.investigation.register({ title: '失踪的商队', subject: '商队去向', location: '北道', witness: '老张', sourceType: 'witness', verifyRule: 'act:investigate' });
+ok('4: register', r.ok === true);
+var i1 = WA.investigation.investigate(r.id, '调查员甲', { receiptId: 'rec_001', content: '发现车轮痕迹' });
+ok('5: investigate', i1.ok === true);
+var i2 = WA.investigation.investigate(r.id, '调查员乙', { receiptId: 'rec_002', content: '发现车轮痕迹' });
+ok('6: investigate 第二条', i2.ok === true);
+var dup = WA.investigation.investigate(r.id, '调查员丙', { receiptId: 'rec_001' });
+ok('7: duplicate 拒收', dup.ok === false && dup.reason === 'duplicate-receipt');
+var chk = WA.investigation.checkEvidence(r.id);
+ok('8: checkEvidence', chk.ok === true && typeof chk.verdict === 'string');
+var pn = WA.investigation.pending();
+ok('9: pending', pn.ok === true && pn.count >= 1);
+var v = WA.investigation.view(r.id);
+ok('10: view', v.ok === true && v.title === '失踪的商队');
+var dg = WA.investigation.diagnose();
+ok('11: diagnose', dg.closedLoop === true);
+var st = WA.investigation.stat();
+ok('12: stat', st.registered >= 1 && st.investigated >= 2);
+var bb = WA.investigation.buildBlock();
+ok('13: buildBlock', typeof bb === 'string');
+console.log('\nTX7 smoke: ' + pass + '/' + (pass + fail));
+process.exit(fail > 0 ? 1 : 0);

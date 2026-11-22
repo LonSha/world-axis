@@ -1,0 +1,283 @@
+// WorldAxis tests/contract-scan-v2150.js —— v2.150.0（RP5 跨模块契约漂移静态扫描器）专锁
+//
+// 【为什么工具也要专锁】`tools/` 不进出口面契约（tests/product-files.js 的 SKIP_DIRS 把
+//   tests/ 与 tools/ 整个排掉），所以工具的可见面由本锁与既有专锁的三档口径承担
+//   （在册 / 引用 / 入口）。那三档答的是「它在不在、被不被用」，**答不出「它说的话对不对」**：
+//   一个永远返回空数组的扫描器在引用面上与真扫描器长得一模一样。本锁补的正是这一面。
+//
+// 【判据结构（与 tests/tools-v2110.js 同规格）】
+//   A 结构面（静态，不装载产品面）· B 运行时（原版读数逐项与现场同源）
+//   · C 负控制（真源码破坏 ⇒ 对应面现形；破坏点不在扫描面上 ⇒ 读数逐字不变）
+//
+// 【负控制的三条纪律（本项目反复踩过）】
+//   ① 破坏必须打得到靶：不存在的东西不能被破坏，故先断言每个锚点在真源码中**恰中 1 次**；
+//   ② 不许自指：不做「把判据自己删了」的破坏（那只能证明源码变了，不能证明判据承重）；
+//   ③ fields 面必须**成对破坏** —— 原版该字段两侧写的都是 `{}`（非字面量），
+//      只破坏一侧时该路径连第二个写者都没有，判据按「不足两个模块」跳过，
+//      那会得到一个假红（「判据不承重」的假结论）。
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const BASE = path.join(__dirname, '..');
+const TOOL_REL = 'tools/contract-scan.js';
+const SRC_OF = function (rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); };
+const TOOL = require(path.join(BASE, TOOL_REL));
+
+//   真源码破坏锚点（每条在目标文件里恰中 1 次；A 段断言该条）
+const ANCHORS = {
+  ghostCode: { rel: 'engines/sediment.js',
+    txt: "reason: 'bad-value', field: 'fact'",
+    sub: "reason: 'lock-ghost-code', field: 'fact'" },
+  enumThird: { rel: 'engines/collab.js',
+    txt: "const STRATEGIES = ['last-write-wins', 'keep-a', 'keep-b'];",
+    sub: "const STRATEGIES = ['first', 'vote', 'blend', 'lock-third'];" },
+  fieldA: { rel: 'engines/horizon.js',
+    txt: 'if (!d.evolution) d.evolution = {};',
+    sub: "if (!d.evolution) d.evolution = 'lock-a';" },
+  fieldB: { rel: 'engines/tool-import.js',
+    txt: 'if (!d.evolution) d.evolution = {};',
+    sub: "if (!d.evolution) d.evolution = 'lock-b';" }
+};
+const hitOf = function (s, x) { return s.split(x).length - 1; };
+/** 在内存副本上重跑同一份真判据（真源码破坏、零文件改写）。 */
+const readWith = function (over) {
+  return function (rel) {
+    return over[rel] !== undefined ? over[rel] : fs.readFileSync(path.join(BASE, rel), 'utf8');
+  };
+};
+const wrecked = function () {
+  const out = {};
+  Object.keys(ANCHORS).forEach(function (k) {
+    const a = ANCHORS[k];
+    out[a.rel] = SRC_OF(a.rel).split(a.txt).join(a.sub);
+  });
+  return out;
+};
+
+// ── A：结构面（静态） ────────────────────────────────────────────────
+const FACES_A = ['EXEMPT', 'scan', 'audit', 'print', 'reportLines', 'selfTest', 'productFiles',
+  'deadTable', 'ledgerBase', 'witnessDeclared'];
+function runA(a) {
+  const s = SRC_OF(TOOL_REL);
+  a(s.length > 8000, 'v2150/A1: ' + TOOL_REL + ' 存在且非空（' + s.length + ' 字符）');
+  FACES_A.forEach(function (k) {
+    a(typeof TOOL[k] !== 'undefined', 'v2150/A2: 导出 ' + k);
+  });
+  // 单一真源：三面所依赖的四个外源全部走委托，不得另立第二份
+  a(s.indexOf("tests', 'product-files.js'") > 0, 'v2150/A3: 产品面委托 tests/product-files.js（不另写遍历器）');
+  a(s.indexOf('reject-code-gate.js') > 0 && s.indexOf('reject-v2780.js') > 0
+    && s.indexOf('reject-code-ledger.json') > 0,
+    'v2150/A4: codes 面三源（扫描面 / 死表 / 台账）均委托既有真源');
+  a(s.indexOf('stripComments') > 0, 'v2150/A5: 注释剥离复用 tests/test-surface-gate.js（解释病灶的文字不是病灶）');
+  // 入口三档至少一档（本仓口径：工具必须有入口）
+  a(s.indexOf('require.main === module') > 0 && s.indexOf('--self-test') > 0
+    && s.indexOf('--json') > 0,
+    'v2150/A6: 三入口就位（默认打印 / --json / --self-test）');
+  // 零命中不算通过：空产品面必须有一条独立判据（不许以「problems 为空」冒充健康）
+  a(s.indexOf('empty-product-face') > 0, 'v2150/A7: 空面判据就位（零命中不算通过）');
+  // 名单会过期：EXEMPT 必须双向核对（登记项仍分歧 / 分歧项已登记）
+  a(s.indexOf('stale-exempt') > 0,
+    'v2150/A8: EXEMPT 表有「过期」向核对（名单会过期，过期名单比没有名单更坏）');
+  // 破坏锚点各恰中 1 次
+  const hits = Object.keys(ANCHORS).map(function (k) { return hitOf(SRC_OF(ANCHORS[k].rel), ANCHORS[k].txt); });
+  a(hits.every(function (n) { return n === 1; }),
+    'v2150/A9: 四个破坏锚点在真源码中各恰中 1 次（实 ' + JSON.stringify(hits) + '）');
+  // fields 面的成对性：两个锚点必须在**不同**模块上（同一模块不构成跨模块）
+  a(ANCHORS.fieldA.rel !== ANCHORS.fieldB.rel,
+    'v2150/A10: fields 面破坏成对且跨模块（' + ANCHORS.fieldA.rel + ' vs ' + ANCHORS.fieldB.rel + '）');
+  // 本锁自身不得成为被测工具的 wired 引用兜底（同 orphan-lock 的 A9 口径：
+  //   本锁里出现的是相对路径 require，不是 tools/contract-scan.js 形态，故不构成兜底）
+  const lockSrc = SRC_OF('tests/contract-scan-v2150.js');
+  a(lockSrc.indexOf('runLock') > 0,
+    'v2150/A11: 本锁由 run.js 的 runLock 真执行（不是「文件在场」）');
+  a(lockSrc.indexOf('require.main === module') > 0,
+    'v2150/A12: 本锁可单独跑（require.main 守卫）');
+}
+
+// ── B：运行时（原版成绿，且两面读数与既有真源逐字同源） ──────────────
+function runB(a) {
+  const r = TOOL.scan({});
+  const au = TOOL.audit({ result: r });
+  a(au.ok === true && au.problems.length === 0,
+    'v2150/B1: 三面零漂移（实 ' + JSON.stringify(au.problems.map(function (p) { return p.face + ':' + p.key; })) + '）');
+  a(r.files > 100, 'v2150/B2: 扫描面非空（产品面 ' + r.files + ' 文件）—— 零命中不算通过');
+  a(r.codes.total > 200 && r.codes.uncovered.length === 0,
+    'v2150/B3: 内联码 ' + r.codes.total + ' 个全部有归属（无归属 ' + r.codes.uncovered.length + '）');
+  //   与 reject-code-gate 的扫描面逐码同源（不得各扫一份）
+  const rc = require('./reject-code-gate.js').scan({});
+  const k1 = Object.keys(rc.hits).sort();
+  const k2 = Object.keys(r.codes.hits).sort();
+  a(k1.length === k2.length && k1.every(function (c, i) { return c === k2[i]; }),
+    'v2150/B4: codes 面与 tests/reject-code-gate.js 逐码同源（' + k1.length + ' vs ' + k2.length + '）');
+  //   与三本账同源：见证声明 / 死表 / 台账 base
+  const w = TOOL.witnessDeclared();
+  const d = TOOL.deadTable();
+  const b = TOOL.ledgerBase();
+  a(w.length > 300, 'v2150/B5: 见证声明面来自真源（实 ' + w.length + ' 个）');
+  a(Object.keys(d).length > 0 && b.length > 0,
+    'v2150/B6: 死表 ' + Object.keys(d).length + ' 条 / 台账 base ' + b.length + ' 条');
+  // B7 见证声明的码必须**真的在源码里存在**（无幽灵见证）。
+  //   v2.231.6 口径修正：原先这条要求「每个见证码都落在内联扫描面 r.codes.hits 上」，
+  //   而扫描面只认内联 `reason: 'x'`；EXP-3～EXP-7 的引擎统一走 `refuse('x')` 辅助函数写法
+  //   （间接写法，门禁**故意不认** —— 见 reject-code-gate.js 形态说明：拼接/间接写法不报错
+  //   也不伪归一，稳定性由各自引擎专锁负责）。于是 19 个真码被判成「幽灵」，本条恒红。
+  //   病根是**判据选错了面**：这条要防的是「见证表里写了源码里根本没有的码」，
+  //   而不是「码必须用内联写法写」。故改判「该码在去注释的产品面源码文本里存在」——
+  //   面内/面外两种写法都算存在，判据强度不降（凭空捏造的码仍然红）。
+  //   面外清单仍显式钉住：防它们静默漂移或悄悄混进面内（口径与 reject-lock-v2780.js 同源）。
+  // v2.381.0 口径修正（本清单与 tests/reject-lock-v2780.js 的 OUT_FACE_OK 是**同一集合的两份冻结**，
+  //   两处必须逐字同集）：
+  //     · 补进 __exp7-absent-check / __exp7-rain-check / __exp7-settle-check：它们是 EXP-7 的
+  //       **正向见证标记**（「缺席者不能获奖」这类验收通过的判据，不是拒收码），确实在见证表里、
+  //       也确实在扫描面外。旧版本清单漏了它们，只因为 tools/contract-scan.js 的 witnessDeclared
+  //       静态正则首字符类写的是 [a-zA-Z]，把下划线开头的这 3 个**静默漏掉**（正则已同版修正为
+  //       [A-Za-z_]，静态 776→779 与运行时 expect 779 对齐）。补清单是补**后果**，修正则才是补**病根**。
+  //     · 摘掉 already-exists：它现在是面内码（city-folklore:77 / foreshadow-tree:86 / legacy-oath:76
+  //       三处内联 reason），留在面外清单里即「把面内码登记成面外」，本判据会报红。
+  const OUT_FACE_OK = ['unknown-worker', 'no-such-facility', 'bad-days', 'order-paused', 'facility-full',
+    'shift-conflict', 'crew-full', 'no-road',
+    'activity-closed', 'activities-full', 'signups-full', 'quota-full', 'already-signed',
+    'no-signup', 'results-full', 'awards-full', 'short-prize', 'bad-day', 'bad-sign', 'no-such-listing', 'not-there', 'offline', 'self-buy', 'too-far', 'unknown-buyer', 'unknown-owner',
+    // v2.524.0（V29 全量尾部实红）：13 条**动态裁决值**落面外 —— 快照落后于 tests/reject-lock-v2780.js。
+    //   后者的清单早已登记这 13 条（v2.529.0），本处没跟上，于是两份「必须逐字同集」的冻结
+    //   清单分叉：B7b 报「实 42 vs 登记 29」。补的是本处，不是去动那边。
+    //   它们的形态是「reason 不是内联字面量」（`reason: broken ? 'chain-broken' : 'traced'`、
+    //   `reason: v`），门禁 CODE_RE 故意不认间接写法。**如实说：这 13 条目前唯一的咬住者
+    //   是 reject-v2780.js 的「见证零缺失」（missing=0 = 每条都真从产品 API 跑出来了），
+    //   letter-post / hearsay-ledger 尚无独立专锁 —— 这是欠账，不是已还账。**
+    'arrived', 'opened', 'sent', 'lost', 'intercepted',
+    'versioned', 'versioned-no-store', 'chain-broken', 'traced',
+    'sharded', 'sharded-no-store', 'ticked', 'ticked-no-store',
+    '__exp7-absent-check', '__exp7-rain-check', '__exp7-settle-check'].sort();
+  const stripC = function (s) { return require('./test-surface-gate.js').stripComments(s); };
+  const faceText = TOOL.productFiles(BASE).map(function (rel) {
+    return stripC(fs.readFileSync(path.join(BASE, rel), 'utf8'));
+  }).join('\n');
+  // v2.381.0 口径修正（B7 判 ghost 的**面**选择错了）：witnessDeclared 取的是「见证表声明了哪些码」，
+  //   而见证表里混着两类东西 ——
+  //     ① 真·拒收码（首字符字母）：它们必须**在产品源码里真的写着**，凭空捏造即红（本判据原意）；
+  //     ② 正向见证标记（`__` 开头，如 __exp7-absent-check：「缺席者不能获奖」这类**验收通过**
+  //        的判据）：它们**本就不在产品源码里**，只在 tests/reject-v2780.js 的 want() 里声明，
+  //        拿「产品面有没有这个词」去问它，等于用错的面 —— 必然恒红。
+  //   旧实现把两类混在一起判，于是 3 个正向标记被读成「幽灵见证」。
+  //   修法按面分流（与台账 v2.102.0 的 reuse / v2.142.0 的 omniscient 同规格：正常归因词
+  //   以同一词法形状出现，一并带见证，但要按各自的面判在场性）：
+  //     ① 拒收码 ⇒ 仍须在产品面源码里逐字存在（强度不降）；
+  //     ② 内部标记 ⇒ 须在见证表真源里逐字存在（更严格：必须在 want() 声明处出现，否则凭空捏造）。
+  //   `__` 前缀不是开后门：任何以 __ 开头的码若在 reject-v2780.js 里查无实据，照样红。
+  const WITNESS_SRC = stripC(fs.readFileSync(path.join(BASE, 'tests', 'reject-v2780.js'), 'utf8'));
+  const isInternalMark = function (c) { return c.indexOf('__') === 0; };
+  const ghost = w.filter(function (c) {
+    if (isInternalMark(c)) return WITNESS_SRC.indexOf("'" + c + "'") < 0;  // 内部标记：见证表里必须有
+    return faceText.indexOf("'" + c + "'") < 0;                             // 拒收码：产品面里必须有
+  });
+  const wInFace = w.filter(function (c) { return !!r.codes.hits[c]; });
+  const wOutFace = w.filter(function (c) { return !r.codes.hits[c]; }).sort();
+  a(ghost.length === 0,
+    'v2150/B7: 见证声明的码全部真在源码里（无幽灵见证；面内 ' + wInFace.length
+    + ' / 面外 ' + wOutFace.length + '，幽灵 ' + JSON.stringify(ghost) + '）');
+  a(wOutFace.join(',') === OUT_FACE_OK.join(','),
+    'v2150/B7b: 面外见证码与登记清单逐字一致（实 ' + wOutFace.length + ' 个）—— 它们是 refuse() 辅助函数写法的码，扫描面外、由各自引擎专锁咬住');
+  a(r.enums.declared > 100, 'v2150/B8: enums 面真扫到具名常量（实 ' + r.enums.declared + ' 个）');
+  a(r.enums.divergent.length > 0 && r.exempt.size === r.enums.divergent.length,
+    'v2150/B9: 分歧 ' + r.enums.divergent.length + ' 名全在 EXEMPT（' + r.exempt.size + ' 条）');
+  a(r.exempt.stale.length === 0 && r.exempt.missing.length === 0,
+    'v2150/B10: EXEMPT 零过期 / 零缺理由');
+  a(Object.keys(TOOL.EXEMPT).every(function (n) {
+    return r.enums.divergent.some(function (x) { return x.name === n; });
+  }), 'v2150/B11: 已豁免名均仍分歧');
+  a(r.fields.divergent.length === 0,
+    'v2150/B12: fields 面零「字面量互斥」（实 ' + r.fields.divergent.length + ' 条）');
+  a(TOOL.selfTest() === true, 'v2150/B13: --self-test 两向自证通过（合成站点报出 / 原版不假报）');
+  //   CLI 真跑（不是「文件在场」）：默认档必须打印读数且 exitCode 与 audit 同向
+  const cp = require('child_process');
+  const out = cp.spawnSync(process.execPath, [path.join('tools', 'contract-scan.js')],
+    { cwd: BASE, encoding: 'utf8', timeout: 120000 });
+  a(out.status === 0, 'v2150/B14: CLI 默认档 rc=0（实 ' + out.status + '）'
+    + (out.status === 0 ? '' : ' :: ' + String(out.stdout || '').slice(-200)));
+  a(/契约漂移: 0/.test(String(out.stdout || '')),
+    'v2150/B15: CLI 人读出口打印「契约漂移: 0」');
+  const outJ = cp.spawnSync(process.execPath, [path.join('tools', 'contract-scan.js'), '--json'],
+    { cwd: BASE, encoding: 'utf8', timeout: 120000 });
+  a(outJ.status === 0 && String(outJ.stdout || '').indexOf('"ok": true') > 0,
+    'v2150/B16: --json 档 rc=0 且 ok:true');
+  //   人读报告行单一真源：print 与 --json 的 lines 共用同一份（不各写一种排版）
+  const rl = TOOL.reportLines(au);
+  a(Array.isArray(rl) && rl.length >= 5
+    && rl.some(function (l) { return l.indexOf('契约漂移: 0') >= 0; }),
+    'v2150/B17: reportLines 交出人读报告行（' + rl.length + ' 行，含结论行）');
+  a(rl.some(function (l) { return l.indexOf('产品面 ') >= 0 && l.indexOf('内联拒收码 ') >= 0; }),
+    'v2150/B18: 报告行含「看了多少」（产品面数与码数）—— 零命中不算通过的前提');
+}
+
+// ── C：负控制（真源码破坏 ⇒ 对应面现形；不在面上 ⇒ 读数逐字不变） ────
+function runC(a) {
+  const pristine = TOOL.scan({});
+  const over = wrecked();
+  Object.keys(ANCHORS).forEach(function (k) {
+    a(over[ANCHORS[k].rel] !== SRC_OF(ANCHORS[k].rel),
+      'v2150/C1: 破坏 ' + k + ' 真落在源码副本上（' + ANCHORS[k].rel + '）');
+  });
+  const rB = TOOL.scan({ read: readWith(over) });
+  const aB = TOOL.audit({ result: rB });
+  a(rB.codes.uncovered.indexOf('lock-ghost-code') >= 0,
+    'v2150/C2: 一个新内联码 ⇒ codes 面报无归属（实 '
+      + JSON.stringify(rB.codes.uncovered) + '）—— 原版该码不在面内，是破坏带出来的');
+  a(pristine.codes.uncovered.length === 0,
+    'v2150/C2b: 同一判据在原版上不报（不是见谁都报）');
+  a(rB.enums.divergent.some(function (x) { return x.name === 'STRATEGIES'; })
+    && !aB.problems.some(function (p) { return p.face === 'enums' && p.key === 'STRATEGIES'; }),
+    'v2150/C3: 原版已豁免的 STRATEGIES 被锯成第三套值 ⇒ 仍认出它是分歧，'
+      + '但豁免表让它不红（豁免是「已登记的同名不同义」，不是「不再报」）');
+  a(rB.fields.divergent.some(function (x) { return x.path === 'evolution'; })
+    && aB.problems.some(function (p) { return p.face === 'fields' && p.key === 'evolution'; }),
+    'v2150/C4: 同一字段两模块各写互斥字面量 ⇒ fields 面报出（原版该路径两侧皆非字面量）');
+  a(aB.ok === false, 'v2150/C5: 有漂移时 audit 必须报 ok:false（坐实判据承重）');
+  //   逐面分离：只破坏 fields 那一对 ⇒ 只有该面变
+  const onlyF = TOOL.scan({ read: function (rel) {
+    if (rel === ANCHORS.fieldA.rel || rel === ANCHORS.fieldB.rel) return over[rel];
+    return fs.readFileSync(path.join(BASE, rel), 'utf8');
+  } });
+  a(onlyF.fields.divergent.some(function (x) { return x.path === 'evolution'; })
+    && onlyF.codes.uncovered.length === 0
+    && onlyF.enums.divergent.length === pristine.enums.divergent.length,
+    'v2150/C6: 只破坏 fields 一面 ⇒ 只有该面变（codes 零无归属、enums 分歧数不变）');
+  //   不在扫描面上的破坏：把整份源码逐行注释化 ⇒ 读数必须逐字不变
+  const cmt = TOOL.scan({ read: function (rel) {
+    if (rel === 'engines/sediment.js') {
+      return SRC_OF(rel).split(String.fromCharCode(10)).map(function (l) { return '// ' + l; })
+        .join(String.fromCharCode(10));
+    }
+    return fs.readFileSync(path.join(BASE, rel), 'utf8');
+  } });
+  a(JSON.stringify(cmt.codes.uncovered) === JSON.stringify(pristine.codes.uncovered)
+    && cmt.codes.total === pristine.codes.total
+    && cmt.enums.divergent.length === pristine.enums.divergent.length,
+    'v2150/C7: 同一份源码整体注释化 ⇒ 读数逐字不变（解释病灶的文字不是病灶）');
+  //   零命中不算通过：空面必须报 empty-product-face
+  const empty = TOOL.audit({ result: TOOL.scan({ files: [], codeScan: { files: [], hits: {} } }) });
+  a(empty.ok === false && empty.problems.some(function (p) { return p.key === 'empty-product-face'; }),
+    'v2150/C8: 空产品面必须报 empty-product-face（零命中不算通过）');
+  const emptyOk = TOOL.scan({ files: [], codeScan: { files: [], hits: {} } });
+  a(emptyOk.codes.uncovered.length === 0 && emptyOk.enums.divergent.length === 0,
+    'v2150/C8b: 同一份空读数若只看三面「红项」会显得全绿 ⇒ 故空面判据必须独立（这正是 C8 治的病）');
+  //   两向自证工具本身
+  a(TOOL.selfTest() === true, 'v2150/C9: selfTest 在原版上为真（不得假报）');
+  const bad = require(path.join(BASE, TOOL_REL));
+  a(bad.EXEMPT && Object.keys(bad.EXEMPT).length > 0,
+    'v2150/C10: EXEMPT 表非空（零命中的豁免表等于没有名单）');
+}
+
+function runAll(a) { runA(a); runB(a); runC(a); }
+if (require.main === module) {
+  const fails = [];
+  let pass = 0;
+  const a = function (c, m) { if (c) pass += 1; else fails.push(m); };
+  runAll(a);
+  fails.forEach(function (m) { console.log('  x ' + m); });
+  console.log('CONTRACT-SCAN-V2150: ' + (fails.length ? 'FAIL (' + fails.length + ')' : 'pass')
+    + ' (' + pass + ')');
+  process.exitCode = fails.length ? 1 : 0;
+}
+module.exports = { runA: runA, runB: runB, runC: runC, runAll: runAll,
+  ANCHORS: ANCHORS, hitOf: hitOf };

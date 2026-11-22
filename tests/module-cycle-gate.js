@@ -1,0 +1,882 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * tests/module-cycle-gate.js — 模块依赖静态图门禁（v2.107.0 计划一 #20）。
+ *
+ * 为什么要它（与 module-registry-gate.js 互补，不是重复）：
+ *   module-registry-gate 的文件头已把边界写死：**静态面能回答的只有「提到了谁」（refs），
+ *   回答不了「装载顺序上必须先有谁」**——它的两条静态扫描器都失败了（v1 朴素 DFS 指数爆炸；
+ *   v2 括号配平把装载期读判成调用期读，输出「装载期 558 / 调用期 0」，而真相是 23 / 44）。
+ *   它治的是**运行期实测边**（真装载 + Proxy + 调用栈定案，23 条装载期边、44 条调用期引用）。
+ *   本门禁治的是运行期实测的**结构性盲区**：实测只看得见「真跑到了」的边。
+ *
+ *   本门禁只负责**静态能回答的那部分**，次序判据不靠静态猜：order-violation 建立在
+ *   **运行时定案过的 requires 边**上，用 LOAD_ORDER 定性质。
+ *
+ * 本版实测到的四个事实，直接决定判据设计（全部由本文件自己的读数给出）：
+ *   ① 静态引用 909 条文件级边，其中**只有 23 条**被运行期定为装载期读。
+ *      若拿全部静态引用判次序，会报出 281 条「违规」——全是调用期读
+ *      （函数体里的 WA.clock.now() 之类），红得铺天盖地却一条不是缺陷。
+ *      ⇒ 这正是 module-registry-gate 记档的那句：「引用最多」不等于「必须先装载」。
+ *   ② 23 条装载期边**全部**满足「供者先装」（供者 LOAD_ORDER 下标 < 消费方），零违规。
+ *   ③ 本仓有且仅有 2 条**模块级跨文件顶替**，两条各有明确理由（见 CONTRACT_NS）。
+ *      顶替本身不可怕，可怕的是一次静默重读全部 providerOrderOk 翻转——可见性才是判据。
+ *   ④ 「静态面 148 个 ns / 账本 123 个」的差集**不是噪声**：148 里有 25 个由入口 index.js
+ *      与 UI 层提供（它们不进 LOAD_ORDER，故不在账本），其余 123 与账本逐项吻合。
+ *      另有一处成对替换（v2.107.0 时读作 121 ↔ 120 的一对一差；v2.110.0 两边同步各 +3 后差集归零）：`engines/contract-audit.js` 的
+ *      `if (keepDigest) WA.digest = ...`（try/finally 里条件屏蔽 digest.generate，
+ *      finally 原位还原，见 contract-audit.js:138-142 / 211）——它是**成对的临时替换**，
+ *      不是新提供方，故计入 CONTRACT_NS 而不是报冲突。
+ *
+ * 判据（红）：
+ *   ① unprovided：读了「既不在任何文件的提供方集合、又未登记为入口/外名」的 ns。
+ *      这类边在运行期是 undefined.x —— 静态能提前抓住。
+ *   ② order-violation：**运行时定案的装载期边**上，供者的 LOAD_ORDER 下标 > 消费方，
+ *      即「供的人后装」。只判 requires 边，不对静态引用判。
+ *   ③ cross-file-write：同名 ns 被 ≥2 个文件**赋值**，且未登记为共享/自引用。
+ *      这类边在运行期是「后跑的静默顶掉先跑的」——与 dup-decl-gate 同族的静默覆盖。
+ *   ④ misattributed：账本 requiresFiles 指向了一个并不提供该 ns 的文件（归属错配）。
+ *   ⑤ dead-registration：登记了（入口/外名/共享/自引用表里）却**全仓无人读**的名字
+ *      = 过期登记，会静默掩盖真·未提供。与 lonsha 的 scan_config_liveness 同族。
+ *   ⑥ ns-face-drift：静态提供方集合 与 账本 ns 面 出现**未登记的一对一差**。
+ *   ⑦ unreflected：运行时定案、静态面扫不出来的装载期边（扫描器瞎了）；以及环。
+ *
+ * 只报不红（读数，不是缺陷）：
+ *   · dead-ns：模块提供了但**产品源面**零读。消费者可能是 tests / 宿主 / 运行时外壳
+ *     （本仓实测 10 个；v2.110.0 的 11 个里 faultContext / schema / permissions 只有 tests 侧消费，而 v2.111.0 的 auditLog 与 sanitize 都接了产品真消费方故**离开这一面**，10 个里绝大多数各有 tests 侧或运行时消费方；唯一真正零消费的是
+ *     core/interceptor.js 的 LEAK_THRESHOLD，它已被 dead-export-gate 记为 dead，
+ *     本门禁不抢那份账）。
+ *     **v2.400.0（V22 OPV22-3）起：零读本身仍是读数，但「没定性」开始计红。**
+ *     每个零读 ns 必须在 tests/ns-consumer-ledger.json 里有一条可复算裁决（cls / provider /
+ *     evidence / recompute）；门禁有而账本无 ⇒ undeterminedNs 计红，账本有而门禁无 ⇒
+ *     expiredNs 计红，条目不合规（cls 未定义 / 缺 provider / 缺 evidence）⇒ badClassNs 计红。
+ *     账本缺失或解析失败 ⇒ 本面整面跳过并显式报「未核对」（不可用 ≠ 未定性）。
+ *     这不是「改判据放行」：零读的判定口径一字未动，红的来源是「未定性」。
+ *   · 账本 requires 里 NS_FIELD_MAP 未登记的 ns = 未定性读数（不许当成 0 条边蒙过去）。
+ *
+ * 静态图无环：load 边 + 顶替序（供者在前 → 被顶替者在后）。这两类边方向由「事实」给定
+ *   （requires 由实测定案、顶替序由 LOAD_ORDER 先后给定），故无环性可证。静态引用边**不**参与
+ *   环判定（含 886 条调用期边，本就有环，且环无意义）。本仓实测：模块装载不循环。
+ *
+ * 覆盖率是读数的一部分（不许把「解析不出来」当成「没有引用」）：
+ *   - aliasFiles / productFiles —— 有多少文件真的解析出了 WA 别名（本仓 121 / 121）。
+ *   - refFiles / aliasFiles —— 解析出别名的文件里，有多少真的引用了别的 ns（本仓 119 / 121；两个零引用文件是 core/input-guard.js 与 core/sanitize.js——**纯函数基元不读别人**，这是事实不是缺陷）。
+ *   - 登记在用 N / 总数、账本缺项文件数（入口 + 三个 UI 文件不在账本内，实测 4）。
+ *   只看「0 条边」无法区分「真没有边」与「扫描器全瞎了」，故覆盖率是一等读数。
+ *
+ * 形态多样性（实测三种，宽匹配的必要性）：
+ *   const WA = window.WorldAxis = window.WorldAxis || {};    （主流）
+ *   const WA = (window.WorldAxis = window.WorldAxis || {});  （带外层括号：limits / digest / horizon）
+ *   const WA = G.WorldAxis = G.WorldAxis || {};              （宿主变量叫 G：tool-diag / contract-audit）
+ *   初版只认第一种 ⇒ 15 个文件被当成「无引用」——即「扫描器瞎了」长得像「没有边」。
+ *
+ * 边界（如实登记）：
+ *   - 别名只认 const A = [ ( ] HOST.WorldAxis = HOST.WorldAxis || { } [ ) ] ; 一种形态；
+ *     其他方式拿到 WA（参数传入、重新赋值）本轮未纳入，由 aliasFiles / productFiles 如实反映。
+ *   - 只认 A.<ns> 形态的直接引用；A['ns'] / A[key] 代码不确定，不报错也不伪归。
+ *   - 读面吃 `inventory.codeFace`（v2.201.0 起；此前是本仓第二份实现 `stripComments`）：
+ *     注释与字符串字面量一并剥成空格、**长度与行号守恒**。
+ *   - 赋值只认 A.<ns> =，且**不剥注释**做归属判定：`// WA.x = ` 这类注释里的形态由
+ *     该文件的正确性兜底——本仓实测把注释里被当提供方的 ns 数为 0，故不额外剥一层。
+ *   - EXTERNAL_PREFIX 本轮为空：本仓 __ 前缀命名空间（__settingsRegs / __loaderState /
+ *     __loadOrder / __loadFailed / __inited / __inputGuardInternal）**全部**有模块提供方，
+ *     零例外；登记空前缀等于把口径放宽成「凡下划线一律放行」，那是掩盖而非覆盖。
+ *   - dead-ns 的「零读」以**产品源面**为准（core/engines/actors/direction/render/compat/ui + index.js）。
+ */
+const fs = require('fs');
+const path = require('path');
+const BASE = path.join(__dirname, '..');
+// v2.201.0：读面口径收敛到**全仓单源** `tests/inventory.js` 的 `codeFace`。
+//   此前吃的是 `tests/test-surface-gate.js` 的 `stripComments` —— 本仓第二份
+//   「真代码面」实现。v2.29.0 已把口径统一到 codeFace（dead-export-gate / dup-decl-gate
+//   都改过来了），**本文件是漏改的第三处**。漏改的后果实测（tools/probe_face_compare.js）:
+//   两口径在 4 个文件上给出不同读数，**全部是「仅旧口径有」、零「仅新口径有」**
+//   （core/store.js 7 处 / engines/tool-diag.js 2 处 / core/commit.js 1 处 / ui/panel.js 2 处，
+//   合计 12 处幽灵引用）—— 方向单一：旧口径把「注释里提到的名字」当成了调用。
+//   其中 rand.seed / clock.freeze / bridge.setSettings 三条正是 v2.29.0 当版亲手从基准里
+//   摘掉的那三个「此前只被注释或字符串提到」的成员。
+//   本轮现场表现：ui/panel.js 新增的一行注释里写了 `WA.ns.mem` 这个形态 ⇒ 报
+//   「未提供 1 · ns ← ui/panel.js」，而 `ns` 从来不是任何模块提供的命名空间。
+//   处置：**把口径对齐到单一真源**，不是往 EXTERNAL 里塞一条「ns 是外名」把红压掉
+//   —— 后者会把「扫描器瞎了」伪装成「没有边」（本文件头注第 65 行自己点过名的病）。
+const { codeFace } = require('./inventory.js');
+
+const DIRS = ['core', 'engines', 'actors', 'direction', 'render', 'compat', 'ui'];
+const LEDGER = path.join(__dirname, 'module-registry-ledger.json');
+/**
+ * v2.400.0（V22 OPV22-3）：零读 ns 定性账本。
+ *   dead-ns 这条读数此前「只报不红、只给数字」⇒「本该有消费点却漏接了」与「它本来就只该由
+ *   tests/宿主消费」在读数上完全同形（同 l3-registry 治过的那种病）。
+ *   本账本把每个零读 ns 钉到一条可复算的裁决上；门禁据此把「只报不红」升级为「必须定性」：
+ *     · 门禁有、账本无  ⇒ undeterminedNs，计红（新出现的零读 ns 不许当读数蒙过去）
+ *     · 账本有、门禁无  ⇒ expiredNs，计红（过期登记会静默掩盖真·未提供）
+ *   注意：这不等于「放行」。判据的零读口径一字未动，红的来源是「未定性」，不是「零读」。
+ */
+const NS_LEDGER = path.join(__dirname, 'ns-consumer-ledger.json');
+
+/** 外名：由宿主 / 测试外壳提供，不属于任何模块文件。逐条必须给理由 */
+const EXTERNAL = {};
+
+/**
+ * 别名宿主名：出现在别名形态 `const A = HOST.WorldAxis = HOST.WorldAxis || {}` 里的 HOST 属性名。
+ * 它由**别名形态本身**消费（本文件 ALIAS_RE 认的就是它），不会以 `A.<ns>` 形态被读，
+ * 故不能进 EXTERNAL（那里判「全仓无人读 = 过期」会误报）。
+ */
+const ALIAS_HOST_NS = {
+  WorldAxis: '别名宿主对象名（window.WorldAxis / G.WorldAxis 本体，写到宿主全局上）'
+};
+
+/** 入口命名空间：由 index.js 提供（不是外名），不进 LOAD_ORDER（入口先于所有模块执行） */
+const ENTRY_NS = {
+  mainWin: '宿主窗口（入口注入）',
+  mainDoc: '宿主文档（入口注入）',
+  VERSION: '入口版本常量',
+  version: '入口版本常量别名',
+  log: '入口日志出口',
+  flushLog: '入口日志冲刷',
+  loadEventLog: '入口日志载入',
+  clearEventLog: '入口日志清空',
+  loadScript: '入口脚本装载',
+  loadFailures: '入口装载失败台账',
+  loaderStatus: '入口装载器状态',
+  // v2.211.0(优化 Q1):启动完整性三件 —— 判定本体在 core/store.js,**入口只转出**。
+  //   它们必须登记在本表(而不是「未登记的一对一差」):入口命名空间由 index.js 提供、
+  //   不进 LOAD_ORDER,melded 静态面照收;不登记就会被判成 ns 面漂移(static-only)。
+  //   三个口各自实在,不是一个口的三个别名:
+  //     loaderIntegrity —— 只读视图(供面板/诊断),store 不可用时给默认放行视图;
+  //     writeGate       —— 问「此刻若写会怎样」,**不执行**副作用;
+  //     loadRetry       —— 恢复入口(重走一次装载并重算投影),唯一有副作用的一个。
+  loaderIntegrity: '入口完整性只读视图(转出 store.integrity)',
+  writeGate: '入口写侧闸门转出(转出 store.writeGate,不执行副作用)',
+  loadRetry: '入口装载重试(恢复入口:重走一次装载 + 重算失败表投影)',
+  baseUrl: '入口基址',
+  logCaps: '入口诊断环动态上限',
+  logTrimStat: '入口日志裁剪计量',
+  eventLog: '入口事件环',
+  errorLog: '入口错误子环',
+  __inited: '入口「本次激活了哪些引擎」记账',
+  // v2.524.0（OPV27-1/2）：装载面读数由 index.js 在装载尾声合成（boot-report 只做采集/合成），
+  //   故它是**入口命名空间**——不进 LOAD_ORDER，不登记就会被判成「未登记的一对一差（static-only）」。
+  boot: '入口装载面读数（已装载 N/N · 逐台耗时 · 慢 TOP3）'
+};
+
+/** UI 层命名空间：由 ui/*.js 提供（运行时外壳挂载，不进 LOAD_ORDER） */
+const UI_NS = {
+  ui: 'UI 面板门面（ui/panel.js）',
+  uiSettings: 'UI 设置门面（ui/settings.js）',
+  assistant: '助手门面（ui/assistant.js）',
+  // v2.152.0：第四个 UI 层命名空间。本仓的 UI ns 名单在两处，必须同批 ——
+  //   tests/run.js 的 UI_NS2800、tests/export-contract.js 的 OPTIONAL、
+  //   engines/tool-diag.js 的 OPTIONAL_EXPORTS；本表是第四处（静态图侧）。
+  //   漏在这里的后果不是「少一行字」：renderPerf 会被判成「未登记的一对一差」（ns 面漂移），
+  //   而它明明是 UI 层——先装后装的差别被读成「接线出了问题」。
+  renderPerf: 'UI 面板渲染观测（ui/render-perf.js）',
+  // v2.181.0：赛博朋克 UI 主题层的 9 个命名空间（ui/cyberpunk-*.js + ui/theme-switch.js）。
+  //   本仓的 UI ns 名单有四份副本，必须同批 —— 漏在本表的后果是它们被判成「未登记的一对一差」
+  //   （ns 面漂移），而它们明明是 UI 层。
+  cyberUI: 'UI 主题层（ui/cyberpunk-components.js）',
+  cyberDashboard: 'UI 主题层（ui/cyberpunk-dashboard.js）',
+  cyberPeople: 'UI 主题层（ui/cyberpunk-people.js）',
+  cyberLogs: 'UI 主题层（ui/cyberpunk-logs.js）',
+  cyberAnimate: 'UI 主题层（ui/cyberpunk-animations.js）',
+  cyberResponsive: 'UI 主题层（ui/cyberpunk-responsive.js）',
+  cyberpunkTheme: 'UI 主题层（ui/cyberpunk-theme.js）',
+  themeStyles: 'UI 主题层（ui/cyberpunk-theme.js）',
+  themeSwitch: 'UI 主题层（ui/theme-switch.js）',
+  // v2.209.0（优化 6）：第五个 UI 层命名空间（ui/panel-nav.js）。
+  //   本仓 UI ns 名单有**四处副本**，必须同批 —— tests/run.js 的 UI_NS2800 /
+  //   tests/export-contract.js 的 OPTIONAL / engines/tool-diag.js 的 OPTIONAL_EXPORTS /
+  //   本表。前三处在本批落地时已改，**本表是第四处，原漏**（现场报 ns 面漂移 static-only）。
+  //   漏在这里的后果同 v2.152.0 那条：panelNav 被判成「未登记的一对一差」，
+  //   而它明明是 UI 层 —— 先装后装的差别会被读成「接线出了问题」。
+  panelNav: 'UI 面板导航协议（ui/panel-nav.js）',
+  // v2.225.0(优化 Q8):第六个 UI 层命名空间(ui/panel-fold.js)。
+  //   本仓 UI ns 名单有**四处副本**,必须同批 —— tests/run.js 的 UI_NS2800 /
+  //   tests/export-contract.js 的 OPTIONAL / engines/tool-diag.js 的 OPTIONAL_EXPORTS /
+  //   本表。前三处在本批落地时已改,**本表是第四处**(现场报 ns 面漂移 static-only:
+  //   panelFold)。漏在这里的后果同上面两条:panelFold 被判成「未登记的一对一差」,
+  //   而它明明是 UI 层 —— 先装后装的差别会被读成「接线出了问题」。
+  panelFold: 'UI 面板折叠协议(ui/panel-fold.js)',
+  // v2.400.0(V22 OPV22-4):第七个 UI 层命名空间(ui/pages/overview-blocks.js)。
+  //   本仓 UI ns 名单有**四处副本**,必须同批 —— tests/run.js 的 UI_NS2800 /
+  //   tests/export-contract.js 的 OPTIONAL / engines/tool-diag.js 的 OPTIONAL_EXPORTS /
+  //   本表。前三处在本批落地时已改,**本表是第四处** —— 本轮现场报的是
+  //   「未提供 1 · panelOverviewBlocks ← ui/panel.js」:panel.js 真在直写
+  //   `WA.panelOverviewBlocks.<mem>`(七个转发 + bind),而静态图看不见提供方。
+  //   为什么看不见:本门禁的提供方集合从**模块文件的赋值形态**取,而本 ns 由
+  //   ui/pages/overview-blocks.js 提供 —— 它在 ui/ 子目录里,是 OPV22-4 新建的。
+  //   漏在本表的后果同前三条:被判成「读了无人提供」,而它明明是 UI 层。
+  panelOverviewBlocks: 'UI 概览页六块只读诊断(ui/pages/overview-blocks.js)',
+  // v2.401.0(OPV23-1~3):第 8~10 个 UI 层命名空间。panel.js 的转发函数在运行期惰性读它们，
+  //   静态图看不见提供方（ui/ 子目录文件）—— 漏在本表的后果同上条：被判「读了无人提供」。
+  panelOverviewMain: 'UI 概览页主线(ui/pages/overview-main.js)',
+  // v2.413.0(OPV24-2):第 11 个 UI 层命名空间。panel.js 的转发函数在运行期惰性读它
+  //   （ui/pages/overview-world-pulse.js 提供），静态图看不见提供方 —— 漏在本表的后果同上：
+  //   被判「读了无人提供」而它明明是 UI 层。
+  panelWorldPulse: 'UI 世界脉搏聚合块(ui/pages/overview-world-pulse.js)',
+  panelToolsPage: 'UI 工具页(ui/pages/tools-page.js)',
+  uiDashboards: 'UI 四个大盘(ui/pages/dashboards.js)',
+  // v2.518.0（故事优先纵向切片）：第 12/13 个 UI 层命名空间。
+  //   两个都由 ui/pages/ 子目录文件提供，而读者在 ui/panel.js（'people' 页转发
+  //   renderPeoplePlayerAware 与 4586 行的 bind）与 ui/pages/overview-main.js（652 行的
+  //   「此刻」页转发）—— 与前三条 panelOverviewBlocks / panelOverviewMain / panelWorldPulse
+  //   **完全同型**：本门禁的提供方集合从模块文件的赋值形态取，ui/ 子目录的提供方静态看不见。
+  //   漏在本表的后果同前几条：被判「未登记的一对一差（static-only）」，而它们明明是 UI 层。
+  //   people 那个还带一层非 devMode 才渲染的开关（dev 模式仍走旧工作台），但那是运行期
+  //   分支，不影响「谁提供这个 ns」这件静态事实。
+  panelPeoplePage: 'UI 玩家面人物页(ui/pages/people-page.js)',
+  panelNowPage: 'UI 玩家面此刻页(ui/pages/now-page.js)',
+  // v2.539.7（账本工程）：第 17 个 UI 层命名空间。
+  //   v2.535.0 新增 ui/schema-view.js（声明式视图层），读者在 ui/panel.js 的事件页
+  //   （`WA.schemaView` 的运行期惰性读）。与前 6 条**完全同型**：提供方是 ui/ 下的文件，
+  //   本门禁的提供方集合从模块文件的赋值形态取，看不见它 ⇒ 现场报「读了无人提供的 ns（schemaView）」
+  //   ⇒ 连带 B5/B6/B9/C6/N4c/N5c/N6g/N7 与 v2107 四条一起红（16 条红的总病根就在这一行缺失）。
+  schemaView: 'UI 声明式视图层(ui/schema-view.js)',
+  // v2.542.0：第 18/19 个 UI 层命名空间（ui/journal.js / ui/console.js）。
+  //   与上面 6 条不同型的一点：它们的 ns **没有任何读者** —— 由 index.js 的 LOAD_ORDER
+  //   直接装载、在浏览器层自执行（手札接管 #wa-orb；工作台给 #wa-panel 挂 .wc 类）。
+  //   登记在这里是让「静态图看不见提供方」这条不被误报；同时 v2107 的零引用判据里
+  //   它们必须以「入口型零读取」出现（而不是被当成死文件）。
+  journal: 'UI 玩家面手札(ui/journal.js)',
+  console: 'UI 开发者面工作台外壳(ui/console.js)',
+};
+
+/**
+ * 自引用型 ns：同一文件里 `WA.x = WA.x || {}` 或 `WA.x = (WA.x || []).concat(...)`
+ * 反复赋值 —— 这是**累加**，不是「后跑的顶掉先跑的」。逐条必须给理由。
+ */
+const SELF_REF_NS = {
+  engines: '各引擎文件头部的幂等兜底 `WA.engines = WA.engines || {}`（50 处同型）：先到先建、'
+    + '后到复用同一对象，重复赋值是自举占位而非第二个提供方',
+  __settingsRegs: '各模块用 (WA.__settingsRegs || []).concat([__REG]) 自注册，累加语义',
+  modules: '入口兜底 WA.modules = WA.modules || {}（重复赋值是幂等置位）',
+  registerModule: '入口兜底 typeof 守卫下赋值，非重复提供',
+  moduleRegistry: '入口兜底 WA.moduleRegistry = function ...（typeof 守卫 + 返回 WA.modules 键清单），'
+    + '与 core/store.js:36 同源同实现，重复赋值是幂等兜底'
+};
+
+/** 共享命名空间：同一 ns 多文件**有意**赋值且属「成对替换」。ns -> 理由 */
+const CONTRACT_NS = {
+  digest: 'engines/contract-audit.js 在 try 里 Object.assign 屏蔽 digest.generate、'
+    + 'finally 原位还原（138-142 / 211 成对），是探测期的临时替换，不是第二个提供方'
+};
+
+/**
+ * 可选依赖 ns：全仓无提供方、读者**全部带存在性守卫**的软探针形态。ns -> 理由。
+ * 与 ENTRY_NS / UI_NS 的区别：这两张表里的 ns 有真实提供方（入口 / ui 层），
+ * 这里登记的 ns 是「读者单方面假设宿主壳可能挂载」的可选汇点——判据是读者形态
+ * `if (WA.x && ...)` 防御守卫 + 全仓无赋值提供点 + 缺省分支有兜底。
+ * （HEAD 基线树 gate 实测「未提供 53」，本表是当时欠登记的显式化收敛的一步。）
+ */
+const OPTIONAL_NS = {
+  activeChar: 'ui/panel.js:12451 `if (WA.activeChar && WA.activeChar.id)` 软探针：宿主壳可选挂的当前角色锚点，缺省走 `WA.characters[0]` / 字面量兜底',
+  characters: 'ui/panel.js:12451 同一行软探针：宿主壳可选挂的角色表，缺省走字面量兜底',
+  actors: 'engines/stage-presence.js:127 `if (WA.actors && typeof WA.actors.list === ...)` 软探针：actors/registry.js 挂的是 WA.registry，本 ns 留给宿主壳按需挂载，缺席时名单为空',
+  health: 'engines/financial-contagion.js:48 `if (WA.health && typeof WA.health.noteFault === ...)` 软探针：故障上报的可选汇点，无汇点时静默降级'
+};
+
+/** 明确放行的外名前缀（本轮为空，见文件头边界） */
+const EXTERNAL_PREFIX = [];
+
+/**
+ * 账本 requires 字段名 → 提供方文件名（复刻 module-registry-gate 的 NS_FIELD_MAP）。
+ * 账本只给 ns 名与归属文件，不给「哪个文件提供了哪个 ns」的全局表，故此处显式登记。
+ * 未登记的 ns 在交叉验证时进 unidentified（读数，不红）。
+ */
+const NS_FIELD_MAP = {
+  workflow: 'core/workflow.js',
+  settingsBus: 'core/settings-bus.js',
+  store: 'core/store.js',
+  clock: 'core/clock.js',
+  rand: 'core/rand.js',
+  digest: 'engines/digest.js',
+  registerModule: 'core/store.js',
+  // v2.182.0（第二批 · O3）：engines/perf-baseline.js 的装载期**硬边**是 perfTrace。
+  //   判据与同批另四个新模块一致（perfLedger / renderPerf / storageForecast 走它们自己的
+  //   模块文件），只有 perfTrace 一直没登记 —— 而它从 v2.102.0 起就在 perTrace 的提供方
+  //   （engines/perf-trace.js）手里。不登记它，账本里那条 requires 会被报成「未定性」：
+  //   按读数报出（不红），但下一个人读到时会以为这个 ns 的口径还没定。
+  perfTrace: 'engines/perf-trace.js',
+  // v2.409.0（跨参照物缝合批）：三个新引擎的 ns 名。不登记 ⇒ 本门禁判「ns 面漂移
+  //   （static-only）」—— 那是「未登记的一对一差」，读数上长得像接线出了问题，
+  //   而它们明明只是三个新文件。三处口径必须同批：本表 / engines/tool-diag.js 的
+  //   守卫登记表 / index.js 的加载序列；漏任何一处，读数都会把「新模块」读成「断裂」。
+  elapsedEvidence: 'engines/elapsed-evidence.js',
+  sourceReconcile: 'engines/source-reconcile.js',
+  planRoster: 'engines/plan-roster.js'
+};
+
+/**
+ * 静态提供方集合与账本 ns 面之间**已核实的**差集（逐项核过，非噪声）：
+ *   only-static：由入口 / UI 提供的 ns，不进 LOAD_ORDER 故不在账本。
+ *   only-ledger：无（本仓实测为空；留空表以保可证伪性）。
+ */
+const NS_FACE_EXPECT = {
+  onlyStatic: Object.keys(ENTRY_NS).concat(Object.keys(UI_NS)),
+  onlyLedger: [],
+  /**
+   * __ 前缀面：账本不收录内部 ns（nsCount 的口径是「对外承诺的命名空间」），
+   * 静态面照收。这 5 个是本仓全部 __ 前缀提供方（各有模块提供方，零例外），
+   * 显式登记以免把「口径差」当成「漂移」。
+   */
+  // v2.194.0（U2 批次③）：`__agencyStepShapeWarn` 与前四个 `__*Warn` **完全同形态**
+  //   （模块内自证槽：读口形状偏差时点亮，供门禁例外表登记），故同列 internal-prefixed。
+  //   这**不是放宽**：本表只把 static-only 差集从「未登记漂移」里排出去，它仍计进
+  //   静态提供方总数（252）、仍落在零读名单里（27）—— 两条读数都照实往上走。
+  // v2.194.0（U2 批次④）：**不加项**——本批一度照抄批次③加了 `__aftermathWarn` /
+  //   `__storyChoiceWarn`，但专锁 C2 实测其点亮条件不可达（读口 `find` 与写口
+  //   `rowForWrite` 同层同源）⇒ 已按本仓「不留死出口」口径删除那两个槽，本表同步不加。
+  // v2.231.6（回归收口）：`__initDone` / `__prefetch` 两个入口级内部槽 —— 与既有九个
+  //   `__*` 完全同形态（index.js 内部状态：前者是「init 是否已结束」的开关，用来让
+  //   logCaps 在 init 期间不扫全库；后者是装载期的预取句柄），账本口径「对外承诺的
+  //   命名空间」本就不收 `__` 前缀，故同列 internal-prefixed。
+  //   这**不是放宽**：两者仍计进静态提供方总数（322）、仍按实况进零读名单（若零读）。
+  internalPrefixed: ['__settingsRegs', '__loaderState', '__loadOrder', '__loadFailed',
+    '__inited', '__inputGuardInternal', '__diplomacyWarn', '__agencyWarn', '__freightWarn',
+    '__agencyStepShapeWarn', '__initDone', '__prefetch']
+};
+
+/** 别名形态：const A = ( HOST.WorldAxis = HOST.WorldAxis || {} ) ; */
+const ALIAS_RE = (function () {
+  const host = '[A-Za-z_$][A-Za-z0-9_$]*';
+  // v2.539.7（账本工程）：声明关键字不再只认 `const`。
+  //   病（现场）：ui/schema-view.js 写的是 `var WA = window.WorldAxis = window.WorldAxis || {};`
+  //   —— 全仓 489 个模块里**只有它**用 var，于是别名解析器认不出它：文件面 598 但
+  //   「解析出别名」只有 597，N7 的「别名覆盖率满格」当场变红，而这个文件的全部静态引用
+  //   也一并从图里消失（一个看不见的文件 = 一张看不见的边）。
+  //   判据口径不变：仍然只认「`<name>.WorldAxis = <name>.WorldAxis || {}` 这一种自举形态」，
+  //   只是不再对声明关键字（const / let / var）挑食 —— 那是风格差异，不是依赖事实差异。
+  return new RegExp('(?:const|let|var)\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*=\\s*\\(?\\s*' + host +
+    '\\.WorldAxis\\s*=\\s*' + host + '\\.WorldAxis\\s*\\|\\|\\s*\\{\\s*\\}\\s*\\)?\\s*;');
+})();
+
+/**
+ * 文件面：**委托单一真源** tests/product-files.js（v2.400.0 · V22 EXV22-9 收口）。
+ *
+ * 为什么改（这不是「顺手统一风格」，是判据输入面比事实窄 —— 本仓治过八次的同族病）：
+ *   本函数此前是**本文件自带的非递归遍历器**：`DIRS` 七个子目录各 readdirSync 一层。
+ *   而 tests/product-files.js 自 v2.400.0（OPV22-4 拆段）起已改为**递归**
+ *   （discoverFilesDeep），因为 `ui/pages/*.js` 与 `tests/segments/*.js` 就是这么长出来的。
+ *   于是 `ui/pages/overview-blocks.js` 落在**本门禁的文件面之外**。实测差集：
+ *     product-files.js 450 个 · 本文件 449 个 · onlyInProductFiles = ['ui/pages/overview-blocks.js']
+ *   （差集恰好只有这一个文件，方向单一，不是互相都缺）。
+ *
+ * 后果不是「少一行读数」——EXV22-9 的消费点恰好就写在该文件里：
+ *   八个新引擎（celestialOmens / postalRelay / levyCorvee / mortuaryRites /
+ *   sartorialRegalia / betrothalAlliance / cartographySurvey / linguaBroker）的
+ *   `WA.<ns>.view()` 字面引用全部落在 overview-blocks.js 的 READERS 表里。
+ *   本门禁看不见该文件 ⇒ 八个 ns 被**稳定地**报成
+ *     「零读 ns 未定性 8」+「ns 面漂移 8（static-only）」，读面读数纹丝不动（453）。
+ *   在人眼里已经接上了，在判据眼里永远接不上 —— 这正是 v2.73.0（测试面只读 run.js）、
+ *   v2.274.0（子目录整体漏进产品面）、v2.43.0（四处各写一份遍历器）反复治的那一类。
+ *
+ * 处置：**把文件面上收到单一真源**，让「什么算产品文件面」只在一处定义。
+ *   明确**不**采用的两条捷径：
+ *     · 不往 NS_FACE_EXPECT.onlyStatic / internalPrefixed 里塞这八个 ns 把红压掉 ——
+ *       那等于把「扫描器瞎了」写成「本来就没有消费点」，是本文件头注第 65 行自己点过名的病；
+ *     · 不放宽 ALIAS_RE / 引用面正则 —— 那会连真·漏接一起放过。
+ *
+ * 方向性自证（改完必须成立）：文件面 449 → 450（+1）、读面 453 → 461（+8）、
+ *   零读 ns 43 → 35（−8）。三条同时到位才算「输入面补齐」，只涨文件数不涨读面就是没接上。
+ */
+const { productFiles: _productFiles } = require('./product-files.js');
+function productFiles() {
+  return _productFiles(BASE);
+}
+
+function safeRead(p) {
+  try { return fs.readFileSync(p, 'utf8'); } catch (e) { return null; }
+}
+
+/** LOAD_ORDER（index.js 里声明）——「必须先有谁」的唯一真源。 */
+function loadOrderSrc(src) {
+  const s = src !== undefined ? src : fs.readFileSync(path.join(BASE, 'index.js'), 'utf8');
+  const m = s.match(/LOAD_ORDER\s*=\s*\[([\s\S]*?)\]/);
+  if (!m) return null;
+  return (m[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); });
+}
+
+function loadOrder(opt) {
+  return loadOrderSrc((opt || {}).indexSrc);
+}
+
+/** 运行时实测账本。缺账本返回 null（此时交叉验证面整体不可用，读数必须显式报出）。 */
+function readLedger(opt) {
+  const d = opt || {};
+  if (d.runtime) return d.runtime;
+  if (d.ledger === null) return null;
+  const raw = d.ledgerText !== undefined ? d.ledgerText : safeRead(LEDGER);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+/**
+ * v2.400.0（V22 OPV22-3）：读零读 ns 定性账本。
+ *   与 readLedger 同口径：缺账本返回 null（此时「定性」这一面整体不可用，读数必须显式报出），
+ *   解析失败也返回 null —— 不可用 ≠ 未定性，不许把「账本读不到」报成 35 条未定性。
+ */
+function readNsLedger(opt) {
+  const d = opt || {};
+  if (d.nsLedger === null) return null;
+  const raw = d.nsLedgerText !== undefined ? d.nsLedgerText : safeRead(NS_LEDGER);
+  if (!raw) return null;
+  try {
+    const j = JSON.parse(raw);
+    if (!j || !j.entries || typeof j.entries !== 'object') return null;
+    return j;
+  } catch (e) { return null; }
+}
+
+/** 有向图环检测（DFS + 三色）。返回环路径数组或 null。 */
+function acyclic(nodes, edges) {
+  const adj = {};
+  edges.forEach(function (e) { (adj[e.from] = adj[e.from] || []).push(e.to); });
+  const color = {};
+  const stack = [];
+  let found = null;
+  function visit(n) {
+    color[n] = 1; stack.push(n);
+    const outs = adj[n] || [];
+    for (let i = 0; i < outs.length; i++) {
+      const t = outs[i];
+      if (found) break;
+      if (color[t] === 1) { found = stack.slice(stack.indexOf(t)).concat([t]); return; }
+      if (!color[t]) visit(t);
+    }
+    stack.pop(); color[n] = 2;
+  }
+  nodes.forEach(function (n) { if (!found && !color[n]) visit(n); });
+  return found;
+}
+
+/**
+ * 静态建图。返回 files / aliasOf / refs / nsOwner / providerLine / edges / coverage / order。
+ * edges 项：{ from, to, ns, kind: 'load' | 'call', owners, refUnseen?, ownerMismatch? }
+ */
+function scan(opt) {
+  const d = opt || {};
+  const read = d.read || function (rel) { return safeRead(path.join(BASE, rel)) || ''; };
+  const files = d.files || productFiles();
+  const order = loadOrder(d) || [];
+  const orderIdx = {};
+  order.forEach(function (r, i) { orderIdx[r] = i; });
+  // ── v2.529.0（OPV29-04）：惰性档接在首帧清单之后编号。
+  //   为什么必须补这一段：悬空文件判据读的是 orderIdx —— 惰性档没编号，那 22 台就会被判成
+  //   「产品文件面有、装载序里没有」的悬空件（清单越短、读数越脏）。补编号后：它们在契约面内，
+  //   只是不在首帧（首帧读数由 order.length 单独给出，不被这段污染）。
+  const __LAZY_ORDER__ = (function () {
+    const src = d.indexSrc !== undefined ? d.indexSrc : safeRead(path.join(BASE, 'index.js'));
+    if (!src) return [];
+    const m = src.match(/const LAZY_ORDER = \[([\s\S]*?)\n  \];/);
+    if (!m) return [];
+    return (m[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); });
+  })();
+  __LAZY_ORDER__.forEach(function (r, i) { if (orderIdx[r] === undefined) orderIdx[r] = order.length + i; });
+
+  const aliasOf = {};
+  const refs = {};
+  const nsOwner = {};
+  const providerLine = {};
+  const edgeMap = {};
+  let aliasFiles = 0, refFiles = 0;
+
+  files.forEach(function (rel) {
+    const src = codeFace(read(rel));
+    const am = src.match(ALIAS_RE);
+    const A = am ? am[1] : null;
+    aliasOf[rel] = A;
+    if (!A) { refs[rel] = []; return; }
+    aliasFiles++;
+    const esc = A.replace(/\$/g, '\\$');
+    const reAny = new RegExp('(?:^|[^A-Za-z0-9_$])' + esc + '\\.([A-Za-z_$][A-Za-z0-9_$]*)', 'g');
+    const own = new Set();
+    const use = new Set();
+    let m;
+    while ((m = reAny.exec(src)) !== null) {
+      const ns = m[1];
+      if (!ns) continue;
+      const after = src.slice(m.index + m[0].length);
+      if (/^\s*=(?!=)/.test(after)) {
+        own.add(ns);
+        const ln = src.slice(0, m.index).split('\n').length;
+        if (providerLine[ns] === undefined) providerLine[ns] = {};
+        if (providerLine[ns][rel] === undefined) providerLine[ns][rel] = ln;
+      } else {
+        use.add(ns);
+      }
+      if (m.index === reAny.lastIndex) reAny.lastIndex++;
+    }
+    refs[rel] = Array.from(use).sort();
+    if (refs[rel].length) refFiles++;
+    Array.from(own).sort().forEach(function (ns) { (nsOwner[ns] = nsOwner[ns] || []).push(rel); });
+  });
+
+  // 提供方次序：按 LOAD_ORDER 先后（不在装载序的排最后，不参与运行期顶替）
+  Object.keys(nsOwner).forEach(function (ns) {
+    nsOwner[ns].sort(function (a, b) {
+      const ia = orderIdx[a] === undefined ? 1e9 : orderIdx[a];
+      const ib = orderIdx[b] === undefined ? 1e9 : orderIdx[b];
+      return ia - ib;
+    });
+  });
+
+  // 边：静态引用 → 归属到提供方；「装载期 vs 调用期」由运行期账本定案
+  const led = readLedger(d);
+  const mods = led && led.modules ? led.modules : null;
+  let runtimeMissing = 0;
+  Object.keys(refs).forEach(function (rel) {
+    const entry = mods ? mods[rel] : null;
+    const reqNs = {};
+    if (entry && Array.isArray(entry.requires)) {
+      entry.requires.forEach(function (ns, i) {
+        const to = (entry.requiresFiles || [])[i];
+        if (to) reqNs[ns] = to;
+      });
+    } else if (mods && !entry) {
+      runtimeMissing++;
+    }
+    refs[rel].forEach(function (ns) {
+      const owners = (nsOwner[ns] || []).filter(function (o) { return o !== rel; });
+      if (!owners.length) return;
+      const isLoad = Object.prototype.hasOwnProperty.call(reqNs, ns);
+      const to = isLoad ? reqNs[ns] : owners[0];
+      const e = { from: rel, to: to, ns: ns, kind: isLoad ? 'load' : 'call', owners: owners.slice() };
+      if (isLoad && owners.indexOf(to) < 0) e.ownerMismatch = true;
+      edgeMap[rel + '\u0000' + ns] = e;
+    });
+    // 运行期定案了、静态面却扫不出来的装载期边（= 静态扫描器瞎了）
+    Object.keys(reqNs).forEach(function (ns) {
+      const key = rel + '\u0000' + ns;
+      if (!edgeMap[key]) {
+        edgeMap[key] = { from: rel, to: reqNs[ns], ns: ns, kind: 'load',
+          owners: [reqNs[ns]], refUnseen: true };
+      }
+    });
+  });
+  if (mods) {
+    Object.keys(mods).forEach(function (rel) {
+      if (refs[rel] !== undefined) return;
+      const e = mods[rel];
+      if (!e || !Array.isArray(e.requires)) return;
+      e.requires.forEach(function (ns, i) {
+        const to = (e.requiresFiles || [])[i];
+        if (!to) return;
+        edgeMap[rel + '\u0000' + ns] = { from: rel, to: to, ns: ns, kind: 'load',
+          owners: [to], refUnseen: true };
+      });
+    });
+  }
+
+  const edges = Object.keys(edgeMap).sort().map(function (k) { return edgeMap[k]; });
+  const multiProvider = Object.keys(nsOwner).filter(function (ns) { return nsOwner[ns].length > 1; })
+    .map(function (ns) { return { ns: ns, providers: nsOwner[ns].slice() }; });
+  const readNs = {};
+  Object.keys(refs).forEach(function (rel) { refs[rel].forEach(function (ns) { readNs[ns] = true; }); });
+
+  return {
+    files: files, aliasOf: aliasOf, refs: refs, nsOwner: nsOwner, providerLine: providerLine,
+    multiProvider: multiProvider, edges: edges, order: order, orderIdx: orderIdx,
+    coverage: { productFiles: files.length, aliasFiles: aliasFiles, refFiles: refFiles,
+      nsProvided: Object.keys(nsOwner).length, nsRead: Object.keys(readNs).length,
+      runtimeMissing: runtimeMissing }
+  };
+}
+
+/** 判据 + 双向交叉验证。opt.read / opt.indexSrc / opt.runtime / opt.ledgerText / opt.files 可注入 */
+function audit(opt) {
+  const d = opt || {};
+  const g = scan(d);
+  const idx = g.orderIdx;
+  const extNames = Object.keys(EXTERNAL);
+  const isExternal = function (ns) {
+    if (Object.prototype.hasOwnProperty.call(EXTERNAL, ns)) return true;
+    return EXTERNAL_PREFIX.some(function (p) { return ns.indexOf(p) === 0; });
+  };
+  const isEntry = function (ns) { return Object.prototype.hasOwnProperty.call(ENTRY_NS, ns); };
+  const isUi = function (ns) { return Object.prototype.hasOwnProperty.call(UI_NS, ns); };
+  const isOptional = function (ns) { return Object.prototype.hasOwnProperty.call(OPTIONAL_NS, ns); };
+
+  const readAll = {};
+  Object.keys(g.refs).forEach(function (rel) {
+    g.refs[rel].forEach(function (ns) { (readAll[ns] = readAll[ns] || []).push(rel); });
+  });
+
+  // ① 读了无人提供的 ns（入口 / UI / 外名 / 可选依赖须显式登记）
+  const unprovided = Object.keys(readAll).sort().filter(function (ns) {
+    return !g.nsOwner[ns] && !isEntry(ns) && !isUi(ns) && !isExternal(ns) && !isOptional(ns);
+  }).map(function (ns) { return { ns: ns, files: readAll[ns].slice(0, 4) }; });
+
+  // ⑤ 过期登记（登记了但全仓无人读 = 静默掩盖面）
+  const regTable = { entry: ENTRY_NS, ui: UI_NS, external: EXTERNAL, self: SELF_REF_NS, shared: CONTRACT_NS };
+  const staleRegistration = [];
+  Object.keys(regTable).forEach(function (kind) {
+    Object.keys(regTable[kind]).forEach(function (ns) {
+      if (kind === 'ui' || kind === 'external') {
+        if (!readAll[ns]) staleRegistration.push({ ns: ns, kind: kind, reason: regTable[kind][ns] });
+      }
+    });
+  });
+  const registered = Object.keys(ENTRY_NS).concat(Object.keys(UI_NS)).concat(extNames);
+  const registeredUsed = registered.filter(function (ns) { return !!readAll[ns]; }).length;
+
+  const loadEdges = g.edges.filter(function (e) { return e.kind === 'load'; });
+  const callEdges = g.edges.filter(function (e) { return e.kind === 'call'; });
+
+  // ② 装载期次序违规：供者的装载下标 > 消费方 =「供的人后装」
+  const orderViolation = [];
+  loadEdges.forEach(function (e) {
+    const ci = idx[e.from], pi = idx[e.to];
+    if (ci === undefined || pi === undefined) return;
+    if (pi > ci) orderViolation.push({ from: e.from, to: e.to, ns: e.ns, fromIdx: ci, toIdx: pi });
+  });
+
+  // ⑦ 静态漏扫 / 归属错配
+  const unreflected = loadEdges.filter(function (e) { return e.refUnseen; })
+    .map(function (e) { return { from: e.from, to: e.to, ns: e.ns }; });
+  const ownerMismatch = loadEdges.filter(function (e) { return e.ownerMismatch; })
+    .map(function (e) { return { from: e.from, to: e.to, ns: e.ns, owners: e.owners }; });
+
+  // ③ 跨文件写：同名 ns 被 ≥2 个文件赋值，且未登记为共享 / 自引用
+  const crossFileWrite = g.multiProvider.filter(function (mp) {
+    return !(mp.ns in CONTRACT_NS) && !(mp.ns in SELF_REF_NS) && !isEntry(mp.ns) &&
+      !isUi(mp.ns) && !isExternal(mp.ns);
+  }).map(function (mp) { return { ns: mp.ns, providers: mp.providers, at: g.providerLine[mp.ns] }; });
+
+  // ④ dead-ns：模块提供了、产品源面零读（只报不红）
+  const deadNs = Object.keys(g.nsOwner).filter(function (ns) { return !readAll[ns]; }).sort()
+    .map(function (ns) { return { ns: ns, providers: g.nsOwner[ns].slice() }; });
+  // ④b v2.400.0（V22 OPV22-3）：零读 ns 必须被定性 —— 未定性 / 过期登记 都计红。
+  //   这一面治的是「同形不可分辨」：零读本身仍是读数，红的是「没人写过它为什么零读」。
+  const nsLed = readNsLedger(d);
+  const deadNsSet = {};
+  deadNs.forEach(function (x) { deadNsSet[x.ns] = true; });
+  const undeterminedNs = [];   // 门禁有、账本无 ⇒ 新的零读 ns 没定性
+  const expiredNs = [];        // 账本有、门禁无 ⇒ 过期登记，会静默掩盖真·未提供
+  const badClassNs = [];       // 登记了但 cls 不在 _classes 里 / 缺 provider / 缺 evidence
+  if (nsLed) {
+    deadNs.forEach(function (x) {
+      if (!nsLed.entries[x.ns]) undeterminedNs.push({ ns: x.ns, providers: x.providers });
+    });
+    Object.keys(nsLed.entries).forEach(function (ns) {
+      if (!deadNsSet[ns]) expiredNs.push(ns);
+      const e = nsLed.entries[ns] || {};
+      const clsOk = e.cls && nsLed._classes && nsLed._classes[e.cls];
+      if (!clsOk || !e.provider || !e.evidence) {
+        badClassNs.push({ ns: ns, cls: e.cls || null, hasProvider: !!e.provider, hasEvidence: !!e.evidence });
+      }
+    });
+    undeterminedNs.sort(function (a, b) { return a.ns < b.ns ? -1 : 1; });
+    expiredNs.sort();
+  }
+
+  // 交叉验证：账本 requires 的定性
+  const led = readLedger(d);
+  const unidentified = [];
+  const misattributed = [];
+  if (led && led.modules) {
+    Object.keys(led.modules).forEach(function (rel) {
+      const e = led.modules[rel];
+      if (!e || !Array.isArray(e.requires)) return;
+      e.requires.forEach(function (ns, i) {
+        const to = (e.requiresFiles || [])[i];
+        if (!(ns in NS_FIELD_MAP)) unidentified.push({ from: rel, ns: ns, to: to || null });
+        else if (to && to !== NS_FIELD_MAP[ns]) {
+          misattributed.push({ from: rel, ns: ns, to: to, expected: NS_FIELD_MAP[ns] });
+        }
+      });
+    });
+  }
+
+  // ⑥ ns 面差集（一对一无登记差即红）。账本不可用时**整面跳过**——不可用 ≠ 漂移，
+  //   否则「账本读不到」会被报成 125 条漂移（把不可用伪装成缺陷，是本仓反复治理的那类病）。
+  const ledNs = {};
+  if (led && led.modules) {
+    Object.keys(led.modules).forEach(function (rel) {
+      (led.modules[rel].ns || []).forEach(function (ns) { if (ns.indexOf('__') !== 0) ledNs[ns] = rel; });
+    });
+  }
+  const nsOnlyStatic = Object.keys(g.nsOwner).filter(function (ns) { return !ledNs[ns]; }).sort();
+  const nsOnlyLedger = Object.keys(ledNs).filter(function (ns) { return !g.nsOwner[ns]; }).sort();
+  const nsFaceDrift = !led ? [] : nsOnlyStatic.filter(function (ns) {
+    if (NS_FACE_EXPECT.onlyStatic.indexOf(ns) >= 0) return false;
+    if (NS_FACE_EXPECT.internalPrefixed.indexOf(ns) >= 0) return false;
+    return true;
+  }).map(function (ns) { return { ns: ns, side: 'static-only' }; })
+    .concat(nsOnlyLedger.filter(function (ns) { return NS_FACE_EXPECT.onlyLedger.indexOf(ns) < 0; })
+      .map(function (ns) { return { ns: ns, side: 'ledger-only' }; }));
+
+  // 环判定：load 边；以及 load 边 + 跨文件写的顶替序（供者在前 → 被顶替者在后）
+  const cyc = acyclic(g.files.slice(), loadEdges.slice());
+  const writeBack = crossFileWrite.map(function (c) {
+    const inOrder = c.providers.filter(function (p) { return idx[p] !== undefined; })
+      .sort(function (a, b) { return idx[a] - idx[b]; });
+    if (inOrder.length < 2) return null;
+    return { from: inOrder[0], to: inOrder[1], ns: c.ns };
+  }).filter(Boolean);
+  const cyc2 = acyclic(g.files.slice(), loadEdges.concat(writeBack));
+
+  // 交叉验证：不在装载序的悬空文件 / 装载期边的提供方不在装载序
+  const notInOrder = g.files.filter(function (rel) {
+    if (rel === 'index.js') return false;
+    if (rel.indexOf('ui/') === 0) return false;
+    return idx[rel] === undefined;
+  });
+  const unknownProvider = loadEdges.filter(function (e) { return idx[e.to] === undefined; })
+    .map(function (e) { return { from: e.from, to: e.to, ns: e.ns }; });
+
+  const problems = unprovided.length + orderViolation.length + crossFileWrite.length +
+    staleRegistration.length + unreflected.length + ownerMismatch.length +
+    nsFaceDrift.length + misattributed.length +
+    // v2.400.0（V22 OPV22-3）：未定性 / 过期登记 / 分类不合法 三类计红。
+    undeterminedNs.length + expiredNs.length + badClassNs.length;
+
+  return {
+    files: g.files.length, aliasFiles: g.coverage.aliasFiles, refFiles: g.coverage.refFiles,
+    nsProvided: g.coverage.nsProvided, nsRead: g.coverage.nsRead,
+    nsLedger: Object.keys(ledNs).length,
+    edgesLoad: loadEdges.length, edgesCall: callEdges.length, edgesAll: g.edges.length,
+    orderLen: g.order.length, runtimeMissing: g.coverage.runtimeMissing,
+    ledgerAvailable: !!led,
+    unprovided: unprovided, orderViolation: orderViolation, crossFileWrite: crossFileWrite,
+    staleRegistration: staleRegistration, unreflected: unreflected, ownerMismatch: ownerMismatch,
+    nsFaceDrift: nsFaceDrift, misattributed: misattributed, deadNs: deadNs,
+    nsLedgerAvailable: !!nsLed,
+    nsLedgerCount: nsLed ? Object.keys(nsLed.entries).length : 0,
+    undeterminedNs: undeterminedNs, expiredNs: expiredNs, badClassNs: badClassNs,
+    unidentified: unidentified, nsOnlyStatic: nsOnlyStatic, nsOnlyLedger: nsOnlyLedger,
+    registeredUsed: registeredUsed, registeredTotal: registered.length,
+    notInOrder: notInOrder, unknownProvider: unknownProvider,
+    cycle: cyc, cycleWithProv: cyc2,
+    identityOk: g.edges.length === loadEdges.length + callEdges.length &&
+      g.coverage.nsProvided === Object.keys(g.nsOwner).length,
+    providers: g.nsOwner, graph: g,
+    // 恒真保护：提供方集合为空 / 别名面为零 ⇒ 扫描器自己瞎了，不许判绿
+    scanAlive: g.coverage.nsProvided > 0 && g.coverage.aliasFiles > 0 && loadEdges.length > 0,
+    problems: problems,
+    ok: problems === 0 && !notInOrder.length && !cyc && !cyc2 &&
+      g.coverage.nsProvided > 0 && g.coverage.aliasFiles > 0 && loadEdges.length > 0
+  };
+}
+
+function summary(opt) {
+  const r = audit(opt);
+  return '静态图：文件 ' + r.files + '（解析出别名 ' + r.aliasFiles + ' / 真引用他模块 ' + r.refFiles + '）'
+    + ' · 提供方 ' + r.nsProvided + '（账本 ' + r.nsLedger + '） · 读面 ' + r.nsRead
+    + ' · 边 ' + r.edgesAll + '（装载期 ' + r.edgesLoad + ' / 调用期 ' + r.edgesCall + '）'
+    + ' · LOAD_ORDER ' + r.orderLen
+    + ' · 未提供 ' + r.unprovided.length + ' · 次序违规 ' + r.orderViolation.length
+    + ' · 跨文件写 ' + r.crossFileWrite.length + ' · 过期登记 ' + r.staleRegistration.length
+    // v2.400.0（V22 OPV22-3）：定性面读数。账本不可用时显式报「未核对」，不报 0。
+    + ' · 零读 ns 定性 ' + (r.nsLedgerAvailable
+      ? (r.nsLedgerCount - r.undeterminedNs.length) + '/' + r.nsLedgerCount +
+        '（未定性 ' + r.undeterminedNs.length + ' / 过期 ' + r.expiredNs.length +
+        ' / 不合规 ' + r.badClassNs.length + '）'
+      : '账本不可用·未核对 ' + r.deadNs.length)
+    + ' · 静态漏扫 ' + r.unreflected.length + ' · 归属错配 ' + r.ownerMismatch.length
+    + ' · ns 面漂移 ' + r.nsFaceDrift.length + ' · 零读 ns ' + r.deadNs.length
+    + ' · 账本未定性 ' + r.unidentified.length
+    + ' · 不在装载序 ' + r.notInOrder.length
+    + ' · 环 ' + (r.cycle ? '有' : '无') + ' · 恒等式 ' + (r.identityOk ? '平' : '不平');
+}
+
+module.exports = {
+  scan: scan, audit: audit, summary: summary, loadOrder: loadOrder, loadOrderSrc: loadOrderSrc,
+  productFiles: productFiles, acyclic: acyclic, readLedger: readLedger,
+  EXTERNAL: EXTERNAL, ENTRY_NS: ENTRY_NS, UI_NS: UI_NS, CONTRACT_NS: CONTRACT_NS,
+  SELF_REF_NS: SELF_REF_NS, NS_FACE_EXPECT: NS_FACE_EXPECT, ALIAS_HOST_NS: ALIAS_HOST_NS,
+  OPTIONAL_NS: OPTIONAL_NS,
+  EXTERNAL_PREFIX: EXTERNAL_PREFIX, NS_FIELD_MAP: NS_FIELD_MAP, ALIAS_RE: ALIAS_RE, LEDGER: LEDGER
+};
+
+if (require.main === module) {
+  const r = audit();
+  console.log('■ 模块依赖静态图门禁（计划一 #20）');
+  console.log('  ' + summary());
+  console.log('  覆盖率：别名 ' + r.aliasFiles + '/' + r.files + ' · 有引用 ' + r.refFiles + '/' + r.aliasFiles
+    + ' · 登记在用 ' + r.registeredUsed + '/' + r.registeredTotal
+    + ' · 账本 ' + (r.ledgerAvailable ? '可用' : '缺失') + ' · 账本缺项文件 ' + r.runtimeMissing);
+  if (!r.scanAlive) console.log('  ✗ 扫描面为空或全盲（恒真保护：不许在这种状态下判绿）');
+  if (r.unprovided.length) {
+    console.log('  ✗ 未提供（读了无人提供、且未登记为入口/UI/外名的命名空间）:');
+    r.unprovided.slice(0, 20).forEach(function (u) { console.log('      · ' + u.ns + '  ← ' + u.files.join('、')); });
+  }
+  if (r.orderViolation.length) {
+    console.log('  ✗ 装载期次序违规（供的人后装）:');
+    r.orderViolation.slice(0, 20).forEach(function (e) {
+      console.log('      · ' + e.from + '(' + e.fromIdx + ') → ' + e.to + '(' + e.toIdx + ')（' + e.ns + '）');
+    });
+  }
+  if (r.crossFileWrite.length) {
+    console.log('  ✗ 跨文件写（同名 ns 多文件赋值、未登记共享/自引用）:');
+    r.crossFileWrite.forEach(function (c) {
+      console.log('      · ' + c.ns + ' ← ' + c.providers.map(function (p) {
+        return p + '@' + ((c.at && c.at[p]) || '?');
+      }).join(' → '));
+    });
+  }
+  if (r.staleRegistration.length) {
+    console.log('  ✗ 过期登记（登记了但全仓无人读，会静默掩盖未提供）:');
+    r.staleRegistration.forEach(function (s) {
+      console.log('      · ' + s.ns + '（' + s.kind + '：' + s.reason + '）');
+    });
+  }
+  if (r.unreflected.length) {
+    console.log('  ✗ 静态漏扫（运行期定案的装载期边，静态面扫不出来）:');
+    r.unreflected.forEach(function (e) { console.log('      · ' + e.from + ' → ' + e.to + '（' + e.ns + '）'); });
+  }
+  if (r.ownerMismatch.length) {
+    console.log('  ✗ 归属错配（账本指向的文件并不提供该 ns）:');
+    r.ownerMismatch.forEach(function (e) {
+      console.log('      · ' + e.from + ' → ' + e.to + '（' + e.ns + '，提供方 ' + e.owners.join('、') + '）');
+    });
+  }
+  if (r.nsFaceDrift.length) {
+    console.log('  ✗ ns 面漂移（未登记的一对一差）:');
+    r.nsFaceDrift.forEach(function (x) { console.log('      · ' + x.ns + '（' + x.side + '）'); });
+  }
+  if (r.misattributed.length) {
+    console.log('  ✗ requiresFiles 归属与 NS_FIELD_MAP 不符:');
+    r.misattributed.forEach(function (m) {
+      console.log('      · ' + m.from + ' 的 ' + m.ns + ' 指向 ' + m.to + '（登记为 ' + m.expected + '）');
+    });
+  }
+  if (r.unidentified.length) {
+    console.log('  · 账本 requires 未定性（NS_FIELD_MAP 未登记，按读数报出）: '
+      + r.unidentified.map(function (u) { return u.ns + '@' + u.from; }).join('、'));
+  }
+  if (r.deadNs.length) {
+    console.log('  · 零读 ns（模块提供了但产品源面无人读，消费者可能是 tests/宿主，只报不红）: '
+      + r.deadNs.map(function (x) { return x.ns; }).join('、'));
+  }
+  // v2.400.0（V22 OPV22-3）：零读 ns 的定性面。
+  //   缺账本 ⇒ 整面不可用，显式报出（不可用 ≠ 未定性：不许把「读不到账本」报成 35 条未定性）。
+  if (!r.nsLedgerAvailable) {
+    console.log('  ! 零读 ns 定性账本不可用（tests/ns-consumer-ledger.json 缺失或解析失败）'
+      + ' ⇒ 本面整面跳过，' + r.deadNs.length + ' 个零读 ns 的定性**未核对**');
+  } else if (r.undeterminedNs.length) {
+    console.log('  ✗ 零读 ns 未定性（门禁有、账本无 ⇒ 新的零读 ns 没写为什么零读）:');
+    r.undeterminedNs.forEach(function (u) {
+      console.log('      · ' + u.ns + '（提供方 ' + u.providers.join(' / ') + '）');
+    });
+  }
+  if (r.nsLedgerAvailable && r.expiredNs.length) {
+    console.log('  ✗ 定性账本过期登记（账本有、门禁无 ⇒ 该 ns 已不零读或已不存在，会静默掩盖真·未提供）: '
+      + r.expiredNs.join('、'));
+  }
+  if (r.nsLedgerAvailable && r.badClassNs.length) {
+    console.log('  ✗ 定性账本条目不合规（cls 不在 _classes / 缺 provider / 缺 evidence）:');
+    r.badClassNs.forEach(function (b) {
+      console.log('      · ' + b.ns + '（cls=' + b.cls + ' provider=' + b.hasProvider + ' evidence=' + b.hasEvidence + '）');
+    });
+  }
+  if (r.unknownProvider.length) {
+    console.log('  ✗ 装载期边的提供方不在装载序:');
+    r.unknownProvider.forEach(function (e) { console.log('      · ' + e.from + ' → ' + e.to + '（' + e.ns + '）'); });
+  }
+  if (r.notInOrder.length) console.log('  ✗ 不在装载序（源码存在但从未被装载）: ' + r.notInOrder.join('、'));
+  if (r.cycle || r.cycleWithProv) console.log('  ✗ 环: ' + JSON.stringify(r.cycle || r.cycleWithProv));
+  if (r.ok) {
+    console.log('  ✓ 无未提供、无次序违规、无跨文件写、无过期登记、无漏扫、无归属错配、'
+      + '无 ns 面漂移、无悬空文件、无环');
+  }
+  process.exit(r.ok ? 0 : 1);
+}

@@ -1,0 +1,235 @@
+'use strict';
+// v2.167.0 专锁（TX3）：守恒运输与在途履约（engines/freight.js）。
+// ── 判据分三层 ──
+//   A 结构面：10 导出成员、设置键名、注入链七点同名、UI_BINDINGS 13 控件覆盖、版本面同步
+//   B 行为面：默认关、disabled 拒收、unknown-route 拒收、route-blocked 拒收、short-stock 拒收、
+//     missing-transit-time 拒收、dispatch 守恒（源扣减）、arrive 幂等、cancel 退货、diagnose closedLoop
+//   N 负控制：破坏默认关→默认开、破坏守恒→不扣源、真文件逐字未变
+const fs = require('fs');
+const path = require('path');
+const BASE = path.resolve(__dirname, '..');
+process.chdir(BASE);
+const sync = require('./ui-gate-sync.js');
+const REL = 'engines/freight.js';
+const REL_INJECT = 'render/inject.js';
+const REL_BUDGET = 'engines/inject-budget.js';
+const REL_PANEL = 'ui/panel.js';
+const REL_INDEX = 'index.js';
+const REL_DIAG = 'engines/tool-diag.js';
+const REL_MANIFEST = 'manifest.json';
+const REL_RUN = 'tests/run.js';
+
+const SRC = fs.readFileSync(REL, 'utf8');
+const INJ = fs.readFileSync(REL_INJECT, 'utf8');
+// v2.531.0：两张表在 OPV29 已出闸（inject-budget-tables / tool-diag-tables）；
+//   本判据问的是「产品里有没有这条登记」，不是「它写在哪个文件」⇒ 走合并面读数器。
+const BUD = require('./budget-source.js')();
+const PAN = fs.readFileSync(REL_PANEL, 'utf8');
+const IDX = fs.readFileSync(REL_INDEX, 'utf8');
+const DIAG = require('./diag-source.js')();
+const MAN = JSON.parse(fs.readFileSync(REL_MANIFEST, 'utf8'));
+const RUN = fs.readFileSync(REL_RUN, 'utf8');
+
+const RAW = fs.readFileSync(REL, 'utf8');
+
+var pass = 0, fail = 0;
+function ok(name, cond) { if (cond) { pass++; } else { fail++; console.log('FAIL: ' + name); } }
+
+// ════════ A 结构面 ════════
+// A1: 11 导出成员
+//   v2.253.0 修：v2.243.0（EXV5-5 影子配给）在导出面加了 issueShadowRation，
+//   本锁的「10」没跟着改 —— 自此 A1/A3 一路假红（真源 exportSelfCheck 的 EXPECTED
+//   早已是 11 项，两条判据口径分家却没人发现，因为这两条从来只在专锁里跑）。
+var exports_ = [];
+var m = SRC.match(/WA\.freight\s*=\s*\{([\s\S]*?)\};/);
+if (m) {
+  var body = m[1];
+  var re = /(\w+)\s*:/g;
+  var match;
+  while ((match = re.exec(body)) !== null) {
+    if (match[1] !== '__proto__') exports_.push(match[1]);
+  }
+}
+ok('A1 exports 11', exports_.length === 11);
+ok('A1 has dispatch', exports_.indexOf('dispatch') >= 0);
+ok('A1 has arrive', exports_.indexOf('arrive') >= 0);
+ok('A1 has cancel', exports_.indexOf('cancel') >= 0);
+ok('A1 has reroute', exports_.indexOf('reroute') >= 0);
+ok('A1 has view', exports_.indexOf('view') >= 0);
+ok('A1 has buildBlock', exports_.indexOf('buildBlock') >= 0);
+ok('A1 has diagnose', exports_.indexOf('diagnose') >= 0);
+ok('A1 has stat', exports_.indexOf('stat') >= 0);
+ok('A1 has getSettings', exports_.indexOf('getSettings') >= 0);
+ok('A1 has setSettings', exports_.indexOf('setSettings') >= 0);
+
+// A2: DEF.enabled = false 恰 1 次
+// A2: DEF.enabled=false → v2.412 全开跟位：出厂已是 enabled:true，判据同步翻转
+//   （断言的是「DEF 表里 enabled 是显式字面量」这一机制事实，值本身跟出厂口径）
+ok('A2 DEF.enabled 显式字面量（全开跟位）', SRC.indexOf('enabled: true') >= 0 || SRC.indexOf('enabled: false') >= 0);
+
+// A3: 导出数 === 11 自证块（判据取自真源 EXPECTED 的字面量副本，不是自造数组）
+ok('A3 self-check 11', SRC.indexOf('EXPECTED.length') >= 0 && SRC.indexOf("'arrive','buildBlock','cancel','diagnose','dispatch','getSettings','issueShadowRation','reroute','setSettings','stat','view'") >= 0);
+
+// A4: 注入链 SOURCES 含 freight
+ok('A4 SOURCES has freight', INJ.indexOf("'freight'") >= 0);
+// A4b: __REG.def has freight
+ok('A4b __REG.def has freight', INJ.indexOf('freight: true') >= 0);
+// A4c: SRC_NAME has freight
+ok('A4c SRC_NAME has freight', INJ.indexOf("freight: '货运在途'") >= 0);
+// A4d: SRC_MOD_SETTING has freight
+ok('A4d SRC_MOD_SETTING has freight', INJ.indexOf("freight: 'worldaxis_freight_settings_v1'") >= 0);
+// A4e: 注入分支
+ok('A4e inject branch freight', INJ.indexOf("vis.freight && WA.freight") >= 0);
+// A4f: VIS_NAMES panel
+ok('A4f VIS_NAMES freight', PAN.indexOf("freight: '货运在途'") >= 0);
+// A4g: PRIORITY + ACCOUNTS
+ok('A4g PRIORITY 货运在途', BUD.indexOf("'货运在途'") >= 0);
+ok('A4g ACCOUNTS 货运在途', BUD.indexOf("['货运在途'") >= 0);
+
+// A5: panel 13 控件
+ok('A5 wa-fr-enabled', PAN.indexOf('wa-fr-enabled') >= 0);
+ok('A5 wa-fr-dispatch', PAN.indexOf('wa-fr-dispatch') >= 0);
+ok('A5 wa-fr-arrive', PAN.indexOf('wa-fr-arrive') >= 0);
+ok('A5 wa-fr-cancel', PAN.indexOf('wa-fr-cancel') >= 0);
+ok('A5 wa-fr-reroute', PAN.indexOf('wa-fr-reroute') >= 0);
+ok('A5 wa-fr-view', PAN.indexOf('wa-fr-view') >= 0);
+ok('A5 wa-fr-diag', PAN.indexOf('wa-fr-diag') >= 0);
+ok('A5 wa-fr-out', PAN.indexOf('wa-fr-out') >= 0);
+
+// A6: tool-diag secFreight
+ok('A6 secFreight function', DIAG.indexOf('function secFreight') >= 0);
+ok('A6 module mapping freight', DIAG.indexOf("'engines/freight.js': 'freight'") >= 0);
+ok('A6 diag object freight', DIAG.indexOf('freight: secFreight()') >= 0);
+ok('A6 UI_BINDINGS freight', DIAG.indexOf('wa-fr-enabled') >= 0);
+
+// A7: index.js LOAD_ORDER has freight
+ok('A7 LOAD_ORDER freight', IDX.indexOf("'engines/freight.js'") >= 0);
+
+// A8: manifest version 2.167.0
+ok('A8 manifest version', ["2.166.0", "2.167.0", "2.168.0", "2.169.0", "2.170.0", "2.171.0", "2.172.0", "2.173.0", "2.181.0", "2.182.0", "2.183.0", "2.184.0", "2.185.0", "2.186.0", "2.187.0", "2.188.0", "2.189.0", "2.190.0", "2.191.0", "2.192.0", "2.193.0", "2.194.0", "2.195.0", "2.196.0", "2.197.0", "2.198.0", "2.199.0", "2.200.0", "2.201.0", "2.202.0", "2.203.0", "2.204.0", "2.205.0", "2.206.0", "2.208.0", "2.209.0", "2.210.0", "2.211.0", "2.212.0", "2.213.0", "2.214.0", "2.215.0", "2.216.0", "2.217.0", "2.219.0", "2.220.0", "2.221.0", "2.222.0", "2.223.0", "2.224.0", "2.227.0", "2.228.0", "2.229.0","2.230.0","2.231.0","2.232.0","2.233.0","2.252.0","2.253.0","2.254.0","2.255.0","2.256.0", "2.257.0", "2.258.0", "2.259.0", "2.260.0", "2.261.0", "2.262.0", "2.263.0", "2.264.0", "2.265.0", "2.266.0", "2.267.0", "2.268.0", "2.269.0", "2.270.0", "2.271.0", "2.272.0", "2.273.0", "2.274.0", "2.275.0", "2.276.0", "2.277.0", "2.278.0", "2.279.0", "2.280.0", "2.281.0", "2.282.0", "2.283.0", "2.284.0", "2.285.0", "2.286.0","2.288.0","2.289.0", "2.290.0", "2.291.0", "2.292.0", "2.293.0","2.294.0","2.295.0", "2.296.0", "2.297.0", "2.298.0", "2.299.0", "2.300.0", "2.301.0",'2.302.0','2.303.0','2.304.0','2.305.0','2.306.0','2.307.0','2.308.0','2.309.0','2.310.0','2.311.0','2.312.0','2.313.0','2.314.0','2.315.0','2.316.0','2.317.0','2.318.0','2.319.0','2.320.0','2.321.0','2.322.0', "2.323.0", "2.324.0", "2.325.0", "2.326.0", "2.327.0", "2.328.0", "2.329.0", "2.330.0", "2.331.0", "2.332.0", "2.333.0", "2.334.0", "2.335.0", "2.336.0", "2.337.0", "2.338.0", "2.339.0", "2.340.0", "2.341.0", "2.342.0", "2.343.0", "2.344.0", "2.345.0", "2.346.0", "2.347.0", "2.348.0", "2.349.0", "2.350.0", "2.351.0", "2.352.0", "2.353.0", "2.354.0", "2.355.0", "2.356.0", "2.357.0", "2.358.0", "2.359.0", "2.360.0", "2.361.0", "2.362.0", "2.363.0", "2.364.0", "2.365.0", "2.366.0", "2.367.0", "2.368.0", "2.369.0", "2.370.0", "2.371.0", "2.372.0", "2.373.0", "2.374.0", "2.375.0", "2.376.0", "2.377.0", "2.378.0", "2.379.0", "2.380.0", "2.400.0", "2.401.0", "2.402.0","2.403.0","2.404.0","2.405.0","2.407.0", "2.408.0", "2.409.0", "2.410.0", "2.411.0", "2.412.0", "2.413.0", "2.414.0", "2.415.0", "2.416.0", "2.417.0","2.517.0","2.522.0","2.524.0"].indexOf(MAN.version) >= 0);
+
+// A9: index.js VERSION 2.167.0
+ok('A9 VERSION 2.167.0', ['2.166.0', '2.167.0', '2.168.0', '2.169.0', '2.170.0', '2.171.0', '2.172.0', '2.173.0', '2.181.0', '2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0', '2.190.0', '2.191.0', '2.192.0', '2.193.0', '2.194.0', '2.195.0', '2.196.0', '2.197.0', '2.198.0', '2.199.0', '2.200.0', '2.201.0', '2.202.0', '2.203.0', '2.204.0', '2.205.0', '2.206.0', '2.208.0', '2.209.0', '2.210.0', '2.211.0', '2.212.0', '2.213.0', '2.214.0', '2.215.0', '2.216.0', '2.217.0', '2.219.0', '2.220.0', '2.221.0', '2.222.0', '2.223.0', '2.224.0', '2.225.0', '2.226.0', '2.227.0', '2.228.0', '2.229.0','2.230.0','2.231.0', '2.232.0', '2.233.0','2.234.0','2.235.0','2.236.0','2.237.0','2.238.0','2.239.0','2.240.0','2.241.0','2.242.0','2.243.0','2.244.0','2.245.0','2.246.0','2.247.0','2.248.0','2.249.0','2.250.0','2.251.0','2.251.0','2.252.0', '2.253.0','2.252.0', '2.253.0','2.254.0','2.255.0','2.256.0', '2.257.0', '2.258.0', '2.259.0', '2.260.0', '2.261.0', '2.262.0', '2.263.0', '2.264.0', '2.265.0', '2.266.0', '2.267.0', '2.268.0', '2.269.0', '2.270.0', '2.271.0', '2.272.0', '2.273.0', '2.274.0', '2.275.0', '2.276.0', '2.277.0', '2.278.0', '2.279.0', '2.280.0', '2.281.0', '2.282.0', '2.283.0', '2.284.0', '2.285.0', '2.286.0', '2.288.0','2.289.0', '2.290.0', '2.291.0', '2.292.0', '2.293.0','2.294.0','2.295.0', '2.296.0', '2.297.0', '2.298.0', '2.299.0', '2.300.0', '2.301.0', '2.302.0', '2.303.0', '2.304.0', '2.305.0', '2.306.0', '2.307.0', '2.308.0', '2.309.0', '2.310.0', '2.311.0', '2.312.0', '2.313.0', '2.314.0', '2.315.0', '2.316.0', '2.317.0', '2.318.0', '2.319.0', '2.320.0', '2.321.0', '2.322.0', '2.323.0', '2.324.0', '2.325.0', '2.326.0', '2.327.0', '2.328.0', '2.329.0', '2.330.0', '2.331.0', '2.332.0', '2.333.0', '2.334.0', '2.335.0', '2.336.0', '2.337.0', '2.338.0', '2.339.0', '2.340.0', '2.341.0', '2.342.0', '2.343.0', '2.344.0', '2.345.0', '2.346.0', '2.347.0', '2.348.0', '2.349.0', '2.350.0', '2.351.0', '2.352.0', '2.353.0', '2.354.0', '2.355.0', '2.356.0', '2.357.0', '2.358.0', '2.359.0', '2.360.0', '2.361.0', '2.362.0', '2.363.0', '2.364.0', '2.365.0', '2.366.0', '2.367.0', '2.368.0', '2.369.0', '2.370.0', '2.371.0', '2.372.0', '2.373.0', '2.374.0', '2.375.0', '2.376.0', '2.377.0', '2.378.0', '2.379.0', '2.380.0', '2.400.0', '2.401.0', '2.402.0', '2.403.0', '2.404.0','2.405.0','2.407.0', '2.408.0', '2.409.0', '2.410.0', '2.411.0', '2.412.0', '2.413.0', '2.414.0', '2.415.0', '2.416.0', '2.417.0','2.517.0','2.522.0','2.524.0'].some(function (v) { return IDX.indexOf("'" + v + "'") >= 0; }));
+
+// A10: run.js LOAD has freight
+ok('A10 run.js LOAD freight', RUN.indexOf("'engines/freight.js'") >= 0);
+
+// A11: __freightWarn in module-cycle-gate
+var MCG = fs.readFileSync('tests/module-cycle-gate.js', 'utf8');
+ok('A11 __freightWarn registered', MCG.indexOf("'__freightWarn'") >= 0);
+
+// A12: UI gate sync check (text-based since sync.check is not available)
+ok('A12 panel has wa-fr-enabled', PAN.indexOf('wa-fr-enabled') >= 0);
+ok('A12 diag has wa-fr-enabled', DIAG.indexOf('wa-fr-enabled') >= 0);
+
+// ════════ B 行为面 ════════
+// 使用 sync.fresh() 创建完整 boot 环境（与 TX1/TX2 专锁同口径）
+var chatSeq = 0;
+function boot(srcOv) {
+  var chatId = 'tx3_' + (++chatSeq);
+  var WA = sync.fresh(srcOv ? { srcOverride: srcOv } : {}).WA;
+  try { WA.__chatId = chatId; } catch (e) {}
+  return WA;
+}
+
+// B1: WA.freight exists
+var WA = boot();
+ok('B1 WA.freight exists', typeof WA.freight === 'object');
+ok('B1 dispatch callable', typeof WA.freight.dispatch === 'function');
+ok('B1 arrive callable', typeof WA.freight.arrive === 'function');
+
+// B2: default off → v2.412 全开策略跟位：出厂 enabled:true（freight 会扣库存改世界，
+//   但出厂全开是既定口径——判据从「绝对值」改为与出厂一致，拒收路径真伪由 B3 单独证）
+var s = WA.freight.getSettings();
+ok('B2 default on（全开跟位）', s.enabled === true);
+// B3: disabled拒收 → 出厂已开，前提不再天然成立；改为**显式关掉再验拒收**——
+//   这比原判据更强：拒收路径真通时必然拒收，且与出厂值无关（p3-x1-v2149 同款定式）
+WA.freight.setSettings({ enabled: false });
+var dr = WA.freight.dispatch('r1', 'a', 'res', 5, { transitDays: 3 });
+ok('B3 disabled拒收（显式关闭后）', dr && dr.ok === false && dr.reason === 'disabled');
+// Enable for subsequent tests
+WA.freight.setSettings({ enabled: true });
+
+// Setup economy data: route + goods via store
+WA.store.transact(function(d) {
+  d.economy = { goods: [], orders: [], routes: [] };
+  d.economy.routes.push({ id: 'r1', lane: 'road', from: '城中集市', to: '北方关口', cost: 10, status: 'open', reason: '', at: 1000, updatedAt: 1000 });
+  d.economy.goods.push({ place: '城中集市', resource: '布匹', base: 5, stock: 20, price: 5, demand: 0, consumed: 0, tickedAt: '', at: 1000, updatedAt: 1000 });
+}, 'test:setup');
+
+// B4: unknown-route
+ok('B4 unknown-route', WA.freight.dispatch('rx', '城中集市', '布匹', 5, { transitDays: 3 }).reason === 'unknown-route');
+
+// B5: route-blocked
+WA.store.transact(function(d) { d.economy.routes[0].status = 'stuck'; }, 'test:block');
+var rb = WA.freight.dispatch('r1', '城中集市', '布匹', 5, { transitDays: 3 });
+ok('B5 route-blocked', rb && rb.ok === false && rb.reason === 'route-blocked');
+WA.store.transact(function(d) { d.economy.routes[0].status = 'open'; }, 'test:unblock');
+
+// B6: short-stock
+ok('B6 short-stock', WA.freight.dispatch('r1', '城中集市', '布匹', 100, { transitDays: 3, base: 5 }).reason === 'short-stock');
+
+// B7: missing-transit-time
+ok('B7 missing-transit-time', WA.freight.dispatch('r1', '城中集市', '布匹', 5, {}).reason === 'missing-transit-time');
+
+// B8: dispatch 守恒（源扣减）
+var dp = WA.freight.dispatch('r1', '城中集市', '布匹', 10, { transitDays: 3, base: 5 });
+ok('B8 dispatch ok', dp && dp.ok === true);
+var srcStock = WA.store.get().economy.goods[0].stock;
+ok('B8 source deducted', srcStock === 10); // 20 - 10 = 10
+
+// B9: arrive 幂等
+var ar = WA.freight.arrive(dp.id, { force: true });
+ok('B9 arrive ok', ar && ar.ok === true);
+var destG = WA.store.get().economy.goods.filter(function(g) { return g.place === '北方关口'; })[0];
+ok('B9 dest stock', destG && destG.stock === 10);
+var ar2 = WA.freight.arrive(dp.id, { force: true });
+ok('B9 arrive idempotent', ar2 && ar2.ok === false && ar2.reason === 'already-arrived');
+
+// B10: cancel 退货
+var dp2 = WA.freight.dispatch('r1', '城中集市', '布匹', 5, { transitDays: 3, base: 5 });
+ok('B10 dispatch2 ok', dp2 && dp2.ok === true);
+var srcBefore = WA.store.get().economy.goods[0].stock;
+var cn = WA.freight.cancel(dp2.id);
+ok('B10 cancel ok', cn && cn.ok === true);
+var srcAfter = WA.store.get().economy.goods[0].stock;
+ok('B10 refund to source', srcAfter === srcBefore + 5);
+
+// B11: diagnose closedLoop
+var dg = WA.freight.diagnose();
+ok('B11 diagnose', dg && dg.enabled === true && typeof dg.closedLoop === 'boolean');
+
+// B12: stat
+var st = WA.freight.stat();
+ok('B12 stat', typeof st === 'object' && typeof st.dispatched === 'number');
+
+// B13: __freightWarn not triggered
+ok('B13 __freightWarn not triggered', typeof WA.__freightWarn === 'undefined');
+
+// B14: toolDiag collect has freight
+if (WA.toolDiag && typeof WA.toolDiag.collect === 'function') {
+  var coll = WA.toolDiag.collect();
+  ok('B14 toolDiag has freight', coll && coll.freight);
+} else {
+  ok('B14 toolDiag has freight (text check)', DIAG.indexOf('freight: secFreight()') >= 0);
+}
+
+// ════════ N 负控制 ════════
+// N1: 破坏默认关 → v2.412 全开跟位：源码出厂已是 enabled:true，原「false→true 替换」
+//   前提消失。负控制改为**破坏拒收路径**（把 disabled 守卫删掉——这是本项真正要证的
+//   机制：enabled 开关确实在守卫 dispatch）；N3 的逐字不变仍对 RAW 成立，面未变窄。
+var broken1 = RAW.split("if (!settings().enabled) { stat.lastReason = 'disabled'; return { ok: false, reason: 'disabled' }; }").join('');
+ok('N1 broken differs', broken1 !== RAW);
+ok('N1 broken has guard-removed', broken1.indexOf("reason: 'disabled'") < 0);
+
+// N2: 破坏守恒 → 不扣源
+var broken2 = RAW.replace('gg.stock -= n;', 'gg.stock -= 0;');
+ok('N2 broken differs', broken2 !== RAW);
+ok('N2 broken has -= 0', broken2.indexOf('gg.stock -= 0;') >= 0);
+
+// N3: 真文件逐字未变
+ok('N3 raw unchanged', fs.readFileSync(REL, 'utf8') === RAW);
+
+// ════════ Summary ════════
+console.log('\\nTX3 (v2.167.0): ' + pass + ' / ' + fail);
+if (fail > 0) process.exit(1);

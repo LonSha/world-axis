@@ -1,0 +1,240 @@
+#!/usr/bin/env node
+// v2.166.0 专锁（TX2）：人物动机、计划、行动与反馈闭环（engines/agency.js）。
+//
+// ── 本锁治的三件事（TX2 原文落地）──────────────────────────────
+//   TX2 要求「人物动机、计划、行动与反馈闭环」——回执驱动步结算，不是定时器自动推进步。
+//   它是 life / plan / act 三模块的协调者，只调既有 API，不复制状态。
+//   本锁锁的就是这条边界，以及它带来的三处静默失效风险：
+//     ① 凭空造步骤：schedule 无计划时自动编步骤 ⇒ AI 被跳过、步骤来源不可追溯
+//     ② 定时器推步：不靠回执自动结算步 ⇒ 步骤在 AI 不知情的情况下推进
+//     ③ 协调者变写者：agency 自己写目标/计划/行动 ⇒ 三模块的「唯一写者」契约被打破
+//
+// ── 判据分三层 ──────────────────────────────────────────────────
+//   A 结构面：7 导出成员、设置键名、注入链七点同名、UI_BINDINGS 6 控件覆盖
+//   B 行为面（真 API）：默认关、disabled 拒收、missing-person 拒收、no-active-goal、
+//     need-steps（不编步骤）、诊断面 closedLoop、统计面自增
+//   N 负控制：破坏后行为必须改变
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const BASE = path.resolve(__dirname, '..');
+process.chdir(BASE);
+const sync = require('./ui-gate-sync.js');
+const REL = 'engines/agency.js';
+const REL_INJECT = 'render/inject.js';
+const REL_BUDGET = 'engines/inject-budget.js';
+const REL_PANEL = 'ui/panel.js';
+const REL_INDEX = 'index.js';
+const REL_DIAG = 'engines/tool-diag.js';
+const REL_MANIFEST = 'manifest.json';
+
+// ── 锚点（真源码里各恰中 1 次）─────────────────────────────────
+// 锚点一取**开关默认关**：enabled: false 是刻意的（行动闭环会准入行动，会改世界）。
+const A_DEF = "  const DEF = { enabled: true, maxSchedulePerTurn: 4, maxReceiptsPerTurn: 8, autoPlanExpand: true };";
+// 锚点二取**need-steps 返回**：无计划时不编步骤——步骤由 AI 文本经结构预检产生或由预设模板提供。
+const A_NEED_STEPS = "      return { ok: false, reason: 'need-steps', person: who, goalId: goal.id,";
+// 锚点三取**导出数检查**：7 个成员是契约（getSettings/setSettings/schedule/processReceipts/buildBlock/diagnose/stat）。
+const A_EXPORT_COUNT = "  if (__exportCount !== 7) WA.__agencyWarn = { expected: 7, got: __exportCount };";
+
+function countOcc(s, sub) { return s.split(sub).length - 1; }
+function read(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function ov(file, src) { const o = {}; o[file] = src; return o; }
+let __seq = 0;
+function boot(srcOv) {
+  const chatId = 'tx2_' + (++__seq);
+  const WA = sync.fresh(srcOv ? { srcOverride: srcOv } : {}).WA;
+  try { WA.__chatId = chatId; } catch (e) {}
+  return WA;
+}
+
+/**
+ * 净场：把 agency 的设置键清回出厂态。
+ *
+ * 为什么需要：`enabled: false` 是出厂默认，但它落在 `worldaxis_agency_settings_v1` 上，
+ *   而 mock 的 localStorage 是模块级共享 store —— 同一进程里跨节存活。前序节验过
+ *   「关了能开」之后，那份 true 一路活到本节。清键让 `settingsBus.read()` 重新取 DEF，
+ *   才是「出厂态」这个断言的真实前置条件。
+ */
+function scrubAgencySettings(WA) {
+  let ls = null;
+  try { ls = ((WA && WA.mainWin) || global).localStorage || null; } catch (e) { ls = null; }
+  if (!ls) return 0;
+  try { ls.removeItem('worldaxis_agency_settings_v1'); } catch (e) {}
+  return 1;
+}
+function runA(a) {
+  const src = read(REL);
+  // A1 导出成员恰 7
+  const m = src.match(/WA\.agency\s*=\s*\{[\s\S]*?\};/);
+  a(!!m, 'v2166/tx2 A1: WA.agency 导出块存在');
+  if (m) {
+    const keys = (m[0].match(/^\s+(\w+):/gm) || []).map(function (s) { return s.trim().replace(':', ''); });
+    a(keys.length === 7, 'v2166/tx2 A1: 导出 7 成员（实 ' + keys.length + '：' + keys.join('/') + '）');
+  }
+
+  // A2 默认关
+  a(countOcc(src, A_DEF) === 1, 'v2166/tx2 A2: DEF.enabled=true 恰 1 次（v2.412.0 全开策略跟位）');
+
+  // A3 need-steps 返回
+  a(countOcc(src, A_NEED_STEPS) === 1, 'v2166/tx2 A3: need-steps 返回恰 1 次');
+
+  // A4 导出数检查
+  a(countOcc(src, A_EXPORT_COUNT) === 1, 'v2166/tx2 A4: 导出数 === 7 检查恰 1 次');
+
+  // A5 注入链七点同名：'行动调度' 在 inject.js 出现
+  const inj = read(REL_INJECT);
+  a(inj.indexOf("agency: '行动调度'") !== -1, 'v2166/tx2 A5: inject.js SRC_NAME 有行动调度');
+  a(inj.indexOf('agency: true') !== -1, 'v2166/tx2 A5: inject.js __REG.def 有 agency');
+  a(inj.indexOf("'agency'") !== -1, 'v2166/tx2 A5: inject.js SOURCES 有 agency');
+
+  // A6 budget 接线
+  // v2.531.0：PRIORITY / ACCOUNTS 两张表在 OPV29-10 出闸到 inject-budget-tables.js；
+  //   本判据问的是「预算里有没有这条源」，故读合并面（表在前、引擎在后）。
+  const bud = require('./budget-source.js')();
+  a(bud.indexOf("'行动调度'") !== -1, 'v2166/tx2 A6: inject-budget 有行动调度');
+
+  // A7 panel VIS_NAMES
+  const pan = read(REL_PANEL);
+  a(pan.indexOf("agency: '行动调度'") !== -1, 'v2166/tx2 A7: panel VIS_NAMES 有行动调度');
+
+  // A8 tool-diag secAgency + UI_BINDINGS
+  const diag = require('./diag-source.js')();
+  a(diag.indexOf('function secAgency') !== -1, 'v2166/tx2 A8: tool-diag 有 secAgency');
+  a(diag.indexOf("'engines/agency.js': 'agency'") !== -1, 'v2166/tx2 A8: tool-diag 模块映射有 agency');
+  a(diag.indexOf('agency: secAgency()') !== -1, 'v2166/tx2 A8: tool-diag diag 对象有 agency');
+  a(diag.indexOf('wa-ag-out') !== -1, 'v2166/tx2 A8: tool-diag UI_BINDINGS 有 wa-ag-out');
+
+  // A9 index.js LOAD_ORDER 有 agency.js
+  const idx = read(REL_INDEX);
+  a(idx.indexOf("'engines/agency.js'") !== -1, 'v2166/tx2 A9: index.js LOAD_ORDER 有 agency.js');
+
+  // A10 manifest 版本
+  const mani = read(REL_MANIFEST);
+  a(['2.166.0', '2.167.0', '2.168.0', '2.169.0', '2.170.0', '2.171.0', '2.172.0', '2.173.0', '2.181.0', '2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0', '2.190.0', '2.191.0', '2.192.0', '2.193.0', '2.194.0', '2.195.0', '2.196.0', '2.197.0', '2.198.0', '2.199.0', '2.200.0', '2.201.0', '2.202.0', '2.203.0', '2.204.0', '2.205.0', '2.206.0', '2.208.0', '2.209.0', '2.210.0', '2.211.0', '2.212.0', '2.213.0', '2.214.0', '2.215.0', '2.216.0', '2.217.0', '2.219.0', '2.220.0', '2.221.0', '2.222.0', '2.223.0', '2.224.0', '2.225.0', '2.226.0', '2.227.0', '2.228.0', '2.229.0','2.230.0','2.231.0', '2.232.0', '2.233.0','2.234.0','2.235.0','2.236.0','2.237.0','2.238.0','2.239.0','2.240.0','2.241.0','2.242.0','2.243.0','2.244.0','2.245.0','2.246.0','2.247.0','2.248.0','2.249.0','2.250.0','2.251.0','2.251.0','2.252.0', '2.253.0','2.252.0', '2.253.0','2.254.0','2.255.0','2.256.0', '2.257.0', '2.258.0', '2.259.0', '2.260.0', '2.261.0', '2.262.0', '2.263.0', '2.264.0', '2.265.0', '2.266.0', '2.267.0', '2.268.0', '2.269.0', '2.270.0', '2.271.0', '2.272.0', '2.273.0', '2.274.0', '2.275.0', '2.276.0', '2.277.0', '2.278.0', '2.279.0', '2.280.0', '2.281.0', '2.282.0', '2.283.0', '2.284.0', '2.285.0', '2.286.0', '2.288.0','2.289.0', '2.290.0', '2.291.0', '2.292.0', '2.293.0','2.294.0','2.295.0', '2.296.0', '2.297.0', '2.298.0', '2.299.0', '2.300.0', '2.301.0', '2.302.0', '2.303.0', '2.304.0', '2.305.0', '2.306.0', '2.307.0', '2.308.0', '2.309.0', '2.310.0', '2.311.0', '2.312.0', '2.313.0', '2.314.0', '2.315.0', '2.316.0', '2.317.0', '2.318.0', '2.319.0', '2.320.0', '2.321.0', '2.322.0', '2.323.0', '2.324.0', '2.325.0', '2.326.0', '2.327.0', '2.328.0', '2.329.0', '2.330.0', '2.331.0', '2.332.0', '2.333.0', '2.334.0', '2.335.0', '2.336.0', '2.337.0', '2.338.0', '2.339.0', '2.340.0', '2.341.0', '2.342.0', '2.343.0', '2.344.0', '2.345.0', '2.346.0', '2.347.0', '2.348.0', '2.349.0', '2.350.0', '2.351.0', '2.352.0', '2.353.0', '2.354.0', '2.355.0', '2.356.0', '2.357.0', '2.358.0', '2.359.0', '2.360.0', '2.361.0', '2.362.0', '2.363.0', '2.364.0', '2.365.0', '2.366.0', '2.367.0', '2.368.0', '2.369.0', '2.370.0', '2.371.0', '2.372.0', '2.373.0', '2.374.0', '2.375.0', '2.376.0', '2.377.0', '2.378.0', '2.379.0', '2.380.0', '2.400.0', '2.401.0', '2.402.0', '2.403.0', '2.404.0','2.405.0','2.407.0', '2.408.0', '2.409.0', '2.410.0', '2.411.0', '2.517.0', '2.524.0'].some(function (v) { return mani.indexOf('"' + v + '"') !== -1; }), 'v2166/tx2 A10: manifest 版本 2.166.0+');
+
+  // A11 版本常量
+  a(['2.166.0', '2.167.0', '2.168.0', '2.169.0', '2.170.0', '2.171.0', '2.172.0', '2.173.0', '2.181.0', '2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0', '2.190.0', '2.191.0', '2.192.0', '2.193.0', '2.194.0', '2.195.0', '2.196.0', '2.197.0', '2.198.0', '2.199.0', '2.200.0', '2.201.0', '2.202.0', '2.203.0', '2.204.0', '2.205.0', '2.206.0', '2.208.0', '2.209.0', '2.210.0', '2.211.0', '2.212.0', '2.213.0', '2.214.0', '2.215.0', '2.216.0', '2.217.0', '2.219.0', '2.220.0', '2.221.0', '2.222.0', '2.223.0', '2.224.0', '2.225.0', '2.226.0', '2.227.0', '2.228.0', '2.229.0','2.230.0','2.231.0', '2.232.0', '2.233.0','2.234.0','2.235.0','2.236.0','2.237.0','2.238.0','2.239.0','2.240.0','2.241.0','2.242.0','2.243.0','2.244.0','2.245.0','2.246.0','2.247.0','2.248.0','2.249.0','2.250.0','2.251.0','2.251.0','2.252.0', '2.253.0','2.252.0', '2.253.0','2.254.0','2.255.0','2.256.0', '2.257.0', '2.258.0', '2.259.0', '2.260.0', '2.261.0', '2.262.0', '2.263.0', '2.264.0', '2.265.0', '2.266.0', '2.267.0', '2.268.0', '2.269.0', '2.270.0', '2.271.0', '2.272.0', '2.273.0', '2.274.0', '2.275.0', '2.276.0', '2.277.0', '2.278.0', '2.279.0', '2.280.0', '2.281.0', '2.282.0', '2.283.0', '2.284.0', '2.285.0', '2.286.0', '2.288.0','2.289.0', '2.290.0', '2.291.0', '2.292.0', '2.293.0','2.294.0','2.295.0', '2.296.0', '2.297.0', '2.298.0', '2.299.0', '2.300.0', '2.301.0', '2.302.0', '2.303.0', '2.304.0', '2.305.0', '2.306.0', '2.307.0', '2.308.0', '2.309.0', '2.310.0', '2.311.0', '2.312.0', '2.313.0', '2.314.0', '2.315.0', '2.316.0', '2.317.0', '2.318.0', '2.319.0', '2.320.0', '2.321.0', '2.322.0', '2.323.0', '2.324.0', '2.325.0', '2.326.0', '2.327.0', '2.328.0', '2.329.0', '2.330.0', '2.331.0', '2.332.0', '2.333.0', '2.334.0', '2.335.0', '2.336.0', '2.337.0', '2.338.0', '2.339.0', '2.340.0', '2.341.0', '2.342.0', '2.343.0', '2.344.0', '2.345.0', '2.346.0', '2.347.0', '2.348.0', '2.349.0', '2.350.0', '2.351.0', '2.352.0', '2.353.0', '2.354.0', '2.355.0', '2.356.0', '2.357.0', '2.358.0', '2.359.0', '2.360.0', '2.361.0', '2.362.0', '2.363.0', '2.364.0', '2.365.0', '2.366.0', '2.367.0', '2.368.0', '2.369.0', '2.370.0', '2.371.0', '2.372.0', '2.373.0', '2.374.0', '2.375.0', '2.376.0', '2.377.0', '2.378.0', '2.379.0', '2.380.0', '2.400.0', '2.401.0', '2.402.0', '2.403.0', '2.404.0','2.405.0','2.407.0', '2.408.0', '2.409.0', '2.410.0', '2.411.0', '2.517.0', '2.524.0'].some(function (v) { return idx.indexOf("VERSION = '" + v + "'") !== -1; }), 'v2166/tx2 A11: index.js VERSION 2.166.0+');
+
+  // A12 panel 6 控件
+  ['wa-ag-enabled', 'wa-ag-person', 'wa-ag-schedule', 'wa-ag-receipts', 'wa-ag-diag', 'wa-ag-out'].forEach(function (id) {
+    a(pan.indexOf(id) !== -1, 'v2166/tx2 A12: panel 有 ' + id);
+  });
+}
+
+function runB(a) {
+  // B1 模块加载 + 7 导出
+  const WA = boot();
+  a(!!WA.agency, 'v2166/tx2 B1: WA.agency 存在');
+  if (!WA.agency) return;
+  ['getSettings', 'setSettings', 'schedule', 'processReceipts', 'buildBlock', 'diagnose', 'stat'].forEach(function (k) {
+    a(typeof WA.agency[k] === 'function' || typeof WA.agency[k] === 'object', 'v2166/tx2 B1: agency.' + k + ' 可用');
+  });
+
+  // B2 默认关
+  //
+  //   v2.166.0 收口（全量实测：B2/B3 在全量里红、单跑绿）：
+  //     `enabled: false` 是**出厂默认**，而它不是「每次读都重现的常量」——
+  //     `engines/agency.js` 把它落在 `worldaxis_agency_settings_v1`（localStorage，跨节存活）。
+  //     本文件 B4 起就会 `setSettings({ enabled: true })` 验「关了能开」，
+  //     而在**全量**里还有别的节也会开它；那份写盘一路活到本段 ⇒ 读到 true。
+  //     于是 B2 说「默认不是关着的」，B3 跟着读到调度真的排上了。
+  //     这不是产品缺陷：**设置本来就该记住玩家开过**。缺的是本段的前置净场 ——
+  //     「出厂默认」这个断言只有在**出厂态**上才成立，摆出出厂态是本段自己的责任。
+  //     （判据没放宽：仍然要求 enabled === false 且调度返回 disabled。）
+  scrubAgencySettings(WA);
+
+  // v2.412.0 全开策略跟位：净场后回落 DEF 是 enabled:true（现行语义），关闭现场改为显式构造
+  WA.agency.setSettings({ enabled: false });
+  const cfg = WA.agency.getSettings();
+  a(cfg.enabled === false, 'v2166/tx2 B2: 显式关闭后 enabled=false（实 ' + cfg.enabled + '）');
+
+  // B3 disabled 时调度拒收
+  const r1 = WA.agency.schedule('某人', Date.now());
+  a(!r1.ok && r1.reason === 'disabled', 'v2166/tx2 B3: 关着时调度返回 disabled');
+
+  // B4 开启后无人物名拒收
+  WA.agency.setSettings({ enabled: true });
+  const r2 = WA.agency.schedule('', Date.now());
+  a(!r2.ok && r2.reason === 'missing-person', 'v2166/tx2 B4: 空人物名返回 missing-person');
+
+  // B5 无 active goal
+  const r3 = WA.agency.schedule('不存在的人', Date.now());
+  a(!r3.ok && r3.reason === 'no-active-goal', 'v2166/tx2 B5: 无目标人物返回 no-active-goal');
+
+  // B6 有 goal 但无 plan → need-steps（不编步骤）
+  // 需要先给人物加 goal
+  if (WA.life && WA.life.addGoal) {
+    try {
+      WA.life.addGoal('测试员', { id: 'g1', text: '造一座桥', status: 'active' });
+      const r4 = WA.agency.schedule('测试员', Date.now());
+      a(!r4.ok && (r4.reason === 'need-steps' || r4.reason === 'no-plan'),
+        'v2166/tx2 B6: 有目标无计划返回 need-steps 或 no-plan（实 ' + (r4.reason || '?') + '）—— 不编步骤');
+    } catch (e) {
+      a(false, 'v2166/tx2 B6: 造局失败 ' + e.message);
+    }
+  } else {
+    a(true, 'v2166/tx2 B6: life.addGoal 不可用，跳过（无消费方不强制）');
+  }
+
+  // B7 诊断面
+  const d = WA.agency.diagnose();
+  a(typeof d.enabled === 'boolean', 'v2166/tx2 B7: diagnose 返回 enabled');
+  a(typeof d.closedLoop === 'boolean', 'v2166/tx2 B7: diagnose 返回 closedLoop');
+  a(typeof d.lifeAvailable === 'boolean', 'v2166/tx2 B7: diagnose 返回 lifeAvailable');
+
+  // B8 统计面
+  const st = WA.agency.stat();
+  a(typeof st.scheduled === 'number', 'v2166/tx2 B8: stat 返回 scheduled（数字）');
+  a(typeof st.lastReason === 'string', 'v2166/tx2 B8: stat 返回 lastReason（字符串）');
+
+  // B9 buildBlock
+  if (typeof WA.agency.buildBlock === 'function') {
+    const bb = WA.agency.buildBlock();
+    a(bb !== null && bb !== undefined, 'v2166/tx2 B9: buildBlock 返回非 null');
+  }
+
+  // B10 __agencyWarn 未触发（导出数 = 7）
+  a(!WA.__agencyWarn, 'v2166/tx2 B10: __agencyWarn 未触发（导出数 = 7）');
+
+  // B11 tool-diag secAgency 在全量诊断中
+  if (WA.toolDiag && typeof WA.toolDiag.collect === 'function') {
+    const coll = WA.toolDiag.collect();
+    a(!!coll.agency, 'v2166/tx2 B11: toolDiag.collect 有 agency 节');
+  }
+}
+
+function runNegative(a) {
+  const orig = read(REL);
+  // N1 破坏默认开（改成 false）→ 出厂即缺面（v2.412.0 全开策略跟位：方向反转）
+  const b1 = orig.replace('enabled: true,', 'enabled: false,');
+  if (b1 === orig) throw new Error('N1 破坏没有改变源码');
+  scrubAgencySettings(boot());   // 净场：清掉共享 localStorage 里的 agency 设置，让 DEF 真正说话
+  const WA1 = boot(ov(REL, b1));
+  const cfg1 = WA1.agency.getSettings();
+  a(cfg1.enabled === false, 'v2166/tx2 N1: 破坏后默认关（缺陷复现：行动闭环出厂即缺面）');
+
+  // N2 破坏 need-steps（改成 ok:true 编步骤）→ 不返回 need-steps
+  const b2 = orig.replace(A_NEED_STEPS, "      return { ok: true, person: who, goalId: goal.id,");
+  if (b2 === orig) throw new Error('N2 破坏没有改变源码');
+  const WA2 = boot(ov(REL, b2));
+  WA2.agency.setSettings({ enabled: true });
+  if (WA2.life && WA2.life.addGoal) {
+    try { WA2.life.addGoal('测试员N2', { id: 'g1', text: '造桥', status: 'active' }); } catch (e) {}
+    const r2 = WA2.agency.schedule('测试员N2', Date.now());
+    a(r2.ok === true, 'v2166/tx2 N2: 破坏后不返回 need-steps（缺陷复现：凭空造步骤）');
+  }
+
+  // N3 真文件逐字未变
+  a(read(REL) === orig, 'v2166/tx2 N3: 真源码文件逐字未变（破坏只在内存副本）');
+}
+
+function runAll(a) { runA(a); runB(a); }
+module.exports = { REL, A_DEF, A_NEED_STEPS, A_EXPORT_COUNT, runA, runB, runAll, runNegative };
+if (require.main === module) {
+  let pass = 0, fail = 0;
+  const a = function (cond, msg) { if (cond) { pass++; } else { fail++; console.log('  \u2717 ' + msg); } };
+  try { runAll(a); } catch (e) { fail++; console.log('  \u2717 抛出：' + e.message); }
+  try { runNegative(a); } catch (e) { fail++; console.log('  \u2717 负控制抛出：' + e.message); }
+  console.log('S3-TX2-V2166: pass ' + pass + ' / fail ' + fail);
+  process.exit(fail ? 1 : 0);
+}

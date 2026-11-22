@@ -1,0 +1,201 @@
+# Agent Note: WorldAxis 故事优先双计划实施切片
+
+Status: in-progress
+- Plan sources: `plans/WORLDAXIS_STORY_EXPANSION_9.md`（EX-1~EX-9）+ `plans/WORLDAXIS_STORY_OPTIMIZATION_9.md`（OP-1~OP-9），合计严格 18 项。
+- Implementation evidence: `engines/story-window.js`、`engines/tool-diag.js`、`core/store.js`、`core/interceptor.js`、`render/inject.js`、`engines/inject-budget.js`、`index.js`、`tests/run.js`、`tests/story-window-v2518.js`
+- Current test evidence: focused Node regression `story-window: ok`；全量 `node tests/run.js` 52 通过 / 0 失败（source-changed 状态下取得，改动后须重跑取干净结果）；改动文件语法编译全部通过。
+- Remaining: 真实 SillyTavern + Ruby 卡宿主验收（唯一未做的产品验收）。全量回归已解除门控并启动
+  （`node tools/isolated-run.js`，隔离树整趟）；L0/L1 已全绿，L2 诚实拒收 `wide-impact`。
+- Coverage: 18 项**全部有代码落点与专项断言**，其中 OP-7/OP-8/OP-9 为只读证据面（不改 owner 实现）。
+  已无「依赖既有 owner」的悬空项。「有落点」不等于「产品验收通过」。
+  本批另把 L1 快档的五支红全部修绿（含 `tools/test-layers.js` 与 `tools/smart-runner.js` 两个
+  调度侧真缺陷），并把五条段提取绝对基线逐条补账 —— 详见下方「第四批」。
+- Date: 2026-11-16
+
+## Problem
+
+方向已定（见同目录 `2026-11-16-worldaxis-story-first-direction.md`），但「18 项到底落到哪些文件、每一批修掉了什么、哪些读数还只是分层读数」散在提交信息与临时探针里：读者无法从仓库内部回答「这一项有代码落点吗、有专锁吗、宿主要验的是什么」。本笔记把这层实施事实固化成可核对的切片。
+
+## Decision
+
+先以既有 `world`、`act`、`livingWorld`、`elsewhere`、`investigation`、`storyChoice`、`foreshadow`、`rumor` 与 `render/inject` 为 owner，落一个可验收的纵向闭环：正文成功推进只开启一次推进窗口；场外行动必须留下带时间、地点、来源、可靠度和可见条件的痕迹；玩家可选择寻找、请人核实、暂不处理，也可从人物页/线索页询问、跟随、等待；选择提交到既有真实写口，不能由叙述直接制造完成事实。
+
+OP-2 的第一步不新建第二套时钟或位置真源：在行动/世界回执中补充可解释的起止位置、在途状态、时间和证据；未知继续保持未知。OP-5 的第一步不删除既有注入源，而是在结构汇流与主注入账中按当前场景、玩家知识和待处理选择优先，并记录折叠原因。
+
+## Consequences
+
+18 项全部有代码落点与专项断言，`tests/run.js` 挂上了对应专锁；L0/L1 快档全绿，L2 对 `wide-impact` 保持诚实拒收。代价是回归面继续变宽（每项一把专锁），且**仓库侧判据不等于宿主验收**：真实 SillyTavern + Ruby 卡这一条仍未做，本笔记保留 `Status: in-progress` 正是为此，而不是把「没做过」写成「已通过」。
+
+## Alternatives considered
+
+1. 不另建万能 `storyWorld` 状态：会复制人物、位置和时钟 owner。
+2. 不把 `backstage.simulate()` 的异步启动当作结算完成：只消费上一份已提交快照，并显式标记 deferred/running。
+3. 不直接改写 Ruby 卡或关闭其 MVU、Tavern Helper、Regex、世界书机制：Ruby 卡仅作为外部不可变验收输入。
+4. 不用新增注入块替代既有预算裁决：所有新增可见信息必须进入 `injectBudget` 与 `lastInjection` 账。
+
+## 本轮修掉的真实缺陷（不是测试问题，是宿主里会静默失效的接线错）
+
+1. **`world.sendMessage` 按四位置参数调用**：真实签名是 `(from, to, opts)`。参数落到 `opts` 位置被当对象读 ⇒ 传话链静默失败。已改为对象接口。
+2. **`world.depart` 按对象调用**：真实签名是 `(person, from, to, at)` 四个位置参数。已按位置参数调用。
+3. **痕迹正文字段读错**：`living-world` 写出的痕迹正文在 `trace` 字段，早期只读 `summary/text/detail/note` ⇒ 真实宿主里痕迹摘要全空、窗口只剩标题。已补 `t.trace`。
+4. **可见性语义把场外行动挡在门外**：`public` 与 `scene` 同义时，场外 NPC 行动/位移按 `scene` 过滤 ⇒ 玩家不在场就永远看不见 ⇒ 「镜头外的人仍在行动」整条 EX-2 落空。已拆分为 `public`（无条件可发现）与 `scene`（必须同地点）。
+5. **截断按插入顺序取尾部**：窗口同时投影十余个 owner 时，确认事实会被传闻/未结算项整体挤掉（宿主里表现为「正文只剩传闻」）。已改为按可靠度分层保留，确认事实优先占位。
+6. **非 defer 选择被写成 `intervening`**：owner 只回了 `presented/planned/in-transit/registered` 就被记成正在介入。已改为只有 owner 明确 `applied` 才进 `intervening`，其余保持 `awaiting`。
+
+## 18 项覆盖矩阵
+
+每一项都落到既有 owner；**不新建第二套时钟、人物状态、库存或万能世界总管**。
+
+| 项 | 状态 | 承接 owner | 本轮落点 |
+| --- | --- | --- | --- |
+| EX-1 正文推进后世界回应一次 | 已接线 | story-window + interceptor | `core/interceptor.js` 在 after 链与楼层结算提交后调用 `storyWindow.open`，replyId 幂等，重复正文不产生第二个窗口 |
+| EX-2 重要 NPC 持续行动 | 投影已接线 | living-world / act / elsewhere / stage-presence / offstage-life | 窗口投影 `livingWorld.npcMovements`、`acts.rows`、`elsewhere.rows`；只报「谁在何方、在做什么」，不报动机与结果 |
+| EX-3 行动留下可发现的痕迹 | 已接线 | living-world / world / rumor / spatial-trace | 投影 `livingTraces`、已抵达 `world.messages`、`rumor.chains`；每条带时间、地点、来源、可靠度、可见条件 |
+| EX-4 伏笔与暗线可追踪可介入 | 投影已接线 | foreshadow / foreshadow-tree / investigation / longline | 只投 `developing`/`triggered` 伏笔与 `collected` 线索；`waiting` 伏笔与无地点未采集线索留在内部账 |
+| EX-5 从故事上下文长出支线 | 投影已接线 | opportunity / threads / agency | 窗口投影 `opportunity.openings`（仅**有承受者**且仍可介入的，`stage` 在 formed/open/offered/deferred）与 `threads`（open/stalled，照实报「还没有线索」与「目前停滞」）与 `plan.plans`（只投现场人物的 running/blocked 一步）；窗口仍不自造任务、不自己判 entitlement |
+| EX-6 选择产生不同后续 | 已接线 | story-choice / branch-tree / dilemma-bargain | 三个正文入口 + 三个页面入口落到不同 owner 写口，各自留下不同的真实状态 |
+| EX-7 人物记住承诺帮助与冒犯 | 投影已接线 | human-realism / social-legacy / affection-dual-axis / pmem | 窗口只投**玩家自己**的未了结记恨（`humanRealism.grudges`）与悬空托付（`socialLegacy.legacies` 中 `acceptStatus==='pending'`），走新可见性规则 `personal:X`；别人的记恨故意不投（在正文里只能表现为反应，不能表现为玩家读到的心事） |
+| EX-8 失约错过与再次相遇 | 投影已接线 | lifeline / custom-lax / pilgrim-flow / stage-presence | 窗口投影 `world.journeys` 的在途/已抵达状态，人物在途中不是瞬移 |
+| EX-9 人物线索页直接介入正文 | 已接线 | story-window + 人物页 | 新增 `ask` / `follow` / `wait` 三入口，走既有写口，不要求用户编辑 JSON |
+| OP-1 收缩默认体验 | 投影已接线 | inject-budget / settings-bus / inject | 三层收缩：① 与正文推进直接相关的一层照旧；② **现场人物**进行中/受阻的计划一步（`plan.plans`）；③ 全部进 `injectBudget` 与 `lastInjection` 账（注入点 `render/inject.js` 判 `c.name1`，无宿主玩家名不出块） |
+| OP-2 人物位置与移动连续性 | 已接线 | world / elapsed-evidence / world-clock / transit-scheduler | 窗口区分在途/已抵达；`resolvePlace` 用 `world.where` 反查真实位置，不靠窗口自记 |
+| OP-3 知情边界 | 已接线 | epistemic-view / anti-omniscience / rumor-cognition | 可见性规则分 `self/rumor/recipient:/place:/scene/public/internal`；未知规则一律拒绝 |
+| OP-4 动作身体与物品连续性 | 投影已接线 | act / personal-inventory / gear / body-anatomy | 进行中行动只报状态不报结果；已结算回执（`acts.res`）带证据来源 |
+| OP-5 注入减负与当前事实优先 | 已接线 | inject-budget / inject-collector / inject-slot-audit | 注入块按可靠度分组为「已确认的事实」与「尚未确认」两栏；截断按可靠度分层保留 |
+| OP-6 聚合破甲与提示词调试 | 已接线 | tool-diag / inject-inspector / tool-analyzer / output-guard | 新增 `tool-diag` 的 `storyWindow` 诊断节（`secStoryWindow`），答「窗口开了几次、当前挂哪条、玩家那一笔落到哪个 owner 的哪个阶段」 |
+| OP-7 反截断与稳妥续写 | 只读证据面已接线 | reasoning-strip / reject-recovery / reply-guard / advance-idempotence | `evidence().stability`：读 `reasoningStrip.held/blocked`（截断痕迹）、`replyGuard.diagnose().status`（冷却中）、`rejectRecovery.unknown`（认不出的拒答码）、`advanceIdem.aborts/dups`。**dups 是「拦下来的重复推进」= 幂等闸在工作，故记为健康证据而非不稳**；窗口自身仍用稳定 replyId 保证幂等，并新增 `checks.idempotent` 自证位 |
+| OP-8 查降智改为证据诊断 | 只读证据面已接线 | degrade-audit / fact-continuity / model-receipt | `evidence().health`：行为面（`degradeAudit.tpsDrops/tokenDrops`）与身份面（`modelReceipt.drifters().total`）**分开报、互不覆盖**，另加 `factContinuity.stat().faults`。缺席即 `unknown`，不判 ok |
+| OP-9 模型路由与调用过程可视化 | 只读证据面已接线 | model-receipt / token-budget / call-timeline / model-pin / perf-trace | `evidence().routing`：`modelReceipt.stats().channels[].lastRespModel` 答「谁应答了这一轮」、`modelPin.audit()` 答「钉版对不对得上」、`callTimeline.view().rounds[0].criticalChannel/longestMs` 答「卡在哪一段」、`tokenBudget.view().channels[].p95Ms` 给延迟分位。perf-trace 本轮未消费（它读的是渲染分层，与「调用路由」不同面，不硬凑） |
+
+「已接线」= 本轮有代码落点并有专项断言；「投影已接线」= 该项的写口仍属既有 owner，本轮只把它的**已提交事实**接进窗口投影并加断言（不改 owner 实现）。**没有任何一项声明为已完成产品验收**——真实宿主验收仍未执行。
+
+本轮（第二批）新落点：
+
+- `collectTraces` 新增 ⑪机会 ⑫悬案 ⑬计划一步 ⑭私人未了结 四个投影块，各自包在 `safely()` 里：
+  单个 owner 的数据形状异常**不清空整张痕迹表**，但会在 `diagnose().projection` 留下自证（`faults` / `lastFault`），并经 `tool-diag` 的 `secStoryWindow` 露出。
+- 可见性规则新增 `personal:X`（只给本人看的内心事实）与 `known-by`（`knownBy` 知情面）；
+  **未知规则依旧一律拒绝**，`internal` 永不进正文。
+- 介入尝试留账：新增 `storyWindow.respond(id, info)`，只写 `attempts` / `responseCount` / `lastResponse`，
+  **绝不写 `choice`、绝不动 `status`**。owner 拒收时 `choose` 返回 `{ok:false, retryable:true}` 并记一次尝试；
+  人物页在「玩家身份缺失 / 线索已不可见 / 窗口抛错」三条路径上补记同一本账（窗口已记过时不重复记）。
+  结算时会带出 `settlement.responsesBeforeSettle`：结算 ≠ 玩家什么都没做。
+- 人物页线索按钮在提交前以 `visibleTraces` **重校一次可见性**：渲染后变得不可见的线索不得提交。
+- 注入点收敛：`render/inject.js` 不再自持身份闸，改调 `buildBlock({})`，由窗口单点解析宿主的
+  `SillyTavern.getContext().name1`（新增内部 `hostPlayerName()`，解析不到就返回空串 ⇒ 不出块）。
+  触发原因：原写法 `&& c.name1` 在 `c` 为 null 时**当场抛 TypeError**，且同一判断在注入点与窗口
+  两处重复→容易漂移。**身份只有一个真源**。
+- 显示名三处同批登记：`render/inject.js` 的 `SRC_NAME`、`ui/panel.js` 的面板名表、注入分支 `source` 名。
+  漏登记时失败台账会把英文键名 `storyWindow` 直接写给用户看（本轮 `inject-sources-v2560` 的 D 判据当场报出）。
+- 测试面登记：`tests/story-window-people-v2518.js` 原先**从未被全量执行**（`test-surface-gate` 判
+  `unregistered-orphan` 当场现形），已同时登记 `runScript` 档与 `spawnSync` 单跑档。
+  `tests/ruby-card-profile.js` 是需 `RUBY_CARD=<外部卡路径>` 的手动作业入口，已在 `EXEMPT` 里带理由登记。
+- `tests/module-cycle-gate.js` 的 `UI_NS` 补登 `panelPeoplePage` / `panelNowPage`：与既有
+  `panelOverviewBlocks` / `panelOverviewMain` / `panelWorldPulse` **完全同型**（`ui/pages/` 子目录提供，
+  静态图看不见提供方），漏登记即被判「未登记的一对一差（static-only）」。
+
+本地已跑通的 15 支门禁（均为单跑，**不是全量回归**）：三支 story-window 专锁、`inject-vis-v2580`、
+`inject-sources-v2560`、`switch-matrix-v2910`、`test-surface-gate`、`module-cycle-gate`、
+`module-registry-gate`、`member-surface-gate`、`ns-consumer-ledger-v2400`、`registry-identity-v2620`、
+`budget-headroom-v2261`、`version-surface-gate-v2185`、`settings-bus-api-gate`。
+
+### 第三批：OP-7 / OP-8 / OP-9 只读证据面
+
+18 项里最后三项此前一直挂在「依赖既有 owner」，意思是「声明了、但窗口侧没有任何消费点」。
+本批把它们接成**只读投影**：窗口不复制、不缓存、不写回任何上游账。
+
+- 新增三组读数（`storyWindow.evidence()`）：
+  - `stability`（OP-7）：`reasoningStrip` 的 `held/blocked`（截断与清洗痕迹）、`replyGuard` 的 `cooling`
+    状态、`rejectRecovery.unknown`（认不出的拒答码）、`advanceIdem` 的 `aborts`/`dups`。
+  - `health`（OP-8）：行为面 `degradeAudit.tpsDrops/tokenDrops` 与身份面 `modelReceipt.drifters().total`
+    **分开列、互不覆盖**，外加 `factContinuity.stat().faults`。
+  - `routing`（OP-9）：`modelReceipt.stats()` 的 `lastRespModel`（谁应答）、`modelPin.audit()`（钉版对否）、
+    `callTimeline.view()` 的 `criticalChannel/longestMs`（卡在哪段）、`tokenBudget.view()` 的 `p95Ms`。
+- 核心口径：**读不到一律 `unknown`，绝不读成 `clean`**。上游全缺席时 `stability/health/routing` 三组
+  都是 `unknown` 且 `reasons` 为空；正文块也**不加注记**（未知不加戏）。
+- 真有迹象时**必须自己说出来**：`buildBlock` 末尾追加一句
+  「本轮上游有中断或降智迹象：……。上列内容可能不完整，未知仍按未知处理。」
+  只报原因，**不删已确认的事实** —— 上游不稳不是抹掉痕迹的理由。
+- `snap()` 包装每个 owner 的读数：单个 owner 抛错只进该组的 `faults`，同组其它 owner 照常读，
+  不是「一错全空」；故障同时暴露在 `diagnose().evidence.*.faults` 与 `tool-diag` 的 `secStoryWindow.evidence`。
+- 新增 `checks.idempotent`（OP-7 自证位）：同一稳定 `replyId` 在台账里只应有一条。
+- 一处语义辨析：`advanceIdem.dups` 是**被拦下来的**重复推进 —— 幂等闸在工作，是健康证据，
+  记进 `sources` 而不是 `reasons`。把「拦住了」读成「出事了」会把守门人当成事故。
+
+本批新增第四把专锁 `tests/story-window-evidence-v2518.js`（已同时登记 `runScript` 档与 `spawnSync`
+单跑档，否则 `test-surface-gate` 判 `unregistered-orphan`）。它锁的是「怎么如实转述上游的坏消息」：
+① 上游全缺席 ⇒ 三组 `unknown` 且不加注记；② 上游健康 ⇒ `stable/clean/aligned` 且不加注记；
+③ 上游真有截断/降智/漂移 ⇒ 原因逐条进读数与正文块，且措辞是「可能不完整」而非「失败」；
+④ 单个 owner 抛错 ⇒ 其余照常 + 故障入 `faults`；⑤ 幂等自证；⑥ 畸形读数不炸且不编造原因。
+
+本批跑通的单跑面（12 支）：四支 story-window 专锁、`test-surface-gate`、`module-cycle-gate`、
+`module-registry-gate`、`member-surface-gate`、`inject-vis-v2580`、`inject-sources-v2560`、
+`ns-consumer-ledger-v2400`、`registry-identity-v2620`、`budget-headroom-v2261`、
+`version-surface-gate-v2185`、`settings-bus-api-gate`、`switch-matrix-v2910`。
+**仍不是全量回归**；真实宿主验收同样未执行。
+### 第四批：把 L1 快档从红修到绿（并修好调度器自己）
+`352e252` 之后第一次跑 `node tools/smoke.js` 得到 5 支红。**先做因果分离再动手**：
+`git stash push -u` 收走全部改动后重跑，五支在基线（`352e252`）上同样红 ⇒ 它们是上一次提交留下的
+登记欠账，不是本轮新改动引入。这决定了方向是「补账」，不是「回退」。
+- `tests/reject-code-gate.js`：三个未分类码。`already-chosen` / `window-missing` 出现在 `ok:false`
+  返回体里 ⇒ 归 `REJECT_FACE`；`waiting-window-held` 出现在 `ok:true` 返回体里（`wait` 入口无写口可
+  委托时把窗口挂在 `deferred` 上，不产生任何完成事实）⇒ 归 `SUCCESS_FACE`。**注意 `already-chosen`
+  不能靠 `'already-'` 前缀命中** —— 快照比对是逐字相等，`'already-'` 是它自己那条码。三码各配真实
+  见证（`settle` 不存在的窗 / 真开窗+真 defer 再 find / 临时摘掉 `WA.act` 后 `choose('wait')`），
+  见证面 841 → 844。
+- `tools/reject-recovery.js --check`：差额 3 → **0**，承诺与现场逐条一致。
+- `tests/dead-export-gate.js`：6 项 storyWindow 死导出。修法一律是**让引用可见**而不是改判据：
+  `tool-diag` 把 `sw.diagnose()` / `d.stat` 改成 `WA.storyWindow.diagnose()` / `WA.storyWindow.stat()`
+  全名调用（死子面清册 `REF_RE` 只认 `WA<sep>ns<sep>mem` 形态，别名在产品面里是看不见的消费），
+  并把 `settle` 真接进 `core/interceptor.js` 的 after 链：新正文推进前若旧窗仍是 pending，先以
+  `evidence:'superseded-by-next-reply'` 结算它。**「被新正文取代」与「玩家处理完了」在台账里必须可
+  区分** —— 前者是系统行为，后者是玩家行为。另补 `render/inject.js` 的 `SRC_MOD_SETTING` 登记与
+  `ui/panel.js` 的「故事回应窗口」面板节（复选框 + 两个数字框 + 两个只读按钮 + bind 项）。
+  账本重冻结：dead 1694 → 1688，证据复核 1695 条。
+- `tests/segment-extract-v2400.js`：五条绝对基线（B1 447 / B2 5267 / C1a 571 / D3a 18038 / D3f 16240）。
+  **逐常量手改、逐条写来历**，产地用 `git worktree` 各挂一棵只读树按 commit 实测：
+  `BASE_SECTION_CC` 446→447 是 v2.518.0 的 story-window 专锁节（段体文件 `tool-diag-v092.js`
+  本轮**一字未动**，段内 section 仍是 1 ⇒ 这是新挂载点，不是拆段漂移）；
+  `BASE_ASSERT_CC` 5263→5267 是三把窗口锁 + 第四把证据锁的 spawn 收尾断言；
+  `BASE_TEST_FILES` 564→571 是七个真新增测试文件（V25 缝合 / V26 可观测 / 四把 story-window 锁 /
+  `ruby-card-profile`），中间四版连续没跟位，与 v2.403~v2.406 那次同族；
+  `BASE_PANEL_LINES` 17878→18038 与 `BASE_PANEL_FILE_LINES` 16103→16240 是四个 commit 里落在
+  **段体外**的 UI 面增量。**关键自证**：段体读数 692 行一字未变 —— 「段外长了」与「段体长了」
+  在读数上是两件可分辨的事。**拒绝用 `>=` 下界了事**：下界对「面塌了」是瞎的，而那正是 C1a 要钉的。
+- `tools/repo-hygiene.js`：`.git/objects` 下 50.79 MiB garbage / 27.38 MiB loose。按门禁自己给的
+  非破坏性修法 `--gc`（`git gc --prune=now`）回收 ⇒ 0.00 / 0.00，pack 15.38 MiB，`git fsck` 干净。
+  **没有用 `git filter-repo`**：病灶不在历史里，重写历史换不来体积、只会让所有 hash 变。
+- `tools/smart-runner.js`（L2 层）与 `tools/test-layers.js`：两个真缺陷。① `tests/reject-v2780.js`
+  被判 `uncovered-change`，可它**真的在 L1 里执行** —— `tests/reject-code-gate.js`（smoke 成员）
+  `require` 它跑见证表。新增 `fastDeps()`：从 smoke 清单派生**一跳** `require` 依赖（不递归 ——
+  递归会让「快档跑过」这句话不再指明任何东西）。② `test-layers.js` 把注释里的 `ui-gate-sync` 当成
+  共享上下文原语，于是 v2.408.0 节被判 `selfContained=false`、选区永远征不动它，
+  `smart-runner-v2408` 的 B3b 因此必然红。修法取**去注释面**（`locks`/`requires` 仍取原文面：
+  它们是正则捕获的调用形态）。这两条都不是放宽判据：真原语写在代码里照样命中。
+  该锁从基线 25/4 提升到 **29/0**。
+### 本轮最终分层读数（如实分层，不合并成一句「全绿」）
+- L0 门禁层：`dup-decl-gate` / `field-liveness-gate` / `version-consistency` 三支**全绿**。
+- L1 快档层：`node tools/smoke.js` **14/14 全绿**（41.1s）。
+- 四支 story-window 专锁 + `smart-runner-v2408`：单跑全绿（后者 29/0）。
+- L2 增量层：**诚实拒收 `wide-impact`**（选中 56 节，上限 10）。原因是 `ui/panel.js` 被大量节的
+  证据面直引 —— 这不是缺陷，是「定向确实不可信」的正确结论。**不许把它读成通过**。
+- L3 全量层：`plans/V23_MASTER_PLAN.md` 的双计划门控在 18 项全部交付后解除，转由
+  `node tools/isolated-run.js` 在隔离树里整趟跑。**这是本轮唯一能覆盖 `ui/panel.js` 那 56 节水位的
+  验收方式**，故必须跑，且结论以它的机器读数（`WA-ISOLATED-RESULT`）为准。
+
+## 窗口契约（当前实现）
+
+- 状态机：`opened → awaiting / deferred / intervening → settled / failed`。只有 owner 明确 `applied` 才是 `intervening`。
+- 阶段字段 `choiceOutcome.phase`：`deferred / awaiting-owner / presented / planned / registered-awaiting-evidence / message-in-transit / in-transit / accepted`。
+- 入口：`find` / `verify` / `defer`（正文三入口）+ `ask` / `follow` / `wait`（人物页与线索页入口）。
+- 可见性：未知规则默认拒绝；`internal` 永不进正文；`scene` 必须同地点；`public` 无条件可发现。
+- 窗口只**读**既有 owner 的已提交事实，**从不自己造世界状态**。
+
+## 验证标准
+
+- 重复正文/重复事件不会产生第二个推进窗口或第二份痕迹。
+- 推进窗口能区分 `opened`、`settled`、`deferred`、`failed`，且异步推演未完成时不伪报完成。
+- 场外行动的意图、进行中、完成、未确认和失败状态可区分；移动必须有 world journey 证据。
+- 痕迹只在玩家可见条件满足时进入默认正文注入，后台台账可解释来源但不强迫用户管理。
+- 三个入口最终改变不同的真实状态或待处理状态；「暂不处理」不产生伪完成。
+- Node mock 回归通过后，另行在真实 SillyTavern + Ruby 卡宿主验收；无宿主时明确记录未执行而非通过。
+- 上游读数缺席时证据面必须是 `unknown`；把「读不到」报成 `clean` 视为缺陷（`tests/story-window-evidence-v2518.js` 锁住这条）。

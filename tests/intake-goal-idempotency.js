@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('assert');require('./mock.js');
+const W=require('./ui-gate-sync.js').fresh().WA;W.store.init();W.intake.setSettings({enabled:true});
+const payload={people:[{name:'甲',intent:'攒钱修屋顶'}]};
+assert(W.intake.run(payload,{idx:1}).ok);
+const goals=()=>W.store.get().people['p_甲'].life.goals;
+assert.strictEqual(goals().length,1);const id=goals()[0].id;
+W.intake.run(payload,{idx:2});assert.strictEqual(goals().length,1);assert.strictEqual(goals()[0].id,id);
+W.store.transact(d=>{d.people['p_甲'].life.goals[0].status='done';});
+W.intake.run(payload,{idx:3});assert.strictEqual(goals().length,2);
+W.intake.run({people:[{name:'甲',intent:'探望朋友'}]},{idx:4});assert.strictEqual(goals().length,3);
+assert.strictEqual(W.dayRoute.scheduleDomain([{status:'active',start:0,end:6}]).state,'clock');
+assert.strictEqual(W.dayRoute.scheduleDomain([{status:'active',start:1,end:5,timeDomain:'absolute'}]).state,'absolute');
+assert.strictEqual(W.dayRoute.scheduleDomain([{status:'active',start:1,end:5,timeDomain:'bad'}]).state,'unknown');
+console.log('intake goal idempotency: PASS (active dedupe preserves ids; completed and distinct goals remain eligible)');

@@ -1,0 +1,4 @@
+link: proposed/architecture/2026-10-09-worldaxis-batch2-o3o4o5-e2e5.md -> "../plans/O_OPTIMIZATION.md" target file does not exist
+link: proposed/architecture/2026-10-09-worldaxis-batch2-o3o4o5-e2e5.md -> "../plans/E_EXPANSION.md" target file does not exist
+link: proposed/architecture/2026-10-09-worldaxis-batch3-e1.md -> "../plans/O_OPTIMIZATION.md" target file does not exist
+link: proposed/architecture/2026-10-09-worldaxis-batch3-e1.md -> "../plans/E_EXPANSION.md" target file does not exist

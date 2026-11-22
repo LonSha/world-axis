@@ -1,0 +1,13 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
+const source=fs.readFileSync(path.join(__dirname,'../core/store.js'),'utf8');
+const start=source.indexOf('  function loaderFailureRels()');
+const end=source.indexOf('\n  /**',start);
+const fn=source.slice(start,end);
+let calls=0;
+const WA={loaderStatus:()=>{calls++;throw Error('recursive status must not be called');},__loaderState:{failed:new Map([['core/commit.js',{}]])}};
+const read=vm.runInNewContext('('+fn.trim()+')',{WA,Array});
+assert.deepStrictEqual(Array.from(read().rels),['core/commit.js']);assert.strictEqual(calls,0);
+delete WA.__loaderState;assert.strictEqual(read().rels,null);assert.strictEqual(calls,0);
+WA.__loadFailed=[];assert.strictEqual(read().rels.length,0);
+console.log('loader-recursion-runtime: 5/5 passed');

@@ -1,0 +1,116 @@
+/** WorldAxis direction/oracle.js (v0.2) — 剧情参谋/弧线/序列/落拍（缝合 story-oracle + outline） */
+(function () {
+  'use strict';
+  const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.15.0: 时间源单一出口。决策时间（进存档/参与判定）走 clockNow；测量时间（耗时/内存台账）走 clockWall。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
+  const LS_PLAN = 'worldaxis_oracle_plan_v1';
+
+  // v2.3.0: optional——用户尚未规划弧线时该键本就缺席，属正常而非废弃。
+  const __REG = { key: LS_PLAN, def: null, module: 'oracle', optional: true };
+  // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——弧线损坏此前静默丢弃且无留痕。
+  //   同时修正登记声明：本键由 savePlan 主动写入、loadPlan 主动读取，并非废弃键，
+  //   原先标 orphan:true 属误声明，会被面板「孤儿键注销」当成幽灵登记清掉。
+  function loadPlan() { return WA.settingsBus.read(__REG); }
+  WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
+  // v2.9.0: 清除走设置总线的删除出口（此前直调 localStorage.removeItem）。
+  //   本键是 **settings 家族且已登记**（classifyKey → {family:'settings'}），删它却绕过了总线：
+  //   ⇒ 删成功不进任何台账、删失败**抛错穿透到 oracle.clear() 调用方**（实测：内存 plan 已清空、
+  //      磁盘键仍在，UI 显示「已清除」而重启后计划复活）。
+  //   总线出口契约「永不抛」，失败返回 {ok:false} 并分桶归因。
+  function savePlan(p) {
+    if (p) { WA.settingsBus.save(__REG, p); return; }
+    const r = WA.settingsBus.remove(__REG);
+    if (r && r.ok === false && WA.log) WA.log('error', '剧情参谋：清除存档计划失败（' + String((r.error && (r.error.message || r.error)) || r.error) + '）——磁盘上的计划仍在，重启后会复活', null);
+  }
+
+  // v2.1.0: 参谋运行观测
+  const __orStat = { runs: 0, generated: 0, failed: 0, advanced: 0, lastReason: null, lastCount: 0, lastAt: 0, lastApiError: null };
+
+  WA.oracle = {
+    plan: loadPlan(),
+    setPlan(p) { this.plan = p; savePlan(p); WA.emit('oracle:plan', p); },
+    clear() { this.plan = null; savePlan(null); WA.emit('oracle:plan', null); },
+    currentBeat() { return this.plan && this.plan.beats[this.plan.current] || null; },
+    advance() {
+      if (!this.plan) return false;
+      this.plan.current++;
+      __orStat.advanced++;
+      if (this.plan.current >= this.plan.beats.length) { this.clear(); return true; }
+      savePlan(this.plan);
+      return false;
+    },
+    /** v2.1.0: 参谋运行观测（此前 generatePlan 零调用 = AI 弧线能力形同虚设） */
+    stat() {
+      return { generated: __orStat.generated, failed: __orStat.failed, lastReason: __orStat.lastReason,
+        lastCount: __orStat.lastCount, lastAt: __orStat.lastAt, advanced: __orStat.advanced,
+        hasPlan: !!this.plan, current: this.plan ? this.plan.current : -1,
+        beats: this.plan ? this.plan.beats.length : 0 };
+    },
+    /**
+     * v2.1.0: 安全生成（面板入口用）——统一守卫与留痕
+     *   - goal 为空 → 拒绝（不浪费通道配额）
+     *   - 通道未配置 → 明确 reason（不吞错）
+     *   - 生成失败/空拍 → 计 failed 并返回原因
+     */
+    async generatePlanSafe(goal, beatCount) {
+      const g = String(goal == null ? '' : goal).trim();
+      __orStat.runs++;
+      __orStat.lastAt = clockWall();
+      if (!g) { __orStat.failed++; __orStat.lastReason = 'empty-goal'; return { ok: false, reason: 'empty-goal' }; }
+      const cfg = WA.apiRouter.getChannel('judge');
+      if (!cfg.baseUrl || !cfg.model) { __orStat.failed++; __orStat.lastReason = 'judge-not-configured'; return { ok: false, reason: 'judge-not-configured' }; }
+      let r = null;
+      try { r = await this.generatePlan(g, beatCount); }
+      catch (e) { __orStat.failed++; __orStat.lastReason = 'throw'; WA.log('warn', '剧情参谋生成异常', e); return { ok: false, reason: 'throw' }; }
+      if (!r || !r.ok) {
+        __orStat.failed++;
+        const base = (r && r.reason) || 'api-fail';
+        __orStat.lastReason = (base === 'api-fail' && __orStat.lastApiError) ? base + ':' + __orStat.lastApiError : base;
+        return { ok: false, reason: __orStat.lastReason };
+      }
+      __orStat.generated++;
+      __orStat.lastReason = null;
+      __orStat.lastApiError = null;
+      __orStat.lastCount = r.count;
+      WA.log('info', '剧情参谋生成弧线：' + r.count + ' 拍（目标：' + g.slice(0, 30) + '）');
+      return { ok: true, count: r.count };
+    },
+    /** 用AI参谋生成一个多拍序列（基于剧情+目标） */
+    async generatePlan(goal, beatCount) {
+      const cfg = WA.apiRouter.getChannel('judge');
+      if (!cfg.baseUrl || !cfg.model) return { ok: false, reason: 'judge通道未配置' };
+      const ctx = (() => { try { return WA.mainWin.SillyTavern.getContext(); } catch (e) { return null; } })();
+      const chat = (ctx && ctx.chat) || [];
+      const recent = chat.slice(-3).map(m => (m.is_user ? '【玩家】' : '【正文】') + String(m.mes || '').slice(0, 400)).join('\n');
+      const n = beatCount || 5;
+      const r = await WA.apiRouter.call('judge', [
+        { role: 'system', content: '你是剧情参谋。基于当前剧情与用户的剧情目标，拆分为' + n + '个循序渐进的剧情节拍。每拍给出 goal(本拍目标≤30字) 与 instruction(给正文的隐形引导指令≤60字)。只输出JSON：{"beats":[{"goal":"...","instruction":"..."}]}' },
+        { role: 'user', content: '【剧情目标】' + goal + '\n【近期剧情】\n' + (recent || '（开场）') }
+      ], { json: true, maxTokens: 1200, temperature: 0.7 }).catch((e) => {
+        // v2.1.0: 失败归因留痕（此前裸 .catch(()=>null) 把网络/配额/时间超时等全洗成笼统 api-fail）
+        __orStat.lastApiError = String((e && (e.kind || e.message)) || e).slice(0, 60);
+        return null;
+      });
+      if (!r || !r.beats || !r.beats.length) return { ok: false, reason: 'api-fail' };
+      this.setPlan({ kind: 'sequence', goal, beats: r.beats.slice(0, n), current: 0, createdAt: clockNow('oracle') });
+      return { ok: true, count: this.plan.beats.length };
+    }
+  };
+
+  // before链：注入当前拍引导
+  WA.workflow.register({
+    id: 'oracle.guide', chain: 'before', order: 50, label: '剧情引导·当前拍',
+    async run(ctx) {
+      const b = WA.oracle.currentBeat();
+      if (!b) return;
+      const plan = WA.oracle.plan;
+      ctx.injections.push({
+        source: '剧情引导(' + (plan.current + 1) + '/' + plan.beats.length + ')',
+        position: 'after_last_user', depth: 1,
+        content: '<plot_guidance>\n【剧情引导·仅你可见·第' + (plan.current + 1) + '拍】目标：' + (b.goal || '') + '\n' + (b.instruction || '') + '\n</plot_guidance>'
+      });
+    }
+  });
+})();

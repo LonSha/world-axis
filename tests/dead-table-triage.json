@@ -1,0 +1,371 @@
+{
+ "_note": "死表逐条定性台账（OPV29-14）。action：keep=结构不可达前提仍成立故留着 / del=码已从产品源码消失故从死表删 / wire=接上见证（须真能 trip）。why ≥24 字且不许占位。工具：tools/dead-table-triage.js --write 重建。",
+ "_debt": "死表数本轮未下降（52 -> 52）：52 条码在产品源码里仍然每条都有 2-16 处字面量，说明码还在、只是结构不可达；真要下降就得删掉产品源码里的这些码（行为改动），不在优化线授权范围内。故本轮 0 删 0 接、52 条全部定性为 keep 并各带 why。本欠账由 T7 强制：只要 del=0 就必须有这段说明，否则红。",
+ "version": "2.529.0",
+ "entries": [
+  {
+   "key": "act-unavailable",
+   "action": "keep",
+   "why": "agency.schedule: act module not loaded. Cannot trigger in standard boot (act always loaded).｜现场复算：产品源码出现 13 处、锚点仍在",
+   "sourceHits": 13,
+   "anchorOk": true
+  },
+  {
+   "key": "already-arrived",
+   "action": "keep",
+   "why": "freight.arrive: shipment already arrived. Needs prior dispatch + arrive.｜现场复算：产品源码出现 5 处、锚点仍在",
+   "sourceHits": 5,
+   "anchorOk": true
+  },
+  {
+   "key": "already-confirmed",
+   "action": "keep",
+   "why": "storyChoice.confirm: choice point already confirmed. Needs prior present + confirm.｜现场复算：产品源码出现 9 处、锚点仍在",
+   "sourceHits": 9,
+   "anchorOk": true
+  },
+  {
+   "key": "already-done",
+   "action": "keep",
+   "why": "agency.checkPrereqs: current step already done. Needs processReceipts to settle step then schedule again.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "already-revealed",
+   "action": "keep",
+   "why": "investigation.reveal: clue already revealed to this person.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "already-running",
+   "action": "keep",
+   "why": "agency.checkPrereqs: current step already running. Needs schedule to be called once before.｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "backup-corrupt",
+   "action": "keep",
+   "why": "v2.83.0（B6）cfgRollback 的备份解析出口，在当前设计下**结构上不可达**：cfgRollback 只在「写盘阶段中途失败」时被调用，而进入写盘阶段的前提是**导入前备份已成功写入**（备份失败会在写盘前以 backup-failed 拒收整次导入，见 settings-bus 的写盘前置条件）。而备份成功必然把同一个备份键覆写成合法 JSON ⇒ cfgRollback 读到的必是合法 JSON。故要走这条分支，得先有一个「存在但不是 JSON」的备份键，同时备份写入又失败——与前置条件互斥。不删：第三方脚本或外部工具若直接调用回滚入口（或未来备份环引入多源写入），它是第一道防线；届时本门禁会以 deadLeak 提醒「该码可能复活」。｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "bad-draft",
+   "action": "keep",
+   "why": "collab.enqueue（v2.196.0 U2 批次⑥）的**嵌套草稿**入参守卫，在现有调用面上结构不可达：产品面唯一调用点是 coop.apply（engines/coop.js:437），它在 mutate(function (draft) {...}) 回调里把 transact/mutate 交下来的骨架草稿原样传进 opts.draft —— 而 mutate 保证传的是对象。（v2.529.0 OPV29-14 复算时改正：此前本条 anchor 还指着 v2.86.0 的 registry.ensurePerson，那行源码早已不在；结论不变、锚点归位，tools/dead-table-triage.js 的 T5 就是抓这个的。）不删：唯一写者是导出面，越界调用时它是第一道防线；届时本门禁会以 deadLeak 提醒它可能复活。｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "bad-operator",
+   "action": "keep",
+   "why": "parseCmp 的筛选形式是：取 tk，要求 tk.t === \"op\"，p++，v := tk.v；而 tokenize 产 op 的分支只输出 >=/<=/==/!=/>/<，该集合恰是下面 if/else 链的全部分支，故 else 永不取。穷举验证：6174 个长度≤3 的词法组合全跑一遍，该码零见证。不删：若未来新增比较符，它是第一道防线（本面门禁会在那时通过 deadLeak 提醒「该码可能复活」）。｜现场复算：产品源码出现 2 处、锚点仍在",
+   "sourceHits": 2,
+   "anchorOk": true
+  },
+  {
+   "key": "bad-state",
+   "action": "keep",
+   "why": "freight.arrive/cancel/reroute: shipment not in transit state. Needs prior dispatch + state change.｜现场复算：产品源码出现 16 处、锚点仍在",
+   "sourceHits": 16,
+   "anchorOk": true
+  },
+  {
+   "key": "branchtree-absent",
+   "action": "keep",
+   "why": "storyChoice.present/confirm: branchTree module not loaded. Cannot trigger in standard boot (branchTree always loaded).｜现场复算：产品源码出现 5 处、锚点仍在",
+   "sourceHits": 5,
+   "anchorOk": true
+  },
+  {
+   "key": "choose-failed",
+   "action": "keep",
+   "why": "storyChoice.confirm: branchTree.choose returned failure. Needs branchTree to reject the choose call.｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "clues-full",
+   "action": "keep",
+   "why": "investigation.register: max clues reached. Needs 32+ existing clues in state.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "contracts-full",
+   "action": "keep",
+   "why": "commission.create: max contracts reached. Needs 24+ existing contracts in state.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "control-usage-unavailable",
+   "action": "keep",
+   "why": "同上：tool-diag.secControlUsage 的 safe() 第二实参。内层两条 return 都是对象（ui 缺席时 return {ok:false, reason: \"ui-not-loaded\"}，正常时 return 行表），异常被 safe 吃掉 ⇒ fallback 永不取。实测 /tmp/probe_v8_wit2.js：摘掉 WA.ui 得到的是ui-not-loaded（不是本码）。不删：safe() 契约若放宽，它是第一道防线。｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "duplicate-enact",
+   "action": "keep",
+   "why": "operations.enact: same decisionId already enacted. Needs 2nd enact with same decisionId.｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "duplicate-event",
+   "action": "keep",
+   "why": "aftermath.register: same eventId already registered. Needs 2nd register with same eventId.｜现场复算：产品源码出现 5 处、锚点仍在",
+   "sourceHits": 5,
+   "anchorOk": true
+  },
+  {
+   "key": "duplicate-settle",
+   "action": "keep",
+   "why": "operations.settle: same cycleTag already settled. Needs 2nd settle with same cycleTag.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "effects-full",
+   "action": "keep",
+   "why": "aftermath.register: max effects reached. Needs 48+ existing effects in state.｜现场复算：产品源码出现 9 处、锚点仍在",
+   "sourceHits": 9,
+   "anchorOk": true
+  },
+  {
+   "key": "end-failed",
+   "action": "keep",
+   "why": "causal.record（v2.89.0 O2）的收卷失败出口，在现有设计下**结构不可达**：进入该分支的前提是 beginTape 成功，而 beginTape 成功必然把磁带置于 open=true；endTape 的拒收条件恰是“磁带不存在或已收卷”，两者互斥。唯一能造出“begin 成功但 end 拒绝”的路径是自己先把磁带收掉，而收卷发生在 finally 里、fn 体拿不到句柄。不删：将来若磁带面被改成可重入（外部可提前收卷），它是第一道防线；届时本门禁会以 deadLeak 提醒它可能复活。｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "enigma-failed",
+   "action": "keep",
+   "why": "investigation.reveal: enigma.mark failed. Needs enigma to reject the mark call.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "enqueue-threw",
+   "action": "keep",
+   "why": "coop.confirm: collab.enqueue threw inside the confirm draft. Needs a collab face whose enqueue throws when handed a valid draft (no product caller does).｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "fork-failed",
+   "action": "keep",
+   "why": "storyChoice.present: branchTree.fork returned failure. Needs branchTree to reject the fork call.｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "insufficient-budget",
+   "action": "keep",
+   "why": "operations.enact: org has insufficient resources for budget. Needs faction with low gold.｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "insufficient-evidence",
+   "action": "keep",
+   "why": "investigation.reveal: evidence verdict not verified/cannot-judge. Needs insufficient evidence.｜现场复算：产品源码出现 7 处、锚点仍在",
+   "sourceHits": 7,
+   "anchorOk": true
+  },
+  {
+   "key": "insufficient-funds",
+   "action": "keep",
+   "why": "operations.disburse: org cannot afford disbursement. 至此仍不可达 —— 拨付金额先过预算闸门（over-budget），而预算是 `org.grant` 按**同一资源项**发的（grant 50 ⇒ budget 50 ⇒ 同一项必然够）；要绕过它得直接改世界（造「资源被外部拿走而预算不动」这一局面），现无产品路径。｜现场复算：产品源码出现 6 处、锚点仍在",
+   "sourceHits": 6,
+   "anchorOk": true
+  },
+  {
+   "key": "kind-locked",
+   "action": "keep",
+   "why": "inst.charter 两道守卫次序相扣：第一道 `seen && !o.replace ⇒ exists` 先返回；第二道 `seen && seen.kind !== kind && !o.replace ⇒ kind-locked` 的输入集合是第一道的子集，故 kind-locked 恒不可达。实测：先 charter(会甲, 公司) 再 charter(会甲, 帮派)，返回 exists 而非 kind-locked。不删：若 exists 的判据将来放宽，它是第一道防线（届时 deadLeak 会提醒它可能复活）。｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "migration-loop",
+   "action": "keep",
+   "why": "checkpoints.migrate 的自旋防护在 FORMAT=1 期**结构上不可达**：循环条件 f < FORMAT 要求 f<1，而唯一的迁移登记入口 registerMigration 收窄为 f<1 ⇒ missing-fields，0/-1/-2 全被拒。故循环体内永远拿不到 step，至多转 1 圈即走 no-migration 出口，guard 永不越 64。穷举验证（/tmp/diag7.js）：registerMigration(-2..0) 全返回 missing-fields；migrate({worldaxisCheckpoint:0}) 返回 no-migration。不删：将来若新增 format 2 与相应迁移，它是第一道防线（届时本门禁会以 deadLeak 提醒「该码可能复活」）。｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "missing-dest",
+   "action": "keep",
+   "why": "freight.dispatch: route has no destination. Needs route without to field.｜现场复算：产品源码出现 7 处、锚点仍在",
+   "sourceHits": 7,
+   "anchorOk": true
+  },
+  {
+   "key": "missing-transit-time",
+   "action": "keep",
+   "why": "freight.dispatch: no transit time given. Needs opts without transitDays.｜现场复算：产品源码出现 5 处、锚点仍在",
+   "sourceHits": 5,
+   "anchorOk": true
+  },
+  {
+   "key": "no-act-id",
+   "action": "keep",
+   "why": "agency.processReceipts: 回执既没有 actId 也没有 id。它由本模块在 v2.194.0 显式表达（此前两处字段都不认，整块被塌成 no-act-row）—— 标准 boot 下 act.receipt() 恒写 id ⇒ 不可达；将来若有非 act 来源往 acts.res 里投递回执，它是第一道防线。｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "no-act-row",
+   "action": "keep",
+   "why": "agency.processReceipts: receipt has no matching act row. Needs acts.res with receipt but acts.rows without matching id.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "no-budget",
+   "action": "keep",
+   "why": "commission.create: principal cannot afford reward. Needs org.canAfford to return false（付款方确有其人/其势，但那一项资源不够）。｜现场复算：产品源码出现 5 处、锚点仍在",
+   "sourceHits": 5,
+   "anchorOk": true
+  },
+  {
+   "key": "no-localStorage",
+   "action": "keep",
+   "why": "life.turnStore（v2.132.0 O19）的「宿主没有 localStorage」出口，在现有设计下**结构上不可达**：进入该行的前提是 `turnCfg()` 已返回 true，而 `turnCfg()` 读的是`settingsBus.read(TURN_REG)` —— 与 `win()` 同一个真源（core/settings-bus.js 全库 10 处统一写作 `(WA.mainWin || window).localStorage`）。宿主没有 localStorage 时，settingsBus 读不到盘、回落登记项的 `def`（`{ crossSession: false }`）⇒ `turnCfg()` 必为 false⇒ `turnStore()` 在**第一行**就以 `disabled` 返回，永远走不到本码。实测（/tmp/wa_probe_nols5.js）：把 `WA.mainWin` 换成 `{}` 后，`settingsBus.read(life 注册项)` 由 `{enabled:true,crossSession:true}` 变为`{enabled:false,maxPeople:4,maxItems:2}`（crossSession 键消失）；另一探针（/tmp/wa_probe_nols4.js，先写盘开双开关再摘掉宿主存储）给出的 tick 仍是`reason:\"disabled\"` —— 两向都指回同一个前置闸。不删：它与 `write-failed` 是**两件事**（「根本没落盘能力」vs「有盘但写失败」），将来若 `turnCfg()` 改为读缓存/内存镜像（不再依赖宿主存储），它是第一道防线；届时本门禁会以 deadLeak 提醒「该码可能复活」。｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "no-relation-face",
+   "action": "keep",
+   "why": "liaison.settleDeal 的关系后果用一个三元兜底 `rel ? ... : no-relation-face`，但被调的 applyRelation 五条出口（relation-absent / missing-person / no-negative-step / 成功 / relation-threw）**每一条都返回真值对象**，无一返回假值 ⇒ `rel` 恒为真，else 分支恒不可达。不删：将来若 applyRelation 改成可能返回空值（例如把「没人可记」静默吞掉），它是那道兜底；届时本门禁会以 deadLeak 提醒它可能复活。｜现场复算：产品源码出现 2 处、锚点仍在",
+   "sourceHits": 2,
+   "anchorOk": true
+  },
+  {
+   "key": "no-result",
+   "action": "keep",
+   "why": "storyChoice.confirm: branchTree.choose returned null/undefined (not ok:false). Cannot trigger in standard boot.｜现场复算：产品源码出现 11 处、锚点仍在",
+   "sourceHits": 11,
+   "anchorOk": true
+  },
+  {
+   "key": "no-stages",
+   "action": "keep",
+   "why": "commission.create: zero stages provided. Witnessed by passing empty stages array.｜现场复算：产品源码出现 5 处、锚点仍在",
+   "sourceHits": 5,
+   "anchorOk": true
+  },
+  {
+   "key": "no-step",
+   "action": "keep",
+   "why": "agency.checkPrereqs: plan has ok but step is null. Needs plan.current to return ok with empty step field.｜现场复算：产品源码出现 15 处、锚点仍在",
+   "sourceHits": 15,
+   "anchorOk": true
+  },
+  {
+   "key": "not-approved",
+   "action": "keep",
+   "why": "operations.enact: decision not in approved state. Needs pending/rejected decision.｜现场复算：产品源码出现 6 处、锚点仍在",
+   "sourceHits": 6,
+   "anchorOk": true
+  },
+  {
+   "key": "not-in-text",
+   "action": "keep",
+   "why": "locate() 的内部定位码；autoMinutes 出口把它拼成 evidence-not-in-text，故产品面不可达｜现场复算：产品源码出现 6 处、锚点仍在",
+   "sourceHits": 6,
+   "anchorOk": true
+  },
+  {
+   "key": "not-owner",
+   "action": "keep",
+   "why": "operations.handover: caller is not current owner. Needs wrong fromPerson.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "over-budget",
+   "action": "keep",
+   "why": "operations.disburse: spending exceeds budget. Needs disburse amount over remaining budget.｜现场复算：产品源码出现 5 处、锚点仍在",
+   "sourceHits": 5,
+   "anchorOk": true
+  },
+  {
+   "key": "panel-yield-unavailable",
+   "action": "keep",
+   "why": "tool-diag.secPanelYield 的 safe() 第二实参：内层函数体每条路径都 return 对象（末尾无条件 return，早退分支也 return 对象），异常被 safe 的 catch 转成 {error} —— 故「fn 返回 undefined」这一路没有任何输入能构造出来，兜底字面量结构不可达。实测见 /tmp/probe_v8_wit2.js / wit9.js：摘掉 WA.driverLedger（undefined）与换成 view() 抛错的对象两种破坏，返回的都是 {error}。不删：safe() 契约若放宽，它是第一道防线（deadLeak 会提醒它可能复活）。｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "plan-unavailable",
+   "action": "keep",
+   "why": "agency.processReceipts: plan module not loaded. Cannot trigger in standard boot (plan always loaded).｜现场复算：产品源码出现 5 处、锚点仍在",
+   "sourceHits": 5,
+   "anchorOk": true
+  },
+  {
+   "key": "preview-rejected",
+   "action": "keep",
+   "why": "storyChoice.confirm: option ops failed rehearsal.preview whitelist. Needs ops that get rejected by preview.｜现场复算：产品源码出现 7 处、锚点仍在",
+   "sourceHits": 7,
+   "anchorOk": true
+  },
+  {
+   "key": "projects-full",
+   "action": "keep",
+   "why": "operations.enact: max projects reached. Needs 32+ existing projects.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "shipments-full",
+   "action": "keep",
+   "why": "freight.dispatch: shipments array at capacity. Needs maxShipments prior shipments.｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  },
+  {
+   "key": "step-not-running",
+   "action": "keep",
+   "why": "agency.processReceipts: receipt found act but step not in running state.｜现场复算：产品源码出现 4 处、锚点仍在",
+   "sourceHits": 4,
+   "anchorOk": true
+  },
+  {
+   "key": "too-many-stages",
+   "action": "keep",
+   "why": "commission.create: stages exceed maxStages cap. Needs >8 stages in spec.｜现场复算：产品源码出现 5 处、锚点仍在",
+   "sourceHits": 5,
+   "anchorOk": true
+  },
+  {
+   "key": "transfer-failed",
+   "action": "keep",
+   "why": "operations.disburse: org.transfer failed. Needs transfer to fail.｜现场复算：产品源码出现 7 处、锚点仍在",
+   "sourceHits": 7,
+   "anchorOk": true
+  },
+  {
+   "key": "unknown-shipment",
+   "action": "keep",
+   "why": "freight.arrive/cancel/reroute/view: shipment not found. Needs non-existent shipment ID.｜现场复算：产品源码出现 11 处、锚点仍在",
+   "sourceHits": 11,
+   "anchorOk": true
+  },
+  {
+   "key": "unknown-source",
+   "action": "keep",
+   "why": "freight.dispatch: source goods not found. Needs place/resource not in economy.goods.｜现场复算：产品源码出现 3 处、锚点仍在",
+   "sourceHits": 3,
+   "anchorOk": true
+  }
+ ]
+}

@@ -1,0 +1,476 @@
+#!/usr/bin/env node
+// WorldAxis tests/test-surface-gate.js — 测试文件面可达性门禁（v2.75.0）
+//
+// 治的病：tests/ 下的 .js 有一类**从不执行**的成员 —— 既不被 run.js require、
+//   也不被 run.js spawn、也不被内联。它们仍然被 product-files.testFiles() 收进
+//   「测试引用面」，而 v2.73.0 起账本的归因证据正是踩在这个面上算出来的。
+//   于是归因依据里混进了从不运行的文件 ——「归因建立在不执行的文件上」。
+//   （与 v2.73.0 治的「输入面窄于事实」同族，方向相反：那一版面太窄，这一版面里含不执行的成员。）
+//
+// 三条判据：
+//   A 可达性：每个测试文件的分类 ∈ {aggregator, lock, spawned, inline, orphan}；
+//     orphan 必须登记在 EXEMPT 里（带理由），未登记的 orphan 即红灯。
+//   B 豁免不得腐烂：EXEMPT 项必须真在 orphans 里（豁免生效）或被判为 spawned/inline（真有执行入口）；
+//     被判为 lock 说明它已被 require —— 豁免与说明该删，红灯。
+//   C 反空转下限：文件面 ≥30、锁 ≥20、可达 ≥30、直接 spawn 行 ≥6 —— 零告警在空集上恒真。
+//   D 宿主不变量：能**到达**的锁不得给宿主全局留下残骸（`global.window` / `global.document`
+//     不能被整体替换后不还原）。挂载会让「裸脚本时期无害的全局替换」第一次变成活的 ——
+//     而它炸的是别的锁；哪一个先炸取决于 run.js 里的**顺序**，靠顺序活着的东西必须判据化。
+//     判据在子进程里跑（污染是进程级的，必须隔离；且能拿到两个方向：污点被逮住 + 干净时零告警）。
+//
+// v2.119.1 补面（输入面不得窄于事实）：
+//   run.js 在 v2.117.0–v2.119.0 把 100 余处挂载行从字面量 `require('./x.js')` 改写成
+//   包装器 `runLock('./x.js')`（定义在 run.js 顶部，体内是真 `require(spec)[m](assert)`）。
+//   包装**照常执行**，但本门禁此前只认字面 `require(` 边 ⇒ 69 个文件被误判成
+//   「从不执行的孤儿」，而 orphan-lock-v2750 的 [B]「真仓库零孤儿」也随之变红 ——
+//   红灯本身是对的（输入面窄了），错的是判据的输入面。
+//   故本版把「包装入口」升格为一等入口面：`WRAP_CALL` 认 `IDENT('./x.js'` 形态，
+//   并要求 `IDENT` 确实是 run.js 里定义的执行包装器（体内含 require / 双层校验），
+//   而不是「任何调用里出现 './x.js'」（那会把注释、参数、数据文件全算成执行入口）。
+//
+// 判据的两条纪律（本仓在 v2.74.0 踩过同族坑，故写进自证）：
+//   ① 引用面必须在**去注释但保留字符串**的面上取：`require('./x.js')` 的路径是字符串字面量，
+//      用 inventory.codeFace（把字符串抹成空白）扫会得到零引用（见 runNegative 的 N4）。
+//   ② 「提及不是引用」：注释里出现 tests/x.js 不构成边；只有 require('./x.js') 才是（见 N2）。
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const BASE = path.join(__dirname, '..');
+const { testFiles } = require('./product-files.js');
+
+const RUN_REL = 'tests/run.js';
+// 豁免表：确实没有自己的执行入口、但已确认可从其他入口覆盖的测试文件。
+//   当前为空 —— 两个不可达者各自的入口都是自解释的（export-contract 由 run.js spawn、
+//   ui-gate 的案例已被内联），判据能自己认出来，不需要人工白名单。
+const EXEMPT = [
+  // v2.416.0（OPV24-9）：p_world_pulse 自 /home/user/probes/ 收编进仓库（26 断言，手动复跑）。
+  //   探针的本质属性就是「手动诊断入口」，不该有也不需要有自动 spawn 入口 ——
+  //   与豁免表头两条注释同口径：登记的是事实（探针不进自动面），不是放过缺陷。
+  //   ⚠ v2.541.3 补一句最要紧的：**豁免的后果是没人跑**。它当时红着 4 条
+  //   （比的是早已按「零消费能力当场删」删掉的逐案明细），且机会段断言一直拿
+  //   mock 自编的 title 当真字段。所以豁免照旧，但 ui-gate 末尾的 G17-L 会用子进程
+  //   跑它一次并把 exit code 变成门禁的一部分：豁免 ≠ 允许腐烂。
+  { rel: 'tests/probes/p_world_pulse.js', why: 'OPV24-9 探针收编：手动诊断入口，26 断言可单独 node 复跑，不占自动执行面；v2.541.3 起由 ui-gate G17-L 兜底跑，防「豁免⇒烂掉」' },
+  // v2.518.0（故事优先纵向切片）：ruby-card-profile 是**外部验收卡的只读画像器**。
+  //   它必须由人传 RUBY_CARD=<卡路径> 才能跑（卡是外部不可变输入，不进仓库、
+  //   不进自动面）：缺路径即 exitCode=2。给它加自动 spawn 入口既无意义也会红。
+  //   登记的是事实（外部手动作业入口），不是放过缺陷。
+  { rel: 'tests/ruby-card-profile.js', why: 'v2.518.0 外部验收卡画像器：需 RUBY_CARD=<外部卡路径> 手动执行，只读不写卡，不占自动执行面' }
+];
+
+const MIN_FILES = 30;
+const MIN_LOCKS = 20;
+const MIN_REACH = 30;
+const MIN_SPAWN_LINES = 6;
+const GLOBAL_PROBE = [
+  { g: 'global.window', mark: 'WorldAxis (mock 建立的宿主全局)' },
+  { g: 'global.document', mark: 'mock DOM' }
+];
+const INLINE_MARK = /内联|inline|embeds/i;
+// 包装入口：`IDENT('./x.js'` 或 `IDENT('./segments/x.js'` —— IDENT 必须先是本文件里**已定义且体内执行**的函数（见 wrapperOf）。
+//   v2.400.0（OPV22-4）：路径段由 `[\w.-]+` 放宽为 `[\w.\-/]+`，因为拆段后调用点写成
+//   `require('./segments/tool-diag-v092.js')`。若仍只认单层，段文件永远算不出可达边 ⇒
+//   本门禁对「抽出去的段」整体失明（负控制实测：注释掉调用点，门禁仍然全绿 —— 判据没现形）。
+const WRAP_CALL = /([A-Za-z_$][\w$]*)\s*\(\s*'\.\/([\w.\-/]+\.js)'/g;
+// 判据必须**容许标识符前缀**，不能用 \b 也不能用「前界不是 word 字符」的 lookbehind。
+//   本仓 run.js 把 spawnSync 存成别名：`const cp_spawnSync = require('child_process').spawnSync;`，
+//   调用点写成 `cp_spawnSync(…)`。`_` 是 word 字符，故 \b 在 `_`/`s` 之间不成立；
+//   (?<![A-Za-z0-9_$]) 同样不成立（前一个字符正是 `_`）。两种「词边界」写法都恒假，
+//   结果就是**真 spawn 行一条都记不到**、跑在子进程里的锁全被误判 orphan。
+// 正确口径：允许任意标识符前缀 `[\w$]*`，即「以该名字结尾的标识符 + 左括号」。
+//   这同时覆盖裸名 spawnSync(、限定名 cp.spawnSync(、别名 cp_spawnSync( 三种现场形态。
+// 不收 exec / execSync：那是 shell 字符串形态，不构成「跑某个 .js 文件」；且 RegExp#exec
+//   会把 `while ((m = re.exec(line)))` 这类纯正则行误算成 spawn 行，虚增下方 MIN_SPAWN_LINES
+//   这个反空转下限（实测 run.js 里就有 9 行这样的误判，虽无 ref 不造假边，但会抬高指标）。
+//   口径须与 wrapperOf 里的 spawn 族判据完全一致，否则上下限说的不是同一件事。
+const SPAWN_CALL = /[\w$]*(spawnSync|spawn|execFileSync|execFile)\s*\(/;
+// v2.400.0（OPV22-4）：两条路径正则同样放宽到多层 —— 段文件在 `tests/segments/` 下。
+//   若只认单层，`require('./segments/x.js')` 不构成边、`tests/segments/x.js` 不被认作测试路径，
+//   于是段文件在可达图里是孤立点，而门禁看不出来。
+const RE_REQUIRE = /require\s*\(\s*'(\.\/[\w.\-/]+\.js)'/g;
+const RE_TEST_PATH = /tests\/([\w.\-/]+\.js)/g;
+
+/** 去注释、**保留字符串原文**的最小剥离器（与 inventory.codeFace 同一状态机思路，但不抹字符串）。 */
+function stripComments(src) {
+  let out = '';
+  let i = 0;
+  const n = src.length;
+  const CONT = '(),=:[!&|?{};+-*%<>~^/\n \t';
+  let st = 'code';
+  const prevCh = function () {
+    for (let j = out.length - 1; j >= 0; j -= 1) {
+      const c = out[j];
+      if (c !== ' ' && c !== '\t' && c !== '\n') return c;
+    }
+    return '';
+  };
+  while (i < n) {
+    const c = src[i], d = src[i + 1];
+    if (st === 'code') {
+      if (c === '/' && d === '/') { st = 'line'; out += '  '; i += 2; continue; }
+      if (c === '/' && d === '*') { st = 'block'; out += '  '; i += 2; continue; }
+      if (c === '/') {
+        const p = prevCh();
+        if (p === '' || CONT.indexOf(p) >= 0) {
+          let k = i + 1, inClass = false, ok = false;
+          while (k < n) {
+            const e = src[k];
+            if (e === '\\') { k += 2; continue; }
+            if (e === '[') inClass = true;
+            else if (e === ']') inClass = false;
+            else if (e === '/' && !inClass) { ok = true; break; }
+            else if (e === '\n') break;
+            k += 1;
+          }
+          if (ok) { while (i <= k) { out += src[i]; i += 1; } continue; }
+        }
+        out += c; i += 1; continue;
+      }
+      if (c === "'") { st = 'sq'; out += c; i += 1; continue; }
+      if (c === '"') { st = 'dq'; out += c; i += 1; continue; }
+      if (c === '`') { st = 'tpl'; out += c; i += 1; continue; }
+      out += c; i += 1; continue;
+    }
+    if (st === 'line') {
+      if (c === '\n') { st = 'code'; out += c; } else out += (c === '\t' ? '\t' : ' ');
+      i += 1; continue;
+    }
+    if (st === 'block') {
+      if (c === '*' && d === '/') { st = 'code'; out += '  '; i += 2; continue; }
+      out += (c === '\n' ? '\n' : ' '); i += 1; continue;
+    }
+    if (c === '\\') { out += c + (src[i + 1] === undefined ? '' : src[i + 1]); i += 2; continue; }
+    if ((st === 'sq' && c === "'") || (st === 'dq' && c === '"')) { st = 'code'; out += c; i += 1; continue; }
+    if ((st === 'sq' || st === 'dq') && c === '\n') { st = 'code'; out += c; i += 1; continue; }
+    if (st === 'tpl' && c === '`') { st = 'code'; out += c; i += 1; continue; }
+    out += c; i += 1; continue;
+  }
+  return out;
+}
+
+/**
+ * 哪些标识符是「执行包装器」：本文件里定义了同名函数，且**函数体内真的 require 了它的入参**。
+ *   两道都要，缺一不可：
+ *     ① 名字得先定义 —— 否则 `foo('./x.js')` 只是把路径当参数传给别人（不代表执行）；
+ *     ② 体内得真 require —— 否则 `function note(p) { log(p) }` 这种「记一笔」也会被算成挂载。
+ *   实测形态：run.js 的 `function runLock(spec, method) { const m = method || 'runAll';
+ *   try { require(spec)[m](assert); } ... }`。
+ */
+function wrapperOf(src) {
+  const text = stripComments(src);
+  const names = {};
+  const re = /function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*\{/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const name = m[1];
+    const params = m[2].split(',').map(function (p) { return p.trim(); }).filter(Boolean);
+    // 取函数体（按花括号配平，字符串已被抹成空白面，故不需要再处理引号）
+    let i = re.lastIndex - 1, depth = 0, end = -1;
+    for (; i < text.length; i += 1) {
+      const c = text[i];
+      if (c === '{') depth += 1;
+      else if (c === '}') { depth -= 1; if (depth === 0) { end = i; break; } }
+    }
+    const body = end > 0 ? text.slice(re.lastIndex, end) : '';
+    // v2.257.0：**两种执行包装器**都认（此前只认 require 型）。
+    //   require 型：体内真 require(param) —— run.js 的 runLock。
+    //   spawn 型：体内把 param 当**子进程文件路径**跑 —— run.js 的 runScript
+    //     （cp_spawnSync(process.execPath, [path.join(__dirname, path.basename(spec))], …)）。
+    //   为什么必须收 spawn 型：本仓有一批锁是**纯脚本体**（顶层 runAll() 直接执行、
+    //   无 module.exports），用 require+[method] 挂载必抛「require(...)[m] is not a function」，
+    //   正确挂载方式就是 spawn 子进程（与 tools/smoke.js 的 cli 档同规）。门禁若不认它，
+    //   这些文件会从「真执行」被误判成 orphan —— 判据面比现场窄，不是产品有洞。
+    //   两条口径，缺一不可（防「记一笔」形态混进来）：
+    //     ① 体内有 spawn 族真启动：spawnSync / spawn / execFileSync / execFile
+    //        （不收 exec / execSync —— 那是 shell 字符串形态，不构成「跑某个 .js 文件」）；
+    //     ② 参数被用来**拼路径**：出现 basename(param) 或 join(…param…)，即参数不是被
+    //        顺手 log 一下。
+    const esc = function (p) { return p.replace(/[$]/g, '\\$&'); };
+    const requiresParam = params.some(function (p) {
+      return p && new RegExp('\\brequire\\s*\\(\\s*' + esc(p) + '\\b').test(body);
+    });
+    const spawnsParam = params.some(function (p) {
+      if (!p) return false;
+      // 同上：容许标识符前缀 —— runScript 体内是别名调用 cp_spawnSync(…)。
+      // （不收 exec / execSync：shell 字符串形态不构成「跑某个 .js 文件」。）
+      if (!/[\w$]*(spawnSync|spawn|execFileSync|execFile)\s*\(/.test(body)) return false;
+      const e = esc(p);
+      return new RegExp('basename\\s*\\(\\s*' + e + '\\b').test(body)
+        || new RegExp('join\\s*\\([^)]*\\b' + e + '\\b').test(body);
+    });
+    if (requiresParam || spawnsParam) names[name] = true;
+  }
+  return names;
+}
+/** 从一段源码文本里取出直接 require 的兄弟测试文件（必须在去注释面上取）。 */
+function refsOf(src) {
+  const text = stripComments(src);
+  const out = [];
+  RE_REQUIRE.lastIndex = 0;
+  let m;
+  while ((m = RE_REQUIRE.exec(text))) out.push('tests/' + m[1].replace(/^\.\//, ''));
+  return out;
+}
+
+/** 从 run.js 文本里取「执行入口」：直接 require 边、spawn 行、内联标记行。 */
+function entriesOf(src, files) {
+  const direct = refsOf(src).filter(function (r) { return files.indexOf(r) >= 0; });
+  const wrapped = wrappedOf(src, files);
+  const spawned = [];
+  const inline = [];
+  let spawnLines = 0;
+  const lines = src.split('\n');
+  lines.forEach(function (l, i) {
+    if (SPAWN_CALL.test(l)) spawnLines += 1;
+    const isComment = l.trim().indexOf('//') === 0;
+    RE_TEST_PATH.lastIndex = 0;
+    let m;
+    while ((m = RE_TEST_PATH.exec(l))) {
+      const rel = 'tests/' + m[1];
+      if (files.indexOf(rel) < 0) continue;
+      if (direct.indexOf(rel) >= 0) continue;
+      if (wrapped.indexOf(rel) >= 0) continue;
+      if (SPAWN_CALL.test(l)) { if (spawned.indexOf(rel) < 0) spawned.push(rel); continue; }
+      if (isComment && INLINE_MARK.test(l)) { if (inline.indexOf(rel) < 0) inline.push(rel); continue; }
+    }
+  });
+  return { direct: direct, wrapped: wrapped, spawned: spawned, inline: inline, spawnLines: spawnLines };
+}
+/** 包装入口边：`IDENT('./x.js')` 且 IDENT 是本文件里的执行包装器（体内真 require）。 */
+function wrappedOf(src, files) {
+  const text = stripComments(src);
+  const names = wrapperOf(src);
+  if (!Object.keys(names).length) return [];
+  const out = [];
+  WRAP_CALL.lastIndex = 0;
+  let m;
+  while ((m = WRAP_CALL.exec(text))) {
+    if (!names[m[1]]) continue;
+    const rel = 'tests/' + m[2];
+    if (files.indexOf(rel) >= 0 && out.indexOf(rel) < 0) out.push(rel);
+  }
+  return out;
+}
+
+/**
+ * 并行账本边（v2.529.0 / OPV29-01）：`tests/shard-locks-v2529.json` 里登记、且由
+ * `tools/shard-locks.js` → `tools/lock-child.js` 以子进程执行的锁，也构成**真执行入口**。
+ *
+ * 为什么必须补这条：`v2.82.0 checkpoints …` 一节约 792.2s，38 把锁顺序挂载；拆成
+ * 「36 把并行 + 2 把串行」后，那 36 个文件名不再出现在 `runLock('./x.js')`/`require('./x.js')`
+ * 里（它们在清单数组 + 账本里），于是本门禁会把它们全判 orphan —— 判据面比现场窄，
+ * 不是产品有洞（与本节 v2.528.0 那条「spawn 别名」教训同族）。
+ *
+ * 防假绿（缺一不可）：
+ *   ① 工具必须真 spawn 子进程，且**点名** `lock-child`（不是随便 spawn 一下）；
+ *   ② `lock-child` 必须存在且自带执行入口（`module.exports` 与主流程）；
+ *   ③ 账本必须是可解析 JSON 且登记了锁文件名。
+ *   只有三样都在，账本里的名字才算边；否则返回空（宁可不认，也不让「往 JSON 里塞个名字」变可达）。
+ */
+/** 读一个相对路径：虚拟面里优先，缺失时回落真仓库（tools/ 不在 vfs 的扫描面内，见 v 的构建处）。 */
+function readRel(vfs, rel) {
+  if (vfs && typeof vfs[rel] === 'string') return vfs[rel];
+  try { return fs.readFileSync(path.join(BASE, rel), 'utf8'); } catch (e) { return null; }
+}
+function shardEdges(vfs) {
+  const LED = 'tests/shard-locks-v2529.json';
+  const TOOL = 'tools/shard-locks.js';
+  const CHILD = 'tools/lock-child.js';
+  const ledTxt = readRel(vfs, LED);
+  const tool = readRel(vfs, TOOL);
+  const child = readRel(vfs, CHILD);
+  if (!ledTxt || !tool || !child) return [];
+  if (!SPAWN_CALL.test(tool) || tool.indexOf('lock-child') < 0) return [];
+  if (!/module\.exports/.test(child)) return [];
+  let j;
+  try { j = JSON.parse(ledTxt); } catch (e) { return []; }
+  const out = [];
+  Object.keys((j && j.groups) || {}).forEach(function (g) {
+    const it = j.groups[g] || {};
+    (it.parallel || []).concat(it.serial || []).forEach(function (x) {
+      const name = (typeof x === 'string') ? x : (x && x.file);
+      if (!name) return;                     // 解析不出文件名的不许进图（否则会造出 tests/ 这种假边）
+      const rel = 'tests/' + String(name);
+      if (out.indexOf(rel) < 0) out.push(rel);
+    });
+  });
+  return out;
+}
+/** 可达性：从 run.js 出发的 require 图 BFS + 执行入口（spawn / 内联）作为并列根。 */
+function buildReach(vfs) {
+  const files = Object.keys(vfs).sort();
+  const text = function (rel) { return vfs[rel]; };
+  const graph = {};
+  files.forEach(function (rel) {
+    const mine = refsOf(text(rel));
+    // 包装入口也是边：否则 runLock 形态的挂载在全图里不存在（v2.119.1 补面）
+    wrappedOf(text(rel), files).forEach(function (r) { if (mine.indexOf(r) < 0) mine.push(r); });
+    graph[rel] = mine.filter(function (r) { return files.indexOf(r) >= 0; });
+  });
+  const hasRun = files.indexOf(RUN_REL) >= 0;
+  // 并行账本边并入 run.js 的出边（见 shardEdges 注释）：它们由 run.js 的 shard 段驱动。
+  if (hasRun) {
+    const sh = shardEdges(vfs).filter(function (r) { return (graph[RUN_REL] || []).indexOf(r) < 0; });
+    if (sh.length) graph[RUN_REL] = (graph[RUN_REL] || []).concat(sh);
+  }
+  const ent = hasRun ? entriesOf(text(RUN_REL), files) : { direct: [], wrapped: [], spawned: [], inline: [], spawnLines: 0 };
+  const roots = (hasRun ? [RUN_REL] : []).concat(ent.spawned, ent.inline);
+  const reached = {};
+  const queue = roots.slice();
+  roots.forEach(function (r) { reached[r] = true; });
+  while (queue.length) {
+    const cur = queue.shift();
+    (graph[cur] || []).forEach(function (dep) {
+      if (!reached[dep]) { reached[dep] = true; queue.push(dep); }
+    });
+  }
+  const orphan = files.filter(function (rel) { return rel !== RUN_REL && !reached[rel]; });
+  const locks = files.filter(function (rel) {
+    return rel !== RUN_REL && reached[rel] && ent.spawned.indexOf(rel) < 0 && ent.inline.indexOf(rel) < 0;
+  });
+  return {
+    files: files,
+    reach: files.filter(function (rel) { return !!reached[rel]; }),
+    wrapped: ent.wrapped,
+    locks: locks,
+    spawned: ent.spawned,
+    inline: ent.inline,
+    orphans: orphan,
+    spawnLines: ent.spawnLines,
+    aggregator: hasRun ? RUN_REL : ''
+  };
+}
+
+/** 扫描：vfs 省略时扫真仓库（现场面）；给出时用虚拟面（负控制：真源码副本 + 定点破坏）。 */
+/**
+ * 宿主全局还原探针：按 run.js 的执行方式一个个跑锁，看哪个不还原宿主全局。
+ * 在子进程里跑（污染是进程级的，必须隔离；子进程也可单跑，不靠聚合器）。
+ */
+function globalResidueProbe(files) {
+  const list = (files || ['intel-v2530.js', 'life-v2520.js', 'longline-v2550.js', 'org-v2540.js']);
+  const grader = [
+    "require('./mock.js');",
+    "const PROBES = " + JSON.stringify(GLOBAL_PROBE.map(function (p) { return p.g; })) + ";",
+    "const read = function (g) { return (0, eval)(g); };",
+    "const snap = function () { const o = {}; PROBES.forEach(function (g) { o[g] = read(g); }); return o; };",
+    "const before = snap();",
+    "const dirty = [];",
+    "const list = " + JSON.stringify(list) + ";",
+    "list.forEach(function (f) {",
+    "  const marks = snap();",
+    "  try { require('./' + f).runAll(function () {}); } catch (e) { dirty.push(f + ' THREW ' + e.message); return; }",
+    "  PROBES.forEach(function (g) {",
+    "    const now = read(g), was = before[g];",
+    "    if (now !== was) dirty.push(f + ' 整换 ' + g);",
+    "    else if (now && typeof now === 'object') {",
+    "      const lost = Object.keys(marks[g] || {}).filter(function (k) { return !(k in now); });",
+    "      if (lost.length) dirty.push(f + ' 抹键 ' + g + ':' + lost.slice(0, 5).join(',') + '+' + lost.length);",
+    "    }",
+    "  });",
+    "});",
+    "process.stdout.write(JSON.stringify(dirty));"
+  ].join('\n');
+  const file = path.join(BASE, 'tests', '__tmp_global_probe.js');
+  fs.writeFileSync(file, grader);
+  try {
+    const r = require('child_process').spawnSync(process.execPath, [file], { cwd: BASE, encoding: 'utf8' });
+    if (r.status !== 0) return { ok: false, dirty: [], why: 'probe 退出 ' + r.status + ' :: ' + String(r.stderr || '').slice(0, 200) };
+    const out = JSON.parse(String(r.stdout || '[]'));
+    return { ok: true, dirty: out, why: '' };
+  } catch (e) {
+    return { ok: false, dirty: [], why: 'probe 异常 ' + e.message };
+  } finally {
+    try { fs.unlinkSync(file); } catch (e) {}
+  }
+}
+
+function scan(opts) {
+  opts = opts || {};
+  let vfs = opts.vfs || null;
+  if (!vfs) {
+    vfs = {};
+    testFiles(BASE).forEach(function (rel) { vfs[rel] = fs.readFileSync(path.join(BASE, rel), 'utf8'); });
+  }
+  const base = buildReach(vfs);
+  const exempt = opts.exempt || EXEMPT.map(function (e) { return e.rel; });
+  const problems = [];
+  base.orphans.forEach(function (rel) {
+    if (exempt.indexOf(rel) < 0) problems.push({ kind: 'unregistered-orphan', msg: '测试文件从不执行且未登记豁免：' + rel });
+  });
+  exempt.forEach(function (rel) {
+    if (base.files.indexOf(rel) < 0) { problems.push({ kind: 'stale-exempt', msg: '豁免项不在测试文件面（幽灵豁免）：' + rel }); return; }
+    if (base.locks.indexOf(rel) >= 0) { problems.push({ kind: 'stale-exempt', msg: '豁免项已被 require 进图（豁免该删）：' + rel }); return; }
+    if (base.spawned.indexOf(rel) >= 0) { problems.push({ kind: 'redundant-exempt', msg: '豁免项已有 spawn 入口（豁免冗余该删）：' + rel }); return; }
+    if (base.inline.indexOf(rel) >= 0) { problems.push({ kind: 'redundant-exempt', msg: '豁免项已有内联入口（豁免冗余该删）：' + rel }); return; }
+    if (base.orphans.indexOf(rel) < 0) { problems.push({ kind: 'stale-exempt', msg: '豁免项分类不可判定：' + rel }); }
+  });
+  if (base.aggregator === '') problems.push({ kind: 'surface-empty', msg: '文件面里没有 ' + RUN_REL + '（聚合器缺失）' });
+  if (base.files.length < MIN_FILES) problems.push({ kind: 'vacuous', msg: '测试文件面 ' + base.files.length + ' < 下限 ' + MIN_FILES });
+  if (base.locks.length < MIN_LOCKS) problems.push({ kind: 'vacuous', msg: '锁 ' + base.locks.length + ' < 下限 ' + MIN_LOCKS });
+  if (base.reach.length < MIN_REACH) problems.push({ kind: 'vacuous', msg: '可达 ' + base.reach.length + ' < 下限 ' + MIN_REACH });
+  if (base.spawnLines < MIN_SPAWN_LINES) problems.push({ kind: 'vacuous', msg: '直接 spawn 行 ' + base.spawnLines + ' < 下限 ' + MIN_SPAWN_LINES });
+  const residue = opts.vfs ? { ok: true, dirty: [], why: '' } : globalResidueProbe();
+  if (!residue.ok) problems.push({ kind: 'probe-broken', msg: '宿主全局探针跑不起来：' + residue.why });
+  residue.dirty.forEach(function (d) { problems.push({ kind: 'global-residue', msg: '锁在宿主全局上留残骸：' + d }); });
+  return {
+    files: base.files.length,
+    aggregator: base.aggregator,
+    reach: base.reach,
+    locks: base.locks,
+    wrapped: base.wrapped,
+    spawned: base.spawned,
+    inline: base.inline,
+    orphans: base.orphans,
+    spawnLines: base.spawnLines,
+    globalResidue: residue.ok ? residue.dirty.length : -1,
+    exempt: exempt.slice(),
+    problems: problems
+  };
+}
+
+function judge(report) { return report.problems; }
+
+function summary(report) {
+  return '测试文件面 ' + report.files + ' · 锁 ' + report.locks.length + ' · 可达 ' + report.reach.length
+    + ' · 包装 ' + report.wrapped.length + ' · spawn ' + report.spawned.length + ' · 内联 ' + report.inline.length
+    + ' · 孤儿 ' + report.orphans.length + ' · spawn 行 ' + report.spawnLines;
+    + ' · 宿主残骸 ' + report.globalResidue;
+}
+
+function main() {
+  const report = scan({});
+  const bad = judge(report);
+  console.log('■ 测试文件面可达性（WorldAxis ' + require('./product-files.js').BASE + '）');
+  console.log('  ' + summary(report));
+  console.log('  孤儿：' + (report.orphans.length ? report.orphans.join('、') : '（无）'));
+  console.log('  豁免：' + (report.exempt.length ? report.exempt.join('、') : '（无）'));
+  console.log('');
+  if (bad.length) {
+    bad.forEach(function (p) { console.log('  ✗ [' + p.kind + '] ' + p.msg); });
+    console.log('\n不可达面存在未登记成员：' + bad.length + ' 项');
+    process.exitCode = 1;
+    return;
+  }
+  console.log('全部通过 ✓（每个测试文件都有可判定的执行入口）');
+}
+
+module.exports = {
+  EXEMPT: EXEMPT,
+  MIN_FILES: MIN_FILES,
+  MIN_LOCKS: MIN_LOCKS,
+  MIN_REACH: MIN_REACH,
+  MIN_SPAWN_LINES: MIN_SPAWN_LINES,
+  stripComments: stripComments,
+  refsOf: refsOf,
+  wrapperOf: wrapperOf,
+  wrappedOf: wrappedOf,
+  entriesOf: entriesOf,
+  buildReach: buildReach,
+  scan: scan,
+  globalResidueProbe: globalResidueProbe,
+  GLOBAL_PROBE: GLOBAL_PROBE,
+  judge: judge,
+  summary: summary
+};
+
+if (require.main === module) main();

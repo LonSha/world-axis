@@ -1,0 +1,2340 @@
+/**
+ * 世界枢轴 WorldAxis v0.1.0
+ * 缝合：世界背面 / DlSNlGHT World / st-beat-tracker / SevenDaysCal / story-oracle(+outline)
+ *       st-direct-event / SoulLink / choice / EW-Assistant / st-theater / Veridis-Rewrite
+ *       WNE引擎 / TH-剧情推进 / 创世工坊 等资产
+ * 骨架：单拦截器调度内核 + 工作流节点注册表 + 世界演算底座 + 分源注入 + 主面板
+ */
+(function () {
+  'use strict';
+
+  const MODULE = 'worldAxis';
+  const VERSION = '2.566.0';
+  const LOG = '[世界枢轴]';
+
+  // 防止重复加载
+  if (window.__WORLD_AXIS_LOADED__) return;
+  window.__WORLD_AXIS_LOADED__ = true;
+
+  // 主窗口引用（TH脚本blob iframe场景下需要parent）
+  const mainWin = (() => {
+    try { return window.parent && window.parent !== window ? window.parent : window; }
+    catch (e) { return window; }
+  })();
+  const mainDoc = mainWin.document || document;
+
+  // ── 命名空间 ─────────────────────────────────────────────
+  const WA = window.WorldAxis = window.WorldAxis || {};
+  // v2.4.0: `WA.VERSION` 此前在 `const WA` 声明**之前**赋值 —— 严格模式命中 TDZ
+  //   （ReferenceError: Cannot access 'WA' before initialization），入口文件抛错即崩、
+  //   扩展整体无法装载。旧键 WS.VERSION 由 tool-diag 消费（`WA.VERSION || WA.version`），
+  //   故在命名空间建立后补回，避免消费端读空。tests/run.js 跳过 index.js，故长期未被回归发现。
+  WA.VERSION = VERSION;
+  WA.version = VERSION;
+  WA.mainWin = mainWin;
+  WA.mainDoc = mainDoc;
+  function _waDiagSet(k, v) {
+    try {
+      if (mainWin && mainWin.localStorage) {
+        mainWin.localStorage[k] = (typeof v === 'string' ? v : JSON.stringify(v));
+      }
+    } catch (e) {}
+  }
+  // v2.15.0: 时间源单一出口（决策时间进存档/参与判定，测量时间只进内存台账与日志）。
+  //   注意：本文件里一律用**内联三目**而非局部 helper——run.js 会把 loadScriptOnce 这
+  //   段源码切片出来在独立沙箱里重编译，helper 不在切片内，用 helper 会在 CDN 回退路径上炸。
+  const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
+  const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
+  // v2.0.0: 模块注册表契约已下沉至 core/store.js（注册表必须在所有加载路径下存在，
+  // 而非仅在入口文件）——此处保留转发兜底，防旧加载顺序下未定义。
+  if (typeof WA.registerModule !== 'function') {
+    WA.modules = WA.modules || {};
+    WA.registerModule = function (name, meta) {
+      if (!name) return null;
+      const rec = { name: name, at: (WA.clock ? WA.clock.now('index.module') : Date.now()), ver: (meta && meta.ver) || VERSION, kind: (meta && meta.kind) || 'engine' };
+      WA.modules[name] = rec;
+      return rec;
+    };
+  }
+  if (typeof WA.moduleRegistry !== 'function') WA.moduleRegistry = function () { return Object.keys(WA.modules || {}).sort(); };
+  WA.eventLog = [];     // 轻量运行日志（内存环形，最多300条，info/warn/error 混装）
+  WA.errorLog = [];    // v0.1.53: error 专属子环（最多50条）——info 噪音挤掉混合环也不丢关键故障证据
+  const ERROR_LOG_MAX = 50;
+  // v0.4.0: 诊断环自适应——上限按存储水位动态收紧/放宽。
+  // 压力来源：① 当前聊天诊断占比超预算（diagBudget.exceeded）② 全库 worldaxis 键总体积越水位。
+  // 收紧后既省体积又不静默丢证据：裁剪量进 logTrimStat 可观测。
+  const LOG_ADAPT = {
+    baseEvent: 300, baseError: 50,       // 常规上限
+    tightEvent: 120, tightError: 30,     // 紧张时上限
+    minuteEvent: 60, minuteError: 20,    // 危急时上限
+    bytesSoft: 4 * 1024 * 1024,          // 软水位 4MB（worldaxis_* 全体）
+    bytesHard: 8 * 1024 * 1024           // 硬水位 8MB
+  };
+  const __logTrimStat = { eventTrims: 0, errorTrims: 0, lastAt: 0, level: 'normal' };
+  function logCaps() {
+    let level = 'normal', why = [];
+    // v2.231.4：**初始化期间绝不扫全库**。
+    //   【为什么】`WA.log()` 每调一次都会走到这里，而下面 `WA.store.storageStat()`
+    //   要遍历整个 localStorage 统计字节数。init 期间日志密集（每步都有），
+    //   真机上这等于把「能不能起来」押在一次全库扫描上 —— 实测现象是 init 在
+    //   `mount-deferred` 之后整段消失（连 catch 都没机会跑）。
+    //   初始化未完成时用固定常规档：此阶段日志量本来就小，动态收紧没有必要，
+    //   而「不扫库」是硬要求。init 结束后（WA.__initDone）恢复原有自适应行为。
+    try { if (!WA.__initDone) return { level: 'normal', event: LOG_ADAPT.baseEvent, error: LOG_ADAPT.baseError, why: ['init-pending'] }; } catch (e) {}
+    try {
+      if (WA.store && WA.store.diagBudget) {
+        const db = WA.store.diagBudget();
+        if (db && db.exceeded) { level = 'tight'; why.push('diagPct=' + db.diagPct + '%>' + db.maxPct + '%'); }
+      }
+      if (WA.store && WA.store.storageStat) {
+        const st = WA.store.storageStat();
+        const tot = (st && st.totalBytes) || 0;
+        if (tot > LOG_ADAPT.bytesHard) { level = 'minute'; why.push('totalBytes>' + LOG_ADAPT.bytesHard); }
+        else if (tot > LOG_ADAPT.bytesSoft && level === 'normal') { level = 'tight'; why.push('totalBytes>' + LOG_ADAPT.bytesSoft); }
+      }
+    } catch (e) {}
+    __logTrimStat.level = level;
+    const ev = level === 'minute' ? LOG_ADAPT.minuteEvent : level === 'tight' ? LOG_ADAPT.tightEvent : LOG_ADAPT.baseEvent;
+    const er = level === 'minute' ? LOG_ADAPT.minuteError : level === 'tight' ? LOG_ADAPT.tightError : LOG_ADAPT.baseError;
+    return { level: level, event: ev, error: er, why: why };
+  }
+  function logTrimStatView() {
+    const caps = logCaps();
+    return { eventTrims: __logTrimStat.eventTrims, errorTrims: __logTrimStat.errorTrims, lastAt: __logTrimStat.lastAt, level: caps.level, eventCap: caps.event, errorCap: caps.error, why: caps.why };
+  }
+  let __logSaveTimer = null;
+  let __logSaveChat = null;   // v0.2.1: 挂起日志所属聊天（防抖窗口内切聊天时写错目标）
+  const LOG_SAVE_DEBOUNCE_MS = 500;
+  function persistEventLog(chatId) {
+    try {
+      const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      mainWin.localStorage.setItem('worldaxis_event_log_' + cid, JSON.stringify(WA.eventLog.slice(-300)));
+      mainWin.localStorage.setItem('worldaxis_error_log_' + cid, JSON.stringify(WA.errorLog.slice(-ERROR_LOG_MAX)));
+    } catch (e) {}
+  }
+  // v0.2.1: 防抖批量落盘——高频 info 日志合并窗口内只写一次，error 立即落盘保关键证据
+  function scheduleLogSave(immediate) {
+    if (immediate) {
+      const target = __logSaveChat || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      if (__logSaveTimer) { clearTimeout(__logSaveTimer); __logSaveTimer = null; }
+      persistEventLog(target); __logSaveChat = null;
+      return;
+    }
+    if (!__logSaveChat) __logSaveChat = (WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default';
+    if (__logSaveTimer) return;
+    __logSaveTimer = setTimeout(function () {
+      const target = __logSaveChat; __logSaveTimer = null; __logSaveChat = null;
+      persistEventLog(target);
+    }, LOG_SAVE_DEBOUNCE_MS);
+  }
+  WA.log = function (level, msg, data) {
+    const entry = { t: clockNow('index.log'), level, msg, data: data === undefined ? null : String(data).slice(0, 500) };
+    WA.eventLog.push(entry);
+    // v0.4.0: 按存储水位动态裁剪（常规 300 / 紧张 120 / 危急 60）
+    const caps = logCaps();   // 函数声明提升：加载期调用也安全
+    if (WA.eventLog.length > caps.event) {
+      const drop = WA.eventLog.length - caps.event;
+      WA.eventLog.splice(0, drop);
+      __logTrimStat.eventTrims += drop; __logTrimStat.lastAt = clockWall();
+    }
+    if (level === 'error') {
+      WA.errorLog.push(entry);
+      if (WA.errorLog.length > caps.error) {
+        const dropE = WA.errorLog.length - caps.error;
+        WA.errorLog.splice(0, dropE);
+        __logTrimStat.errorTrims += dropE; __logTrimStat.lastAt = clockWall();
+      }
+    }
+    scheduleLogSave(level === 'error');   // v0.2.1: error 立即落盘；info/warn 走防抖窗口
+    const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
+    fn(LOG, msg, data ?? '');
+  };
+  WA.logCaps = logCaps;          // v0.4.0: 当前诊断环动态上限（供测试/诊断消费）
+  WA.logTrimStat = logTrimStatView;
+  // v0.2.1: 恢复/清理日志（v0.1.53: 同步恢复/清理 error 子环）
+  //          切换聊天/清理前先冲刷挂起的防抖写入，防止未落盘日志丢失
+  WA.flushLog = function () {
+    if (!__logSaveTimer) return;   // v0.2.1: 无挂起写入 = 全部已落盘，不得动磁盘（防用已切换的内存覆盖已持久化数据）
+    clearTimeout(__logSaveTimer); __logSaveTimer = null;
+    const target = __logSaveChat || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+    __logSaveChat = null;
+    persistEventLog(target);
+  };
+  // v2.11.0: 宿主级读失败投递（与各模块同口径——单一台账、多模块投递）
+  function reportHostReadFail(source, key, err) {
+    try { if (WA.store && typeof WA.store.reportReadFail === 'function') WA.store.reportReadFail(source, key, err); } catch (e) {}
+  }
+  WA.loadEventLog = function (chatId) {
+    try {
+      WA.flushLog();   // 先落盘当前聊天挂起日志
+      const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      // v2.11.0: 两处日志载入此前共用一个空 catch ⇒ 读失败表现为「本会话没有历史日志」，
+      //   而日志正是排查其它故障的唯一证据面——它自己读不出来时必须是可见的。
+      let raw = null;
+      try { raw = mainWin.localStorage.getItem('worldaxis_event_log_' + cid); }
+      catch (eH) { reportHostReadFail('eventLog', 'worldaxis_event_log_' + cid, eH); }
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) WA.eventLog = arr.slice(-LOG_ADAPT.baseEvent);
+      }
+      let rawErr = null;
+      try { rawErr = mainWin.localStorage.getItem('worldaxis_error_log_' + cid); }
+      catch (eH2) { reportHostReadFail('errorLog', 'worldaxis_error_log_' + cid, eH2); }
+      if (rawErr) {
+        const arrErr = JSON.parse(rawErr);
+        if (Array.isArray(arrErr)) WA.errorLog = arrErr.slice(-ERROR_LOG_MAX);
+      }
+    } catch (e) {}
+  };
+  WA.clearEventLog = function (chatId) {
+    WA.eventLog = [];
+    WA.errorLog = [];
+    // v0.2.1: 取消挂起的防抖写入，防止已清空日志被定时器复活写回
+    if (__logSaveTimer) { clearTimeout(__logSaveTimer); __logSaveTimer = null; }
+    __logSaveChat = null;
+    try {
+      const cid = chatId || ((WA.store && WA.store.chatId) ? WA.store.chatId() : 'wa_default');
+      // v2.9.0: 走 store 的受控删除出口（此前裸调 removeItem）。清除日志的语义是「清空」——
+      //   删失败时防抖写入已取消、内存也清了，而磁盘上的旧日志会在下次 loadEventLog 时
+      //   整段复活：用户看到「已清空」，重启后又回来了，且没有任何线索。
+      if (WA.store && typeof WA.store.removeVerified === 'function') {
+        WA.store.removeVerified('worldaxis_event_log_' + cid);
+        WA.store.removeVerified('worldaxis_error_log_' + cid);
+      }
+    } catch (e) {}
+  };
+
+  // ── 加载子模块（按依赖顺序）─────────────────────────────
+  // 使用扩展自身URL推导base路径（兼容 third-party 目录）
+  // ── 扩展根目录推导（v2.231.1 修复）─────────────────────────────
+  // 【它治的病·真机活体缺陷】旧实现只认字面量 `WorldAxis`：
+  //     if (idx > 0 && src.includes('WorldAxis')) return src.slice(0, idx);
+  //     return '/scripts/extensions/third-party/WorldAxis';
+  //   于是扩展若装在**别的目录名**下（`git clone` 默认给的仓库名是 `world-axis`，
+  //   全小写带连字符；TauriTavern 扩展目录里实测就是这个名），两条路同时落空：
+  //   本地 src 拼成 `/scripts/extensions/third-party/WorldAxis/core/clock.js` —— 一个
+  //   **不存在的路径**，100+ 个模块全部 404，然后逐个掉进 CDN 容灾，每个模块
+  //   1 次本地 + 3 次 CDN × 12s 超时。手机网络到 jsDelivr 不通时，整条装载链
+  //   就是「无限期静默失败」：`ui/panel.js` 永不被求值 ⇒ `WA.ui` 恒缺席 ⇒
+  //   **悬浮球和面板永不出现，且没有任何报错**（用户视角：「装了这个扩展什么都没发生」）。
+  //   这正是本仓反复点名的「静默降级」形态，且是**文档约束冒充代码约束**的后果：
+  //   README 说「目录名必须是 WorldAxis」，但代码没有能力在目录名不同时存活。
+  // 【修法·与目录名解耦】三条路，越靠前越准：
+  //   ① `document.currentScript` —— 脚本执行期自身，名字随目录走，天然正确；
+  //   ② DOM 里任意 third-party 扩展的 `index.js` 脚本（TH 脚本 iframe 场景下
+  //      currentScript 是 iframe 自己的，故 mainDoc 兜底仍必要）；
+  //   ③ 最后才回退到目录惯例 —— 且**不再假设**某一种写法。
+  //   取到的前缀一律剥掉 query/hash，避免把 `?v=` 带进下一次拼接。
+  function stripQuery(u) { const q = u.search(/[?#]/); return q < 0 ? u : u.slice(0, q); }
+  function getBaseUrl() {
+    // ① 当前正在执行的脚本自身
+    try {
+      const cur = document.currentScript || mainDoc.currentScript;
+      const cs = cur && cur.src ? stripQuery(String(cur.src)) : '';
+      if (cs) {
+        const k = cs.lastIndexOf('/index.js');
+        if (k > 0) return cs.slice(0, k);
+        const s = cs.lastIndexOf('/');
+        if (s > 0) return cs.slice(0, s);
+      }
+    } catch (e) { /* currentScript 不可用 ⇒ 走 ② */ }
+    // ② DOM 中任意 third-party 扩展入口（不挑目录名）
+    try {
+      const scripts = mainDoc.getElementsByTagName('script');
+      for (let i = scripts.length - 1; i >= 0; i--) {
+        const src = stripQuery(scripts[i].src || '');
+        const idx = src.indexOf('/index.js');
+        if (idx > 0 && src.indexOf('/extensions/') > 0) return src.slice(0, idx);
+      }
+    } catch (e) { /* 继续 ③ */ }
+    // ③ 目录惯例回退（最后手段；两个已知写法都试，先大写后小写）
+    return '/scripts/extensions/third-party/WorldAxis';
+  }
+  WA.baseUrl = getBaseUrl();
+  // ── v2.231.1：装载现场取证（写进 localStorage，真机不可开 DevTools 时唯一通道）──
+  //   为什么要在**这一刻**写：下面就是 282 个模块的串行装载，任何一处 baseUrl 拼错都会让
+  //   整个 init 卡在超时里（每模块 1 本地 + 3 CDN × 12s），诊断信息要能在「卡住之前」落盘。
+  //   读法：localStorage.getItem('wa_boot_v1')
+  try {
+    const scriptsSeen = [];
+    try {
+      const ss = mainDoc.getElementsByTagName('script');
+      for (let i = 0; i < ss.length && scriptsSeen.length < 40; i++) {
+        const s = ss[i].src || '';
+        if (s.indexOf('extension') > 0 || s.indexOf('index.js') > 0) scriptsSeen.push(s);
+      }
+    } catch (e) {}
+    const perfSeen = [];
+    try {
+      const es = (mainWin.performance && mainWin.performance.getEntriesByType)
+        ? mainWin.performance.getEntriesByType('resource') : [];
+      for (let i = 0; i < es.length && perfSeen.length < 40; i++) {
+        const n = es[i].name || '';
+        if (n.indexOf('extension') > 0) perfSeen.push(n);
+      }
+    } catch (e) {}
+    _waDiagSet('wa_boot_v1', {
+      ver: VERSION,
+      base: WA.baseUrl,
+      currentScript: (function () { try { return (document.currentScript && document.currentScript.src) || null; } catch (e) { return 'err'; } })()
+        || (function () { try { return (mainDoc.currentScript && mainDoc.currentScript.src) || null; } catch (e) { return 'err'; } })(),
+      href: (function () { try { return String(mainDoc.location && mainDoc.location.href); } catch (e) { return 'err'; } })(),
+      scripts: scriptsSeen,
+      perf: perfSeen
+    });
+  } catch (e) { /* 存储不可用 ⇒ 诊断缺席，但不影响扩展本体 */ }
+  WA.loadScript = loadScript;
+  // ── v2.231.1：URL 形态探测（一次把「哪种写法真能取到模块」问清楚）──────────
+  //   背景：真机症状是「扩展装了但什么都没发生」，日志只有一句
+  //   `Uncaught SyntaxError: Unexpected token '<'` —— 说明某个 script 的 src 取回了
+  //   HTML（404 页）却被当 JS 解析。宿主是 Tauri 自定义协议（origin = tauri.localhost），
+  //   这类协议对 `?query`、对大小写、对目录映射的处理各不相同，**不能假设与 http 同构**。
+  //   故这里把候选写法逐个 fetch 一遍，把「哪个 200 / 哪个回 HTML」落盘：
+  //     localStorage.getItem('wa_probe_v1')
+  //   探针只读 GET，不写任何东西，不改变被观测对象。
+  (function probeUrlForms() {
+    try {
+      if (typeof fetch !== 'function') return;
+      const rel0 = 'core/clock.js';
+      const cands = [
+        WA.baseUrl + '/' + rel0,                 // ① 裸路径
+        WA.baseUrl + '/' + rel0 + '?v=' + VERSION, // ② 带 query（现用写法）
+        WA.baseUrl + '/' + rel0 + '#v=' + VERSION  // ③ 带 hash
+      ];
+      const out = { base: WA.baseUrl, ver: VERSION, results: [] };
+      const one = function (u) {
+        return fetch(u, { method: 'GET', cache: 'no-store' })
+          .then(function (r) {
+            return r.text().then(function (t) {
+              out.results.push({
+                url: u,
+                status: r.status,
+                ok: r.ok,
+                len: t.length,
+                head: t.slice(0, 60).replace(/\s+/g, ' ')
+              });
+            });
+          })
+          .catch(function (e) { out.results.push({ url: u, error: String(e && (e.message || e)) }); });
+      };
+      let p = Promise.resolve();
+      cands.forEach(function (u) { p = p.then(function () { return one(u); }); });
+      p.then(function () {
+        _waDiagSet('wa_probe_v1', out);
+      });
+    } catch (e) { /* 探针失败不影响本体 */ }
+  })();
+
+  const LOAD_ORDER = [
+    'core/clock.js',           // v2.15.0: 时间源单一出口（决策时间可冻结 / 测量时间不受影响）——须最先装载
+    'core/rand.js',            // v2.14.0: 随机源单一出口（决策流可复现 / 标识流不混流）
+    'core/input-guard.js',     // v2.85.0: 统一输入边界（须早于一切消费外部值的模块）
+    // v2.110.0（计划一 #21/#22 + 计划二 #39/#70）：三个**基元**模块。位置与 tests/run.js 的 LOAD 同序
+    //   （紧随 input-guard）。三者在**调用期**读 WA.inputGuard / WA.store / WA.clock，不在装载期读，
+    //   故对次序无硬要求；放在这一批是刻意的 —— 它们与 input-guard 是同一条边界上的三层：
+    //   值级 → 结构级 → 归属级，而 fault-context 是三层共用的「一次失败怎么讲清楚」。
+    'core/fault-context.js',
+    'core/schema.js',
+    'core/permissions.js',    // v2.111.0（计划二 #67/#69）：审计与消毒。
+    //   位置在 permissions 之后、settings-bus 之前：audit-log 在调用期读 WA.permissions（取当前用户），
+    //   sanitize 不读任何东西（纯函数）。两者对次序均无硬要求 —— 与 v2.110.0 三个基元同一批。
+    'core/audit-log.js', 'core/sanitize.js',
+    'core/settings-bus.js',
+    'core/store.js',
+    //   v2.524.0（OPV27-1/2）：装载汇报与逐台耗时。**为什么排在 store 之后、引擎之前**：
+    //     ① 它靠替换 `console.log` 属性来截获 182 台引擎的自述行 ⇒ 必须早于全部引擎（否则窗口外漏行）；
+    //     ② 它在装载尾声调 `WA.registerModule`，而 registerModule 在**调用期**读 WA.store ——
+    //        排在 store 之前会构成一条“供者后装”的装载期边（module-cycle B4 会当场报次序违规）；
+    //     ③ 它自己计时走 `WA.clock`，故也不能排在 clock 之前。
+    //   夹在 store 与引擎之间的唯一代价：clock 与 store 两条自述行漏在窗口外（实两行，可接受）。
+    'core/boot-report.js',
+    // v2.118.0（计划二 B7）：显式执行上下文（试演的承重结构）。位置只需**早于** engines 区 ——
+    //   act.js / world.js 都在**调用期**经 WA.exec 取值（装载期不读），故对次序无硬要求；
+    //   放在 store 之后是刻意的：它自身不读 WA.store，但 cloneState 的入参是 WA（含 store），
+    //   与 store 同批便于「存储层 → 执行层」的阅读次序。
+    'core/exec.js',
+    // v2.114.0（计划二 #56/#68）：生命周期钩子与进程内白名单沙箱。
+    //   位置**必须**在 store 之后：两模块尾部都调 WA.registerModule 登记自己
+    //   （registerModule 由 store 提供），排在 store 之前会 order-violation 装载期抛错。
+    //   调用期关系是反向的——store 在 save/init 里读 WA.plugin.fire，plugin 的钩子体走 WA.sandbox.run，
+    //   都在调用期取，故排在 store 之后不产生环。
+    'core/sandbox.js', 'core/plugin.js',
+    'core/evict.js',          // v2.13.0: 挤出侧单一出口（必须先于各引擎装载）
+    'core/api-router.js',
+    'core/undo.js',           // v2.30.0: 参数编辑撤销栈（P0-2；须在 store 之后、UI 之前装载）
+    'core/workflow.js',
+    'core/settle-guard.js',
+    // v2.160.0（TP4）：跨引擎提交契约。位置**必须**在 store / evict 之后 ——
+    //   它尾调 WA.registerModule（由 store 提供），且写入侧经 WA.evict.array 走挤出台账。
+    //   调用期关系：它读 WA.store / WA.clock / WA.evict，全在调用期取，故排在此处不产生环。
+    'core/commit.js',
+    // v2.296.0（V10 OPV10-7）：全仓统一待办中心。位置在 store / commit 之后、引擎之前
+    'core/unified-pending.js',
+    'core/interceptor.js',
+    // OPV29-11：backstage 的协议常量与设置登记表已拆到 engines/backstage-protocols.js，
+    //   必须先于引擎装载（缺表时引擎求值期当场抛错，不静默退化成「没有协议」）。
+    'engines/backstage-protocols.js',
+    'engines/backstage.js',
+    'engines/evolution.js',
+    'engines/enemies.js',
+    // v2.533.0（OPV30 收口）：五台缝合件**有产品读点**（ui/settings.js 的「缝合件台账」读数行）
+    //   ⇒ 按 Z1-04 的 B16「wired 不许懒」退出惰性档、进首帧面：它们全是纯函数，
+    //   只依赖 store 的 registerModule，排在 store/commit 之后即可。
+    'engines/arc-guide.js',
+    'engines/ctx-boundary.js',
+    'engines/replica-family.js',
+    'engines/save-audit.js',
+    'engines/write-rehearsal.js',
+    'engines/lazy-load.js',
+    'engines/regional.js',
+    'engines/parallel-world.js', // v2.34.0: 平行世界（主线之外独立推演，缝合自狐神抚 V19.5）
+     'engines/horizon.js',
+     'engines/digest.js',
+     'engines/limits.js',
+'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
+    'engines/chapters.js',
+    'engines/direct-event.js',
+    'engines/editor-faction.js',
+    'engines/editor-events.js',
+    'engines/inspector-state.js',
+    'engines/tool-snapshot.js',
+    'engines/tool-analyzer.js',
+    'engines/tool-import.js',
+    'engines/inject-inspector.js',
+    'engines/inject-budget-tables.js',
+    'engines/inject-budget.js',
+    'engines/tool-diag-tables.js',
+    'engines/tool-diag.js',
+    'engines/contract-audit.js',
+    'engines/memory-sampler.js',
+    'engines/sampler-check.js',
+    'engines/inject-channel.js',
+    'engines/inject-slot-audit.js',
+    'engines/proactive.js',
+    'engines/wb-inject.js',
+    // v2.45.0: 世界书条目按需路由。必须在 worldbook.js 之后装载——它读 worldbook 的
+    //   按聊天覆写表（getOverrides/getSelectedIds/saveSelection）落「本回合隐藏」。
+    'engines/entry-router.js',
+    // v2.46.0: 变量驱动条款（世界状态 → 派生量 → 按变量值确定性注入正文）。
+    //   须在 core/store 之后（它只读 store 快照），与本模块的 before 节点位置无关
+    //   （节点顺序由 workflow 的 order 决定，不由装载顺序决定）。
+    // v2.542.21：json-repair 从惰性档移回首帧。理由是现场矛盾：
+    //   ui/panel.js:7950 真读 WA.jsonRepair.parse，而它又在 LAZY_ORDER 里 —— 首帧未装时
+    //   面板那一块会静默少功能（opv29-z1-04 的 D1 就是拦这个）。惰性档只能放
+    //   「产品源面零出现」的模块；要面板读它，就得回首帧。
+    'engines/json-repair.js',
+    // v2.542.23：story-export 同病同批回首帧。工具页「导出正文 / 复制正文」两个按钮
+    //   真调 WA.storyExport.build —— 它在惰性档里时，首帧点按钮会静默少功能（D1 拦的就是这个）。
+    //   惰性档只放「产品源面零出现」的模块；既然面板要读它，它就得在首帧面。尾部
+    //   调 WA.registerModule（由 store 提供）⇒ 装载期边 +1；store 在下标之前，order-violation 仍 0。
+    'engines/story-export.js',
+    // v2.542.24：api-vault 同病同批回首帧。api-router 是首帧装载的核心件，本版起它
+    //   在**唯一的**读写路径上真调 WA.apiVault（vaultOn / save / peek / prime）——
+    //   vault 留在惰性档里时，首帧保存 API Key 会静默退回明文（安全升级被降级）。
+    //   尾部调 WA.registerModule（由 store 提供）⇒ 装载期边在惰性档时就已计入，移回首帧不增。
+    'engines/api-vault.js',
+    // v2.542.25：import-kind 同病同批回首帧。面板「这是哪种文件？」按钮真调
+    //   WA.importKind.detectText / describe —— 惰性档里时首帧点它会静默少功能（D1 拦的就是这个）。
+    //   惰性档只放「产品源面零出现」的模块；面板要读它，它就得在首帧面。
+    'engines/import-kind.js',
+    'engines/kaleidoscope.js',
+    'engines/calendar.js',
+    // v2.302.0（缝 World Chronicle）：正文内联状态回报标签 <time>/<choice>/<flag>。
+    //   位置**必须在 calendar 之后**：它调 WA.calendar.setClock 写 clock.iso（既有写口），
+    //   且必须在 interceptor 之前（拦截器在 m.load 后订阅事件，解析入口要已就绪）。
+    'engines/inline-tags.js',
+    'engines/periodicals.js',
+    'engines/memory.js',
+    'engines/opinion.js',
+    // v2.16.0: 对外只读互操作桥（worldaxis_bridge_v1）。须在 store/settingsBus/interceptor/workflow
+    //   之后装载——它读 store、写设置走 settingsBus、订阅总线、并在 after 链注册发布节点。
+    'engines/bridge.js',
+    // v2.17.0: 记忆桥消费面（读 window.lonsha_memory_bridge_v1）。须在 core/store 之后装载
+    //   ——它读 store.clock 做对账；与 bridge.js（对外的**供货**面）互为镜像：桥发得出去、
+    //   也读得进来，这套互操作才算通了整条。
+    'engines/lonsha-reader.js',
+    // v2.50.0（第三十五面）: 宿主两侧 + 时间轴三账。
+    //   须在 engines/timeline.js（hashText / auditRefs 的提供方）之后，且**必须早于**
+    //   render/inject.js —— 注入落地时会读 hostWbTrace.crossCheck 与 ledgerTimeline.probeDefault，
+    //   而 core/interceptor.js 的订阅回调也要在 install() 时找到这三个命名空间。
+    'engines/host-wb-trace.js',
+    'engines/ledger-timeline.js',
+    'engines/floor-changes.js',
+    // v2.231.0（优化 OPT-5）：楼层结算账。与 floor-changes 同一批（都在 timeline 之后）。
+    //   它**唯一写回世界状态**：beginRound 抓基线、endRound 落账、rollback 才动 store ——
+    //   故必须在 core/store.js 之后，且与 floor-snapshot（字段级只读补丁）无装载依赖。
+    'engines/floor-settle.js',
+    // v2.231.0（拓展 EXP-1）：能力成长台账。位置在 entities 之后（它读 entities 的表）。
+    'engines/training.js',
+    // v2.231.0（拓展 EXP-2）：唯一物件台账。位置在 economy 之后（它与堆叠资源分列，
+    //   但读 people 的资源面做修理材料判定）。
+    // v2.231.0（拓展 EXP-3）：生产工单与设施。读 economy（配方/库存真源）与 freight
+    //   （运输真源），故排在二者之后 —— 调用期读，不产生装载期环。
+    'engines/production.js',
+    'engines/gear.js',
+    // v2.231.0（拓展 EXP-4）：探索与地理发现。排在 world 之后（客观地图真源
+    //   world.places / world.roads 的读口在调用期），且**晚于** production/gear
+    //   （同为「逐人/逐件」的台账家族，登记顺序与 store 骨架同批）。
+    //   本模块**不写 world.***（不造路、不改地形），故与 world 之间无装载期环。
+    'engines/survey.js',
+    // v2.231.0（拓展 EXP-5）：可选规则的对抗场景（多轮多阶段 / 对抗检定 / 部分成功 /
+    //   代价成功 / 撤退）。掷骰与 DC 解析走 fate（调用期读，故与 fate 之间无装载期环），
+    //   位置改动走 world（本模块全文不写 world.*）。排在 survey 之后：同为「场景/台账」
+    //   家族，登记顺序与 store 骨架同批。
+    'engines/contest.js',
+    'engines/ruling.js',
+    // v2.231.0（拓展 EXP-7）：可参与的公共活动（筹备 / 报名 / 名额 / 开场 /
+    //   分轮 / 结算 / 延期 / 取消）。排在 ruling 之后：同属「公共事务」家族，
+    //   登记顺序与 store 骨架同批。contest 是它的**可选**结算器（调用期读），
+    //   故与 contest 之间无装载期环。
+    'engines/activity.js',
+    // v2.231.0（拓展 EXP-8）：研究阶段、成果权限与制造入口联动。
+    //   配方定义读 economy；组织成员读 evolution，均为调用期访问。
+    'engines/research.js',
+    // v2.231.0（拓展 EXP-9）：共同生活、照护与显式资产交接。
+    //   复用 people 人物与资源，不自动制造出生、死亡或婚姻事件。
+    'engines/family.js',
+    // v2.231.0（优化 OP-1）：场景行动桌。**排在全部 owner 之后**（research/family/
+    //   production/training/gear 都是它的读源），且须晚于 settingsBus（读设置面）。
+    //   位置与 tests/run.js 的 LOAD 同序 —— 两处不同序会让专锁的隔离判据静默降级。
+    'engines/action-desk-routes.js',
+    'engines/action-desk.js',
+    // v2.231.0（优化 OP-2）：能力—工具—行动结果联动。消费 training/gear/act，提供多解法评估与原子消耗。
+    'engines/action-methods.js',
+    // v2.231.0（优化 OP-3）：劳动与日程结算。同一段时间只能花一次，跨业务时段排他。
+    'engines/labor-schedule.js',
+    // v2.231.0（优化 OP-4）：研究成果闭环。类型化前置验证与三权分立就绪度评估。
+    'engines/research-closure.js',
+    // v2.231.0（创新 IN-1）：动机竞合。NPC 不再只选第一条可执行任务，权衡生计/承诺/抱负/恢复/安全。
+    'engines/motive-arbitration.js',
+    // v2.231.0（创新 IN-2）：未走之路的回声。有限预期、遗憾与经验修正。
+    'engines/path-echo.js',
+    // v2.231.0（创新 IN-5）：活的技术谱系。知识传承、分化与断代复兴。
+    'engines/tech-lineage.js',
+    // v2.231.0（优化 OP-5）：共同生活经营。预算、分工与责任交接。
+    'engines/family-ops.js',
+    // v2.231.0（优化 OP-6）：世界痕迹消费。设施损坏、封路、绕路与不可逆修复。
+    'engines/aftermath-impact.js',
+    // v2.231.0（优化 OP-7）：角色手里的版本。局部事实视图与信念修正。
+    'engines/epistemic-view.js',
+    // v2.231.0（拓展 IN-3）：共同知晓与默契。二阶认知、公开宣布与协作约定。
+    'engines/shared-awareness.js',
+    // v2.231.0（拓展 IN-4）：习俗到制度。惯例候选→组织批准→规则→复审。
+    'engines/custom-lax.js',
+    // v2.231.0（优化 OP-8）：场景与历史按因果讲清楚。只读聚合。
+    'engines/scene-narrative.js',
+    // v2.231.0（拓展 IN-6）：公共设施与服务网络。容量、排队、维护与降级。
+    'engines/service-network.js',
+    // v2.231.0（优化 OP-9）：可玩的世界蓝图。样例、依赖检查、玩法定义导出。
+    'engines/playable-blueprint.js',
+    // v2.281.0（V7 OPV7-6）：开局即喂。把已安装蓝图播种成结构化世界（目标/日程/关系/势力归属）。
+    //   位置**必须紧随 playable-blueprint**：调用期它读 WA.playableBlueprint.getSample（玩法定义
+    //   与初始条件的唯一真源）和各写口（life.addGoal/addSchedule、bonds.setBond、org.assignRole）。
+    //   装载期它只登记自己的设置键 —— 零上游读、零 store 写、零落盘，故排在这里不构成装载期依赖。
+    'engines/playable-seed.js',
+    // v2.231.0（拓展 IN-7）：有承载力的环境。存量、再生、压力与恢复时滞。
+    'engines/environmental-capacity.js',
+    // v2.231.0（拓展 IN-8）：社会遗产。未完事业/设施/物件/师承/声誉的承接与见证。
+    'engines/social-legacy.js',
+    // v2.231.0（拓展 IN-9）：历史相变。局部社会状态评估、过渡与路径依赖。
+    'engines/phase-transition.js',
+    // v2.233.0（拓展 EXV4-2）：人口迁入迁出与地方能力变化。
+    'engines/demographic-flow.js',
+    // v2.233.0（拓展 EXV4-3）：照护链与公共服务韧性。
+    'engines/care-chain.js',
+    // v2.233.0（拓展 EXV4-4）：公共议程设置与代表性缺口。
+    'engines/public-agenda.js',
+    // v2.233.0（拓展 EXV4-5）：共同资源的使用权与维护责任。
+    'engines/commons-governance.js',
+    // v2.233.0（拓展 EXV4-6）：知识的地方传播与实践许可。
+    'engines/knowledge-practice.js',
+    // v2.233.0（拓展 EXV4-7）：地方风险分担与保险式互助。
+    'engines/risk-pooling.js',
+    // v2.233.0（拓展 EXV4-8）：地方身份与多重归属冲突。
+    'engines/role-conflict.js',
+    // v2.233.0（拓展 EXV4-9）：世代交替与制度惯性。
+    'engines/institutional-inertia.js',
+    // v2.234.0 (Living World V5): 真实世界自治演化与偶遇痕迹中枢
+    'engines/living-world.js',
+    // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
+    'engines/geo-tracker.js',
+    // v2.328.0 (MAP-ADVANCED): 分形空间拓扑、通勤滞留仲裁、视听阻抗遮蔽与现场物理痕迹
+    'engines/spatial-topology.js',
+    'engines/local-grid.js',
+    'engines/spatial-bridge.js',
+    'engines/transit-scheduler.js',
+    'engines/environmental-occlusion.js',
+    'engines/spatial-trace.js',
+    // v2.329.0: 随身行囊物理约束与生理代谢疲劳时钟双引擎
+    'engines/personal-inventory.js',
+    'engines/metabolism-clock.js',
+    // v2.330.0 (V15): 全域通用物理与生活新引擎
+    'engines/environmental-hazard.js',
+    'engines/disaster-evacuation.js',
+    'engines/spatial-conflict.js',
+    'engines/universal-routine.js',
+    'engines/social-encounter.js',
+    'engines/lens-culling.js',
+    'engines/cascade-bus.js',
+    // v2.330.0 (V16): 微气候相变、毒素代谢与全息物理空间对抗引擎
+    'engines/microclimate-phase.js',
+    'engines/toxic-metabolism.js',
+    'engines/pyro-telecom.js',
+    'engines/contraband-pipeline.js',
+    'engines/crowd-panic.js',
+    'engines/veracity-arbitration.js',
+    'engines/gear-wear.js',
+    'engines/cover-ballistics.js',
+    // v2.340.0 (V17): 混沌蝴蝶、深层心智与文明戏剧大系引擎
+    'engines/butterfly-cascade.js',
+    'engines/psyche-trauma.js',
+    'engines/conspiracy-weaver.js',
+    'engines/ideology-memetics.js',
+    'engines/dramatic-tension.js',
+    // v2.542.2：叙事脊柱 L1「本幕」。须早于 render/inject.js（注入时读 sceneIntent.buildBlock()），
+    //   且此刻读的 director / plotGauge / store 都已在装载面里；它自己不写世界。
+    // v2.542.4：叙事脊柱 L3「弧线与核账」。必须早于 scene-intent（后者在 compose 里读
+    //   phase/settle/debtItem）；它自己在**调用期**读 plotGauge 与 chapters，两者都在装载面里。
+    // v2.542.5：叙事脊柱 L4「人物驱动力」。早于 scene-intent（后者在 compose 里取筹码），
+    //   只读 people 画像与 store，零写入。
+    'engines/character-drive.js',
+    'engines/arc-phase.js',
+    'engines/scene-intent.js',
+    // v2.542.3：叙事脊柱 L2「注入分档」（影子）。须早于 render/inject.js（applyInjections 里在 plan
+    //   之前调 observe）；此刻它读的 sceneNarrative / sceneIntent / injectBudgetTables 都已在装载面里，
+    //   它自己零写入（观测只存内存）。
+    'engines/inject-tier.js',
+    'engines/epoch-tide.js',
+    'engines/moral-dilemma.js',
+    'engines/perception-manipulation.js',
+    // v2.340.0 (V18): 具身战术、微表情审讯、荒野生态、围城与遗迹引擎
+    'engines/tactical-combat.js',
+    'engines/interrogation-tell.js',
+    'engines/ecosystem-predation.js',
+    'engines/siege-attrition.js',
+    'engines/anomaly-mutation.js',
+    'engines/bureaucracy-ascension.js',
+    'engines/judicial-inquest.js',
+    'engines/ruin-mechanism.js',
+    // v2.247.0 (SYS-DEF-1): 全向系统健康与生成质量前置预检器 (SillyTavern-Self-Check 机制缝入)
+    'engines/health-preflight.js',
+    // v2.247.0 (NARR-1): 双轨因果隔离与线索断裂补偿推演台 (Gloria 叙事三部曲机制缝入)
+    'engines/narrative-deduction.js',
+    // v2.248.0 (ANTI-OMNI): 全域认知隔离、四大防御屏障与防全知阻断引擎
+    'engines/anti-omniscience.js',
+    'engines/persona-anchor.js',
+    // v2.250.0（拓展）：四个新引擎。位置紧随 persona-anchor，与 tool-diag 的
+    //   MODULE_EXPORTS 同批登记。四条都必须早于 render/inject.js 与 core/interceptor.js
+    //   —— 注入落地读各自 buildBlock()、after 链调用各自推进口。
+    'engines/gen-timing.js',      // 主动的时机（泊松渴望 / 贝叶斯状态 / 信息增益）
+    'engines/one-shot-mod.js',    // 只这一轮的临时调制（消费即焚）
+    'engines/mood-glide.js',      // 情绪惯性（半衰期回落 / 思念累积）
+    'engines/output-guard.js',    // 别替玩家说话（伪造引述核对）
+    // v2.251.0（拓展 SB-1）：场景频次上限（注意预算，cf. gaze 静止退避）。
+    //   纯判据模块：不推世界、不读正文，所以位置不敏感；需要它的推进方
+    //   （beat / tempo / rhythm-loop）只在调用点取 `WA.sceneBudget.note()`。
+    'engines/scene-budget.js',
+    // v2.251.0（拓展 FG-1）：跃过静默阈值的升级提醒闸门（cf. callhome 四道门控）。
+    //   它与 ladder/care-chain 正交：那两者靠「已出事」升档，本模块答「什么都没发生但很久没动静」。
+    'engines/followup-gate.js',
+    // v2.251.0（拓展 CT-1）：折叠时机（缓存冷热判据，cf. GranCyan continuityPlan）。
+    //   与 inject-budget（装多少）、length-policy（算多长）正交：它只答「什么时候动手」。
+    'engines/compact-timing.js',
+    // v2.251.0（拓展 OPJ-1）：同一事实的多观察者投影（cf. rain-go viewMatch）。
+    //   排在 epistemic-view 之后、注入之前：不自己翻信念账，只把调用方给的版本按人物物理分开。
+    'engines/observation-projection.js',
+    // v2.251.0（拓展 DS-1）：梦境结算的空稿闸与去现实标记（cf. dreams EMPTY_DREAM_RE）。
+    //   须晚于 word-budget（有效字数走它，不另算一套）；与 dream.js 正交：那里管线，这里管稿。
+    'engines/dream-settle.js',
+    // v2.251.0（拓展 ES-1）：注入块的历史洗除（阅后即焚，cf. pilulier burn-after-reading）。
+    //   与 one-shot-mod 正交：那里管发与销，它只管已落盘历史里那段原文。
+    'engines/ephemeral-scrub.js',
+    // v2.251.0（拓展 IM-1）：认人的分数排序与判不清带（cf. voice-familiarity ambiguity_margin）。
+    //   纯判据：不写名册，认完要不要建档由 actors/registry 做。
+    'engines/identity-match.js',
+    // v2.251.0（拓展 DT-1）：延迟任务的代际令牌与串行尾链（cf. dsh-toy StopTimer token + exclusive）。
+    //   纯基建，不判业务：offline-return 的 defer 已接上（此前排完队无句柄留底）。
+    'engines/defer-token.js',
+    // v2.251.0（拓展 SG-1）：判定成功等级五档（cf. coc-kp-host success_level）。
+    //   须早于 engines/fate.js：fate.check 在返回值里追加 grade（只追加，不改 pass/crit/fumble）。
+    'engines/success-grade.js',
+    'engines/outcome-dice.js',
+    'engines/identity-ledger.js',
+    // v2.524.0 (V29 批一): 称呼随亲疏 / 年龄体貌 / 习惯认人 / 失礼后果（只判不说）
+    'engines/address-form.js',
+    'engines/aging.js',
+    'engines/habit-tell.js',
+    'engines/etiquette.js',
+    'engines/floor-order.js',
+    'engines/interrupt-cost.js',
+    'engines/overhear-split.js',
+    'engines/quiet-round.js',
+    // v2.524.0 (V29 批三·Y3 收束与谢幕): 终局条件 / 卷末结算 / 未收的线 / 退场仪典 / 前世
+    'engines/finale.js',
+    'engines/arc-settle.js',
+    'engines/loose-ends.js',
+    'engines/exit-rite.js',
+    'engines/past-life.js',
+    // v2.524.0 (V29 批四·Y4 身后与传承): 身后名 / 身后四事（债·遗物·翻案·悼念）
+    'engines/reputation-after.js',
+    'engines/posthumous.js',
+    // v2.524.0 (V29 批五·Y5 物价与生计): 三人三价 / 生计五面
+    'engines/price-voice.js',
+    'engines/livelihood.js',
+    // v2.524.0 (V29 批六·Y6 时间的边界): 离线/回来/暂停/并发/长档/局长度
+    'engines/world-bounds.js',
+    // v2.302.0 (V13 Batch A): 剧情变奏骰与空间具身声学
+    'engines/narrative-dice.js',
+    'engines/spatial-acoustics.js',
+    // v2.302.0 (V13 Batch B): 守恒通胀走私与险道天堑
+    'engines/contraband.js',
+    'engines/terrain-hazard.js',
+    // v2.303.0 (V13 Batch C): 伏笔生命树、叙事潜台词张力、自传回忆、跨阵营史料与代际盟约
+    'engines/foreshadow-tree.js',
+    'engines/subtext-tension.js',
+    'engines/autobiography-epiphany.js',
+    'engines/faction-chronicle.js',
+    'engines/legacy-oath.js',
+    'engines/city-folklore.js',
+    'engines/periodical-ideology.js',
+    'engines/counterfactual-sandbox.js',
+    'engines/civilization-relic.js',
+    'engines/idiosyncrasy.js',
+    'engines/whisper-backchannel.js',
+    'engines/collateral-rupture.js',
+    'engines/action-cost-feedback.js',
+    'engines/foreshadow-germination.js',
+    'engines/courier-dispatch.js',
+    'engines/supply-choke.js',
+    'engines/rumor-cognition.js',
+    'engines/cognitive-poisoning.js',
+    'engines/dilemma-bargain.js',
+    'engines/faction-schism.js',
+    'engines/institutional-schism.js',
+    'engines/environment-interference.js',
+    'engines/branch-transplant.js',
+    'engines/sanctuary-scramble.js',
+    'engines/counterfactual-echo.js',
+    // v2.323.0: 通用退场角色跨题材自主生计与烟火生活流转 + 怪诞市井暗线
+    'engines/offstage-life.js',
+    'engines/stage-presence.js',
+    'engines/covert-espionage.js',
+    'engines/epidemic-contagion.js',
+    'engines/surgical-triage.js',
+    'engines/maritime-navigation.js',
+    'engines/blackmarket-usury.js',
+    'engines/stealth-infiltration.js',
+    'engines/alchemy-toxicology.js',
+    'engines/covenant-sanction.js',
+    'engines/eccentric-threads.js',
+    'engines/human-realism.js',
+    // v2.360.0 (V20): 纪元突变、地貌灾变与地下金融引擎
+    'engines/epochal-transition.js',
+    'engines/cataclysm-hazard.js',
+    'engines/financial-contagion.js',
+    // v2.380.0 (V21): 文明盛衰、神权军团、刑狱血脉、工程拓扑与生态政变大系
+    'engines/theology-cult.js',
+    'engines/regiment-tactics.js',
+    'engines/incarceration-jailbreak.js',
+    'engines/bloodline-heritage.js',
+    'engines/engineering-blueprint.js',
+    'engines/dungeon-hazard-mesh.js',
+    'engines/ecosystem-cascade.js',
+    'engines/court-intrigue.js',
+    // v2.325.0: 剧情生活动线与身份世界观节律
+    'engines/routine-pacing.js',
+    // v2.251.0（拓展 WD-1）：阶位权重池 + 未得补偿 + 幸运封顶（cf. aifarm gacha/soft-pity）。
+    //   纯判据 + 抽一个：走 rand.pickWeighted 的 `draw` 通道，池子与图鉴留在调用方。
+    'engines/weighted-draw.js',
+    // v2.251.0（拓展 CL-1）：借据账（欠条 / 计息 / 先息后本 / 逾期）（cf. cedarduet loans）。
+    //   与 karma 的 debt 轴正交：那是业力不是钱，不计息、不到期。economy 仍是钱货两清，本模块只管赊。
+    'engines/credit-ledger.js',
+    // v2.252.0（拓展 IF-1）：AOI 兴趣面（格网 + 方形半径，只在跨格时重算覆盖集合）（cf. OpenMMO interest.rs）。
+    //   与 region/farfield 正交：那两者按**天**算传播与摘要，本模块按**格**算同一时刻谁在场。
+    //   纯投递判据：投给谁之后那件事算不算「他知道了」仍归 epistemic-view / knowledge。
+    'engines/interest-face.js',
+    // v2.253.0（拓展 ST-1）：离线寄售摊（摆摊 / 挂货锁货 / 过路人成交 / 抽税 / 脱绳收摊）（cf. OpenMMO stall.rs）。
+    //   与 economy 互补而非重复：economy 管「当场这一笔成不成」，本模块管「人走开了货怎么卖出去」。
+    //   挂单价必须落在 economy 同一资源的定价带宽内，本模块不另开一套价。
+    'engines/stall.js',
+    'actors/registry.js',
+    'actors/monologue.js',
+    'actors/observe.js',
+    'actors/profile.js',
+    'direction/oracle.js',
+    'direction/tags.js',
+    'direction/choices.js',
+    // v2.51.0（第三十六面）：叙事工艺设置面。须早于其唯一消费方 render/inject.js
+    //   —— 注入落地时 applyInjections 要读 style.buildBlock()。
+    //   它是 engines/rules.js 的 craft 模块（「叙事工艺按设置面口径执行」）所指向的
+    //   那个**设置面本身**：此前只有口径声明、没有产生方。
+    'engines/style.js',
+    // v2.52.0：人物生活。须早于 render/inject.js，注入时读取 life.buildBlock()。
+    'engines/life.js',
+    // v2.53.0：因果与情报。须早于 render/inject.js，注入时读取 intel.buildBlock()。
+    'engines/intel.js',
+    // v2.54.0：资源与组织。须早于 render/inject.js，注入时读取 org.buildBlock()。
+    'engines/org.js',
+    // v2.55.0：长线伏笔。须早于 render/inject.js，注入时读取 longline.buildBlock()。
+    'engines/longline.js',
+    // v2.135.0（E6）：伏笔生命周期。须**晚于** engines/longline.js —— 它的 resolve/recycle
+    //   要清掉 longline 设的承诺时刻（dueAt / promisedAt），先装会出现「清了但还没人设」的窗口；
+    //   须早于 render/inject.js，注入时读取 foreshadow.buildBlock()。
+    //   真源是既有的 memory.foreshadows（不新开容器）—— 见模块头部边界 2。
+    'engines/foreshadow.js',
+    // v2.62.0：因果结算。须早于 render/inject.js，注入时读取 causal.buildBlock()；
+    //   且须**晚于** intel.js —— knownCause 单一真源指向 intel.knownCause。
+    'engines/causal.js',
+    // v2.97.0（X5）：跨插件因果桥（**入站边**，worldaxis_phone_ops_v1）。
+    //   为什么须**晚于** engines/causal.js：它把手机侧的操作登记进 `causal.phoneOps`
+    //   （与因果链同容器），并把「这条链的因是手机操作」这一层接回来——因果面先在场，
+    //   入站台账才有链可指。与 engines/bridge.js（只读**出站**投影）正交，两者互不调用。
+    'engines/phone-bridge.js',
+    // v2.63.0：世界织体（社会生活 / 共同日程 / 地点与路途）。
+    //   须早于 render/inject.js，注入时读取 world.buildBlock()；
+    //   且须**晚于** life.js —— 在场者名单的唯一证据是「人物自己的日程安排」（life.schedule）。
+    // OPV29-11：world 的封闭词表与设置登记表已拆到 engines/world-tables.js（先装表）。
+    'engines/world-tables.js',
+    'engines/world.js',
+    // v2.65.0 天气与难度。天气必须晚于 world.js：setWeather 用 world.reach 确认地点已登记。
+    'engines/weather.js',
+    'engines/difficulty.js',
+    // v2.63.0：社交漩涡（关系经历与承诺深化）。
+    //   须早于 render/inject.js，注入时读取 shadow.buildBlock()。
+    'engines/shadow.js',
+    // v2.63.0：悬案（调查与情报玩法面）。
+    //   须早于 render/inject.js，注入时读取 threads.buildBlock()。
+    'engines/threads.js',
+    'engines/offstage-queue.js',
+    'engines/act-step.js',
+    'engines/trace-post.js',
+    'engines/misbelief.js',
+    'engines/thread-sprout.js',
+    'engines/dormant-ladder.js',
+    'engines/consequence-schedule.js',
+    'engines/appointment.js',
+    'engines/time-ledger.js',
+    'engines/hearsay-ledger.js',
+    'engines/far-account.js',
+    'engines/interlude.js',
+    'engines/letter-post.js',
+    // v2.524.0（X6）：世界简报 —— 拼图板 / 世界一句话 / 安静的权利 / 世界年表。
+    //   硬依赖：须晚于 engines/hearsay-ledger.js（拼图板读它落的 shard）；
+    //   须早于 render/inject.js（注入读 worldBrief.buildBlock()）。
+    'engines/world-brief.js',
+    // v2.524.0（OPV28 组一~组六）：六台「面向玩家与调度的治理面」。
+    //   硬依赖：continuity-guard 早于 story-rhythm（pov 复用它的 knowledge 口径）；
+    //   narrative-preset / controllability 读 world-brief（静默许可与注入块）。
+    'engines/narrative-preset.js',
+    'engines/world-loop-log.js',
+    'engines/cost-guard.js',
+    'engines/continuity-guard.js',
+    'engines/controllability.js',
+    'engines/story-rhythm.js',
+    // v2.96.0（X3）：传播与辟谣（事实 / 目击 / 转述 / 流言四层传播链）。
+    //   三条位置约束，全是硬依赖：
+    //     ① 须**晚于** engines/memory.js —— 事实真源是 memory.facts（事实唯一写者 upsertFact）；
+    //     ② 须**晚于** engines/intel.js —— 层的置信度由 intel.CONFIDENCE 反查（不内联第二套数）；
+    //     ③ 须**早于** render/inject.js —— 注入时读取 rumor.buildBlock()。
+    'engines/rumor.js',
+    // v2.99.0（第五十六面）：原著幕目（canon.js：长文本 → 幕 → 剧情点）。
+    //   位置只需**早于 render/inject.js**（注入时读取 canon.buildBlock()）；
+    //   与 rumor 无依赖。它在 LOAD 里排在 rumor 之后、affect 之前——
+    //   与 `engines/*` 区的既有次序保持「新增追加在同类末尾」的惯例。
+    'engines/canon.js',
+    // v2.66.0：情绪通道 / 关系六型 / 假面。须早于 render/inject.js，注入时读取各自 buildBlock()；
+    //   且须晚于 threads.js —— affect 的过载口径参考 difficulty 的枚举纪律，无硬依赖但保持装载序。
+    'engines/affect.js',
+    'engines/bonds.js',
+    'engines/masks.js',
+    // v2.67.0: 时间锁 / 双层性格 / 好感审计 / 场外事件。位置与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/temporal-lock.js',
+    'engines/temperament.js',
+    'engines/fondness.js',
+    'engines/affection-nexus.js',
+    'engines/intimate-arbiter.js',
+    'engines/parallel-events.js',
+    // v2.68.0: 资料片周期 / 生存三轴 / 通缉 / 驯兽。位置与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/era-cycle.js',
+    'engines/survival.js',
+    'engines/warrant.js',
+    'engines/beast-bond.js',
+    // v2.69.0: 外貌分级契约 / 原型阶梯。位置与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/appearance.js',
+    'engines/ladder.js',
+    // v2.411.0 (R251 缝合批)：人体结构契约。位置与 tests/run.js 的 LOAD 同序，早于 render/inject.js。
+    'engines/body-anatomy.js',
+    // v2.70.0: 情境切片 / 阻尼量规 / 竞争焦点。
+    'engines/scene-slice.js',
+    'engines/gauge.js',
+    'engines/rivalry.js',
+    // v2.71.0: 叙事纪律四件套（信息暗礁 / 节奏齿轮 / 伏笔配给 / 焦点分配）。
+    'engines/enigma.js',
+    'engines/tempo.js',
+    'engines/quota.js',
+    'engines/spotlight.js',
+    // v2.72.0: 叙事动力四件套（业力双轴 / 累积风险 / 边际折旧 / 手段耐受）。
+    'engines/karma.js',
+    'engines/hazard.js',
+    'engines/marginal.js',
+    'engines/tolerance.js',
+    'engines/events.js',
+    // v2.82.0: 快照与分支（B3）。**无核心依赖**（只读 store.get / store.transact），
+    //   位置只需早于 render/inject.js 的消费点（注入块与事件调度同批）。
+    'engines/checkpoints.js',
+    // v2.117.0（计划二 B1）：行动执行。位置与 tests/run.js 的 LOAD 同序。
+    //   · 须晚于 engines/life.js：行动的目标来源只读 life.goals（不另存副本）；
+    //   · 须晚于 engines/world.js：准入读 canBeAt/reach/depart，结算读 arrive/stop；
+    //   · 须早于 render/inject.js：注入落地时消费 act.buildBlock()。
+    //   · 尾部自带 workflow 心跳注册（after / order 21）——它读 WA.workflow，而 core/workflow.js
+    //     在 core 区早已装载，故此处对装载期无硬依赖；带守卫调用（同 calendar/bridge 的做法）。
+    'engines/act.js',
+    // v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）：因果链追踪与协作面。位置与 tests/run.js 的 LOAD 同序。
+    //   · chrono 只读 `store.get/transact` 与 `clock.wallNow`，**不读**任何引擎出口 —— 故对次序无硬依赖，
+    //     放在 engines 区末尾（与 checkpoints 同批的「无核心依赖」面）。
+    //   · collab 同理（只读 store 与 inputGuard），两者都不在装载期读 WA，与 settings-bus 的次序无关。
+    //   为什么排在 render/inject.js **之前**：本版两者都没有注入消费点（不产 buildBlock），
+    //     但按惯例「engines 区一律早于 render」，以免后续接消费方时被迫改装载序。
+    'engines/chrono.js',
+    'engines/collab.js',
+    // v2.117.0（计划二 B6）：机会形成 + 题材完整配置配方。位置与 tests/run.js 的 LOAD 同序。
+    //   · opportunity 只读五处引擎出口（longline.overdue / org.projectView / life.goals /
+    //     intel.entitledTo / causal.due）⇒ 须晚于这五个模块；模块缺席时如实不产候选，
+    //     不在装载期读 WA。
+    //   · recipe 在装载期只读两处**静态表**（WA.act.KINDS 与 WA.theme.THEMES）做核对
+    //     ⇒ 须晚于 engines/theme.js 与 engines/act.js；其 preview / apply 都在调用期委托
+    //     既有的 theme.preview / theme.apply，不另立写盘路径。
+    //   · 两者本版都不产注入消费点（recipe 无 buildBlock；opportunity 的 buildBlock
+    //     尚无调用方），按引擎区惯例仍排在 render/inject.js 之前，以免后续接消费方时改装载序。
+    'engines/opportunity.js',
+    'engines/recipe.js',
+    // v2.118.0（计划二 B7）：统一试演 / 回滚范围 / 原著分歧。位置与 tests/run.js 的 LOAD 同序。
+    //   三条硬约束，缺一条就会在真跑里引用未装载的引擎（试演的危害比真跑更大：
+    //   它给出的是「看起来已经验证过」的结论）：
+    //     · 须晚于 engines/act.js —— 改道走 act.add + act.admit 真判（不自算结论）；
+    //     · 须晚于 engines/phone-bridge.js —— 提前通知走 noteAction 入站面；
+    //     · 须晚于 engines/canon.js —— 分歧报告复用 canon.alignView（不另造对位口径）；
+    //   · 另须晚于 core/exec.js（同批）与 engines/causal.js（推进面）。
+    'engines/rehearsal.js',
+    // v2.118.0（计划二 B8）：跨插件业务闭环。位置与 tests/run.js 的 LOAD 同序。
+    //   三条硬约束，缺一条就会静默降级成「无业务判断的台账」：
+    //     · 须晚于 engines/act.js —— 约定任务走 act.add 真准入（不自造一份行动规则）；
+    //     · 须晚于 engines/world.js —— 「对方在场吗」只问 world.where 的真源；
+    //     · 须晚于 engines/phone-bridge.js —— 出站边走 noteAction 入站面。
+    //   另：它复用 core/exec.js 的上下文门面（B7），故须晚于 core/exec.js。
+    'engines/liaison.js',
+    'engines/coop.js',
+    // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。位置与 tests/run.js 的 LOAD 同序。
+    //   两条硬约束，缺一条就会在真跑里读到未装载的精算模块（两者都在装载期读 WA 本体，
+    //   故必须在调用期之前把它们排在依赖项之后）：
+    //     · 须晚于 engines/life.js —— 计划的唯一来源是 life.goals（本模块不自建目标、不自建人）；
+    //     · 须晚于 engines/org.js  —— 步骤的资源真源是 org.stockOf（本模块不复制一份库存判定）；
+    //     · 须晚于 engines/fondness.js —— 修复结案时唯一一次调 fondness.apply（不自造关系口径）。
+    //   两者都须早于 render/inject.js：注入落地时读 plan.buildBlock() / mend.buildBlock()。
+    'engines/plan.js',
+    'engines/mend.js',
+    // v2.119.0（拓展计划 ③）：供需循环。须晚于 core/store（读写 people.resources），
+    //   须早于 render/inject.js（注入落地时读 economy.buildBlock()）。
+    'engines/economy.js',
+    // v2.167.0（拓展计划 TX3）：守恒运输。须晚于 engines/economy.js（读 economy.goods/routes），
+    //   须早于 render/inject.js（注入落地时读 freight.buildBlock()）。
+    'engines/freight.js',
+    'engines/story-choice.js',
+    // v2.325.0（缝合 -Galgame 呈现半边）：待选按钮。须晚于 engines/story-choice.js
+    //   （只经它读 pending/review、只经它 confirm），须晚于 core/settings-bus。
+    'engines/choice-board.js',
+    // v2.326.0（缝合 卢克之光 Anti-Route 8.31）：三个只读缝合引擎，与 tests/run.js LOAD 同序。
+    //   narrative-lens 只产叙述镜片文本，reply-guard 只判回包给建议，channel-probe 只产探针报文；
+    //   三者都不 hook fetch、不自动发请求、不写世界。故对 render/inject.js 无次序硬约束，
+    //   统一放在核心设置总线之后、面板之前，由各自的 buildBlock 与 diagnose 显式供读。
+    'engines/narrative-lens.js',
+    'engines/reply-guard.js',
+    'engines/channel-probe.js',
+    'engines/commission.js',
+    'engines/investigation.js',
+    'engines/aftermath.js',
+    'engines/operations.js',
+    'engines/probe.js',
+    // v2.119.0（拓展计划 ⑥）：跨地域传播。须晚于 core/clock（延迟按 clock 算），
+    //   须早于 render/inject.js（注入落地时读 region.buildBlock()）。
+    'engines/region.js',
+    // v2.119.0（拓展计划 ⑦）：玩法包与阶段迁移。须晚于 recipe（槽位真源在那里），
+    //   须早于 render/inject.js（注入落地时读 stage.buildBlock()）。
+    'engines/stage.js',
+    // v2.119.0（拓展计划 ⑧）：多人连接层。须晚于 coop（裁决语义在那里），
+    //   须早于 render/inject.js（注入落地时读 session.buildBlock()）。
+    'engines/session.js',
+    // v2.119.0（拓展计划 ④）：组织制度。须晚于 core/store（读 people / org 现状），
+    //   须早于 render/inject.js（注入落地时读 inst.buildBlock()）。
+    'engines/inst.js',
+    // v2.129.0（缝 A1/A4/A5/A6/A8）：五个叙事纪律引擎。位置须**早于** render/inject.js：
+    //   注入落地时读 userlock / rhythmLoop / motif / beatMask / powerAnchor 的 buildBlock()。
+    //   rhythm-loop 另须晚于 core/store（它读写 rhythm 容器）；其余四个只读 store。
+    'engines/userlock.js',
+    'engines/rhythm-loop.js',
+    'engines/motif.js',
+    'engines/beat-mask.js',
+    'engines/power-anchor.js',
+    // v2.129.0（缝 A2/A3）：改写通道（调副 API）与正文时间戳审计。纯调用期模块，不产注入块，
+    //   对次序无硬要求；与同批新引擎并列，便于「本批五引擎 + 两旁路」一眼看全。
+    'engines/rewriter.js',
+    'engines/storyclock.js',
+    // v2.129.0（缝 A7/A9/A10）：静态设定缓存 / 请求报文预览 / 世界书搜索。三者都不产注入块。
+    //   A10 在**调用期**读 WA.worldbook.peekEntries，A9 在**调用期**读 WA.apiRouter.getChannel ——
+    //   都在调用期取，不构成装载期依赖。A7 只写自己的 localStorage 键（一次不碰 store）。
+    'engines/preset-world.js',
+    'engines/request-viewer.js',
+    'engines/wb-search.js',
+    // v2.189.0（缝 A1/A2/A3 + B1/B2）：四个新引擎。位置与 tests/run.js 的 LOAD 同序。
+    //   三条硬约束：
+    //     ① `beat-report` / `gen-gate` **必须早于** render/inject.js —— 注入落地时读它们的
+    //        buildBlock()（注入面三处同批登记见 render/inject.js 的 SOURCES / def / VIS_NAMES）；
+    //     ② `beat-report` / `beat-ledger` **须晚于** core/store（它们读写 beatReport / beatLedger
+    //        两个骨架键，骨架物化在 store.js）；
+    //     ③ `plan-audit` 是**纯只读面**（全文零 store.transact），对次序无硬要求；
+    //        它与 `beat-ledger` 都读拍，但一个管「往后还成不成立」、一个管「现演到第几拍」。
+    'engines/beat-report.js',
+    'engines/beat-ledger.js',
+    'engines/plan-audit.js',
+    'engines/gen-gate.js',
+    // v2.192.0（U5）：拒收码 → 恢复动作的统一映射。位置紧随四个拍引擎之后 ——
+    //   它正是为这四者那批「处置方向相反」的码建的（`hard-cut` / `landed-immutable` /
+    //   `adjust` / `setup` 都可拒收，含义却分属四档）。**纯只读**：零 store、零 fs、
+    //   零 localStorage，只有七块冻结表与纯函数（表已拆到 `reject-recovery-tables.js`，
+    //      故本引擎**有**次序硬要求：表必须先装载，缺表当场抛错）。
+    //   它是诊断面 / 面板面 / 日志面三处共用的**唯一**一份恢复语义（此前三面各猜一句）。
+    // OPV29-09：拒收恢复的七块冻结表（1162 行纯数据）拆出去了，必须先于算法装载。
+    'engines/reject-recovery-tables.js',
+    'engines/reject-recovery.js',
+    // v2.193.0（第二批 · U1）：拍引擎家族的**统一运行门面**（拍报告 / 计划审计 / 拍台账 /
+    //   生成闸门四者共 9 个 op 的单一入口）。位置**紧随四个家族成员与其恢复映射之后**：
+    //   它读 `WA.家族成员`（`run()` 时）与 `WA.rejectRecovery`（编排期取恢复档，缺席即 null），
+    //   两者都要求先装载。**零 store 写入、零参数校验、零注入折叠** —— 故对 render/inject.js
+    //   无次序约束（注入链仍直接读 beatReport / genGate 的 buildBlock，不经门面：编排不改字）。
+    //   ⚠ 本段注释里**不得出现方括号**：module-cycle-gate 用一条非贪婪正则从 LOAD_ORDER
+    //   数组字面量里抓路径，注释里任何一个右方括号都会让它提前截断、orderLen 静默少算
+    //   （写入时实测踩过：216 → 151，且门禁只报读数不报原因）。措辞一律用「WA.家族成员」。
+    'engines/beat-facade.js',
+    // v2.130.0（拓展计划 B1/C1/C2/D1/D2/D3/D4/A1/A2/A3/A4）：十二个新引擎。
+    //   位置与 tests/run.js 的 LOAD 同序，且**一律早于** render/inject.js：
+    //   reasoning（思考开销约束）与 story-tone（剧情倾向）产注入块，注入落地时读它们的
+    //   buildBlock()。其余十个不产注入块（纯调用期模块：改写前拦截 / 净化范围 /
+    //   群聊闸门 / 历法换算 / 写前预演 / 归档隐藏 / 字数闭环 / 配置绑定 / 档案精编 / 输入润色），
+    //   对次序无硬要求；与产块的两个并列成一批，便于「本批十二引擎」一眼看全。
+    //   写世界状态的四个（story-tone / calendar-custom / binding / rehearse）
+    //   都走调用期的 store.transact，不构成装载期依赖。
+    'engines/stale-guard.js',
+    'engines/purify-scope.js',
+    'engines/group-refuse.js',
+    'engines/reasoning.js',
+    'engines/story-tone.js',
+    'engines/calendar-custom.js',
+    'engines/rehearse.js',
+    'engines/archive-hide.js',
+    'engines/word-budget.js',
+    'engines/binding.js',
+    'engines/refine.js',
+    'engines/polish.js',
+    // v2.138.0（E5）：多模型并发推演与结果仲裁。
+    //   位置与 tests/run.js 的 LOAD 同序，且**须早于** render/inject.js 之后的任何消费者。
+    //   它对本批无装载期依赖（只读 apiRouter / settingsBus / clock / inputGuard，四者都早已在场），
+    //   也不产注入块 —— 与 polish 并列成「调用期模块」的一批，便于一眼看全。
+    //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
+    'engines/ensemble.js',
+    // v2.139.0（E9）：势力关系动态图与张力热力图。
+    //   装载位置：**须晚于** engines/evolution.js（档位词表 FACTION_RELATION / FACTION_STATUS 的
+    //   单一真源在那里，本模块**不自带副本** —— 两份枚举必然漂移），
+    //   且**须早于** readers —— engines/tool-diag.js 与 ui/panel.js 都要读它的现场读数。
+    //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
+    'engines/faction-graph.js',
+    // v2.140.0（F1）：防全知闸门。装载位置晚于它所聚合的四个知情面真源
+    //   （enigma / intel / rumor / shadow 均在前），且晚于 world（感知半径的真源）。
+    //   **只读**：全文件零 store.transact / 零 store.patch（专锁 N 面钉这条）。
+    'engines/noesis.js',
+    // v2.141.0（F2）：生理与照护真实层。装载位置紧随 noesis 之后（与 tests/run.js 的 LOAD 同序）——
+    //   两条硬约束：① 须**晚于** core/store（它读写 `draft.lifeline`）；
+    //   ② 须**早于** render/inject.js（注入落地时读 lifeline.buildBlock()）。
+    //   noesis.perceive 在**调用期**读 WA.lifeline（不是装载期），故两者次序无硬要求；
+    //   排在这里是刻意的：感知第二轴的真源就在本模块，两条相邻便于阅读「谁给感知划档」。
+    //   **只读**：读取面零 store.transact，写侧只有 register / advance 两口（专锁 N 面钉这条）。
+    'engines/lifeline.js',
+    // v2.142.0（F3）：视角锁。装载位置紧随 lifeline 之后（与 tests/run.js 的 LOAD 同序）——
+    //   两条硬约束：① 须**晚于** core/store（它读写 `draft.perspective`）；
+    //   ② 须**早于** render/inject.js（注入落地时读 perspective.buildBlock()）。
+    //   与 noesis 是**串联而非取代**：noesis 答「他知道吗」，本模块答「这笔该不该现在由这个视角写」
+    //   —— 两个真源不可合并（本模块不调 noesis.knows，见边界 4）。
+    //   写侧只有 assign 一口（专锁 N 面钉这条）。
+    'engines/perspective-lock.js',
+    // v2.148.0（RP1+RP2）：性能历史台账 + 磁带卷仓库。装载位置晚于 inject-budget /
+    //   perf-trace（两模块的现场读数是它的输入面），早于 render/inject.js（engineCall
+    //   计时点之后分流入账）。tape-store 与 rand 磁带语义解耦（仓库不改录制/回放语义）。
+    //   perf-ledger **只读**（零 store.transact）；tape-store 写侧只有仓库键读写。
+    'engines/perf-ledger.js',
+    'engines/tape-store.js',
+    // v2.149.0（X1）：世界沉积层。装载位置在**所有地点源之后**（sceneSlice / world / chrono）——
+    //   它的 buildBlock 在调用期读 WA.sceneSlice.read()「此刻在哪」，故 sceneSlice 必须先装载；
+    //   与 tests/run.js 的 LOAD 同序。只读 + 三容器环（sediment.places / sediment.events）。
+    'engines/sediment.js',
+    // v2.150.0(RP4): 注入价值评估。装载位置**晚于 perf-ledger**（它把自己每次判定的耗时
+    //   经 perfLedger.ingest 报进性能台账）、**早于 render/inject.js**（后者在注入链末尾
+    //   调它的 observe 交本轮真落地项）。口径：只读评估 + 进程态内存环（_pending / _rounds
+    //   不落盘、不登记 store 骨架——写在这两处会把「重启清零」伪装成「有界容器」）。
+    'engines/inject-value.js',
+    // v2.151.0（RX2+RX3）：跨会话记忆锚 + 远方世界脉搏。位置在既有 v2.150.0 段之后、
+    //   render/inject.js **之前**（注入落地时读 offlineTick.buildBlock() 与
+    //   farfield.buildBlock()）——两条硬约束：① 须晚于 core/store（它们读写
+    //   draft.offlineTick / draft.farfield）；② 须早于 render/inject.js。
+    //   farfield 在**调用期**读 WA.region.places()（远方地区的单一真源）与
+    //   WA.sediment.settle（联动口），两者皆在本行之前装载，故无装载期次序要求。
+    //   两者都**写**世界状态（各自两条/三条容器环），故模块总开关默认关。
+    'engines/offline-tick.js',
+    'engines/farfield.js',
+    // v2.166.0（TX2）：行动反馈闭环。装载位置**须晚于** plan.js（读 plan.current/settle）、
+    //   act.js（读 act.stat/view/add/admit），且**须早于** render/inject.js（注入落地时读
+    //   agency.buildBlock()）。本模块只调用 life/plan/act 既有 API，不复制状态。
+    'engines/agency.js',
+    // v2.228.0(拓展 N10):历史留存与检索(engines/retrieval.js)。
+    //   位置在 agency 之后、render/inject.js **之前**:注入落地时读 retrieval.buildBlock()。
+    //   本模块装载期不读任何上游(一律**调用期**读 WA.causal.knownCause /
+    //   WA.chrono.chronicle / WA.historySearch.search / WA.store 快照)——后三者虽在本行之后装载,
+    //   但两者都只在调用期消费,故无硬次序要求(同 history-search 的读法)。
+    //   零 store 写:没有 transact、没有 draft 赋值;只有自己那一格
+    //   localStorage 偏好键(worldaxis_retrieval_v1)。
+    'engines/retrieval.js',
+    // v2.294.0（V8 OPV8-1）：正文注面汇流器。位置须早于 render/inject.js（注入落地时读
+    //   injectCollector.buildBlock()）；零 store 写、只读五台结构化引擎的既有读口。
+    'engines/inject-collector.js',
+    // v2.518.0：正文后故事回应窗口。位置在结构汇流之后、render/inject 之前；
+    // 只读既有 world/livingWorld/messages，写入自己的编排账，不替代事实 owner。
+    'engines/story-window.js',
+    'render/inject.js',
+    'render/theater.js',
+    'render/purifier.js',
+    // v2.246.0 (MAP-2): SVG 画布平滑飞行漫游、动态避让与同地聚类引擎
+    'render/map-viewport.js',
+    'compat/host.js',
+    'compat/mvu.js',
+    'compat/th-helper.js',
+    // v2.101.0（O11）：跨插件互操作验收面（纯读）。
+    //   为什么必须**最后**：它读的是三处现场读数——compat.detect()（宿主能力）、
+    //   lonshaReader.lonshaSource()（上游桥）、phoneBridge.phaseOf()（下游入站桥），
+    //   不是自己另探一遍；先于它们装载只会让三态一律落到 unknown。
+    'engines/interop.js',
+    // v2.102.0（A2 = O12）：性能基线与分层增量（纯内存观测：不写存档、不落盘）。
+    //   为什么必须**最后**（与 interop 并列在 compat 之后、ui 之前）：它测的四个面全是既有出口——
+    //   render.visibilityStat / render.buildWorldSnapshot / toolDiag.collect / canon.alignView，
+    //   不是自己另探一遍；先于它们装载只会让基线一律落到「模块缺席」。
+    'engines/perf-trace.js',
+    // v2.152.0（RP7）：存储水位预测（纯读：sample 只收 store 的字节数读数，不枚举存储）。
+    //   装在 perf-trace 之后、ui 之前：forecast 读的是 store.sizeAudit/saveStat 的派生量，
+    //   与 perf-trace 同为观测面，无装载期依赖，但保持「观测面在 ui 之前」的既有次序。
+    'engines/storage-forecast.js',
+    // v2.153.0（RX5+RX6）：剧情深度仪 + 多结局分支树。位置**必须在 causal / foreshadow / threads /
+    //   rehearsal 之后** —— 两者都在调用期读它们（plot-gauge 取三源计数、branch-tree 把预演交给
+    //   rehearsal.preview），排在前面会让「源全空」被读成「故事还没开始」。二者不互相依赖。
+    'engines/plot-gauge.js',
+    'engines/branch-tree.js',
+    // v2.224.0(拓展 N8):分支语义比较与选择性移植(engines/branch-diff.js)。
+    //   位置紧随 branch-tree:它把那一族的读数**从指纹升级到语义**(实体/关系/义务/事件四类,
+    //   逐行按身份键配对)。调用期读三处:**checkpoints**(槽位与谱系,行 387 已装)、
+    //   **worldSnapshot**(行身份真源 IDENTITY_REFS,行 636 装在本行之后 —— 那时才读,
+    //   故对本行无装载期依赖,取不到时按声明表兜底并如实标 idSource)、**store**(只读)。
+    //   本模块**零写路径**:三个口全部 readOnly(改世界/改分支都不在这里做)——
+    //   「原分支不改」这句硬要求的实现方式就是「这里没有写口」。
+    'engines/branch-diff.js',
+    // v2.227.0(拓展 N9):三项目剧情事件闭环(engines/story-loop.js)。
+    //   位置在 **phone-bridge / lonsha-reader / causal / bridge 全部之后** —— 它把这条链上的
+    //   三段串起来(手机动作回执 → 世界候选因果 → 确认落地 → 记忆来源追溯),而**三段全都
+    //   委托来源模块的公开口**(bridge.handshake / phoneBridge.opTrace·opsView·linkChain /
+    //   causal.addChain·knownCause·stateView / lonshaReader.lonshaSource·readLonshaSnapshot·
+    //   ledgerSummary·diffWithLonsha),本模块不另探一遍。故这些对端必须先装,否则契约与追溯
+    //   一律落到「缺席」。
+    //   本模块**零改动给对端**(计划明文「不改对端直到另获实施授权」):它只作消费方。
+    'engines/story-loop.js',
+    // v2.154.0（RX4+RX7）：世界联网面 + 世界生态自洽审计。位置在 branch-tree 之后、
+    //   ui/panel.js 之前：两者在调用期读 rumor / causal / chronicle / worldFacts 与 perfLedger
+    //   （全部在本行之前装载），且 eco-audit 的读数由面板「联网」页与 store.maintain 消费 ——
+    //   两者互不依赖，也不写世界状态（world-bridge 只写自己的两条环）。
+    'engines/world-bridge.js',
+    'engines/eco-audit.js',
+    // v2.155.0（RX8）：世界生成种子库。位置在 eco-audit 之后、ui/panel.js 之前：
+    //   它在调用期读 world / evolution / people / background 四个既有面（全部在本行之前装载），
+    //   且只写自己那一格 `worldSeed.library` —— 不依赖任何后装模块。
+    'engines/world-seed.js',
+    // v2.164.0（TX5）：版本化完整世界蓝图。位置在 world-seed 之后 ——
+    //   两者回答**同一族问题的两个档位**（有损种子 vs 无损结构蓝图），且都只写自己那一格
+    //   （worldSeed.library / blueprint.library），互不调用。放在紧随其后是刻意的：
+    //   读代码的人一眼看到「同一个世界导出有两条路径，边界在格式上」。
+    //   调用期依赖：registry（人物唯一写者）/ world（地点与道路形状）/ evict（蓝图库容量）
+    //   —— 全在调用期取，故此处对装载期无硬依赖。
+    'engines/world-blueprint.js',
+    // v2.200.0（第四批 Y5）：世界快照与整包搬运（engines/world-snapshot.js）。
+    //   位置紧随 world-blueprint：快照↔蓝图互转的两口（toBlueprint / fromBlueprint）
+    //   在调用期读 worldBlueprint.exportBlueprint —— 排在它之前会让互转面恒报 module-missing。
+    //   本模块**零新世界键**：快照库落在自己的 localStorage 键（同 presetWorld / genGate 先例，
+    //   那些不是世界事实，不该进存档）；导入面只改已经存在的面，不改骨架。
+    //   与 tool-snapshot 的分工写在模块头：那个是「整块换掉」（restore 是替换式），
+    //   本模块是「按面搬 + 默认不覆盖」—— 两种意图是两件事，合成一个口会让最坏结果
+    //   （把本地世界写没了）成为默认。
+    'engines/world-snapshot.js',
+    // v2.165.0（TX1）：可谈判、可履约的势力外交（engines/diplomacy.js）。位置紧随
+    //   world-blueprint：它在调用期读 store / evolution.factions / inst.authority / clock /
+    //   inputGuard（全在本行之前装载），不依赖任何后装模块。
+    //   与 faction-graph 的分工写在模块头：前者是**推导面**（derived 边），本模块是**事实面**
+    //   （pairId / 双边态度 / 条约 / 履约回执）—— 两者不相迁（推导结果不静默写进事实表）。
+    'engines/diplomacy.js',
+    // v2.156.0（SP1）：时间来源与游玩生命周期（engines/playtime.js）。位置在 world-seed 之后、
+    //   ui/panel.js 之前：它在调用期读 store / settingsBus / clock / inputGuard（全部在本行之前装载），
+    //   且只写自己那一格 localStorage 键——不依赖任何后装模块。
+    'engines/playtime.js',
+    // v2.156.0（S1）：离线恢复编排（engines/offline-return.js）。位置在 playtime 之后、
+    //   ui/panel.js 之前：它在调用期读 playtime / offlineTick / life / evolution / world / rand
+    //   （全部在本行之前装载），并把推演整体委托给 SP2 的草稿体 —— 自己不算任何数值、
+    //   不写任何键（零 localStorage），故不依赖任何后装模块。
+    'engines/offline-return.js',
+    // v2.182.0（E2 第二批）：世界日程 / 未来事件表（engines/agenda.js）。
+    //   位置在全部**来源模块之后**（longline / commission / diplomacy / freight / aftermath 均已装载）
+    //   与 ui/panel.js 之前：本模块是**只读聚合面**，在调用期读上述五源与 playtime/clock，
+    //   自己不算任何数值、不写任何键（零 localStorage、零 store 写入），故不依赖任何后装模块。
+    //   与 chrono 的分工：chrono 答「这世界此前发生过什么」（只增不减），本模块答「接下来会发生什么」
+    //   （未来向、按剧情时间排序）—— 两问的时间方向相反，合成一个源会让「已发生」与「将发生」互相冒充。
+    'engines/agenda.js',
+    // v2.182.0（E5 第二批）：玩家可读的世界纪事与证据日志（engines/chronicle-view.js）。
+    //   位置在 chronicle / sediment / causal / timeline / chrono 全部装载之后、ui/panel.js 之前：
+    //   本模块是**只读聚合面 + 下钻**，在调用期读上述五源与 playtime/clock，
+    //   自己不算任何数值、不写任何键（零 localStorage、零 store 写入）。
+    //   与 chrono 的分工：chrono 是**表本身**（归档写入与 cap 口径的持有者），
+    //   本模块是**玩家视图**（合并三源 + 时间排序 + 单条下钻 + 引用校验 + 覆盖范围标注），
+    //   故必须后装 —— 反过来会让「视图」被误当成「表的真源」，出现两套 cap。
+    'engines/chronicle-view.js',
+    // v2.182.0（O4 第二批）：存储压力 / 义务清点 / 迁移预检（engines/capacity-audit.js）。
+    //   位置在**全部义务来源模块之后**（commission / operations / aftermath / investigation /
+    //   story-choice / farfield / coop / collab / longline / freight / diplomacy / world 均已装载）
+    //   与 core/evict.js / engines/storage-forecast.js 之后、ui/panel.js 之前：
+    //   本模块是**只读聚合面**，在调用期读上述十二源与 store.sizeCaps / evict.siteDecls /
+    //   storageForecast.forecast，自己不算任何数值、不写任何键（零 localStorage、零 store 写入）。
+    //   特别地 migrationCheck() **不调用 store.migrate()** —— 那个函数会写 __migrateReport
+    //   与 __loadStat.migrateRefused（观测层），在只读面上留痕等于污染下一次真迁移的报告。
+    'engines/capacity-audit.js',
+    // v2.182.0（O3 第二批）：手机端与长局性能基线（engines/perf-baseline.js）。
+    //   位置在 perf-trace / perf-ledger / storage-forecast 之后、ui/panel.js 之前：
+    //   本模块是**只读聚合面**，在调用期读上列三处与 store 的字节读数，
+    //   自己不算任何数值、不写任何键（零 localStorage、零 store 写入）。
+    //   它**不调用** perfLedger.ingest / perfTrace.mark / renderPerf.observe ——
+    //   观测面自己往被观测的窗口里塞数，等于污染下一次读数（观测污染被观测者）。
+    //   实机采样栏一律留空（gap().reason === 'needs-real-device'）：无头环境里
+    //   `perfTrace.CLASS_DEF.lowend.approx === true` 是「同机放大估计」，
+    //   填进实机栏就是拿估计冒充测量。
+    'engines/perf-baseline.js',
+    // v2.182.0（O5 第二批）：玩家可读的「世界健康中心」（engines/world-health.js）。
+    //   位置在**末尾**（全部引擎与 perf-baseline 之后）、ui/panel.js 之前：
+    //   本模块是**只读聚合面**，在调用期动态读 settingsBus.registry()（模块清单）与
+    //   各模块自己的 pending() / stat().faults、store.sizeCaps / storageForecast，
+    //   自己不算任何数值、不写任何键（零 localStorage、零 store 写入）。
+    //   它必须后装：模块清单取自 settingsBus 登记表，先装会让清单恒空
+    //   （阻塞栏「全绿」而实际有模块在拒收 —— 比不装更坏）。
+    'engines/world-health.js',
+    // v2.183.0（第一批 E1）：统一待办事项中心（engines/pending-center.js）。
+    //   位置在**八个来源模块之后**（aftermath / commission / investigation / operations /
+    //   storyChoice / coop / farfield / backstage 均已装载）与 ui/panel.js 之前：
+    //   本模块是**只读聚合面**，在调用期读上述八源的 `pending()` 与 settingsBus/inputGuard，
+    //   自己不算任何数值、不写任何键（零 localStorage 写、零 store 写）。
+    //   与 world-health 的待办栏分列不合并：两者答两个粒度 —— 健康栏答「还有几件没做完」
+    //   （计数 + 是否全清），本中心答「具体是哪几件、去哪看、能不能处置」（逐条归一 + 路由）。
+    'engines/pending-center.js',
+    // v2.187.0（E4）：场景 / 战役层（engines/campaign.js）。
+    //   排在 world-blueprint / diplomacy / freight / faction-graph 之后：
+    //   它的谓词读这些引擎的公开读口，装载期就必须在场。
+    'engines/campaign.js',
+    // v2.187.0（E6）：统一世界地图与关系视图（engines/atlas.js）。
+    //   排在 region / farfield / economy / freight / faction-graph / diplomacy / sediment 之后：
+    //   它把七处坐标与关系**只读地**摆进同一张图，装载期这些源必须都在场。
+    //   本模块**零 store 写**（没有 transact、没有自有状态键）—— 地图是只读视图。
+    'engines/atlas.js',
+    // v2.187.0（E8）：蓝图 / 种子依赖包与迁移助手（engines/dep-check.js）。
+    //   排在 world-blueprint / world-seed / checkpoints / recipe / worldbook / compat 之后：
+    //   它的每一处判定源都是这些模块的公开读口（版本常量 / 保留说明 / 迁移链 / 配方真源 /
+    //   宿主上下文 / 世界书条目），本模块**不自带任何一份副本**。
+    //   本模块**纯读**：零 store 写、零文件写，且**不驱动任何模块干活**
+    //   （不为核对 pack 版本去调 worldSeed.importPack —— 那会动它的计数器）。
+    'engines/dep-check.js',
+    // v2.188.0（E7）：玩家自定义规则包与白名单自动化模板（engines/rule-pack.js）。
+    //   排在 settingsBus 的**全部消费模块之后**（theme / recipe / preset / rules / backstage /
+    //   difficulty / story-choice / rehearsal 均已装载）：它的「可进包的键」是**调用期**从
+    //   `WA.__settingsRegs` 现场筛出来的，先装会让那张名单不完整 —— 而后果不是报错，
+    //   是包里少存了几键（最坏的那种静默失效）。
+    //   本模块**只记录设置与启用面**：零 store 写、零 localStorage 写，
+    //   一切落盘经 `settingsBus`（写路径唯一）。
+    'engines/rule-pack.js',
+    // v2.188.0（E9）：隔离世界实验室与反事实对比（engines/world-lab.js）。
+    //   排在 rehearsal / world-blueprint / dep-check 之后：三条路径的执行面（rehearsal.run）、
+    //   导出面（worldBlueprint.exportBlueprint）、体检面（depCheck.check）都是它的**调用期**依赖。
+    //   本模块**零 store 写**（没有 transact、没有 draft 赋值）—— 实验全落在隔离副本上，
+    //   且「live 前后摘要一致」是跑前跑后**实测**出来的，不是一句声明。
+    // OPV29-11：world-lab 的语汇常量与登记表已拆到 engines/world-lab-tables.js（先装表）。
+    'engines/world-lab-tables.js',
+    'engines/world-lab.js',
+    // v2.201.0（第四批 Y6）：世界历史检索（engines/history-search.js）。
+    //   位置排在**全部六个检索源的装载之后**（chronicle-view / worldbook+wb-search / atlas /
+    //   rules / store 面的 people 与 evolution.factions），且仍在 ui/panel.js 之前：
+    //   本模块是**跨库只读聚合面**，装载期不需要这些源在场（一律**调用期**读），
+    //   但排在它们之后让「装载序 = 依赖序」这条读法继续成立 —— 后来者照着这一段
+    //   找依赖关系时不会先撞上一个「看起来更早、其实更晚用」的模块。
+    //   本模块**零 store 写**：没有 transact、没有 draft 赋值；只有自己那一格
+    //   localStorage 偏好键（`worldaxis_historysearch_v1`，同 presetWorld / genGate 先例）。
+    'engines/history-search.js',
+    // v2.202.0（第四批 Y7）：地图与关系可视化（engines/world-graph.js）。
+    //   位置排在 **atlas / faction-graph / bonds / store.people 四个读源之后、ui/panel.js 之前**：
+    //   本模块是**视图面**（节点与边一律调用期从既有表读），装载期不读任何上游，
+    //   但排在它们之后让「装载序 = 依赖序」这条读法继续成立。
+    //   本模块**零 store 写**：没有 transact、没有 draft 赋值；只有自己那一格
+    //   localStorage 偏好键（`worldaxis_worldgraph_v1`，同 history-search 先例）。
+    'engines/world-graph.js',
+    // v2.210.0（拓展 8）：地图上的行动与行程工作台（engines/travel-desk.js）。
+    //   位置排在 **world / economy / freight / world-graph 之后、ui/panel.js 之前**：
+    //   本模块是**编排面**（耗时与路径逐字段取自 world.transit，动作原样透传给
+    //   world.depart / freight.dispatch 等公开写口），装载期不读任何上游。
+    //   本模块**零 store 写**：没有 transact、没有 draft 赋值；只有自己那一格
+    //   localStorage 偏好键（`worldaxis_travel_desk_settings_v1`，同 world-graph 先例）。
+    'engines/travel-desk.js',
+    // v2.221.0（拓展 N3）：经营供应链：订单编排与瓶颈图（engines/supply-chain.js）。
+    //   位置排在 travel-desk 之后、ui/panel.js 之前：本模块同为**编排面**
+    //   （逐段检查取自 economy.view / economy.routeView / org.canAfford / economy.RECIPES，
+    //   动作原样透传给 economy.buy / freight.dispatch / economy.craft / org.transfer），
+    //   装载期不读任何上游。本模块**零 store 写**：没有 transact、没有 draft 赋值；
+    //   只有自己那一格 localStorage 偏好键（`worldaxis_supply_chain_settings_v1`）。
+    'engines/supply-chain.js',
+    // v2.222.0（拓展 N4）：调查证据工作台（engines/evidence-board.js）。
+    //   位置排在 supply-chain 之后、ui/panel.js 之前：本模块同为**编排面**
+    //   （支持/反驳条数取自 probe.tally；来源链 / 证人 / 动作逐条现取 investigation 与 rumor）
+    //   ，装载期不读任何上游（一律调用期读 WA.家族成员）。本模块**零 store 写**：
+    //   没有 transact、没有 draft 赋值；只有自己那一格 localStorage 偏好键
+    //   （`worldaxis_evidence_board_settings_v1`）。
+    'engines/evidence-board.js',
+    // v2.230.0（拓展 N12）：十枚新引擎（缝 13 仓的 34 面缺口）。
+    //   elsewhere.js → elsewhere
+    //   vitals.js → vitals
+    //   fate.js → fate
+    //   coordinate.js → coordinate
+    //   compare.js → compare
+    //   beat.js → beat
+    //   backstage-tone.js → backstageTone
+    //   dream.js → dream
+    //   modelink.js → modelink
+    //   portal.js → portal
+    //   位置都在 evidence-board 之后、ui/panel.js 之前：装载期零上游读，
+    //   一律调用期读 WA.store / settingsBus / evict / inputGuard / rand。
+    'engines/elsewhere.js',
+    'engines/vitals.js',
+    'engines/fate.js',
+    'engines/coordinate.js',
+    'engines/compare.js',
+    'engines/beat.js',
+    'engines/backstage-tone.js',
+    'engines/dream.js',
+    'engines/modelink.js',
+    'engines/portal.js',
+    // v2.230.0（拓展 N12 续批）：16 枚新引擎（把 34 面缺口收口到 46/46）。
+    //   floor-snapshot.js → floorSnapshot（G07 楼层快照 + B09 绑定 message）
+    //   memory-tiers.js   → memoryTiers（G18 三层记忆）
+    //   deep-clean.js     → deepClean（G20 深度清理生命周期）
+    //   lingqi.js         → lingqi（G29 玲七管家）
+    //   scope-tag.js      → scopeTag（B01 范围标签）
+    //   reasoning-strip.js→ reasoningStrip（B02 推理块过滤）
+    //   length-policy.js  → lengthPolicy（B03 字数策略）
+    //   auto-hide.js      → autoHide（B04 隐藏楼层）
+    //   prefilter-gate.js → prefilterGate（B06 档案预筛 Gate）
+    //   community-note.js → communityNote（G27 社区笔记）
+    //   world-clock.js    → worldClock（B07 世界钟权威）
+    //   outline-inject.js → outlineInject（B08 大纲注入）
+    //   redact-layer.js   → redactLayer（B05 脱敏层）
+    //   relation-graph.js → relationGraph（B10 关系图谱 edgeId）
+    //   solo-voice.js     → soloVoice（B11 独白推演）
+    //   observe-slice.js  → observeSlice（B12 观测切片）
+    //   位置仍在 ui/panel.js 之前：装载期**零上游读、零 store 写、零落盘**，
+    //   一律调用期读 WA.settingsBus / inputGuard；因此**不进** __BOUNDED_CAPS / evict SITES
+    //   （那两张表管的是 store 骨架里的有界容器，本批一条都不写 store）。
+    'engines/floor-snapshot.js',
+    'engines/memory-tiers.js',
+    'engines/deep-clean.js',
+    'engines/lingqi.js',
+    'engines/scope-tag.js',
+    'engines/reasoning-strip.js',
+    'engines/length-policy.js',
+    'engines/auto-hide.js',
+    'engines/prefilter-gate.js',
+    'engines/community-note.js',
+    'engines/world-clock.js',
+    'engines/outline-inject.js',
+    'engines/redact-layer.js',
+    'engines/relation-graph.js',
+    'engines/solo-voice.js',
+    'engines/observe-slice.js',
+    // v2.257.0（V6 OPV6-1 / OPV6-2）：能力档位与启用面可见。
+    //   位置在两处都是**末尾、ui/panel.js 之前**：两者都是「调用期读 WA 上的其他命名空间」
+    //   （capability-tier 要枚举所有引擎并调各自的 setSettings；capability-audit 要读
+    //   WA.__settingsRegs 与各引擎的 getSettings），装载期**零上游读、零 store 写、零落盘**。
+    //   故不进 __BOUNDED_CAPS / evict SITES 两张表。
+    //   ⚠ 顺序有讲究：audit 需在 tier **之后**（它要能看到 tier 自己的设置键），
+    //     而 tier 不读 audit。反过来会让 audit 在首次盘点时看不见档位键。
+    // v2.265.0（V6 EXV6-1）：世界日记 —— 镜头外真实结算的事实压成一到三句人话。
+    //   位置在 capability-tier **之前**：本模块装载期只登记自己的设置键（零上游读、零 store 写、
+    //   零落盘），排在 tier/audit 之前是为了让能力审计首次盘点就能看见它的键；否则「日记开没开」
+    //   会落在登记面之外，档位审计读不到、面板却念得出（两处口径分叉）。
+    'engines/world-diary.js',
+    // v2.266.0（V6 EXV6-2）：人物今日动线 —— 「今天在哪 / 做了什么 / 接下来」读成三句人话。
+    //   位置同世界日记：capability-tier **之前**。本模块装载期只登记自己的设置键，
+    //   零上游读、零 store 写、零落盘，排在 tier/audit 之前让「动线开没开」首次盘点就在登记面内。
+    //   与 world-diary 的相邻次序不是随意的：动线的边界面（地名可见性）**复用**世界日记的 boundary()，
+    //   装载先 diary 后 day-route，面板诊断节两节并列时可从同一批源取证。
+    'engines/day-route.js',
+    'engines/relation-temp.js',
+    // v2.268.0（V6 EXV6-4）：暗流日历 —— 未结算的事几时撞上。
+    //   位置同前面的只读读数模块（relation-temp 之后、tier 之前）。本模块装载期
+    //   只登记自己的设置键，零上游读、零 store 写、零落盘；它读的暗流来自 store.get().currents、
+    //   时间基准来自 clock/storyclock，两处都是运行期读口 —— 装载期不需要任何依赖在场。
+    'engines/undercurrent-calendar.js',
+    'engines/storyline-advance.js',
+    'engines/world-changes.js',
+    // v2.269.0（V6 EXV6-5）：单轮成本卡。位置同前面的只读读数模块（undercurrent-calendar
+    //   之后、capability-tier 之前）：装载期只登记自己的设置键，零上游读、零 store 写。
+    //   顺序也不是随意的 —— 它读的三源（injectBudget / injectValue / perfLedger）在
+    //   本清单里全部更早装载，破坏副本与专锁读到的是同一批邻接。
+    'engines/round-cost.js',
+    // v2.270.0（V6 EXV6-6）：存档体检。位置同前面的只读读数模块（round-cost 之后、
+    //   capability-tier 之前）：装载期只登记自己的设置键，零上游读、零 store 写。
+    //   它读的三源（store 字节口 / storageForecast / capacityAudit）在本清单里全部更早装载。
+    'engines/save-health.js',
+    // v2.271.0（V6 EXV6-7）：开局引导。位置同前面的只读读数模块（save-health 之后、
+    //   tier 之前）：装载期只登记自己的设置键，零上游读、零 store 写。
+    //   它读的三源（api-router / capability-tier / store）里，前两个在本清单里更早装载。
+    'engines/first-run.js',
+    // v2.273.0（V6 EXV6-9）：一键交班，与 index.js LOAD_ORDER 严格同序
+    //   （first-run 之后、capability-tier 之前）。
+    'engines/handoff-pack.js',
+    // v2.275.0（V7 OPV7-5）：驱动者登记表。位置同前面的只读读数模块（handoff-pack 之后、
+    //   tier 之前）：装载期只登记自己的设置键，零上游读、零 store 写、零落盘。
+    //   它与 tier/audit 排在同一段末尾的理由不同 —— 本模块**调用期**要读 WA.workflow 的链清单
+    //   与产品源码（静态扫描），但两者都是惰性的：首次 view()/build() 才扫描，装载期不触任何上游。
+    //   排在 ui/panel.js 之前是为了让面板概览与诊断面在首屏就能念出分层读数。
+    'engines/driver-ledger.js',
+    // v2.277.0（V7 OPV7-1）：推演结果分发器。位置**必须**在 life/temperament/enigma/events 之后
+    //   （它调用期要调这四个引擎的写口，装载期只登记自己的设置键：零上游读、零 store 写、零落盘）。
+    //   排在 backstage 之后也不构成环：backstage 只在结算成功分支里**调用期**取 WA.intake。
+    //   排在 ui/panel.js 之前，让面板首屏就能念出分发读数。
+    'engines/intake-dispatch.js',
+    // v2.280.0（V7 OPV7-4）：写口契约自描述。位置**必须**在 capability-tier 之前、
+    //   driver-ledger 之后：它调用期要读任意引擎的导出函数体（toString），装载期零上游读。
+    //   排在这里不构成环：本模块只在自己被调用时才碰 WA 的其它命名空间。
+    'engines/write-contract.js',
+    // v2.285.0（V7 EXV7-1）：今日世界简报 —— 这一轮结构化引擎各自吃进了几笔。
+    //   位置在 write-contract 之后、capability-tier 之前（同前面的只读读数模块）：
+    //   装载期只登记自己的设置键（零上游读、零 store 写、零落盘），排在 tier/audit
+    //   之前让「简报开没开」首次盘点就在登记面内（同 world-diary 的口径）。
+    //   它的六源（life/events/intel/bonds/temperament/enigma）在本清单里全部更早装载，
+    //   但都是调用期读口 —— 装载期不需要任何依赖在场。
+    'engines/world-briefing.js',
+    // v2.286.0（V7 EXV7-2）：人物意图看板 —— 他在图什么、卡在哪一步。
+    //   与 world-briefing 同列（write-contract 之后、capability-tier 之前）：
+    //   装载期只登记自己的设置键，零上游读、零 store 写、零落盘；
+    //   它要读的 plan / agency 在本清单里更早装载，但那是**调用期**读口 ——
+    //   装载期不需要任何依赖在场。排在这里让「看板开没开」首次盘点就在登记面内。
+    'engines/intent-board.js',
+    // v2.292.0（V7 EXV7-8）：世界自传 —— 这一局跑下来，世界分几个阶段、各留了什么。
+    //   与 intent-board 同列（capability-tier 之前）：装载期只登记设置键、零上游读、
+    //   零 store 写、零落盘；三条源（chrono / worldDiary / worldBriefing）在本清单里
+    //   全部更早装载，但都是调用期读口。排在这里让它在首次盘点里就在登记面内。
+    'engines/world-autobiography.js',
+    'engines/player-archive.js',
+    // v2.293.0（V7 EXV7-9）：一键播种 —— 给空世界种一批人。
+    //   位置在 capability-tier 之前、world-autobiography 之后：装载期只登记自己的
+    //   设置键（零上游读、零 store 写、零落盘）。它调用期要读的九个写口
+    //   （world/life/bonds/org/editorFaction/registry/evict/rand/store）在本清单里
+    //   全部更早装载，但都是**调用期**读口 —— 装载期不需要任何依赖在场。
+    //   排在这里让「播种开没开」首次盘点就在登记面内（同 world-diary 的口径）。
+    'engines/populate.js',
+    // v2.294.0（V8 OPV8-4/EXV8-2）：轮次驱动器 —— 把「每轮只需推进状态」的
+    //   悬空引擎（tolerance/motif/marginal/quota/spotlight/rhythmLoop/eraCycle）
+    //   挂进真实轮次循环。装载期只登记自己的设置键（零上游读、零 store 写、
+    //   零落盘）；backstage 在结算成功分支**调用期**取 WA.roundDrivers（与
+    //   intake 同形态），不构成环。七台目标引擎在本清单里全部更早装载。
+    // v2.299.0（V11 OPV11-3）：L3 分级登记表 —— 28 台未驱动引擎的四类裁决，**单一真源**。
+    //   装载期零上游读、零 store 写、零落盘。刻意排在 round-drivers 之前：
+    //   round-drivers 派生 A 类名单时要读本表（装载期只读静态表，不读 WA 运行态），
+    //   顺序反了就会让派生方读到 undefined 然后各自 fallback 出一份第二真源。
+    // v2.300.0（V11 OPV11-6）：多写者字段写权声明表 —— 5 个字段的单一真源。
+    'engines/field-writers.js',
+    'engines/l3-registry.js',
+    // v2.299.0（V11 OPV11-4）：推进类 API 死面裁决表 —— 11 条真零调用的单一真源。
+    //   同样排在 round-drivers 之前（drive 类要派生进 DRIVERS）。
+    'engines/push-api-registry.js',
+    'engines/round-drivers.js',
+    // v2.294.0（V8 EXV8-2）：写口台 —— 悬空引擎的统一手动写入口。
+    //   台面清单从 write-contract 契约现场读（参数形状/拒收码/hint），
+    //   装载期零上游读、零 store 写、零落盘。排在 round-drivers 之后、
+    //   capability-tier 之前，让首次盘点就在登记面内。
+    'engines/write-desk.js',
+    'engines/capability-tier.js',
+    'engines/capability-audit.js',
+    // ══ v2.400.0（V22 拓展线 EXV22-1～8）：八项制度性引擎 ══
+    //   八项共用同一条纪律（见各自文件头）：**零 store 写**，只算不落账。
+    //   为什么统一如此：这八项都会「死人 / 逼走人 / 定罪 / 走错路」，
+    //   它们给出的是读数与拒收原因，落账必须走各自领域的既有写口
+    //   （economy / bonds / diplomacy / atlas），这样才不会出现
+    //   「一个纯算引擎顺手改了世界」这种无法归因的写入。
+    //   八项之间互不依赖，排列只要在两处之前即可：**在 ui/panel.js 之前**
+    //   （EXV22-9 的全景中心要读它们的 view），与 capability-audit 之后（无强依赖）。
+    'engines/celestial-omens.js',      // EXV22-1 天文星象 / 历法漂移 / 农时误判
+    'engines/postal-relay.js',         // EXV22-2 驿传网络 / 换马耗时 / 驿路断毁
+    'engines/levy-corvee.js',          // EXV22-3 税制徭役 / 征发额度 / 逃户流亡
+    'engines/mortuary-rites.js',       // EXV22-4 丧葬儀式 / 服丧禁令 / 遗产清算
+    'engines/anniversary-rites.js',    // EXV24-1 忌日周年 / 祭访提醒 / 过期不自动消账
+    'engines/outsider-integration.js', // EXV24-2 外乡人融入 / 见证定档 / 排外留痕
+    'engines/tenancy-rent.js',         // EXV24-3 租佃田租 / 欠租累计 / 逼佃两季门禁
+    'engines/military-levy.js',        // EXV24-4 兵籍军饷 / 拖饷记档 / 哗变风险只报不触
+    'engines/nursing-care.js',         // EXV24-5 乳母雇佣 / 哺育分派 / 断奶结工
+    'engines/lost-and-found.js',       // EXV24-6 失物招领 / 上交私吞两途 / 认领凭据
+    'engines/pilgrim-flow.js',         // EXV24-7 香客香火 / 还愿凭据硬门禁
+    'engines/dice-den.js',             // EXV24-8 赌坊骰局 / 决策流开骰 / 出千留痕
+    'engines/bathhouse-laundry.js',    // EXV24-9 浴堂浆洗 / 洁净档按故事时间衰减
+    'engines/pawn-redemption.js',      // EXV27-1 当票质押 / 本息结清才还物 / 绝当余款不许吞
+    'engines/silver-assay.js',         // EXV27-2 银钱成色 / 倾煎火耗 / 短陌
+    'engines/salt-franchise.js',       // EXV27-3 盐引额 / 越额即私盐 / 查缉须见证
+    'engines/broker-house.js',         // EXV27-4 牙行居间 / 抽佣上限 / 失信须告发
+    'engines/night-watch.js',          // EXV27-5 更夫夜禁 / 报事须在班 / 无见证不立
+    'engines/fire-watch.js',           // EXV27-6 火政走水 / 起火须声明 / 扑救按算术
+    'engines/festival-fair.js',        // EXV27-7 灯会庙市 / 客流分派 / 灯棚火险档
+    'engines/ward-compact.js',         // EXV27-8 保甲乡约 / 甲长连坐 / 义仓放赈
+    'engines/divination-craft.js',     // EXV27-9 巫觋占卜 / 应验不许改口 / 断语哄传
+    'engines/inject-delta.js',         // OPV27-9 注入信息增量账 / 逐源唯一片段 / 只读不改正文
+    'engines/reject-phrase.js',        // OPV27-7 拒收码五簇话术 / 覆盖率读数 / 未覆盖如实甩码
+    'engines/settings-index.js',       // OPV27-6 设置面中文索引 / 搜索 / 分组 / 关掉会怎样
+    'engines/save-curve.js',           // OPV27-3 存档体积四点曲线 / 容器增长排名 / 只读不写档
+    'engines/narrow-consumers.js',     // OPV27-5 12 台窄消费引擎接产品链 / 在用机制一行
+    'engines/sartorial-regalia.js',    // EXV22-5 服饰规制 / 僭越风险 / 身份识别
+    'engines/betrothal-alliance.js',   // EXV22-6 婚约聘娶 / 妆匛议价 / 门第联姻
+    'engines/cartography-survey.js',   // EXV22-7 舆图测绘 / 精度分层 / 迷雾认知
+    'engines/lingua-broker.js',        // EXV22-8 方言隔阂 / 译语掮客 / 误译后果
+    // ══ v2.408.0（EXV23-1 至 EXV23-9）：V23 超级史诗全域因果觉醒拓展引擎 ══
+    'engines/commodity-circulation.js', // EXV23-1 物资商路与债务违约
+    'engines/somatic-trauma.js',        // EXV23-2 具身肢体创伤与知觉剥夺
+    'engines/psyche-dissociation.js',    // EXV23-3 创伤闪回与记忆虚构
+    'engines/mob-stampede.js',          // EXV23-4 暴民恐慌踩踏与传闻裂变
+    'engines/geophysical-reshaping.js', // EXV23-5 水文地貌重塑与道路熔断
+    'engines/artifice-degradation.js',  // EXV23-6 器械磨损疲劳与炸膛卡死
+    'engines/shadow-council.js',        // EXV23-7 影子间谍死信箱与暗室暗杀
+    'engines/dynastic-lineage.js',      // EXV23-8 宗族谱系与夺嫡立嗣
+    'engines/world-singularity.js',     // EXV23-9 张力时钟与时代奇点收束
+    // ══ v2.402.0（V23 缝合线 · 异空间 V1.4 三缝）：会话账本 / 记忆互通 / 聊天回收站 ══
+    //   三缝共用一条纪律（同 V22 八引擎）：**零 store 写**，只算、只记自己的账。
+    //   为什么三缝都要如此：它们都会「丢掉东西」（丢会话 / 丢上下文 / 丢文件），
+    //   落手必须走既有写口或由宿主执行 —— 一个纯账本引擎顺手删了文件，
+    //   事后无法归因到底是谁删的（chat-recycle 的 enforce() 恒 purged:0 就是这条）。
+    //   三缝之间互不依赖；排列只需在 ui/panel.js 之前（面板要读它们的 view）。
+    'engines/stage-session.js',        // V23-1 小剧场会话生命周期 / 退出三选 / 存档快照
+    'engines/memory-relay.js',         // V23-2 记忆互通（摘要跨聊天挂载，不合并原文）
+    // v2.407.0（三缝②）：总结接口适配层，依赖 memory-relay，必须在 backstage 调用前装载。
+    'engines/summarizer-adapter.js',   // 两级摘要 ⇄ 标准摘要/互通接口
+    'engines/chat-recycle.js',         // V23-3 聊天回收站（上限 10 / 锁定保护 / 只出清单不删）
+    // v2.405.0：世界读数通道（RUBY read 机制的 WorldAxis 版）。位置在 chat-recycle 之后、
+    //   ui/panel.js 之前：面板概览页的统一卡在调用期读它的 snapshot/renderCard。
+    //   纯只读现算——零 store 写、零 settingsBus 写、零落盘、零模型调用。
+    'engines/world-reader.js',         // 世界读数通道（snapshot 结构化读口 + 玩家面统一卡）
+    // v2.407.0（三缝①/③）：书签与导演都是面板/推演的调用期读口，须在 ui/panel.js 前注册。
+    'engines/reading-bookmark.js',     // 分支感知增量阅读书签 / 漏楼补读
+    'engines/director.js',             // 世界读数归一 / 确定性导演排期建议（含事件桶/冷却/顺延）
+    // v2.407.0（外部 11 份资料主线 A/B/C/E/F/G）：两个只读判据引擎。
+    //   两者都是调用期读 WA 命名空间，装载期零上游读、零 store 写、零落盘、零模型；
+    //   位置在全部既有引擎之后、ui/panel.js 之前，与 world-reader/director 同层。
+    'engines/branch-continuity.js',    // 主线B：证据契约 / 原子提交判据 / 楼层绑定恢复
+    'engines/fact-continuity.js',      // 主线A/C/E/F/G：事实分层 / 信息边界 / 经济锚定 / 正文纪律 / 状态签名
+    // v2.409.0（跨参照物缝合批）：三个只读判据引擎。缝合来源是 npc-life 3.0.0-beta.4
+    //   与 st-4a-guard v4.3.1，逐条对照后只取本仓确实缺的能力（不搬题材、不搬破盾）。
+    //   三者都是调用期读，装载期零上游读、零 store 写、零落盘、零模型，与上两行同层。
+    'engines/elapsed-evidence.js',     // 时间流逝的证据解析：四层拒绝 + 模型分钟数双重校验
+    'engines/source-reconcile.js',     // 来源编辑 → 依赖后缀撤销 + 复合票据（十项比对）
+    'engines/plan-roster.js',          // 计划准入：同行闭包 / 角色游标 / 封闭动作白名单
+    // ══ v2.417.0（V25 柏宝书 + 数据库 缝入批，EXV25-1～5 / OPV25-1～6）：11 引擎 ══
+    //   审计依据 plans/V25_MASTER_PLAN.md R0：11 项真缺口成立，4 个同名异义已排除。
+    //   全部调用期读 WA 命名空间，装载期零上游读；仅 shadow 进程账 + settingsBus，
+    //   不写 store、不落盘 ⇒ 不入 evict SITES（无站点无登记）。
+    //   位置：全部既有引擎之后、ui/panel.js 之前，与 world-reader/director 同层。
+    'engines/player-knowledge.js',     // EXV25-1 角色对主角的了解清单 / 没记=不知道
+    'engines/affection-dual-axis.js',  // EXV25-2 内心好感×外在态度 双轴五档 / 未知≠中性
+    'engines/life-profile.js',         // EXV25-3 生活小档案按人分账 / 不跨人合并
+    'engines/suspense-ledger.js',      // EXV25-4 悬念核销簿 / close 必给凭据 / 逾期不自动消账
+    'engines/source-hints.js',         // EXV25-5 易漏原文提醒 / 整段副本不截断 / 未命中≠没有
+    'engines/advance-idempotence.js',  // OPV25-1 剧情推进幂等闸 / 同键只放行一次
+    'engines/takeover-yield.js',       // OPV25-2 接管让路 / 可见提示 + 非阻塞回执
+    'engines/sim-rehearsal.js',        // OPV25-3 整轮推演执行链 / 占位符缺值不猜
+    'engines/history-batch-read.js',   // OPV25-4 历史批量读 / 快照续放 + 无帧跳段
+    'engines/save-throttle.js',        // OPV25-5 存盘节流 / 窗口合并 + 尾随补存
+    'engines/history-provenance.js',   // OPV25-6 历史读数来源身份 / patched≠drifted
+    // v2.517.0（V26 模型可观测性批）：六引擎全部只读调用台账 + settingsBus，
+    //   装载期零上游读、不写 store、不落盘 ⇒ 不入 evict SITES。排位沿用 V25 段之后、ui/panel.js 之前。
+    'engines/model-receipt.js',        // OPV26-1 模型响应回执账 / req≠resp 漂移计数 + TPS
+    'engines/token-budget.js',         // OPV26-3 用量延迟分位视图 / p50/p95 + 债务点名
+    'engines/model-pin.js',            // OPV26-3b 模型钉版守卫 / 未钉不判 / 回执缺席不判
+    'engines/call-timeline.js',        // OPV26-4 单轮调用时间线 / 关键渠道占比
+    'engines/model-catalog.js',        // OPV26-5 模型清单拉取与在册核对 / ingest 纯收账
+    'engines/degrade-audit.js',        // OPV26-6 降智行为面审计 / 样本不足不给结论
+    'ui/panel.js',
+    // v2.209.0（优化 6）：面板导航协议。**必须排在 ui/panel.js 之后**：协议调用期读
+    //   `WA.ui.pages()`（页白名单的真源是 panel.js 的 PAGES 表）与 `WA.ui.goPage()`；
+    //   先装会让页白名单恒空、一切导航被拒收成 no-page-table（协议静默失效，比不装更难查）。
+    //   本模块**零 store 写、零落盘、零时钟读数**：回程栈与输入态留档都是进程态交互物。
+    'ui/panel-nav.js',
+    'ui/cyberpunk-theme.js',
+    'ui/cyberpunk-components.js',
+    'ui/cyberpunk-dashboard.js',
+    'ui/cyberpunk-people.js',
+    'ui/cyberpunk-logs.js',
+    'ui/cyberpunk-animations.js',
+    'ui/cyberpunk-responsive.js',
+    // v2.181.0：主题切换（右键悬浮球）。必须排在全部 cyberpunk 模块**之后**：
+    //   它们在装载期把样式文本登记进 WA.themeStyles，本模块要读那张表来装卸。
+    'ui/theme-switch.js',
+    // v2.152.0（RP6）：面板渲染性能观测。**必须在 panel.js 之后**：observe 的页 id
+    //   白名单读 WA.ui.pages()（PAGES 表是 panel.js 的真源），先装会让白名单恒空、
+    //   一切 observe 被拒收成 unknown-page（观测面静默失效，比不装更坏）。
+    'ui/render-perf.js',
+    // v2.225.0(优化 Q8 · 面板减负):专家段折叠。与 render-perf 同理**必须排在 panel.js
+    //   之后** —— panel.js 的 foldSec 渲染期读 `WA.panelFold.isCollapsed`;本模块另读
+    //   `WA.ui.pages()` 做页白名单核对。先装会让 `isCollapsed` 恒报 page-table-absent
+    //   (折叠整条静默失效,比不装更难查)。本模块**零世界写、零落盘**(状态走 settingsBus)。
+    'ui/panel-fold.js',
+    // v2.400.0（V22 OPV22-4）：概览页六块只读诊断（原 ui/panel.js 517–851 行，335 行 / 7 个函数）。
+    //   **必须排在 ui/panel.js 之后**：panel.js 的七个同名转发函数在运行期惰性读
+    //   `WA.panelOverviewBlocks`，先装会让首次渲染读到 undefined ⇒ 六块全返回空串
+    //   （而 renderOverview 的 try/catch 不会报错，症状是「概览页那几块突然没内容了」）。
+    //   本模块零世界写、零落盘、零控件、零 id（只拼 HTML 字符串）。
+    'ui/pages/overview-blocks.js',
+    // v2.413.0（OPV24-1）：世界脉搏聚合块。**必须排在 ui/panel.js 之后、overview-main.js 之前**：
+    //   panel.js 的 worldPulseBlock 转发在运行期惰性读 WA.panelWorldPulse，overview-main 的段体
+    //   经 bind 注入消费它。先装/后装都成立（首次渲染前 bind 到即可），但排这里最稳。
+    //   零世界写、零落盘、零控件、零 id（只拼 HTML 字符串）。
+    'ui/pages/overview-world-pulse.js',
+    // v2.401.0（OPV23-1~3）：三段拆分 —— 概览主线 / 工具页 / 四大盘。**必须排在 ui/panel.js 之后**：
+    //   panel.js 的转发函数在运行期惰性读 WA.panelOverviewMain / WA.panelToolsPage /
+    //   WA.uiDashboards，先装会让首次渲染读到 undefined（缺席降级行）。零世界写、零落盘。
+    'ui/pages/overview-main.js',
+    // UI-P1（v2.518.0）：玩家面「此刻」页。**排在 overview-main.js 之后**（同批装载，渲染在
+    //   面板打开时才发生，故此后装即可读到 WA.panelNowPage）；缺席时 overview-main 退回旧读数
+    //   （不渲染空卡）。零世界写、零落盘、零控件 id 冲突，只读既有出口。
+    'ui/pages/now-page.js',
+    // UI-P1（v2.518.0）：玩家面「人物」。排在 panel.js 之后，渲染期由 panel.js 惰性读取；
+    // 缺席时回退旧人物工作台，保持开发者与旧宿主兼容。
+    'ui/pages/people-page.js',
+    'ui/pages/tools-page.js',
+    'ui/pages/dashboards.js',
+    // v2.535.0：声明式视图层（schema → DOM）。必须排在 ui/panel.js **之后**：panel.js
+    //   的事件页在渲染期惰性读 WA.schemaView，先装会让首帧拿到 undefined（降级行一直显示）。
+    //   零世界读、零落盘、零控件绑定（只出结构，绑定归消费方）。
+    'ui/schema-view.js',
+    'ui/settings.js',
+    'ui/assistant.js',
+    // v2.542.0：玩家面「夜读手札」（ui/journal.js）与开发者面「工作台」外壳（ui/console.js）。
+    //   两者都必须排在 ui/panel.js 之后：console.js 给 #wa-panel 挂 .wc 类并观察 .wa-body 重绘，
+    //   journal.js 接管 #wa-orb 的点击（原面板 toggle 之后同步改为开手札）。面板在 init 期已 mount，
+    //   故此处装完即可找到 DOM；两者自持重试（journal 60×500ms / console 80×400ms）。
+    //   无头环境（无 doc.body 或 UA 含 jsdom/HeadlessChrome）只登记空壳命名空间、不碰 DOM。
+    'ui/journal.js',
+    'ui/console.js',
+  ];
+  // ── 惰性档（v2.529.0 · OPV29-04）：首帧不装，首帧后由 engines/lazy-load.js 串行补装 ──
+  //   凭什么可以延迟：这每一条的产品读点都是零，定性记在 tests/ns-consumer-ledger.json 的
+  //   pending-wire 类（evidence 写明谁会在什么时候读它）。判据在 tests/opv29-z1-04-v2529.js：
+  //   惰性档非空、首帧装载边严格小于全量、每条都能 ensure 装回来、失败可重试。
+  //   本节注释同样不放方括号 —— 门禁用正则从本段取清单。
+  const LAZY_ORDER = [
+    'engines/card-file.js',
+    'engines/chat-guard.js',
+    'engines/contrast.js',
+    'engines/fact-age.js',
+    'engines/floor-census.js',
+    'engines/floor-favorites.js',
+    'engines/floor-hide.js',
+    'engines/floor-scrub.js',
+    'engines/green-keys.js',
+    'engines/macro-guard.js',
+    'engines/mixed-index.js',
+    'engines/msg-align.js',
+    'engines/save-migrate.js',
+    'engines/setup-plan.js',
+    'engines/slot-format.js',
+    'engines/store-merge.js',
+    'engines/stream-gate.js',
+    'engines/write-serial.js',
+  ];
+
+  // v0.1.16: 多源容灾——主源（本地扩展目录）失败时依次回退 jsDelivr 三域，每源 12s 闸刀
+  // v2.211.0(优化 Q1 · 同版加载):回退源此前写死 @main,而那是一个会走的引用。
+  //   实测(2026-10-15):本地 v2.210.0 而远端 main 的 manifest.json 是 v2.181.0 ——
+  //   那是本仓的另一条独立历史线。于是「本地某个文件读不到 ⇒ 从 main 取同名文件」这条
+  //   容灾路径会把另一个版本的模块拼进当前运行时;而查询串 ?v=2.210.0 对 jsDelivr 的
+  //   取内容没有任何约束(它按路径取,查询串既不选版本也不进缓存键)。
+  //   混版不会报错:每个模块各自自洽,只是彼此的约定不同 —— 症状是「某些功能行为怪」,
+  //   而没有任何一处会告诉用户「你跑的是两个版本的拼盘」。
+  //   治法:绑定不可变构建标识。BUILD_ID 是本版交付时的提交(40 位),回退源一律取它;
+  //   同一构建标识下取到的模块与本地是同一次产物,这才谈得上「同版容灾」。
+  //   纪律:升版时 BUILD_ID 与 VERSION 同批推进(判据见 tests/index-build-v2211.js),
+  //   不允许只改其一 —— 只改 VERSION 会让回退源指向旧代码,只改 BUILD_ID 会让版本账对不上现场。
+  const BUILD_ID = 'c073d16c7c09c8efb58b3e408b4195c357ba3320';
+  const CDN_BASES = [
+    'https://cdn.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
+    'https://fastly.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
+    'https://testingcf.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
+  ];
+  const SCRIPT_TIMEOUT_MS = 12000;
+  const CDN_COOLDOWN_MS = 60000;
+  const loadedScripts = new Map();
+  const failedCdnAt = new Map();
+  function loadScriptOnce(src, timeoutMs) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = (r) => { if (!settled) { settled = true; resolve(r); } };
+      let timer = null;
+      const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+      // ── 通道 A：fetch + 全局执行（仅 Tauri 系壳启用）──────────────────────────
+      //   【真机实测数据，不是推测】TauriTavern（origin `http://tauri.localhost`）里：
+      //     · fetch 取 `core/clock.js` → 200 / 486 字节 / 正文 `/**`（正确源码）
+      //     · `<script src>` 取同一 URL → onload 回调，但喂给 JS 引擎的是 HTML
+      //       ⇒ 控制台只剩 `Uncaught SyntaxError: Unexpected token '<'`
+      //   而 loadScript 把 onload 记成功 ⇒ 失败表恒空、`WA.ui` 恒缺席 ⇒
+      //   **悬浮球与主面板永不出现，且没有任何一处报错**。
+      //   故 Tauri 下优先 fetch（与壳自身装载扩展的方式同构），失败再回落 `<script>`。
+      //   非 Tauri（普通 http 部署 / 测试桩）**不启用**：Node 自带 fetch 会真发请求，
+      //   让回归变慢且不确定；且那些环境里 `<script>` 本来就对，零行为变化。
+      const isTauri = (function () {
+        try {
+          const loc = (mainDoc && mainDoc.location) || {};
+          const h = String(loc.hostname || '');
+          const p = String(loc.protocol || '');
+          if (h === 'tauri.localhost' || h === 'localhost.tauri') return true;
+          if (p === 'tauri:' || p === 'asset:') return true;
+          if (mainWin.__TAURI__ || mainWin.__TAURI_INTERNALS__) return true;
+          return false;
+        } catch (e) { return false; }
+      })();
+      const viaFetch = function () {
+        // 预取命中 ⇒ 直接执行（网络已经并行取完，这里只剩「按序执行」的成本）
+        try {
+          const pf = WA.__prefetch;
+          if (pf && pf.get) {
+            const cached = pf.get(src);
+            if (cached) {
+              (0, eval)(cached + '\n//# sourceURL=' + src);
+              pf.delete(src);          // 执行过即释放，18MB 不常驻内存
+              return Promise.resolve({ ok: true, src: src, via: 'prefetch' });
+            }
+          }
+        } catch (e) { /* 预取体执行失败 ⇒ 走正常通道重取 */ }
+        if (!isTauri || typeof fetch !== 'function') return Promise.reject(new Error('skip'));
+        return fetch(src, { method: 'GET', cache: 'no-store' }).then(function (r) {
+          if (!r.ok) throw new Error('http-' + r.status);
+          return r.text();
+        }).then(function (text) {
+          // 壳在路由未命中时回 200 + HTML，必须验形再执行
+          const head = String(text).replace(/^\uFEFF/, '').replace(/^\s+/, '').slice(0, 1);
+          if (head === '<') throw new Error('html-instead-of-js');
+          if (!text || text.length < 16) throw new Error('empty-body');
+          try { (0, eval)(text + '\n//# sourceURL=' + src); }
+          catch (e) { throw new Error('eval:' + String(e && (e.message || e))); }
+          return { ok: true, src: src, via: 'fetch' };
+        });
+      };
+      const viaTag = function () {
+        return new Promise(function (res) {
+          try {
+            const s = mainDoc.createElement('script');
+            s.src = src;
+            s.onload = function () { res({ ok: true, src: src, via: 'tag' }); };
+            s.onerror = function () { res({ ok: false, src: src, error: 'onerror' }); };
+            mainDoc.head.appendChild(s);
+          } catch (e) { res({ ok: false, src: src, error: String(e && (e.message || e)) }); }
+        });
+      };
+      timer = setTimeout(function () { done({ ok: false, src: src, error: 'timeout' }); }, timeoutMs || SCRIPT_TIMEOUT_MS);
+      // ── v2.231.6：非 Tauri 且无预取命中 ⇒ **同步**走 <script>，不许先排一趟必然 reject 的 fetch ──
+      //   病灶（本轮全量回归捞出来的）：上面的 viaFetch() 是 async 的，`viaFetch().then().catch()`
+      //   把 viaTag() 推进了**微任务**。于是 `WA.loadScript(rel)` 返回时，`<script>` 元素**还没建**。
+      //   非 Tauri 环境里 fetch 通道必然 `reject('skip')`（Node 下会真发请求，故刻意不启用），
+      //   也就是说这里先排队的是一条**注定失败**的通道，除了把建元素推迟一个微任务之外没有别的效果。
+      //   实测代价：run.js 的 v0.1.16 段（`const ls = global.__scriptEls.slice(); ls[0].onerror()`）
+      //   当场 `Cannot read properties of undefined (reading 'onerror')` —— 整趟回归 runner-failed。
+      //   口径：**能力判定要在排队之前做完**，不要在通道内部 reject 了再回退。
+      //   预取命中要保留（它是同步可判的），Tauri + fetch 的组合也保留（那是真通道）。
+      const prefetchHit = (function () {
+        try { const pf = WA.__prefetch; return !!(pf && pf.get && pf.get(src)); } catch (e) { return false; }
+      })();
+      if (!prefetchHit && (!isTauri || typeof fetch !== 'function')) {
+        viaTag().then(function (r) { clear(); done(r); })
+          .catch(function (e) { clear(); done({ ok: false, src: src, error: String(e && (e.message || e)) }); });
+      } else {
+        viaFetch().then(function (r) { clear(); done(r); }).catch(function () {
+          viaTag().then(function (r) { clear(); done(r); })
+            .catch(function (e) { clear(); done({ ok: false, src: src, error: String(e && (e.message || e)) }); });
+        });
+      }
+    });
+  }
+  function loadScript(rel) {
+    return (async () => {
+      if (!WA.__loaderState) WA.__loaderState = { loaded: new Map(), failedCdnAt: new Map(), failed: new Map() };
+      const loaded = WA.__loaderState.loaded;
+      const failed = WA.__loaderState.failedCdnAt;
+      const cooldownMs = 60000;
+      const tag = '?v=' + VERSION;
+      // ── v2.231.1：Tauri 系壳**不能**带 query string（真机实测）────────────────
+      //   【实测】同一模块同一路径，在 TauriTavern（origin `http://tauri.localhost`）里：
+      //     · `/…/core/clock.js`          → 200，正文 `/** …`（模块源码）
+      //     · `/…/core/clock.js?v=2.231.0` → 回一页 HTML（路由未命中）
+      //   壳的协议处理器把「带查询串的路径」当成另一个资源，不剥 query 去查文件。
+      //   而本仓 282 个模块**全部**拼了 `?v=`，于是全部 404；`<script>` 又把 HTML
+      //   喂给 JS 引擎 ⇒ 只有一句 `Unexpected token '<'`，且 onload 照常触发、
+      //   失败表恒空 ⇒ 面板永不出现且无从得知原因。
+      //   【代价】Tauri 下失去「同 URL 换版本即刷缓存」的语义。但这不构成回退：
+      //     · 扩展升级本身就要重启壳，重启即重新装载；
+      //     · 同一构建内 `?v=` 恒定，本来也没有 cache-busting 作用。
+      //   故这里是**去掉一个从未生效、且在真宿主上致命的后缀**，不是牺牲功能。
+      const useQueryTag = !(function () {
+        try {
+          const loc = (mainDoc && mainDoc.location) || {};
+          const h = String(loc.hostname || '');
+          const p = String(loc.protocol || '');
+          if (h === 'tauri.localhost' || h === 'localhost.tauri') return true;
+          if (p === 'tauri:' || p === 'asset:') return true;
+          if (mainWin.__TAURI__ || mainWin.__TAURI_INTERNALS__) return true;
+          return false;
+        } catch (e) { return false; }
+      })();
+      const localSrc = WA.baseUrl + '/' + rel + (useQueryTag ? tag : '');
+      const cacheKey = rel + '@' + VERSION;
+      const state = WA.__loaderState;
+      if (state.loaded.has(cacheKey)) return state.loaded.get(cacheKey);
+      const r0 = await loadScriptOnce(localSrc);
+      if (r0.ok) {
+        const result = { rel: rel, ok: true, src: r0.src };
+        state.loaded.set(cacheKey, result);
+        try { state.failed.delete(rel); } catch (e) {}
+        return result;
+      }
+      for (let i = 0; i < CDN_BASES.length; i++) {
+        const base = CDN_BASES[i];
+        const lastFail = state.failedCdnAt.get(base) || 0;
+        if ((WA.clock ? WA.clock.now('index.cdnCooldown') : Date.now()) - lastFail < cooldownMs) continue;
+        const cdnSrc = base + '/' + rel + tag;
+        const r = await loadScriptOnce(cdnSrc);
+        if (r.ok) {
+          const result = { rel: rel, ok: true, src: r.src, fallback: base };
+          state.loaded.set(cacheKey, result);
+          try { state.failed.delete(rel); } catch (e) {}
+          WA.log('warn', '模块走 CDN 容灾加载成功: ' + rel + ' <- ' + base);
+          return result;
+        }
+        state.failedCdnAt.set(base, (WA.clock ? WA.clock.now('index.cdnCooldown') : Date.now()));
+      }
+      WA.log('error', '模块全部源加载失败: ' + rel);
+      try { state.failed.set(rel, { at: (WA.clock ? WA.clock.now('index.cdnFail') : Date.now()), sourcesTried: 1 + CDN_BASES.length }); } catch (e) {}
+      return { rel: rel, ok: false, failed: true };
+    })();
+  }
+  WA.loaderStatus = function () { return { loaded: Array.from((WA.__loaderState&&WA.__loaderState.loaded||new Map()).values()), cdnFailures: Array.from((WA.__loaderState&&WA.__loaderState.failedCdnAt||new Map()).entries()), failedModules: Array.from((WA.__loaderState&&WA.__loaderState.failed||new Map()).entries()).map(function (e) { return { rel: e[0], at: e[1].at, sourcesTried: e[1].sourcesTried }; }), buildId: BUILD_ID, version: VERSION, integrity: WA.loaderIntegrity ? WA.loaderIntegrity() : null }; };
+  // ── v2.211.0(优化 Q1)· 启动完整性:关键模块缺席 ⇒ 停止危险写入,并给恢复入口 ──────
+  // 【它治的病】本仓此前的形态是「加载失败 = 记一条 error 日志 + 把名字列进 WA.loadFailures」,
+  //   然后 `init()` **照常往下走**:store 初始化、拦截器安装、UI 挂载全部照做。
+  //   而写路径(store.transact / save)此前对「谁的代码在跑」一无所知 —— 于是
+  //   「core/store.js 没装上」的运行时里,任何一个引擎的写调用都只在**它自己**那层失败,
+  //   彼此无关地各写一半。用户看到的是一堆「某些功能不好使」,而不是「你的扩展没装全」。
+  //   真实触发面不止网络:扩展目录被部分同步、杀毒/清理工具删掉一两个文件、
+  //   用户手动改过目录 —— 这些都不会让浏览器报错,只会让某个模块静默缺席。
+  // 【为什么闸门写在 store 里而不是本文件】判定要能被执行得起来的上下文驱动。
+  //   `tests/run.js` 的装载面**刻意不含 index.js**(入口文件靠切片取 loadScript 段),
+  //   故把「关键键表 + 判定」放在 index.js 会让它结构上不可见证 —— 而一个不可见证的
+  //   安全判据,与本仓反复点名的「躺在磁盘上的文件」是同一种东西。
+  //   故:定义与闸门在 `core/store.js`(唯一真源),本文件只**转出**(供面板/诊断消费),
+  //   并把装载面才知道的信息(失败表)喂给它。
+  // 【恢复入口】`WA.loadRetry(rel)`:重新走一遍 loadScript(带冷却),成功则把自己从
+  //   失败表里摘掉、并重算闸门。**不做自动重试**:自动重试会把「一直失败」变成
+  //   「一直在后台重试」,故障反而更难看见(本仓口径:失败必须可见)。
+  WA.loaderIntegrity = function () {
+    try {
+      if (WA.store && typeof WA.store.integrity === 'function') return WA.store.integrity();
+      return { ok: true, armed: false, missing: [], reason: '', unknown: 'store-unavailable', buildId: BUILD_ID, version: VERSION };
+    } catch (e) {
+      return { ok: false, armed: true, missing: [], reason: '完整性判定异常', buildId: BUILD_ID, version: VERSION };
+    }
+  };
+  /** 写侧闸门转出(唯一实现仍在 core/store.js):读侧一律放行,只有写侧被挡。 */
+  WA.writeGate = function () {
+    try {
+      if (WA.store && typeof WA.store.writeGate === 'function') return WA.store.writeGate();
+      return null;
+    } catch (e) { return { ok: false, reason: 'load-integrity', missing: [], note: '完整性判定异常,收紧为拒写' }; }
+  };
+  /**
+   * 恢复入口:对某个失败模块**重走一次装载**。成功 ⇒ 从失败表摘掉、重算闸门。
+   * 边界:只接受**装载失败表里确实记着**的项(不猜、不替用户"清一下表");
+   *   未登记的 rel 如实返回 not-failed,不假装重试过。
+   */
+  WA.loadRetry = function (rel) {
+    return (async function () {
+      const state = WA.__loaderState;
+      if (!state || !(state.failed instanceof Map)) return { ok: false, reason: 'no-loader-state' };
+      const r = String(rel || '');
+      if (!r) return { ok: false, reason: 'missing-rel' };
+      if (!state.failed.has(r)) return { ok: false, reason: 'not-failed', rel: r, note: '该模块不在装载失败表里,无须重试' };
+      // 重试前把冷却清掉:冷却的语义是「这一轮别再试了」,而用户点重试就是**新一轮**。
+      try { if (state.failedCdnAt && state.failedCdnAt.clear) state.failedCdnAt.clear(); } catch (e) {}
+      // 缓存里若留着旧结论,一并摘掉,否则 loadScript 会直接把旧结论还回来(空转)。
+      try { state.loaded.delete(r + '@' + VERSION); } catch (e) {}
+      const res = await loadScript(r);
+      if (res && res.ok === true) {
+        try { state.failed.delete(r); } catch (e) {}
+        WA.log('info', '模块重试装载成功: ' + r + (res.fallback ? '(走 CDN ' + res.fallback + ')' : ''));
+      } else {
+        WA.log('error', '模块重试装载仍失败: ' + r);
+      }
+      // v2.211.0(优化 Q1):投影必须跟着真源走。失败表变了而投影不更新,
+      //   store 的闸门就会读着**旧表**继续拒写 —— 用户明明补好了文件、重试也成功了,
+      //   写入却仍然关着,且没有任何一处能解释为什么。故这里无条件重算投影。
+      try {
+        if (WA.__loaderState && WA.__loaderState.failed instanceof Map) {
+          WA.__loadFailed = Array.from(WA.__loaderState.failed.keys());
+          WA.loadFailures = WA.loaderStatus().failedModules.slice();
+        }
+      } catch (e) {}
+      const ig = WA.loaderIntegrity();
+      return { ok: !!(res && res.ok), rel: r, src: res && res.src, fallback: res && res.fallback,
+        integrity: ig, note: '重试结果已重算完整性;写入闸门当前' + (ig.armed ? '仍然关闭' : '已恢复') };
+    })();
+  };
+
+  // ── 主初始化 ────────────────────────────────────────────
+  async function init() {
+    WA.log('info', '世界枢轴 v' + VERSION + ' 启动，base=' + WA.baseUrl);
+    // ── v2.231.1：装载进度实时落盘 ──────────────────────────────────────
+    //   【为什么必须逐模块写】真机现场（TauriTavern）表现是「什么都没发生」：
+    //   控制台不可读，唯一线索是一句 `Unexpected token '<'`，且不说是哪个文件。
+    //   于是把「加载到第几个 / 哪个失败 / 错误是什么」逐条写进 localStorage，
+    //   下一次现场就能直接读出卡点，而不是靠猜：
+    //       JSON.parse(localStorage.getItem('wa_load_v1'))
+    //   写入失败（配额/隐私模式）不影响装载，故整段包在 try 里。
+    const __prog = { base: WA.baseUrl, ver: VERSION, total: LOAD_ORDER.length, done: 0, failed: [],
+      startedAt: (WA.clock ? WA.clock.wallNow('index.loadProgress') : Date.now()) };
+    const __flush = function (extra) {
+      try {
+        if (extra) { for (const k in extra) __prog[k] = extra[k]; }
+        __prog.updatedAt = (WA.clock ? WA.clock.wallNow('index.loadProgress') : Date.now());
+        _waDiagSet('wa_load_v1', __prog);
+      } catch (e) {}
+    };
+    // ── v2.231.1：累积式阶段日志（wa_stage_v1）──────────────────────────
+    //   __flush 只保留「最后一格」，一旦后续某步不再写盘就无从判断断在哪。
+    //   __mark 把**每一步的名字**追加进数组并整条覆盖写盘，历史留在 LevelDB 的
+    //   append-only log 里 ⇒ 现场能读出「走到哪一步为止」，而不是只知道最后一步。
+    const __stages = [];
+    // v2.231.3：__mark 的失败**必须自己可见**。
+    //   【为什么】上一版它整个包在 try/catch 里，setItem 一旦开始抛错（配额/安全错误/
+    //   storage 被冻结），后续所有阶段就静默消失 —— 现场只能看到「走到某一步为止」，
+    //   却看不出「是这一步没走到」还是「走到了但记不下来」。这两种病因完全不同：
+    //   前者要修逻辑，后者要修存储。故这里加**降级通道**：写 wa_stage_v1 失败时，
+    //   改为写一条极小的 wa_stage_err_v1（只放失败阶段名 + 错误名），仍失败则挂到
+    //   window.__waMarkErr 供诊断段读出。三条路都断才允许真的静默。
+    let __markBroken = false;
+    const __mark = function (name, err) {
+      let s = String(name);
+      if (err) { s += '!' + (err && err.message ? err.message : String(err)); }
+      __stages.push(s);
+      if (__markBroken) return;
+      try {
+        _waDiagSet('wa_stage_v1', {
+          base: WA.baseUrl, ver: VERSION, stages: __stages,
+          at: (WA.clock ? WA.clock.wallNow('index.loadStage') : Date.now())
+        });
+      } catch (e) {
+        __markBroken = true;
+        const why = 'mark-fail@' + s + ':' + (e && (e.name || e.message) || String(e));
+        _waDiagSet('wa_stage_err_v1', why);
+        try { (mainWin || window).__waMarkErr = why; } catch (e3) {}
+        try {
+          WA.errorLog.push({ t: (WA.clock ? WA.clock.wallNow('index.loadStageErr') : Date.now()),
+            level: 'error', msg: '阶段打点写盘失败：' + why, data: null });
+        } catch (e4) {}
+      }
+    };
+    __mark('init-enter');
+    __flush({ phase: 'begin' });
+    // ── v2.231.1：并行预取 + 保序执行（装载提速）──────────────────────────
+    //   【真机实测】282 个模块共 18MB。串行 `await loadScript` 时单个约 1 秒
+    //   ⇒ 全程 4~5 分钟；期间 `WA.ui` 还没定义，用户看到的就是
+    //   「扩展装了但什么都没有」——**慢与坏在用户眼里是同一件事**。
+    //   而网络本可并行，只有**执行**必须保序（模块间有依赖）。
+    //   故先把源码并行取进内存，再按 LOAD_ORDER 逐个执行：
+    //   网络并行、执行保序，装载时间从分钟级压到十秒级。
+    //   【不牺牲正确性】预取失败的模块**不写进表**，仍走 loadScript 正常通道；
+    //   验形规则与单模块通道一致（HTML/过短一律视为未命中）。
+    try {
+      const tauriHost = (function () {
+        try {
+          const loc = (mainDoc && mainDoc.location) || {};
+          const h = String(loc.hostname || '');
+          const p = String(loc.protocol || '');
+          return h === 'tauri.localhost' || h === 'localhost.tauri'
+            || p === 'tauri:' || p === 'asset:'
+            || !!mainWin.__TAURI__ || !!mainWin.__TAURI_INTERNALS__;
+        } catch (e) { return false; }
+      })();
+      if (tauriHost && typeof fetch === 'function') {
+        const pf = new Map();
+        WA.__prefetch = pf;
+        const urls = LOAD_ORDER.map(function (rel) { return WA.baseUrl + '/' + rel; });
+        let cursor = 0;
+        const worker = function () {
+          if (cursor >= urls.length) return Promise.resolve();
+          const u = urls[cursor++];
+          return fetch(u, { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.text() : null; })
+            .then(function (t) {
+              if (!t || t.length < 16) return;
+              const head = String(t).replace(/^\uFEFF/, '').replace(/^\s+/, '').slice(0, 1);
+              if (head === '<') return;          // HTML ⇒ 不是模块源码，不写表
+              pf.set(u, t);
+            })
+            .catch(function () {})               // 单个失败不影响其他
+            .then(worker);
+        };
+        const lanes = [];
+        for (let i = 0; i < 6; i++) lanes.push(worker());
+        __flush({ phase: 'prefetch-start', total: urls.length });
+        Promise.all(lanes).then(function () {
+          __flush({ phase: 'prefetch-done', prefetched: pf.size });
+        });
+      }
+    } catch (e) { /* 预取失败 ⇒ 退回逐个通道，不改变正确性 */ }
+    // 装载**前**刷盘：记下「正在加载谁」。写在装载后只能看到「谁完成了」，
+    // 而真机卡点恰恰是「那一个没完成」—— 这一字之差决定了能不能定位。
+    // ── v2.524.0（OPV27-1）：启动噪音收口 ·（OPV27-2）：逐台装载耗时 ────────────
+    //   【现场读数 R1】182 台引擎各打一行 `[WorldAxis] engines/xxx 已加载（ver）` ⇒ 扩展一装好
+    //     控制台就刷 182 行，真正的告警被淹掉；R2 的「空世界 485ms」只有总量读数，
+    //     **没有任何一处回答这 485ms 花在谁身上**。
+    //   【落点】收口器是独立模块 `core/boot-report.js`（可单独开窗/关窗/自证），本处只做接线：
+    //     · 只在装载窗口内截获「自述行」，其余 log/warn/error **原样放行**（告警照旧必响）；
+    //     · 每台模块实测 `loadScript` 往返耗时（eval + 注册全算），与自述版本合成逐台明细；
+    //     · 窗口**无论如何都关**（finally），再打**一条**装载汇报。
+    //   【为什么逻辑不在 init() 里】测试桩只逐台 eval 模块、从不执行 init()，
+    //     写在 init() 里等于这段代码在 591 个测试文件里一次也不会被执行。
+    //   【计时口径】走上面第 47 行的 `clockWall()`（测量时钟），不裸调 Date.now()：
+    //     裸调会绕过冻结，回放对不上时只能全库通读（tests/run.js K20 的判据）。
+    const __bootRows = [];
+    const __bootT0 = clockWall();
+    let __bootCap = null;
+    let __bootClosed = { selfLines: [], quietLines: 0 };
+    const __openCap = function () {
+      if (__bootCap) return __bootCap;
+      try {
+        if (WA.bootReport && typeof WA.bootReport.open === 'function') {
+          __bootCap = WA.bootReport.open({ ver: VERSION });
+        }
+      } catch (e) { /* 采集器起不来 ⇒ 照常装载，只是没有逐台版本与降噪；不许因为它停装 */ }
+      return __bootCap;
+    };
+    try {
+      for (const rel of LOAD_ORDER) {
+        __flush({ phase: 'loading', at: rel });
+        __openCap();  // 第一个模块装完即开窗：此后逐台自述行不再刷控制台
+        const __t0 = clockWall();
+        const r = await loadScript(rel); // 串行保证依赖顺序
+        __bootRows.push({ rel: rel, ms: Math.round((clockWall() - __t0) * 10) / 10,
+          ok: !!(r && r.ok === true), ver: '' });
+        __prog.done++;
+        if (!__bootRows[__bootRows.length - 1].ok) {
+          __prog.failed.push({ rel: rel, err: (r && (r.error || r.failed)) || 'unknown' });
+        }
+        __flush({ phase: 'loading', at: rel });
+      }
+    } finally {
+      // 采集器不许把宿主控制台改坏：装载失败也在这里还原。
+      try {
+        __bootClosed = (__bootCap && typeof __bootCap.close === 'function')
+          ? __bootCap.close() : { selfLines: [], quietLines: 0 };
+      } catch (e) { __bootClosed = { selfLines: [], quietLines: 0 }; }
+    }
+    // ── OPV29-04（v2.529.0）惰性档接线：首帧只装 LOAD_ORDER；LAZY_ORDER 在这里交出装载器并排队，
+    //   空闲帧开始串行补装。判据不是「清单短了」而是「装得回来」：ensure 幂等、失败退回 pending、
+    //   auto 串行。补装起不来时首帧照常可用（catch 吞掉，只是不回补）。
+    try {
+      if (WA.lazyLoad && typeof WA.lazyLoad.bind === 'function') {
+        WA.lazyLoad.bind(function (rel) { return loadScript(rel); });
+        WA.lazyLoad.add(LAZY_ORDER);
+        const __kickLazy = function () {
+          try { Promise.resolve(WA.lazyLoad.auto()).then(function () {}, function () {}); }
+          catch (e) { /* 回补失败不留残局：ensure 下次还能再试 */ }
+        };
+        if (typeof requestIdleCallback === 'function') requestIdleCallback(__kickLazy, { timeout: 2000 });
+        else setTimeout(__kickLazy, 0);
+      }
+    } catch (e) { /* 惰性档坏了 → 首帧照常可用，只是不回补 */ }
+    // 版本以**引擎自述**为准（不是拿 manifest 回填）：这样「某台引擎的版本没跟上」
+    // 会直接出现在同一张逐台表里，而不是靠升版脚本另行发现。
+    const __verMap = {};
+    (__bootClosed.selfLines || []).forEach(function (x) { __verMap[x.self] = x.ver; });
+    if (!__verMap['core/boot-report.js']) {
+      __verMap['core/boot-report.js'] = (WA.bootReport && WA.bootReport.ver) || VERSION;
+    }
+    const __bootMeta = { ver: VERSION, quietLines: __bootClosed.quietLines || 0,
+      elapsedMs: Math.round(clockWall() - __bootT0), total: LOAD_ORDER.length, verMap: __verMap };
+    if (WA.bootReport && typeof WA.bootReport.summarize === 'function') {
+      WA.boot = WA.bootReport.summarize(__bootRows, __bootMeta);
+    } else {
+      // 收口器缺失（模块装载失败）⇒ **不许静默**：汇报里如实写「无逐台读数 / 未降噪」。
+      const __okN = __bootRows.filter(function (x) { return x.ok; }).length;
+      const __badN = __bootRows.filter(function (x) { return !x.ok; });
+      WA.boot = {
+        ver: VERSION, total: LOAD_ORDER.length, ok: __okN,
+        failed: __badN.map(function (x) { return x.rel; }),
+        engines: __bootRows.filter(function (x) { return x.rel.indexOf('engines/') === 0; }).length,
+        elapsedMs: __bootMeta.elapsedMs, quietLines: 0, p50: 0, p95: 0, max: 0,
+        rows: function () { return __bootRows.slice(); },
+        slow: function () { return []; },
+        report: function () {
+          return '已装载 ' + __okN + '/' + LOAD_ORDER.length + '·失败 ' + __badN.length
+            + ' · ' + __bootMeta.elapsedMs + 'ms（boot-report 缺失：无逐台版本 / 无分位 / 未降噪）';
+        }
+      };
+    }
+    // 汇报**只打一条**；失败仍逐条必响（error 级），不被降噪静默。
+    if (typeof console !== 'undefined' && console.log) console.log('[WorldAxis] ' + WA.boot.report());
+    if (WA.boot.failed.length && typeof console !== 'undefined' && console.error) {
+      console.error('[WorldAxis] 装载失败 ' + WA.boot.failed.length + ' 个：' + WA.boot.failed.join(', '));
+    }
+    __flush({ phase: 'modules-done' });
+    __mark('modules-done');
+    // ── v2.231.1：UI **优先**挂载 ──────────────────────────────────────
+    // ── v2.231.2：撤销「UI 提前挂载」────────────────────────────────────
+    //   【为什么撤销】v2.231.1 曾把 WA.ui.mount() 提到这里（模块装载完就建 DOM），
+    //   真机实测后果是**整页点击全部失效**：mount() 会把 #wa-panel（position:fixed、
+    //   z-index:10000、430×600 的覆盖层）插进 body，而它的隐藏完全依赖 style.css 的
+    //   `#wa-panel.wa-hidden{display:none}`。样式一旦没到位（宿主 CSS 加载时序/失败），
+    //   这个面板就是一个盖住全屏的透明层，把所有点击都吃掉 —— 用户看到的是「卡死」。
+    //   教训与本仓「故障必须可见」并不矛盾：**入口可见**不能靠把覆盖层提前插进 DOM 换取，
+    //   那等于用「挡住别人」来证明「我来了」。挂载仍在 init 末尾，且 mount() 自带样式兜底。
+    __mark('mount-deferred');
+    // v2.231.5：审计块前后**各加一个打点**，并把它拆成可归因的小步。
+    //   【为什么】前几版只知道「卡在 mount-deferred 之后、audit-done 之前」，但那中间
+    //   有 4 个动作：① 取 loaderStatus（遍历 __loaderState 三个 Map）② map 投影
+    //   ③ 赋值 WA.loadFailures ④ WA.log。只报「这段没过」等于没报 —— 本仓口径是
+    //   「故障必须可见」且**必须指向可修的那一行**，所以这里逐步落盘。
+    //   注意：打点本身也走 localStorage，若连它都不出现，说明是**执行流中断**
+    //   （进程被杀/页面被冻结），而不是某一行逻辑出错 —— 这个区分是决定性的。
+    __mark('audit-enter');
+    try {
+      __mark('audit-status-begin');
+      // v2.231.5：**只取失败表，不调 loaderStatus()**。
+      //   【真机实测的元凶】`WA.loaderStatus()` 表面只是「读三个 Map」，但它的返回体里
+      //   还拼了 `integrity: WA.loaderIntegrity()` —— 而 `loaderIntegrity()` 会转到
+      //   `WA.store.integrity()` → `loadGap()` → `loaderFailureRels()`。**此刻 store.init()
+      //   还没执行**，等于在 store 未初始化时就去问它「装载完整性如何」。
+      //   打点证据：`audit-status-begin` 写进去了、`audit-status-ok` 没写进去，
+      //   中间只隔这一行 —— 精确定位到它就是断点。
+      //   修法：审计只需要**失败表**（下一步投影成字符串数组给 store 闸门读），
+      //   直接读 `__loaderState.failed` 这个唯一真源即可，不必绕道整个 loaderStatus()。
+      //   这也顺带修掉一个结构问题：**记账不该依赖它正在服务的那个模块**。
+      const st = WA.__loaderState;
+      const failedEntries = (st && st.failed instanceof Map) ? Array.from(st.failed.entries()) : [];
+      const failedList = failedEntries.map(function (e) {
+        return { rel: e[0], at: e[1] && e[1].at, sourcesTried: e[1] && e[1].sourcesTried };
+      });
+      __mark('audit-status-ok:' + failedList.length);
+      // v2.211.0(优化 Q1):把失败表**投影**成 store 闸门能读的字符串数组。
+      //   为什么在此刻(而不是 init 末尾):下一句就是 store.init(),它会装载存档并可能触发
+      //   首次写路径 —— 闸门在那一刻就要能读到表。判定真源仍是本文件的 __loaderState.failed,
+      //   这里只是投影,不是第二份账。
+      //   三态口径(见 core/store.js · loaderFailureRels):**未定义**=装载面不在场(闸门不适用);
+      //   **数组**(空数组也算"已知")=失败表可读。故这里必须写数组,不能"没失败就不写"。
+      WA.__loadFailed = failedList.map(function (f) { return f.rel; });
+      __mark('audit-projected');
+      if (failedList.length) {
+        WA.loadFailures = failedList.slice();
+      } else {
+        WA.loadFailures = [];
+      }
+      __mark('audit-done');
+    } catch (e) { __mark('audit-err', e); }
+    // 模块全部加载后：初始化store、注册拦截器、建UI
+    __flush({ phase: 'stage-store' });
+    try { WA.store && WA.store.init && WA.store.init(); __mark('store-ok'); }
+    catch (e) { __mark('store-err', e); WA.log('error', 'store初始化失败', e); }
+    // v2.286.0（V7 EXV7-2）：瞬态读面在每次完整启动时归零；不改世界存档。
+    try { if (WA.worldBriefing && typeof WA.worldBriefing.reset === 'function') WA.worldBriefing.reset(); } catch (e) {}
+    try { if (WA.intentBoard && typeof WA.intentBoard.reset === 'function') WA.intentBoard.reset(); } catch (e) {}
+    // v2.211.0(优化 Q1):闸门关着就**当场如实点名**。为什么必须在这里说:
+    //   闸门拦的是「本次世界写未发生」,用户此时只看到「操作没反应」。没有这一句,
+    //   「加载不全」对用户就是不可见的 —— 本仓治过的「静默降级」形态。
+    //   关键模块表不在这里复制一份(唯一真源在 core/store.js),此处只**转出**结论。
+    try {
+      const ig = WA.loaderIntegrity();
+      if (ig && ig.armed) {
+        WA.log('error', '启动完整性:关键模块缺席(' + (ig.missing || []).join('、')
+          + '),写侧已关闭 —— 读 / 诊断 / 导出 / 恢复不受影响;补上文件后用 WA.loadRetry(rel) 重试装载');
+      }
+    } catch (e) {}
+    __flush({ phase: 'stage-interceptor' });
+    try { WA.interceptor && WA.interceptor.install && WA.interceptor.install(); __mark('icpt-ok'); }
+    catch (e) { __mark('icpt-err', e); WA.log('error', '拦截器安装失败', e); }
+    // [v2.19.0/v2.20.0] 启动接线：
+    //   · injectInspector.init：订阅 prompt-ready 事件 → 注入自检抓最终 prompt 快照。
+    //     这是**面板与 tool-diag 实际消费的那个**（getLastSnapshot/statusText/flatten）。
+    //   · chatcache.init：包裹 store.save → 驱动「跨设备同步」与「自动备份」两条链路；
+    //     与同步/备份开关（def.syncToChat / def.autoBackup，v2.19.0 补声明）配合生效。
+    //   两者均幂等（自持已挂载标记，重复调用返回 false）。
+    //   · [v2.20.0] 移除 v2.19.0 加入的 `WA.inspector.init()` 接线——其前提为误判：
+    //     经实测，engines/inspector.js（WA.inspector）与 engines/inject-inspector.js
+    //     （WA.injectInspector）订阅**同一批**宿主 prompt-ready 事件；而 injectInspector 是
+    //     前者的严格超集（多 memory 作用域、MISSING/SKIPPED_REROLL/SUCCESS_SLOTS_ONLY 状态、
+    //     订阅重试、快照 clone 隔离、flatten/safe），且只有它被面板/诊断消费
+    //     （WA.inspector 的全部导出零消费、也未登记进 MODULE_EXPORTS）。故「注入自检从未订阅」
+    //     不成立——真实代价仅是每次生成多挂一个无人读取的 handler。该重复模块已一并删除。
+    __flush({ phase: 'stage-hooks' });
+    const __inited = [];
+    try { if (WA.injectInspector && typeof WA.injectInspector.init === 'function' && WA.injectInspector.init() === true) __inited.push('injectInspector'); } catch (e) { __mark('inject-err', e); WA.log('warn', '注入自检初始化失败', e); }
+    try { if (WA.chatcache && typeof WA.chatcache.init === 'function' && WA.chatcache.init() === true) __inited.push('chatcache'); } catch (e) { __mark('chatcache-err', e); WA.log('warn', '酒馆缓存同步初始化失败', e); }
+    __mark('hooks-done');
+    WA.__inited = __inited;
+    __flush({ phase: 'stage-mount' });
+    // 兜底重试：若前面那次挂了（或当时 WA.ui 还没定义），这里再试一次。mount 幂等。
+    try {
+      const __m = !!(WA.ui && WA.ui.mounted);
+      if (WA.ui && WA.ui.mount) WA.ui.mount();
+      __mark(__m ? 'mount-retry-already' : 'mount-retry-ok');
+    } catch (e) { __mark('mount-retry-err', e); WA.log('error', 'UI挂载失败', e); }
+    __flush({ phase: 'stage-mounted' });
+    // ── v2.231.1：装载诊断落盘（真机不可开 DevTools 时的唯一取证通道）──────────
+    //   【为什么非要有这一段】扩展「装了但什么都没发生」在真宿主里**没有任何可见输出**：
+    //   TauriTavern/手机端拿不到控制台，用户只能描述「没有悬浮球」。而本仓的判据一贯是
+    //   「故障必须可见」——于是把装载结论写进 localStorage，任何一次现场都能被读出来：
+    //     localStorage.getItem('wa_diag_v1')
+    //   读到的字段直接指向病因：`base` 拼错 ⇒ 全部子模块 404；`hasUi:false` ⇒ panel.js
+    //   没装载；`orbInDom:false` 且 `mounted:true` ⇒ 挂载点被宿主 DOM 结构挡住。
+    //   【它不能替代什么】它不是门禁：本段只在 init 末尾跑一次，不参与任何断言。
+    try {
+      const __dg = ({
+        ver: VERSION,
+        buildId: BUILD_ID,
+        base: WA.baseUrl,
+        readyState: mainDoc.readyState,
+        loaded: Object.keys(WA.modules || {}).length,
+        failedCount: (WA.loadFailures || []).length,
+        failed: (WA.loadFailures || []).slice(0, 12).map(function (f) { return f.rel; }),
+        hasUi: !!(WA.ui && WA.ui.mount),
+        uiMounted: !!(WA.ui && WA.ui.mounted),
+        // v2.542.0：两个新增 UI 层的装载面。它们**不是**被别的模块读的提供方（自执行挂 DOM），
+        //   故这里是人读诊断面唯一的读数口：真机打不开 DevTools 时，读 localStorage 的
+        //   wa_diag_v1 就能分清「手札没装 / 装了但没接管 ◈」和「工作台外壳没挂上 .wc」。
+        journalReady: !!(WA.journal && WA.journal.open),
+        consoleShellReady: !!(WA.console && WA.console.tidy),
+        orbInDom: !!(mainDoc.getElementById && mainDoc.getElementById('wa-orb')),
+        panelInDom: !!(mainDoc.getElementById && mainDoc.getElementById('wa-panel')),
+        integrity: (function () { try { return WA.loaderIntegrity ? WA.loaderIntegrity() : null; } catch (e) { return 'err'; } })()
+      });
+      const __dgStr = (function (o) {
+        try { return JSON.stringify(o); }
+        catch (e2) { return JSON.stringify({ ver: o.ver, buildId: o.buildId, base: o.base, loaded: o.loaded, failedCount: o.failedCount, hasUi: o.hasUi, uiMounted: o.uiMounted, orbInDom: o.orbInDom, panelInDom: o.panelInDom, note: 'stringify-degraded' }); }
+      })(__dg);
+      _waDiagSet('wa_diag_v1', __dgStr);
+    } catch (e) { /* 存储不可用 ⇒ 诊断缺席，但不影响扩展本体 */ }
+    __mark('diag-written');
+    // v2.231.4：init 关键路径走完 ⇒ 解除 logCaps 的降级档（恢复动态水位自适应）。
+    //   放在 diag-written 之后而不是更早：早解除会让后续日志重新触发全库扫描，
+    //   而「diag-written」本身就是 init 完成的可观测标志。
+    try { WA.__initDone = true; } catch (e) {}
+    // v2.0.0: 装载审计——「已加载 / 已注册 / 清单声明」三方对齐，注册表不再空转
+    try {
+      const failedRels = (WA.loadFailures || []).map(function (f) { return f.rel; });
+      const loadedRels = LOAD_ORDER.filter(function (rel) { return failedRels.indexOf(rel) < 0; });
+      loadedRels.forEach(function (rel) {
+        const kind = rel.indexOf('core/') === 0 ? 'core' : (rel.indexOf('ui/') === 0 ? 'ui' : (rel.indexOf('compat/') === 0 ? 'compat' : 'engine'));
+        WA.registerModule(rel, { kind: kind, ver: VERSION });
+      });
+      WA.__loadOrder = LOAD_ORDER.slice();
+      WA.__loadFailed = failedRels.slice();
+      WA.log('info', '世界枢轴初始化完成。已注册模块 ' + Object.keys(WA.modules).length + '/' + LOAD_ORDER.length
+        + (failedRels.length ? '（失败 ' + failedRels.length + '：' + failedRels.join('、') + '）' : ''));
+    } catch (e) { WA.log('warn', '模块注册审计异常', e); }
+    // v2.0.0: 兼容层激活——此前 compatMvu.sync / compatTH.expose 定义了却无人调用（能力死代码）
+    try {
+      if (WA.compatMvu && WA.compatMvu.init) WA.compatMvu.init();
+      if (WA.compatTH && WA.compatTH.init) WA.compatTH.init();
+    } catch (e) { WA.log('warn', '兼容层初始化失败', e); }
+  }
+
+  // SillyTavern APP_READY 后再初始化（保证宿主事件源可用）
+  //
+  // 【v2.211.0（优化 3 第一刀）· 真宿主验收抓到的活体缺陷】
+  //   原实现只**注册监听**：
+  //       ctx.eventSource.on(APP_READY, fn);
+  //   于是扩展若在宿主 `APP_READY` **之后**才被装载，那一刻事件已经发过、不会再发，
+  //   `init()` 永不执行 ⇒ `ui/panel.js` 永不求值 ⇒ `WA.ui` 恒缺席、面板永不出现，
+  //   **且没有报错、没有日志**（用户视角就是「装了这个扩展什么都没发生」）。
+  //   这条路径桩面（`route.fulfill` 喂源码 + `tests/mock.js` 同形桩）结构上够不着：
+  //   桩里 `APP_READY` 由测试自己 emit，时序永远「先装载、后发事件」。
+  //   真宿主里它有两种日常触发：① 用户在扩展面板里**后启用**本扩展；② 页面重载后
+  //   宿主自己装配扩展的时刻晚于 APP_READY。
+  //
+  //   修法（两条，都不改变「已就绪」路径的语义）：
+  //     ① **一次性守卫**：事件与兜底并存时 `init` 只能跑一次（否则双跑会重复注册设置项）；
+  //     ② **宿主已就绪则直接跑**：`ctx.eventSource` 在场说明宿主已装配，此时不必再等一个
+  //        不会再来的事件；`getContext` 缺席的极早期仍保留 `DOMContentLoaded + 800ms` 回退。
+  //   「保证宿主事件源可用」的本意（等事件源存在）由此仍被满足：`ctx.eventSource && ctx.eventTypes`
+  //   仍是进入条件，只是不再**额外**要求「事件还没发过」这个不可观测的前提。
+  function whenReady(fn) {
+    let done = false;
+    // v2.231.3：**必须接住 async init 的 rejection**。
+    //   【真机实测抓到的静默故障】`init` 是 async 函数，它内部抛出的错误**不会**变成
+    //   同步异常 —— 而是变成一个 rejected Promise。而这里原来的写法是
+    //   `try { fn(); } catch (e) {...}`：try/catch 对 rejected Promise **完全无效**，
+    //   于是 init 中途抛错时：① 不会有任何 catch 接住；② 不会写任何阶段打点；
+    //   ③ 表现就是「模块全装载了、然后什么都没发生」—— 与本轮真机现场一模一样
+    //   （wa_stage_v1 停在 modules-done 之后的某一步，且 audit-done / audit-err 都没有）。
+    //   修法：拿返回值，若为 thenable 就挂 .catch，把 rejection **落盘**为阶段打点。
+    //   这不是「多一层日志」，是本仓「故障必须可见」在 async 边界上的补洞：
+    //   同步 throw 有 catch，异步 reject 同样必须有 catch，否则故障在语言层面就隐身。
+    const once = function () {
+      if (done) return;
+      done = true;
+      let ret;
+      try { ret = fn(); } catch (e) {
+        WA.log('warn', '初始化异常', e);
+        try { (mainWin || window).__waInitErr = String((e && e.message) || e); } catch (e2) {}
+        return;
+      }
+      if (ret && typeof ret.then === 'function') {
+        ret.catch(function (e) {
+          WA.log('error', 'init异步拒绝', e);
+          try { (mainWin || window).__waInitErr = String((e && e.message) || e); } catch (e2) {}
+          _waDiagSet('wa_init_err_v1', {
+            ver: VERSION, msg: String((e && e.message) || e),
+            stack: String((e && e.stack) || '').slice(0, 1200),
+            at: (WA.clock ? WA.clock.wallNow('index.initReject') : Date.now())
+          });
+        });
+      }
+    };
+    const ctx = mainWin.SillyTavern && mainWin.SillyTavern.getContext && mainWin.SillyTavern.getContext();
+    if (ctx && ctx.eventSource && ctx.eventTypes) {
+      // 先兜底后挂事件：兜底用同步立即执行，故它一定先于任何随后到来的 APP_READY。
+      const arm = function () { setTimeout(once, 800); };
+      if (mainDoc.readyState === 'complete' || mainDoc.readyState === 'interactive') arm();
+      else mainDoc.addEventListener('DOMContentLoaded', arm);
+      if (ctx.eventTypes.APP_READY && ctx.eventSource.on) {
+        try { ctx.eventSource.on(ctx.eventTypes.APP_READY, once); } catch (e) { /* 事件源拒绝订阅 ⇒ 兜底已在路上 */ }
+      }
+      return;
+    }
+    // 回退：DOM ready + 延迟
+    if (mainDoc.readyState === 'complete' || mainDoc.readyState === 'interactive') setTimeout(once, 800);
+    else mainDoc.addEventListener('DOMContentLoaded', () => setTimeout(once, 800));
+  }
+
+  whenReady(init);
+})();

@@ -1,0 +1,284 @@
+'use strict';
+// WorldAxis tests/s3-b2-e2-v2182.js (v2.182.0) — E2 世界日程专锁（四段齐备）
+//
+// 本锁钉的是**否定式核心**（每条都是「不许把「不知道」写成「没有」」）：
+//   ① 剧情时间缺失时**整表拒算**（no-story-clock），不许退回墙钟、不许用「现在」冒充；
+//   ② 未知时间的条目**保持未知**（untimed 计数单列），不许猜一个日期把它排进时间序；
+//   ③ 表里没有 ⇒ 不下「不会发生」的结论（note 里那句话是判据，不是文案）；
+//   ④ **只读**：连读四口之后存档逐字节不变（本模块是聚合面，不是第二个写者）；
+//   ⑤ 委派而非复算：五源的「是否到期」由来源模块自己判，本模块只排序与展示。
+//
+// 装载走 tests/ui-gate-sync.js 的 fresh()（与真装载同源的 LOAD），
+//   而不是自拼一份模块清单 —— 自拼清单就是第二个真源，长出来的模块它不认识。
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const BASE = path.resolve(__dirname, '..');
+process.chdir(BASE);
+const sync = require('./ui-gate-sync.js');
+const synthHost = require('./synth-host.js');
+const REL = 'engines/agenda.js';
+const KEYS = ['getSettings', 'setSettings', 'upcoming', 'soon', 'overdueList', 'sources', 'diagnose', 'stat', 'reset'];
+// 按仓规「无消费方不挂导出」：本模块的真消费方是面板与诊断节，故**没有**注入段。
+//   多一个 buildBlock 就要走注入链七点登记 —— 这里钉住它「不该存在」。
+const MUST_BE_ABSENT = ['buildBlock'];
+
+function srcOf() { return fs.readFileSync(path.join(BASE, REL), 'utf8'); }
+function readOf(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+function exportBody(src) {
+  const at = src.indexOf('WA.agenda = {');
+  if (at < 0) return '';
+  let i = src.indexOf('{', at), depth = 0;
+  for (let j = i; j < src.length; j++) {
+    if (src[j] === '{') depth++;
+    else if (src[j] === '}') { depth--; if (!depth) return src.slice(i, j + 1); }
+  }
+  return '';
+}
+/** 最小 localStorage 桩（真 localStorage 语义：缺键返 null、值恒字符串） */
+function fakeLS() {
+  const m = Object.create(null);
+  return { getItem: function (k) { return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; },
+    setItem: function (k, v) { m[k] = String(v); },
+    removeItem: function (k) { delete m[k]; }, _dump: function () { return m; } };
+}
+/** 合成宿主 + 真 settingsBus（N 段要用**真归一/saveOrThrow 路径**，否则开关判据会静默降级） */
+function hostWith(src, stubs) {
+  const c = synthHost.negativeContext({});
+  c.window.localStorage = fakeLS();
+  vm.runInContext(readOf('core/settings-bus.js'), c, { filename: 'core/settings-bus.js' });
+  vm.runInContext(src, c, { filename: REL });
+  const WA = c.window.WorldAxis;
+  if (stubs) stubs(WA);
+  return WA;
+}
+
+// ── A 段：静态契约（导出面 / 单一真源 / 装载面 / 登记面 / 冻结串）───────────
+function runA(a) {
+  const src = srcOf();
+  const body = exportBody(src);
+  a(body.length > 0, 'e2v2182/A1: 能从真源码取出 WA.agenda 的对象字面量体');
+  KEYS.forEach(function (k) { a(body.indexOf(k + ':') > 0, 'e2v2182/A2: 导出面含 ' + k); });
+  MUST_BE_ABSENT.forEach(function (k) {
+    a(body.indexOf(k + ':') < 0, 'e2v2182/A3: 导出面**没有** ' + k + '（无消费方不挂导出）');
+  });
+  a(/EXPORT_COUNT\s*=\s*9/.test(src), 'e2v2182/A4: EXPORT_COUNT = 9');
+  a(/agenda: export count mismatch/.test(src), 'e2v2182/A5: 自证串在位（导出面变动必须有人确认过）');
+  a(/const DEF = \{ enabled: (false|true),/.test(src), 'e2v2182/A6: DEF.enabled 显式字面量（v2.412 全开跟位，值跟出厂口径）');
+  a(/LS_KEY = 'worldaxis_agenda_settings_v1'/.test(src), 'e2v2182/A7: 设置键是单一真源');
+  a(/bounds: \{ maxRows: \[4, 96\], soonCount: \[1, 24\] \}/.test(src), 'e2v2182/A8: 区间声明在位');
+  a(/reason: 'no-story-clock'/.test(src) && /reason: 'disabled'/.test(src), 'e2v2182/A9: 两个拒收码字面量在位');
+  // 装载面：index.js 与 tests/run.js 的 LOAD 必须**都**有它（漏一边就是「测了但没接上」）
+  a(readOf('index.js').indexOf("'engines/agenda.js'") >= 0, 'e2v2182/A10: index.js LOAD_ORDER 装载');
+  a(readOf('tests/run.js').indexOf("'engines/agenda.js'") >= 0, 'e2v2182/A11: tests/run.js LOAD 装载');
+  // 诊断面三点登记：模块映射 / 节函数 / 诊断对象成员
+  const diag = require('./diag-source.js')();   // v2.531.0：UI_BINDINGS / MODULE_EXPORTS 已出闸到 tool-diag-tables
+  a(diag.indexOf("'engines/agenda.js': 'agenda'") >= 0, 'e2v2182/A12: tool-diag MODULE_EXPORTS 登记');
+  a(diag.indexOf('function secAgenda()') >= 0, 'e2v2182/A13: tool-diag secAgenda() 存在');
+  a(diag.indexOf('agenda: secAgenda()') >= 0, 'e2v2182/A14: tool-diag 诊断对象成员在位');
+  a(diag.indexOf('wa-wh-ag-enabled') >= 0 && diag.indexOf('wa-wh-ag-view') >= 0,
+    'e2v2182/A15: tool-diag UI_BINDINGS 登记本模块的两个控件');
+  // 面板面：三块合页（健康中心 / 世界日程 / 世界纪事）里的日程块
+  const pan = readOf('ui/panel.js');
+  ['wa-wh-ag-enabled', 'wa-wh-ag-view', 'wa-wh-ag-sources', 'wa-wh-ag-out'].forEach(function (id) {
+    a(pan.indexOf(id) >= 0, 'e2v2182/A16: 面板渲染 ' + id);
+  });
+  a(pan.indexOf("'#wa-wh-ag-view'") >= 0, 'e2v2182/A17: 面板接线（点击处理器）在位');
+  a(pan.indexOf('agenda: renderHealth') < 0 || pan.indexOf('renderHealth') >= 0, 'e2v2182/A18: 面板 RENDERERS 挂载 renderHealth');
+  // 出口面契约冻结串：**逐字**钉住本模块进契约面的成员集
+  a(readOf('tests/run.js').indexOf('|agenda:getSettings overdueList setSettings sources stat upcoming|') >= 0,
+    'e2v2182/A19: FROZEN2800 逐字含本模块的契约成员集');
+  a(/VERSION = '2\.(182|183|184|185|186|187|188|189|190|191|192|193|194|195|196|197|198|199|200|201|202|203|204|205|206|207|208|209|210|211|212|213|214|215|217|218|219|220|221|222|223|224|225|226|227|228|229|230|231|232|233|234|235|236|237|238|239|240|241|242|243|244|245|246|247|248|249|250|251|252|253|254|255|256|257|258|259|260|261|262|263|264|265|266|267|268|269|270|271|272|273|274|275|276|277|278|279|280|281|282|283|284|285|286|287|288|289|290|291|292|293|294|295|296|297|298|299|300|301|302|303|304|305|306|307|308|309|310|311|312|313|314|315|316|317|318|319|320|321|322|323|324|325|326|327|328|329|330|331|332|333|334|335|336|337|338|339|340|341|342|343|344|345|346|347|348|349|350|351|352|353|354|355|356|357|358|359|360|361|362|363|364|365|366|367|368|369|370|371|372|373|374|375|376|377|378|379|380|400|401|402|403|404|405|408|409|410|411|412|413|414|416|415|417|517|522|523|524)\.0'/.test(readOf('index.js')), 'e2v2182/A20: index.js 版本钉在 2.182.0');
+  a(JSON.parse(readOf('manifest.json')).version && ['2.182.0', '2.183.0', '2.184.0', '2.185.0', '2.186.0', '2.187.0', '2.188.0', '2.189.0', '2.190.0', '2.191.0', '2.192.0', '2.193.0', '2.194.0', '2.195.0', '2.196.0', '2.197.0', '2.198.0', '2.199.0', '2.200.0', '2.201.0', '2.202.0', '2.203.0', '2.204.0', '2.205.0', '2.206.0', '2.208.0', '2.209.0', '2.210.0', '2.211.0', '2.212.0', '2.213.0', '2.214.0', '2.215.0', '2.216.0', '2.217.0', '2.219.0', '2.220.0', '2.221.0', '2.222.0', '2.223.0', '2.224.0', '2.225.0', '2.226.0', '2.227.0', '2.228.0', '2.229.0','2.230.0','2.231.0', '2.232.0', '2.233.0','2.234.0','2.235.0','2.236.0','2.237.0','2.238.0','2.239.0','2.240.0','2.241.0','2.242.0','2.243.0','2.244.0','2.245.0','2.246.0','2.247.0','2.248.0','2.249.0','2.250.0','2.251.0','2.251.0','2.252.0', '2.253.0','2.252.0', '2.253.0','2.254.0','2.255.0','2.256.0', '2.257.0', '2.258.0', '2.259.0', '2.260.0', '2.261.0', '2.262.0', '2.263.0', '2.264.0', '2.265.0', '2.266.0', '2.267.0', '2.268.0', '2.269.0', '2.270.0', '2.271.0', '2.272.0', '2.273.0', '2.274.0', '2.275.0', '2.276.0', '2.277.0', '2.278.0', '2.279.0', '2.280.0', '2.281.0', '2.282.0', '2.283.0', '2.284.0', '2.285.0', '2.286.0', '2.288.0','2.289.0', '2.290.0', '2.291.0', '2.292.0', '2.293.0','2.294.0','2.295.0', '2.296.0', '2.297.0', '2.298.0', '2.299.0', '2.300.0', '2.301.0', '2.302.0', '2.303.0', '2.304.0', '2.305.0', '2.306.0', '2.307.0', '2.308.0', '2.309.0', '2.310.0', '2.311.0', '2.312.0', '2.313.0', '2.314.0', '2.315.0', '2.316.0', '2.317.0', '2.318.0', '2.319.0', '2.320.0', '2.321.0', '2.322.0', '2.323.0', '2.324.0', '2.325.0', '2.326.0', '2.327.0', '2.328.0', '2.329.0', '2.330.0', '2.331.0', '2.332.0', '2.333.0', '2.334.0', '2.335.0', '2.336.0', '2.337.0', '2.338.0', '2.339.0', '2.340.0', '2.341.0', '2.342.0', '2.343.0', '2.344.0', '2.345.0', '2.346.0', '2.347.0', '2.348.0', '2.349.0', '2.350.0', '2.351.0', '2.352.0', '2.353.0', '2.354.0', '2.355.0', '2.356.0', '2.357.0', '2.358.0', '2.359.0', '2.360.0', '2.361.0', '2.362.0', '2.363.0', '2.364.0', '2.365.0', '2.366.0', '2.367.0', '2.368.0', '2.369.0', '2.370.0', '2.371.0', '2.372.0', '2.373.0', '2.374.0', '2.375.0', '2.376.0', '2.377.0', '2.378.0', '2.379.0', '2.380.0', '2.400.0', '2.401.0', '2.402.0', '2.403.0', '2.404.0','2.405.0','2.407.0', '2.408.0', '2.409.0', '2.410.0', '2.411.0', '2.412.0', '2.413.0', '2.414.0', '2.415.0', '2.416.0', '2.417.0','2.517.0','2.522.0','2.524.0'].indexOf(JSON.parse(readOf('manifest.json')).version) >= 0, 'e2v2182/A21: manifest 版本一致');
+}
+
+// ── B 段：运行时行为（真装载面 + 真 API）────────────────────────────────
+function runB(a) {
+  const boot = sync.fresh({});
+  const WA = boot.WA;
+  a(typeof WA.agenda === 'object', 'e2v2182/B1: 模块装载');
+  a(KEYS.every(function (k) { return typeof WA.agenda[k] === 'function'; }), 'e2v2182/B2: 9 口全部可调用');
+  // v2.412 全开跟位：出厂 enabled:true（p3-x1-v2149 同款定式——判据从绝对值改为翻转/事实）
+  a(WA.agenda.getSettings().enabled === true, 'e2v2182/B3: 默认开（全开跟位）');
+  // B4: 出厂已开 ⇒ 拒收前提不再天然成立，改为显式关掉再验拒收路径（更强：与出厂值无关）
+  WA.agenda.setSettings({ enabled: false });
+  const d0 = WA.agenda.upcoming();
+  a(d0.ok === false && d0.reason === 'disabled', 'e2v2182/B4: 显式关闭后整表拒算（disabled）');
+  WA.agenda.setSettings({ enabled: true });
+  a(WA.agenda.getSettings().enabled === true, 'e2v2182/B5: 开关是活的（写了读得回来）');
+  const d1 = WA.agenda.upcoming();
+  a(d1.ok === false && d1.reason === 'no-story-clock',
+    'e2v2182/B6: 无剧情钟 ⇒ 整表拒算（不退回墙钟，实 ' + JSON.stringify(d1.reason) + '）');
+  WA.calendar.setClock('第1日', { source: 'user', dayIndex: 1 });
+  const d2 = WA.agenda.upcoming();
+  a(d2.ok === true && typeof d2.storyDay === 'number', 'e2v2182/B7: 有剧情钟 ⇒ ok + storyDay');
+  a(d2.count === 0 && d2.note.indexOf('不等于不会发生') >= 0,
+    'e2v2182/B8: 空表如实报，且不下「不会发生」的结论');
+  // 造一条有 deadline 的真条目（委托在途阶段）——时间序里应出现
+  WA.commission.setSettings({ enabled: true });
+  var c1 = WA.commission.create({ title: '护送商队', principal: '商会', agent: '护卫',
+    stages: [{ label: '接洽', deadline: 0 }, { label: '启程', deadline: 0 }] });
+  a(c1.ok === true, 'e2v2182/B9: 夹具（委托）建立成功');
+  var d3 = WA.agenda.upcoming();
+  a(d3.rows.some(function (r) { return r.source === 'commission'; }), 'e2v2182/B10: 委托进日程（聚合真的走通了源）');
+  a(d3.perSource.commission >= 1, 'e2v2182/B11: perSource 如实计数');
+  // 未知时间与已知时间**分列**：委托阶段 deadline 为 0 ⇒ 未知时间，进 untimed 而不是被猜一个日期
+  a(d3.untimedCount >= 1 && d3.timedCount + d3.untimedCount === d3.total,
+    'e2v2182/B12: 未知时间单列（timed + untimed = total，实 ' + d3.timedCount + '+' + d3.untimedCount + '=' + d3.total + '）');
+  // 只读不变式：连读四口之后存档逐字节不变
+  var s1 = JSON.stringify(WA.store.get());
+  WA.agenda.upcoming(); WA.agenda.soon(3); WA.agenda.overdueList(); WA.agenda.sources();
+  var s2 = JSON.stringify(WA.store.get());
+  a(s1 === s2, 'e2v2182/B13: 只读（连读四口存档逐字节不变）');
+  var srcs = WA.agenda.sources();
+  a(Array.isArray(srcs) && srcs.length === 5, 'e2v2182/B14: 五源可用性表');
+  a(srcs.every(function (s) { return typeof s.name === 'string' && typeof s.available === 'boolean'; }),
+    'e2v2182/B15: 每源带 available（缺席如实报，不静默丢）');
+  var sn = WA.agenda.soon(1);
+  a(sn.ok === true && sn.count <= 1, 'e2v2182/B16: soon(n) 按 n 夹取（实 ' + sn.count + '）');
+  var ol = WA.agenda.overdueList();
+  a(ol.ok === true && Array.isArray(ol.rows), 'e2v2182/B17: overdueList 结构稳定');
+  var dg = WA.agenda.diagnose();
+  a(dg.closedLoop === true && dg.checks.store === true, 'e2v2182/B18: diagnose 闭环自证');
+  // v2.205.0（优化 2）：本轮**真改了** engines/agenda.js（逐源状态三分 / 失败上报口），
+  //   故模块自报版本随本批交付抬（与 bump2204_main.py 的同一口径：没碰不抬、碰了必抬）。
+  a(/^2\.(182|183|184|185|186|187|188|189|190|191|192|193|194|195|196|197|198|199|200|201|202|203|204|205|206|207|208|209|210|211|212|213|214|215|217|218|219|220|221|222|223|224|225|226|227|228|229|230|231|232|233|234|235|236|237|238|239|240|241|242|243|244|245|246|247|248|249|250|251|252|253|254|255|256|257|258|259|260|261|262|263|264|265|266|267|268|269|270|271|272|273|274|275|276|277|278|279|280|281|282|283|284|285|286|287|288|289|290|291|292|293|294|295|296|297|298|299|300|301|302|303|304|305|306|307|308|309|310|311|312|313|314|315|316|317|318|319|320|321|322|323|324|325|326|327|328|329|330|331|332|333|334|335|336|337|338|339|340|341|342|343|344|345|346|347|348|349|350|351|352|353|354|355|356|357|358|359|360|361|362|363|364|365|366|367|368|369|370|371|372|373|374|375|376|377|378|379|380|400|401|402|403|404|405|408|409|410|411|412|413|414|415|517|522|523|524)\.0$/.test(dg.version),
+    'e2v2182/B19: diagnose 报版本（实 ' + dg.version + '）');
+  WA.agenda.upcoming();
+  var stt = WA.agenda.stat();
+  a(stt.reads >= 1 && typeof stt.bySource === 'object', 'e2v2182/B20: stat 记读数与按源计数');
+  WA.agenda.reset();
+  a(WA.agenda.stat().reads === 0 && Object.keys(WA.agenda.stat().faults).length === 0, 'e2v2182/B21: reset 清读数与 faults');
+  // 开关**关回去**再拒算一次：证明它不是「装载时读一次」的死旋钮
+  WA.agenda.setSettings({ enabled: false });
+  a(WA.agenda.upcoming().ok === false && WA.agenda.upcoming().reason === 'disabled',
+    'e2v2182/B22: 关回去仍拒算（开关每次读，不是装载期快照）');
+}
+
+// ── C 段：不变式（跨入口一致 / 形状稳定）────────────────────────────────
+function runC(a) {
+  const boot = sync.fresh({});
+  const WA = boot.WA;
+  WA.agenda.setSettings({ enabled: true });
+  WA.agenda.setSettings({ maxRows: 4 });
+  a(WA.agenda.getSettings().maxRows === 4, 'e2v2182/C1: maxRows 写回一致（区间内不夹错）');
+  WA.calendar.setClock('第1日', { source: 'user', dayIndex: 1 });
+  var r1 = WA.agenda.upcoming();
+  var r2 = WA.agenda.upcoming();
+  a(JSON.stringify(r1.rows) === JSON.stringify(r2.rows), 'e2v2182/C2: 同一存档两次读数逐字相同（无随机序）');
+  // 上限生效且**如实标注**覆盖范围
+  WA.commission.setSettings({ enabled: true });
+  for (var i = 0; i < 6; i++) {
+    WA.commission.create({ title: 't' + i, principal: 'p', agent: 'a', stages: [{ label: 's', deadline: 0 }] });
+  }
+  var r3 = WA.agenda.upcoming();
+  a(r3.count === 4 && r3.total >= 6 && r3.capped === true,
+    'e2v2182/C3: 上限生效并标注 capped（count ' + r3.count + ' / total ' + r3.total + '）');
+  a(r3.rows.every(function (x) { return x && typeof x.source === 'string' && typeof x.label === 'string'; }),
+    'e2v2182/C4: 行形状稳定（source/label/kind 恒在）');
+  // 五源判据只看「读口是否在场」，不看结果内容 —— 探可用性不得污染 bySource 计数
+  var b1 = JSON.stringify(WA.agenda.stat().bySource);
+  WA.agenda.sources();
+  var b2 = JSON.stringify(WA.agenda.stat().bySource);
+  a(b1 === b2, 'e2v2182/C5: sources() 不产生读数副作用（探可用性不改被探对象）');
+  // 返回副本：调用方改不动内部行
+  var rows1 = WA.agenda.upcoming().rows;
+  rows1[0].source = '__mutated__';
+  a(WA.agenda.upcoming().rows.every(function (x) { return x.source !== '__mutated__'; }),
+    'e2v2182/C6: 返回的是副本（改返回值不改下一次读数）');
+}
+
+// ── N 段：负控制（真源码破坏 → 合成宿主装载破坏副本 → 重跑同款真判据）──────
+function runN(a) {
+  const SRC = srcOf();
+  const CASES = [
+    { n: 1, why: 'N1: 剧情时间缺失时照算 ⇒ 拿「现在/0」冒充剧情时间（本模块的头号禁令）',
+      from: "if (!label) return { ok: false, reason: 'no-story-clock' };",
+      to: 'if (false) return { ok: false, reason: \'no-story-clock\'; };',
+      probe: function (WA) { WA.agenda.setSettings({ enabled: true }); return WA.agenda.upcoming().ok; },
+      want: false },
+    { n: 2, why: 'N2: 关掉的模块照算 ⇒ 开关是死旋钮（点了没效果的开关）',
+      from: "if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled', rows: [] }; }\n    const o = (opts && typeof opts === 'object') ? opts : {};",
+      to: "if (false) { noteFault('disabled'); return { ok: false, reason: 'disabled', rows: [] }; }\n    const o = (opts && typeof opts === 'object') ? opts : {};",
+      probe: function (WA) { return WA.agenda.upcoming().ok; },
+      want: false,
+      // 判据必须能只由「关掉仍照算」这一件事决定：给合成宿主一支**剧情钟**，
+      //   否则破坏后走到的下一道闸（no-story-clock）也返回 ok:false —— 破坏不显现（假绿）。
+      stubs: function (WA) {
+        WA.store = { get: function () { return { clock: { label: '第1日', dayIndex: 1 } }; },
+          sizeCaps: function () { return {}; } };
+      } },
+    { n: 3, why: 'N3: 未知时间被丢掉 ⇒ 「不知道什么时候」在读数上与「不会发生」同形',
+      from: 'const untimed = rows.filter(function (r) { return r.unknown; });',
+      to: 'const untimed = [];',
+      probe: function (WA) { WA.agenda.setSettings({ enabled: true }); return WA.agenda.upcoming().untimedCount; },
+      want: 1,
+      stubs: function (WA) {
+        WA.freight = { view: function () { return { ok: true }; } };
+        WA.store = { get: function () { return { freight: { shipments: [
+          { id: 's1', status: 'transit', from: '甲', to: '乙', resource: '粮', qty: 1 }] } }; },
+          sizeCaps: function () { return {}; } };
+      } },
+    { n: 4, why: 'N4: 截断不标注 ⇒ 「前 N 行都正常」被读成「全部正常」',
+      from: 'const capped = merged.length > limit;',
+      to: 'const capped = false;',
+      probe: function (WA) { WA.agenda.setSettings({ enabled: true }); return WA.agenda.upcoming({ limit: 1 }).count; },
+      want: 1,
+      stubs: function (WA) {
+        WA.freight = { view: function () { return { ok: true }; } };
+        WA.store = { get: function () { return { freight: { shipments: [
+          { id: 's1', status: 'transit', from: '甲', to: '乙', resource: '粮', qty: 1 },
+          { id: 's2', status: 'transit', from: '丙', to: '丁', resource: '盐', qty: 2 }] } }; },
+          sizeCaps: function () { return {}; } };
+      } },
+    { n: 5, why: 'N5: 读数不计数 ⇒ 「读过几次」不可观测（面在，账不在）',
+      from: '    _stat.reads++;\n    return { ok: true, rows: kept.map(function (r) { return Object.assign({}, r); }),',
+      to: '    ;\n    return { ok: true, rows: kept.map(function (r) { return Object.assign({}, r); }),',
+      probe: function (WA) { WA.agenda.setSettings({ enabled: true }); WA.agenda.reset(); WA.agenda.upcoming(); WA.agenda.upcoming(); return WA.agenda.stat().reads; },
+      want: 2,
+      stubs: function (WA) {
+        WA.store = { get: function () { return { clock: { label: '第1日', dayIndex: 1 } }; },
+          sizeCaps: function () { return {}; } };
+      } },
+    { n: 6, why: 'N6: 拒收不记账 ⇒ 「为什么拒算」在诊断面上消失（只剩一句 ok:false）',
+      from: "if (!now.ok) { noteFault('no-story-clock'); return { ok: false, reason: 'no-story-clock', rows: [], note: '世界钟未设定：剧情时间缺失时拒算，不猜日期' }; }",
+      to: "if (!now.ok) { ; return { ok: false, reason: 'no-story-clock', rows: [], note: '世界钟未设定：剧情时间缺失时拒算，不猜日期' }; }",
+      probe: function (WA) { WA.agenda.setSettings({ enabled: true }); WA.agenda.reset(); WA.agenda.upcoming(); return WA.agenda.stat().faults['no-story-clock']; },
+      want: 1 }
+  ];
+  CASES.forEach(function (cs) {
+    const hits = SRC.split(cs.from).length - 1;
+    a(hits === 1, 'e2v2182/N0(' + cs.n + '): 破坏锚点恰中 1 次（实 ' + hits + '）—— 锚点漂了该条不算通过');
+    if (hits !== 1) return;
+    const broken = SRC.split(cs.from).join(cs.to);
+    a(broken !== SRC, 'e2v2182/Na(' + cs.n + '): 破坏真的改动了源码文本');
+    let got = '#threw#';
+    try {
+      const WA = hostWith(broken, cs.stubs);
+      got = cs.probe(WA);
+    } catch (e) { got = '#threw#:' + (e && e.message); }
+    a(got !== cs.want, 'e2v2182/' + cs.why + '（破坏后实得 ' + JSON.stringify(got) + '，原版为 '
+      + JSON.stringify(cs.want) + '）');
+  });
+  // Nb. 纯度：原版上同款判据必须为真 —— 否则「破坏后不同」可能只是因为原版本来就不成立
+  const W0 = hostWith(SRC, function (WA) {
+    WA.store = { get: function () { return { clock: { label: '第1日', dayIndex: 1 } }; }, sizeCaps: function () { return {}; } };
+  });
+  W0.agenda.setSettings({ enabled: true });
+  a(W0.agenda.upcoming().ok === true, 'e2v2182/Nb1: （纯度）原版上有剧情钟即 ok');
+  W0.agenda.reset();
+  W0.agenda.upcoming();
+  a(W0.agenda.stat().reads === 1, 'e2v2182/Nb2: （纯度）原版上读数记账成立');
+  W0.agenda.setSettings({ enabled: false });
+  a(W0.agenda.upcoming().reason === 'disabled', 'e2v2182/Nb3: （纯度）原版上关掉即拒算');
+  a(SRC.length > 12000, 'e2v2182/Nc: 被破坏的源码面非空（' + SRC.length + ' 字符）');
+}
+
+module.exports = { runA: runA, runB: runB, runC: runC, runN: runN, KEYS: KEYS, REL: REL };
+if (require.main === module) {
+  let pass = 0, fail = 0;
+  const a = function (ok, name) { if (ok) { pass++; } else { fail++; console.log('FAIL ' + name); } };
+  runA(a); runB(a); runC(a); runN(a);
+  console.log('\nE2 s3-b2-e2-v2182 ' + pass + ' / 失败 ' + fail);
+  process.exit(fail > 0 ? 1 : 0);
+}

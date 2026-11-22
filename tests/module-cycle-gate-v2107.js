@@ -1,0 +1,966 @@
+'use strict';
+/**
+ * tests/module-cycle-gate-v2107.js — 模块依赖静态图（计划一 #20）四段专锁。
+ *   A 静态契约：导出面形状、五张登记面形态、形态表不许放宽、锚点纯度。
+ *   B 运行时：真跑 module-cycle-gate，拿现场读数（覆盖率 / 三类边 / 恒等式 / 交叉验证）。
+ *   C 不变式：判据纯只读（连调不变量、不改被取证文件）。
+ *   N 负控制：**真源码破坏 → 装载破坏副本 → 在副本上重跑同款真判据**。
+ *
+ * 为什么负控制走「装载破坏副本」而不是改真文件：本门禁要治的病之一正是
+ *   「0 条边」与「扫描器全瞎了」长得一模一样；若验证判据真会现形要靠改真文件，
+ *   验证者自己就成了新的风险源。副本装载用 vm.runInNewContext 包 CommonJS 外壳，
+ *   `__dirname` 指到 tests/，故相对 require 与 path.join(__dirname,'..') 照原样工作
+ *   （这是「装载」而不是「字符串匹配」：破坏必须在**真模块**上现形）。
+ *
+ * 本锁自证（H 系列口径）：
+ *   H5 每个锚点字面量在其目标文件里恰中 1 次、且在本文件里恰声明 1 次（缺失与重复同罪）。
+ *   H6 判据两向自证：原版上必须为真（A/B 组），破坏副本上必须为假（N 组）；
+ *      且每处破坏必须**真的改变源码**（breakOnce 会抛，不许静默）。
+ */
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const BASE = path.join(__dirname, '..');
+const SELF_REL = 'tests/module-cycle-gate-v2107.js';
+const MOD_REL = 'tests/module-cycle-gate.js';
+const RUN_REL = 'tests/run.js';
+const LEDGER_REL = 'tests/module-registry-ledger.json';
+
+/**
+ * 统一锚点表（{rel, txt}；txt 在目标文件里恰中 1 次）。
+ * 一律取**不含反斜杠**的行首片段——含非换行反斜杠的锚点在统一纯度口径下结构性不可满足（R87 H7）。
+ */
+const ANCHORS = {
+  aAlias: { rel: MOD_REL, txt: 'const ALIAS_RE = (function () {' },
+  aExternal: { rel: MOD_REL, txt: 'const EXTERNAL = {};' },
+  aEntry: { rel: MOD_REL, txt: 'const ENTRY_NS = {' },
+  aSkip: { rel: MOD_REL, txt: 'if (refs[rel] !== undefined) return;' },
+  aOrder: { rel: MOD_REL, txt: 'if (pi > ci) orderViolation.push(' },
+  aAlive: { rel: MOD_REL, txt: 'scanAlive: g.coverage.nsProvided > 0' },
+  aLeak: { rel: MOD_REL, txt: 'const deadNs = Object.keys(g.nsOwner).filter(' },
+  aWire: { rel: RUN_REL, txt: "const mcg = require('./module-cycle-gate.js');" }
+};
+
+/** 现场破坏：**全部**出现处一次改掉（字符串版 replace 只改第一处——v2.105.0 的 D2 教训）。 */
+function allReplace(src, from, to) { return src.split(from).join(to); }
+
+function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
+
+/** 真源码破坏，并证明破坏真的发生（没打中 ⇒ 抛，不许静默）。 */
+function breakOnce(src, from, to, label) {
+  const out = allReplace(src, from, to);
+  if (out === src) throw new Error('破坏未生效（锚点没打中）:: ' + label + ' :: ' + from);
+  return out;
+}
+
+/** 装载破坏副本（CommonJS 外壳 + 原目录 __dirname）。 */
+function loadCopy(rel, src) {
+  const dir = path.dirname(path.join(BASE, rel));
+  const m = { exports: {} };
+  // require 解析必须与 Node 同规矩：裸模块名（fs / path / vm）走模块查找，
+  // 只有相对路径才补 dir。若一律 path.resolve(dir, p)，`fs` 会被拼成 <dir>/fs ⇒
+  // Cannot find module（副本装载失败会被误读成「判据在破坏下也没反应」）。
+  const req = function (p) {
+    if (p.charAt(0) !== '.') return require(p);
+    return require(path.resolve(dir, p));
+  };
+  // shebang 不是合法 JS：包进 CommonJS 外壳后 `#!...` 会变成 SyntaxError
+  // （Invalid or unexpected token），而 `.js` 带 shebang 本身是对的（可执行入口）。
+  // 装载副本前必须先剥掉——本锁锚点一律取函数体/常量区，不取首行，故此剥离不影响破坏落点。
+  const body = src.replace(/^#![^\n]*\n/, '');
+  const fn = vm.runInNewContext(
+    '(function (module, exports, require, __filename, __dirname) {\n' + body + '\n})',
+    { console: console, process: process, Buffer: Buffer });
+  fn(m, m.exports, req, path.join(BASE, rel), dir);
+  return m.exports;
+}
+
+/** 锚点纯度（H5）。 */
+function auditAnchors(A) {
+  const self = rd(SELF_REL);
+  Object.keys(ANCHORS).forEach(function (k) {
+    const a = ANCHORS[k];
+    const nTarget = rd(a.rel).split(a.txt).length - 1;
+    const nSelf = self.split(a.txt).length - 1;
+    A(nTarget === 1, 'A5 锚点 ' + k + ' 在 ' + a.rel + ' 里恰 1 次（实 ' + nTarget + '）');
+    A(nSelf === 1, 'A5 锚点 ' + k + ' 在本锁里恰声明 1 次（实 ' + nSelf + '，缺失与重复同罪）');
+  });
+}
+
+/** 造一份最小假产品面（负控制用：不改真文件，全部走 opt.read 注入）。 */
+function fakeProduct(over) {
+  const d = {
+    'index.js': 'const WA = (function () { return (typeof G !== "undefined" ? (G.WorldAxis = G.WorldAxis || {}) : {}); })();\n',
+    'core/a.js': "const WA = window.WorldAxis = window.WorldAxis || {};\nWA.alpha = function () {};\nWA.beta = 1;\nWA.alpha();\n",
+    'core/b.js': 'const WA = (window.WorldAxis = window.WorldAxis || {});\nWA.gamma = 1;\nWA.alpha();\n'
+  };
+  return Object.assign(d, over || {});
+}
+
+function runAll(A) {
+  const S = rd(MOD_REL);
+  const M = require('./module-cycle-gate.js');
+
+  // ── A 静态契约 ──
+  const EXPORTS = ['scan', 'audit', 'summary', 'loadOrder', 'loadOrderSrc', 'productFiles',
+    'acyclic', 'readLedger', 'EXTERNAL', 'ENTRY_NS', 'UI_NS', 'CONTRACT_NS', 'SELF_REF_NS',
+    'NS_FACE_EXPECT', 'ALIAS_HOST_NS', 'OPTIONAL_NS', 'EXTERNAL_PREFIX', 'NS_FIELD_MAP', 'ALIAS_RE', 'LEDGER'];
+  const keys = Object.keys(M).sort();
+  A(keys.join(',') === EXPORTS.slice().sort().join(','),
+    'A1 导出面恰为 ' + EXPORTS.length + ' 项（实 ' + keys.length + '：' + keys.join(',') + '）');
+  // 形态表必须**真宽**（三种 alias 形态都在同一正则里）
+  A(M.ALIAS_RE instanceof RegExp && !M.ALIAS_RE.global,
+    'A2 ALIAS_RE 是正则且非全局（逐文件 match 用）');
+  const reSrc = M.ALIAS_RE.source;
+  A(reSrc.indexOf('\\(?') >= 0 && reSrc.indexOf('\\)?') >= 0,
+    'A2b ALIAS_RE 允许外层括号（第二种形态：const WA = (window.WorldAxis = ...));');
+  A(reSrc.indexOf('WorldAxis') >= 0 && reSrc.indexOf('\\|\\|') >= 0,
+    'A2c ALIAS_RE 认 `HOST.WorldAxis || {}` 本体（宿主变量名不限，第三种形态靠它兜）');
+  // 五张登记面必须是对象（逐条理由表）
+  ['EXTERNAL', 'ENTRY_NS', 'UI_NS', 'CONTRACT_NS', 'SELF_REF_NS'].forEach(function (t) {
+    A(M[t] && typeof M[t] === 'object' && !Array.isArray(M[t]),
+      'A3 ' + t + ' 是「名字 -> 理由」的对象表（不是数组：每条必须给理由）');
+  });
+  A(Object.keys(M.CONTRACT_NS).length >= 1 && M.CONTRACT_NS.digest,
+    'A3b digest 的跨文件替换已登记在 CONTRACT_NS 并附理由（try/finally 成对，不是第二个提供方）');
+  A(Object.keys(M.EXTERNAL).length === 0,
+    'A4 EXTERNAL 显式为空 —— 本仓没有「由宿主提供、且以 A.ns 形态被读」的外名'
+    + '（别名宿主名走 ALIAS_HOST_NS，不进这条判据）');
+  A(M.EXTERNAL_PREFIX.length === 0,
+    'A4b EXTERNAL_PREFIX 为空 —— 不放宽到「凡下划线一律放行」（那是掩盖而非覆盖）');
+  A(Object.keys(M.NS_FACE_EXPECT).length === 3
+    && Array.isArray(M.NS_FACE_EXPECT.onlyStatic) && Array.isArray(M.NS_FACE_EXPECT.onlyLedger)
+    && Array.isArray(M.NS_FACE_EXPECT.internalPrefixed),
+    'A4c ns 面差集的三张登记面齐备（onlyStatic / onlyLedger / internalPrefixed）');
+  // 边界必须真写在实现里
+  A(S.indexOf('EXTERNAL_PREFIX.some') >= 0, 'A6 外名前缀真的参与了「未提供」判定');
+  A(S.indexOf('if (rel.indexOf(\'ui/\') === 0) return false;') >= 0,
+    'A6b notInOrder 跳过 ui/（UI 层由运行时外壳挂载，不进 LOAD_ORDER）');
+  A(S.indexOf(ANCHORS.aLeak.txt) >= 0 && S.indexOf('return !readAll[ns];') >= 0,
+    'A6c 零读 ns 的判据按 readAll（产品源面读集合）而不是「文件里出现过」');
+  A(S.indexOf('恒等式') >= 0 && S.indexOf('覆盖率') >= 0,
+    'A7 summary 同时给出覆盖率与恒等式态（缺一都无法区分「真没有」与「瞎了」）');
+  A(S.indexOf('if (mods) {') >= 0 && S.indexOf('refUnseen: true') >= 0,
+    'A8 账本有 requires 而静态面没扫到时不许静默丢边（补 refUnseen）');
+  A(S.indexOf("if (!led) return false;") >= 0 || S.indexOf('ledNs[ns]') >= 0,
+    'A9 ns 面差集读账本（账本不可用时整面跳过）');
+  auditAnchors(A);
+
+  // ── B 运行时（现场真跑） ──
+  const a = M.audit();
+  // v2.140.0（F1 防全知闸门）：新增 engines/noesis.js（noesis 命名空间）⇒ 文件面 165 → 167、
+  //   解析出别名 165 → 167、有引用 163 → 164（零引用仍恰 core/input-guard.js / core/sanitize.js
+  //   两个声明过的纯函数基元——noesis 读 store（登记自己）故有引用，不落零引用名单）。
+  //   现场读数由 M.audit() 采，非估算；增量逐条可核（+1 文件、+1 别名、+1 有引用）。
+  // v2.141.0（F2）：新增 engines/lifeline.js（lifeline 命名空间）⇒ 文件面 167 → 167、
+  //   解析出别名 167 → 167、有引用 164 → 165（零引用仍恰 core/input-guard.js / core/sanitize.js
+  //   两个声明过的纯函数基元——lifeline 读 store（登记自己）故有引用，不落零引用名单）。
+  // v2.142.0（F3）：新增 engines/perspective-lock.js（perspective 命名空间）⇒ 文件面 167 → 168、
+  //   解析出别名 167 → 168、有引用 165 → 167（零引用仍恰 core/input-guard.js / core/sanitize.js
+  //   两个声明过的纯函数基元 —— perspective-lock 读 store（登记自己）故有引用，不落零引用名单）。
+  //   现场读数由 M.audit() 采，非估算；增量逐条可核（+1 文件、+1 别名、+1 有引用）。
+  // v2.153.0（RX5+RX6）：新增 engines/plot-gauge.js 与 engines/branch-tree.js ⇒
+  //   文件面 176 → 178、解析出别名 176 → 178、有引用 174 → 176（两模块都读 store（登记自己）
+  //   故有引用，零引用仍恰 core/input-guard.js / core/sanitize.js 两个声明过的纯函数基元）。
+  // v2.154.0（RX4+RX7）：新增 engines/world-bridge.js 与 engines/eco-audit.js ⇒
+  //   文件面 178 → 180、解析出别名 178 → 180、有引用 176 → 178（两模块都读 store（登记自己）
+  //   故有引用，零引用仍恰 core/input-guard.js / core/sanitize.js 两个声明过的纯函数基元）。
+  // v2.165.0（TX1）：新增 engines/diplomacy.js ⇒ 文件面 185 → 186、解析出别名 185 → 186、
+  //   有引用 183 → 184（diplomacy 读 store（登记自己）故有引用；零引用名单不变）。
+  // v2.167.0（TX2）：新增 engines/agency.js ⇒ 文件面 186 → 187、解析出别名 186 → 187、
+  //   有引用 184 → 185（agency 读 store/plan/act/life 故有引用；零引用名单不变）。
+  // v2.187.0（E4）：新增 engines/campaign.js ⇒ 文件面 207 → 208、解析出别名 207 → 208、
+  //   有引用 205 → 206（campaign 读 store / settingsBus / inputGuard / worldBlueprint /
+  //   diplomacy / factionGraph / freight 七个 ns，故「有引用」）。
+  // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
+  // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
+  // v2.194.0（第三批 · U2 批次①）：跨模块链接线 —— 无新文件、无新命名空间；两条调用期边：
+  //   operations → commit（chain / step）与 diplomacy → commit（inflight / active）
+  //   ⇒ 调用期 1674 → 1676、合计 1782 → 1784；装载期 108 不变（两模块本就在装载期读 store）。
+  // v2.228.0(N10):新增 engines/retrieval.js(retrieval 命名空间),它尾部调 WA.registerModule
+  //   登记自己 ⇒ 文件面 228 → 229、解析出别名 228 → 229、有引用 226 → 227;装载期边 116 → 117
+  //   (registerModule 由 store 提供);调用期 1789 → 1800(它读 store/clock/causal/chrono/
+  //   history-search/injectBudget 六个 ns,并新增一个命名空间面);
+  //   LOAD_ORDER 227 → 228(见 A10 与 orderLen 回填)。
+  // v2.229.0(N11 + N10 收口):现场逐条 diff(HEAD 树 vs 工作区,取 scan().edges 的
+  //   (from, ns, kind) 三元组、集合去重)实测恰好 **14 条新增、0 条消失**,全部为调用期边:
+  //     · engines/retrieval.js 读 9 个 ns(store / clock / causal / chrono / historySearch /
+  //       injectBudget / log / settingsBus / __settingsRegs);
+  //     · engines/tool-diag.js 新增读 gauge 与 retrieval(secGauge / secRetrieval 两节);
+  //     · engines/word-budget.js 新增读 reasoning(count 走 officialOnly 单一真源);
+  //     · render/inject.js 与 ui/panel.js 各新增读 retrieval(注入块与面板读数页)。
+  //   装载期 117 不变(实测:HEAD 树同为 117 —— N10 注释里记的 116 与现场不符,
+  //   本版以实测回填:差全在调用期,不在装载期)。
+  // v2.230.0（拓展 N12 收口）：本门禁四组期望值**逐条按现场实测回填** ——
+  //   此前它们停在 v2.203.0 时代（229/229/227 · 117+1803=1920 · orderLen 228 · 267/222/240），
+  //   而现场已推进到 255/255/253 · 146+1964=2110 · 254 · 292/248/267。
+  //   为什么必须回填而不是「放宽成 >=」：本门禁验的是**静态图的读数面**，
+  //   放宽下限会让「新增文件忘了入图」与「新增 ns 忘了登记账本」静默通过 —— 那正是它防的两件事。
+  //   真相源：本文件 runB 里的 `scan()` 现场复算；回填口径与 v2.203.0 那次相同（实测回填，不改判据形态）。
+  // v2.277.0（V7 OPV7-1）：**新增一个引擎文件** engines/intake-dispatch.js（intake 命名空间）
+  //   ⇒ 文件面 326 → 327、解析出别名 326 → 327、有引用 324 → 325、LOAD_ORDER 325 → 326、
+  //   命名空间三面 367/320/329 → 367/321/330（差仍 46：intake 三面同时长）。
+  //   装载期边 195 **不变**（intake-dispatch 不调 registerModule）；调用期 2520 → **2524**（+4）：
+  //     · engines/backstage.js → intake（分发器唯一调用方，两处：run 与「有没有装」的探测）
+  //     · engines/intake-dispatch.js → __settingsRegs / log / settingsBus（三处本就同族，集合去重后 3 条）
+  //   ⚠ 本版在这里**先踩过一次判据**：分发器初版把别名写成
+  //     `const WA = (typeof window !== 'undefined' ? window.WorldAxis : global.WorldAxis) || ...`，
+  //     而 ALIAS_RE 只认 `const X = (HOST.WorldAxis = HOST.WorldAxis || {})`（仓内 326 个文件的统一写法）。
+  //     后果不是「多一条红」，是**整条链读歪**：本文件既不进提供方（`intake` 落 nsLedger-only 漂移），
+  //     也不进引用方，于是 backstage.js 读 intake 变成「读了一个没人提供的 ns」（B9 problems 2）。
+  //     修法不是放宽 ALIAS_RE（那是把判据改弱），是把源码改回仓内统一形态 —— 判据没动，源码动了。
+  // v2.280.0（V7 OPV7-4）：**新增一个引擎文件** engines/write-contract.js（writeContract 命名空间）
+  //   ⇒ 文件面 327 → 328、别名 327 → 328、有引用 325 → 326、LOAD_ORDER 326 → 327、
+  //   命名空间三面 367/321/330 → 368/322/331（差仍 46：三面同时长）。
+  //   装载期 195 **不变**（不调 registerModule）；调用期 2526 → **2531**（+5，逐条可核）：
+  //     · engines/write-contract.js → settingsBus（settingsBus.read / normalize / saveOrThrow，
+  //       集合去重后 1 条）
+  //     · engines/write-contract.js → clock（读写时刻，1 条）
+  //     · engines/tool-diag.js → writeContract（诊断节 secWriteContract，1 条）
+  //     · ui/panel.js → writeContract（wcLine 提示行，1 条）
+  //     · engines/write-contract.js → __settingsRegs（自注册，与全仓同形态，1 条）
+  //   五条全部是调用期边：本模块装载期零上游读。
+  // v2.281.0（V7 OPV7-6）：**新增一个引擎文件** engines/playable-seed.js（playableSeed 命名空间）
+  //   ⇒ 文件面 328 → 329、别名 328 → 329、有引用 326 → 327、LOAD_ORDER 327 → 328、
+  //   命名空间三面 368/322/331 → 369/323/332（差仍 46：三面同时长）。
+  //   装载期 195 → **196**（+1：尾调 WA.registerModule，registerModule 由 store 提供 —— 与仓内统一形态一致）。
+  //   调用期 2531 → **2544**（+13，逐条可核）：
+  //     · engines/playable-seed.js → store / clock / settingsBus / log / __settingsRegs（自身装载与记账，5 条）
+  //     · engines/playable-seed.js → life / bonds / org / evolution / playableBlueprint（读蓝图与调四个真写口，5 条）
+  //     · engines/playable-blueprint.js → evolution（applyFactions，势力真源改走唯一合法写口，1 条）
+  //     · engines/playable-blueprint.js → playableSeed（installSample 末尾播种，1 条）
+  //     · engines/tool-diag.js → playableSeed（诊断节 secPlayableSeed，1 条）
+  //     · ui/panel.js → playableSeed（播种读数行与两个按钮，1 条）
+  //   ⚠ 本版在这里**再次**踩到 v2.277.0 记过的同一条坑：playable-seed 初稿的别名写法若不套
+  //     `const WA = (HOST.WorldAxis = HOST.WorldAxis || {})`，本文件既不进提供方也不进引用方，
+  //     而 blueprint 读 playableSeed 会变成「读了一个没人提供的 ns」。修法同上：改源码，不放宽 ALIAS_RE。
+  // v2.287.0（EXV7-3 情报网）：本轮新增情报网产品消费链仅接入既有 engines/intel.js，
+  //   不新增模块文件；但版本面已吸收此前尚未回填的工作区模块，因此现场基线为
+  //   文件/别名/有引用 331/331/329。这里钉现场读数，不放宽覆盖率判据。
+  // v2.293.0（EXV7-4~9 收口跟位）：EXV7-5~8 各新增 1 个模块文件 ⇒ 文件/别名/有引用
+  //   331/331/329 → 333/333/331（实测回填；此后各版新增文件照此口径续记）。
+  // v2.294.0（V8 EXV8-2）：文件/别名/有引用 333/333/331 → 335/335/333
+  //   （新增 engines/round-drivers.js 与 engines/write-desk.js，两文件都有真引用）。
+  // v2.294.0（V8 收口）：335/335/333 -> 337/337/335（新增 inject-collector 与
+  //   player-archive 两文件，两者都被产品面真引用）。
+  // v2.297.0（V11 立项轮跟位）：339/339/337 → 340/340/338。
+  //   +1 文件来自 core/unified-pending.js（V10 OPV10-7 落地时漏进本表）。
+  //   **同一轮还修了它的一处真缺陷**：该文件初版把 WA 取成
+  //   `(window.WorldAxis) ? window.WorldAxis : (global.WA ? global.WA : {})`
+  //   —— 与全仓 `const WA = window.WorldAxis = window.WorldAxis || {};` 不同形态，
+  //   于是静态别名扫描认不出它（unreflected 报 registerModule 那条装载边为「扫不到」），
+  //   且 `WA.unifiedPending = ...` 没进 nsOwner（nsFaceDrift 报 ledger-only）。
+  //   更严重的是顺序依赖：window.WorldAxis 尚不存在时它落进一份游离空对象，
+  //   产品面静默拿不到聚合器。改回统一形态后三处读数同时归零。
+  // v2.299.0（V11 OPV11-3/4）：文件/别名/有引用 340/340/338 → 342/342/340
+  //   （新增 engines/l3-registry.js 与 engines/push-api-registry.js，两文件都被 round-drivers 真引用）。
+  // v2.299.0：装载期 208 → 212（两文件尾调 registerModule）、调用期 2676 → 2678、合计 2874 → 2880。
+  // v2.299.0：命名空间三面 380/334/342 → 382/336/344（两个新 ns 同步入账、入读面）。
+  // v2.401.0(OPV23):实测回填（node -e audit 直读——三段拆分 4 个段文件入产品面 ⇒ 文件/别名 453、有引用 451）
+  // v2.524.0（V27 拓展线）：EXV27-1~9 九台引擎入场 ⇒ 文件面 507→516、别名 516、有引用 514（实测回填；
+  //   九台都尾调 registerModule 且都被 tool-diag 登记表引用，故「有引用」同步 +9）。
+  // v2.524.0（V27 优化线）：OPV27 五个新模块（inject-delta / reject-phrase / settings-index /
+  //   save-curve / narrow-consumers）入场 ⇒ 文件面 517→522、别名 522、有引用 520（实测回填）。
+  //   五个模块都被产品源面真读（render/inject.js 两处、engines/action-desk.js 一处、
+  //   engines/tool-diag.js 两处），故「有引用」同步 +5 —— 不是「新增文件但没人读」。
+  // v2.529.0（V29 优化线 OPV29-10 / OPV29-09）：两个**纯数据表文件**入场
+  //   （engines/inject-budget-tables.js 600 行、engines/reject-recovery-tables.js 1198 行），
+  //   都尾调 registerModule 且都被各自的算法引擎静态读（WA.injectBudgetTables /
+  //   WA.rejectRecoveryTables）⇒ 文件面 / 别名各 +2、「有引用」同步 +2。
+  //   实测回填：562/562/560 → 564/564/562（node -e audit 直读）。
+  // v2.529.0（V29 OPV29-11）：三个表文件入场（backstage-protocols 167 行 / world-lab-tables 67 行 /
+  //   world-tables 61 行），都尾调 registerModule 且都被各自的引擎静态读 ⇒ 562/562/560 → 564/564/562
+  //   → 本轮 567/567/565（三件各 +1 文件、+1 别名、+1 有引用）。实测回填。
+  // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表文件连续入场 ——
+  //   engines/tool-diag-tables.js（诊断面端口表）与 engines/action-desk-routes.js（1328 条动作路由），
+  //   各 +1 文件 / +1 别名 / +1 有引用。实测 HEAD~2 ⇒ HEAD ⇒ 工作区 两档复算：
+  //   567/567/565 ⇒ 568/568/567 ⇒ 569/569/567 ⇒ **589/589/587**。
+  //   v2.529.0（缝合批 19 件）：每件一个新引擎文件 + 一条 registerModule 尾调 ⇒ 文件面与别名面各 +19；
+  //   19 件全是纯函数（不读别人的账），故「有引用」三项同步 +19。实测回填，非估算。
+  // v2.530.0（OPV30-R1/R2）：副本族与上下文边界各 +1 文件 / +1 别名 / +1 有引用 ⇒ 592/592/590 → 594/594/592。
+  // v2.531.0（OPV30-R3）：写前预演 +1 文件 / +1 别名 / +1 有引用 ⇒ 594/594/592 → 595/595/593。
+  // v2.532~533（OPV30-R4/R5）：引导弧 + 存档体检各 +1 文件 / +1 别名 / +1 有引用 ⇒ 595/595/593 → 597/597/595。
+  // v2.539.7（账本工程 · 一次说清七处 +1）：v2.535.0 新增 ui/schema-view.js（声明式视图层）后，
+  //   本门禁的六处读数同批漂移，病根有三条、各自都不在读数本身：
+  //    ① 文件面 +1（598）：磁盘上多一个模块文件 —— 这是事实，读数本就该跟；
+  //    ② 别名面 +1（598）：该文件写的是 `var WA = window.WorldAxis = …`，而 ALIAS_RE 只认
+  //       const（全仓 489 个模块里只有它用 var）⇒ 整个文件从静态图里隐形。已把 ALIAS_RE
+  //       改成 const|let|var（口径不变：仍只认那一种自举形态，不对声明关键字挑食）；
+  //    ③ 提供方 +1（641）：ui/schemaView 的提供方在 ui/ 下，模块账本按设计不收 ui 面，
+  //       于是它被判成「读了无人提供的 ns」。已登记进 UI_NS（第 17 条，与 panelNav /
+  // v2.542.0（UI 移植跟位）：ui/journal.js + ui/console.js 两个 UI 层文件进装载面与登记表。
+  //   七条数字同批跟位（实测回填，不是放宽）：文件面/别名/有引用 598→600/600→600/595→597；
+  //   调用期边 3971→3987（+16：两文件的产品读点按 (file, ns) 去重后的真实并集）、合计 4439→4455；
+  //   LOAD_ORDER 575→577；静态提供方 641→643、读面 576→578（账本 586 不动 —— ui 层不入账）；
+  //   B6 差 55→57（两条新的 static-only 差，正是「UI 层刻意不进 LOAD」那条口径）；
+  //   登记面 37/44→39/46（两个 ns 都由 index.js 的 wa_diag_v1 装载面真读，故计入在用）；
+  //   账本缺项 23→25（ui 面仍不入账，如实报出）。口径零变化。
+  //       panelFold / panelOverviewBlocks 等前 16 条完全同型）。
+  //   下面七条断言里的数字是**实测回填**，逐条对应：文件面/render 面 +1、调用期边 +1
+  //   （schema-view 的 stat 读点）、记账文件面 +1、ns 提供方 +1、ns 面差 54→55、
+  //   登记面 36/43→37/44（UI 层 ns 登记表多一条）、账本缺项 22→23（ui 面仍不入账，如实报）。
+  // v2.542.2（叙事脊柱 L1）：新增 engines/scene-intent.js 一文件 ⇒ 文件面 / 别名面 +1、
+  //   有引用 +1（它读 director / plotGauge / dramaticTension / store 四个既有 ns，均在读面内）。
+  //   600/600/597 → 601/601/598，实测回填；覆盖率口径（有人引用即算）零变化。
+  // v2.542.2（叙事脊柱 L1）：新增 engines/scene-intent.js 一文件 ⇒ 文件面 / 别名面 +1、
+  //   有引用 +1（它读 director / plotGauge / dramaticTension / store 四个既有 ns，均在读面内）。
+  //   600/600/597 → 601/601/598，实测回填；覆盖率口径（有人引用即算）零变化。
+  // v2.542.3（叙事脊柱 L2）：新增 engines/inject-tier.js ⇒ 文件面 / 别名面 +1、有引用 +1
+  //   （它读 sceneNarrative / sceneIntent / injectBudgetTables / store / evolution 五个既有 ns，均已在读面内）。
+  //   601/601/598 → 602/602/599，实测回填；覆盖率口径零变化。
+  // v2.542.4（叙事脎柱 L3）：新增 engines/arc-phase.js ⇒ 文件面 / 别名面 +1、有引用 +1
+  //   （它读 plotGauge / chapters / evolution / store 四个既有 ns；另外 L1 读它）。602/602/599 → 603/603/600，实测回填。
+  // v2.542.5（L4）：engines/character-drive.js 进文件面 ⇒ 603/603/600 → 604/604/601（三数同步 +1，实测回填）。
+  A(a.files === 604 && a.aliasFiles === 604 && a.refFiles === 601,
+    'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
+    + '（覆盖率三数一起报，不许只报边数）');
+  // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
+  //   现场逐条 diff（`git show 73be9de^:<file>` 对照工作区，只算 WA.<ns>.<mem> 形态的
+  //   静态引用，排除注释行与自引用）得到**恰好三条新增**，与 +3 逐条对得上：
+  //     · render/inject.js +timeline.hashText        （P3 的键级指纹复用既有实现）
+  //     · render/inject.js +injectBudget.incrementalCost（P3 的观测面真调用）
+  //     · engines/tool-diag.js +perfTrace.bandCompare（P4 的诊断结构面）
+  //   三条都在调用期（无一条落在装载期）⇒ 装载期 37 不变、调用期 1054→1057、总 1091→1094。
+  //   再叠上 v2.124.0（P5 + P6）本版自己新增的两条：
+  //     · core/settings-bus.js +permissions.gate（rmRemove 的删除闸门 —— `permissions` 这个
+  //       命名空间此前只有 core/store.js 一处消费方，现在多了设置总线这一处）
+  //     · ui/panel.js +permissions.gateStat（心跳块的删除闸门那一格）
+  //   ⇒ 调用期 1057→1059、总 1094→1096。两条都由现场 diff 逐条核对过，不是「+2 就对了」。
+  //   ui/panel.js 的 `perfTrace.bandCompare` 与 tool-diag 同属**同一命名空间同一成员**，
+  //   集合去重后只算一条 —— 这也是为什么「文件改了两处、边只多一条」。
+  // v2.140.0（F1）：engines/noesis.js 尾部真调 WA.registerModule('engines/noesis.js', …)
+  //   （registerModule 由 store 提供）⇒ 装载期边 63 → 64；调用期 1215 不变——
+  //   它读的 store / clock / settingsBus 三个 ns 早在调用期面内，集合去重后不新增边
+  //   （同 v2.124.0 记过的「文件改两处、边只多一条」：边是 (file, ns) 对，不是站点数）。
+  // v2.141.0（F2）：两条新硬边，逐条可核——
+  //   ① engines/lifeline.js 尾部真调 WA.registerModule（registerModule 由 store 提供）
+  //      ⇒ 装载期边 64 → 65；
+  //   ② 调用期 1215 → 1225（+10）：它读的 ns 里 store / clock / settingsBus / inputGuard / evict
+  //      早已在调用期面内（集合去重后不新增边），真正新增的 (file, ns) 对来自**五处新读者**：
+  //      render/inject.js（注入分支读 lifeline.buildBlock）、engines/tool-diag.js（secLifeline 读 boundary）、
+  //      ui/panel.js（13 枚控件真读 register / advance / capacityOf / careGap / view / getSettings / setSettings）、
+  //      engines/noesis.js（attenuationOf 读 lifeline.capacityOf，感知第二轴的真源）
+  //      —— 同 v2.124.0 记过的「边是 (file, ns) 对，不是站点数」，故 +11 而非按控件数膨胀。
+  // v2.142.0（F3）：两条新硬边，逐条可核——
+  //   ① engines/perspective-lock.js 尾部真调 WA.registerModule（registerModule 由 store 提供）
+  //      ⇒ 装载期边 65 → 67；
+  //   ② 调用期 1225 → 1234（+9）：它读的 ns 里 store / clock / settingsBus / inputGuard / evict
+  //      早已在调用期面内（集合去重后不新增边），真正新增的 (file, ns) 对来自**四处新读者**：
+  //      render/inject.js（注入分支读 perspective.buildBlock）、engines/tool-diag.js（secPerspective 读 boundary）、
+  //      ui/panel.js（8 枚控件真读 assign / current / allows / boundary / buildBlock / leakScan / getSettings / setSettings）、
+  //      engines/probe.js（`view` 的第二参读 intel.project —— 这正是 D2 信息生态收口那条口）
+  //      —— 同 v2.124.0 记过的「边是 (file, ns) 对，不是站点数」，故 +9 而非按控件数膨胀。
+  // v2.153.0（RX5+RX6）：两条新硬边，逐条可核——
+  //   ① 两个新引擎尾部各真调 WA.registerModule（registerModule 由 store 提供）⇒ 装载期边 71 → 73；
+  //   ② 调用期 1297 → 1313（+16）：它们读的 ns 里 store / clock / settingsBus / inputGuard / evict
+  //      早已在调用期面内（集合去重后不新增边），真正新增的 (file, ns) 对来自**五处新读者**：
+  //      engines/rehearsal.js（branch-tree 经 rehearsal.preview / checkPreview 反读，指纹面同批）
+  //      —— 实为 tools 侧；render/inject.js 无（两者都不产注入块）、engines/tool-diag.js
+  //      （secPlotGauge / secBranchTree 两节）、ui/panel.js（11 枚控件真读）、
+  //      engines/branch-tree.js 与 engines/plot-gauge.js 各读彼此无关的 ns。
+  //      —— 同 v2.124.0 记过的「边是 (file, ns) 对，不是站点数」。
+  // v2.154.0（RX4+RX7）：两条新硬边 + 调用期 1313 → 1335（+22）——逐条可核：
+  //   ① 两个新引擎尾部各真调 WA.registerModule（registerModule 由 store 提供）⇒ 装载期边 73 → 75；
+  //   ② 调用期 1313 → 1335：真正新增的 (file, ns) 对来自五处新读者（world-bridge 读 store/rumor/chronicle，
+  //      eco-audit 读 causal/chrono/people/rumor，两者都不产注入块）—— 同 v2.124.0 记过的
+  //      「边是 (file, ns) 对，不是站点数」，故不按控件数膨胀。
+  // v2.187.0（E4）：装载期 97 → 98（campaign 尾部调 WA.registerModule，registerModule 由 store
+  //   提供 ⇒ +1）；调用期 1584 → 1594（十处新 (file, ns) 对，逐条可核：
+  //     · engines/campaign.js 读 store / settingsBus / inputGuard（三个 ns 早已在面内，去重后不新增）
+  //       —— 真正新增的来自战役层**自己的写口与读口**在别的文件里被读：
+  //     · engines/tool-diag.js → campaign（secCampaign 诊断节，+1）
+  //     · ui/panel.js → campaign（六枚控件 + 读数出口，+1）
+  //     · __settingsRegs（设置注册槽，全仓同一形态，+1）
+  //   其余为 run.js / tool-diag 的登记面读数在同 (file, ns) 对上去重后的净增。
+  // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
+  // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
+  // v2.194.0（第三批 · U2 批次①）：**不新增文件**（链面住在既有的 core/commit.js 里），
+  //   只多两条**调用期** (file, ns) 边 —— 边是 (file, ns) 对、不是站点数：
+  //   ① engines/operations.js 真读 `WA.commit.chain` / `WA.commit.step`（拨付自己开链）；
+  //   ② engines/diplomacy.js 真读 `WA.commit.inflight` / `WA.commit.active`（单一漏斗 rx 的在途标注）。
+  //   装载期边 108 不变（两模块本就在装载期读 store），合计 1782 → 1784。
+  // v2.194.0（U2 批次②）：freight / commission 接链 —— 两条调用期边：
+  //   freight → commit（inflight / active，在途如实标注）与 commission → commit（chain / step / active / inflight）。
+  //   装载期 108 不变；调用期 1676 → 1678、合计 1784 → 1786。
+  // v2.194.0（U2 批次③）：agency + investigation 接链 —— 逐条 diff（HEAD 树 vs 工作区，
+  //   取 scan().refs 的 (file, ns) 对、集合去重）实测恰好 **3 条新增、0 条消失**，全部调用期：
+  //     ① engines/agency.js → commit（processReceipts 自己开链 digest→advance→settle）
+  //     ② engines/agency.js → org（advanceStepOnDraft 逐条镜像 plan.stockOf 的资源闸门）
+  //     ③ engines/investigation.js → commit（reveal 三写同链一次提交）
+  //   装载期 108 不变（两模块本就在装载期读 store）；调用期 1678 → 1681、合计 1786 → 1789。
+  // v2.194.0（U2 批次④）：调用期 1681 → **1682**、合计 1789 → **1790**（实测值，逐条 diff 取证）。
+  //   **恰一条新增边**：`engines/story-choice.js → commit` —— 它此前读的是
+  //   `commit.begin` / `commit.commit`，本批为在途标注与链内读面新增读
+  //   `commit.inflight` / `commit.chain`（`aftermath` 同样新增这两口，但它在**装载期**就已
+  //   计入 `store` 面，(file, ns) 集合里 `aftermath → commit` **本就是新边**？实测回答：
+  //   回退两文件到 HEAD 后调用期读数为 1681 ⇒ 本批合计只 +1，说明 `aftermath → commit`
+  //   在 HEAD 上**已经存在**（它对 `WA.commit` 的引用来自 v2.171.0 起的 `WA.commit` 判空读，
+  //   只是此前没有真正的**调用**点）。逐条 diff 结论：新增 1 条、消失 0 条。）
+  //   置信方式：`git checkout HEAD -- engines/{aftermath,story-choice}.js` 后实跑门禁得 1681。
+  // v2.195.0（U2 批次⑤）：world-blueprint + world-seed 接链 —— 调用期 1682 → **1684**、
+  //   合计 1790 → **1792**（实测值，逐条 diff 取证）。**恰两条新增边**，全部调用期：
+  //     ① engines/world-blueprint.js → commit（`mech` 前提经 `effect()` 当场登记；
+  //        另读 `commit.inflight` / `commit.step`）
+  //     ② engines/world-seed.js → commit（装种子时的在途标注读 `commit.inflight`）
+  //   装载期 108 不变（两模块本就在装载期读 store）；逐条 diff 结论：新增 6 条、消失 0 条，
+  //   其中 aftermath / agency / investigation 三条已计入批次③④ 的 1790。
+  // v2.231.0（WP/WX 切片交付收口）：调用期 2175 → **2191**、合计 2345 → **2361**（实测回填）。
+  //   跨引擎（activity/laborSchedule、techLineage/production、sceneNarrative/aftermathImpact 等）真实调用接线。
+  // v2.276.0（V7 OPV7-7）：调用期 2519 -> 2520、合计 2714 -> 2715（实测回填，逐条 diff 取证）。
+  //   新增 **1 条**调用期边：engines/health-preflight.js -> store（yieldAttrib 多挂载点扫描读
+  //   store.get()，探测 people[*][key] / world[key] / evolution[key] 三处非同名挂载点）。
+  //   装载期 195 **不变**：health-preflight 在运行期账本里 requires 为空（它不在装载期读任何 ns），
+  //   这 1 条由静态引用面扫出、由运行期账本定案为调用期 —— 与 B2 判据口径一致。
+  //   同一批次 OPV7-5 的 10 条（driver-ledger 自身 8 条 + tool-diag/panel 各一条读 driverLedger）
+  //   已在上一版入账（2509/2704 -> 2519/2714），本次只补这 1 条。
+  // v2.278.0（V7 OPV7-2）：调用期 2524 → **2525**、合计 2719 → **2720**（实测回填，逐条 diff 取证）。
+  //   新增恰好 **1 条**调用期边：engines/health-preflight.js → driverLedger
+  //   （第四道门槛 `drive` 读 `WA.driverLedger.view()`，取 L3 名单与扫描口径）。
+  //   装载期 195 **不变**：health-preflight 运行期 requires 为空，这条边由静态引用面扫出、
+  //   由运行期账本定案为调用期 —— 与 B2 判据口径一致。
+  //   文件面 / 别名 / 有引用 / LOAD_ORDER / 命名空间三面**全部不变**：本版零新文件、零新 ns。
+  // v2.279.0（V7 OPV7-3）：调用期 2525 → **2526**、合计 2720 → **2721**（实测回填）。
+  //   新增恰好 **1 条**调用期边：engines/health-preflight.js → evolution
+  //   （产出面的轮次真源回落 `WA.evolution.roundOf()`；`store` 那条边早已在面内）。
+  //   装载期 195 不变；文件面 / 别名 / 有引用 / LOAD_ORDER / 命名空间三面全部不变。
+  // v2.287.0（EXV7-3）：现场运行期账本复测为装载期 198、调用期 2565、合计 2763；
+  //   198 + 2565 = 2763，identityOk 仍由底层扫描器独立证明。
+  // v2.293.0（EXV7-4~9 收口跟位）：装载期 198 → 200（EXV7-8 新增 world-autobiography /
+  //   EXV7-9 新增 populate 一键播种，两模块尾部各调 WA.registerModule ⇒ 各 +1 装载期边）；
+  //   调用期 2565 → 2597（新引擎族调用接线累积，实测回填）⇒ 合计 2763 → 2797。
+  // v2.294.0（V8 EXV8-2）：装载期 200 → 202（新增 engines/round-drivers.js 与
+  //   engines/write-desk.js，两文件尾部各调 WA.registerModule ⇒ 各 +1 装载期边）；
+  //   调用期 2597 → 2604、合计 2797 → 2806（roundDrivers 被 backstage 调、writeDesk
+  //   读 writeContract 与 33 台引擎面，实测回填）。LOAD_ORDER 332 → 334；
+  //   命名空间三面 373/327/336 → 375/329/338（roundDrivers / writeDesk 双双入账）。
+  // v2.294.0（V8 收口跟位）：装载期 202 → 205、调用期 2604 → 2636、合计 2806 → 2841。
+  //   增量来自 V8 新增的三台引擎（inject-collector / player-archive / round-drivers 等）：
+  //   尾部各调 WA.registerModule ⇒ 装载期各 +1；它们在调用期读 store / clock /
+  //   injectCollector / writeDesk 等既有命名空间。恒等式仍然成立，B4 零次序违规不动。
+  // v2.297.0（V11 立项轮跟位）：装载期 207 → 208、调用期 2658 → 2676、合计 2865 → 2874。
+  //   装载期 +1：core/unified-pending.js 尾部 registerModule 那条边，在别名形态修正后才被静态扫到。
+  //   调用期 +8：unifiedPending 修正别名后，它真读的 store / clock / storyChoice / commission /
+  //   investigation / aftermath / operations / farfield 等命名空间引用现在都被计入
+  //   （此前整个文件对扫描器不可见 ⇒ 这 8 条 (file, ns) 边一条都没算）。
+  // v2.380.0（历史欠账消红跟位）：装载期 280 不变、调用期 3260 → 3323、合计 3540 → 3603。
+  //   增量归因：68 文件 clockNow 守卫改写带来的调用期引用（含 epoch-tide 的 clock 边）
+  //   与 action-desk 等真读者，静态面已逐文件归因闭合（/tmp/refs_attr.js 同轮取证）。
+  // v2.401.0(OPV23):实测回填（4 段文件尾调 registerModule ⇒ 装载期 280→296；调用期 3323→3407；合计 3703）
+  // v2.524.0（V27 拓展线）：九台引擎各尾调 registerModule ⇒ 装载期 +9（364→373）；
+  //   九台在调用期读 store/clock/settingsBus/__settingsRegs/rand 且被 tool-diag 诊断节引用
+  //   ⇒ 调用期 +19（3695→3714）；合计 4059→4087，恒等式由本判据当场核对。
+  // v2.524.0（V27 优化线）：实测回填 374/3717/4091 → 384/3736/4120（装载期 +10、调用期 +19、
+  //   合计 +29）。归因口径与前几批逐字相同：新文件尾调 registerModule 计装载期边；
+  //   它们读 store / settingsBus / clock / __settingsRegs 计调用期 (file, ns) 去重边。
+  //   恒等式由本判据当场核对（不靠人算）。
+  // v2.529.0（V29 OPV29-10/09）：两个表文件都被算法引擎静态读（+2 调用期边），
+  //   且各尾调 registerModule（+2 装载期边，见 module-registry-gate 账本 430）⇒ 实测回填
+  //   426/3936/4362 → 430/3938/4368。恒等式仍由本判据当场核对（不靠人算）。
+  // v2.529.0（V29 OPV29-11）：三表登记各 +1 装载期边、三引擎读表各 +1 ⇒ 430 → 436；
+  //   调用期不变（3938）；合计 4368 → 4374。恒等式仍由判据当场核对。
+  // v2.529.0（V29 OPV29-07）：诊断面端口表出闸 ⇒ 装载期 436 → 438（表登记 +1、引擎读表 +1）、
+//   调用期 3938 → 3940（表内 99 处探针里跨 ns 的那一条 + 引擎仍读旧面）；合计 4374 → 4378。
+  //   实测 HEAD~2 ⇒ HEAD 两档复算。恒等式由本判据当场核对。
+  // v2.529.0（V29 OPV29-08）：路由表出闸 ⇒ 装载期 438 → 440；调用期 3940 → 3961（+21，逐条闭合：
+  //   路由表读到 274 个 ns，其中 **20 个在引擎剩余 1643 行里也读到** ⇒ 每个多一条 (file,ns) 去重边；
+  //   再加「引擎读新命名空间 actionDeskRoutes」1 条 = 21）；合计 4378 → 4401。
+  //   v2.529.0（缝合批 19 件）：装载期边 +19（每件的 registerModule 尾调 1 条）；
+  //   调用期 +1（新件合计 2×19 条调用期引用里，1 条落到已有命名空间... 实测为 3961 → 3962）。
+  //   合计 4401 → 4422。恒等式仍成立（460 + 3962 = 4422）。
+  //   v2.529.0 收口：store-merge 的墓碑老化改走 clockWall ⇒ 多一条 WA.clock.wallNow() 调用期读
+  //   ⇒ 调用期 3963 → 3964、合计 4426 → 4427（恒等式 463 + 3964 = 4427 当场核对）。
+  // v2.530.0（OPV30-R1/R2）：两件各尾调 registerModule ⇒ 装载期边 463 → 465、合计 4427 → 4429；
+  //   调用期 3964 **不动**（两件都只读 store 的 registerModule，与既有 (file, ns) 对同源去重）。
+  // v2.531.0（OPV30-R3）：写前预演尾调 registerModule ⇒ 装载期 466 / 合计 4430（调用期 3964 仍不动）。
+  // v2.532~533（OPV30-R4/R5）：两件各尾调 registerModule ⇒ 装载期 468；同轮五台缝合件接进面板台账
+  //   （ui/settings.js 新增 5 条 (file, ns) 调用期边、另两件各读 store ⇒ 3964 → 3970）、合计 4438。
+  // v2.542.2（叙事脊柱 L1）：装载期 468 → 470 —— scene-intent 尾部真调 WA.registerModule
+  //   （registerModule 由 store 提供）+ 它另读 store 一 ns，与既有 (file, ns) 对去重后 +1；
+  //   render/inject.js 的注入分支在装载期读 sceneIntent ⇒ +1。
+  //   调用期 3987 → 3994（+7）：scene-intent 读 director / plotGauge / dramaticTension（+3，store 已计）、
+  //   render/inject.js 注入分支读 sceneIntent（+1）、ui/panel.js 的 VIS_NAMES（+1，ui 面计入调用期）、
+  //   engines/tool-diag-tables.js 的 MODULE_EXPORTS（+1）、tests 侧读数不计。
+  //   恒等式 470 + 3994 = 4464 当场核对。
+  // v2.542.2（叙事脊柱 L1）：装载期 468 → 470 —— scene-intent 尾部真调 WA.registerModule
+  //   （registerModule 由 store 提供）+ 它另读 store 一 ns，与既有 (file, ns) 对去重后 +1；
+  //   render/inject.js 的注入分支在装载期读 sceneIntent ⇒ +1。
+  //   调用期 3987 → 3994（+7）：scene-intent 读 director / plotGauge / dramaticTension（+3，store 已计）、
+  //   render/inject.js 注入分支读 sceneIntent（+1）、ui/panel.js 的 VIS_NAMES（+1，ui 面计入调用期）、
+  //   engines/tool-diag-tables.js 的 MODULE_EXPORTS（+1）、tests 侧读数不计。
+  //   恒等式 470 + 3994 = 4464 当场核对。
+  // v2.542.3（叙事脊柱 L2）：装载期 470 → 472 —— inject-tier 尾调 WA.registerModule（+1），
+  //   且 render/inject.js 的注入面在装载期读 injectTier（+1）。
+  //   调用期 3994 → 4001（+7）：inject-tier 读 sceneNarrative / sceneIntent / injectBudgetTables（+3）、
+  //   render/inject.js 注入面读 injectTier（+1）、engines/tool-diag-tables.js 的 MODULE_EXPORTS（+1），
+  //   另 +2 是它读 store（registerModule 之外的 store.get 站点归为同一 (file, ns) 对，与既有对去重后
+  //   仍是 +1）与 evolution（roundOf）各一条。恒等式 472 + 4001 = 4473 当场核对。
+  // v2.542.4（叙事脎柱 L3）：装载期 472 → 474（arc-phase 尾调 registerModule +1；
+  //   scene-intent 在装载期多读一个 ns（arcPhase）+1）；调用期 4001 → 4009（+8：
+  //   arc-phase 读 plotGauge / chapters / evolution / store（4）、scene-intent 读 arcPhase（1）、
+  //   tool-diag-tables 的 MODULE_EXPORTS（1）、两处 store.transact 与 evict 归同一 ns对（1）、
+  //   scene-intent 新增的 measure/record 路径（1）。恒等式 474 + 4009 = 4483 当场核对。
+  // v2.542.5（L4）：装载期 474 → 476（character-drive 尾调 registerModule +1；scene-intent 在装载期
+  //   多读一个 ns（characterDrive）+1）；调用期 4009 → 4012（+3：character-drive 读 store / settingsBus /
+  //   __settingsRegs 三个 ns 各一条边，集合去重后按文件计；scene-intent 新增的 stakes/line 路径同文件不重复计）。
+  // v2.542.12（UI 读引擎）：调用期 4016 -> 4017（+1：人物页结论卡新增 WA.characterDrive.derive
+  //   一处真调用，属“UI 直接读引擎字段”的首例；装载期不变 476）；恒等式 476 + 4017 = 4493 当场核对。
+  // v2.542.12（UI 接 jsonRepair）：调用期 4017 -> 4018（+1：面板 dcPayload 的 catch 改走
+  //   engines/json-repair.js 的阶梯）；装载期不变 476；恒等式 476 + 4018 = 4494 当场核对。
+  // v2.542.14（引擎互校）：调用期 4018 -> 4019（+1：engines/toxic-metabolism.js 真读
+  //   WA.elapsedEvidence 的 parse/verify，把「这一轮推进了多久」交回证据判定）；装载期不变 476；
+  //   恒等式 476 + 4019 = 4495 当场核对。
+  // v2.542.16（引擎互校③）：调用期 4019 -> 4020（+1：engines/mood-glide.js 真读
+  //   WA.elapsedEvidence 的 parse/verify —— 与 toxic-metabolism 同一阶梯，同族不再分裂）；
+  //   装载期不变 476；恒等式 476 + 4020 = 4496 当场核对。
+  // v2.542.18（引擎互校③：time-ledger 接真锚点）：调用期 4020 -> 4021（+1：engines/time-ledger.js 新增
+  //   hostChat()，真读 WA.mainWin —— (engines/time-ledger.js, mainWin) 是一对**新**的 (file, ns) 边；
+  //   同批新增的 WA.storyclock.readLatest / audit 只加**成员引用**（refs +3），storyclock 这个 ns 与 time-ledger
+  //   的边在旧版就已存在（discipline），集合去重后不再计边 —— 这正与 v2.124.0 记过的「改了两处、边只多一条」同款）。
+  //   装载期不变 476；恒等式 476 + 4021 = 4497 当场核对。
+  // v2.542.20（narrative-deduction 五个导出接入 routes）：调用期 4021 -> 4022（+1：
+  //   (engines/action-desk-routes.js, narrativeDeduction) 是一对**新**的 (file, ns) 边；五个成员引用
+  //   只计进 refs，边以 ns 对去重）。装载期不变 476；恒等式 476 + 4022 = 4498 当场核对。
+  // v2.542.21（choice-board 接进 interceptor 的已有监听位 + json-repair 回首帧）：
+  //   调用期 4022 -> 4023（+1：(core/interceptor.js, choiceBoard) 新边）；装载期仍 476（json-repair 的
+  //   registerModule 边在惰性档时就已计入，移回首帧不增）；恒等式 476 + 4023 = 4499 当场核对。
+  // v2.542.23（导出正文接进面板）：调用期 4023 -> 4024（+1：(ui/panel.js, storyExport) 是一对**新**的
+  //   (file, ns) 边 —— 该 ns 自 v2.529.0 入库后产品面零读，本版起有真消费者）。装载期仍 476
+  //   （story-export 在 LOAD_ORDER 里的 registerModule 边早就计入）；恒等式 476 + 4024 = 4500 当场核对。
+  // v2.542.24（API Key 迁进加密仓）：调用期 4024 -> 4025（+1：(core/api-router.js, apiVault) 新边）；
+  //   装载期仍 476（api-vault 的 registerModule 边在惰性档时就已计入）；恒等式 476 + 4025 = 4501。
+  // v2.543.0~v2.545.0（引擎深度第一批，逐条是 (file, ns) 对，不是站点数）：
+  //   +1 (engines/dream.js, dreamSettle)              入卷口空稿闸
+  //   +1 (engines/spatial-acoustics.js, lensCulling)  partial 档借隔墙叙事句
+  //   +1 (engines/regional.js, weightedDraw)          区域抽签走 draw/weightOf
+  //   +1 (engines/spotlight.js, followupGate)         轻提静默闸
+  //   = 4025 + 4 = 4029。另：HEAD 65713bc 实测已是 4027（v2.542.25/2.542.26 有两条未跟位），
+  //   本版一并补账 ⇒ 4031；恒等式 476 + 4031 = 4507。
+  // v2.546.0：调用期 4031 → 4032（+1：(engines/inject-collector.js, compactTiming) 是一对**新**的
+  //   (file, ns) 边 —— compactTiming.plan 自入库起产品面零读，本版在装配后真判一次折叠时机）。
+  //   装载期仍 476；恒等式 476 + 4032 = 4508。
+  // v2.547.0：调用期 4032 → 4035（+3 对**新**的 (file, ns) 边，逐条可核）：
+  //   · (core/interceptor.js, msgAlign)          —— roundSig 的松散指纹借 loose/textOf，alignRound 借 align/stat
+  //   · (core/interceptor.js, ephemeralScrub)    —— scrubReply 真调 scrub（只采用「真删且无多处命中」的结果）
+  //   · (render/inject.js,    ephemeralScrub)    —— 注入落地前登记 finalItems 的结构性块
+  //   装载期仍 476；恒等式 476 + 4035 = 4511。
+  A(a.edgesLoad === 476 && a.edgesCall === 4035 && a.edgesAll === 4511 && a.identityOk,
+  //   恒等式 476 + 4012 = 4488 当场核对。
+    'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
+    + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
+    + ' engines/recipe.js 三文件（act / opportunity 尾读 registerModule ⇒ 装载期边 +1；'
+    + '三者调用期读 store/clock/evict/org/intel/theme ⇒ 调用期 +33）'
+    + '（v2.123.0（优化计划 P3 + P4）：render/inject.js 真调 injectBudget.incrementalCost 与'
+    + ' timeline.hashText、engines/tool-diag.js 真读 perfTrace.bandCompare（面板那一处同成员去重）'
+    + ' ⇒ 调用期 +3，37 / 1054 / 1091 → 37 / 1057 / 1094；本常量在 v2.123.0 漏回填，v2.124.0 补账）'
+    + '（运行期定案 37 条装载期读；静态引用 1091 条里 1054 条是调用期，'
+    + '拿 909 判次序会报 281 条噪声；v2.110.0（计划一 #21/#22 + 计划二 #39/#70）新增 core/fault-context.js / core/schema.js / core/permissions.js 三文件后：装载期边 23 不变、调用期 +9（归因为提供方）、文件面 +3）'
+    + ' v2.111.0（计划二 #67/#69）新增 core/audit-log.js（auditLog）与 core/sanitize.js（sanitize）两文件后：装载期边 23 不变、调用期 +5（store 的审计写入 + permissions 两处拒绝留痕 + 面板字面调用 sanitize）、文件面 +2）'
+    + ' v2.112.0（计划二 #31/#32/#33 + #36/#37/#38/#40）新增 engines/chrono.js（chrono）与 engines/collab.js（collab）两文件后：装载期边 23 不变、调用期 +15（chrono 只读 store/clock、collab 只读 store/inputGuard，两者都不在装载期读 WA）、文件面 +2）' + ' v2.114.0（计划二 #56/#68）新增 core/sandbox.js（sandbox）与 core/plugin.js（plugin）两文件后：装载期边 23 → 25（两模块尾部都调 WA.registerModule 登记自己，而 registerModule 由 store 提供 ⇒ 各多 1 条装载期硬边；两者初版排在 store 之前，现场报 2 条 order-violation，已移到 store 之后修正）、调用期 +12（store 两处 WA.plugin.fire + tool-diag 诊断节 + 面板字面调用）、文件面 +2） v2.114.0 收口：engines/collab.js（prune 三处）与 engines/chrono.js（entries 落盘后挤出）各接 WA.evict.array ⇒ 调用期再 +2（915 / 940，2 条新站点引用 core/evict.js）'
+    + ' v2.129.0（拓展计划 A1–A10）：新增十个引擎文件（userlock / rewriter / storyclock / rhythm-loop / motif /'
+    + ' beat-mask / preset-world / power-anchor / request-viewer / wb-search）⇒ 文件面 140 → 150、有引用 148。'
+    + '装载期边 37 → 47：十个文件尾部各调 WA.registerModule（registerModule 由 store 提供）⇒ 各 +1；'
+    + '它们分三组插在 render/inject.js 之前与之后，全部排在 store 之后，现场 order-violation 0。'
+    + '调用期 1072 → 1125（+53）：五条产注入块的引擎（userlock / rhythm-loop / motif / beat-mask / power-anchor）'
+    + '在 render/inject.js 真调 buildBlock；rewriter / storyclock 为旁路；preset-world / request-viewer /'
+    + ' wb-search 三条旁路只在 tests/run.js 与 ui/panel.js 接读者。LOAD_ORDER 139 → 149（同十个文件）。'
+    + ' v2.136.0（E6）：新增 engines/foreshadow.js（foreshadow 命名空间）⇒ 文件面 162 → 163、有引用 160 → 161、LOAD_ORDER 161 → 162；装载期边 59 → 60（尾部调 WA.registerModule，registerModule 由 store 提供）；调用期 1178 → 1185（它读 store / clock / inputGuard / settingsBus 四 ns，并经 tool-diag 的诊断节与 render/inject.js 的注入分支各被读一次）；命名空间面：静态提供方 191 → 192、账本 167 → 167、读面 170 → 171。'
+    + ' v2.138.0（E7 + E5）：文件面 163 → 164、有引用 161 → 162、LOAD_ORDER 162 → 163；'
+    + '装载期边 60 → 62、调用期 1185 → 1191、合计 1245 → 1253；命名空间面：静态提供方 192 → 193、'
+    + '账本 167 → 168、读面 171 不变（新增的 apiRouter / inputGuard / workflow 三个 ns 都早已在读面内）。'
+    + ' **逐条 diff（HEAD 树 256aead vs 工作区，只算 (file, ns) 对、集合去重）实测恰好 8 条新增、0 条消失**：'
+    + ' E7 给 engines/hazard.js 加 workflow 节点（chain after / order 13），尾部真调 `WA.workflow.register`'
+    + ' ⇒ +1 装载期边（workflow 由 core/workflow.js 提供，供者 LOAD_ORDER 下标在前，order-violation 仍 0）；'
+    + ' 另有 ui/settings.js → hazard 一条**调用期**边 —— E7 的面板读数行（wa-hzwx-view）真读'
+    + ' hazard.getSettings / hazard.stat，这也是那两个成员从死导出面离场的原因（人真读了）。'
+    + ' E7 自身**没有再添调用期边**：rollAll 新读的 settingsBus（联动开关）与 clock（上轮结算时刻）'
+    + '在基线就已作为 (engines/hazard.js, ns) 对存在（E6 的结算链同读这两个 ns），集合去重后计数不动 ——'
+    + ' 这正与 v2.124.0 记过的「文件改了两处、边只多一条」同款：边是 (file, ns) 对，不是站点数。'
+    + ' E5 新增 engines/ensemble.js（ensemble 命名空间）⇒ 尾部同样调 WA.registerModule'
+    + '（registerModule 由 store 提供）⇒ +1 装载期边；调用期 +5：apiRouter（并发取模型通道）/'
+    + ' clock（超时与耗时刻度）/ inputGuard（入参净化，与 hazard 同款口径）/ settingsBus（配置面）'
+    + ' / __settingsRegs（设置注册槽，全仓同一形态）。合计装载期 +2、调用期 +6、总计 +8 = 实测 8 条，'
+    + ' 恒等式 62 + 1191 = 1253。专锁 tests/ensemble-v2138.js 的 N 面另钉「它零 store.transact / 零 store.patch」'
+    + '（本门禁的 store 边只算 ns 对，读不出这一层；两条判据互补，不互相代替）。');
+    // v2.161.0（TP3 页面恢复入口）：调用期 1382 → 1383（+1）、装载期 81 不变。
+    //   新增的唯一一条 (file, ns) 对是 **engines/offline-return.js → index.js 的 mainWin** ——
+    //   页面恢复入口要拿宿主窗口挂 `visibilitychange` / `pageshow`（与 playtime.win() 同规：
+    //   `WA.mainWin || window`，故「真实宿主存在」时这条边在）。其余读面（clock / store /
+    //   playtime / offlineTick / evolution / world / life / rand / inputGuard / settingsBus / log）
+    //   在基线就已作为 (file, ns) 对存在，集合去重后不动。恒等式 81 + 1383 = 1464。
+    //   为什么页面入口不新增**装载期**边：它不调 WA.registerModule、也不调 WA.workflow.register
+    //   （入口是事件面的，不是链上的）—— 这一点由 tests/s3-tp3-v2161.js 的 A 段单独钉住。
+    // v2.165.0（TX1）：装载期 82 → 83（diplomacy 尾部真调 WA.registerModule，registerModule 由
+    //   store 提供）；调用期 1395 → 1404（+9）：diplomacy 自身读 store/clock/inputGuard/settingsBus/
+    //   evolution/inst 六 ns（部分在基线内集合去重后不新增，真正新增的 (file, ns) 对来自它的
+    //   三处新读者 —— render/inject.js 注入分支、ui/panel.js 控件（含 getSettings 初值渲染与
+    //   setSettings 开关）、engines/tool-diag.js 诊断节（secDiplomacy 读 pairId/diagnose））。
+    //   恒等式 83 + 1404 = 1487。
+    // v2.167.0（TX2）：装载期 83 → 84（agency 尾部真调 WA.registerModule，registerModule 由
+    //   store 提供）；调用期 1404 → 1415（+11）：agency 自身读 store/plan/act/life/inputGuard/
+    //   settingsBus/clock 七 ns（部分在基线内集合去重后不新增，真正新增的 (file, ns) 对来自
+    //   它的三处新读者 —— render/inject.js 注入分支、ui/panel.js 控件（含 getSettings 初值渲染
+    //   与 setSettings 开关）、engines/tool-diag.js 诊断节（secAgency 读 diagnose/stat））。
+    //   恒等式 84 + 1415 = 1499。
+  // v2.173.0（TX4b）：装载期 90 不变、调用期 1481 → 1486、合计 1571 → 1576。
+  //   归因**实证而非估计**：把 HEAD 与工作区的边集各自 dump 成 `from|ns|kind` 行再逐行 diff，
+  //   实测恰好 5 条新增、0 条消失，且全部同族 —— ui/panel.js → aftermath / commission /
+  //   investigation / operations / storyChoice（各 1 条 call 边）。即本轮把 TX4/TX6/TX7/TX8/TX9
+  //   五段面板接上真消费方后，面板第一次读这五个模块的命名空间；这与 TX1/TX2 记过的
+  //   「diplomacy / agency 自身读七 ns，真正新增的 (file, ns) 对来自它的三处新读者（含 ui/panel.js）」
+  //   是同款。**装载期 90 不变**：本轮不新增模块，故没有新的 registerModule 尾调边
+  //   （TX3 freight 的装载期边在 v2.167.0 就已入账）。恒等式 90 + 1486 = 1576。
+  // v2.140.0（F1）：LOAD_ORDER 164 → 165（engines/noesis.js 入序）。
+  // v2.141.0（F2）：LOAD_ORDER 165 → 167（engines/lifeline.js 入序，紧随 noesis）。
+  // v2.142.0（F3）：LOAD_ORDER 167 → 167（engines/perspective-lock.js 入序，紧随 lifeline）。
+  // v2.153.0（RX5+RX6）：LOAD_ORDER 175 → 177（两个新引擎入序，紧随 storage-forecast）。
+  // v2.154.0（RX4+RX7）：LOAD_ORDER 177 → 179（两个新引擎入序，紧跟 branch-tree）。
+  // v2.165.0（TX1）：LOAD_ORDER 184 → 185（engines/diplomacy.js 入序）。
+  // v2.167.0（TX2）：LOAD_ORDER 185 → 186（engines/agency.js 入序）。
+  // v2.187.0（E4）：LOAD_ORDER 206 → 207（新增 engines/campaign.js）。
+  // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
+  // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
+  // v2.287.0（EXV7-3）：LOAD_ORDER 现场长度为 330；仍只对运行期定案的装载边判序。
+  // v2.293.0（EXV7-4~9 收口跟位）：world-autobiography 与 populate 两模块入序 ⇒ LOAD_ORDER 330 → 332。
+  // v2.294.0（V8 收口）：LOAD_ORDER 334 → 336（新增两台入序引擎）。
+  // v2.297.0（V11 立项轮跟位）：LOAD_ORDER 338 → 339（core/unified-pending.js 入序）。
+  // v2.401.0(OPV23):实测回填（LOAD_ORDER 440 → 452，ui/pages 四段文件与关联模块入序）
+  // v2.524.0（V27 拓展线）：LOAD_ORDER 506 → 515（九台引擎入序，实测回填）。
+  // v2.524.0（V27 优化线）：LOAD_ORDER 516 → 521（本批新增的五个 OPV27 模块入序，实测回填）。
+  // v2.529.0（V29 OPV29-10/09）：两个表文件入序（LOAD_ORDER 561 → 563，实测回填）。
+  // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表文件各入序一档 ⇒ 567 ⇒ 567 ⇒ 568（实测回填）。
+  // v2.529.0（缝合批 19 件）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +19 ⇒ **587**（实测）。
+  // v2.533.0（OPV30 收口）：五台缝合件入首帧面 ⇒ LOAD_ORDER 569 → 574（实测回填）。
+  // v2.542.2（叙事脊柱 L1）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1（紧跟 dramatic-tension、
+  //   早于 render/inject.js）⇒ 577 → 578，实测回填。order-violation 仍 0（它读的三个 ns 前置都在其前）。
+  // v2.542.2（叙事脊柱 L1）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1（紧跟 dramatic-tension、
+  //   早于 render/inject.js）⇒ 577 → 578，实测回填。order-violation 仍 0（它读的三个 ns 前置都在其前）。
+  // v2.542.3（叙事脊柱 L2）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1 ⇒ 578 → 579（实测回填）。
+  // v2.542.4（叙事脎柱 L3）：LOAD_ORDER 与 run.js LOAD 双登记各 +1 ⇒ 579 → 580。
+  // v2.542.5（L4）：LOAD_ORDER 与 run.js LOAD 双登记各 +1 ⇒ 580 → 581。
+  // v2.542.21：L OAD_ORDER 581 -> 582（json-repair 从惰性档回首帧：面板真读它，不能迟装）。
+  // v2.542.23：LOAD_ORDER 582 -> 583（story-export 从惰性档回首帧：工具页两个按钮真调它）。
+  // v2.542.24：LOAD_ORDER 583 -> 584（api-vault 从惰性档回首帧：api-router 首帧就调它）。
+  // v2.545.0 跟位：584 -> 585（HEAD 65713bc 实测已 585，存量 +1 未跟位；本版按实测补账）
+  A(a.edgesLoad >= 20 && a.orderLen === 585,
+    'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
+  A(a.orderViolation.length === 0,
+    'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
+  // v2.141.0（F2）：静态提供方 195 → 196、账本 170 → 171、读面 173 → 174（lifeline 由
+  //   module-registry-gate --update 落进账本，读面含上面那五处新读者）。
+  // v2.142.0（F3）：静态提供方 196 → 197、账本 171 → 172、读面 174 → 175（perspective 由
+  //   module-registry-gate --update 落进账本，读面含上面那四处新读者）。
+  // v2.153.0（RX5+RX6）：静态提供方 205 → 207、账本 179 → 181、读面 183 → 186
+  //   （plotGauge / branchTree 由 module-registry-gate --update 落进账本，
+  //   读面含 tool-diag 两节与 ui/panel.js 的 11 枚控件）。
+  // v2.154.0（RX4+RX7）：静态提供方 207 → 209、账本 181 → 183、读面 186 → 188
+  //   （worldBridge / ecoAudit 由 module-registry-gate --update 落进账本，
+  //   读面含 tool-diag 两节与 ui/panel.js 的联网页控件）。
+  // v2.165.0（TX1）：静态提供方 214 → 216、账本 188 → 189、读面 193 → 194
+  //   （diplomacy 与新消费面 render/inject.js 注入分支 + ui/panel.js 控件 + tool-diag 诊断节；
+  //   静态 +2 = diplomacy 命名空间与 __settingsRegs 之外的引擎面新增，账本经 --update 落定）。
+  // v2.167.0（TX2）：静态提供方 216 → 218、账本 189 → 190、读面 194 → 195
+  //   （agency 与新消费面 render/inject.js 注入分支 + ui/panel.js 控件 + tool-diag 诊断节；
+  //   静态 +2 = agency 命名空间与 clock 消费面新增，账本经 --update 落定）。
+  // v2.187.0（E4）：命名空间三面各 +1（静态提供方 240 → 241 / 账本 202 → 203 /
+  //   读面 217 → 218）—— campaign 是一个新命名空间，且**三面同时 +1**：
+  //   它自己提供 ns、登记进 module-registry 账本、又被 tool-diag 与面板读到。
+  // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
+  // v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 217 → 218、解析出别名 217 → 218、有引用 215 → 216、装载期边 107 → 108；它不在装载期读任何 ns，但**在调用期**读四个家族成员（beatReport / planAudit / beatLedger / genGate）与 rejectRecovery，并在 tool-diag 的诊断表里被登记 ⇒ 调用期 1671 → 1674、合计 1778 → 1782；LOAD_ORDER 216 → 217；命名空间面：静态提供方 250 → 251、账本 212 → 213（由 module-registry-gate --update 重写）、读面 224 → 225（beatFacade 在 tool-diag 被真读）。
+  // v2.194.0（U2 批次③）：**静态提供方 251 → 252**（+1）—— 不新增文件、不新增账本位；
+  //   新增的那一个 ns 是 `engines/agency.js` 的模块内自证槽 `__agencyStepShapeWarn`
+  //   （读口形状偏差时点亮，与同族的 `__agencyWarn` / `__diplomacyWarn` / `__freightWarn`
+  //   **完全同形态**，后者本来就在静态提供方里、也本就在零读名单里）⇒ 账本 213 与读面 225 不动。
+  // v2.194.0（U2 批次④）：**三面均不变**（252 / 213 / 225）—— 本批零新增命名空间：
+  //   两个模块的新增记号全部是**模块内函数**（`nestedTx` / `chainInflight` / `inChainDraft` /
+  //   `readEffects` / `markInflight` / `rowForWrite` / `laneBlocked` / `_clearLaneIfBlocked`），
+  //   不挂 `WA.*`。**这一点是刻意选的**：上一批（批次③）为「形状偏差」加了自证槽
+  //   `__agencyStepShapeWarn`，本批一度照抄加了 `__aftermathWarn` / `__storyChoiceWarn`，
+  //   但实测发现**它们的点亮条件不可达**（读口 `find` 与写口 `rowForWrite` 查的是同一层同一份，
+  //   find 通过 ⇒ rowForWrite 也必通过）⇒ 那是一个零调用的死自证位，按本仓口径**不该留**。
+  //   撤掉后：静态提供方不涨（252 与批次③持平）、零读名单不涨（27）、账本与读面一动不动。
+  // v2.287.0（EXV7-3）：现场命名空间三面复测为静态提供方/账本/读面 371/325/334；
+  //   提供方与账本仍保持 46 项有理由差集，nsFaceDrift 另行钉零。
+  // v2.293.0（EXV7-4~9 收口跟位）：新 ns 三面同步生长 ⇒ 371/325/334 → 373/327/336
+  //   （差集 46 不变，B6 判据不动；实测回填）。
+  // v2.294.0（V8 收口）：三面 375/329/338 → 377/331/340（新增 ns 同步入账、入读面）。
+  //   差集 46 不变 ⇒ B6 判据不动。
+  // v2.297.0（V11 立项轮跟位）：三面 379/333/342 → 380/334/342。
+  //   unifiedPending 从「账本有、静态无」归位为「两面都有」（差集 46 不变）。
+  // v2.401.0(OPV23):实测回填（三面 483/437/452 → 495/445/464——段 ns 同步入账本与读面）
+  // v2.524.0（V27 拓展线）：九台新引擎的命名空间同步进静态提供方与账本（549/496/515 → 558/505/515）；
+  //   读面不动（515）—— 它们目前只有专锁与 tool-diag 登记表在读，产品侧消费面见 OPV27-5。
+  // v2.524.0（V27 优化线）：三面 560/506/517 → 565/511/522（实测回填）。本批五个新 ns 同时进
+  //   静态提供方、账本（module-registry-gate --update 落定）与读面 —— 读面也 +5 正是 OPV27-5
+  //   那件事的旁证：它们不再是「只有专锁在读」的零消费面。
+  // v2.529.0（V29 OPV29-10/09）：两个表 ns 同时进静态提供方、账本（module-registry-gate
+  //   --update 落定 553）与读面（各自的算法引擎静态读）⇒ 三面 605/551/562 → 607/553/564。
+  //   差额 607-553=54 与回填前**相同**：两个 ns 三面同步增长，漂移口径不动（B6 常量不改）。
+  // v2.529.0（V29 OPV29-11）：三个表 ns 同时进静态提供方、账本（--update 落定 556）与读面
+  //   ⇒ 607/553/564 → 610/556/567。差额 610-556=54 与回填前**相同**（三面同步增长，B6 常量不动）。
+  // v2.529.0（V29 OPV29-07 + OPV29-08）：两个表 ns（toolDiagTables / actionDeskRoutes）连续三面同步增长
+  //   ⇒ 610/556/567 ⇒ 611/557/568 ⇒ **612/558/569**。差额 612-558 = 54 与回填前**相同**
+  //   （三面同步增长，漂移口径不动 ⇒ B6 常量不改）。
+  // v2.530.0（OPV30-R1/R2）：replicaFamily / ctxBoundary 同时进静态提供方与账本 ⇒ 635/581 → 637/583；
+  //   读面 570 不变（两件都还没有产品读点，定性登记在零读账本 pending-wire）——B6 差 54 不动。
+  // v2.531.0（OPV30-R3）：writeRehearsal 进静态提供方与账本 ⇒ 638 / 584；读面 570 不动（仍是 pending-wire）。
+  // v2.532~533（OPV30-R4/R5）：两件进静态提供方与账本 ⇒ 640/586；五台缝合件接进面板 ⇒ 读面 570 → 575。
+  //   B6 差仍是 640 - 586 = 54（三面同步增长，漂移口径不动）。
+  // v2.542.2（叙事脊柱 L1）：sceneIntent 进静态提供方 ⇒ 643 → 644；module-registry-gate --update 后入账 ⇒
+  //   账本 586 → 587；产品读点（render/inject.js + ui/panel.js + tool-diag-tables）⇒ 读面 578 → 579。
+  //   三面同步 +1，漂移口径（静态提供方 - 账本）不动 ⇒ B6 常量不改。
+  // v2.542.2（叙事脊柱 L1）：sceneIntent 进静态提供方 ⇒ 643 → 644；module-registry-gate --update 后入账 ⇒
+  //   账本 586 → 587；产品读点（render/inject.js + ui/panel.js + tool-diag-tables）⇒ 读面 578 → 579。
+  //   三面同步 +1，漂移口径（静态提供方 - 账本）不动 ⇒ B6 常量不改。
+  // v2.542.3（叙事脊柱 L2）：injectTier 进静态提供方 ⇒ 644 → 645；--update 后入账 ⇒ 587 → 588；
+  //   产品读点（render/inject.js + tool-diag-tables）⇒ 读面 579 → 580。三面同步 +1，漂移口径不动。
+  // v2.542.4（叙事脎柱 L3）：arcPhase 进静态提供方、账本、读面各 +1 ⇒ 646/589/581。
+  // v2.542.5（L4）：characterDrive 进静态提供方、账本、读面各 +1 ⇒ 646/589/581 → 647/590/582。
+  //   读面之所以也 +1（而不是像 v2.192.0 那样只涨提供方）：scene-intent 在产品面真读它，
+  //   不是在测试里读 —— 故差恒等式 647 - 590 = 57 不变，漂移口径不动。
+  // v2.542.12：读面 582 -> 583（面板 dcPayload 真读 jsonRepair ⇒ 它从零读面进读面）。
+  //   提供方与账本不变（647/590），漂移口径不动。
+  // v2.542.20：读面 584 -> 585（narrativeDeduction 从零读面进读面：它的五个导出被
+  //   action-desk-routes 真调）。提供方与账本不变（647/590），差恒等式不动。
+  // v2.542.23：读面 585 -> 586（storyExport 从零读面进读面：panel 的导出正文按钮真调
+  //   storyExport.build）。提供方与账本不变（647/590），差恒等式 647 - 590 = 57 不动 ——
+  //   注意「账本」这一格**没动**：nsLedger 是静态提供清单，不是零读定性账（后者是
+  //   tests/ns-consumer-ledger.json，storyExport 那一条已按纪律④删除，66 -> 65）。
+  // v2.542.24：读面 586 -> 587（apiVault 从零读面进读面：core/api-router.js 真调它）。
+  //   提供方与账本不变（647/590），差恒等式不动。
+  // v2.545.0 跟位：读面 587 → 592。HEAD 65713bc 实测 588（存量 +1 未跟位）；
+  //   本会话 +4：dreamSettle / lensCulling / weightedDraw / followupGate 各一对新 (file, ns) 边。
+  // v2.546.0：读面 592 → 593（compactTiming 由 inject-collector 真读）。
+  // v2.547.0：读面 593 → 595（msgAlign / ephemeralScrub 两个 ns 由零读进读面；
+  //   提供方 647 与账本 590 不动 —— 账本条目会在「接到真读点」时注销，见 ns-consumer-ledger.json）。
+  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 595,
+    'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
+  // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
+  //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
+  //   （它们的零读定性逐条登记在 tests/ns-consumer-ledger.json 的 pending-wire 类）。
+  // v2.152.0（RP6+RP7）：ui/render-perf.js 的 renderPerf 是 static-only 差（UI 层刻意不进
+  //   LOAD，静态扫不到它的消费者）⇒ 差 25 → 26。
+  // v2.153.0（RX5+RX6）：差仍为 26 —— 两个新 ns 都进了账本（引擎层不是 static-only 差）。
+  // v2.165.0（TX1）：差 26 → 27（diplomacy 已入账本；差 +1 来自静态提供方面新增，
+  //   登记理由同前——入口/内部前缀类，非未登记漂移）。
+  // v2.167.0（TX2）：差 27 → 28（agency 已入账本；差 +1 来自静态提供方面新增，
+  //   登记理由同前——入口/内部前缀类，非未登记漂移）。
+  // （v2.187.0 E4：241 - 203 = 38，差值不变 —— 新 ns 三面同时增长，漂移口径不动。）
+  // v2.194.0（U2 批次④）：差**仍为 39**（与批次③持平）—— 本轮一度写成 41（照抄批次③
+  //   的自证槽增量），但两个自证槽实测不可达已撤除 ⇒ 静态提供方没涨，差自然也不涨。
+  // v2.401.0(OPV23):实测回填（差 46 → 50——静态提供方 +12 / 账本 +8，差额仍全有登记理由：入口/UI/内部前缀）
+  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 57,
+    'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
+  // v2.153.0（RX5+RX6）：零读 ns 22 → 21（plotGauge 与 branchTree 都被 tool-diag 与面板真读，
+  //   从零读名单里离场）。
+  // v2.165.0（TX1）：零读 ns 21 → 22（diplomacy 的新消费面在 render/inject.js 注入分支 /
+  //   ui/panel.js 控件 / tool-diag 诊断节，但静态扫描下其 __settingsRegs 等内部槽面新增
+  //   一项未被读出的 ns —— 与 v2.153.0 前的 static-only 差同性质，只报不红）。
+  // v2.167.0（TX2）：零读 ns 22 → 23（agency 的新消费面同上）。
+  // v2.192.0（U5）：新增 engines/reject-recovery.js（rejectRecovery 命名空间），它尾部调 WA.registerModule 登记自己 ⇒ 文件面 216 → 217、解析出别名 216 → 217、有引用 214 → 215、装载期边 106 → 107（合计 1777 → 1778）；它不读任何既有 ns（只用 registerModule 登记）⇒ 调用期 1671 不变；命名空间面：静态提供方 249 → 250、账本 211 → 212、读面 224 不变（rejectRecovery 的读者是专锁与核对器，静态扫描下不进读面 —— 与既有 static-only 差同性质）。
+  // v2.194.0（U2 批次④）：零读 **仍为 27**（与批次③持平）—— 本轮一度写成 29（那两个
+  //   自证槽），但它们实测不可达已撤除，产品源面本就没有这两个记号。
+  // v2.297.0（V11 立项轮跟位）：零读 ns 37 → 38。
+  //   +1 是 unifiedPending 自己：修正别名形态后它终于进入静态提供方面，
+  //   而它的读者是 ui/panel.js 的待办页与 core/unified-pending.js 自身的 diagnose ——
+  //   静态扫描下 `WA.unifiedPending` 只在面板里出现一次（<A>.<ns> 形态读得出），
+  //   但 B7 数的是「提供方有、读面零」的命名空间，本轮实测为 38。
+  // v2.300.0（V11 OPV11-6）：零读 ns 38 → 39（fieldWriters 目前只有测试与面板候选消费，
+  //   产品面静态读集合里还没出现；这是如实增长，不是判据放宽）。
+  // v2.524.0（V27 拓展线）：零读 ns 38 → 47（九台新引擎的命名空间目前只有专锁与 tool-diag 登记表
+  //   在读，产品面静态读集合里还没出现 —— 这是**如实增长**，不是判据放宽；消费面登记见 OPV27-5）。
+  // v2.530.0（OPV30-R1/R2）：副本族与上下文边界都还没有产品读点 ⇒ 零读 ns 69 → 71
+  //   （与 tests/ns-consumer-ledger.json 的 BASE_DEAD_NS 同源，两处必须一起动）。
+  // v2.542.12：69 -> 68（jsonRepair 接线后出零读面；账本同批出表，见 ns-consumer-ledger.json）。
+  // v2.542.20：零读 ns 67 -> 66（narrativeDeduction 已接线，按纪律四从 ns 账本删行出表）。
+  // v2.542.23：66 -> 65（storyExport 出零读面：panel 的「导出正文」两个按钮真调 storyExport.build）。
+  // v2.542.24：65 -> 64（apiVault 出零读面：api-router 的读写链真调它）。
+  // v2.545.0 跟位：零读 ns 64 → 59。HEAD 65713bc 实测 63（存量 -1 未跟位）；
+  //   本会话 -4：dreamSettle（dream.archive）/ lensCulling（eavesdrop）/ weightedDraw（regional.roll）/
+  //   followupGate（spotlight.resolveIntervention）四条零读 ns 出表。
+  // v2.546.0：零读 ns 59 → 58（compactTiming 出表）。
+  // v2.547.0：58 → 56（msgAlign / ephemeralScrub 两口真接了产品消费点；零读定性账本同步注销两条）。
+  A(a.deadNs.length === 56, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
+    && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
+    'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
+    + a.staleRegistration.length + ' / 静态漏扫 ' + a.unreflected.length
+    + ' / 归属错配 ' + a.ownerMismatch.length + '）');
+  A(a.problems === 0 && a.ok && a.scanAlive && !a.cycle && !a.cycleWithProv && !a.notInOrder.length,
+    'B9 总判据：problems ' + a.problems + ' / ok ' + a.ok + ' / 扫描面活着 ' + a.scanAlive
+    + ' / 环 无 / 悬空文件 ' + a.notInOrder.length);
+    // v2.153.0（RX5+RX6）：**B10 不变**（16/21）—— 本表数的是入口 ns（17）+ UI 层 ns（4），
+  //   两个新引擎是普通引擎模块（进的是账本，不是这张表）。改动本项前先看这一行，
+  //   否则会把「引擎进账本」误读成「登记表多两项」（本轮实测过一次）。
+  // v2.225.0(优化 Q8):registeredUsed 27 -> 28、registeredTotal 34 -> 35 ——
+  //   新增第六个 UI 层命名空间 panelFold(ui/panel-fold.js),它**有真读者**
+  //   (ui/panel.js 的 foldSec() 直写 `WA.panelFold.isCollapsed(...)`),故计入「在用」而非零读。
+  // v2.401.0(OPV23):实测回填（28/35 → 32/39——panelOverviewMain/panelToolsPage/uiDashboards 三段 ns 接上真读者）
+  A(a.registeredUsed === 39 && a.registeredTotal === 46,
+    'B10 登记面在用 ' + a.registeredUsed + '/' + a.registeredTotal
+    + '（未在用的 5 个是取数型入口 ns，只在 index.js 内部自用；v2.181.0：UI 主题层 9 个 ns 全部接上真读者）');
+  // v2.153.0（RX5+RX6）：两个新引擎进账本 ⇒ 账本缺项文件面收缩，缺项 5 不变（UI 层仍 4 文件）。
+  // v2.401.0(OPV23):实测回填（缺项 15 → 19——ui/pages 四段文件入账本外文件面）
+  // v2.529.0（V29 OPV29-10/09）：实测仍是 **22**，且 22 条逐条未变（index.js + 21 个
+  //   ui 文件）。两个新表文件曾一度使缺项变 24（它们进文件面、账本还没收），
+  //   `node tests/module-registry-gate.js --update` 把账本落定后即回到 22 ——
+  //   这一轮记下这个中间态，是因为「+2 就该把常量写 24」会让判据在 --update 之后反而红。
+  A(a.runtimeMissing === 25 && a.ledgerAvailable,
+    'B11 账本缺项文件 ' + a.runtimeMissing + ' 个（入口 + 十二个 ui 文件，如实报出）');
+  // 次序判据方向的两向自证（用假产品面，不碰真文件）
+  const fakeOk = M.audit({
+    read: function (rel) { return fakeProduct()[rel] || ''; },
+    files: Object.keys(fakeProduct()),
+    indexSrc: 'const LOAD_ORDER = [\n  \'core/a.js\',\n  \'core/b.js\'\n];',
+    // 注入面必须与真源同构：readLedger 返回的是**账本对象**（含 modules 一层）。
+    // 少写一层 ⇒ 交叉验证面静默全空，「0 条违规」会在空集上恒真（不可用 ≠ 健康）。
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: ['alpha'], requiresFiles: ['core/a.js'] } } },
+    ledgerText: null
+  });
+  A(fakeOk.orderViolation.length === 0 && fakeOk.unprovided.length === 0,
+    'B12 假面上「供者先装」不报违规（实 ' + fakeOk.orderViolation.length + '）—— 判据不是恒真');
+  const fakeBad = M.audit({
+    read: function (rel) { return fakeProduct()[rel] || ''; },
+    files: Object.keys(fakeProduct()),
+    indexSrc: 'const LOAD_ORDER = [\n  \'core/b.js\',\n  \'core/a.js\'\n];',
+    // 注入面必须与真源同构：readLedger 返回的是**账本对象**（含 modules 一层）。
+    // 少写一层 ⇒ 交叉验证面静默全空，「0 条违规」会在空集上恒真（不可用 ≠ 健康）。
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: ['alpha'], requiresFiles: ['core/a.js'] } } },
+    ledgerText: null
+  });
+  A(fakeBad.orderViolation.length === 1
+    && fakeBad.orderViolation[0].from === 'core/b.js' && fakeBad.orderViolation[0].to === 'core/a.js',
+    'B12b 假面上把装载序倒过来 ⇒ 恰报 1 条次序违规（用者先装 b@0 → 供者 a@1）—— 判据真在测方向');
+  // 「未提供」判据的两向自证
+  const fakeGhost = M.audit({
+    read: function (rel) {
+      const f = fakeProduct({ 'core/b.js': 'const WA = window.WorldAxis = window.WorldAxis || {};\nWA.nobody = 1;\nWA.ghostNs();\n' });
+      return f[rel] || '';
+    },
+    files: Object.keys(fakeProduct()),
+    indexSrc: 'const LOAD_ORDER = [\n  \'core/a.js\',\n  \'core/b.js\'\n];',
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: [], requiresFiles: [] } } },
+    ledgerText: null
+  });
+  A(fakeGhost.unprovided.length === 1 && fakeGhost.unprovided[0].ns === 'ghostNs',
+    'B13 假面上读一个无人提供的 ns ⇒ 恰报 1 条未提供（'
+    + fakeGhost.unprovided.map(function (u) { return u.ns; }).join(',') + '）');
+  // 跨文件写判据的两向自证
+  const fakeDup = M.audit({
+    read: function (rel) {
+      const f = fakeProduct({ 'core/b.js': 'const WA = window.WorldAxis = window.WorldAxis || {};\nWA.alpha = function () {};\n' });
+      return f[rel] || '';
+    },
+    files: Object.keys(fakeProduct()),
+    indexSrc: 'const LOAD_ORDER = [\n  \'core/a.js\',\n  \'core/b.js\'\n];',
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: [], requiresFiles: [] } } },
+    ledgerText: null
+  });
+  A(fakeDup.crossFileWrite.length === 1 && fakeDup.crossFileWrite[0].ns === 'alpha',
+    'B14 假面上两文件都赋值 alpha ⇒ 恰报 1 条跨文件写（'
+    + fakeDup.crossFileWrite.map(function (c) { return c.ns; }).join(',') + '）');
+  void fakeOk;
+
+  // ── C 不变式 ──
+  const before = { mod: rd(MOD_REL), led: rd(LEDGER_REL) };
+  const a1 = M.audit(), a2 = M.audit(), a3 = M.audit();
+  A(JSON.stringify(a1) === JSON.stringify(a2) && JSON.stringify(a2) === JSON.stringify(a3),
+    'C1 audit 连调幂等（三次同值）');
+  A(M.summary() === M.summary(), 'C1b summary 连调幂等');
+  A(JSON.stringify(M.loadOrder()) === JSON.stringify(M.loadOrder()), 'C1c loadOrder 连调幂等');
+  A(rd(MOD_REL) === before.mod && rd(LEDGER_REL) === before.led,
+    'C2 判据纯只读：连调后模块与账本逐字未变（取证不得改变被取证对象）');
+  A(M.productFiles().length === a.files,
+    'C2b productFiles 连调同长且与现场文件面同源（' + M.productFiles().length
+    + ' === ' + a.files + '）');
+}
+
+function runNegative(A) {
+  const S = rd(MOD_REL);
+  let n = 0;
+  const done = function (label) { n += 1; return label; };
+
+  // ── N1 真源码破坏：ALIAS_RE 窄到只认一种形态 ⇒ 别名覆盖率塌陷 ──
+  const narrow = 'const ALIAS_RE = new RegExp("const\\\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\\\s*=\\\\s*window\\\\.WorldAxis\\\\s*=\\\\s*window\\\\.WorldAxis\\\\s*\\\\|\\\\|\\\\s*\\\\{\\\\s*\\\\}\\\\s*;");';
+  // 破坏必须换掉**整个 IIFE 块**：只换首行会留下孤立的 `})();`，破坏副本变成 SyntaxError，
+  // 于是「判据没反应」与「副本根本没装载起来」长得一模一样（本锁要治的正是这类混淆）。
+  // 块文本由切片取得（不是字面量），故锚点整串在本锁里仍只出现 1 次（锚点表那行）。
+  const n1i = S.indexOf(ANCHORS.aAlias.txt);
+  const n1j = S.indexOf('})();', n1i) + 5;
+  const aliasBlock = S.slice(n1i, n1j);
+  const n1src = breakOnce(S, aliasBlock, narrow, 'N1');
+  const n1 = loadCopy(MOD_REL, n1src);
+  const n1a = n1.audit();
+  A(n1a.aliasFiles < n1a.files,
+    done('N1b 装载破坏副本 ⇒ 别名面塌陷（' + n1a.aliasFiles + '/' + n1a.files
+      + ' < 119）—— 证明 B1 的下限判据真在测覆盖率，而不是恒真'));
+
+  // ── N2 真源码破坏：EXTERNAL 表填一个假外名 ⇒ 「过期登记」判据必须现形 ──
+  const n2src = breakOnce(S, ANCHORS.aExternal.txt, "const EXTERNAL = { ghostExternal: '假外名' };", 'N2');
+  const n2 = loadCopy(MOD_REL, n2src);
+  const n2a = n2.audit();
+  A(n2a.staleRegistration.some(function (s) { return s.ns === 'ghostExternal'; }),
+    done('N2b 装载破坏副本 ⇒ 报出过期登记 ' + n2a.staleRegistration.map(function (s) { return s.ns; }).join(',')
+      + '（原版为空）—— 证明 B8 的「无过期登记」不是恒真'));
+
+  // ── N3 真源码破坏：次序方向写反（pi < ci）⇒ 真源码上必须报违规 ──
+  const n3src = breakOnce(S, ANCHORS.aOrder.txt, 'if (pi < ci) orderViolation.push(', 'N3');
+  const n3 = loadCopy(MOD_REL, n3src);
+  const n3a = n3.audit();
+  A(n3a.orderViolation.length > 20,
+    done('N3b 装载破坏副本 ⇒ 方向写反后报出 ' + n3a.orderViolation.length
+      + ' 条「违规」（真源码上恒 0）—— 证明判据方向是现场测出来的，不是恒真'));
+
+  // ── N4 真源码破坏：恒真保护被抽掉 ⇒ 空扫描面也会判绿 ──
+  const n4src = breakOnce(S, ANCHORS.aAlive.txt, 'scanAlive: false && g.coverage.nsProvided > 0', 'N4');
+  const n4 = loadCopy(MOD_REL, n4src);
+  const n4a = n4.audit({ read: function () { return ''; }, files: ['index.js'], indexSrc: 'const LOAD_ORDER = [];' });
+  A(n4a.scanAlive === false && n4a.ok === false,
+    done('N4b 装载破坏副本 + 空扫描面 ⇒ ok 为假（恒真保护生效；原版上 scanAlive 为真）'
+      + '—— 证明「0 问题」不会被空集伪装'));
+
+  // ── N5 真源码破坏：账本漏扫不再补边 ⇒ 有 requires 却扫不到的边被静默丢掉 ──
+  const n5src = breakOnce(S, ANCHORS.aSkip.txt, 'if (true) return;', 'N5');
+  const n5 = loadCopy(MOD_REL, n5src);
+  const n5a = n5.audit({ read: function (rel) { return rel === 'core/a.js' ? fakeProduct()['core/a.js'] : ''; },
+    files: ['core/a.js'], indexSrc: "const LOAD_ORDER = ['core/a.js', 'core/b.js'];",
+    runtime: { modules: { 'core/a.js': { requires: [], requiresFiles: [] },
+      'core/b.js': { requires: ['alpha'], requiresFiles: ['core/a.js'] } } } });
+  A(n5a.unreflected.length === 0 && n5a.edgesLoad === 0,
+    done('N5b 装载破坏副本 ⇒ 账本里 b→a 的装载期边整条消失（漏扫补丁失效，实装载期边 '
+      + n5a.edgesLoad + ' 条）—— 证明 A8 锁的「不许静默丢边」真在生效'));
+
+  // ── N6 假锚点（v2.107.0 开发期占位串，从未落进模块）⇒ breakOnce 必抛 ──
+  let threw = false;
+  try { breakOnce(S, 'const fld = s.raw || s.field;', 'X', 'N6'); } catch (e) { threw = true; }
+  A(threw, done('N6 破坏锚点不存在时 breakOnce 抛（不许静默通过）'
+    + '—— 证明「破坏没发生也会报绿」这条假路径被堵死'));
+
+  // ── N7 反向自证（H6）：原版上同款判据必须为真 ──
+  const M = require('./module-cycle-gate.js');
+  A(M.audit().aliasFiles === M.audit().files,
+    done('N7 原版上别名覆盖率满格为真，破坏副本上塌陷（N1b）—— 两向自证成立'));
+  A(M.audit().orderViolation.length === 0,
+    done('N7b 原版上零次序违规为真，方向反转后报 ' + '20+' + ' 条（N3b）—— 两向自证成立'));
+
+  // ── N8 破坏落点全部可核（不靠改真文件） ──
+  A([n1src, n2src, n3src, n4src, n5src].every(function (x) { return x !== S; }) && n >= 6,
+    done('N8 五处真源码破坏 + 一处「锚点不存在必抛」全部可核（本组共 ' + n + ' 项断言），'
+      + '且全部是内存副本，真文件逐字未动'));
+  A(rd(MOD_REL) === S, done('N8b 真文件在全部负控制跑完后逐字未变（负控制不得改真文件）'));
+}
+
+module.exports = { ANCHORS: ANCHORS, runAll: runAll, runNegative: runNegative };
+
+if (require.main === module) {
+  let P = 0, F = 0;
+  const A = function (c, m) { if (c) { P += 1; } else { F += 1; console.log('  ✗ ' + m); } };
+  try { runAll(A); } catch (e) { F += 1; console.log('  ✗ 异常：' + e.message); }
+  try { runNegative(A); } catch (e) { F += 1; console.log('  ✗ 负控制异常：' + e.message); }
+  console.log('MODULE-CYCLE-V2107: ' + (F === 0 ? 'pass（' + P + ' 项）' : 'FAIL ' + F + ' / ' + (P + F)));
+  process.exit(F === 0 ? 0 : 1);
+}
