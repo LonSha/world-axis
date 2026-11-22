@@ -288,8 +288,18 @@
     };
 
     // ① pinned 优先：整体超预算时，从 rank 最末开始折叠（不静默丢弃 pinned）
+    //    v2.558.0：这句注释此前**不成立** —— 实现是 `pinned.forEach` 按**输入顺序**遍历，
+    //    于是「先到的那条 rank2 只要放得下就先占住」，后面的 rank1 反倒先被折成一小段。
+    //    实测（4 条 pinned：rank2/1/2/1，各 60 token，budget 120）：被折的是 [2, 1] ——
+    //    一条「近端事件」（rank1，最不可替代）被折，而一条「世界状态」（rank2）完整保留。
+    //    修法两条，都守住前几批的口径：
+    //      · **预算够时不重排**（pinnedTokens ≤ budget ⇒ 原样，行为完全不变）；
+    //      · 只有真需要取舍（pinned 整体超预算）才按 rank 升序 —— 放不下的自然是最末那档。
     let pinnedTokens = pinned.reduce(function (s, x) { return s + x.tokens; }, 0);
-    pinned.forEach(function (x) {
+    const pinnedOrder = (pinnedTokens <= budget)
+      ? pinned
+      : pinned.slice().sort(function (a, b) { return a.rank - b.rank; });
+    pinnedOrder.forEach(function (x) {
       if (pinnedTokens <= budget || used + x.tokens <= budget) { kept.push(x); used += x.tokens; occupied.push({ source: x.source, tokens: x.tokens }); return; }
       const floorTokens = Math.min(x.tokens, Math.max(FOLD_FLOOR_TOKENS, Math.floor(x.tokens * 0.25)));
       const t = trim(x.content, Math.min(floorTokens, x.tokens));

@@ -22696,6 +22696,18 @@ await runScript('./dormant-quota-v2556.js');
 //   21 段：A 静态 / B 行为（含丙进得来、面板语义不变、只读）/ C 读数（含 reset 清零）/ N 三条负控。
 //   单独跑：node tests/intent-quota-v2557.js
 await runScript('./intent-quota-v2557.js');
+// v2.558.0：pinned 折叠顺序专锁 —— `inject-budget.plan` 第 ① 段（同一个病的第五处，
+//   而且是在最不该丢的一段上：块与块之间的取舍，不是单块内部的名额）。
+//   注释从 v0.9.3 起就写着「整体超预算时，从 rank 最末开始折叠」，实现却是 pinned.forEach
+//   按**输入顺序**遍历 ⇒ 先到的 rank2 只要放得下就先占住，后面的 rank1 反倒先被折成一小段。
+//   实测（4 条 pinned：rank2/1/2/1 各 60 token，budget 120）：被折的 rank 序列 = [2,1]。
+//   改法：**预算够时不重排**（pinnedTokens ≤ budget ⇒ 原样，行为完全不变）；
+//   只有真需要取舍才按 rank 升序（放不下的自然是最末那档）。
+//   14 段：A 静态（pinnedOrder / 短路顺序 / optional 那段没被碰坏）/
+//   B 行为（只折 rank2、rank1 完整、预算够不重排、pinned 永不 dropped、占位账恒等式）/
+//   C 读数（三表 / reason / 未声明源可观测）/ N 两条负控。
+//   单独跑：node tests/budget-pinned-order-v2558.js
+await runScript('./budget-pinned-order-v2558.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
