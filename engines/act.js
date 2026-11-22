@@ -923,11 +923,61 @@
       confirmed: stat.confirmed, awaiting: stat.awaiting };
   }
 
+  /**
+   * v2.559.0：注入名额的**分配判据**（此前是 `filter(ACTIVE).slice(0, cfg.maxRun)` ——
+   *   **按登记顺序**截断）。`maxActs` 是 8（候选表上界），`maxRun` 是 4（名额），
+   *   于是「同时活着 5 条以上」是常态可达的局面，而注入面永远只列**最早登记的那 4 条**。
+   *   实测（6 条 active：4 条很早登记、一直停在 `planned`；2 条刚登记、`running`、5 秒后结束）：
+   *     注入块 = 甲 work「修屋顶」planned / 乙 work「打水」planned /
+   *              丙 wait「等回信」planned / 丁 wait「等船」planned
+   *     两条 `running`（正在发生、马上要变）**一条都没进**。
+   *   这正是本引擎头部边界③治的形态的另一面：那里说「拟稿不冒充事实」，
+   *   而注入面把 4 条**拟稿**（planned）排在了 2 条**事实**（running）前面 ——
+   *   **「他打算做」压掉了「他正在做」**。
+   *
+   * 判据三条（缺一不可）：
+   *   ① **名额够就全进**（active ≤ maxRun ⇒ 原样，顺序不变；fail-open）；
+   *   ② **running 优先**：正在发生的比计划中的先入文（`status` 现成字段，不新造评分）；
+   *   ③ 同档按 `dueAt` 升序（快结束的先 —— 模型该先知道「马上要变」的那条），
+   *      再按 `at` 升序（登记早的在前，卡住的更该被看见），最后按 id 字典序（可复算）。
+   *   纯函数：不改入参、不读 store。
+   */
+  function pickRun(active, cap) {
+    const all = Array.isArray(active) ? active.slice() : [];
+    const quota = Math.max(0, Math.floor(Number(cap) || 0));
+    if (!all.length || !quota) return { picked: [], mode: 'empty', quota: quota };
+    if (all.length <= quota) return { picked: all.slice(), mode: 'all-fit', quota: quota };
+    const atOf = function (x) { const n = Number(x && x.at); return isFinite(n) && n > 0 ? n : Infinity; };
+    const dueOf = function (x) { const n = Number(x && x.dueAt); return isFinite(n) && n > 0 ? n : Infinity; };
+    const sorted = all.slice().sort(function (a, b) {
+      const ra = (a && a.status === 'running') ? 1 : 0;
+      const rb = (b && b.status === 'running') ? 1 : 0;
+      if (ra !== rb) return rb - ra;                       // ② running 先
+      const d = dueOf(a) - dueOf(b);                        // ③ 快结束的先
+      if (d !== 0) return d;
+      const t = atOf(a) - atOf(b);                          //    登记早的先
+      if (t !== 0) return t;
+      const ai = String((a && a.id) || ''), bi = String((b && b.id) || '');
+      return ai < bi ? -1 : (ai > bi ? 1 : 0);
+    });
+    return { picked: sorted.slice(0, quota), mode: 'running-first', quota: quota };
+  }
+  /** 最近一次注入单的读数（供 stat().block 投影；**拷贝**出去，不是引用）。 */
+  let __lastBlock = null;
   function buildBlock() {
     const cfg = settings();
     if (!cfg.enabled || !WA.store) return '';
-    const rows = acts().filter(function (x) { return x && ACTIVE.indexOf(x.status) >= 0; }).slice(0, cfg.maxRun);
-    if (!rows.length) return '';
+    const active = acts().filter(function (x) { return x && ACTIVE.indexOf(x.status) >= 0; });
+    const pick = pickRun(active, cfg.maxRun);
+    // 读数先落账（**空表也留读数**）：`picked: 0` 与「从没构建过（null）」是两件事。
+    __lastBlock = {
+      at: clockNow('act'), active: active.length, candidates: active.length, picked: pick.picked.length,
+      running: active.filter(function (x) { return x.status === 'running'; }).length,
+      planned: active.filter(function (x) { return x.status !== 'running'; }).length,
+      quota: pick.quota, mode: pick.mode
+    };
+    if (!pick.picked.length) return '';
+    const rows = pick.picked;
     const lines = rows.map(function (x) {
       const left = (x.status === 'running' && x.dueAt) ? '，预计 ' + Math.max(0, x.dueAt - clockNow('act')) + 'ms 后结束' : '';
       const where = x.place ? '（' + x.place + '）' : (x.departed ? '（在途中，位置未知）' : '');
@@ -947,7 +997,15 @@
     verdict: verdict,
     // v2.524.0（S1 接线）：判定面接骰子（只降档）+ 五档→四档纯映射（可整表核）。
     judge: judge, diceVerdict: diceVerdict, DICE_VERDICT: Object.assign({}, DICE_VERDICT),
-    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
+    stat: function () {
+      // v2.559.0：`block` 是「最近一次注入单」的名额面读数（拷贝出去，不是引用）。
+      //   null = 本进程还没构建过；picked: 0 = 构建过但空表 —— 这两件事不许混成一个读数。
+      //   running/planned 与 active 并列：`active: 6` 说的是「六条行动活着」，
+      //   `block: { running: 2, picked: 4 }` 说的是「注入面提了 4 条」—— 不许互相顶替。
+      const o = Object.assign({}, stat, { faults: Object.assign({}, stat.faults) });
+      o.block = __lastBlock ? Object.assign({}, __lastBlock) : null;
+      return o;
+    }
   };
   // Automatic cycle consumes the previous committed snapshot before backstage.simulate (20).
   // Current inference results participate next turn; do not mistake asynchronous launch

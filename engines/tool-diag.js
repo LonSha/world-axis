@@ -310,6 +310,29 @@
    *   两个数不许互相顶替，所以并列报出。`block: null` = 本进程还没构建过；
    *   `picked: 0` = 构建过但空表（两件事，不许混成一个读数）。
    */
+  /**
+   * v2.559.0：人物行动 —— 名额面读数。
+   *   `active: 6` 说的是「六条行动活着」；`block: { running: 2, picked: 4 }`
+   *   说的是「注入面提了 4 条、其中 2 条正在跑」—— 两个数不许互相顶替。
+   *   纯读：只调 `stat()` / `getSettings()`，**不 buildBlock**（那会推进名额面读数，
+   *   诊断面不该污染它 —— 与 secIntentBoard「不 board」同一条纪律）。
+   */
+  function secAction() {
+    return safe(function () {
+      if (!WA.act || typeof WA.act.stat !== 'function') return { error: 'engines/act.js 未加载（行动读数缺席）' };
+      const st = WA.act.stat();
+      const cfg = (typeof WA.act.getSettings === 'function') ? WA.act.getSettings() : null;
+      return {
+        enabled: !!(cfg && cfg.enabled === true),
+        settings: cfg ? { maxActs: cfg.maxActs, maxRun: cfg.maxRun } : null,
+        added: st.added, admitted: st.admitted, completed: st.completed, failed: st.failed,
+        aborted: st.aborted, deferred: st.deferred, unconfirmed: st.unconfirmed,
+        faults: Object.assign({}, st.faults || {}),
+        // null = 还没构建过注入块；picked: 0 = 构建过但空表（两件事）。
+        block: st.block || null
+      };
+    });
+  }
   function secDormantLadder() {
     return safe(function () {
       if (!WA.dormantLadder || typeof WA.dormantLadder.view !== 'function') return { error: 'dormantLadder 模块不可用' };
@@ -4838,7 +4861,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
   // ── 汇总 ──
   function collect() {
     const diag = {
-      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), perfLedger: secPerfLedger(), tapeStore: secTapeStore(), intel: secIntel(), perspective: secPerspective(), sediment: secSediment(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), dormantLadder: secDormantLadder(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
+      meta: secMeta(), env: secEnv(), modules: secModules(), visibility: secVisibility(), style: secStyle(), life: secLife(), factionGraph: secFactionGraph(), noesis: secNoesis(), lifeline: secLifeline(), perfLedger: secPerfLedger(), tapeStore: secTapeStore(), intel: secIntel(), perspective: secPerspective(), sediment: secSediment(), org: secOrg(), longline: secLongline(), foreshadow: secForeshadow(), dormantLadder: secDormantLadder(), act: secAction(), causal: secCausal(), opportunity: secOpportunity(), recipe: secRecipe(),
       // v2.231.0（OPT-8）：世界词汇面（货币 / 配方 / 判定维度 / 题材目录 + 逐配方前置自洽）。
       //   与 recipe 节分列：那一节答「这一局按哪张配方跑」，本节答「这一局用哪些词」。
       playerArchive: safe(function () { const v = WA.playerArchive.view(); return { settings: WA.playerArchive.getSettings(), count: v.works.length, rounds: v.works.map(function (x) { return x.round; }), note: v.note }; }, {}),

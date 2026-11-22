@@ -22708,6 +22708,16 @@ await runScript('./intent-quota-v2557.js');
 //   C 读数（三表 / reason / 未声明源可观测）/ N 两条负控。
 //   单独跑：node tests/budget-pinned-order-v2558.js
 await runScript('./budget-pinned-order-v2558.js');
+// v2.559.0：人物行动注入名额专锁 —— `act.buildBlock`（同一个病的第六处）：
+//   `filter(ACTIVE).slice(0, cfg.maxRun)` 按**登记顺序**取 4 条，而 maxActs=8 ⇒
+//   实测 6 条 active（4 条很早登记却一直是 `planned`、2 条刚登记且 `running`、5 秒后结束）时，
+//   注入块列的是四条 planned，两条 running 一条都进不来 ——
+//   引擎边界③说「拟稿不冒充事实」，而注入面把拟稿排在了事实前面。
+//   改法：pickRun（名额够就全进 / running 优先 / dueAt 近的先 / at 早的先 / id 字典序）；
+//   名额面读数进 stat().block；tool-diag 新增 secAction 节（只读 stat/getSettings，不 buildBlock）。
+//   18 段：A 静态 / B 行为（含 running 压过更早的 planned、终态不进、只读）/ C 读数 / N 三条负控。
+//   单独跑：node tests/act-quota-v2559.js
+await runScript('./act-quota-v2559.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
