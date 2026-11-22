@@ -22773,6 +22773,14 @@ await runScript('./appointment-quota-v2562.js');
     //   26 段：A 静态 / B 行为 / C 读数 / N 四条负控。
     //   单独跑：node tests/aftermath-block-quota-v2563.js
 await runScript('./aftermath-block-quota-v2563.js');
+    // v2.564.0（按序截断第十二处）：长线伏笔注入名额 —— 排序对，但截断不说还有几条。
+    //   engines/longline.js 的 buildBlock 早已按 lateBy 降序（最逾期先），
+    //   但只念 maxItems 条就不管了：探针 10 条只念 4 条，读者无从知道还有 6 条。
+    //   改法（不改判据）：名额提成 quotaOf(cfg) → 截断自证「另有 N 条逾期未列」
+    //   → 读数进 stat().block（五栗 + 单独拷贝）。
+    //   20 段：A 静态 / B 行为 / C 读数 / N 三条负控。
+    //   单独跑：node tests/longline-block-v2564.js
+await runScript('./longline-block-v2564.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——

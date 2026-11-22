@@ -12,6 +12,8 @@
  *   1 总开关默认关闭；关闭时不结算、不注入。
  *   2 只给**已存在的伏笔**设定承诺，不创建伏笔、不改写伏笔状态。
  *   3 逾期只报欠账，**不自行回收**——回收与否是叙事决定，不是容量决定。
+ *   4 注入面名额（maxItems）只截断不参与筛选（排序已是「最逾期优先」），
+ *     但截断必须自证「另有几条未列」——否则读者不知道自己看到的是全部还是抽样。（v2.564.0）
  */
 (function () {
   'use strict';
@@ -28,7 +30,8 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   // 终态：已收/已弃/已引爆——都不再算「欠账」（与 memory.FS_TERMINAL / backstage 同口径）
   const TERMINAL = ['recycled', 'dropped', 'triggered'];
-  const stat = { promises: 0, sweeps: 0, overdue: 0, blocked: 0, lastReason: '' };
+  const stat = { promises: 0, sweeps: 0, overdue: 0, blocked: 0, lastReason: '',
+    block: null };
   function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function ts(v) { const n = Number(v); return isFinite(n) && n > 0 ? Math.floor(n) : 0; }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -78,22 +81,45 @@
     const worst = rows[0].lateBy;
     return { count: rows.length, worstMs: worst, level: worst > 3600000 ? 'heavy' : 'light' };
   }
+  // 名额：来自设置面 maxItems（1..8），但提成具名函数，避免 NaN/0
+  function quotaOf(cfg) {
+    var n = Math.floor(Number(cfg && cfg.maxItems));
+    return isFinite(n) && n > 0 ? n : 1;
+  }
   function buildBlock() {
-    const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
-    const rows = overdue();
+    var cfg = settings();
+    if (!cfg.enabled || !WA.store) return '';
+    var rows = overdue();
+    var quota = quotaOf(cfg);
+    var picked = rows.slice(0, quota);
+    var hidden = Math.max(0, rows.length - quota);
+    var mode = !rows.length ? 'empty' : (hidden ? 'worst-first' : 'all-fit');
+    // v2.564.0：旧写法只截断不读数、也不说还有几条（探针 s1：10 条只念
+    //   4 条，读者无从知道）。排序早已是「最逾期优先」，本批只补自证与读数。
+    stat.block = { candidates: rows.length, picked: picked.length,
+      quota: quota, hidden: hidden, mode: mode };
     if (!rows.length) return '';
-    const lines = rows.slice(0, cfg.maxItems).map(function (r) {
-      return '- ' + (r.id || '未命名') + '：' + r.content + '（已逾 ' + Math.round(r.lateBy / 60000) + ' 分钟）';
+    var lines = picked.map(function (r) {
+      return '- ' + (r.id || '未命名') + '：' + r.content
+        + '（已逾 ' + Math.round(r.lateBy / 60000) + ' 分钟）';
     });
-    const head = '[长线伏笔]' + String.fromCharCode(10)
-      + '以下伏笔已过承诺回收时刻但仍未收束，请在叙事中推进或明确放弃（不得当作从未埋下）：' + String.fromCharCode(10);
-    const tail = String.fromCharCode(10) + '逾期只提示，不自动回收；收束与否由剧情决定。';
+    if (hidden > 0) {
+      lines.push('- 另有 ' + hidden + ' 条逾期未列出'
+        + '（本面只念最逾期的 ' + picked.length + ' 条）');
+    }
+    var head = '[长线伏笔]' + String.fromCharCode(10)
+      + '以下伏笔已过承诺回收时刻但仍未收束，请在叙事中推进或明确放弃（不得当作从未埋下）：'
+      + String.fromCharCode(10);
+    var tail = String.fromCharCode(10) + '逾期只提示，不自动回收；收束与否由剧情决定。';
     return head + lines.join(String.fromCharCode(10)) + tail;
   }
-  WA.longline = {
+
+WA.longline = {
     TERMINAL: TERMINAL.slice(),
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     promise: promise, overdue: overdue, sweep: sweep, pressure: pressure, buildBlock: buildBlock,
-    stat: function () { return Object.assign({}, stat); }
+    stat: function () { var o = Object.assign({}, stat);
+      o.block = stat.block ? Object.assign({}, stat.block) : null;
+      return o; }
   };
 })();
