@@ -23311,7 +23311,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.567.0';
+  const __wantPin293 = '2.568.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');
@@ -23383,6 +23383,17 @@ await runScript('./story-window-evidence-v2518.js');
     const rMI2567 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/mixed-index-wire-v2567.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rMI2567.status === 0, 'mixed-index 专锁 exit 0（实 ' + rMI2567.status + '）'
       + (rMI2567.status === 0 ? '' : ' :: ' + String(rMI2567.stdout || '').slice(-600)));
+  }
+  // v2.568.0（裁决收口）：四台超期 pending-wire（arcGuide / ctxBoundary / macroGuard / greenKeys）
+  //   按纪律⑤改判 readonly-api。为什么单独成节：这四条的失败形态是「文字续命」——
+  //   账本写着一句「待接」，代码可以悄悄改了而账本照样看着一致；本锁把「为什么不可接」
+  //   各自钉成一条真源码判据（plan 无上游 / 无起止标记 / 无宏替换实现 / 世界书全 constant），
+  //   解一条就红，逼着改账本而不是悄悄多一个读点。
+  section('v2.568.0（裁决收口）：四台超期 pending-wire 改判 readonly-api —— 零读事实 / 结构阻断条件 / 负控');
+  {
+    const rNA2568 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/ns-adjudication-v2568.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
+    assert(rNA2568.status === 0, 'ns-adjudication 专锁 exit 0（实 ' + rNA2568.status + '）'
+      + (rNA2568.status === 0 ? '' : ' :: ' + String(rNA2568.stdout || '').slice(-600)));
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');
