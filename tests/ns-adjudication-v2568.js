@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * v2.568.0 专锁：四台超期 pending-wire 的「不接」裁决（arcGuide / ctxBoundary / macroGuard / greenKeys）
+ * v2.568.0 专锁：超期 pending-wire 的「不接」裁决（第一批 4 台 + 第二批 13 台，共 17 条）
  *
  * ── 治什么病 ───────────────────────────────────────────────────────
  *  tests/ns-consumer-ledger.json 的纪律⑤：「pending-wire 是**有时限**的定性。若某条超过一个
@@ -19,6 +19,20 @@
  *  D 负控：拿账本文本的**内存副本**制造破坏（cls 回改 pending-wire / evidence 截短 ⇒
  *               A 面判据必须各自点名），证明 A 面不是空转。
  *  E 触发器可执行：每条 recompute 是真命令且其引用的文件/路径存在。
+ *
+ * ── 第二批（同版本、同为清账） ────────────────────────────────────────
+ *  剩余 13 条 pending-wire 一并改判 readonly-api，pending-wire 归零：
+ *  cardFile / chatGuard / contrast / factAge / floorCensus / floorFavorites / floorHide /
+ *  floorScrub / saveMigrate / setupPlan / slotFormat / storeMerge / streamGate。
+ *  这 13 条**不是同一句话的复制**：每台的结构阻断形态不同，判据也不同——
+ *  cardFile 没有 FileReader/arrayBuffer（拿不到 Blob）；chatGuard 零 loadChat（拿不到磁盘那份）；
+ *  contrast 主题色是字面常量（无运行时配色输入，且 render/inject.js 里的 contrast( 全是
+ *  WA.theme.contrast，属命名撞车）；factAge 要的 f.lastTurn 全库无人写（upsertFact 只写 at）；
+ *  floorCensus 零 sentFloors；floorFavorites 零 getChatMessages（拿不到整份楼层数组）；
+ *  floorHide 零处写 is_hidden；floorScrub 进不了 story-export；saveMigrate 与 store.js 载入期
+ *  migrate 双写；setupPlan 零卡切换钩子；slotFormat 零处用存档位命名；storeMerge 的七分区
+ *  本仓不持有（且 store.js 已有 storage 钩子）；streamGate 产品面零 fetch 覆写。
+ *  对应判据在 C5~C17，逐台一条。
  */
 'use strict';
 const fs = require('fs');
@@ -32,6 +46,24 @@ const CASES = [
   { ns: 'macroGuard', prov: 'engines/macro-guard.js' },
   { ns: 'greenKeys', prov: 'engines/green-keys.js' }
 ];
+
+/** 第二批 13 条：产品源面除自身零读 + tests 有消费 + 上游结构缺失。contrast 的 allowProd 是命名撞车豁免。 */
+const CASES2 = [
+  { ns: 'cardFile', prov: 'engines/card-file.js' },
+  { ns: 'chatGuard', prov: 'engines/chat-guard.js' },
+  { ns: 'contrast', prov: 'engines/contrast.js', allowProd: ['render/inject.js'] },
+  { ns: 'factAge', prov: 'engines/fact-age.js' },
+  { ns: 'floorCensus', prov: 'engines/floor-census.js' },
+  { ns: 'floorFavorites', prov: 'engines/floor-favorites.js' },
+  { ns: 'floorHide', prov: 'engines/floor-hide.js' },
+  { ns: 'floorScrub', prov: 'engines/floor-scrub.js' },
+  { ns: 'saveMigrate', prov: 'engines/save-migrate.js' },
+  { ns: 'setupPlan', prov: 'engines/setup-plan.js' },
+  { ns: 'slotFormat', prov: 'engines/slot-format.js' },
+  { ns: 'storeMerge', prov: 'engines/store-merge.js' },
+  { ns: 'streamGate', prov: 'engines/stream-gate.js' }
+];
+const CASES_ALL = CASES.concat(CASES2);
 
 function rd(rel) { return fs.readFileSync(path.join(BASE, rel), 'utf8'); }
 function exists(rel) { try { return fs.existsSync(path.join(BASE, rel)); } catch (e) { return false; } }
@@ -71,7 +103,7 @@ function runAll(assertFn) {
   // ── A 账本面 ──
   const ledger = JSON.parse(rd(LEDGER));
   const E = ledger.entries || {};
-  CASES.forEach(function (c) {
+  CASES_ALL.forEach(function (c) {
     const e = E[c.ns];
     a(!!e, 'A1 ' + c.ns + ' 在账本里（缺失=未定性）');
     if (!e) return;
@@ -85,10 +117,11 @@ function runAll(assertFn) {
   // ── B 零读事实 ──
   const prod = productFiles();
   const tsts = testFiles();
-  CASES.forEach(function (c) {
+  CASES_ALL.forEach(function (c) {
     const rx = nsRe(c.ns);
     const prodHit = prod.filter(function (rel) {
       if (rel === c.prov) return false;
+      if ((c.allowProd || []).indexOf(rel) >= 0) return false;
       return rx.test(rd(rel));
     });
     a(prodHit.length === 0, 'B1 ' + c.ns + ' 产品源面零读（除自身外命中：' + (prodHit.join(',') || '无') + '）');
@@ -131,6 +164,52 @@ function runAll(assertFn) {
   const selHits = prod.filter(function (rel) { return /type:\s*'selective'/.test(rd(rel)); });
   a(selHits.length === 0, 'C4c 全仓无 type:selective（关键词激活面真不存在；命中：' + (selHits.join(',') || '无') + '）');
 
+  // ── C' 第二批 13 条：每台一条真源码判据（阻断条件本身，解开即红） ──
+  // 口径：z(re, ex) = 「产品源面除 ex 外零命中」。ex 只放本台自身 provider
+  //   与已证实的命名撞车位置（contrast 用 render/inject.js 里的 WA.theme.contrast）。
+  const noHit = function (re, ex) {
+    return prod.filter(function (rel) {
+      if ((ex || []).indexOf(rel) >= 0) return false;
+      return re.test(rd(rel));
+    });
+  };
+  const z = function (re, ex) { return noHit(re, ex).length === 0; };
+  a(z(/FileReader|arrayBuffer/, ['engines/card-file.js']),
+    'C5 cardFile：产品面无文件读取原语 ⇒ 拿不到 Blob/字节（导入由宿主完成）');
+  a(z(/loadChat/, ['engines/chat-guard.js']),
+    'C6 chatGuard：产品面零 loadChat ⇒ 拿不到磁盘那份的条数/内容，硬接只能靠猜');
+  const th = rd('ui/cyberpunk-theme.js');
+  a(th.indexOf('#0f1419') >= 0 && th.indexOf('#e2e8f0') >= 0,
+    'C7a contrast：主题色是 cyberpunk-theme 里的字面常量 ⇒ 无运行时配色输入');
+  const injTxt = rd('render/inject.js');
+  const cAll = (injTxt.match(/contrast\s*\(/g) || []).length;
+  const cTheme = (injTxt.match(/theme\.contrast\s*\(/g) || []).length;
+  a(cAll > 0 && cAll === cTheme,
+    'C7b render/inject.js 里的 contrast( 全是 WA.theme.contrast（命名撞车，不是本引擎读点）：' + cTheme + '/' + cAll);
+  const upBody = (rd('engines/memory.js').match(/facts\.push\(\{[^}]*\}\)/g) || []).join('');
+  a(upBody.length > 0 && upBody.indexOf('lastTurn') < 0,
+    'C8 factAge：memory.upsertFact 写入的字段里没有 lastTurn（只有 at）⇒ 「上次引用第几轮」无人生产');
+  a(z(/sentFloors/, ['engines/floor-census.js']),
+    'C9 floorCensus：产品面零 sentFloors ⇒ 「哪些楼层发出去过」在宿主 picker 里');
+  a(z(/getChatMessages|getChat\(\)/, ['engines/floor-favorites.js']),
+    'C10 floorFavorites：本仓零处取整份楼层数组（楼层只在回调里以单条 mes 到来）⇒ 收藏无处锚定');
+  a(z(/is_hidden\s*=[^=]/, ['engines/floor-hide.js']),
+    'C11 floorHide：本仓零处写 is_hidden ⇒ 隐藏标记只能宿主改，本仓只能出计划');
+  a(rd('engines/story-export.js').indexOf('floorScrub') < 0,
+    'C12 floorScrub：story-export 不经楼层清洗面 ⇒ 规则与落笔都在调用方');
+  a(rd('core/store.js').indexOf('migrate') >= 0 && z(/WA\.saveMigrate/, ['engines/save-migrate.js']),
+    'C13 saveMigrate：core/store.js 载入期自带 migrate ⇒ 外挂迁移器会双写');
+  a(z(/CARD_SWITCH|cardSwitch|onCardSwitch/),
+    'C14 setupPlan：产品面零卡切换钩子（CHAT_CHANGED 是聊天切换，不是进卡/离卡）');
+  a(z(/【WA存档·/, ['engines/slot-format.js']),
+    'C15 slotFormat：本仓零处使用存档位命名 ⇒ 没有「第 N 檔」这个实体');
+  a(z(/regexOwners|presetInfo|pluginInfo|worldSources/, ['engines/store-merge.js']),
+    'C16a storeMerge：那七个 settings.json 分区只有它自己在念（本仓不持有）');
+  a(/addEventListener\(\s*['"]storage/.test(rd('core/store.js')),
+    'C16b 跨标签页冲突已由 core/store.js 的 storage 钩子处理 ⇒ 不在合并器这层');
+  a(z(/(?:window|globalThis|self)\.fetch\s*=/),
+    'C17 streamGate：产品面零 fetch 覆写 ⇒ 流中无本仓入口（净化在流后）');
+
   // ── D 负控（账本文本的内存副本破坏） ──
   const good = rd(LEDGER);
   const bad1 = good.replace('"arcGuide": {\n   "cls": "readonly-api"', '"arcGuide": {\n   "cls": "pending-wire"');
@@ -145,14 +224,33 @@ function runAll(assertFn) {
   o2.entries.greenKeys.evidence = '待接';
   a(!((o2.entries.greenKeys.evidence || '').length >= 200),
     'D3 负控：evidence 截短 ⇒ A3（>=200 字）判据必须现形');
+  //   D4~D6：C' 面三条主判据拿「真有」的样本自证不是恒假。
+  a(/FileReader/.test('var r = new FileReader();'),
+    'D4 负控自证：C5 判据对「真有 FileReader」的样本返 true（非恒假）');
+  a(/(?:window|globalThis|self)\.fetch\s*=/.test('window.fetch = wrap;'),
+    'D5 负控自证：C17 判据对「真覆写 fetch」的样本返 true');
+  a(/is_hidden\s*=[^=]/.test('m.is_hidden = true;'),
+    'D6 负控自证：C11 判据对「真写 is_hidden」的样本返 true');
+  const o3 = JSON.parse(good);
+  o3.entries.streamGate.cls = 'pending-wire';
+  a(!(o3.entries.streamGate.cls === 'readonly-api'),
+    'D7 负控：13 条里任一台（streamGate）cls 回改 ⇒ A2 判据必须现形');
 
   // ── E 触发器可执行 ──
-  CASES.forEach(function (c) {
+  CASES_ALL.forEach(function (c) {
     const e = E[c.ns];
     const files = ((e && e.recompute) || '').match(/(?:engines|tests|render|core|ui)\/[\w./-]+\.js/g) || [];
     a(files.length >= 1 && files.every(exists),
       'E1 ' + c.ns + ' recompute 里引用的路径全部存在（' + (files.join(' ') || '无') + '）');
   });
+
+  // ── F 清账面 ──
+  const pend = Object.keys(E).filter(function (k) { return E[k].cls === 'pending-wire'; });
+  a(pend.length === 0, 'F1 账本里 pending-wire 已归零（实 ' + pend.length + ' 条：' + pend.join(',') + '）');
+  a(CASES2.every(function (c) { return (E[c.ns] || {}).cls === 'readonly-api'; }),
+    'F2 13 条 cls 全为 readonly-api');
+  a(CASES2.every(function (c) { return exists(c.prov); }), 'F3 13 条 provider 文件都存在');
+  a(CASES2.length === 13, 'F4 第二批恰 13 条（少一条就是漏账）');
 
   return { pass: pass, fail: fail, fails: fails };
 }
@@ -164,4 +262,4 @@ if (require.main === module) {
   r.fails.forEach(function (f) { console.error('  x ' + f); });
   process.exit(1);
 }
-module.exports = { runAll: runAll, CASES: CASES };
+module.exports = { runAll: runAll, CASES: CASES, CASES2: CASES2 };

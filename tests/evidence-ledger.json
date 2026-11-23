@@ -4415,11 +4415,11 @@
     },
     {
       "file": "tests/ns-adjudication-v2568.js",
-      "sha": "64f3628a5dac",
+      "sha": "527773172246",
       "version": "2.568.0",
       "versionSource": "head",
       "fileAnchor": "2568",
-      "commit": null,
+      "commit": "adc15af",
       "wired": {
         "form": "path-literal",
         "line": 23394

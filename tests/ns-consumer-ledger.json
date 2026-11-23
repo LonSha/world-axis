@@ -1,5 +1,5 @@
 {
- "_note": "WorldAxis 零读 ns 定性账本（v2.400.0 · V22 OPV22-3）。治的缺口：tests/module-cycle-gate.js 报 35 个『模块提供了、产品源面零读』的命名空间，但这条读数此前只有数字、没有任何地方写明『为什么它零读』。于是『本该有消费点却漏接了』与『它本来就只该由程序或宿主消费』在读数上完全同形 —— 这正是 l3-registry 治过的同一种病（同形不可分辨）。本账本把每一个零读 ns 钉到一条可复算的裁决上。　v2.542.25：版本面跟位。此前 index.js/manifest/三本台账一起停在 v2.524.0 ——扩展列表与诊断面读到的版本号落后现场代码十八版，「装上了但看着像老版」因此无从自证；本次同批推进，台账与 index.js VERSION 再次逐字同源。 v2.542.26：手札在 TauriTavern 2.4 上的四连修 —— 点击改走 document 级 click / touchend（宿主里 pointer 事件到不了球上）、root 几何与墨/纸两套色板内联兜底（styles 里 #wa-journal 那条规则在宿主里不生效）、pointercancel 不再当成点击、openFull 先开面板再合手札并逐步接错。台账与 index.js VERSION 逐字同源。 v2.543.0：引擎深度第一批 —— dream-settle 的空稿闸接进入卷口。此前 WA.dreamSettle.screen 全仓零调用（index.js 连装载位都按「那里管线，这里管稿」摆好了），模板句与二三十字的敷衍稿照样占梦卷卷位；现在入卷前判一次，不合格退回并带 retryHint，卷位不动，闸门关掉时如实 skipped。 v2.543.0 注销两条过期登记：dreamSettle（空稿闸已接进入卷口 engines/dream.js:archive）与 importKind（v2.542.25 起 ui/panel.js 导入面已真读 detectText/describe）。两条都是「账本说零读、现场已读」，本轮按可复算口径注销，不留「过期登记」。 v2.544.0：引擎深度第一批收官 —— 叙事侧两处零调用引擎接进主链。① spatial-acoustics.eavesdrop 的「隔墙听到什么」改由 lensCulling 三级裁决：旧实现 partial 档隔一词插「微弱气声」，仍能拼出原句；现在非 full 档零原词。② regional 的区域突发事件抽取改由 weightedDraw 抽：seen 为空时全员同乘 softPity，分布与旧线性抽取等价（首轮手感不变），出过的类型才被相对压低；出过的类型在 applyIncident 记账（最近 8 条），roll 仍只读。 v2.544.0 补记：上一版只在 _note 写了 dreamSettle/importKind 的注销理由、条目本身没删；本轮连同新接的 lensCulling（spatial-acoustics.eavesdrop 真读 cullAcousticEvent）与 weightedDraw（regional.weightedPick 真读 draw/weightOf）四条一起从零读账本移除，B4「账本有、门禁无」回到 0 条。 v2.545.0：叙事深度第一批（4/5）—— spotlight 的「轻提」接上 followup-gate 的静默闸。此前只要 missed 够多就每轮轻提一次，读者读到的是「刚见过的人又被顺口带一句」；现在先问 due（静默 300 分钟 / 时段两闸），刚登场 10 分钟的直接 hold，久静默 400 分钟照常轻提；gate 缺席时退回原行为。本口仍零写，fire 的当天记账交给结算侧。 v2.545.0 注销：followupGate（spotlight.resolveIntervention 的 presence-trace 分支真读 due 做静默闸）—— 账本说零读、现场已读，按可复算口径出表，不留过期登记。 v2.546.0：引擎深度第二批（1）—— compact-timing 的折叠时机判据接进注入装配。此前 inject-collector 按预算硬折，缓存还热也照折（省下的读量要几十轮才回本），而 compactTiming.plan 全仓零调用；现在装配完把「本轮折了多少 + 上次回复时刻」交给它判一次，热缓存返回 hold、冷 fold、没折 none，读数挂在 stat().fold 与 diagnose().fold（同源）。本轮只出读数、不改折叠结果（预算仍归 injectBudget），且 lastReplyMs 传的是**时刻**不是差值。 v2.546.0 注销：compactTiming（inject-collector 装配后真读 plan 判折叠时机，读数进 stat().fold / diagnose().fold）——账本说零读、现场已读。 v2.546.0 评估（未接的两条，写明阻塞而非假装完成）：① observationProjection 仍是 stale —— 它的入参是「同一事实的多个持有者版本表」，本仓 prompt 是单视角全局装配，没有任何一处同时持有 N 个观察者的版本；给它硬塞一个调用点只会变成「传一份共享文本再取回一份共享文本」。要真接，先得有「事实版本表」（shared-awareness 或 noesis 侧按 factId 存 who→version），② planRoster 已是 readonly-api —— 它的 admit 需要 catalog（npcs/locations/routes）与 plan.party/step.fromId-toId，而 engines/plan.js 的 normStep 只保留 kind/text/need/place，契约不兼容；接它同样要先建路线与同行数据口。 v2.549.0：引擎深度第三批 —— 叙事域两处零调用引擎接进主链。\n① msg-align 接进 core/interceptor.js 两处：轮次去重签名把「最后一条的长度」换成 loose 归一化后的松散指纹\n（旧签名只比长度，两条等长不同文的消息签名相同 ⇒ 整条 before 链被静默跳过：世界不推进，日志却写「本轮before链已执行」），\n另给每轮落一份「宿主真要发的 chat vs 存档 chat」逐位对齐读数，漂移时告警但**不改行为**\n（漂移时跳过去重会让同一轮重复推进世界）。\n② ephemeral-scrub 接成「注入登记 → 正文洗除」：落地前把 finalItems 里的结构性块登记进内存台账，\n输出净化之后把「模型复述进正文的注入原文」洗掉；判据三条缺一不改正文（真删了、只命中一处、返回是字符串）\n—— 没删时引擎内部仍会 tidy 空白，采用了就是观测污染被观测者。\n入口刻意落到「新生成的那一楼」而非整份历史：本仓注入走 setExtensionPrompt 槽位、不写 chat 数组，\n所以「注入块留在历史里」的正身是模型把注入块复述进正文。\n两条都已真接产品读点（账本说零读、现场已读），按可复算口径注销，不留过期登记。 本次注销的两条命名空间是 msgAlign 与 ephemeralScrub（驼峰名，供 A0e 一类判据指名到条）。 v2.549.0：本批不注销任何命名空间，但更正一笔账——v2.545.0 以「followupGate 已真接产品读点（spotlight 轻提闸）」为由注销该条时，那个读点（spotlight.resolveIntervention）全仓只有测试在调、产品零消费者；本版把 buildBlock 接上它，并让 followupGate.fire 在注入构建侧真落账，注销理由到今天才成立。零读面 56 → 56 不动。 v2.550.0：五台「零故事面读点」引擎写成可复算裁决，**不接线、也不注销任何条目** —— polish / preflight / ensemble / archiveHide / autoHide 在生成、注入、结算三处零读，已由 tests/orphan-engine-adjudication-v2550.js 21 段钉住（可达面四类入口的精确计数 + 故事面零命中 + 裁决文档在位）。其中三台（preflight / polish / archiveHide）在面板上有开关且 getSettings().enabled 默认就是 true—— 开关只是「可达」不是「读到」；autoHide 另有 tool-diag 工具表 11 处与行动台路由 7 条（14 处引用），缺的是宿主动作（timeline 明写不实现 syncHidden）。零读面 56 → 56 不动。【v2.551.0 写回收口批】零读面 56 → 55：writeSerial 按纪律④出表。  它不是「补了个最小读点销账」——本批把 evidence 里那句「消费方应是世界书写回点（现在没有统一写回点）」量成了具体形态：写回点不是没有，是**有三个且互不知情**（outline-inject.apply / outline-inject.undo 内部的 flip / wb-inject.ensureEntry），形态都是「读整本 → 改一条 → 写整本」。谁先读到旧整本，谁就在写回时覆盖掉别人刚建的条目，而每一步都「调用成功」——读数上看不出丢了东西。  修法不是加一层包装，而是给引擎补上它自己缺的那一半：「按名取同一条队列」（serial()；此前只有每次新建的 createSerial ⇒ 两个调用方各自建队列 = 串行在读数上启用、在行为上完全失效），并加 runStrict（不吞异常、队列不断）——因为这三个调用方都靠 catch 产出具名拒收码（create-failed / update-failed / verify-failed），`run` 会把异常吞成 undefined，等于把「具名拒收」退化成「静默什么都没做」。三个写入口的「读-改-写」整段进同一条 `wb:<书名>` 队列。  由 tests/worldbook-write-serial-v2551.js 18 段钉住（含两条运行时负控 + 一条真源码破坏：把 withBook 的走队列改回直跑 ⇒ 并发 ensure 必建出 2 条同 order 条目，随后逐字节还原 + sha256 校验）。【v2.552.0 读数真实性批】零读面 55 → 57：arcGuide / ctxBoundary 两条**重新**登记。  这一批不是「又发现两台零读」，而是**纠正一次账本失真** —— 它们原本靠一行面板读数「出过表」。  ui/settings.js 的「缝合件台账」行有五台读数，v2.533.0 把它写成「本行就是接线点」，  并据此让副本族 / 上下文边界 / 写前预演三台按纪律④出表。本批实测那句话不成立：  ① 两台传**常量空参数**（ctxBoundary.stat([]) / arcGuide.stat([])）⇒ 读数恒 0；  ② 后两台读的是真计数器，但 rehearse() / audit() 的产品调用点为 0 ⇒ 计数器恒初值；  ③ 五台的核心函数（plan / scrub / rehearse / audit）产品调用点**全是 0**。  「0 条 / 0 通过 / 0 次」在面板上读起来都像「一切正常」，实际含义是「这条链没人喂」。  更坏的是：它让这些 ns 在 module-cycle-gate 里被计成「有调用期引用」⇒ 连零读清单都进不去  ⇒ 任何账本都不必提它们。**靠「引用」续命比靠改 evidence 文字续命更彻底**：后者至少还要动账本。  本批所做的：把那一行改成直说（无数据源的写「无数据源」，从没调用过的写「从未调用」），  于是两台如实回到零读面并在此登记；另两台（writeRehearsal / saveAudit）的 stat 仍在引用面，  它们的「核心零调用」不在本账本的判据粒度内 —— 这一条已在 tests/stitch-ledger-truthfulness-v2552.js 里  钉成可复算读数（A 假读数已消失 / B 四台核心调用点计数 / C 读数面≠消费面的判据边界）。 【v2.553.0 载入体检批】零读面 57 → 57 不动。本批无新增、也无注销任何命名空间。saveAudit 的 audit() 从「零产品调用」变成 1 个产品调用点（core/store.js 的载入点，在 migrate 之前），但那是**成员级**变化，不是 ns 级零读面的变化 —— saveAudit 的 stat 一直有面板读面，本账本本来就不登记它；「有调用点」与「在零读账本里」互不蕴含，这一条由 tests/stitch-ledger-truthfulness-v2552.js 的 C2 钉住（本批同时把 C2 改成两半：writeRehearsal 仍零调用 / saveAudit 已毕业，两台都不在账本里）。同批另一件事：store.loadStat().lastAudit 这条结论第一次有了三个读面（engines/tool-diag.js 的 shape 读数、engines/capacity-audit.js 的 migrationCheck.loadAudit、ui/settings.js 的存档体检格），由 tests/load-audit-wire-v2553.js 的 E 段钉住 —— 「接上线但没人读」是本仓反复治的病，不许在这一批回来。 【v2.554.0 写前预演批】零读面 57 → 56：schema 按纪律④出表 —— 但这不是「接线销账」，是**推翻本账的一条旧裁决**。旧理由写的是「结构指纹与迁移器契约只属存储层、消费方只有 tests 面」，而它的成立前提是「没有产品写入口需要结构规则」：core/schema.js 的 define / validate / validateNamed / list 此前全仓零产品调用，dead-export-ledger 里那些 schema.* 冻结说的正是这件事。本批把前提拆了：core/store.js 的 patch() 在 transact 之前新增写前预演闸门，第一次给「往某个顶层分区写一个形态不同的值」这件事一条如实拒收出口 —— PATCH_SCHEMA 由 schema.define 登记、确保登记走 schema.list、逐条取值走 writeRehearsal 的 validate 闭包调 schema.validate。于是 schema 从「没人读的登记表」变成「写入口的结构规则来源」，产品面真读了，按纪律④出表。口径四条写在这里，防止下一批把它读成「补了个最小读点」：① 只拦容器级形态漂移（array / object / 标量 互改），标量↔标量放行（空串 → 0 那种写法到处都是，拦它会一片误伤，是另一件事要单独量）；② 预演不判「值好不好」，只判形态；③ 缺席一律 fail-open（引擎没装载 / schema 没装载 / 路径形态不合法 / 预演自己炸了 ⇒ 记 skipped 并放行，保持旧行为）；④ 只有 code === type-conflict 才拒写。同批 dead 面四条出表（schema.define / schema.list / writeRehearsal.rehearse / writeRehearsal.checkPath），dead 1989 → 1985；writeRehearsal 那两条属**成员级**、不在本账（它的 stat 一直有面板读面，本账本来就不登记它）。留档旧登记：cls = readonly-api、provider = core/schema.js —— 前者撤销（它已由「产品刻意不读」变成「产品在读」），后者仍成立。由 tests/patch-rehearsal-wire-v2554.js 15 段钉住（含两条负控：把 rehearse 换成恒真 ⇒ 形态漂移就写进去了；删 schema-absent 分支 ⇒ 拒写范围判据现形）。 v2.567.0：引擎深度第一批收官之一 —— mixedIndex（常驻混合索引）接进注入主链。此前全仓零读：引擎只有 build(entries, opts)，条目要由调用方喂，而「谁喂」这一层永远缺着。本轮补两处：① engines/mixed-index.js 增产品入口 buildBlock()（真源 WA.worldbook.peekEntries()，只读；无条目/无常驻项/抛错三态一律返回空串，不产空块白吃常驻 token）；② render/inject.js 增注入源 mixedIndex（SOURCES / def 默认 false / SRC_NAME / 分支四处同批）+ ui/panel.js VIS_NAMES，默认关 —— 常驻文本不该给没开过这个设置面的老用户凭空多出约束。本行按纪律④注销：账本说零读、现场已读，留着就是过期登记。 【v2.568.0 裁决收口批】四台 pending-wire 超期条目按纪律⑤改判 readonly-api，零读面 55 -> 55 不动。本批不是「补了个最小读点销账」，而是把「计划要接」改判为「结构上不可接」，并把每个改判写成可复算的触发器：arcGuide（plan 的 arcs 无产品级提供者，arc-phase.js 已明文拒接）、ctxBoundary（本仓注入不写 chat 正文，无可剥对象）、macroGuard（全仓无宏替换点，宿主替换发生在本仓之后，替换前文本审计是空读数）、greenKeys（两处世界书写点一律 constant 策略，零处 selective，关键词激活面不存在）。四台都有 tests 专锁消费（opv30-r4 / opv30-r2 / macro-guard / green-keys 各自测例），故不是 stale（stale 要求连 tests 都零读），只能是 readonly-api。分类分布：readonly-api 25 / pending-wire 13 / stale 11 / gate-selfwitness 5 / derived-handle 1，仍覆盖 5 类，wired 恒 0。本批同时修正上一版的一处版本面疏漏：plans/V29_LEDGER.json 与 docs/ERROR_CODES.md 停在 v2.566.0，release-manifest --check 当时是红的 - 两处一并跟位到 v2.568.0。",
+ "_note": "WorldAxis 零读 ns 定性账本（v2.400.0 · V22 OPV22-3）。治的缺口：tests/module-cycle-gate.js 报 35 个『模块提供了、产品源面零读』的命名空间，但这条读数此前只有数字、没有任何地方写明『为什么它零读』。于是『本该有消费点却漏接了』与『它本来就只该由程序或宿主消费』在读数上完全同形 —— 这正是 l3-registry 治过的同一种病（同形不可分辨）。本账本把每一个零读 ns 钉到一条可复算的裁决上。　v2.542.25：版本面跟位。此前 index.js/manifest/三本台账一起停在 v2.524.0 ——扩展列表与诊断面读到的版本号落后现场代码十八版，「装上了但看着像老版」因此无从自证；本次同批推进，台账与 index.js VERSION 再次逐字同源。 v2.542.26：手札在 TauriTavern 2.4 上的四连修 —— 点击改走 document 级 click / touchend（宿主里 pointer 事件到不了球上）、root 几何与墨/纸两套色板内联兜底（styles 里 #wa-journal 那条规则在宿主里不生效）、pointercancel 不再当成点击、openFull 先开面板再合手札并逐步接错。台账与 index.js VERSION 逐字同源。 v2.543.0：引擎深度第一批 —— dream-settle 的空稿闸接进入卷口。此前 WA.dreamSettle.screen 全仓零调用（index.js 连装载位都按「那里管线，这里管稿」摆好了），模板句与二三十字的敷衍稿照样占梦卷卷位；现在入卷前判一次，不合格退回并带 retryHint，卷位不动，闸门关掉时如实 skipped。 v2.543.0 注销两条过期登记：dreamSettle（空稿闸已接进入卷口 engines/dream.js:archive）与 importKind（v2.542.25 起 ui/panel.js 导入面已真读 detectText/describe）。两条都是「账本说零读、现场已读」，本轮按可复算口径注销，不留「过期登记」。 v2.544.0：引擎深度第一批收官 —— 叙事侧两处零调用引擎接进主链。① spatial-acoustics.eavesdrop 的「隔墙听到什么」改由 lensCulling 三级裁决：旧实现 partial 档隔一词插「微弱气声」，仍能拼出原句；现在非 full 档零原词。② regional 的区域突发事件抽取改由 weightedDraw 抽：seen 为空时全员同乘 softPity，分布与旧线性抽取等价（首轮手感不变），出过的类型才被相对压低；出过的类型在 applyIncident 记账（最近 8 条），roll 仍只读。 v2.544.0 补记：上一版只在 _note 写了 dreamSettle/importKind 的注销理由、条目本身没删；本轮连同新接的 lensCulling（spatial-acoustics.eavesdrop 真读 cullAcousticEvent）与 weightedDraw（regional.weightedPick 真读 draw/weightOf）四条一起从零读账本移除，B4「账本有、门禁无」回到 0 条。 v2.545.0：叙事深度第一批（4/5）—— spotlight 的「轻提」接上 followup-gate 的静默闸。此前只要 missed 够多就每轮轻提一次，读者读到的是「刚见过的人又被顺口带一句」；现在先问 due（静默 300 分钟 / 时段两闸），刚登场 10 分钟的直接 hold，久静默 400 分钟照常轻提；gate 缺席时退回原行为。本口仍零写，fire 的当天记账交给结算侧。 v2.545.0 注销：followupGate（spotlight.resolveIntervention 的 presence-trace 分支真读 due 做静默闸）—— 账本说零读、现场已读，按可复算口径出表，不留过期登记。 v2.546.0：引擎深度第二批（1）—— compact-timing 的折叠时机判据接进注入装配。此前 inject-collector 按预算硬折，缓存还热也照折（省下的读量要几十轮才回本），而 compactTiming.plan 全仓零调用；现在装配完把「本轮折了多少 + 上次回复时刻」交给它判一次，热缓存返回 hold、冷 fold、没折 none，读数挂在 stat().fold 与 diagnose().fold（同源）。本轮只出读数、不改折叠结果（预算仍归 injectBudget），且 lastReplyMs 传的是**时刻**不是差值。 v2.546.0 注销：compactTiming（inject-collector 装配后真读 plan 判折叠时机，读数进 stat().fold / diagnose().fold）——账本说零读、现场已读。 v2.546.0 评估（未接的两条，写明阻塞而非假装完成）：① observationProjection 仍是 stale —— 它的入参是「同一事实的多个持有者版本表」，本仓 prompt 是单视角全局装配，没有任何一处同时持有 N 个观察者的版本；给它硬塞一个调用点只会变成「传一份共享文本再取回一份共享文本」。要真接，先得有「事实版本表」（shared-awareness 或 noesis 侧按 factId 存 who→version），② planRoster 已是 readonly-api —— 它的 admit 需要 catalog（npcs/locations/routes）与 plan.party/step.fromId-toId，而 engines/plan.js 的 normStep 只保留 kind/text/need/place，契约不兼容；接它同样要先建路线与同行数据口。 v2.549.0：引擎深度第三批 —— 叙事域两处零调用引擎接进主链。\n① msg-align 接进 core/interceptor.js 两处：轮次去重签名把「最后一条的长度」换成 loose 归一化后的松散指纹\n（旧签名只比长度，两条等长不同文的消息签名相同 ⇒ 整条 before 链被静默跳过：世界不推进，日志却写「本轮before链已执行」），\n另给每轮落一份「宿主真要发的 chat vs 存档 chat」逐位对齐读数，漂移时告警但**不改行为**\n（漂移时跳过去重会让同一轮重复推进世界）。\n② ephemeral-scrub 接成「注入登记 → 正文洗除」：落地前把 finalItems 里的结构性块登记进内存台账，\n输出净化之后把「模型复述进正文的注入原文」洗掉；判据三条缺一不改正文（真删了、只命中一处、返回是字符串）\n—— 没删时引擎内部仍会 tidy 空白，采用了就是观测污染被观测者。\n入口刻意落到「新生成的那一楼」而非整份历史：本仓注入走 setExtensionPrompt 槽位、不写 chat 数组，\n所以「注入块留在历史里」的正身是模型把注入块复述进正文。\n两条都已真接产品读点（账本说零读、现场已读），按可复算口径注销，不留过期登记。 本次注销的两条命名空间是 msgAlign 与 ephemeralScrub（驼峰名，供 A0e 一类判据指名到条）。 v2.549.0：本批不注销任何命名空间，但更正一笔账——v2.545.0 以「followupGate 已真接产品读点（spotlight 轻提闸）」为由注销该条时，那个读点（spotlight.resolveIntervention）全仓只有测试在调、产品零消费者；本版把 buildBlock 接上它，并让 followupGate.fire 在注入构建侧真落账，注销理由到今天才成立。零读面 56 → 56 不动。 v2.550.0：五台「零故事面读点」引擎写成可复算裁决，**不接线、也不注销任何条目** —— polish / preflight / ensemble / archiveHide / autoHide 在生成、注入、结算三处零读，已由 tests/orphan-engine-adjudication-v2550.js 21 段钉住（可达面四类入口的精确计数 + 故事面零命中 + 裁决文档在位）。其中三台（preflight / polish / archiveHide）在面板上有开关且 getSettings().enabled 默认就是 true—— 开关只是「可达」不是「读到」；autoHide 另有 tool-diag 工具表 11 处与行动台路由 7 条（14 处引用），缺的是宿主动作（timeline 明写不实现 syncHidden）。零读面 56 → 56 不动。【v2.551.0 写回收口批】零读面 56 → 55：writeSerial 按纪律④出表。  它不是「补了个最小读点销账」——本批把 evidence 里那句「消费方应是世界书写回点（现在没有统一写回点）」量成了具体形态：写回点不是没有，是**有三个且互不知情**（outline-inject.apply / outline-inject.undo 内部的 flip / wb-inject.ensureEntry），形态都是「读整本 → 改一条 → 写整本」。谁先读到旧整本，谁就在写回时覆盖掉别人刚建的条目，而每一步都「调用成功」——读数上看不出丢了东西。  修法不是加一层包装，而是给引擎补上它自己缺的那一半：「按名取同一条队列」（serial()；此前只有每次新建的 createSerial ⇒ 两个调用方各自建队列 = 串行在读数上启用、在行为上完全失效），并加 runStrict（不吞异常、队列不断）——因为这三个调用方都靠 catch 产出具名拒收码（create-failed / update-failed / verify-failed），`run` 会把异常吞成 undefined，等于把「具名拒收」退化成「静默什么都没做」。三个写入口的「读-改-写」整段进同一条 `wb:<书名>` 队列。  由 tests/worldbook-write-serial-v2551.js 18 段钉住（含两条运行时负控 + 一条真源码破坏：把 withBook 的走队列改回直跑 ⇒ 并发 ensure 必建出 2 条同 order 条目，随后逐字节还原 + sha256 校验）。【v2.552.0 读数真实性批】零读面 55 → 57：arcGuide / ctxBoundary 两条**重新**登记。  这一批不是「又发现两台零读」，而是**纠正一次账本失真** —— 它们原本靠一行面板读数「出过表」。  ui/settings.js 的「缝合件台账」行有五台读数，v2.533.0 把它写成「本行就是接线点」，  并据此让副本族 / 上下文边界 / 写前预演三台按纪律④出表。本批实测那句话不成立：  ① 两台传**常量空参数**（ctxBoundary.stat([]) / arcGuide.stat([])）⇒ 读数恒 0；  ② 后两台读的是真计数器，但 rehearse() / audit() 的产品调用点为 0 ⇒ 计数器恒初值；  ③ 五台的核心函数（plan / scrub / rehearse / audit）产品调用点**全是 0**。  「0 条 / 0 通过 / 0 次」在面板上读起来都像「一切正常」，实际含义是「这条链没人喂」。  更坏的是：它让这些 ns 在 module-cycle-gate 里被计成「有调用期引用」⇒ 连零读清单都进不去  ⇒ 任何账本都不必提它们。**靠「引用」续命比靠改 evidence 文字续命更彻底**：后者至少还要动账本。  本批所做的：把那一行改成直说（无数据源的写「无数据源」，从没调用过的写「从未调用」），  于是两台如实回到零读面并在此登记；另两台（writeRehearsal / saveAudit）的 stat 仍在引用面，  它们的「核心零调用」不在本账本的判据粒度内 —— 这一条已在 tests/stitch-ledger-truthfulness-v2552.js 里  钉成可复算读数（A 假读数已消失 / B 四台核心调用点计数 / C 读数面≠消费面的判据边界）。 【v2.553.0 载入体检批】零读面 57 → 57 不动。本批无新增、也无注销任何命名空间。saveAudit 的 audit() 从「零产品调用」变成 1 个产品调用点（core/store.js 的载入点，在 migrate 之前），但那是**成员级**变化，不是 ns 级零读面的变化 —— saveAudit 的 stat 一直有面板读面，本账本本来就不登记它；「有调用点」与「在零读账本里」互不蕴含，这一条由 tests/stitch-ledger-truthfulness-v2552.js 的 C2 钉住（本批同时把 C2 改成两半：writeRehearsal 仍零调用 / saveAudit 已毕业，两台都不在账本里）。同批另一件事：store.loadStat().lastAudit 这条结论第一次有了三个读面（engines/tool-diag.js 的 shape 读数、engines/capacity-audit.js 的 migrationCheck.loadAudit、ui/settings.js 的存档体检格），由 tests/load-audit-wire-v2553.js 的 E 段钉住 —— 「接上线但没人读」是本仓反复治的病，不许在这一批回来。 【v2.554.0 写前预演批】零读面 57 → 56：schema 按纪律④出表 —— 但这不是「接线销账」，是**推翻本账的一条旧裁决**。旧理由写的是「结构指纹与迁移器契约只属存储层、消费方只有 tests 面」，而它的成立前提是「没有产品写入口需要结构规则」：core/schema.js 的 define / validate / validateNamed / list 此前全仓零产品调用，dead-export-ledger 里那些 schema.* 冻结说的正是这件事。本批把前提拆了：core/store.js 的 patch() 在 transact 之前新增写前预演闸门，第一次给「往某个顶层分区写一个形态不同的值」这件事一条如实拒收出口 —— PATCH_SCHEMA 由 schema.define 登记、确保登记走 schema.list、逐条取值走 writeRehearsal 的 validate 闭包调 schema.validate。于是 schema 从「没人读的登记表」变成「写入口的结构规则来源」，产品面真读了，按纪律④出表。口径四条写在这里，防止下一批把它读成「补了个最小读点」：① 只拦容器级形态漂移（array / object / 标量 互改），标量↔标量放行（空串 → 0 那种写法到处都是，拦它会一片误伤，是另一件事要单独量）；② 预演不判「值好不好」，只判形态；③ 缺席一律 fail-open（引擎没装载 / schema 没装载 / 路径形态不合法 / 预演自己炸了 ⇒ 记 skipped 并放行，保持旧行为）；④ 只有 code === type-conflict 才拒写。同批 dead 面四条出表（schema.define / schema.list / writeRehearsal.rehearse / writeRehearsal.checkPath），dead 1989 → 1985；writeRehearsal 那两条属**成员级**、不在本账（它的 stat 一直有面板读面，本账本来就不登记它）。留档旧登记：cls = readonly-api、provider = core/schema.js —— 前者撤销（它已由「产品刻意不读」变成「产品在读」），后者仍成立。由 tests/patch-rehearsal-wire-v2554.js 15 段钉住（含两条负控：把 rehearse 换成恒真 ⇒ 形态漂移就写进去了；删 schema-absent 分支 ⇒ 拒写范围判据现形）。 v2.567.0：引擎深度第一批收官之一 —— mixedIndex（常驻混合索引）接进注入主链。此前全仓零读：引擎只有 build(entries, opts)，条目要由调用方喂，而「谁喂」这一层永远缺着。本轮补两处：① engines/mixed-index.js 增产品入口 buildBlock()（真源 WA.worldbook.peekEntries()，只读；无条目/无常驻项/抛错三态一律返回空串，不产空块白吃常驻 token）；② render/inject.js 增注入源 mixedIndex（SOURCES / def 默认 false / SRC_NAME / 分支四处同批）+ ui/panel.js VIS_NAMES，默认关 —— 常驻文本不该给没开过这个设置面的老用户凭空多出约束。本行按纪律④注销：账本说零读、现场已读，留着就是过期登记。 【v2.568.0 裁决收口批】四台 pending-wire 超期条目按纪律⑤改判 readonly-api，零读面 55 -> 55 不动。本批不是「补了个最小读点销账」，而是把「计划要接」改判为「结构上不可接」，并把每个改判写成可复算的触发器：arcGuide（plan 的 arcs 无产品级提供者，arc-phase.js 已明文拒接）、ctxBoundary（本仓注入不写 chat 正文，无可剥对象）、macroGuard（全仓无宏替换点，宿主替换发生在本仓之后，替换前文本审计是空读数）、greenKeys（两处世界书写点一律 constant 策略，零处 selective，关键词激活面不存在）。四台都有 tests 专锁消费（opv30-r4 / opv30-r2 / macro-guard / green-keys 各自测例），故不是 stale（stale 要求连 tests 都零读），只能是 readonly-api。分类分布：readonly-api 25 / pending-wire 13 / stale 11 / gate-selfwitness 5 / derived-handle 1，仍覆盖 5 类，wired 恒 0。本批同时修正上一版的一处版本面疏漏：plans/V29_LEDGER.json 与 docs/ERROR_CODES.md 停在 v2.566.0，release-manifest --check 当时是红的 - 两处一并跟位到 v2.568.0。 v2.568.0 第二批：剩余 13 条 pending-wire 全部改判 readonly-api（pending-wire 归零）。判定口径与第一批四台完全一致：产品源面除自身 provider 外零读（⇒没接）+ tests 面有专锁消费（⇒不是 stale，stale 要求连 tests 都零读）+ 上游契约在本仓结构上拿不到（⇒不能硬接，硬接就是伪造读数）。这 13 条的「结构阻断」不是同一句话的复制：cardFile 拿不到 Blob；chatGuard 拿不到读失败信号与磁盘条数；contrast 无运行时配色输入（主题色是 ui/cyberpunk-theme.js 里的字面常量，且 render/inject.js 里的 .contrast( 全是 WA.theme.contrast，属命名撞车不是本引擎读点）；factAge 要的 f.lastTurn 全库无人写（memory.upsertFact 只写 at，接入等于全体 unknown）；floorCensus 要 sentFloors、floorFavorites 要整份楼层数组（本仓零 getChatMessages）、floorHide 要写宿主 is_hidden（本仓零处写）、floorScrub 规则须调用方给（story-export 不经清洗面）；saveMigrate 与 core/store.js 载入期 migrate 重复（会双写）；setupPlan 无进卡/离卡钩子（CHAT_CHANGED 是聊天切换）；slotFormat 无存档位概念；storeMerge 的七分区属宿主 settings.json（本仓不持有），跨标签页冲突已由 core/store.js 的 storage 钩子处理；streamGate 头注释明写不装 fetch hook。每条 evidence 末尾都写了「改判触发器：当且仅当 X 时改判 wired」，X 就是上面那个缺口被补上的那天。故分布为 readonly-api 38 / stale 11 / gate-selfwitness 5 / derived-handle 1，仍覆盖 4 类以上，wired 恒 0。",
  "_classes": {
   "wired": "产品面本该读它、当前确实漏接了消费点 ⇒ 必须补消费点。本仓当前 0 条（补完即出表）。",
   "readonly-api": "对外诊断/自证读口，产品源面**刻意**不读：由 tests、宿主（SillyTavern）、或人读诊断面消费。零读是设计，不是缺陷。",
@@ -84,16 +84,16 @@
    "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('calendarPlan.')).length)\""
   },
   "cardFile": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/card-file.js",
-   "evidence": "角色卡 PNG/JSON 直读（tEXt 块、卡摘要、世界书指纹）。消费方应是「导入前识别与重复卡检测」，导入流程还没接。",
-   "recompute": "grep -rn \"cardFile\" engines core ui tests | head"
+   "evidence": "角色卡 PNG/JSON 直读（tEXt块 / 卡摘要 / 世界书指纹）。**本仓拿不到文件句柄**：导入由宿主 SillyTavern 完成（拖入文件→宿主解析→发事件），扩展层的 JS 无权拿到那个 Blob/ArrayBuffer，也无导入器 UI（产品面零处 FileReader/arrayBuffer 读取）。消费者是 tests（stitch-redbird-v2529 的 tEXt/指纹用例）。改判触发器：当且仅当本仓自建卡片导入器（拿到 Blob）时，本条改判 wired。",
+   "recompute": "grep -n \"WA.cardFile\" engines/card-file.js | head -3; grep -rln \"WA.cardFile\" engines core ui render tests | head"
   },
   "chatGuard": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/chat-guard.js",
-   "evidence": "存档防覆盖守卫（读失败时拦存盘）。消费方应是宿主的保存路径：现在保存路径还没有守卫，故零读。",
-   "recompute": "grep -rn \"chatGuard\" engines core ui tests | head"
+   "evidence": "存档防覆盖守卫（纯判定，不写盘）。**关键入参本仓拿不到**：判据①②都需「宿主读聊天失败」这个信号，判据③需「磁盘上那份的条数」；而宿主不会把这个状态告诉扩展，本仓在 ctx.saveChat() 调用点只能拿到「即将保存的 chat」。硬接只能用「空壳+1条」猜测，会把真新聊天也拦掉（丢一次比丢整档更轻，但不能靠猜）。消费者是 tests（stitch-redbird-v2529 的七组判据）。改判触发器：宿主暴露读失败标记或磁盘条数时改判 wired。",
+   "recompute": "grep -n \"WA.chatGuard\" engines/chat-guard.js | head -3; grep -rln \"WA.chatGuard\" engines core ui render tests | head"
   },
   "clearEventLog": {
    "cls": "readonly-api",
@@ -102,10 +102,10 @@
    "recompute": "grep -n 'clearEventLog' index.js tests/mock.js tests/run.js"
   },
   "contrast": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/contrast.js",
-   "evidence": "WCAG 对比度与背景压暗量。消费方应是界面配色/背景图那层：配色当前是手挑常量，没接体检。",
-   "recompute": "grep -rn \"contrast(\" engines core ui tests | head"
+   "evidence": "可读性对比度（WCAG）与背景压暗量。**设计期校验工具，运行期无可改变的行为**：本仓主题色是 ui/cyberpunk-theme.js 里手挑的 CSS 常量（无运行时配色方案输入、无用户背景图上传），故 checkOn/contrast 算出「某对色值是否达标」之后没有任何行为可以因此改变 —— 接进面板只会变成「读数面冒充消费面」（v2.552.0 已判过的失真）。实测该主题 --wa-text-tertiary #64748b 在四层底色上 3.63–4.05（够辅助字号 3.0、不够正文 4.5），结论属设计审查。消费者是 tests（x7-contrast-v2128）。改判触发器：出现运行时配色选择或背景图上传（shadeFor 有真输入）时改判 wired。",
+   "recompute": "grep -n \"WA.contrast\" engines/contrast.js | head -3; grep -rln \"WA.contrast\" engines core ui render tests | head"
   },
   "divinationCraft": {
    "cls": "readonly-api",
@@ -120,10 +120,10 @@
    "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('ensemble.')).length)\""
   },
   "factAge": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/fact-age.js",
-   "evidence": "世界事实的老化分层读数：plan(facts, nowTurn) 产出的 rows（每条的 age / level / text）就是「哪些设定久未引用」的注入数据源，消费点是世界盘点面板与注入侧的世界块筛选。当前这两处仍按原始 facts 全量注入，尚未换接 —— 接线时刻：盘点面板的「事实」页上线时读 rows，注入侧在需要裁剪陈事实时读 ids.stale / ids.dead。今天只有专锁 tests/opv29-z6-factage-jsonrepair-v2529.js 在读（A3~A17）。",
-   "recompute": "grep -n 'factAge' engines/fact-age.js tests/opv29-z6-factage-jsonrepair-v2529.js"
+   "evidence": "世界事实的老化分层（plan(facts, nowTurn) 产 rows）。**上游字段语义不匹配**：它需要「最近引用轮次 lastTurn」才能算 age，而 core/store.js 的 upsertFact 只写 at（写入时点），全仓产品面无 lastTurn。用 at 顶替 lastTurn 会把「写于第3轮」算成「第3轮引用过」——那是伪造读数。消费者是 tests（opv29-z6-factage-jsonrepair）。改判触发器：upsertFact 开始写 lastTurn（且事实被注入侧回读时打点）后改判 wired。",
+   "recompute": "grep -n \"WA.factAge\" engines/fact-age.js | head -3; grep -rln \"WA.factAge\" engines core ui render tests | head"
   },
   "faultContext": {
    "cls": "readonly-api",
@@ -150,28 +150,28 @@
    "recompute": "grep -n 'fireWatch' tests/scenario-v71-v27-money-night-fire.js | head -2"
   },
   "floorCensus": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/floor-census.js",
-   "evidence": "未发楼层普查（该发却没发）。消费方应是「提示词读数/诊断面板」：读数面还没接这一项。",
-   "recompute": "grep -rn \"floorCensus\" engines core ui tests | head"
+   "evidence": "未发楼层普查（该发却没发）。**sentFloors 在本仓之外**：本仓注入走 setExtensionPrompt 槽位、不参与宿主的楼层选择与裁剪，故「这次真正发出去的楼层清单」拿不到；能拿到的只有 chat 数组（全楼层）。用全楼层冒充 sentFloors 会让读数天天报警（这正是该引擎头注释要防的事）。消费者是 tests（stitch-redbird-v2529）。改判触发器：宿主暴露 prompt 楼层面时改判 wired。",
+   "recompute": "grep -n \"WA.floorCensus\" engines/floor-census.js | head -3; grep -rln \"WA.floorCensus\" engines core ui render tests | head"
   },
   "floorFavorites": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/floor-favorites.js",
-   "evidence": "楼层收藏（waxFavorite 只动 extra、不存盘）。消费方应是楼层操作菜单，菜单还没接。",
-   "recompute": "grep -rn \"floorFavorites\" engines core ui tests | head"
+   "evidence": "楼层收藏（只动 extra 里的收藏标记，不存盘）。**本仓拿不到整份楼层数组**：产品面零处 getChatMessages / getChat() （楼层只在事件回调里以单条 mes 到来），而收藏要按楼层索引锚定，索引又会随 swipe 与删除漂移——本仓没有任何稳定键可挂；宿主楼层操作菜单与 extra 字段展示也不归本仓。消费者是 tests（stitch-nekotools-v2529）。改判触发器：当且仅当本仓拿到整份楼层数组或自建楼层操作菜单时，本条改判 wired。",
+   "recompute": "grep -n \"WA.floorFavorites\" engines/floor-favorites.js | head -3; grep -rln \"WA.floorFavorites\" engines core ui render tests | head"
   },
   "floorHide": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/floor-hide.js",
-   "evidence": "楼层双层隐藏（waxHiddenByData / waxHiddenByVisual 分离）。消费方应是楼层渲染与上下文构建，两处都还没接。",
-   "recompute": "grep -rn \"floorHide\" engines core ui tests | head"
+   "evidence": "楼层双层隐藏（waxHiddenByData 与 waxHiddenByVisual 分离）。**本仓零处写 is_hidden**（实测产品面零处 is_hidden = 赋值）：隐藏标记由宿主写在消息对象上，本仓只能出计划（plan/patches/cutoffIndexForKeep），落笔得交回调用方；隐藏真正影响的是宿主怎么渲染楼层、把哪些楼层放进 prompt，这两处本仓都不在控制面内。消费者是 tests（stitch-nekotools-v2529）。改判触发器：当且仅当本仓取得楼层对象写权（能改 is_hidden）时，本条改判 wired。",
+   "recompute": "grep -n \"WA.floorHide\" engines/floor-hide.js | head -3; grep -rln \"WA.floorHide\" engines core ui render tests | head"
   },
   "floorScrub": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/floor-scrub.js",
-   "evidence": "楼层文本清洗（三形态规则、swipe/display 同步口径）。消费方应是清洗面板与导出，都还没接。",
-   "recompute": "grep -rn \"floorScrub\" engines core ui tests | head"
+   "evidence": "楼层文本清洗（parseRules / apply / plan / undoPlan / tidy，三形态规则）。**规则必须由调用方给，本仓无规则来源**：与 ctxBoundary 同型 —— 内置 DEFAULTS 不含任何规则，而本仓导出正文走 engines/story-export.js（不经楼层文本清洗面），故 scrub 无对象可洗。消费者是 tests（stitch-nekotools-v2529）。改判触发器：出现清洗面板或导出前清洗需求（且给出规则来源）时改判 wired。",
+   "recompute": "grep -n \"WA.floorScrub\" engines/floor-scrub.js | head -3; grep -rln \"WA.floorScrub\" engines core ui render tests | head"
   },
   "greenKeys": {
    "cls": "readonly-api",
@@ -270,16 +270,16 @@
    "recompute": "grep -n 'saltFranchise' tests/scenario-v71-v27-money-night-fire.js | head -2"
   },
   "saveMigrate": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/save-migrate.js",
-   "evidence": "存档结构变更的迁移与回滚。消费方应是「打开老档 / 离卡」两条路径：读档时 detect+plan，写回前 migrate 并留 backup，回退走 rollback。这两条路径还没接，故零读。",
-   "recompute": "node tests/opv29-z5-30-v2529.js"
+   "evidence": "存档结构变更的迁移与回滚。**本仓已有迁移实现，属性重复件**：core/store.js 的载入点自带 migrate（v2.553.0 已在读档处接 saveAudit 体检、migrate 在其之前跑），产品面的迁移路径已存在且是自研那份；再挂一份外部迁移器会产生「谁先跑」的双写风险。消费者是 tests（opv29-z5-30）。改判触发器：store.js 的迁移逻辑被移除或需要独立回滚能力时改判 wired。",
+   "recompute": "grep -n \"WA.saveMigrate\" engines/save-migrate.js | head -3; grep -rln \"WA.saveMigrate\" engines core ui render tests | head"
   },
   "setupPlan": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/setup-plan.js",
-   "evidence": "进卡/离卡的设置恢复计划。消费方应是角色切换流程，流程还没接。",
-   "recompute": "grep -rn \"setupPlan\" engines core ui tests | head"
+   "evidence": "进卡/离卡的设置恢复计划（全局 vs 本卡专用三条分支）。**本仓没有进卡/离卡钩子**：产品面零处 CARD_SWITCH / cardSwitch / onCardSwitch；唯一相关的 CHAT_CHANGED 在 core/interceptor.js，语义是「换了聊天」而不是「换了角色卡」，拿它顶替会把「切卡」与「切聊天」混成一件事；而计划要对比的 before/after 卡专用设置清单本身存在宿主的 settings 里，本仓不持有那份清单，无法生成本卡的专用键集合。消费者是 tests（stitch-redbird-v2529）。改判触发器：当且仅当宿主暴露角色卡切换事件且本仓能读到卡专用设置清单时，本条改判 wired。",
+   "recompute": "grep -n \"WA.setupPlan\" engines/setup-plan.js | head -3; grep -rln \"WA.setupPlan\" engines core ui render tests | head"
   },
   "silverAssay": {
    "cls": "readonly-api",
@@ -294,10 +294,10 @@
    "recompute": "grep -n 'WA.situation = situation' engines/scene-narrative.js"
   },
   "slotFormat": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/slot-format.js",
-   "evidence": "存档位命名与解析（UTF-8 字节预算）。消费方应是存档位读写，还没接。",
-   "recompute": "grep -rn \"slotFormat\" engines core ui tests | head"
+   "evidence": "存档位命名与解析（【WA存档·<角色名>·N】，按 UTF-8 字节预算 220/255 截断）。**本仓存储模型没有「存档位」这个实体**：状态按聊天 id 分键落盘（core/store.js 的 classifyKey 家族 state / stateDerived），同一聊天只有一份，不存在「同角色第 N 档」；实测产品面零处使用【WA存档· 前缀（只有本文件自己定义），故命名与解析函数没有任何输入可喂。消费者是 tests（stitch-nekotools-v2529）。改判触发器：当且仅当本仓引入多存档位（同角色多份状态并列）时，本条改判 wired。",
+   "recompute": "grep -n \"WA.slotFormat\" engines/slot-format.js | head -3; grep -rln \"WA.slotFormat\" engines core ui render tests | head"
   },
   "sourceReconcile": {
    "cls": "readonly-api",
@@ -306,16 +306,16 @@
    "recompute": "grep -n 'SR-' tests/cross-ref-stitch-v2409.js | head -3"
   },
   "storeMerge": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/store-merge.js",
-   "evidence": "设置文件合并（每条谁新留谁 + 墓碑）。消费方应是设置持久化层，还没接。",
-   "recompute": "grep -rn \"storeMerge\" engines core ui tests | head"
+   "evidence": "设置文件合并（逐条时间戳比较 + 墓碑，SECTIONS 白名单）。**本仓不持有那七个分区**：cards / profiles / regexOwners / presetInfo / pluginInfo / worldSources / themeInfo 在产品面只出现在本文件里，本仓自己的设置住在宿主的扩展设置槽；且跨标签页的同聊天冲突已经由 core/store.js 的 installStorageHook （storage 事件 + rev/writer 对账）处理过，再叠一层合并器会与它抢同一份状态、产生双写。消费者是 tests（stitch-redbird-v2529）。改判触发器：当且仅当本仓开始多端同步、或把上述七分区纳入自管状态时，本条改判 wired。",
+   "recompute": "grep -n \"WA.storeMerge\" engines/store-merge.js | head -3; grep -rln \"WA.storeMerge\" engines core ui render tests | head"
   },
   "streamGate": {
-   "cls": "pending-wire",
+   "cls": "readonly-api",
    "provider": "engines/stream-gate.js",
-   "evidence": "流式标签闸门。消费方应是流式渲染入口 —— 本文件**刻意不装 fetch hook**（装 hook 需要产品接线时再做），故零读。",
-   "recompute": "grep -rn \"streamGate\" engines core ui tests | head"
+   "evidence": "流式标签闸门（流中剥离）。**刻意不装 fetch hook**：本模块头注释第①条边界写明「不装 fetch hook（劫持全局 fetch 属 interceptor 的职责面）」，而本仓输出净化是流后（core/interceptor.js 在 MESSAGE_RECEIVED 后改 mes，设计如此）。产品面无 fetch 劫持点，流中无入口。消费者是 tests（stitch-nekotools-v2529）。改判触发器：本仓接管流式渲染入口时改判 wired。",
+   "recompute": "grep -n \"WA.streamGate\" engines/stream-gate.js | head -3; grep -rln \"WA.streamGate\" engines core ui render tests | head"
   },
   "unifiedPending": {
    "cls": "stale",
