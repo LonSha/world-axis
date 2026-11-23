@@ -1,7 +1,7 @@
 {
- "version": "2.566.0",
- "loadOrderCount": 584,
- "lazyCount": 19,
+ "version": "2.567.0",
+ "loadOrderCount": 585,
+ "lazyCount": 18,
  "loadedCount": 579,
  "uiCount": 24,
  "nsCount": 590,
@@ -2008,6 +2008,25 @@
    "consumedBy": [
     "core/api-router.js"
    ]
+  },
+  "engines/import-kind.js": {
+   "ns": [
+    "importKind"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
   },
   "engines/kaleidoscope.js": {
    "ns": [
@@ -11374,25 +11393,6 @@
   "engines/green-keys.js": {
    "ns": [
     "greenKeys"
-   ],
-   "requires": [
-    "registerModule"
-   ],
-   "requiresFiles": [
-    "core/store.js"
-   ],
-   "providerOrderOk": true,
-   "callRefs": [
-    "clock",
-    "modules"
-   ],
-   "ghostRefs": [],
-   "stateKeys": [],
-   "consumedBy": []
-  },
-  "engines/import-kind.js": {
-   "ns": [
-    "importKind"
    ],
    "requires": [
     "registerModule"

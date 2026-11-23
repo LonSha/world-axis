@@ -244,7 +244,14 @@
     //   v0.1.29 那条「真空轮 injected=false」当场就会红）；只加源表不加分支 = 声明了没人消费。
     //   默认 **true**：本模块只报「这局真长出了什么数」（vias / bookings / rows / tags），
     //   空局恒返回 ''，故默认开不会给老用户凭空多出一段约束。
-    'narrowConsumers'];
+    'narrowConsumers',
+    // v2.567.0（引擎深度）：常驻混合索引。与源表/def/VIS_NAMES/SRC_NAME/注入分支**五处同批**登记 ——
+    //   只加分支不加源表 = 开关点了零效果；只加源表不加分支 = 声明了没人消费。
+    //   它答的是第三种档位：不是「全量进」也不是「全量不进」，而是**只列名字 + 一句简报**，
+    //   详情仍留在按需条目里 —— 模型永远知道有什么，又不为详情付常驻 token。
+    //   默认 **false**：这是**常驻**文本（每轮都在），与 worldAutobiography 同一条理由 ——
+    //   没开过这个设置面的人不该凭空多出一段长期约束，也看不到它是哪来的。
+    'mixedIndex'];
   const __REG = { key: LS_KEY, def: { sceneIntent: true, clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -364,7 +371,9 @@ style: false,
         engineeringBlueprint: true, dungeonHazardMesh: true, ecosystemCascade: true, courtIntrigue: true,
         // v2.524.0（OPV27-5）：窄消费引擎的「在用机制」行。取默认 true —— 它只报本局真长出的数，
         //   空局恒 ''，不给老用户凭空多出约束。
-        narrowConsumers: true }, module: 'render' };
+        // v2.567.0（引擎深度）：常驻混合索引默认 **false**（同 worldAutobiography 的理由）——
+        //   常驻文本每轮都在，默认开会让老用户凭空多出一段长期约束，且看不到来源。
+        narrowConsumers: true, mixedIndex: false }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -671,7 +680,13 @@ style: false,
     //   逐字同名（explain-v2900 的 A4 咬「不裸露英文键」、C1 咬「源表每项都有名」）。
     narrativeLens: '叙述镜片',
     // v2.524.0（OPV27-5）：窄消费引擎的「在用机制」行。与注入分支的 source 字面量逐字同名。
-    narrowConsumers: '在用机制'
+    narrowConsumers: '在用机制',
+    // v2.567.0（引擎深度）：常驻混合索引的显示名。与 SOURCES（键）/ 注入分支 source 名 /
+    //   ui/panel.js 的 VIS_NAMES **四处逐字同名**登记 —— 少一处就会出现「面板上是英文键名」或
+    //   「注入项没有对应开关」这两种同形不可分辨的缺口。
+    //   取名口径同 diplomacy：答「这一段是什么」——「常驻索引」明示它**只有名字与一句简报**，
+    //   与「伏笔台账」「记忆」这类带内容的源划清边界。
+    mixedIndex: '常驻索引'
   };
   // ── v2.91.0 O4：开关两面对账 ──────────────────────────────────────────
   /**
@@ -1976,6 +1991,14 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.ledger && WA.ledger) { const lb = engineCall('ledger', function () { return WA.ledger.buildLedgerText(); }); if (lb) items.push({ source: '账本', content: '[重大事件账本]\n' + lb }); }
       // v0.7: world_digest块
       if (vis.digest && WA.digest) { const db = engineCall('digest', function () { return WA.digest.buildBlock(); }); if (db) items.push({ source: '世界推演', content: db }); }
+      // v2.567.0（引擎深度）：常驻混合索引。**默认关**（def 里 false），开了才进正文。
+      //  位置刻意排在「在用机制」之前、近端事件之前：它是**参考索引**而不是现场情报，
+      //   预算吃紧时应当先被折叠的是它这类「长期都在」的块，而不是现场事件。
+      //   空局/没有常驻条目时 buildBlock 自己返回 ''，**不输出空块**（不白吃常驻 token）。
+      if (vis.mixedIndex && WA.mixedIndex) {
+        const mi = engineCall('mixedIndex', function () { return WA.mixedIndex.buildBlock(); });
+        if (mi) items.push({ source: '常驻索引', content: mi });
+      }
       // v2.524.0（OPV27-5）：窄消费引擎接产品链——12 台 consumer≤3 的引擎里「这局真有数」的那几台，
       //   在注入正文留一行 [在用机制]。空局/无产出时 buildBlock 自己返回 ''，**不输出空块**。
       if (vis.narrowConsumers && WA.narrowConsumers) {

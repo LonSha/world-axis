@@ -23311,7 +23311,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.566.0';
+  const __wantPin293 = '2.567.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');
@@ -23374,6 +23374,15 @@ await runScript('./story-window-evidence-v2518.js');
     const rCD2545 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/character-drive-v2545.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
     assert(rCD2545.status === 0, 'character-drive 专锁 exit 0（实 ' + rCD2545.status + '）'
       + (rCD2545.status === 0 ? '' : ' :: ' + String(rCD2545.stdout || '').slice(-600)));
+  }
+  // v2.567.0（引擎深度）：常驻混合索引接进注入主链。为什么单独成节：本源的失败形态两向都静默——
+  //   「开关点了没反应」（源表/默认值/显示名/分支任一处单边增长）与「没开也照样多出一段常驻文本」
+  //   （默认值取 true）。两者都不报错、不影响注入，只在正文里多一段或少一段，必须单独锁。
+  section('v2.567.0（引擎深度）：常驻混合索引接进注入主链 —— 三态返空 / 四处登记 / 默认关');
+  {
+    const rMI2567 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/mixed-index-wire-v2567.js')], { cwd: BASE, encoding: 'utf8', timeout: 1344000, killSignal: 'SIGKILL' });
+    assert(rMI2567.status === 0, 'mixed-index 专锁 exit 0（实 ' + rMI2567.status + '）'
+      + (rMI2567.status === 0 ? '' : ' :: ' + String(rMI2567.stdout || '').slice(-600)));
   }
   // ── 汇总 ──
   console.log('  ⏱ ' + ((Date.now() - __secT) / 1000).toFixed(2) + 's  ← ' + __secName + '（末节）');

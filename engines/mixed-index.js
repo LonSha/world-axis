@@ -66,6 +66,32 @@
     };
   }
 
-  WA.mixedIndex = { build: build, brief: brief, isResident: isResident, SEC_ORDER: SEC_ORDER };
+  /**
+   * v2.567.0（引擎深度）：**产品入口**——常驻索引的正文块。
+   *
+   * 为什么本模块需要自己的 buildBlock：注入面（render/inject.js）只收「会往正文里放块」的源，
+   *   而这些源统一以 `<ns>.buildBlock()` 取内容（tests/inject-sources-v2560.js 的 A 判据就是
+   *   按 `WA.<ns>.buildBlock(` 反查分支是否真接）。本模块此前只有 `build(entries, opts)`，
+   *   条目要由调用方喂 —— 于是「谁喂」这一层永远缺着，全仓零读是必然结果，不是设计。
+   *
+   * 真源取 `WA.worldbook.peekEntries()`（按当前聊天选中的世界书条目，只读）。
+   * 三态如实（都不产块）：
+   *   · 世界书模块不在 / 没选条目 ⇒ ''（不产「空索引」占位，占位会白吃常驻 token）；
+   *   · 条目里没有常驻项（constant / selective===false）⇒ ''（非常驻项本来走按需激活，不进索引）；
+   *   · 抛错 ⇒ ''（索引是增益面，不能因为算不出来就打断注入）。
+   */
+  function buildBlock(opts) {
+    const wb = WA.worldbook;
+    if (!wb || typeof wb.peekEntries !== 'function') return '';
+    let list = null;
+    try { list = wb.peekEntries(); } catch (e) { return ''; }
+    if (!Array.isArray(list) || !list.length) return '';
+    let r = null;
+    try { r = build(list, opts || {}); } catch (e) { return ''; }
+    if (!r || !r.text || !r.names) return '';
+    return r.text;
+  }
+
+  WA.mixedIndex = { build: build, buildBlock: buildBlock, brief: brief, isResident: isResident, SEC_ORDER: SEC_ORDER };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/mixed-index.js', { kind: 'engine', ver: '2.529.0' });
 })();

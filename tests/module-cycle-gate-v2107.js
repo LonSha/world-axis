@@ -544,7 +544,7 @@ function runAll(A) {
   //   · (core/interceptor.js, ephemeralScrub)    —— scrubReply 真调 scrub（只采用「真删且无多处命中」的结果）
   //   · (render/inject.js,    ephemeralScrub)    —— 注入落地前登记 finalItems 的结构性块
   //   装载期仍 476；恒等式 476 + 4035 = 4511。
-  A(a.edgesLoad === 476 && a.edgesCall === 4044 && a.edgesAll === 4520 && a.identityOk,
+  A(a.edgesLoad === 476 && a.edgesCall === 4046 && a.edgesAll === 4522 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -733,7 +733,7 @@ function runAll(A) {
   // v2.546.0：读面 592 → 593（compactTiming 由 inject-collector 真读）。
   // v2.547.0：读面 593 → 595（msgAlign / ephemeralScrub 两个 ns 由零读进读面；
   //   提供方 647 与账本 590 不动 —— 账本条目会在「接到真读点」时注销，见 ns-consumer-ledger.json）。
-  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 595,
+  A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 596,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -780,7 +780,10 @@ function runAll(A) {
   //   followupGate（spotlight.resolveIntervention）四条零读 ns 出表。
   // v2.546.0：零读 ns 59 → 58（compactTiming 出表）。
   // v2.547.0：58 → 56（msgAlign / ephemeralScrub 两口真接了产品消费点；零读定性账本同步注销两条）。
-  A(a.deadNs.length === 56, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+  // v2.567.0：56 → 55（mixedIndex 出零读面：engines/mixed-index.js 增 buildBlock()，render/inject.js
+  //   的注入分支真读 `WA.mixedIndex`；README 式零点同时从 ns-consumer-ledger.json 注销 ——
+  //   两处必须一起动，否则账本多一条就是「过期登记」）。
+  A(a.deadNs.length === 55, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
