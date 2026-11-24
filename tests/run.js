@@ -22840,6 +22840,11 @@ await runScript('./sediment-block-quota-v2572.js');
     //   得 slice(0) 把十条全念出来。改法 quotaOf + pickHeard（at 降序 + id 字典序）+ 自证 + block 五栗；
     //   23 段 A/B/C/N。单独跑：node tests/farfield-block-quota-v2573.js
 await runScript('./farfield-block-quota-v2573.js');
+    // v2.574.0（按序截断第十七处）：注入收集器的**上游取样窗口** —— 自证只管下游折叠。
+    //   注入块已有「其余折叠：N 条」，但五处 owner 读取自身在静默取样（滞留 5 / 避险·险道·危机·公约 各 3 / 人物 48）；
+    //   截断发生在候选生成前，折叠自证看不见。改法 SAMPLE 具名 + recentOf（时间降序 + 主键兜底）+ 块尾取样自证 + sample 读数；
+    //   22 段 A/B/C/N。单独跑：node tests/inject-collector-sample-window-v2574.js
+await runScript('./inject-collector-sample-window-v2574.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
@@ -23368,7 +23373,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.573.0';
+  const __wantPin293 = '2.574.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

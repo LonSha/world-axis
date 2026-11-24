@@ -10,7 +10,9 @@
   const REG = { key: 'worldaxis_inject_collector_settings_v1', def: DEF,
     module: 'injectCollector', bounds: { maxItems: [1, 12], maxChars: [400, 12000], maxTokens: [0, 12000] } };
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([REG]);
-  let last = { enabled: true, selected: 0, folded: 0, chars: 0, rows: [], faults: [] };
+  // v2.574.0：sample 面（上游取样窗口留痕）也在这里声明 —— 未构建时它是空表，不是 undefined。
+  let last = { enabled: true, selected: 0, folded: 0, chars: 0, rows: [], faults: [],
+    sample: { rows: [], truncated: 0 } };
   // V8 EXV8-1：场景来源留痕。为什么要单独一格而不是塞进 last：
   //   「场景换了但选的一样」有两种完全不同的原因 —— ①场景输入根本没到（from='none'）；
   //   ②到了但这几条候选恰好不含在场人（relevance 全是 0）。两者修法相反，
@@ -25,11 +27,39 @@
     const m = WA[name];
     return m && (!m.getSettings || m.getSettings().enabled !== false);
   }
+  // ── v2.574.0（按序截断第十七处）：上游取样窗口 ──
+  //   注入面本来就有自证：「其余折叠：N 条」—— 但它只管**下游折叠**（候选 → 入选）。
+  //   上游的 owner 读取本身就在静默取样：气候滞留取最近 5、避险争夺/险道/危机/公约各取 3、
+  //   人物只扫 48 个。这些截断发生在候选生成**之前**，折叠自证看不见它们：
+  //   「八条滞留只念了五条」与「一共就五条」在读数上完全同形。
+  //   故取样窗口具名成表 + 逐面留痕，并在块尾自证「哪个面取了几分之几」。
+  const SAMPLE = { disruptions: 5, sanctuaries: 3, chokes: 3, crises: 3, pacts: 3, people: 48 };
+  let sampleTrace = { rows: [], truncated: 0 };
+  // 最近 N 条：显式按时间降序（同刻用主键字典序兜底），不靠数组原有次序 ——
+  //   旧写法 slice(-N) 取的是**登记次序**的尾巴，倒序写入的数组上会取到最旧的 N 条。
+  function recentOf(list, n, face, timeKey) {
+    const arr = (list || []).filter(function (x) { return !!x; }).slice();
+    function keyOf(x) {
+      return String((x && (x.actorId || x.routeId || x.seedId || x.pactId || x.sanctuaryId)) || '');
+    }
+    arr.sort(function (a, b) {
+      const ta = Number(a && a[timeKey]) || 0, tb = Number(b && b[timeKey]) || 0;
+      if (ta !== tb) return tb - ta;
+      return keyOf(a).localeCompare(keyOf(b));
+    });
+    const out = arr.slice(0, Math.max(0, Math.floor(Number(n)) || 0));
+    if (arr.length > out.length) {
+      sampleTrace.rows.push({ face: face, total: arr.length, picked: out.length });
+      sampleTrace.truncated++;
+    }
+    return out;
+  }
   function buildBlock(context) {
     const cfg = settings();
     routineTrace = {status:cfg.enabled ? 'owner-disabled-or-hidden' : 'collector-disabled', candidates:0, selected:0};
     if (!cfg.enabled) { last = { enabled: false, selected: 0, folded: 0, chars: 0, rows: [], faults: [] }; return ''; }
     const c = context || {}, candidates = [], faults = [];
+    sampleTrace = { rows: [], truncated: 0 };
     const max = Math.max(1, Math.min(12, Math.floor(Number(cfg.maxItems) || 4)));
     const cap = Math.max(400, Math.min(12000, Math.floor(Number(cfg.maxChars) || 2400)));
     const visibility = c.visibility || {};
@@ -67,7 +97,12 @@
       // chainBlock intentionally belongs to backstage. Use chain() and reveal only the
       // current step/blockers, never the future rest[] itinerary.
       const people = ((WA.store && WA.store.get()) || {}).people || {};
-      Object.keys(people).slice(0, 48).forEach(function (id) {
+      const allIds = Object.keys(people);
+      if (allIds.length > SAMPLE.people) {
+        sampleTrace.rows.push({ face: '人物扫描', total: allIds.length, picked: SAMPLE.people });
+        sampleTrace.truncated++;
+      }
+      allIds.slice(0, SAMPLE.people).forEach(function (id) {
         const p = people[id]; if (!p) return;
         const v = WA.plan.chain(p.name || id.replace(/^p_/, ''));
         if (!v || !v.ok || ['done', 'abandoned', 'refused'].indexOf(v.status) >= 0) return;
@@ -130,13 +165,13 @@
     read('life', function () {
       const st = (WA.store && WA.store.get) ? WA.store.get() : {};
       const disruptions = Array.isArray(st.routineDisruptions) ? st.routineDisruptions : [];
-      disruptions.slice(-5).forEach(function (dis, idx) {
+      recentOf(disruptions, SAMPLE.disruptions, '气候滞留', 'at').forEach(function (dis, idx) {
         add('life', 'disrupt:' + dis.actorId + ':' + idx,
           dis.actorId + '受恶劣气候【' + dis.weather + '】阻断，强制滞留避险（状态：' + dis.imposedState + '）',
           [dis.actorId], dis.at, '气候滞留');
       });
       const sanctLogs = Array.isArray(st.sanctuaryLogs) ? st.sanctuaryLogs : [];
-      sanctLogs.slice(-3).forEach(function (sl, idx) {
+      recentOf(sanctLogs, SAMPLE.sanctuaries, '避险争夺', 'at').forEach(function (sl, idx) {
         add('life', 'sanctuary:' + sl.sanctuaryId + ':' + idx,
           '避难所【' + sl.sanctuaryId + '】席位争夺已结算：入驻[' + sl.admitted.join(',') + ']，牺牲[' + (sl.sacrifices.join(',') || '无') + ']',
           sl.admitted.concat(sl.sacrifices || []), sl.at, '避险争夺');
@@ -153,19 +188,19 @@
       });
       // V14 深化：险道断裂配给危机、破土公开危机与城下之盟和解公约注入
       const chokes = Array.isArray(st.supplyChokes) ? st.supplyChokes : [];
-      chokes.filter(function (ck) { return ck.status === 'active'; }).slice(-3).forEach(function (ck, idx) {
+      recentOf(chokes.filter(function (ck) { return ck.status === 'active'; }), SAMPLE.chokes, '物资断供', 'startedAt').forEach(function (ck, idx) {
         add('life', 'choke:' + ck.routeId + ':' + idx,
           '险道【' + ck.routeId + '】被阻断，城池【' + ck.destinationCity + '】物资【' + ck.resourceKind + '】面临断供与' + ck.priceMultiplier + '倍物价暴涨（限购配给中）',
           [ck.destinationCity], ck.startedAt, '物资断供');
       });
       const crises = Array.isArray(st.activeCrises) ? st.activeCrises : [];
-      crises.filter(function (cr) { return cr.status === 'erupted'; }).slice(-3).forEach(function (cr, idx) {
+      recentOf(crises.filter(function (cr) { return cr.status === 'erupted'; }), SAMPLE.crises, '伏笔反噬', 'eruptedAt').forEach(function (cr, idx) {
         add('life', 'crisis:' + cr.seedId + ':' + idx,
           '历史伏笔全面爆发公开危机：对【' + cr.targetActor + '】形成现实反噬（严重度：' + cr.severity + '）',
           [cr.targetActor], cr.eruptedAt, '伏笔反噬');
       });
       const pacts = Array.isArray(st.pacts) ? st.pacts : [];
-      pacts.filter(function (p) { return p.ratified === true; }).slice(-3).forEach(function (p, idx) {
+      recentOf(pacts.filter(function (p) { return p.ratified === true; }), SAMPLE.pacts, '和解公约', 'timestamp').forEach(function (p, idx) {
         add('life', 'pact:' + p.pactId + ':' + idx,
           '利益和解公约达成：【' + p.partyA + '】与【' + p.partyB + '】缔结互信协定（双方效用：' + p.utilityA + '/' + p.utilityB + '）',
           [p.partyA, p.partyB], p.timestamp, '和解公约');
@@ -485,12 +520,18 @@
     // Local material ceiling, not a second allocation from render's shared pool.
     const tokenCap = Math.max(0, Math.floor(Number(cfg.maxTokens) || 0));
     const tokenCost = WA.injectBudget.tokensOf;
+    function sampleLine() {
+      if (!sampleTrace.rows.length) return '';
+      return '\n上游取样：' + sampleTrace.rows.map(function (r) {
+        return r.face + ' ' + r.picked + '/' + r.total;
+      }).join('、') + '（按最近发生取；未列者仍在存档里，不是没发生）';
+    }
     function compose(rows, omitted) {
       return rows.length ? header + rows.map(function(r){return r.content;}).join('\n')
-        + (omitted ? '\n其余折叠：' + omitted + ' 条' : '') + footer : '';
+        + (omitted ? '\n其余折叠：' + omitted + ' 条' : '') + sampleLine() + footer : '';
     }
     // Reserve an exact worst-case omission marker; final text is re-counted below.
-    const reserve = tokenCost(header + footer + '\n其余折叠：' + candidates.length + ' 条');
+    const reserve = tokenCost(header + footer + '\n其余折叠：' + candidates.length + ' 条' + sampleLine());
     let tokenUsed = reserve;
     let used = header.length + footer.length + 100; // reserve collapse counters
     candidates.forEach(function (r) {
@@ -531,7 +572,9 @@
       }
     } catch (e) { foldAdvice = { ok: false, action: 'error', reason: 'compact-timing-error:' + (e && e.message) }; }
     last = { enabled: true, selected: picked.length, folded: candidates.length - picked.length,
-      chars: block.length, cap: cap, tokenCap: tokenCap, tokens: tokenCost(block), candidateCount: candidates.length, inputTokens: inputs.reduce(function(n,r){return n+tokenCost(r.content);},0), volume: volume, rows: picked, skipped: skipped, faults: faults, fold: foldAdvice, chatId: WA.store.chatId() };
+      chars: block.length, cap: cap, tokenCap: tokenCap, tokens: tokenCost(block), candidateCount: candidates.length, inputTokens: inputs.reduce(function(n,r){return n+tokenCost(r.content);},0), volume: volume, rows: picked, skipped: skipped, faults: faults, fold: foldAdvice, chatId: WA.store.chatId(),
+      sample: { rows: sampleTrace.rows.map(function (r) { return Object.assign({}, r); }),
+        truncated: sampleTrace.truncated } };
     return block;
   }
   WA.injectCollector = {
@@ -546,7 +589,7 @@
       const populated=Object.keys(s.people||{}).length>0||(s.currents||[]).length>0||(s.events&&s.events.rows||[]).length>0;
       const faults=last.faults.slice();
       if(populated&&last.candidateCount===0)faults.push({fault:'state-but-no-candidate',scope:'collector-five-owners',note:'可能是源关闭/可见性过滤或无适用材料，不代表整个世界注入失败'});
-      return {ok:faults.length===0,status:faults.length?'attention':'ok',candidateCount:last.candidateCount,selected:last.selected,fold:last.fold||null,faults:faults,routine:Object.assign({},routineTrace)};
+      return {ok:faults.length===0,status:faults.length?'attention':'ok',candidateCount:last.candidateCount,selected:last.selected,fold:last.fold||null,faults:faults,routine:Object.assign({},routineTrace),sample:last.sample?{rows:last.sample.rows.map(function(r){return Object.assign({},r);}),truncated:last.sample.truncated}:{rows:[],truncated:0}};
     },
     noteScene: function (info) {
       const i = info || {};
