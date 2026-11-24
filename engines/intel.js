@@ -9,6 +9,9 @@
  *   4 人物只能使用自己持有的情报，不把全知伪装成推理。
  *   5 情报不得瞬移。给了 from/to 且路途有耗时时，接收者在到期前看不到它；
  *     路途未登记则报 unreachable，不回落成「马上知道」。没给路途的情报仍是即时入账。
+ *   6 注入面「因果 / 人物 / 每个人的情报」三处截断都各有排序键（因果按更新、人物按情报量、
+ *     情报按置信度），名额只截断不参与筛选，且截断必须自证「另有几条未列」——否则模型
+ *     不知道自己看到的是全部还是抽样，也分不出「最先登记的那个人」与「最该先说的那个人」。(v2.571.0)
  */
 (function () {
   'use strict';
@@ -204,16 +207,87 @@
     const causes = (row.causes || []).filter(knownCause);
     return causes.length ? { ok: true, id: row.id, causes: causes } : { ok: false, reason: 'unexplained' };
   }
+  // ── v2.571.0（按序截断第十四处）：因果与情报注入名额 ──
+  //   旧写法三个截断口各用一种「谁被念」，且都不自证：
+  //     · currents.slice(-maxLinks)                  → 取数组最后 N 条（按写入顺序，不是按更新）
+  //     · Object.values(people).slice(0, maxItems)   → 取对象键最先的 N 个（谁先被登记谁被念）
+  //     · p.knowledge.intel.slice(-maxItems)         → 每人取最后 N 条（不看置信度）
+  //   探针（/tmp/probe571.js）：把 people 的插入顺序倒过来，念出的人物就全变了；
+  //   一个持 12 条情报的人与一个持 1 条的人抢同一个名额，先登记的赢。
+  const LINKS_MAX = 8, ITEMS_MAX = 4;
+  function quotaOf(v, def, hi) {
+    var n = Math.floor(Number(v));
+    if (!isFinite(n) || n < 1) n = def;
+    return Math.min(hi, Math.max(1, n));
+  }
+  // 因果面排序：① updatedAt 新的先 ② causes 多的先（链更长 = 更该先说）③ id 字典序
+  function pickCurrents(list, quota) {
+    var arr = (list || []).slice().sort(function (a, b) {
+      var ua = Number(a.updatedAt) || Number(a.createdAt) || 0;
+      var ub = Number(b.updatedAt) || Number(b.createdAt) || 0;
+      if (ua !== ub) return ub - ua;
+      var ca = (a.causes || []).length, cb = (b.causes || []).length;
+      if (ca !== cb) return cb - ca;
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    });
+    return { picked: arr.slice(0, quota), hidden: Math.max(0, arr.length - quota),
+      candidates: arr.length };
+  }
+  // 人物面排序：① 情报条数多的先（信息量大）② lastSeenAt 新的先 ③ id 字典序
+  function pickPeople(list, quota) {
+    var arr = (list || []).slice().sort(function (a, b) {
+      var na = (a.knowledge.intel || []).length, nb = (b.knowledge.intel || []).length;
+      if (na !== nb) return nb - na;
+      var sa = Number(a.lastSeenAt) || Number(a.updatedAt) || 0;
+      var sb = Number(b.lastSeenAt) || Number(b.updatedAt) || 0;
+      if (sa !== sb) return sb - sa;
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    });
+    return { picked: arr.slice(0, quota), hidden: Math.max(0, arr.length - quota),
+      candidates: arr.length };
+  }
+  // 每人情报排序：① 置信度高先（record > witness > report > rumor）② at 新的先 ③ claim 字典序
+  function pickIntel(list, quota) {
+    var arr = (list || []).slice().sort(function (a, b) {
+      var ca = Number(a.confidence) || 0, cb = Number(b.confidence) || 0;
+      if (ca !== cb) return cb - ca;
+      var ta = Number(a.at) || 0, tb = Number(b.at) || 0;
+      if (ta !== tb) return tb - ta;
+      return String(a.claim || '').localeCompare(String(b.claim || ''));
+    });
+    return { picked: arr.slice(0, quota), hidden: Math.max(0, arr.length - quota),
+      candidates: arr.length };
+  }
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
-    const currents = (state().currents || []).filter(function (x) { return x && Array.isArray(x.causes) && x.causes.length; }).slice(-cfg.maxLinks);
-    const people = Object.values(state().people || {}).filter(function (p) { return p && p.knowledge && Array.isArray(p.knowledge.intel) && p.knowledge.intel.length; }).slice(0, cfg.maxItems);
+    var ql = quotaOf(cfg.maxLinks, DEF.maxLinks, LINKS_MAX);
+    var qi = quotaOf(cfg.maxItems, DEF.maxItems, ITEMS_MAX);
+    var cur = pickCurrents((state().currents || []).filter(function (x) {
+      return x && Array.isArray(x.causes) && x.causes.length; }), ql);
+    var ppl = pickPeople(Object.values(state().people || {}).filter(function (x) {
+      return x && x.knowledge && Array.isArray(x.knowledge.intel) && x.knowledge.intel.length; }), qi);
+    var hiddenAny = cur.hidden + ppl.hidden;
+    var mode = !(cur.candidates + ppl.candidates) ? 'empty' : (hiddenAny ? 'informative-first' : 'all-fit');
+    stat.block = { candidates: cur.candidates + ppl.candidates,
+      picked: cur.picked.length + ppl.picked.length,
+      quota: ql + qi, hidden: hiddenAny, mode: mode,
+      links: { candidates: cur.candidates, picked: cur.picked.length, quota: ql, hidden: cur.hidden },
+      people: { candidates: ppl.candidates, picked: ppl.picked.length, quota: qi, hidden: ppl.hidden } };
     const lines = [];
-    currents.forEach(function (x) { lines.push('因果：' + x.causes.slice(-2).join('、') + ' → ' + (x.title || x.id)); });
-    people.forEach(function (p) {
-      const rows = p.knowledge.intel.slice(-cfg.maxItems);
-      lines.push(p.name + '：' + rows.map(function (x) { return x.status + '「' + x.claim + '」（来源 ' + x.source + '，' + x.confidence + '）'; }).join('；'));
+    cur.picked.forEach(function (x) { lines.push('因果：' + x.causes.slice(-2).join('、') + ' → ' + (x.title || x.id)); });
+    if (cur.hidden > 0) {
+      lines.push('另有 ' + cur.hidden + ' 条因果未列出（本面只念最该先说的 ' + cur.picked.length + ' 条）');
+    }
+    ppl.picked.forEach(function (x) {
+      var it = pickIntel(x.knowledge.intel, qi);
+      var body = it.picked.map(function (r) {
+        return r.status + '「' + r.claim + '」（来源 ' + r.source + '，' + r.confidence + '）'; }).join('；');
+      if (it.hidden > 0) body += '（另有 ' + it.hidden + ' 条未列）';
+      lines.push(x.name + '：' + body);
     });
+    if (ppl.hidden > 0) {
+      lines.push('另有 ' + ppl.hidden + ' 个持情报的人物未列出（本面只念最该先说的 ' + ppl.picked.length + ' 个）');
+    }
     return lines.length ? '[因果与情报]\n' + lines.join('\n') + '\n人物只能依据自己持有的情报行动；怀疑不得写成既成事实，缺少来源的内容不得补写。' : '';
   }
 
@@ -442,6 +516,11 @@
     // v2.117.0（B3）：认知层——真相只读、相信不改事实、弱证据不抬升、辟谣只对收到者生效。
     truthOf: truthOf, rowsOf: rowsOf, entitledTo: entitledTo, believe: believe,
     verify: verify, correct: correct, project: project, network: network, networkStat: networkStat,
-    stat: function () { return Object.assign({}, stat); }
+    stat: function () {
+      var o = Object.assign({}, stat, { faults: Object.assign({}, stat.faults) });
+      o.block = stat.block ? Object.assign({}, stat.block) : null;
+      o.block && stat.block.links && (o.block.links = Object.assign({}, stat.block.links));
+      o.block && stat.block.people && (o.block.people = Object.assign({}, stat.block.people));
+      return o; }
   };
 })();

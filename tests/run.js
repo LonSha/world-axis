@@ -22823,6 +22823,12 @@ await runScript('./longline-block-v2564.js');
     //   注面念的是最早登记那几处：最后登记且最拦路的 storm 一个字都没有（/tmp/probe570.js）；
     //   改法 quotaOf(cfg) + pickBlock 四条键（地点 → 拦路 → 新 → 地名）+ 截断自证「另有 N 处未列」+ stat().block 五栗；25 段 A/B/C/N。
 await runScript('./weather-block-quota-v2570.js');
+    // v2.571.0（按序截断第十四处）：因果与情报注入名额 —— 一个模块三处截断，三种「谁被念」。
+    //   currents slice(-N) 按写入、people slice(0,N) 按插入次序、每人情报 slice(-N) 不看置信度；
+    //   实测（/tmp/probe571.js）：p9 持 6 条却因登记最晚而一个字都没有；maxLinks 写成字符串时
+    //   slice(-'x') 反把六条全念出来（注面爆炸）。改法 quotaOf + 三个排序函数 + 三处截断自证
+    //   + stat().block 五栗带 links/people 子面；28 段 A/B/C/N。单独跑：node tests/intel-block-quota-v2571.js
+await runScript('./intel-block-quota-v2571.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
@@ -23351,7 +23357,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.570.0';
+  const __wantPin293 = '2.571.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');
