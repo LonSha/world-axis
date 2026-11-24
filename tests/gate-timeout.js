@@ -126,6 +126,14 @@ const TIMEOUT_ARMED = {
   'inject-tier-v2543': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   'arc-phase-v2544': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   'character-drive-v2545': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  // v2.568.0 收口补账：本轮四个新调用点与 ARMED_SITES 同批入表（两张表各说一套时，
+  //   coherence 会报 site-not-armed / armed-without-site）。其中 worldtime-coupling 与
+  //   wb-greengate 两处现场原写 `timeout: 60000` —— 那是第二套 spawn 预算，
+  //   已按口径一改回统一值 1344000（单一真源，不逐道紧贴）。
+  'mixed-index-wire-v2567': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'ns-adjudication-v2568': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'worldtime-coupling-v2568': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
+  'wb-greengate-v2568': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
 'story-window-evidence-lock': { value: 1344000, mode: 'spawn', optionKey: 'timeout', killSignal: 'killSignal' },
   // v2.173.0（TX4b 收尾）：TX1–TX9 批次的 14 个子进程调用点（8 个 TX 专锁 + 6 个
   //   tx*_smoke 工具）。它们此前既未声明 timeout、也未入表 —— 正是本模块治的病
@@ -522,7 +530,21 @@ const ARMED_SITES = [
   { key: 'arc-phase-v2544', mode: 'spawn', kill: true,
     anchor: "const rAP2544 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/arc-phase-v2544.js')]," },
   { key: 'character-drive-v2545', mode: 'spawn', kill: true,
-    anchor: "const rCD2545 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/character-drive-v2545.js')]," }
+    anchor: "const rCD2545 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/character-drive-v2545.js')]," },
+  // v2.568.0 收口补账：本轮三个新调用点（v2.567.0 mixed-index + v2.568.0 ns-adjudication /
+  //   worldtime-coupling / wb-greengate）开了 section + spawnSync 却没入武装表 ——
+  //   正是本模块治的病（新开的调用点不入表即红），故处置是入表而不是放宽。
+  //   另外两处现场写成 `timeout: 60000` —— 那是**第二套 spawn 预算**，违背「单一真源」，
+  //   已随本轮一并改回统一值 1344000（口径见模块头口径一）。
+  //   插入点硬约束同前：A10 要求站点行号严格递增 ⇒ 四条必须落在数组末尾（run.js 里它们也是最后四处）。
+  { key: 'mixed-index-wire-v2567', mode: 'spawn', kill: true,
+    anchor: "const rMI2567 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/mixed-index-wire-v2567.js')]," },
+  { key: 'ns-adjudication-v2568', mode: 'spawn', kill: true,
+    anchor: "const rNA2568 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/ns-adjudication-v2568.js')]," },
+  { key: 'worldtime-coupling-v2568', mode: 'spawn', kill: true,
+    anchor: "const rWT2568 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/worldtime-coupling-v2568.js')]," },
+  { key: 'wb-greengate-v2568', mode: 'spawn', kill: true,
+    anchor: "const rGG2568 = require('child_process').spawnSync(process.execPath, [path.join(BASE, 'tests/wb-greengate-v2568.js')]," }
 ];
 
 /**

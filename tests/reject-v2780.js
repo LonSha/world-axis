@@ -4538,6 +4538,35 @@ function runWitness(WA) {
       } finally { WA.store.get = keepGet; Ws.setSettings(keepWs); }
     }
   }
+  // ── v2.568.0（引擎深度两条主线）：世界钟推进器的四态（reject-v2780 新增三条码）──
+  //   口径同 worldMinutes：不知道上一拍在哪，就不把未知长度当成事实。
+  //   三条码全部由真 API 跑出来（不靠桩）：换存档对钟 ⇒ first-tick；钟没动 ⇒ no-advance；
+  //   钟真前进 ⇒ advanced。时钟在用前快照、用后还原（不给后面的段留下被改过的世界）。
+  {
+    const MC = WA.metabolismClock, Pt560 = WA.playtime;
+    if (MC && typeof MC.worldTick === 'function' && Pt560 && typeof Pt560.worldMinutes === 'function') {
+      const keepClock = JSON.parse(JSON.stringify((WA.store.get() || {}).clock || {}));
+      try {
+        WA.store.transact(function (d) {
+          d.clock = { iso: '', label: '第3日·正午', dayIndex: 2, source: 'user' };
+        }, 'reject-witness:wt-clock');
+        want('first-tick', 'metabolismClock.worldTick：换存档 / 手动对钟后 rebaseline ⇒ 只重设基准、不补算未知时长');
+        trip('first-tick', function () { return [MC.worldTick({ rebaseline: true }).reason]; });
+        want('no-advance', 'metabolismClock.worldTick：世界钟没前进 ⇒ 拒收 no-advance（不把零时长当推进）');
+        trip('no-advance', function () { return [MC.worldTick().reason]; });
+        want('advanced', 'metabolismClock.worldTick：世界钟真前进 ⇒ 按小时推进已登记角色（advanced）');
+        trip('advanced', function () {
+          WA.store.transact(function (d) {
+            d.clock = Object.assign({}, d.clock, { label: '第4日·正午', dayIndex: 3 });
+          }, 'reject-witness:wt-adv');
+          return [MC.worldTick().reason];
+        });
+      } finally {
+        WA.store.transact(function (d) { d.clock = keepClock; }, 'reject-witness:wt-restore');
+      }
+    }
+  }
+
   // ── v2.156.0（SP1 + S1）：playtime 与 offline-return 的**新增**拒收码 ──
   //   与前面各段同规矩：新增字面量全部由**真实局面**触发，不进基线。
   //   几条只能用内存桩造前提（「换个聊天」「存储面抛错」这类局面在单进程里造不出来），

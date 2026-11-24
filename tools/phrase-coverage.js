@@ -40,7 +40,11 @@ const LEDGER = path.join(ROOT, 'tests/phrase-coverage-ledger.json');
 //   来自现场。这一版的两个数都是从命令输出里抄下来的。
 // v2.542.8 抬线：45.2 -> 45.4（现场 845 / 1863 = 45.4%；本版给「场上没有」家族补了簇命中）。
 //   本仓纪律：线只许升不许降 —— 覆盖面上来后不抬线，等于把涨出来的这部分又让回去。
-const BASELINE_PERCENT = 45.4;
+// v2.569.0 抬线：45.4 -> 59.5（现场 1115 / 1873 = 59.5%）。
+//   抬线的理由不是「想让它绿」：本版给三个语义极清楚、却一直在甩裸码的家族补了簇命中
+//   —— `already-*`（53 条）/ `*-unavailable`（168 条）/ `*-threw`（48 条）。
+//   按本仓纪律「线只许升不许降」，覆盖面上来后不抬线等于把涨出来的部分又让回去。
+const BASELINE_PERCENT = 59.5;
 
 function readJson(root, rel) {
   try { return { ok: true, value: JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8')) }; }

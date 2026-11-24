@@ -1120,6 +1120,10 @@
     'anonymous', 'applied', 'attenuated', 'checked', 'clean', 'first', 'first-baseline',
     'halted', 'interior-blocked', 'module-disabled', 'needs-real-device', 'no-elapsed', 'no-far',
     'not-in-table', 'ok', 'omniscient', 'out-of-lens', 'pass',
+    // ── v2.568.0（引擎深度两条主线）：metabolismClock.worldTick 的三条**成功面**返回。
+    //   判据同本表：三条只出现在 `ok:true` 对象里（缺钟/未推进/首次基准都是「如实摇头」，
+    //   不是拒收）—— 给它们编恢复动作就是造数据。
+    'advanced', 'first-tick', 'no-advance',
     'player-view', 'premature', 'range-off', 'reuse', 'same-day', 'trigger-fired', 'triggered',
     'unlocked', 'within-lock',
     // v2.517.0（V26 批）：engines/player-knowledge.js 的新成功返回（known:false + reason:'not-recorded'，

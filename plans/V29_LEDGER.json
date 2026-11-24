@@ -1,9 +1,9 @@
 {
   "tool": "plan-ledger",
   "schema": 1,
-  "version": "2.568.0",
-  "sourceDigest": "41acb9e7a158d376d971ac872ec9e5322fe054ffc58b38c00e3ff811b3f64ecb",
-  "sourceCommits": 35,
+  "version": "2.569.0",
+  "sourceDigest": "ac1c5331bde5f2c1a0841a3de6c6a5a46ba217c8a0904fb69442300c8d5ac910",
+  "sourceCommits": 36,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -555,7 +555,12 @@
       "OPV29-17",
       "OPV29-24"
     ],
-    "unparsedForm": [],
+    "unparsedForm": [
+      {
+        "commit": "81d90e4",
+        "subject": "v2.542.11（探针跟位）：desk-coverage 的 ROUTES 锚点随 OPV29 拆段搬迁"
+      }
+    ],
     "dupClaims": [
       {
         "item": "OPV29-22",
@@ -613,7 +618,7 @@
     "pending": 0,
     "rangeForm": 1,
     "noRecompute": 8,
-    "unparsedForm": 0,
+    "unparsedForm": 1,
     "dupClaims": 7
   }
 }

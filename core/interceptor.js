@@ -303,6 +303,13 @@
               try {
                 if (WA.moodGlide && typeof WA.moodGlide.glide === 'function') WA.moodGlide.glide({});
               } catch (eMG) { /* 情绪回落失败不影响世界推进 */ }
+              // v2.569.0（世界时间耦合）：同一处世界推进点，把「过了多久」也报给生理时钟。
+              //   与上面 moodGlide 同口径：失败一律放行（生理读数不该卡住一次生成）。
+              //   为什么放在这里而不是 after 链：after 链的节点各自读 store，而世界钟
+              //   的推进发生在本次结算内部 —— 放在结算点后能让两个消费方拿到**同一个** delta。
+              try {
+                if (WA.metabolismClock && typeof WA.metabolismClock.worldTick === 'function') WA.metabolismClock.worldTick();
+              } catch (eMT) { /* 生理时钟推进失败不影响世界推进 */ }
               const runAfter = async () => {
                 await WA.workflow.run('after', actx);
                 // v0.7.0: 结算完成才记录楼层（批内提交，随批落盘；失败阻断则下轮重试）

@@ -98,8 +98,13 @@ const missLed = nineNs.filter(function (n) { return !nsLed.entries[n]; });
 //   不在账本里 ⇒ 必须在 _note 里找得到注销理由（找不到 = 逃账，仍然红）。
 const wiredOut = missLed.slice();
 const unexplained = wiredOut.filter(function (n) { return String(nsLed._note || '').indexOf(n) < 0; });
-const wrongCls = nineNs.filter(function (n) { return nsLed.entries[n] && nsLed.entries[n].cls !== 'pending-wire'; });
-a(unexplained.length === 0 && wrongCls.length === 0, 'A0e 9 个零读 ns 都在定性账本里（cls=pending-wire；已接线的须有注销理由）',
+// v2.569.0 跟位：v2.568.0 已把这 13 条 pending-wire 全部改判 readonly-api（pending-wire 归零）。
+//   判据形态不动（在账本里 ⇒ 必须是这两类之一；不在账本里 ⇒ _note 必须有注销理由），
+//   只把合法类别从单一 pending-wire 换成 {pending-wire, readonly-api} —— 本锁钉的是
+//   「零读且结构上接不上」这几台，它们现在如实是 readonly-api；wired 仍然红。
+const OK_CLS = ['pending-wire', 'readonly-api'];
+const wrongCls = nineNs.filter(function (n) { return nsLed.entries[n] && OK_CLS.indexOf(nsLed.entries[n].cls) < 0; });
+a(unexplained.length === 0 && wrongCls.length === 0, 'A0e 9 个零读 ns 都在定性账本里（cls ∈ {pending-wire, readonly-api}；已接线的须有注销理由）',
   { miss: unexplained, wrongCls: wrongCls, wiredOut: wiredOut });
 
 // ── 1 store-merge ────────────────────────────────────

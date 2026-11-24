@@ -453,7 +453,14 @@ module.exports = function settingsWriteV2600(deps) {
         return sites;
       })();
       // 冻结清单：新增任何一处旁路都会使本断言失败（迫使走一次「它属于哪个家族」的判断）
-      const INVENTORY_G = { 'core/store.js': 8, 'core/workflow.js': 1, 'engines/worldbook.js': 1,
+      const INVENTORY_G = { 'core/store.js': 8, 'core/workflow.js': 1, 'engines/worldbook.js': 2,
+        // v2.569.0 跟位：engines/worldbook.js 的第 2 个旁路写点来自 v2.568.0 的
+        //   autoGreen 开关（`setAutoGreen` 要把 `autoGreen` 位单独回写，见该函数的
+        //   「只改一个位、不重排 ids/overrides」注释）。与既有那处同键同族
+        //   （`worldaxis_wb_selection_<chat>` ⇒ classifyKey 家族 `wb`，不是 settings
+        //   也不是 settingsUnregistered，下面的语义断言会当场核这一点）。
+        //   处置按纪律是「入表而不是放宽」：清单 1 → 2 并在此留账，
+        //   判据本身（新增旁路必须失败一次）一字未动。
         'engines/chatcache.js': 2, 'render/inject.js': 1, 'index.js': 2,
         // v2.132.0（O19）: engines/life.js 的跨会话轮转游标（`worldaxis_life_turn_v1`）。
         //   它**是**一处正当的旁路写：游标不是世界事实、刻意不进 store 存档（见 life.js 的

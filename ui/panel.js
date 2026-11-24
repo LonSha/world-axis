@@ -826,6 +826,10 @@
         // v2.35.0: 世界书蓝绿灯选择/覆写/触发预览（此前引擎有、面板零入口）
         if (!WA.worldbook) return '<div class="wa-sec">世界书</div><div class="wa-dim">世界书模块未加载</div>';
         const trig = (typeof WA.worldbook.triggerEnabled === 'function') ? WA.worldbook.triggerEnabled() : false;
+        // v2.568.0（引擎深度第二主线收口）：常驻条目的关键词闸开关。
+        //   此前这开关位只有 API、没有渲染面 —— 产品里根本打不开，等于能力未接线。
+        //   默认关（关闭时 activationOf 行为逐字不变），打开后常驻条目本轮无绿灯命中就不注。
+        const autoGreen = (typeof WA.worldbook.getAutoGreen === 'function') ? WA.worldbook.getAutoGreen() === true : false;
         if (typeof WA.worldbook.peekEntries === 'function') WA.worldbook.peekEntries();
         const rows = (typeof WA.worldbook.previewActivation === 'function') ? WA.worldbook.previewActivation(__wbScan) : [];
         const ovOpts = (WA.worldbook.OVERRIDE_VALUES || ['const', 'key', 'off']);
@@ -839,6 +843,7 @@
         }).join('') : '<div class="wa-empty">尚无条目缓存——点「刷新条目」从当前世界书载入，无头环境可用 seedEntries mock</div>';
         return '<div class="wa-sec">世界书蓝绿灯（' + rows.length + '）</div>'
           + '<label class="wa-node"><input type="checkbox" id="wa-wb-trigger" ' + (trig ? 'checked' : '') + '/><span class="wa-node-label">关键词触发（关=已选全量注入）</span></label>'
+          + '<label class="wa-node"><input type="checkbox" id="wa-wb-autogreen" ' + (autoGreen ? 'checked' : '') + '/><span class="wa-node-label">常驻条目先过关键词闸（关=常驻一律注入）</span></label>'
           + '<div class="wa-row"><button class="wa-btn wa-mini" id="wa-wb-refresh" title="从酒馆当前世界书载入条目（失败则保留缓存）">刷新条目</button>'
           + '<button class="wa-btn wa-mini" id="wa-wb-preview" title="用扫描文本预览蓝绿灯命中">预览触发</button></div>'
           + '<textarea id="wa-wb-scan" class="wa-ta" placeholder="扫描文本（预览关键词命中，可空）">' + esc(__wbScan) + '</textarea>'
@@ -5743,6 +5748,11 @@ on('#wa-desk-show', showDesk);
       const trig = $('#wa-wb-trigger');
       if (trig) trig.onchange = function () {
         if (WA.backstage && typeof WA.backstage.setSettings === 'function') WA.backstage.setSettings({ worldbookTrigger: !!trig.checked });
+        renderBody();
+      };
+      const wbAutoGreen = $('#wa-wb-autogreen');
+      if (wbAutoGreen) wbAutoGreen.onchange = function () {
+        if (WA.worldbook && typeof WA.worldbook.setAutoGreen === 'function') WA.worldbook.setAutoGreen(!!wbAutoGreen.checked);
         renderBody();
       };
       on('#wa-wb-refresh', async function () {
@@ -15374,7 +15384,11 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
       wpsOut('<div class="wa-log wa-log-info">可读 JSON 已生成：' + Math.round(r.bytes / 1024) + 'KB　指纹 <code>'
         + esc(String(r.sig)) + '</code>　（文本已回填到下面的输入框，可直接复制）</div>');
     });
-    // ── v2.542.25：从**形状**认文件类型（engines/import-kind.js 的首个真消费点）──
+    // ──·· v2.542.25：从**形状**认文件类型（engines/import-kind.js 的首个真消费点）──
+    //   注：这是 Y5 段内的**子块**（同一个「搬运」页的导入分支），不是新页段。
+    //   故本行用 `──··` 而不是 `── ` 开头：v2203 的「段内恰 1 个段头」判据按
+    //   「注释里两个 em-dash + 空格 + v2.」计段头，若写成段头形态，判据会把它读成
+    //   「切片跨段」（v2.569.0 全量回归实测该判据读到 2 个）。
     //   为什么本页需要它：本页是导入面，而酒馆的导出文件大量都是 `.json`（预设 / 世界书 /
     //   正则 / 角色卡 / 美化 / 脚本全一样），后缀一点信息量都没有。用户把美化粘到快照口，
     //   importSnapshot 只会回一句 bad-json ——「被拒了」与「你拿的是别家的文件」不是一件事。

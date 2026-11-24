@@ -452,14 +452,14 @@ function runAll(a) {
   //   38 台非源命名空间逐台核过证据后进了白名单 A（见下方 v2.542.8 补登记段）：16 台在
   //   engines/inject-collector.js 有真调用点（reasoning），3 台死面账本归因 self-only（dead）。
   //   判据（长度相等）未动 —— 表跟位，不是放宽。
-  a(j.sources.length === 166, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.542.8 现场基线 166；v2.524.0 为 151）');
+  a(j.sources.length === 167, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.569.0 跟位：166 → 167 = v2.567.0 的 mixedIndex 常驻索引注入源；v2.542.8 基线 166；v2.524.0 为 151）');
   //   v2.407.0 跟位：runtimeKeys 144 → 150（memoryRelay/stageSession 为 v2.402.0 V10 新增，
   //   summarizerAdapter/director/branchContinuity/factContinuity 为 v2.407.0 三缝新增）；
   //   SOURCES 仍 144 —— 六台都没有 def/VIS_NAMES/vis.X 注入契约，走白名单 A 归属。
   //   v2.524.0 跟位：runtimeKeys 现场复算 155（基线 151）。涨出来的命名空间里，未进源表的
   //   localGrid / spatialBridge 两台已在白名单 A 按 dead 逐台裁决（证据见下方补登记）；
   //   其余进的是 SOURCES 或已在册项 —— 表跟位，判据（长度相等）未动。
-  a(j.runtimeKeys.length === 189, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.542.8 现场基线 189；v2.524.0 为 155）');
+  a(j.runtimeKeys.length === 190, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.569.0 跟位：189 → 190 = mixedIndex；v2.542.8 基线 189；v2.524.0 为 155）');
   a(j.missingDef.length === 0, 'v11src: [T2] 源表每项在 def 有默认值（缺: ' + (j.missingDef.join(',') || '无') + '）');
   a(j.missingName.length === 0, 'v11src: [T3] 源表每项有面板显示名（缺: ' + (j.missingName.join(',') || '无') + '）');
   a(j.missingVis.length === 0, 'v11src: [T4] 源表每项有 vis 读取点（缺: ' + (j.missingVis.join(',') || '无') + '）');

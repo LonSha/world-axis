@@ -103,13 +103,13 @@ function runA() {
   //   1905 → 1915、在用码 1853 → 1863；同时本版给「场上没有」家族补了簇命中，
   //   有玩家话 837 → 845、裸码 1016 → 1018、覆盖率 45.2 → 45.4。
   //   判据形态（五个数互相咬合：在用 = 扫描面 − 死表；covered + uncovered = total）未动。
-  a(base.json.scanned === 1915, 'A2 扫描面 = 1915（reject-code-gate.scan 命中数）', String(base.json.scanned));
+  a(base.json.scanned === 1925, 'A2 扫描面 = 1925（reject-code-gate.scan 命中数；v2.569.0 跟位 1915 → 1925）', String(base.json.scanned));
   a(base.json.dead === 52, 'A3 死表 = 52（reject-v2780.DEAD 键数）', String(base.json.dead));
-  a(base.json.total === 1863, 'A4 在用码 = 1863 = 扫描面 − 死表', String(base.json.total));
-  a(base.json.base === 937, 'A5 基线表 = 937 条（ledger.base 数组长度）', String(base.json.base));
-  a(base.json.covered === 845, 'A6 有玩家话 = 845 条', String(base.json.covered));
-  a(base.json.uncovered === 1018, 'A7 裸码 = 1018 条（必须点名，不许只报百分比）', String(base.json.uncovered));
-  a(base.json.percent === 45.4, 'A8 覆盖率 = 45.4%', String(base.json.percent));
+  a(base.json.total === 1873, 'A4 在用码 = 1873 = 扫描面 − 死表（v2.569.0 跟位）', String(base.json.total));
+  a(base.json.base === 940, 'A5 基线表 = 940 条（ledger.base 数组长度；v2.569.0 跟位）', String(base.json.base));
+  a(base.json.covered === 1115, 'A6 有玩家话 = 1115 条（v2.569.0：三簇补面后 845 → 1115）', String(base.json.covered));
+  a(base.json.uncovered === 758, 'A7 裸码 = 758 条（必须点名，不许只报百分比；v2.569.0 跟位）', String(base.json.uncovered));
+  a(base.json.percent === 59.5, 'A8 覆盖率 = 59.5%（v2.569.0 抬线：三簇补面后 1115/1873）', String(base.json.percent));
   a(base.json.baselinePercent === base.json.percent, 'A9 达标线 ≡ 实测覆盖率（冻结基线与现场同值）',
     String(base.json.baselinePercent) + ' vs ' + String(base.json.percent));
   a(Array.isArray(base.json.crossBad) && base.json.crossBad.length === 0, 'A10 交叉核对零失配', JSON.stringify(base.json.crossBad));
@@ -178,9 +178,9 @@ function runC() {
   // C4 文档计数与现场不符（改了码表没重生成文档）⇒ doc-drift
   const c4 = makeCopy('c4');
   const okC4 = edit(c4, 'docs/ERROR_CODES.md', function (s) {
-    return s.replace(/基线\s*937/, '基线 936');
+    return s.replace(/基线\s*940/, '基线 939');   // v2.569.0 跟位：基线随见证增长 937 -> 940
   });
-  a(okC4, 'C4a 破坏已落盘（文档基线 937→936）', okC4 ? 'ok' : 'anchor-miss');
+  a(okC4, 'C4a 破坏已落盘（文档基线 940→939）', okC4 ? 'ok' : 'anchor-miss');
   const c4j = runJson(c4);
   const c4c = runCheck(c4);
   a(!!(c4j.json && Array.isArray(c4j.json.crossBad) && c4j.json.crossBad.some(function (x) { return x.indexOf('doc-live') >= 0; })),

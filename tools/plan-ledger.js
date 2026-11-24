@@ -198,7 +198,12 @@ function buildLedger(root, logText) {
   return {
     tool: 'plan-ledger',
     schema: 1,
-    version: '2.524.0',
+    // v2.569.0 修正：这里原先钉死 `'2.524.0'`（本工具首版那天的版本），此后每轮升版都没跟上 ——
+    //   于是 plans/V29_LEDGER.json 的 version 一路落后现场四十多版，OPV29-27 的「九载体同号」
+    //   在**生成器这一侧**就已经不可能成立（它每次 --write 都把旧数字写回去）。
+    //   改为从单一真源 index.js 的 `const VERSION` 读：生成的账本永远与现场同号，不再需要人记。
+    version: (fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8')
+      .match(/const VERSION = '(\d+\.\d+\.\d+)'/) || [])[1],
     sourceDigest: crypto.createHash('sha256').update(srcLines.sort().join('\n'), 'utf8').digest('hex'),
     sourceCommits: srcLines.length,
     total: TOTAL_ITEMS,

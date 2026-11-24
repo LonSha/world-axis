@@ -205,6 +205,26 @@
       fixed = r.minutes;
       dtSource = 'evidence';
     }
+    // ── v2.569.0（世界时间耦合）：世界钟档 ─────────────────────────────
+    // 阶殯顺序：caller > evidence > **world-clock** > wall。
+    // 为什么世界钟要压过墙钟：墙钟答的是「用户挂了多久」，世界钟答的是「故事过了多久」。
+    // 本模块此前只读墙钟 ⇒ 剧情「三天后」情绪丝毫不落，而挂机三小时情绪已经淡了
+    // —— 两件事反着来。**世界钟前进过（delta > 0）才接管**；delta 为 0（同日同时段）
+    // 时仍回退墙钟，否则长时间 OOC 对话里情绪会冻住。
+    let worldAt = null;
+    if (!isFinite(fixed)) {
+      try {
+        if (WA.playtime && typeof WA.playtime.worldMinutes === 'function') {
+          const w = WA.playtime.worldMinutes();
+          if (typeof w === 'number' && isFinite(w)) {
+            worldAt = w;
+            const prev = (WA.store && WA.store.read) ? WA.store.read('moodGlide.atWorld', null) : null;
+            const dtW = (typeof prev === 'number' && isFinite(prev)) ? (w - prev) : NaN;
+            if (isFinite(dtW) && dtW > 0) { fixed = dtW; dtSource = 'world-clock'; }
+          }
+        }
+      } catch (e) { /* 世界钟读失败 ⇒ 保持墙钟档（不改口径，dtSource 仍为 caller/clock） */ }
+    }
     const rows = [];
     try {
       WA.store.transact(function (draft) {
@@ -233,6 +253,7 @@
           m.moods[who] = cur;
           rows.push({ person: who, v: Math.round(cur.v * 1000) / 1000, a: Math.round(cur.a * 1000) / 1000, d: Math.round(cur.d * 1000) / 1000, longing: Math.round(cur.longing * 1000) / 1000, elapsedMin: Math.round(dt) });
         });
+        if (worldAt != null) m.atWorld = worldAt;
         draft.moodGlide = m;
       }, 'moodGlide:glide');
     } catch (e) { noteFault('store-unavailable'); return { ok: false, reason: 'store-unavailable', rows: [] }; }

@@ -242,6 +242,39 @@
     });
   }
 
+  /**
+   * v2.569.0（世界时间耦合第一步）：世界钟的**分钟坐标**。
+   *
+   * 为什么需要这一层：世界钟（store.clock）只有两个刻度 —— `dayIndex`（整数「第几日」）
+   * 与 label 里的时段词（「第3日·黄昏」）。两者都**不能相减**，于是
+   * 「时间前进 ⇒ 状态衰减」这条边无处可写：所有按分钟/小时衰减的引擎
+   * （moodGlide 的半衰期、metabolismClock 的每小时速率）只能去读真实时钟。
+   * 后果是**剧情跳过三天 = 什么都没发生，而用户挂机三小时 = 世界老了三小时**。
+   *
+   * 口径（三条，都是否定式）：
+   *   ① **缺钟即 null**，不返回 0 —— 「世界钟未设定」与「时间没走」必须分开；
+   *      否则未设定的档会被当成「时间静止」，衰减永远不发生却看不出原因。
+   *   ② **不做历法换算、不猜日期**：只把既有两段（dayIndex + 时段词）合成一个数；
+   *      时段词认不出就取 0 分钟（当日零点），仍返回该日坐标。
+   *   ③ **只读**：本函数不改世界钟 —— 写方仍是 calendar.setClock（见 story() 的裁决）。
+   */
+  const PART_MIN = {
+    '破晓': 300, '黎明': 330, '清晨': 360, '上午': 600, '正午': 720, '中午': 720,
+    '午后': 840, '下午': 840, '傍晚': 1080, '黄昏': 1080, '入夜': 1260,
+    '夜里': 1290, '深夜': 1380, '午夜': 1440
+  };
+  function worldMinutes() {
+    const r = story();
+    if (!r.ok) return null;
+    const idx = (typeof r.dayIndex === 'number' && isFinite(r.dayIndex) && r.dayIndex >= 0) ? Math.floor(r.dayIndex) : 0;
+    let part = 0;
+    const keys = Object.keys(PART_MIN);
+    for (let i = 0; i < keys.length; i++) {
+      if (r.label.indexOf(keys[i]) >= 0 && PART_MIN[keys[i]] > part) part = PART_MIN[keys[i]];
+    }
+    return idx * 1440 + part;
+  }
+
   WA.playtime = {
     DATA_KEY: DATA_KEY,
     SOURCE_NAMES: ['wall', 'decision', 'story', 'activity'],
@@ -249,6 +282,10 @@
     setSettings: saveSettings,
     sources: sources,
     story: story,
+    // v2.568.0：PART_MIN 是 worldMinutes 的**内部表**（时段词 -> 当日分钟），产品面零乱码。
+    //   挂在导出面上只会多一枚零消费的数据成员（dataOnly），且会把「表怎么填」变成对外承诺。
+    //   要判时段映射，走 worldMinutes() 并直接看结果（对外面只剩行为，不泄内部表）。
+    worldMinutes: worldMinutes,
     touch: touch,
     lastActive: lastActive,
     stat: statOf

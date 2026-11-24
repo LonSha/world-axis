@@ -41,10 +41,12 @@ const FIELDS = ['purpose', 'nextConsumer', 'reviewAfter', 'disposition'];
 //   现在：① 不许变多（多了说明有新增未处理）；② 少了必须同步下调本常量（不许悄悄少报）；
 //   ③ missing-field / purpose-stale 仍然必须为零（那才是真错）。
 //   ⚠ 不是把到期改日期续命：reviewAfter 一个都没动，到期清单仍在账本上可见。
-//   v2.566.0：382 → 379（--register 重建时移除了 3 条**已获得真实消费者**的过期登记 ——
-//   的过期登记条目）。按本条纪律
-//   「少了必须同步下调」，不许多报，也不许借机改日期。
-const KNOWN_OVERDUE_DEBT = 379;
+//   v2.566.0：382 → 379（--register 重建时移除了 3 条**已获得真实消费者**的过期登记
+//   条目）。按本条纪律「少了必须同步下调」，不许多报，也不许借机改日期。
+//   v2.569.0：379 → 378（本轮唯一动因：`metabolismClock.advanceClock` 因新增 
+//   `worldTick` 内部调用而 own 2 ⇒ 从 programmatic 翻档为 internal，登记随之移除 ——
+//   同一条纪律：删了登记就同步下调常量，不许悄悄少报）。
+const KNOWN_OVERDUE_DEBT = 378;
 
 // ══════════ A. 静态 ══════════
 function runA(A) {

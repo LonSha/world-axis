@@ -43,8 +43,7 @@ const LEDGER = 'tests/ns-consumer-ledger.json';
 const CASES = [
   { ns: 'arcGuide', prov: 'engines/arc-guide.js' },
   { ns: 'ctxBoundary', prov: 'engines/ctx-boundary.js' },
-  { ns: 'macroGuard', prov: 'engines/macro-guard.js' },
-  { ns: 'greenKeys', prov: 'engines/green-keys.js' }
+  { ns: 'macroGuard', prov: 'engines/macro-guard.js' }
 ];
 
 /** 第二批 13 条：产品源面除自身零读 + tests 有消费 + 上游结构缺失。contrast 的 allowProd 是命名撞车豁免。 */
@@ -162,7 +161,12 @@ function runAll(assertFn) {
   a(/type:\s*'constant'/.test(rd('engines/outline-inject.js')) && /keys:\s*\[\]/.test(rd('engines/outline-inject.js')),
     'C4b outline-inject 同上（两处写点同策略）');
   const selHits = prod.filter(function (rel) { return /type:\s*'selective'/.test(rd(rel)); });
-  a(selHits.length === 0, 'C4c 全仓无 type:selective（关键词激活面真不存在；命中：' + (selHits.join(',') || '无') + '）');
+  a(selHits.length === 0, 'C4c 宿主条目策略面：全仓无 type:selective（本仓从不写内容条目，只写变量镜像槽；命中：' + (selHits.join(',') || '无') + '）');
+  //   C4d（v2.568.0 第二主线）：greenKeys **已出表** —— 它现在有真的产品消费点
+  //   （engines/worldbook.js 的 constGate 用它给常驻条目派生短键）。账本里再留着它就是过期登记。
+  a(!E.greenKeys, 'C4d greenKeys 已从账本注销（账本说零读、现场已读，留着就是过期登记）');
+  a(rd('engines/worldbook.js').indexOf('deriveGreenKeys') >= 0,
+    'C4e greenKeys 的消费点真在产品面（worldbook.constGate 调 deriveGreenKeys，不是只写在注释里）');
 
   // ── C' 第二批 13 条：每台一条真源码判据（阻断条件本身，解开即红） ──
   // 口径：z(re, ex) = 「产品源面除 ex 外零命中」。ex 只放本台自身 provider
@@ -212,7 +216,11 @@ function runAll(assertFn) {
 
   // ── D 负控（账本文本的内存副本破坏） ──
   const good = rd(LEDGER);
-  const bad1 = good.replace('"arcGuide": {\n   "cls": "readonly-api"', '"arcGuide": {\n   "cls": "pending-wire"');
+  const bad1 = good.replace(/("arcGuide"\s*:\s*\{[^{}]{0,80}?"cls"\s*:\s*)"readonly-api"/, '$1"pending-wire"');
+  //   v2.569.0 修正：这里原先钉的是**带缩进的字面串**（`"arcGuide": {\n   "cls": …` 三个空格），
+  //   本批账本经手改判后格式统一成了两空格缩进，于是「破坏」当场落空 ⇒ D1 红。
+  //   这正是判据自己写在下面的那条纪律（「不依赖文本缩进形态，避免缩进一变负控就假绿」）
+  //   被违反 —— 现在改成缩进无关的正则：只要求 arcGuide 块内**第一个** cls 字段。
   a(bad1 !== good, 'D1 负控自证：副本破坏确实改到了文本（否则 D2 恒真）');
   const Lbad = JSON.parse(bad1);
   a(Lbad.entries.arcGuide.cls === 'pending-wire', 'D2 负控：cls 回改成 pending-wire ⇒ A2 判据必须现形');
@@ -221,8 +229,8 @@ function runAll(assertFn) {
   //   两处都走**对象副本**：D1 已单独证明文本副本能被改到，这里只需证明「判据表达式在坏数据
   //   上返 false」——即判据不是恒真装饰。不依赖文本缩进形态，避免缩进一变负控就假绿。
   const o2 = JSON.parse(good);
-  o2.entries.greenKeys.evidence = '待接';
-  a(!((o2.entries.greenKeys.evidence || '').length >= 200),
+  o2.entries.macroGuard.evidence = '待接';
+  a(!((o2.entries.macroGuard.evidence || '').length >= 200),
     'D3 负控：evidence 截短 ⇒ A3（>=200 字）判据必须现形');
   //   D4~D6：C' 面三条主判据拿「真有」的样本自证不是恒假。
   a(/FileReader/.test('var r = new FileReader();'),

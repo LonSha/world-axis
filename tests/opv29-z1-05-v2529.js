@@ -29,7 +29,7 @@ const cold = FB.coldBoot();
 const stat = FB.check({ cold: cold });
 a(stat.pages === 49, 'A1 页 49（实测 ' + stat.pages + '）', stat.pages);
 a(stat.playerPages === 6, 'A2 玩家页 6（实测 ' + stat.playerPages + '）', stat.playerPages);
-a(stat.controlsTotal === 1799, 'A3 静态控件 1799 处（v2.542.8 跟位：1794 → 1799 = 叙事脊柱 L3/L4 的面板卡片）', stat.controlsTotal);
+a(stat.controlsTotal === 1809, 'A3 静态控件 1809 处（v2.569.0 跟位：1799 → 1809 = 世界书「常驻条目先过关键词闸」复选框 + 最近两批面板卡片）', stat.controlsTotal);
 a(cold.ok === true && cold.controls === 43 && cold.bytes === 4161,
   'A4 冷开读数：' + cold.controls + ' 控件 / ' + cold.bytes + 'B（打开面板那一瞬）', cold);
 a(stat.coldControls < stat.controlsTotal * 0.1,
@@ -98,9 +98,9 @@ a(jObj && jObj.check && jObj.check.attributable === false && jObj.check.note,
 const meas = FB.measure();
 a(meas.ok === true && meas.pages.length === 34,
   'D1 逐页真量：' + meas.pages.length + ' 页量到（现场 34）', meas.pages.length);
-a(meas.totalControls === 1683, 'D2 逐页合计 1683 控件（实测 ' + meas.totalControls + '）', meas.totalControls);
+a(meas.totalControls === 1693, 'D2 逐页合计 1693 控件（实测 ' + meas.totalControls + '；v2.569.0 跟位：1683 → 1693）', meas.totalControls);
 const rowOv = (meas.pages || []).filter(function (x) { return x.page === 'overview'; })[0];
-a(rowOv && rowOv.controls === 46 && rowOv.bytes === 25206,
+a(rowOv && rowOv.controls === 46 && rowOv.bytes === 25230,   // v2.569.0 跟位：25206 → 25230B（overview 首屏多了那一个复选框及其标签）
   'D3 首屏 overview 实测 ' + (rowOv && rowOv.controls) + ' 控件 / ' + (rowOv && rowOv.bytes) + 'B', rowOv);
 const full = FB.check({ cold: cold, measured: meas, expectMeasured: true });
 a(full.verdict.ok === true,

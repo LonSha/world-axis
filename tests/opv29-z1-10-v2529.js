@@ -45,8 +45,8 @@ a(!!TB && Object.keys(TB).sort().join(',') === 'ACCOUNTS_ROWS,COST_BANDS,PRIORIT
 //   加进 PRIORITY 与 ACCOUNTS_ROWS（块名/显示名/科目键三处同一个字符串），本锁钉的计数
 //   没跟位；全量回归此前每次都死在这一段之前，所以红了足足 20 多个版本没人看见。
 //   判据形态（键数 == 科目行数，且等于现场真值）未动。
-a(Object.keys(IB.PRIORITY).length === 164 && TB.ACCOUNTS_ROWS.length === 164,
-  'A2 164 个源：PRIORITY ' + Object.keys(IB.PRIORITY).length + ' 键 / 科目行 ' + TB.ACCOUNTS_ROWS.length + ' 行');
+a(Object.keys(IB.PRIORITY).length === 165 && TB.ACCOUNTS_ROWS.length === 165,
+  'A2 165 个源（v2.569.0 跟位：164 → 165 = v2.567.0 mixedIndex「常驻索引」同批进 PRIORITY 与 ACCOUNTS_ROWS）：PRIORITY ' + Object.keys(IB.PRIORITY).length + ' 键 / 科目行 ' + TB.ACCOUNTS_ROWS.length + ' 行');
 const KEYS = ['AUTO_MAX', 'AUTO_MIN', 'AUTO_RATIO', 'DEFAULT_BUDGET', 'FOLD_FLOOR_TOKENS', 'MIN_KEEP_TOKENS',
   'PRIORITY', 'apply', 'autoBudget', 'budgetView', 'costOf', 'costView', 'explain', 'foldable',
   'incrementalCost', 'plan', 'rankOf', 'resolveBudget', 'resolveContextSize', 'summaryText',

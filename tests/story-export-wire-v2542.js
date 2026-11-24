@@ -134,7 +134,9 @@ const E = ledger.entries || {};
 a(!E.storyExport, '7a 账本里已无 storyExport（接线完成即删行，不靠改 evidence 续命）');
 a(Array.isArray(ledger._discipline) && ledger._discipline.some(function (s) { return /双向一致/.test(s); }),
   '7b 纪律④「账本键集与门禁 deadNs 双向一致」仍在（删除是把账销掉，不是把判据改弱）');
-a(!!(E.streamGate && E.streamGate.cls === 'pending-wire'), '7c 邻居 streamGate 仍在表内（证明删的是这一条，没误伤整表）');
+// v2.569.0 跟位：streamGate 在 v2.568.0 已按纪律⑤由 pending-wire 改判 readonly-api（结构上装不了 fetch hook）。
+//   判据意图不动（「删的是 storyExport 这一条，没误伤整表」），只把合法类别换成 {pending-wire, readonly-api}。
+a(!!(E.streamGate && ['pending-wire', 'readonly-api'].indexOf(E.streamGate.cls) >= 0), '7c 邻居 streamGate 仍在表内（证明删的是这一条，没误伤整表）');
 
 console.log('STORY-EXPORT-WIRE-V2542: ' + (fail ? 'FAIL ' : 'pass（') + pass + (fail ? ' / ' + (pass + fail) : ' 项）'));
 process.exit(fail ? 1 : 0);

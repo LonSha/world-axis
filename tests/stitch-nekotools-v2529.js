@@ -87,8 +87,38 @@ for (const f of FILES) {
 a(nsCount === 10, 'A0a 10 件都能装载并各自提供命名空间（实 ' + nsCount + '）', nsCount);
 const regs = WA.__regs || [];
 a(regs.length === 10, 'A0b 10 件都尾调 registerModule（实 ' + regs.length + '）', regs.map(function (r) { return r.rel; }));
-a(regs.every(function (r) { return r.meta && r.meta.kind === 'engine' && r.meta.ver === '2.529.0'; }),
-  'A0c 登记元信息统一（kind=engine / ver=2.529.0）', regs.map(function (r) { return r.meta; }));
+// v2.569.0 修正（原判据钉死单一 `2.529.0`，我第一版跟位时改成钉一组已知值 —— 那是把
+//   病灶从「过期」换成「白名单」：每入库一台就得人肉加一项，且这一组字面量反过来被
+//   v2.185/vs 版本面门禁判成「跟随型版本面没跟上当前版本」（本趟全量回归当场逮住）。
+//   现场事实先说清，判据才写得对：本仓的「文件头版本」与「registerModule 的 ver」
+//   **是两个不同的印章** ——
+//     · 文件头 `WorldAxis engines/x.js (vA)` 是**入库批次**印章，入库后不再改
+//       （metabolism-clock 头停 v2.329.0，worldbook 头停 v0.8，本轮改写大改也没动）；
+//     · `ver` 是**该模块最近一次语义变更/真接线**的版本（write-serial 在 v2.551.0
+//       才把三处写回整段接进按书串行队列，ver 因此抬到 2.551.0，头仍是 2.529.0）。
+//   两处语义不同 ⇒ 不能要求「相等」，更不能要求「∈ 某个已知列表」。改为三条不变量
+//   （现场可复算、不含任何版本字面量、也不存在需要维护的名单）：
+//     ① kind 统一 engine；
+//     ② ver 是合法 semver；
+//     ③ 文件头印章 ≤ ver ≤ 当前 VERSION —— 登记版本不可能比文件入库更早，
+//        也不可能超前于当前版本（这两头任一被跨过，就是有人手改了元信息而没说）。
+const CUR_V = (RD('index.js').match(/const VERSION = '(\d+\.\d+\.\d+)'/) || [])[1];
+function vnum(v) {
+  const p = String(v).split('.').map(Number);
+  return (p[0] || 0) * 1e6 + (p[1] || 0) * 1e3 + (p[2] || 0);
+}
+const badKind = regs.filter(function (r) { return !r.meta || r.meta.kind !== 'engine'; });
+const badVer = regs.filter(function (r) {
+  const v = r.meta && r.meta.ver;
+  if (!/^\d+\.\d+\.\d+$/.test(String(v))) return true;
+  const src = RD(String(r.rel));
+  const head = (src.match(/WorldAxis engines\/[^\s]+\.js \(v(\d+\.\d+\.\d+)\)/) || [])[1];
+  if (!head) return true;   // 头里没有自述版本 ⇒ 「印章」这一栏不存在，不能默认它自洽
+  return vnum(v) < vnum(head) || (!!CUR_V && vnum(v) > vnum(CUR_V));
+});
+a(badKind.length === 0 && badVer.length === 0,
+  'A0c 登记元信息自洽（kind 全 engine；文件头印章 ≤ ver ≤ 当前 ' + CUR_V + '；失配 ' + badVer.length + ' 条）',
+  regs.map(function (r) { return String(r.rel) + ' ' + JSON.stringify(r.meta); }));
 
 const IDX = RD('index.js'), RUN = RD('tests/run.js');
 const missIdx = FILES.filter(function (f) { return IDX.indexOf("'engines/" + f + ".js'") < 0; });
@@ -98,7 +128,15 @@ a(missIdx.length === 0 && missRun.length === 0, 'A0d 双登记齐全（index.js 
 const nsLed = JSON.parse(RD('tests/ns-consumer-ledger.json'));
 const missLed = ['apiVault', 'floorFavorites', 'storyExport', 'floorScrub', 'mixedIndex', 'floorHide',
   'streamGate', 'slotFormat', 'greenKeys', 'writeSerial'].filter(function (n) { return !nsLed.entries[n]; });
-a(missLed.length === 0 && nsLed._classes['pending-wire'], 'A0e 10 个零读 ns 都在定性账本里（cls=pending-wire）', missLed);
+// v2.569.0 修正（原判据只有一个方向）：这 10 台里已有多台按账本纪律④**注销**
+//   （mixedIndex / greenKeys / writeSerial / storyExport / apiVault 都有了真实产品读点
+//   或被改判 readonly-api），账本里本就不该再有它们 —— 旧写法「不在账本 ⇒ 逃账」
+//   于是把「已接线」判成「逃账」，与纪律④直接打架。改为两向：
+//   在账本里 ⇒ 必须定性为 pending-wire / readonly-api；不在账本里 ⇒ _note 必须有注销理由。
+const OK_CLS2 = ['pending-wire', 'readonly-api'];
+const wrongCls2 = missLed.filter(function (n) { return nsLed.entries[n] && OK_CLS2.indexOf(nsLed.entries[n].cls) < 0; });
+const unexplained2 = missLed.filter(function (n) { return String(nsLed._note || '').indexOf(n) < 0; });
+a(unexplained2.length === 0 && wrongCls2.length === 0, 'A0e 10 个零读 ns 要么在定性账本里（cls 属于 {pending-wire, readonly-api}）、要么 _note 有注销理由', { miss: unexplained2, wrongCls: wrongCls2 });
 
 // ── 1 api-vault ──────────────────────────────────────
 const AV = WA.apiVault;

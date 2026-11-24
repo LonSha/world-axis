@@ -240,7 +240,10 @@ const LEDGER = JSON.parse(rd('tests/ns-consumer-ledger.json'));
 ok('C1 账本已登记 arcGuide / ctxBoundary（两条都是 pending-wire）', function () {
   ['arcGuide', 'ctxBoundary'].forEach(function (k) {
     assert.ok(LEDGER.entries[k], '账本缺 ' + k + ' 条');
-    assert.strictEqual(LEDGER.entries[k].cls, 'pending-wire', k + ' 的定性应是 pending-wire');
+    // v2.569.0 跟位：v2.568.0 已把这两条按纪律⑤改判 readonly-api（结构上接不上）。
+    //   判据形态不动（必须在账本里 + 必须是「没接线也不是 wired」的那两类），
+    //   只是合法类别从 pending-wire 扩到 {pending-wire, readonly-api}。
+    assert.ok(['pending-wire', 'readonly-api'].indexOf(LEDGER.entries[k].cls) >= 0, k + ' 的定性应是 pending-wire 或 readonly-api（实 ' + LEDGER.entries[k].cls + '）');
     const ev = String(LEDGER.entries[k].evidence || '');
     assert.ok(ev.length > 80, k + ' 的 evidence 太短（要写清「谁会在什么时候读它」）');
   });

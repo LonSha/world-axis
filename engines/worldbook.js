@@ -47,7 +47,7 @@
       const data = JSON.parse(raw || '[]');
       if (Array.isArray(data)) return { ids: data.filter(id => typeof id === 'string'), t: 0, overrides: {} };
       if (data && Array.isArray(data.ids)) {
-        return { ids: data.ids.filter(id => typeof id === 'string'), t: Number(data.t) || 0, overrides: sanitizeOverrides(data.overrides) };
+        return { ids: data.ids.filter(id => typeof id === 'string'), t: Number(data.t) || 0, overrides: sanitizeOverrides(data.overrides), autoGreen: data.autoGreen === true };
       }
     } catch (e) {}
     return { ids: [], t: 0, overrides: {} };
@@ -78,7 +78,8 @@
     const ov = sanitizeOverrides(overrides);
     const trimmed = {};
     for (const k in ov) if (idSet.has(k)) trimmed[k] = ov[k];
-    mainWin.localStorage.setItem(getSelectionKey(), JSON.stringify({ ids: uniqueIds, t: clockNow('worldbook'), overrides: trimmed }));
+    // v2.568.0：autoGreen 是同一份选择的开关位，存盘必须带上——否则「保存一次选择」会把它静默清回默认。
+    mainWin.localStorage.setItem(getSelectionKey(), JSON.stringify({ ids: uniqueIds, t: clockNow('worldbook'), overrides: trimmed, autoGreen: autoGreenOn() }));
   }
   function saveSelectedIds(ids) { persistSelection(ids, readStored().overrides); }
   function saveSelection(ids, overrides) { persistSelection(ids, overrides); }
@@ -193,11 +194,74 @@
     return caseSensitive ? text.indexOf(needle) !== -1 : text.toLowerCase().indexOf(needle.toLowerCase()) !== -1;
   }
 
+  // ── v2.568.0（引擎深度第二主线）：常驻条目的**关键词闸** ──────────────
+  //
+  // 治的病：`constant` / 强制常驻的条目**恒常占上下文预算**，与「本轮聊到没聊到它」无关。
+  //   本仓此前的做法是事后结算采纳率（engines/inject-value.js），能事后看出「这条没人用」，
+  //   但**本轮仍然已经注进去了** —— 读数能追责，不能止损。
+  //
+  // 所以在这里加一道**事前**闸：常驻条目若能从它的标题/正文里派生出合格的**短词**
+  //   （engines/green-keys.js 的口径：2–6 字、非分类名、非抽象名、非句子碎片），
+  //   而本轮上下文一个都没命中，则**本轮**不注入；下一轮重新判。
+  //
+  // 四条否定式边界（缺一条就会静默丢内容，这正是本闸最大的风险）：
+  //   ① **默认关闭**（`autoGreen` 位默认 false）—— 关闭时 `activationOf` 行为逐字不变；
+  //   ② **派生不出键就放行**（fail-open）：「没有键」不等于「不相关」，否则短条目全被误杀；
+  //   ③ **本轮为空文本时放行**：没有可扫的上下文时不能判「没命中」；
+  //   ④ **只作用于常驻面**：本来就走关键词的条目不受影响（它们已经是「按需」的了）。
+  //   另：触发关闭（全量注入）模式下本闸不参与 —— 那是用户显式要的「全量」。
+  function autoGreenOn() {
+    try { return readStored().autoGreen === true; } catch (e) { return false; }
+  }
+  function setAutoGreen(on) {
+    const st = readStored();
+    if (st.readFailed) return { ok: false, reason: 'read-failed' };
+    try {
+      mainWin.localStorage.setItem(getSelectionKey(), JSON.stringify({
+        ids: st.ids || [], t: clockNow('worldbook'), overrides: st.overrides || {}, autoGreen: !!on
+      }));
+      return { ok: true, autoGreen: !!on };
+    } catch (e) { return { ok: false, reason: 'write-failed' }; }
+  }
+  /** 从条目标题+正文派生短键（纯派生，不落盘不改条目）。 */
+  function greenKeysOf(entry) {
+    const GK = WA.greenKeys;
+    if (!GK || typeof GK.deriveGreenKeys !== 'function') return [];
+    try {
+      const names = [getEntryTitle(entry)];
+      const body = String(entry && entry.content || '').split(/\n/).slice(0, 4);
+      for (let i = 0; i < body.length; i++) if (String(body[i]).trim()) names.push(String(body[i]).trim());
+      const ks = GK.deriveGreenKeys(names, { max: 12 });
+      return Array.isArray(ks) ? ks : [];
+    } catch (e) { return []; }
+  }
+  /** 常驻条目的相关性判决。返回 { active, reason }，语义与 activationOf 同构。 */
+  function constGate(entry, scanText) {
+    // 边界④（纵深防御）：本闸只服务于常驻面 —— 调用方传错条目也不能让它误伤
+    //   本来就走关键词的条目（那些条目自己已经是「按需」的了）。
+    if (!entry || entry.constant !== true) return { active: true, reason: 'not-const(放行)' };
+    if (!autoGreenOn()) return { active: true, reason: null };
+    const text = String(scanText == null ? '' : scanText);
+    if (!text) return { active: true, reason: 'no-text(放行)' };
+    const keys = greenKeysOf(entry);
+    if (!keys.length) return { active: true, reason: 'no-green-keys(放行)' };
+    for (let i = 0; i < keys.length; i++) {
+      if (text.indexOf(keys[i]) >= 0) return { active: true, reason: '🔵常驻·绿灯命中「' + keys[i] + '」' };
+    }
+    return { active: false, reason: '🔵常驻但本轮无命中（绿灯闸）', keys: keys };
+  }
+
   function activationOf(entry, scanText, mode) {
     const m = mode || 'auto';
     if (m === 'off') return { active: false, reason: '关闭(覆写)' };
-    if (m === 'const') return { active: true, reason: '强制常驻(覆写)' };
-    if (m === 'auto' && entry.constant) return { active: true, reason: '🔵常驻' };
+    if (m === 'const') {
+      const g = constGate(entry, scanText);
+      return g.active ? { active: true, reason: g.reason || '强制常驻(覆写)' } : { active: false, reason: g.reason, keys: g.keys };
+    }
+    if (m === 'auto' && entry.constant) {
+      const g = constGate(entry, scanText);
+      return g.active ? { active: true, reason: g.reason || '🔵常驻' } : { active: false, reason: g.reason, keys: g.keys };
+    }
     const primary = entry.keys || [];
     if (!primary.length) return { active: false, reason: entry.vectorized ? '🔗向量条目(不触发)' : '无主关键词' };
     const cs = entry.caseSensitive, mw = entry.matchWholeWords;
@@ -357,6 +421,10 @@ ${content}`;
     loadCurrentEntries, buildPromptSection, triggerEnabled,
     isEntryActive, activationOf, matchKey,
     seedEntries, peekEntries, previewActivation, OVERRIDE_VALUES,
+    // v2.568.0：getAutoGreen/setAutoGreen 是用户面开关（ui/panel.js 的世界书段真渲染 + 真回写）；
+    //   greenKeysOf / constGate 是**内部判据**（派生短键、判决常驻相关性），外部零消费者。
+    //   此前一并挂上导出面，实测被门禁判 self-only 过度导出 —— 收回内部，不留在承诺面上。
+    getAutoGreen: autoGreenOn, setAutoGreen: setAutoGreen,
     hashContent, rememberFingerprint, isHandEdited, safeUpdateEntry, rollbackLastOp, getOplog
   };
 })();

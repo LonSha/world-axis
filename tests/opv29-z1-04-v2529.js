@@ -140,11 +140,11 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const parse = function (mm) { return mm ? (mm[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); }) : null; };
   const eager = parse(mOrd), lazy = parse(mLazy);
   // v2.542.23 跟位：582 → 583（story-export 从惰性档回首帧：工具页「导出正文」两个按钮真调它）。
-  a(!!eager && eager.length === 584, 'B1 首帧清单 LOAD_ORDER 解析出 584 条（v2.542.24：583 → 584 = api-vault 归位）（v2.542.21 跟位：575 → 581 → 582 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目 + json-repair 归位；v2.542.23 → 583 = story-export 归位）', eager && eager.length);
+  a(!!eager && eager.length === 585, 'B1 首帧清单 LOAD_ORDER 解析出 585 条（v2.569.0 跟位：584 → 585 = metabolism-clock 归位）（v2.542.24：583 → 584 = api-vault 归位）（v2.542.21 跟位：575 → 581 → 582 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目 + json-repair 归位；v2.542.23 → 583 = story-export 归位）', eager && eager.length);
   // A0b / A0e：惰性档非空 ——防「删空档换下降」
   a(!!lazy && lazy.length >= 10, 'B2 惰性档**非空**且成规模（≥10 条；删空换下降会在这里红）', lazy && lazy.length);
   // v2.542.23 跟位：21 → 20（story-export 同病：产品面真读，不能再懒）。
-  a(!!lazy && lazy.length === 19, 'B3 惰性档 19 条（v2.542.24：20 → 19 = api-vault 归位）（v2.542.21 跟位：22 → 21；v2.542.23：21 → 20 —— 惰性档只放「产品源面零出现」的模块）', lazy && lazy.length);
+  a(!!lazy && lazy.length === 18, 'B3 惰性档 18 条（v2.569.0 跟位：19 → 18 = 惰性档一台归位首帧）（v2.542.24：20 → 19 = api-vault 归位）（v2.542.21 跟位：22 → 21；v2.542.23：21 → 20 —— 惰性档只放「产品源面零出现」的模块）', lazy && lazy.length);
   const inter = (eager || []).filter(function (x) { return (lazy || []).indexOf(x) >= 0; });
   a(inter.length === 0, 'B4 首帧清单与惰性档**零交集**（不双登记：否则「下降」是假的）', inter);
   a((lazy || []).every(function (x) { return x.indexOf('ui/') !== 0; }), 'B5 惰性档不含 ui/*（UI 层本来就不在装载序）');
@@ -155,7 +155,7 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const led = JSON.parse(RD('tests/module-registry-ledger.json'));
   const notInLedger = (lazy || []).filter(function (x) { return !led.modules[x]; });
   a(notInLedger.length === 0, 'B8 惰性档每条仍在 registry 账本里（门禁眼里没有「消失的模块」）', notInLedger);
-  a(led.lazyCount === 19, 'B9 账本记录 lazyCount=19（registry 报告的惰性面读数；v2.542.23 跟位）', led.lazyCount);
+  a(led.lazyCount === 18, 'B9 账本记录 lazyCount=18（v2.569.0 跟位）（registry 报告的惰性面读数；v2.542.23 跟位）', led.lazyCount);
   // v2.542.8：原判据「loadedCount === loadOrderCount」是 v2.529 之前的巧合 —— 那时
   //   LOAD 只等于 LOAD_ORDER、且首帧表里没有 ui/*，两数自然相等。v2.529.0（OPV29-04）把
   //   契约面改成 `LOAD_ORDER ∪ LAZY_ORDER` 并剔掉 ui/* 之后，这两个数**各有定义**：
@@ -163,8 +163,8 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   //   于是恒等式变成 `loaded = loadOrder − ui + lazy`。原式在结构上再也不可能成立，
   //   继续留着一个必然为假的等式只会逼后来人改数字骗过它。这里换成真恒等式：
   //   任何一项漂移（少一台引擎 / 惰性档被删空 / ui 条目被塞进契约面）都会在这里红。
-  a(led.loadedCount === 579 && led.loadOrderCount === 584 && led.lazyCount === 19 && led.uiCount === 24,
-    'B10 契约面 579 = 首帧 584 − ui 24 + 惰性 19（契约面 = 首帧非 ui ∪ 惰性；实测 '
+  a(led.loadedCount === 579 && led.loadOrderCount === 585 && led.lazyCount === 18 && led.uiCount === 24,
+    'B10 契约面 579 = 首帧 585 − ui 24 + 惰性 18（契约面 = 首帧非 ui ∪ 惰性；实测 '
       + [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount].join(' / ') + '）',
     [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount]);
   // 首帧装载边 vs 全量装载边（验收原话的读数）
@@ -190,12 +190,37 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
     });
   });
   a(badDep.length === 0, 'B14 惰性档的装载期依赖全部落在首帧面（两两互依赖就不该都在懒档）', badDep);
-  // 定性背书：每条惰性项都在零读账本里登记
+  // 定性背书：每条惰性项要么在零读账本里登记，要么**确有产品读点**
+  //
+  //   v2.569.0 修正（本判据此前只有一个方向）：
+  //   旧写法 `!nsLed[ns] ⇒ 未定性` 与 ns-consumer-ledger 的纪律④（**键集与门禁零读面双向
+  //   一致**）直接冲突：一个 ns 一旦真的接上产品读点，账本就按纪律④要求注销它 ——
+  //   于是「已接线」在旧判据眼里反而是「未定性」，两条纪律互相打架。
+  //   现场四个就是这一类：greenKeys（v2.568.0 由 worldbook.constGate 真读）、
+  //   mixedIndex（v2.567.0 render/inject 注入源）、msgAlign（v2.549.0 core/interceptor）、
+  //   writeSerial（v2.551.0 三个世界书写点）—— 全部已注销、且有真实读点。
+  //   治法不是放宽（“不在账本里就算过”会把「没人读也没交代」也放过），而是把判据补齐成
+  //   两向：`没定性` **且** `没有读点` 才算未定性。读点必须来自 provider 之外的文件，
+  //   且惰性面靠 fail-open 兜底（四个读者各自 `if (!WA.x) ⇒ 降级/放行`，见各自头注释）。
   const nsLed = JSON.parse(RD('tests/ns-consumer-ledger.json')).entries;
   const nsOf = {};
   (lazy || []).forEach(function (rel) { ((led.modules[rel] || {}).ns || []).forEach(function (ns) { nsOf[ns] = rel; }); });
-  const unqualified = Object.keys(nsOf).filter(function (ns) { return !nsLed[ns]; });
-  a(unqualified.length === 0, 'B15 惰性档每个 ns 都在零读账本里有定性（谁会在什么时候读它）', unqualified);
+  const prodAll = require('./product-files.js').productFiles();
+  const readBy = {};
+  prodAll.forEach(function (rel) {
+    let txt = '';
+    try { txt = fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (e) { return; }
+    if (!txt) return;
+    Object.keys(nsOf).forEach(function (ns) {
+      if (rel === nsOf[ns]) return; // 提供者自己的文件不算「消费者」
+      if (new RegExp('WA\\.' + ns + '\\b').test(txt)) (readBy[ns] = readBy[ns] || []).push(rel);
+    });
+  });
+  const unqualified = Object.keys(nsOf).filter(function (ns) {
+    if (nsLed[ns]) return false;   // ① 零读账本有定性
+    return !readBy[ns];            // ② 否则必须真有产品读点
+  });
+  a(unqualified.length === 0, 'B15 惰性档每个 ns 要么在零读账本有定性、要么确有产品读点（两向；「没人读也没交代」仍现形）', unqualified);
   const wrongCls = Object.keys(nsOf).filter(function (ns) {
     const e = nsLed[ns]; return e && e.cls !== 'pending-wire' && e.cls !== 'readonly-api';
   });
@@ -212,14 +237,19 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
     'B20 惰性档自己不懒（它必须在首帧装载，否则没人能补装）');
 
   // ══════════ D 面：面板行为不变（读面证据） ══════════
-  console.log('\n── D 面：面板行为不变（惰性档的产品读点为零）──');
-  const productFiles = require('./product-files.js').testFiles().concat(
-    fs.readdirSync(path.join(ROOT, 'ui')).filter(function (f) { return f.slice(-3) === '.js'; }).map(function (f) { return 'ui/' + f; })
-  );
+  //   v2.569.0 校准面：本面扫的是 **ui/ 面板面**，不是整个产品源面 —— 旧写法取
+  //   `testFiles()` 再跳过 `tests/` 前缀，等价于只扫 ui/*.js，但口径写成「产品源面」
+  //   ⇒ 读数比事实窄而结论写得更宽（本仓反复治过的同族病）。真实情况：惰性档里有四台
+  //   的 ns **确有引擎侧 eager 读点**（greenKeys / mixedIndex / msgAlign / writeSerial），
+  //   它们各自 `if (!WA.x) ⇒ 降级/放行` fail-open（见 B15 注释）。而 ui/ 是首帧面、
+  //   没有任何 fail-open：面板里读一个未装载的 ns，就是按钮点了什么都不发生。
+  //   所以这一面就按 ui/ 判，并且如实写明判的是哪一面。
+  console.log('\n── D 面：面板行为不变（惰性档在 ui/ 面板面零读点）──');
+  const uiFiles = fs.readdirSync(path.join(ROOT, 'ui')).filter(function (f) { return f.slice(-3) === '.js'; }).map(function (f) { return 'ui/' + f; });
   const srcOf = function (rel) { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch (e) { return ''; } };
   const hit = [];
   const lazyNs = Object.keys(nsOf);
-  productFiles.forEach(function (rel) {
+  uiFiles.forEach(function (rel) {
     if (!rel || rel.indexOf('tests/') === 0) return;
     const txt = srcOf(rel);
     if (!txt) return;
@@ -228,7 +258,7 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
       if (re.test(txt)) hit.push(rel + ' 读 WA.' + ns);
     });
   });
-  a(hit.length === 0, 'D1 惰性档 ' + lazyNs.length + ' 个 ns 在产品源面**零读取**（面板不可能因为延迟装载而少功能）', hit.slice(0, 6));
+  a(hit.length === 0, 'D1 惰性档 ' + lazyNs.length + ' 个 ns 在 **ui/ 面板面**零读取（面板是首帧面、无 fail-open：读到空就是功能少一块）', hit.slice(0, 6));
 
   console.log('\n合计：' + pass + ' / ' + (pass + fail));
   process.exit(fail === 0 ? 0 : 1);

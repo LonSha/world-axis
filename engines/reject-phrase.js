@@ -66,6 +66,27 @@
       id: 'owner', label: '归属/未知',
       re: /(unknown|not-?found|no-?owner|no-?such|unregistered|orphan|nobody|unresolved)/i,
       phrase: '找不到这件事的对象（人或物不存在 / 没登记）：先把它立起来，或换一个对象。'
+    },
+    // ── v2.569.0 三簇补面（由覆盖率真实读数驱动，不是为凑数）────────────
+    //   现场事实：未覆盖 1027 条里有三大**语义极清楚**的家族一直在甩裸码 ——
+    //   `already-*`（三十余条：已经做过的事）、`*-unavailable`（本局没装这个模块）、
+    //   `*-threw`（内部出错，不是玩法限制）。三者对玩家的含义完全不同，
+    //   却都被当成「未知错误」原样显示。加簇而不是加 1027 张逐条表：
+    //   本引擎立的规矩就是「一族一个模式」，逐条表在下一批新码进来时必然漂移。
+    {
+      id: 'already', label: '已经做过',
+      re: /(^already(-|$)|-already-)/i,
+      phrase: '这一步已经做过了 —— 不用重复点：先刷新看当前状态，再决定下一步。'
+    },
+    {
+      id: 'unavailable', label: '本局没装这个模块',
+      re: /(-unavailable|-not-?loaded|-absent)/i,
+      phrase: '本局没装 / 没开这个模块 —— 不是你操作错了：到设置里确认对应开关，或换一条路继续。'
+    },
+    {
+      id: 'threw', label: '内部出错',
+      re: /(-threw$|-throw$|^throw-|exception|crashed)/i,
+      phrase: '内部出错了（不是玩法限制）：先重试一次；仍失败就记下这一步，反馈时带上它。'
     }
   ];
 

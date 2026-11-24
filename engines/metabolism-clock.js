@@ -34,10 +34,56 @@
   // 内部生理状态台账 (按角色聚合)
   // characterId -> { awakeHours, fatigue, alcoholBac, bodyTempState, lastUpdateHour }
   const characterVitals = {};
+  // v2.569.0：世界时间耦合用的两件东西（只存内存：它回答的是「本会话里报过几次时」）
+  let _lastWorldMin = null;
+  const _worldStat = { ticks: 0, lastHours: 0 };
 
   const metabolismClock = {
     version: '2.329.0',
     settings: settings,
+
+    /**
+     * v2.569.0（世界时间耦合）：按**世界时间**推进一次已登记角色。
+     *
+     * 治的病：本模块每个入口都要调用方把 `elapsedHours` 算好递进来，
+     *   而产品面**没有任何一处**递 ——于是「剧情过了三天」时角色既没累也没饿，
+     *   而「用户挂机三小时」也没人记。这不是生理模型错，是**没有人报时**。
+     *
+     * 口径（四条，都是否定式）：
+     *   ① 世界钟缺 / 未设定 ⇒ 如实报 `no-clock`，**不猜**用墙钟顶替；
+     *   ② 首次见到钟（没有上一份快照）⇒ 只记快照，不一次性补算未知时长（`first-tick`）；
+     *   ③ 时间**没前进**（同一天同一时段）⇒ `no-advance`，不做零时长换算；
+     *   ④ 只推进**已登记角色**：本函数不凭空造人（人物从哪来不归本模块决定）。
+     *
+     * 调用点：core/interceptor.js 在 moodGlide.glide 之后（同一处世界推进点），
+     *   失败一律放行——生理读数不该卡住一次生成。
+     */
+    worldTick: function (opts) {
+      // opts.rebaseline：**只重设基准、不补算**（换存档 / 换世界 / 手动对钟之后用）。
+      //   与 first-tick 同一个不变量：不知道上一拍在哪 ⇒ 一律不把未知长度当成事实。
+      const force = !!(opts && opts.rebaseline);
+      let w = null;
+      try { if (WA.playtime && typeof WA.playtime.worldMinutes === 'function') w = WA.playtime.worldMinutes(); }
+      catch (e) { w = null; }
+      if (typeof w !== 'number' || !isFinite(w)) return { ok: false, reason: 'no-clock', advanced: 0 };
+      const prev = _lastWorldMin;
+      _lastWorldMin = w;
+      if (force || typeof prev !== 'number' || !isFinite(prev)) return { ok: true, reason: 'first-tick', advanced: 0, at: w };
+      const dtMin = w - prev;
+      if (!(dtMin > 0)) return { ok: true, reason: 'no-advance', advanced: 0, at: w };
+      const hours = dtMin / 60;
+      const ids = Object.keys(characterVitals);
+      for (let i = 0; i < ids.length; i++) {
+        try { metabolismClock.advanceClock(ids[i], hours, {}); } catch (e) { /* 单个角色失败不拖累整批 */ }
+      }
+      _worldStat.ticks++;
+      _worldStat.lastHours = Math.round(hours * 100) / 100;
+      return { ok: true, reason: 'advanced', advanced: ids.length, hours: _worldStat.lastHours, at: w };
+    },
+    // v2.568.0：worldStat 是**内部计数**（worldTick 自己的推进台账），产品面零消费者；
+    //   挂在导出面上会被判 unwired（已实现、无人接线）。收回内部：要读数就从 worldTick 的
+    //   返回值读（advanced/no-advance/first-tick/no-clock 四态本身就带 hours 与 at）。
+
 
     /**
      * 获取或初始化角色生理时钟状态
