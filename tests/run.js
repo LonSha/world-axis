@@ -22835,6 +22835,11 @@ await runScript('./intel-block-quota-v2571.js');
     //   改法 quotaOf(cfg) + pickTraces（at 降序 + key 字典序，不改方向）+ 截断自证 + stat().block 五栗；
     //   23 段 A/B/C/N。单独跑：node tests/sediment-block-quota-v2572.js
 await runScript('./sediment-block-quota-v2572.js');
+    // v2.573.0（按序截断第十六处）：远方传闻注入名额 —— 取登记尾巴，不是「最新的」。
+    //   farfield 用 h.rows.slice(-maxItems)：念的是 heard 数组尾巴；maxItems 写成字符串时 slice(-NaN)
+    //   得 slice(0) 把十条全念出来。改法 quotaOf + pickHeard（at 降序 + id 字典序）+ 自证 + block 五栗；
+    //   23 段 A/B/C/N。单独跑：node tests/farfield-block-quota-v2573.js
+await runScript('./farfield-block-quota-v2573.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
@@ -23363,7 +23368,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.572.0';
+  const __wantPin293 = '2.573.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

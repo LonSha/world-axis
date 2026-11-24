@@ -43,6 +43,9 @@
  *      在途传闻原地不动 —— 「那边没变」与「我们这边收不到」是两件事。
  *   6 **有界**：四个容器全部登记容量并走 `WA.evict` 单一出口。
  *   7 地区名与事件类型**一律显式**（表外值拒收并带 `allowed`）。
+ *   8 注入面名额（maxItems）只截断不参与筛选（heard 按 `at` 降序，同刻用 id 字典序兜底），
+ *     截断必须自证「另有几条未列」—— 本模块 transferPack 的注释早就写过「被截断在读数上
+ *     与这就是全部完全同形」，注入面却是同一个病（v2.573.0 补）。
  *
  * ── v2.157.0（SP4 队列/预算/长局容量 + S2 远方自动生命周期）────────
  *   四类上限**分列声明**（此前它们挤在一个 `maxPulses` 上，读者分不清
@@ -107,7 +110,10 @@
     //     · autoTicks / autoFirsts —— 自动推进真跑过几次 / 其中几次只落基准。
     //   **必须在这里声明**：它们不入这一行，`stat.x++` 会写成 NaN / undefined，
     //   而 NaN 在面板与诊断上看起来像「这个读数没实现」——恰恰是静默失效。
-    carriedOnce: 0, pendingFull: 0, transfers: 0, autoTicks: 0, autoFirsts: 0 };
+    carriedOnce: 0, pendingFull: 0, transfers: 0, autoTicks: 0, autoFirsts: 0,
+    // v2.573.0：注入面名额读数（candidates / picked / quota / hidden / mode）。
+    //   必须在这里声明 —— 「没构建过」与「构建过但空表」要能分辨，undefined 与 null 不行。
+    block: null };
 
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 80) : String(v == null ? '' : v).slice(0, max || 80); }
@@ -508,6 +514,26 @@
     return r;
   }
 
+  // ── v2.573.0（按序截断第十六处）：远方传闻注入名额 ──
+  //   旧写法 h.rows.slice(-cfg.maxItems)：取的是**登记次序**的最后 N 条，不是「最新的 N 条」；
+  //   更糟的是截断不说还有几条 —— 读者分不出一屏就是全部，还是抽样。
+  //   探针（/tmp/probe573.js）：十条听闻、名额 4 ⇒ 只念 s9..s6（登记尾巴），另 6 条无声消失；
+  //   maxItems 被写成字符串时 slice(-NaN) 得 slice(0) ⇒ 十条**全念出来**（与 v2.571 同一种爆炸）。
+  const QUOTA_MAX = 12;
+  function quotaOf(cfg) {
+    const n = Math.floor(Number(cfg && cfg.maxItems));
+    if (!isFinite(n) || n < 1) return DEF.maxItems;
+    return Math.min(QUOTA_MAX, Math.max(1, n));
+  }
+  // 排序键：① at 新的先 ② id 字典序（同刻可复算；名额只截断不参与筛选）
+  function pickHeard(list, quota) {
+    const arr = (list || []).slice().sort(function (a, b) {
+      const ta = Number(a.at) || 0, tb = Number(b.at) || 0;
+      if (ta !== tb) return tb - ta;
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    });
+    return { picked: arr.slice(0, quota), hidden: Math.max(0, arr.length - quota), candidates: arr.length };
+  }
   /**
    * 注入块。关闭或无内容时**返回空串**（不给老用户凭空多出约束）。
    *   只念**已传到近场**的消息，在途的一条都不念 —— 「还在路上」写进正文
@@ -517,15 +543,23 @@
     const cfg = settings();
     if (!cfg.enabled) return '';
     const h = heard();
-    if (!h.count) return '';
+    const quota = quotaOf(cfg);
+    const pk = pickHeard(h.rows, quota);
+    // 先落读数再判空：「没构建过」与「构建过但空表」必须可分辨（本批 C3 判的就是这一条）。
+    stat.block = { candidates: pk.candidates, picked: pk.picked.length, quota: quota,
+      hidden: pk.hidden, mode: !pk.candidates ? 'empty' : (pk.hidden ? 'newest-first' : 'all-fit') };
+    if (!pk.picked.length) return '';
     const part = partition();
-    const rows = h.rows.slice(-cfg.maxItems);
     stat.blocks = (stat.blocks || 0) + 1;
+    const lines = pk.picked.map(function (r) {
+      return '- ' + r.said + '（' + (r.distorted ? '转述已失真' : '原话') + '）';
+    });
+    if (pk.hidden > 0) {
+      lines.push('- 另有 ' + pk.hidden + ' 条远方听闻未列出（本面只念最新的 ' + pk.picked.length + ' 条）');
+    }
     return '[远方的脉搏]' + String.fromCharCode(10)
       + '近处之外还有别的地方在动（以下都是听来的，不是亲眼所见，且多半已经走了样）：' + String.fromCharCode(10)
-      + rows.map(function (r) {
-        return '- ' + r.said + '（' + (r.distorted ? '转述已失真' : '原话') + '）';
-      }).join(String.fromCharCode(10))
+      + lines.join(String.fromCharCode(10))
       + String.fromCharCode(10) + '近场（' + part.near.length + ' 处）的动向不在此列，由眼前的世界自行呈现。';
   }
 
@@ -533,7 +567,7 @@
     const cfg = settings();
     const p = rowsOf('pending').filter(function (m) { return m && !m.deliveredAt; }).length;
     const part = partition();
-    return Object.assign({}, stat, {
+    const out = Object.assign({}, stat, {
       faults: Object.assign({}, stat.faults),
       byTrend: Object.assign({}, stat.byTrend),
       enabled: !!cfg.enabled,
@@ -548,6 +582,8 @@
         transfer: cfg.capTransfer },
       autoOn: !!cfg.auto
     });
+    out.block = stat.block ? Object.assign({}, stat.block) : null;
+    return out;
   }
 
   WA.farfield = {
