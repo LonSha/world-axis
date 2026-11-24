@@ -11,6 +11,8 @@
  *     \u4e0d\u56de\u843d\u6210\u300c\u6674\u300d\u2014\u2014\u300c\u6ca1\u8bf4\u5929\u6c14\u5c31\u5f53\u6674\u5929\u300d\u662f\u672c\u4ed3\u5e93\u6700\u8d35\u7684\u4e00\u7c7b\u9ed8\u8ba4\u503c\u3002
  *   3 \u4fee\u6b63\u53ea\u6765\u81ea\u5df2\u767b\u8bb0\u7684\u5929\u6c14\uff0ceffect() \u5bf9\u672a\u767b\u8bb0\u5730\u70b9\u62a5 unknown-place\uff0c\u4e0d\u7ed9\u4e00\u4e2a\u515c\u5e95\u7cfb\u6570\u3002
  *   4 \u5b63\u8282\u7531\u4e16\u754c\u949f\u7684 dayIndex \u6d3e\u751f\uff08\u6bcf 90 \u5929\u4e00\u5b63\uff09\uff0c\u4e0d\u53e6\u7ef4\u62a4\u4e00\u4efd\u300c\u4eca\u5929\u662f\u51e0\u6708\u300d\u3002
+ *   5 注入面按「最该先说的」排序（此刻所在的地点 → 真会拦住行程的 → 刚变的 → 地点名），
+ *     名额只截断不参与筛选；截断必须自证「另有几处未列」——否则模型不知道自己看到的是全部还是抽样。(v2.570.0)
  */
 (function () {
   'use strict';
@@ -116,14 +118,58 @@
     return { ok: true, place: clean(place, 40), base: base, factor: e.factor, minutes: Math.ceil(base * e.factor), reason: e.reason || 'applied' };
   }
 
+  // ── v2.570.0（按序截断第十三处）：天气注入名额 ──
+  //   旧写法 rows().slice(0, Math.max(1, cfg.maxItems)) 连排序都没有：
+  //   先登记的地点把名额占满，玩家此刻站着的地方可能一个字都没有；
+  //   截断也不说还有几处，读者无从分辨「全部」与「抽样」。
+  var QUOTA_MAX = 8;
+  function quotaOf(cfg) {
+    var n = Math.floor(Number(cfg && cfg.maxItems));
+    if (!isFinite(n) || n < 1) n = DEF.maxItems;
+    return Math.min(QUOTA_MAX, Math.max(1, n));
+  }
+  // 此刻所在的地点（可选依赖：拿不到就报空串，不猜、不回落成第一个地点）
+  function focusPlace() {
+    try {
+      if (!WA.sceneSlice || typeof WA.sceneSlice.read !== 'function') return '';
+      var cur = WA.sceneSlice.read();
+      return (cur && cur.ok && cur.place) ? String(cur.place) : '';
+    } catch (e) { return ''; }
+  }
+  // 排序键（「最该先说的」四条）：
+  //   ① 此刻所在的地点先 —— 玩家马上要消费的就是这一条；
+  //   ② 真会拦住行程的先（factor > 1）—— 「天气改变的是耗时」得先兑现；
+  //   ③ at 新的先；④ 地点名字典序（同刻可复算，结果不由登记顺序决定）。
+  function pickBlock(list, quota, focus) {
+    var arr = (list || []).slice().sort(function (a, b) {
+      var fa = (focus && a && a.place === focus) ? 0 : 1;
+      var fb = (focus && b && b.place === focus) ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      var va = (FACTOR[a.kind] || 1) > 1 ? 0 : 1;
+      var vb = (FACTOR[b.kind] || 1) > 1 ? 0 : 1;
+      if (va !== vb) return va - vb;
+      var ta = Number(a.at) || 0, tb = Number(b.at) || 0;
+      if (ta !== tb) return tb - ta;
+      return String(a.place || '').localeCompare(String(b.place || ''));
+    });
+    return { picked: arr.slice(0, quota), hidden: Math.max(0, arr.length - quota),
+      candidates: arr.length };
+  }
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
-    const list = rows().slice(0, Math.max(1, cfg.maxItems));
-    if (!list.length) return '';
+    var quota = quotaOf(cfg);
+    var pk = pickBlock(rows(), quota, focusPlace());
+    var mode = !pk.candidates ? 'empty' : (pk.hidden ? 'most-blocking-first' : 'all-fit');
+    stat.block = { candidates: pk.candidates, picked: pk.picked.length,
+      quota: quota, hidden: pk.hidden, mode: mode };
+    if (!pk.picked.length) return '';
     const sea = season();
-    const lines = list.map(function (x) { return x.place + '\uff1a' + x.kind + '\uff08\u8017\u65f6 \u00d7' + FACTOR[x.kind] + '\uff09'; });
-    let out = '[\u5929\u6c14\u4e0e\u7269\u5019]\n' + (sea.ok ? ('\u5b63\u8282\uff1a' + sea.season + '\n') : '') + lines.join('\n');
-    out += '\n\u5929\u6c14\u6539\u53d8\u7684\u662f\u8017\u65f6\u4e0e\u4e8b\u4ef6\u6743\u91cd\uff0c\u4e0d\u662f\u63cf\u5199\uff1b\u672a\u767b\u8bb0\u5929\u6c14\u7684\u5730\u70b9\u4e0d\u5f97\u88ab\u5199\u6210\u6674\u5929\u3002';
+    const lines = pk.picked.map(function (x) { return x.place + '：' + x.kind + '（耗时 ×' + FACTOR[x.kind] + '）'; });
+    let out = '[天气与物候]\n' + (sea.ok ? ('季节：' + sea.season + '\n') : '') + lines.join('\n');
+    if (pk.hidden > 0) {
+      out += '\n另有 ' + pk.hidden + ' 处地点的天气未列出（本面只念最该先说的 ' + pk.picked.length + ' 处）';
+    }
+    out += '\n天气改变的是耗时与事件权重，不是描写；未登记天气的地点不得被写成晴天。';
     return out + '\n';
   }
 
@@ -200,6 +246,8 @@
     getMicroclimate: getMicroclimate,
     // v2.138.0（E7）：地点清单读口。只读、不推进、只报名字 —— 见函数定义处的理由。
     places: places,
-    buildBlock: buildBlock, stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
+    buildBlock: buildBlock, stat: function () { var o = Object.assign({}, stat, { faults: Object.assign({}, stat.faults) });
+      o.block = stat.block ? Object.assign({}, stat.block) : null;
+      return o; }
   };
 })();
