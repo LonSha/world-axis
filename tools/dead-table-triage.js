@@ -178,7 +178,9 @@ function writeLedger(base) {
   const out = {
     _note: '死表逐条定性台账（OPV29-14）。action：keep=结构不可达前提仍成立故留着 / del=码已从产品源码消失故从死表删 / wire=接上见证（须真能 trip）。why ≥24 字且不许占位。工具：tools/dead-table-triage.js --write 重建。',
     _debt: (old && old._debt) || '',
-    version: '2.529.0',
+    // v2.569.0：原先钉死 '2.529.0'（本工具首版那天）—— 每次 --write 都把四十版前的数字写回台账。
+    //   改为从单一真源 index.js 的 `const VERSION` 读，生成的台账永远与现场同号。
+    version: (fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8').match(/const VERSION = '(\d+\.\d+\.\d+)'/) || [])[1],
     entries: entries
   };
   fs.writeFileSync(path.join(root, LEDGER_REL), JSON.stringify(out, null, 1) + '\n');

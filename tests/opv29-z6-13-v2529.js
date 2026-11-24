@@ -107,9 +107,9 @@ function runA() {
   a(base.json.dead === 52, 'A3 死表 = 52（reject-v2780.DEAD 键数）', String(base.json.dead));
   a(base.json.total === 1873, 'A4 在用码 = 1873 = 扫描面 − 死表（v2.569.0 跟位）', String(base.json.total));
   a(base.json.base === 940, 'A5 基线表 = 940 条（ledger.base 数组长度；v2.569.0 跟位）', String(base.json.base));
-  a(base.json.covered === 1115, 'A6 有玩家话 = 1115 条（v2.569.0：三簇补面后 845 → 1115）', String(base.json.covered));
-  a(base.json.uncovered === 758, 'A7 裸码 = 758 条（必须点名，不许只报百分比；v2.569.0 跟位）', String(base.json.uncovered));
-  a(base.json.percent === 59.5, 'A8 覆盖率 = 59.5%（v2.569.0 抬线：三簇补面后 1115/1873）', String(base.json.percent));
+  a(base.json.covered === 1422, 'A6 有玩家话 = 1422 条（v2.569.0 二批：八簇再补面 1115 → 1422）', String(base.json.covered));
+  a(base.json.uncovered === 231, 'A7 裸码 = 231 条（必须点名，不许只报百分比；v2.569.0 二批：分母剔非拒收面 220 后的真裸码）', String(base.json.uncovered));
+  a(base.json.percent === 86, 'A8 覆盖率 = 86%（v2.569.0 二批：口径修正剔非拒收面 220 + 八簇补面，1422/1653）', String(base.json.percent));
   a(base.json.baselinePercent === base.json.percent, 'A9 达标线 ≡ 实测覆盖率（冻结基线与现场同值）',
     String(base.json.baselinePercent) + ' vs ' + String(base.json.percent));
   a(Array.isArray(base.json.crossBad) && base.json.crossBad.length === 0, 'A10 交叉核对零失配', JSON.stringify(base.json.crossBad));
@@ -149,7 +149,7 @@ function runC() {
   a(okBreak, 'C1a 破坏已落盘（把 missing 簇的正则换成永不匹配）', okBreak ? 'ok' : 'anchor-miss');
   const c1j = runJson(c1);
   const c1c = runCheck(c1);
-  a(c1j.json && c1j.json.percent < 45.2, 'C1b 破坏后覆盖率真跌（< 45.2%）',
+  a(c1j.json && c1j.json.percent < 60, 'C1b 破坏后覆盖率真跌（< 60%；v2.569.0 二批：基线 86，missing 簇永不匹配后实测跌到 56.6，跌破 60 即证判据看得见腐烂）',
     c1j.json ? String(c1j.json.percent) : c1j.out.slice(0, 100));
   a(c1c.rc !== 0, 'C1c 破坏后 --check rc≠0（判据看得见腐烂）', 'rc=' + c1c.rc);
 

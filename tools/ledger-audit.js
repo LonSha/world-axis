@@ -18,6 +18,6 @@ function audit(){
   if(!m)throw Error('missing frozen contract');const frozen=vm.runInNewContext(m[1]);return {ok:generated===frozen,chars:generated.length,frozenChars:frozen.length,drift:generated===frozen?0:1};
  });
  add('UI_BINDINGS',['engines/tool-diag.js','ui/panel.js'],['-e',"const r=require('./tests/ui-binding-coverage').audit();console.log('LEDGER_RESULT='+JSON.stringify(r));process.exit(r.ok?0:1);"],p=>JSON.parse(p.stdout.slice(p.stdout.lastIndexOf('LEDGER_RESULT=')+14).trim()));
- return {version:'2.294.0',ok:rows.every(x=>x.ok),checkedAt:new Date().toISOString(),stale:rows.filter(x=>!x.ok).map(x=>x.name),rows,note:'Age is time since file modification, not proof of freshness. current requires recomputed semantic parity. No auto-update and no main regression invoked.'};
+ return {version:(fs.readFileSync(path.join(BASE,'index.js'),'utf8').match(/const VERSION = '(\d+\.\d+\.\d+)'/)||[])[1],ok:rows.every(x=>x.ok),checkedAt:new Date().toISOString(),stale:rows.filter(x=>!x.ok).map(x=>x.name),rows,note:'Age is time since file modification, not proof of freshness. current requires recomputed semantic parity. No auto-update and no main regression invoked.'};
 }
 module.exports={audit};if(require.main===module){const r=audit();if(process.argv.includes('--json'))console.log(JSON.stringify(r,null,2));else{for(const x of r.rows)console.log((x.ok?'PASS ':'FAIL ')+x.name+' '+x.durationMs+'ms '+JSON.stringify(x.detail));console.log('ledger-audit: '+(r.ok?'all current':'stale: '+r.stale.join(', ')));}process.exit(r.ok?0:1);}

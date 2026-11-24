@@ -109,7 +109,8 @@ function probe(url) {
   });
 
   const report = {
-    version: '2.294.0',
+    // v2.569.0：原先钉死 '2.294.0'。报告自称的版本必须是**跑这一趟时的版本**，否则读数不可信。
+    version: (fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8').match(/const VERSION = '(\d+\.\d+\.\d+)'/) || [])[1],
     attemptedAt: new Date().toISOString(),
     attempts: attempts,
     hostFound: !!hit,

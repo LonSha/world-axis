@@ -40,11 +40,12 @@ const LEDGER = path.join(ROOT, 'tests/phrase-coverage-ledger.json');
 //   来自现场。这一版的两个数都是从命令输出里抄下来的。
 // v2.542.8 抬线：45.2 -> 45.4（现场 845 / 1863 = 45.4%；本版给「场上没有」家族补了簇命中）。
 //   本仓纪律：线只许升不许降 —— 覆盖面上来后不抬线，等于把涨出来的这部分又让回去。
-// v2.569.0 抬线：45.4 -> 59.5（现场 1115 / 1873 = 59.5%）。
+// v2.569.0 二次抬线：59.5 -> 86。口径修正（非拒收面 220 条剔除，真分母 1653）+
+// 第二批八簇补面，现场 1422 / 1653 = 86%。棘轮线跟位，防止回退。
 //   抬线的理由不是「想让它绿」：本版给三个语义极清楚、却一直在甩裸码的家族补了簇命中
 //   —— `already-*`（53 条）/ `*-unavailable`（168 条）/ `*-threw`（48 条）。
 //   按本仓纪律「线只许升不许降」，覆盖面上来后不抬线等于把涨出来的部分又让回去。
-const BASELINE_PERCENT = 59.5;
+const BASELINE_PERCENT = 86;
 
 function readJson(root, rel) {
   try { return { ok: true, value: JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8')) }; }
@@ -124,7 +125,36 @@ function audit(root) {
 
   const live = liveCodes(base);
   if (!live.ok) return { ok: false, why: live.why, phrase: true };
-  const cov = phrase.coverage(live.live, { maxMissing: 60 });
+  // v2.569.0：把**非拒收面**（成功面 / 中性面）从分母里剔掉 —— 由工具侧从
+  //   reject-recovery-tables 取（引擎不复制第二份真源，它不认识这两张表）。
+  //   给成功面补「出错了怎么办」的话术是语义错误，不是覆盖率没做完。
+  let faces = { success: [], neutral: [] };
+  try {
+    const tb = require(path.join(base, 'engines/reject-recovery-tables.js'));
+    // 该模块是浏览器侧 IIFE（挂 window.WorldAxis），不是 CommonJS 导出 —— 如实处理：
+    //   读文件文本抽两张表（与 reject-recovery.js 读它的方式同源：都是那两行 `const X = [`）。
+    void tb;
+  } catch (e) { /* 下面走文本路径 */ }
+  try {
+    const tbSrc = fs.readFileSync(path.join(base, 'engines/reject-recovery-tables.js'), 'utf8');
+    function arrOf(name) {
+      const i = tbSrc.indexOf('const ' + name + ' = [');
+      if (i < 0) return [];
+      const j = tbSrc.indexOf('\n  ];', i);
+      const body = tbSrc.slice(i, j < 0 ? undefined : j);
+      return (body.match(/'([^']+)'/g) || []).map(function (q) { return q.slice(1, -1); });
+    }
+    faces.success = arrOf('SUCCESS_FACE');
+    faces.neutral = arrOf('NEUTRAL_FACE');
+  } catch (e) { faces = { success: [], neutral: [], unreadable: String(e && e.message).slice(0, 60) }; }
+  const faceSet = {};
+  faces.success.concat(faces.neutral).forEach(function (c) { faceSet[c] = 1; });
+  const exclude = live.live.filter(function (c) { return faceSet[c]; });
+  if (!faces.success.length || !faces.neutral.length) {
+    // 读不到面表 ⇒ 不许静默按旧口径算（那样会把 220 条非拒收面算成裸码，读数偏悲观且不可复算）
+    return { ok: false, why: 'faces-unreadable', phrase: true };
+  }
+  const cov = phrase.coverage(live.live, { maxMissing: 60, exclude: exclude });
 
   // 交叉核对：ERROR_CODES.md 头部的三档计数（生成物）必须与两边口径对得上。
   //   README 那行是「见证 N / 死表 M / 基线 K」，只用来核对 N 与 K 的量级，
@@ -159,6 +189,9 @@ function audit(root) {
   return {
     ok: ok,
     total: cov.total,
+    judged: cov.judged,
+    nonRejectFace: cov.excluded,
+    faceCounts: { success: faces.success.length, neutral: faces.neutral.length },
     covered: cov.covered,
     uncovered: cov.uncovered,
     percent: cov.percent,
@@ -181,6 +214,9 @@ function render(res) {
   if (!res.ok && res.why) { L.push('  ✗ 读不到：' + res.why + '（不知道 ≠ 没问题）'); return L.join('\n'); }
   L.push('  在用码 ' + res.total + ' 个 = 扫描面 ' + res.scanned + ' − 死表 ' + res.dead +
          '（基线表 ' + res.base + ' 条；死表不算 —— 给死路修路灯没有意义）');
+  L.push('  非拒收面 ' + (res.nonRejectFace == null ? '?' : res.nonRejectFace) + ' 条从分母剔除'
+         + '（成功面 ' + (res.faceCounts ? res.faceCounts.success : '?') + ' / 中性面 ' +
+         (res.faceCounts ? res.faceCounts.neutral : '?') + ' —— 给「做成了」配「出错怎么办」是语义错误）');
   L.push('  有玩家话 ' + res.covered + ' · 裸码 ' + res.uncovered + ' · 覆盖率 **' + res.percent + '%**（达标线 ' + res.baselinePercent + '%）');
   L.push('  话术簇 ' + res.clusters + ' 个');
   if (res.docCounts) {

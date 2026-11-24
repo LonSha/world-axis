@@ -87,6 +87,57 @@
       id: 'threw', label: '内部出错',
       re: /(-threw$|-throw$|^throw-|exception|crashed)/i,
       phrase: '内部出错了（不是玩法限制）：先重试一次；仍失败就记下这一步，反馈时带上它。'
+    },
+    // ── v2.569.0 第二批八簇（同一动因：覆盖率读数把「真裸码」点名到 248 条）──────
+    //   这一批与上面三簇的区别只有一点：上面三簇是「一条码一个后缀」，
+    //   这一批是「一条码一种**下一步动作**」——每个簇的 phrase 都能直接答
+    //   「我现在该做什么」，而不是「哪里不对」。
+    {
+      id: 'failed', label: '这一步没做成',
+      re: /(-failed$|-fail$|^fail-|_failed$)/i,
+      phrase: '这一步没做成（不是你没权限，是真的执行失败）：原样再试一次；连着两次这样，就换一条路走。'
+    },
+    {
+      id: 'conflict', label: '与已有的事撞了',
+      re: /(conflict|collided|duplicate|^dedup$|^near-dup$|^dup-|cannot-(clash|conflict|encounter)-self|^same-|^occupied$|^role-taken$|^name-taken$|^slot-taken$|^overlap$)/i,
+      phrase: '这件事和已经有的东西撞了（重名 / 同一件事已经立过 / 不能拿自己跟自己比）：换一个对象，或先把旧的改掉。'
+    },
+    {
+      id: 'closed', label: '这条路已经关了',
+      re: /(-closed$|^closed|^closed_|^sealed$|-sealed$|^settled$|^settle-|^terminal$|-terminal$|^frozen$|^finished$|^irreversible$|^tries-exhausted$|^design-exhausted$|^redesign-exhausted$)/i,
+      phrase: '这条路已经关了（结案 / 封了 / 次数用完 / 不可逆）：别再试同一条，去开另一条线。'
+    },
+    {
+      id: 'off-target', label: '量不对（尺寸/距离/时机偏了）',
+      // 「too-short / too-long / too-small / too-big / below-min / out-of-range」这一族的
+      //   共同点是「值是真的，只是不在允许区间里」—— 与 capacity（到上限了）不同：
+      //   这里往往能靠调参数解决，而不是靠清理。
+      re: /(-range$|^out-of-|threshold|below-|above-|^too-|-(too)-(short|long|big|small|deep|new|soon|close)$|^short-(input|material|stock|supply|cost|fine)$|^shortfall$)/i,
+      phrase: '这个数值偏了（太长 / 太短 / 太大 / 不够门槛 / 不在允许区间）：按提示把量调到区间内再试。'
+    },
+    {
+      id: 'switched-off', label: '这个面被关掉了',
+      re: /(-off$|^off-|^off_)/i,
+      phrase: '对应的那个面被关掉了（不是坏）：到设置里把它打开，或换用开着的那个面。'
+    },
+    {
+      id: 'unconfigured', label: '还没配置 / 没登记',
+      //   与 owner（「找不到这个对象」）不同：这里是「对象在，但它还没被配好/没启用」。
+      re: /(unconfigured|not-?configured|not-?registered|^no-?\w*-registered|not-?active$|-not-active$|^no-?\w*-active$|^blueprint-not-installed$|^not-in-table$)/i,
+      phrase: '这件事还没配好 / 没登记进系统：先去对应页面把它配上（或让它先生效），再回来。'
+    },
+    {
+      id: 'absent', label: '场上压根没有这件东西',
+      //   本仓最大的一族（139 条）：`no-actor / no-clock / no-entry / no-goal / no-grounds…`。
+      //   phrase 必须与 missing 区分开：missing 是「你少填了一项」，absent 是「世界里没有它」。
+      re: /^(no|nothing|none)(-|_|$)/i,
+      phrase: '场上没有这件东西（没有人 / 没有那条线 / 没有这个存档…）：先把它造出来或换一个存在的对象。'
+    },
+    {
+      id: 'unmet', label: '条件还没满足',
+      //   `not-authorized` 已被 permission 抢先命中（它更具体）；这里收剩下的 `not-*`。
+      re: /^not(-|_)/i,
+      phrase: '条件还没满足（还不够格 / 还没到位 / 还不在那个状态）：先满足它，再回来做这一步。'
     }
   ];
 
@@ -124,29 +175,52 @@
   /**
    * 覆盖率读数：传一组码（如 reject-code-ledger 的 base）→ 覆盖几条 / 百分比 / 未覆盖清单。
    * text 一行可供面板与诊断直接显示。
+   *
+   * v2.569.0 口径修正（这是本轮唯一一处「读数本身是错的」）：
+   *   旧口径把**全部在用码**都当成「该有拒收话术的码」，于是 220 条**根本不表示拒收**的码
+   *   也在分母里，永远算未覆盖 —— 其中 144 条是 `reject-recovery-tables.SUCCESS_FACE`
+   *   （成功面：`ok:true` 的信封，如 applied / landed / committed）、90 条是 `NEUTRAL_FACE`
+   *   （中性面：既不是失败也不是成功，如 `no-console` 这类「没事发生」）。
+   *   给成功面补一句「出错了怎么办」的话术是**语义错误**，不是没做完。
+   *   于是覆盖率读数长期被这 220 条按在地上（59.5% 的上限就是这么来的）。
+   *   现改为「可判面」口径：允许调用方传 `opts.exclude`（引擎不认识这两张表，
+   *   由工具侧把面表传进来 —— 引擎不复制第二份真源）。
+   *   分母变成 `total − excluded`，同时**如实报出** excluded 的条数，
+   *   `percent` 是**可判面**上的百分比；`text` 会写明「分母里剔掉了 N 条非拒收面」。
+   *   判据形态没放宽：被剔除的只是「本来就该没有这句话」的码，不是「难写的码」。
    */
   function coverage(codes, opts) {
     const o = opts || {};
     const list = Array.isArray(codes) ? codes : [];
+    const exList = Array.isArray(o.exclude) ? o.exclude : [];
+    const ex = {};
+    exList.forEach(function (c) { ex[String(c)] = 1; });
     const total = list.length;
-    let covered = 0;
+    let covered = 0, excluded = 0;
     const byCluster = {};
     CLUSTERS.forEach(function (c) { byCluster[c.id] = 0; });
     const missing = [];
+    const excludedList = [];
     list.forEach(function (code) {
-      const k = classify(typeof code === 'string' ? code : (code && code.code));
+      const s = String(typeof code === 'string' ? code : (code && code.code));
+      if (ex[s]) { excluded++; if (excludedList.length < (o.maxExcluded || 40)) excludedList.push(s); return; }
+      const k = classify(s);
       if (k.ok) { covered++; byCluster[k.cluster]++; }
-      else if (missing.length < (o.maxMissing || 40)) missing.push(String(typeof code === 'string' ? code : (code && code.code)));
+      else if (missing.length < (o.maxMissing || 40)) missing.push(s);
     });
-    const percent = total ? Math.round((covered / total) * 1000) / 10 : 0;
+    const judged = total - excluded;
+    const percent = judged ? Math.round((covered / judged) * 1000) / 10 : 0;
     return {
       ok: true, at: clockNow('rejectPhrase'),
-      total: total, covered: covered, uncovered: total - covered,
+      total: total, judged: judged, excluded: excluded,
+      covered: covered, uncovered: judged - covered,
       percent: percent, byCluster: byCluster,
-      missing: missing, missingTotal: total - covered,
-      text: '拒收码话术覆盖：' + covered + '/' + total + '（' + percent + '%）；'
+      missing: missing, missingTotal: judged - covered,
+      excludedList: excludedList,
+      text: '拒收码话术覆盖：' + covered + '/' + judged + '（' + percent + '%）；'
+        + '分母 ' + total + ' 条 − 非拒收面 ' + excluded + ' 条（成功面 / 中性面，本来就不该有拒收话术）；'
         + CLUSTERS.map(function (c) { return c.label + ' ' + byCluster[c.id]; }).join(' · ')
-        + '；未覆盖 ' + (total - covered) + ' 条仍原样甩码'
+        + '；未覆盖 ' + (judged - covered) + ' 条仍原样甩码'
     };
   }
 
