@@ -22829,6 +22829,12 @@ await runScript('./weather-block-quota-v2570.js');
     //   slice(-'x') 反把六条全念出来（注面爆炸）。改法 quotaOf + 三个排序函数 + 三处截断自证
     //   + stat().block 五栗带 links/people 子面；28 段 A/B/C/N。单独跑：node tests/intel-block-quota-v2571.js
 await runScript('./intel-block-quota-v2571.js');
+    // v2.572.0（按序截断第十五处）：此地痕迹注入名额 —— 排序本来就对，病在「截断不说还有几条」。
+    //   engines/sediment.js 用 feel() 的行再 slice(0, cfg.maxItems)：八条痕迹、名额 3 ⇒ 另 5 条无声消失；
+    //   maxItems 写成字符串时 slice(0,'x') 得 0 条（注面整块消失，与 v2.570 同病）。
+    //   改法 quotaOf(cfg) + pickTraces（at 降序 + key 字典序，不改方向）+ 截断自证 + stat().block 五栗；
+    //   23 段 A/B/C/N。单独跑：node tests/sediment-block-quota-v2572.js
+await runScript('./sediment-block-quota-v2572.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
@@ -23357,7 +23363,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.571.0';
+  const __wantPin293 = '2.572.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

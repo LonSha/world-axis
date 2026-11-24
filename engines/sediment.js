@@ -37,6 +37,8 @@
  *   4 **衰减只报不改**。feel 现算档位，不写回任何字段（写回即第二真源）。
  *   5 **有界**。三容器全部登记容量并走 WA.evict 单一出口（place / events / total 三重上限）。
  *   6 地点 id 与事实键**一律显式**（不给就拒收，不自动生成、不猜）。
+ *   7 注入面名额（maxItems）只截断不参与筛选（feel 已按 at 降序，pickTraces 再显式排一次以保可复算），
+ *     截断必须自证「另有几条未列」——否则模型不知道自己看到的是全部还是抽样。(v2.572.0)
  */
 
 (function () {
@@ -302,19 +304,47 @@
       return (cur && cur.ok && cur.place) ? cur.place : null;
     } catch (e) { return null; }
   }
+  // ── v2.572.0（按序截断第十五处）：此地痕迹注入名额 ──
+  //   旧写法 f.rows.filter(非传说).slice(0, cfg.maxItems)：排序方向本来就对（feel 按 at 降序），
+  //   但截断不说还有几条、stat() 也没有 block 读数 —— 读者分不出「全部」与「抽样」。
+  //   探针（/tmp/probe572.js）：八条异步痕迹、名额 3 ⇒ 只念 3 条，另 5 条无声消失；
+  //   名额被写成字符串时 Math.max(1,'x') 得 NaN ⇒ 注面整块消失（不是「按默认念」）。
+  var QUOTA_MAX = 8;
+  function quotaOf(cfg) {
+    var n = Math.floor(Number(cfg && cfg.maxItems));
+    if (!isFinite(n) || n < 1) n = DEF.maxItems;
+    return Math.min(QUOTA_MAX, Math.max(1, n));
+  }
+  // 排序键：① at 新的先（feel 已排过，这里显式再排一次以保「同输入同输出」）② key 字典序
+  function pickTraces(list, quota) {
+    var arr = (list || []).slice().sort(function (a, b) {
+      var ta = Number(a.at) || 0, tb = Number(b.at) || 0;
+      if (ta !== tb) return tb - ta;
+      return String(a.key || '').localeCompare(String(b.key || ''));
+    });
+    return { picked: arr.slice(0, quota), hidden: Math.max(0, arr.length - quota),
+      candidates: arr.length };
+  }
   function buildBlock(placeId) {
     const cfg = settings();
     if (!cfg.enabled || !WA.store) return '';
     const place = clean(placeId, 40) || currentPlace();
     if (!place) return '';
     const f = feel(place);
-    if (!f.ok || !f.count) return '';
-    const alive = f.rows.filter(function (r) { return r.now !== 'legend'; }).slice(0, cfg.maxItems);
-    if (!alive.length) return '';
+    if (!f.ok) return '';
+    var quota = quotaOf(cfg);
+    var pk = pickTraces(f.rows.filter(function (r) { return r.now !== 'legend'; }), quota);
+    var mode = !pk.candidates ? 'empty' : (pk.hidden ? 'freshest-first' : 'all-fit');
+    stat.block = { candidates: pk.candidates, picked: pk.picked.length,
+      quota: quota, hidden: pk.hidden, mode: mode };
+    if (!pk.picked.length) return '';
     stat.blocks++;
-    const lines = alive.map(function (r) {
+    const lines = pk.picked.map(function (r) {
       return '- ' + (r.label || r.now) + '：' + (r.text || r.key) + (r.faded ? '（痕迹已淡）' : '');
     });
+    if (pk.hidden > 0) {
+      lines.push('- 另有 ' + pk.hidden + ' 条痕迹未列出（本面只念最新的 ' + pk.picked.length + ' 条）');
+    }
     return '[此地的历史痕迹]' + String.fromCharCode(10)
       + '这处地方留有旧事的痕迹（痕迹会随时间变淡，但不会消失）：' + String.fromCharCode(10)
       + lines.join(String.fromCharCode(10))
@@ -330,13 +360,15 @@
       total++;
       if (decayedTrace(e.trace, e.at, now, cfg.traceWindowMs) === 'legend') legend++;
     }); });
-    return Object.assign({}, stat, {
+    var out = Object.assign({}, stat, {
       faults: Object.assign({}, stat.faults),
       byTrace: Object.assign({}, stat.byTrace),
       enabled: !!cfg.enabled,
       places: arr.length, events: total, legends: legend,
       caps: { places: cfg.capPlaces, events: cfg.capEvents, total: cfg.capTotal }
     });
+    out.block = stat.block ? Object.assign({}, stat.block) : null;
+    return out;
   }
 
   WA.sediment = {
