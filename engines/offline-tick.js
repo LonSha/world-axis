@@ -41,6 +41,8 @@
  *   6 **没有基准点不假装**：首次调用只落基准、不结算。
  *      「我不知道你走了多久」与「你走了零秒」是两件事（同 region 的 X3 纪律）。
  *   7 **离线时长可配、轮数有闸**：`stepMs` 与 `maxRounds` 都是显式旋钮；
+ *   8 摘要名额（maxItems）只截断不参与筛选：跳过明细按时间降序 + 路径字典序兜底，
+ *     截断必须自证「另有几处未列」—— 否则「三处被挡」与「一共三处」在读数上同形（v2.575.0）。
  *      长时间离线（如一个月）也不会被换算成上千轮。
  */
 
@@ -69,7 +71,9 @@
     //   （它不产批次，故不能用 ticks 代替）；`consumed` 答「有几批摘要真的进了正文」
     //   （不消费与没批次是两件事——前者有批可念却没被生成成功消费）。
     advances: 0, consumed: 0,
-    rounds: 0, lastReason: '', faults: {}, byKind: {} };
+    rounds: 0, lastReason: '', faults: {}, byKind: {},
+    // v2.575.0：摘要名额读数。必须在这里声明 —— 未摘要（null）与摘要但无跳过（mode='empty'）要能分辨。
+    block: null };
 
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 80) : String(v == null ? '' : v).slice(0, max || 80); }
@@ -383,6 +387,26 @@
     return out || { ok: false, reason: 'store-unavailable' };
   }
 
+  // ── v2.575.0（按序截断第十八处）：跳过明细的摘要名额 ──
+  //   旧写法：skips.filter(at===last.at).slice(-last.protectedRows).slice(0, cfg.maxItems)
+  //   两刀都在静默截断：第一刀按「登记次序尾巴」取，第二刀再砍到 maxItems；
+  //   而摘要只说「其中 N 处改动…」，读者看不出「三处」是全部还是抽样。
+  const QUOTA_MAX = 12;
+  function quotaOf(cfg) {
+    const n = Math.floor(Number(cfg && cfg.maxItems));
+    if (!isFinite(n) || n < 1) return DEF.maxItems;
+    return Math.min(QUOTA_MAX, Math.max(1, n));
+  }
+  // 排序键：① at 新的先 ② path 字典序（同刻可复算；名额只截断不参与筛选）
+  function pickSkips(list, quota) {
+    const arr = (list || []).filter(function (x) { return !!x; }).slice().sort(function (a, b) {
+      const ta = Number(a && a.at) || 0, tb = Number(b && b.at) || 0;
+      if (ta !== tb) return tb - ta;
+      return String((a && a.path) || '').localeCompare(String((b && b.path) || ''));
+    });
+    const picked = arr.slice(0, quota);
+    return { picked: picked, hidden: Math.max(0, arr.length - picked.length), candidates: arr.length };
+  }
   /**
    * 「你不在时发生的事」摘要 —— **只读**。
    *   为什么单独一口而不是让面板自己拼：面板拼 = 摘要口径出现第二份，
@@ -395,20 +419,28 @@
     if (!list.length) return { ok: false, reason: 'no-batch', lines: [], rows: [] };
     const cfg = settings();
     const last = list[list.length - 1];
-    const rows = last.protectedRows > 0 ? (Array.isArray(b.skips) ? b.skips : [])
-      .filter(function (s) { return s && s.at === last.at; }).slice(-last.protectedRows).slice(0, cfg.maxItems) : [];
+    const quota = quotaOf(cfg);
+    const all = last.protectedRows > 0 ? (Array.isArray(b.skips) ? b.skips : [])
+      .filter(function (x) { return x && x.at === last.at; }) : [];
+    const pk = pickSkips(all, quota);
+    const rows = pk.picked;
+    // 先落读数：名额是判据不是装饰 —— 「三处被挡」要看得出是一共三处还是抽样（本批 C1/C5 钉这一条）。
+    stat.block = { candidates: pk.candidates, picked: rows.length, quota: quota, hidden: pk.hidden,
+      mode: !pk.candidates ? 'empty' : (pk.hidden ? 'recent-first' : 'all-fit') };
     const lines = [];
     lines.push(describeElapsed(last.elapsedMs) + '，世界推进了 ' + last.rounds + ' 轮'
       + (last.capped ? '（已按上限截断）' : '') + '。');
     if (rows.length) {
       lines.push('其中 ' + rows.length + ' 处改动因落在你的记忆锚上而被跳过：'
-        + rows.map(function (r) { return r.path; }).join('、') + '。');
+        + rows.map(function (r) { return r.path; }).join('、')
+        + (pk.hidden ? '（另有 ' + pk.hidden + ' 处未列出，本面只念最近 ' + rows.length + ' 处）' : '') + '。');
     }
     if (!last.applied) lines.push('本次未接入推演（只落了批次账）。');
     return { ok: true, from: last.from, to: last.to, elapsedMs: last.elapsedMs,
       rounds: last.rounds, capped: !!last.capped, protectedRows: last.protectedRows,
       // v2.156.0（S1）：这一批的摘要是否已经进过正文。
       consumed: num(last.consumedAt) !== null, consumedAt: num(last.consumedAt),
+      quota: quota, hidden: pk.hidden, candidates: pk.candidates,
       lines: lines, rows: rows };
   }
   function describeElapsed(ms) {
@@ -440,7 +472,7 @@
   function statOf() {
     const b = state().offlineTick || {};
     const cfg = settings();
-    return Object.assign({}, stat, {
+    const out = Object.assign({}, stat, {
       faults: Object.assign({}, stat.faults),
       byKind: Object.assign({}, stat.byKind),
       enabled: !!cfg.enabled,
@@ -454,6 +486,8 @@
       rounds: b.rounds || 0,
       caps: { anchors: cfg.maxAnchors, batches: cfg.capBatches, skips: cfg.capSkips }
     });
+    out.block = stat.block ? Object.assign({}, stat.block) : null;
+    return out;
   }
 
   WA.offlineTick = {
