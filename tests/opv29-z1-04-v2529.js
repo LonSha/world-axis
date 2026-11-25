@@ -140,7 +140,7 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const parse = function (mm) { return mm ? (mm[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); }) : null; };
   const eager = parse(mOrd), lazy = parse(mLazy);
   // v2.542.23 跟位：582 → 583（story-export 从惰性档回首帧：工具页「导出正文」两个按钮真调它）。
-  a(!!eager && eager.length === 585, 'B1 首帧清单 LOAD_ORDER 解析出 585 条（v2.569.0 跟位：584 → 585 = metabolism-clock 归位）（v2.542.24：583 → 584 = api-vault 归位）（v2.542.21 跟位：575 → 581 → 582 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目 + json-repair 归位；v2.542.23 → 583 = story-export 归位）', eager && eager.length);
+  a(!!eager && eager.length === 586, 'B1 首帧清单 LOAD_ORDER 解析出 586 条（v2.583.0 跟位：585 → 586 = attire-state 归位首帧）（v2.542.24：583 → 584 = api-vault 归位）（v2.542.21 跟位：575 → 581 → 582 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目 + json-repair 归位；v2.542.23 → 583 = story-export 归位）', eager && eager.length);
   // A0b / A0e：惰性档非空 ——防「删空档换下降」
   a(!!lazy && lazy.length >= 10, 'B2 惰性档**非空**且成规模（≥10 条；删空换下降会在这里红）', lazy && lazy.length);
   // v2.542.23 跟位：21 → 20（story-export 同病：产品面真读，不能再懒）。
@@ -159,12 +159,12 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   // v2.542.8：原判据「loadedCount === loadOrderCount」是 v2.529 之前的巧合 —— 那时
   //   LOAD 只等于 LOAD_ORDER、且首帧表里没有 ui/*，两数自然相等。v2.529.0（OPV29-04）把
   //   契约面改成 `LOAD_ORDER ∪ LAZY_ORDER` 并剔掉 ui/* 之后，这两个数**各有定义**：
-  //     契约面 = (首帧 582 − ui 24) ∪ 惰性 21 = 579
+  //     契约面 = (首帧 586 − ui 24) ∪ 惰性 18 = 580（v2.583.0 R254：新增 attire-state ⇒ 首帧与契约面各 +1）
   //   于是恒等式变成 `loaded = loadOrder − ui + lazy`。原式在结构上再也不可能成立，
   //   继续留着一个必然为假的等式只会逼后来人改数字骗过它。这里换成真恒等式：
   //   任何一项漂移（少一台引擎 / 惰性档被删空 / ui 条目被塞进契约面）都会在这里红。
-  a(led.loadedCount === 579 && led.loadOrderCount === 585 && led.lazyCount === 18 && led.uiCount === 24,
-    'B10 契约面 579 = 首帧 585 − ui 24 + 惰性 18（契约面 = 首帧非 ui ∪ 惰性；实测 '
+  a(led.loadedCount === 580 && led.loadOrderCount === 586 && led.lazyCount === 18 && led.uiCount === 24,
+    'B10 契约面 580 = 首帧 586 − ui 24 + 惰性 18（契约面 = 首帧非 ui ∪ 惰性；实测 '
       + [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount].join(' / ') + '）',
     [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount]);
   // 首帧装载边 vs 全量装载边（验收原话的读数）

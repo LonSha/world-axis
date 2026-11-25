@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.582.0';
+  const VERSION = '2.583.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -864,6 +864,9 @@
     'engines/ladder.js',
     // v2.411.0 (R251 缝合批)：人体结构契约。位置与 tests/run.js 的 LOAD 同序，早于 render/inject.js。
     'engines/body-anatomy.js',
+    // v2.583.0（R254 缝合批）：服装穿着状态机。位置紧跟 body-anatomy（同属人物物理面），
+    //   且在 render/inject.js 之前 —— 注入块要读它。与 tool-diag MODULE_EXPORTS 同批登记。
+    'engines/attire-state.js',
     // v2.70.0: 情境切片 / 阻尼量规 / 竞争焦点。
     'engines/scene-slice.js',
     'engines/gauge.js',

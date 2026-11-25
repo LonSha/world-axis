@@ -7242,3 +7242,95 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - **未做（如实登记）**：修完后再起的最终确认全量（`bRBJWB`）在跑，终态未出。
   真实 SillyTavern 宿主上的 `v10-ui-pills` / `v10-r3-persist-hosted` 两件**本趟未执行即未证明通过**，
   仍按如实登记留在原处。
+
+## R254（v2.583.0 · 两份材料各判各的：迷雾之外不缝 + 五官构建二次评估缝三块）
+
+- **起点是两份性质完全不同的投喂，所以结论也相反**。材料二「迷雾之外 v5.0.7」（Tavern Helper 脚本，
+  1052375 字节 / content 834889 字符 / 18103 行 / 18 段）判**不缝**；材料一「五官构建」世界书
+  （2 条 entry，正文 25927 + 5234 字）判**只缝三条可判定规则**。两份都不是凭感觉，都先给实测命中数。
+- **材料二不缝的四条理由（第一条就足以定案）**：
+  1. **它是同类产品，不是素材**。`05_engine.js` 的五阶段 + 四轴 + 边际递减 + 越界拦分，
+     对照本仓：四轴 → `affection-dual-axis`（两根五档文字轴）、边际递减 → `marginal`（算式
+     `增益 = 原始 × ratio^(count−1)`，两条清零路径 + 冷却期）、剧情节点 → `plan`/`chapters`/`beat-ledger`/`arc-phase`、
+     世界书写回 → `wb-inject` + `outline-inject`（已踩过「replaceWorldbook 收完整列表不能递函数」的坑）、
+     MVU → `compatMvu`、自动演化 → `backstage` + `generate_interceptor`。缝进去 = **两套幕后演化 / 好感轴 /
+     世界书写回共用一个 store**，各自漂移。
+  2. 它的机制本身也是从别处缝的（`39_update.js` 是全文件质量最高的一段，但那是工程写法，属借鉴不属缝合）。
+  3. **缝入即带出站网络依赖**：`39_update.js` 拉 `raw.githubusercontent.com`，与「零依赖（只用 fs/path/
+     child_process/vm）」直接冲突。这条是硬约束，不是取舍。
+  - 唯一值得记的三组读数（供将来再审）：`MJ_ACT_FLOOR` 越界词表按「最低允许阶」分级（做爱 min 4 /
+    拥抱 min 3 / 牵手 min 2）；`mjCapDelta` 单轮限幅玩家 ±6 / 第三方 ±4；归属减速 心属第三人 ×0.45 / 多角 ×0.6。
+- **材料一先确认「已经缝过一次」再谈增量**。`engines/appearance.js` 文件头第 5 行写着缝合来源 ref7，
+  `ITERATION_LOG` 的 R50 段（v2.69.0）记了那次取舍：「分级覆盖契约、关系加权、异化档位、场景排他」，
+  并明确「几千词要素库与比喻/光影规则留在预设层」。**所以本轮不是「要不要缝」，是「新版里还有哪些
+  可判定规则没被覆盖」**。逐条读 `appearance.js` 现状：`TIERS=['S','A','B','C']`、
+  `COVERAGE_REQ = {S:{10,8,4,4}, A:{10,5,4,3}, B:{4,3,3,2}, C:{1,0,0,0}}`、`C_MAX_COVERAGE=1`、
+  `sceneAssert`（眼型×脸型 / outfit×style 同场唯一）、八种拒收码。**边界点明：cover 只记每层子项个数，
+  不记具体子项；weighted 只单向升一级，无出场计数**。
+- **三块真空是实测出来的，不是猜的**：`开合 6 / 袖口 3` 但全在 docs（`engines/` 与 `render/` 内 0）；
+  `衣摆 0 / 襞皱 0 / 贴合度 0 / 整洁度 0 / 换装 0 / 衣橱 0 / 穿着状态 0 / 服装状态 0`；
+  `动态升级 0 / 出场次数 0 / 外貌等级 0 / 连续性锁 0 / 风格防漂移 0`。两个邻域引擎都不管这块：
+  `gear-wear`（v2.330.0）管武器装备耐久 `pristine→dull→cracked→shattered`；
+  `sartorial-regalia`（v2.400.0）管制度性穿着的僭越与城门识别（`attireAs` / `identifyAtGate`）。
+- **③ 新引擎 `engines/attire-state.js`（374 行）服装穿着状态机**。六键各带枚举：
+  `closure` firm/half/open · `cuffs` down/rolled/pushed/carried · `hem` hanging/swaying/lifted/pressed/wet/dusty ·
+  `wrinkles` none/crosswise/crease/tension/settled · `fit` loose/natural/taut/settled ·
+  `cleanliness` new/daily/slight-mess/rain-worn/long-activity（`DEF_STATE()` = firm/down/hanging/none/natural/new）。
+  三条硬边界写进文件头：**不碰 store**（内存台账，与 gear-wear / sartorial-regalia 同型）、**不替写描写**、
+  **不拿设备墙钟**（at 由调用方给）。最硬的一个执行点：`update()` 里 `if (!cause) return {ok:false, reason:'no-cause'}`
+  —— 衣服不会自己变。`establish()` 对已有服装者要求六个理由之一，否则 `continuity-lock`；
+  换装时主色与版型双双不继承则 `style-drift`；`crop()` 返回 `{parts, stateUnchanged}`，
+  把「只减重复不改状态」落成可判定断言（六键六值全表见文件头）。
+- **①② 改在 `engines/appearance.js`（14100 → 17034 字节）**：
+  - **手动标记优先**：`markOf(text)` 三条正则只认「外貌等级」四字或整段单档位，**不猜**，解析不出返回
+    `null` 交给加权。`register()` 内顺序改成「标记 → 覆盖校验 → 动态升级 → 缩水校验 → 按 finalTier 校验」，
+    标记命中时 `weighted = {tier, weighted:false}` 强制不生效。
+  - **动态升级**：`UPGRADE_CAUSES = ['third-appearance','substantive-interaction','new-identity']` 三因白名单，
+    坏因报 `bad-upgrade-cause`；升级后层覆盖数变小报 `downgrade-coverage`（这是材料「不得推翻已有描写」的
+    唯一可判定落点）；**标记角色不吃动态升级**（材料把动态升级限定在「临时生成、无设定的角色」）。
+- **本轮自己踩的三个坑（都是自造的）**：
+  1. **`\s` 被吞成 `s`**：写进 `MARK_RES` 的第一条正则成了 `/外貌等级s*[:：]?s*([SABC])/`，
+     于是 `markOf('外貌等级: B')` 与 `markOf(' C ')` 全返 null。用 `cat -A` 查字节才确证，逐行补回反斜杠。
+  2. **「褒皱」错字 5 处** + `VIEW_PARTs` 大小写错（应为 `VIEW_PARTS`）。
+  3. **多次是测试自己写错而不是实现错**：B1/B2 没先 `establish` 所以先命中 `unknown`；E3 的 `prev`
+     已被 E2 改成「青灰/华贵」；G2 用 `cover:{L1:1}` 去测升级到 B 必然 `missing-coverage`；
+     最典型是 **N4 断言 `marked===''` 是错的** —— 打掉优先级后 marked 仍是 'S'，该断言的是**档位下降 S→B**。
+- **接口面登记四处（缺一即死面）**：`index.js` 装载（紧跟 `body-anatomy.js`）、`tests/run.js` 的
+  `runLock('./attire-state-v2583.js')`、`render/inject.js` 五处（SOURCES 白名单 / `vis` 默认可见性 /
+  显示名 `attireState: '穿着状态'` / 设置键 `worldaxis_attire_state_settings_v1` / 注入分支）、
+  `engines/tool-diag-tables.js` 的 `MODULE_EXPORTS`。**不登记的直接后果写在注释里**：`secModules` 报 missing
+  假缺席 + export-contract 的 OWNER 不认 ⇒ 调用点被静默跳过。实测：登记前 `grep -o "attireState:[^|]*"` 空；
+  登记后出现 `attireState:buildBlock`。
+- **回填 FROZEN2800 时被输出污染了一次**：第一次把 stdout 里的 boot 日志（`[WorldAxis] engines/... 已加载`）
+  也当成契约串对比，得出「added 17」全是噪音；改成只取最后一行非空行后得到正确结论
+  **added = ['attireState.buildBlock']，removed = []** —— 正是预期的最小增量（delta 23 字节）。
+- **判据跟位而非放宽（两处，都已在注释里写清理由）**：
+  1. `settle-v2690` 报 FAIL 2，堆栈指向 `A_AP_C` 锁的旧源码字面量
+     `if (effTier === 'C' && total > C_MAX_COVERAGE)`，而本轮已改成 `finalTier`（C 级单子项上限必须在
+     **动态升级之后**的档位上判）。改完 `pass (77)`，N1 仍要求去掉这句 ⇒ C 超覆盖被放行。
+  2. `settle-v2830` 的 `nsCount/loadedCount` 590/579 → 591/580、`opv29-z1-04` 的
+     `loadedCount/loadOrderCount` 579/585 → 580/586 与首帧清单 585 → 586（新引擎进首帧面）。
+     四处同批跟位，同段补了沿革注释。
+- **新引擎入场牵动六本台账，每本都跑它自己的生成器、不手改**：`module-registry-gate --update`
+  （文件 580 / ns 591 / 装载期边 476 / 硬边 0 / 调用期引用 768）、`dead-export-gate --update`
+  （dead 1990 → 1991，新增 `appearance.markOf` 按 `self-only` 登记 —— 它是**过度导出**，产品零引用、
+  测试 F1–F7 直接断言，与同 ns 另 5 条同类登记同口径）、`evidence-index --write`（新增 1 条 / stale 11 条）、
+  `consumer-types --register`（378 条）、`sync-hardcoded --write`（refs 13145→13150 / members 6079→6082 /
+  dead 1990→1991 / dataOnly 783→785，写后校验通过）。
+- **本轮主动报废了一趟全量回归（决策记录）**：第五趟 `/tmp/worldaxis-regression-6psCkd` 已跑 26.8 分钟，
+  用户指示「没必要等，直接开始做」。于是 `kill -9 13379 13470` + `--recover-lock` 回收 stale 锁
+  （state: stale, owner pid=13379）。**代价必须记清：全量零失败凭据仍未取得**，
+  `bRBJWB` 的 26013/0 因 `unchanged:false` 依旧不能当凭据（R253 已如实登记）。
+- **门禁复验**：`attire-state-v2583` **51/51**（含 4 条反向判据：打坏实现必须变红）· `settle-v2690` pass(77) ·
+  `settle-v2830` pass(55) · `opv29-z1-04` **46/46** · `u3-loose-readings` pass(35) · `ns-consumer-ledger` pass(72) ·
+  `dead-export-gate` 无新增 · `module-registry-gate` pass · `version-consistency` **22/22** · `gate-timeout` rc=0 ·
+  `loose-readings` 5 站点 / 11 处字面量一致。
+- **版本面跟位（本轮最大的机械面，21 处 + 六本台账）**：`version-consistency` 一次报清 21 条 ——
+  `index.js` VERSION / `module-registry-ledger` version / 10 个 s3 专锁的 manifest 白名单与 VERSION 正则
+  `|582)` → `|582|583)` / `run.js` 入口钉版 `__wantPin293`。全绿 22/22 后，
+  `release-manifest` 又点出 4 处台账 version，`plan-ledger --write` + 逐本 `--update`/`--write` 收敛，
+  `gen-error-codes` 重生（1934 码，见证 933 / 死表 52 / 基线 940），最后 `release-manifest` 零跟位不一致。
+  `segment-extract-v2400` 的 `BASE_TEST_FILES` 680 → 681（新锁入面，实测 681）。
+- **未做（如实登记）**：① 全套回归 `node tests/run.js` 尚未跑（本轮改树量大，须在提交后统一跑）；
+  ② `BUILD_ID` 待提交后按惯例二次提交指向交付提交；③ 材料一 Layer2 与要素库含大量露骨身体/私处词汇，
+  **本轮刻意未纳入**（只缝三条可判定规则），纳入到什么抽象层级仍是产品决策，不由实现方单方面决定。

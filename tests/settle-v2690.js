@@ -22,7 +22,10 @@ const TAG = '__st2690_';
 
 const A_AP_GATE = "if (!settings().enabled) { out = { ok: true, reason: 'disabled' }; return; }";
 const A_AP_TIER = "if (TIERS.indexOf(tier) < 0) { noteFault('bad-tier'); return { ok: false, reason: 'bad-tier', got: tier }; }";
-const A_AP_C = "if (effTier === 'C' && total > C_MAX_COVERAGE) { out = { ok: false, reason: 'too-many-coverage', who: w }; return false; }";
+// v2.583.0(R254)：这条锚点的判据从 effTier 换成了 finalTier —— 因为 C 级上限必须在
+//   「动态升级之后」的档位上判（升级到 B 的人不该再受 C 的单子项上限约束）。
+//   锚点跟着真源码走，不是放宽：下面 N1 仍要求「去掉这句 ⇒ C 超覆盖被放行」。
+const A_AP_C = "if (finalTier === 'C' && total > C_MAX_COVERAGE) { out = { ok: false, reason: 'too-many-coverage', who: w }; return false; }";
 const A_AP_EXISTS = "if (prev && o.mode !== 'rescan') { out = { ok: false, reason: 'exists', who: w }; return false; }";
 const A_AP_FORM = "if (o.form != null && FORMS.indexOf(o.form) < 0) { out = { ok: false, reason: 'bad-form', got: o.form }; return false; }";
 const A_AP_EYEFACE = "if (clashEyeFace) { out = { ok: false, reason: 'eye-face-clash', who: w, scene: scene }; return false; }";

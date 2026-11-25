@@ -1,10 +1,10 @@
 {
- "version": "2.582.0",
- "loadOrderCount": 585,
+ "version": "2.583.0",
+ "loadOrderCount": 586,
  "lazyCount": 18,
- "loadedCount": 579,
+ "loadedCount": 580,
  "uiCount": 24,
- "nsCount": 590,
+ "nsCount": 591,
  "totals": {
   "loadEdges": 476,
   "hardEdges": 0,
@@ -6304,6 +6304,20 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_body_anatomy_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/attire-state.js": {
+   "ns": [
+    "attireState"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_attire_state_settings_v1"
    ],
    "consumedBy": []
   },

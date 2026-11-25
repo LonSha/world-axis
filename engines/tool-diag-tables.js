@@ -341,6 +341,9 @@
     'engines/beast-bond.js': 'beastBond',
     // v2.69.0：外貌分级契约 / 原型阶梯（与 index.js LOAD_ORDER 同批登记）
     'engines/appearance.js': 'appearance',
+    // v2.583.0(R254)：服装穿着状态机。漏登记的后果同 world-reader：secModules 报 missing
+    //   （假缺席）、export-contract 的 OWNER 不认 ⇒ 契约串里所有调用点被静默跳过。
+    'engines/attire-state.js': 'attireState',
     'engines/body-anatomy.js': 'bodyAnatomy',
     'engines/ladder.js': 'ladder',
     'engines/scene-slice.js': 'sceneSlice',

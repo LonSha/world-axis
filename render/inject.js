@@ -58,6 +58,8 @@
     'eraCycle', 'survival', 'warrant', 'beastBond',
     // v2.69.0: 'appearance' / 'ladder'。与注入分支同批登记（键名 = 命名空间名）。
     'appearance', 'ladder',
+    // v2.583.0(R254): 'attireState'。与注入分支同批登记，否则开关点了零效果。
+    'attireState',
     // v2.70.0: 'sceneSlice', 'gauge', 'rivalry'
     'sceneSlice', 'gauge', 'rivalry',
     // v2.71.0: 'enigma', 'tempo', 'quota', 'spotlight'
@@ -260,7 +262,7 @@ style: false,
         life: true, intel: true, org: true, longline: true,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
-        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, affectionNexus: true, intimateArbiter: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true,
+        causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, affectionNexus: true, intimateArbiter: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, attireState: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true,
         worldBrief: true, offstageQueue: true, actStep: true, tracePost: true, misbelief: true, threadSprout: true, dormantLadder: true, consequenceSchedule: true, appointment: true, timeLedger: true, hearsayLedger: true, farAccount: true, interlude: true, letterPost: true,
         // v2.96.0：传播与辟谣。取默认 true（同四条理由——其模块总开关默认为关）。
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
@@ -505,7 +507,7 @@ style: false,
     difficulty: '世界难度', affect: '情绪通道', bonds: '关系六型', masks: '假面',
     temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', affectionNexus: '情感中枢', intimateArbiter: '亲密生理',
     parallelEvents: '场外事件', eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉',
-    beastBond: '驯兽', appearance: '外貌契约', ladder: '原型阶梯', sceneSlice: '情境切片',
+    beastBond: '驯兽', appearance: '外貌契约', ladder: '原型阶梯', attireState: '穿着状态', sceneSlice: '情境切片',
     gauge: '阻尼量规', rivalry: '竞争焦点', enigma: '信息暗礁', tempo: '节奏齿轮',
     quota: '伏笔配给', spotlight: '焦点分配', karma: '业力账', hazard: '风险账',
     marginal: '边际折旧', tolerance: '手段耐受', events: '事件调度', checkpoints: '快照与分支',
@@ -706,6 +708,7 @@ style: false,
     fondness: 'worldaxis_fondness_settings_v1', parallelEvents: 'worldaxis_pevents_settings_v1',
     eraCycle: 'worldaxis_era_settings_v1', survival: 'worldaxis_survival_settings_v1', warrant: 'worldaxis_warrant_settings_v1',
     beastBond: 'worldaxis_beast_settings_v1', appearance: 'worldaxis_appearance_settings_v1', ladder: 'worldaxis_ladder_settings_v1',
+    attireState: 'worldaxis_attire_state_settings_v1',
     sceneSlice: 'worldaxis_scene_slice_settings_v1', gauge: 'worldaxis_gauge_settings_v1', rivalry: 'worldaxis_rivalry_settings_v1',
     enigma: 'worldaxis_enigma_settings_v1', tempo: 'worldaxis_tempo_settings_v1', quota: 'worldaxis_quota_settings_v1',
     spotlight: 'worldaxis_spotlight_settings_v1', karma: 'worldaxis_karma_settings_v1', hazard: 'worldaxis_hazard_settings_v1',
@@ -1575,6 +1578,9 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       // v2.69.0 外貌分级契约 / 原型阶梯。总开关关闭时 buildBlock 返回空串，零 token。
       if (vis.appearance && WA.appearance) { const ap = engineCall('appearance', function () { return WA.appearance.buildBlock(); }); if (ap) items.push({ source: '外貌契约', content: ap }); }
       if (vis.ladder && WA.ladder) { const ld = engineCall('ladder', function () { return WA.ladder.buildBlock(); }); if (ld) items.push({ source: '原型阶梯', content: ld }); }
+      // v2.583.0：穿着状态。与外貌契约紧邻——一个答「这人该写多细」，一个答「这身衣服此刻怎样」。
+      //   总开关关闭/无登记时 buildBlock 返回空串，零 token。
+      if (vis.attireState && WA.attireState) { const at = engineCall('attireState', function () { return WA.attireState.buildBlock(); }); if (at) items.push({ source: '穿着状态', content: at }); }
       if (vis.sceneSlice && WA.sceneSlice) { const ss = engineCall('sceneSlice', function () { return WA.sceneSlice.buildBlock(); }); if (ss) items.push({ source: '情境切片', content: ss }); }
       if (vis.gauge && WA.gauge) { const gg = engineCall('gauge', function () { return WA.gauge.buildBlock(); }); if (gg) items.push({ source: '阻尼量规', content: gg }); }
       if (vis.rivalry && WA.rivalry) { const rv = engineCall('rivalry', function () { return WA.rivalry.buildBlock(); }); if (rv) items.push({ source: '竞争焦点', content: rv }); }

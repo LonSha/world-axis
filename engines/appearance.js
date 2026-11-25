@@ -8,6 +8,15 @@
  *   当前视角最值得看的 1-3 个细节」「恋人/血亲/宿敌自动升一级」；条目二《异族外貌构建》的
  *   「非人角色异化三档：拟人态 / 半人态 / 真身态，逐项异化替换表、真身态映射规则」。
  *
+ * v2.583.0（R254 增量缝合）：补上材料里当时没缝的两条可判定规则——
+ *   ① 【手动标记优先】：设定/条目里写了「外貌等级：S/A/B/C」就按它执行，覆盖自动判断，
+ *      也不再受关系加权影响（材料原文）。落成 `markOf()` + `register({mark})`：
+ *      解析得出来就用解析值，解析不出来才走加权。
+ *   ② 【动态升级】：第 3 次出场 / 实质性互动 / 剧情赋予新身份，三者任一升一级（封顶 S）。
+ *      材料还要求「升级后补写缺失层且不得推翻已有描写」——后半句可判定：升的是**档位**，
+ *      已登记的覆盖子项数不得因升级而变小（`downgrade-coverage` 拒收）。
+ *   仍不缝：比喻结构/行文顺序/光影权重/情绪绑定（文风层），以及几千词要素库（词库）。
+ *
  * 取舍口径（沿 R50）：能落成「登记→核验→拒收」的进引擎；Layer1-4 具体子项清单与
  * 外貌要素库（几千词汇）是创作词库，不进引擎；比喻结构要求/行文顺序规则/光影权重/
  * 情绪绑定属文风层，留给预设。
@@ -54,6 +63,15 @@
   // 覆盖度要求（子项数）：S 全 4 层；A 五官全 + 身体 5；B 五官 4 + 身体 3；C 至少 1。
   const COVERAGE_REQ = { S: { L1: 10, L2: 8, L3: 4, L4: 4 }, A: { L1: 10, L2: 5, L3: 4, L4: 3 }, B: { L1: 4, L2: 3, L3: 3, L4: 2 }, C: { L1: 1, L2: 0, L3: 0, L4: 0 } };
   const C_MAX_COVERAGE = 1; // C 级只允许登记 1 个覆盖子项
+  // v2.583.0：动态升级的三个触发因（材料原文三条，一等一）。
+  //   为什么是白名单而不是布尔：材料说的是「出现以下任一情况」——枚举能把
+  //   「为什么升」留在账上，布尔只留下「升了」。
+  const UPGRADE_CAUSES = ['third-appearance', 'substantive-interaction', 'new-identity'];
+  const UPGRADE_CAUSE_LABELS = {
+    'third-appearance': '第 3 次出场',
+    'substantive-interaction': '与主角实质性互动',
+    'new-identity': '剧情赋予新身份'
+  };
   const stat = { regs: 0, blocked: 0, lastReason: '', faults: {} };
   // v2.581.0：注入名额统一形态（「同形态尾部截断」簇二，与 v2.580.0 的三引擎同一口径）。
   //   旧法 `X.slice(-maxRows)` 三病俱在：取**登记尾部**（≈登记顺序，不是新旧）、
@@ -103,6 +121,38 @@
     if (i <= 0) return TIERS[0]; // S 之上不再升；表外不动
     return TIERS[i - 1];
   }
+  // ── v2.583.0 手动标记优先 ────────────────────────────────────────────
+  //   材料原文：「角色设定/角色卡/世界书中若明确写有『外貌等级：S/A/B/C』，一律按该等级执行，
+  //   覆盖 AI 的自动判断，也不再受关系加权影响。」
+  //   两条落地约束：
+  //     · 先解析、后加权 —— 标记命中时 weighted 一律不生效（不是「先加权再看标记」）；
+  //     · 解析不出来就**不猜**：返回 null 交给加权，绝不把一段随便的文字读成 S。
+  const MARK_RES = [
+    /外貌等级\s*[:：]?\s*([SABC])/,          // 中文冒号/无冒号
+    /外貌等级\s*[:：]?\s*([SABC])\s*级/,
+    /^\s*([SABC])\s*$/                   // 整段只有一个档位字样
+  ];
+  /**
+   * 从一段文字里解析手动外貌等级标记。返回 'S'|'A'|'B'|'C'|null。
+   * 只认「外貌等级」这四个字（或整段单档位），不做模糊匹配——标记是**作者显式意愿**，
+   * 猜错一次就把整条分级契约带偏。
+   */
+  function markOf(text) {
+    const t = String(text == null ? '' : text);
+    if (!t) return null;
+    for (let i = 0; i < MARK_RES.length; i++) {
+      const m = t.match(MARK_RES[i]);
+      if (m && TIERS.indexOf(m[1]) >= 0) return m[1];
+    }
+    return null;
+  }
+  /** 升一级（S 封顶）。与 upTier 的区别：那个是「加权」，这个是「动态升级」，各记各的因。 */
+  function bumpTier(t) {
+    const i = TIERS.indexOf(t);
+    if (i <= 0) return TIERS[0];
+    return TIERS[i - 1];
+  }
+
   /** 关系加权：weighted 数组里出现任一登记关系 → 升一级。 */
   function weight(tier, weighted) {
     const list = (Array.isArray(weighted) ? weighted : []).map(function (w) { return clean(w, 12); }).filter(Boolean);
@@ -141,13 +191,38 @@
       if (prev && o.mode !== 'rescan') { out = { ok: false, reason: 'exists', who: w }; return false; }
       const form = FORMS.indexOf(o.form) >= 0 ? o.form : 'humanoid';
       if (o.form != null && FORMS.indexOf(o.form) < 0) { out = { ok: false, reason: 'bad-form', got: o.form }; return false; }
-      const weighted = weight(tier, o.weighted);
-      const effTier = weighted.tier;
+      // v2.583.0 ①：手动标记优先。标记命中即**盖过**入参档位，且关系加权不再生效
+      //   （不是「先加标再看标记」——材料原话是「覆盖自动判断，也不再受关系加权影响」）。
+      const marked = markOf(o.mark != null ? o.mark : o.note);
+      let weighted = { tier: tier, weighted: false };
+      let effTier = marked;
+      if (!marked) { weighted = weight(tier, o.weighted); effTier = weighted.tier; }
       // C 级只允许 1 个覆盖子项（「至少 1 个可识别特征」的上限）
       const cov = o.cover || {};
+      // v2.583.0 ②：动态升级。**只对无手动标记的角色生效** —— 材料把动态升级
+      //   限定在「临时生成、无设定的角色」上，标记级是作者定档，不跟着出场次数漂。
+      let upCause = '';
+      let finalTier = effTier;
+      if (!marked && o.upgrade != null) {
+        const causes = (Array.isArray(o.upgrade) ? o.upgrade : [o.upgrade])
+          .map(function (x) { return clean(x, 32); }).filter(Boolean);
+        const badUp = causes.filter(function (c) { return UPGRADE_CAUSES.indexOf(c) < 0; });
+        if (badUp.length) { out = { ok: false, reason: 'bad-upgrade-cause', got: badUp }; return false; }
+        if (causes.length) { finalTier = bumpTier(effTier); upCause = causes[0]; }
+      }
+      // 升级不得把已登记的覆盖子项数改小：材料的「不得推翻已有描写」在这里
+      //   唯一可判定的面就是「层覆盖数不得减少」。
+      if (prev && upCause) {
+        const pc = prev.cover || {};
+        const shrink = LAYERS.filter(function (L) {
+          return (typeof cov[L] === 'number' ? cov[L] : 0) < (Number(pc[L]) || 0);
+        });
+        if (shrink.length) { out = { ok: false, reason: 'downgrade-coverage', who: w, layers: shrink }; return false; }
+      }
       const total = LAYERS.reduce(function (n, L) { return n + (typeof cov[L] === 'number' ? cov[L] : 0); }, 0);
-      if (effTier === 'C' && total > C_MAX_COVERAGE) { out = { ok: false, reason: 'too-many-coverage', who: w }; return false; }
-      const covChk = checkCoverage(effTier, cov);
+      if (finalTier === 'C' && total > C_MAX_COVERAGE) { out = { ok: false, reason: 'too-many-coverage', who: w }; return false; }
+      // 升级后的覆盖校验按**新档位**要求（材料：升级后那次出场须按新等级补写缺失层）
+      const covChk = checkCoverage(finalTier, cov);
       if (!covChk.ok) { out = { ok: false, reason: covChk.reason, missing: covChk.missing, who: w }; return false; }
       // 场景排他断言：同场景已有人占用了 眼型+脸型 组合或同色系服装 → 拒收
       const scene = clean(o.scene, 40);
@@ -164,18 +239,19 @@
         });
         if (clashOutfit) { out = { ok: false, reason: 'outfit-clash', who: w, scene: scene }; return false; }
       }
-      const row = { who: w, tier: tier, effTier: effTier, weighted: weighted.weighted, weightedBy: weighted.by || '',
+      const row = { who: w, tier: tier, effTier: finalTier, weighted: weighted.weighted, weightedBy: weighted.by || '',
+        marked: marked || '', upgradeCause: upCause || '', baseTier: effTier,
         cover: { L1: cov.L1 || 0, L2: cov.L2 || 0, L3: cov.L3 || 0, L4: cov.L4 || 0 },
         form: form, scene: scene, eye: eye || '', face: face || '', outfit: outfit || '', style: style || '',
         rescan: o.mode === 'rescan', at: clockNow('appearance') };
       if (prev) {
         const idx = draft.appearance.rows.indexOf(prev);
         draft.appearance.rows[idx] = row;
-        out = { ok: true, who: w, tier: effTier, form: form, updated: true };
+        out = { ok: true, who: w, tier: finalTier, form: form, updated: true, marked: marked || '', upgradeCause: upCause || '' };
       } else {
         draft.appearance.rows.push(row);
         if (WA.evict) WA.evict.array(draft.appearance.rows, 'appearance.rows');
-        out = { ok: true, who: w, tier: effTier, form: form, updated: false };
+        out = { ok: true, who: w, tier: finalTier, form: form, updated: false, marked: marked || '', upgradeCause: upCause || '' };
       }
     }, 'appearance:register');
     if (out && out.ok) { stat.regs++; stat.lastReason = out.updated ? 'rescanned' : 'registered'; } else if (out && !out.ok) noteFault(out.reason);
@@ -189,7 +265,8 @@
     const hit = rowOf(w);
     if (!hit) { noteFault('missing'); return { ok: false, reason: 'missing', who: who }; }
     return { ok: true, who: hit.who, tier: hit.tier, effTier: hit.effTier, weighted: hit.weighted,
-      weightedBy: hit.weightedBy, cover: Object.assign({}, hit.cover), form: hit.form,
+      weightedBy: hit.weightedBy, marked: hit.marked || '', baseTier: hit.baseTier || hit.tier,
+      upgradeCause: hit.upgradeCause || '', cover: Object.assign({}, hit.cover), form: hit.form,
       formLabel: FORM_LABELS[hit.form], scene: hit.scene, reason: 'applied' };
   }
   /** 场景排他断言：核验当前场景里是否有人违反 眼型+脸型 / 服装 唯一性。返回冲突清单。 */
@@ -220,7 +297,10 @@
     const lines = list.map(function (r) {
       const c = r.cover || {};
       return '· ' + r.who + '：' + (TIER_LABELS[r.effTier] || r.effTier) + '（L1×' + (c.L1 || 0) + ' L2×' + (c.L2 || 0) +
-        ' L3×' + (c.L3 || 0) + ' L4×' + (c.L4 || 0) + '）' + (r.weighted ? '【关系加权】' : '') +
+        ' L3×' + (c.L3 || 0) + ' L4×' + (c.L4 || 0) + '）'
+        + (r.marked ? '【标记定档】' : '')
+        + (r.upgradeCause ? '【动态升级:' + (UPGRADE_CAUSE_LABELS[r.upgradeCause] || r.upgradeCause) + '】' : '')
+        + (r.weighted && !r.marked ? '【关系加权】' : '') +
         (r.form !== 'humanoid' ? '（' + (FORM_LABELS[r.form] || r.form) + '）' : '');
     });
     return '[外貌契约]\n' + lines.join('\n') + '\n分级决定扫描深度：S 完整四层、A 完整五官+精选身体、B 精选四件套、C 至少 1 个可识别特征；恋人/血亲/宿敌自动升一级；再出场只写当前视角最值得看的 1-3 个细节。\n';
@@ -241,6 +321,8 @@
   WA.appearance = {
     TIERS: TIERS, TIER_LABELS: TIER_LABELS, FORMS: FORMS, FORM_LABELS: FORM_LABELS,
     LAYERS: LAYERS, LAYER_LABELS: LAYER_LABELS, WEIGHT_RELATIONS: WEIGHT_RELATIONS,
+    UPGRADE_CAUSES: UPGRADE_CAUSES, UPGRADE_CAUSE_LABELS: UPGRADE_CAUSE_LABELS,
+    markOf: markOf,
     COVERAGE_REQ: COVERAGE_REQ,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     register: register, read: read, sceneAssert: sceneAssert, buildBlock: buildBlock,
