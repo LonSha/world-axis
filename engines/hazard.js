@@ -76,7 +76,7 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   // v2.580.0：注入名额（同形态尾部截断的第三处集中修法）。
-  //   旧法 `list.slice(-Math.max(1, cfg.maxRows))` 取**登记尾部**——与「哪条更新」无关；
+  //   旧法 `list.slice(-maxRows)` 取**登记尾部**——与「哪条更新」无关；
   //   且 `maxRows` 坏值时 `slice(NaN)` = `slice(0)` ⇒ **整环全念**（与上限正好相反）；
   //   念了几条、还有几条没念，一个字都不说。
   const ROWS_QUOTA_MAX = 32;

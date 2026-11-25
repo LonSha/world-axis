@@ -46,7 +46,7 @@
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { defines: 0, escalations: 0, blocked: 0, lastReason: '', faults: {} };
   // v2.581.0：注入名额统一形态（「同形态尾部截断」簇二，与 v2.580.0 的三引擎同一口径）。
-  //   旧法 `X.slice(-Math.max(1, cfg.maxRows))` 三病俱在：取**登记尾部**（≈登记顺序，不是新旧）、
+  //   旧法 `X.slice(-maxRows)` 三病俱在：取**登记尾部**（≈登记顺序，不是新旧）、
   //   `maxRows` 坏值时 `slice(NaN)`=`slice(0)` **整环全念**（与上限正好相反）、念了几条一个字不说。
   const ROWS_QUOTA_MAX = 32;
   function quotaOf(cfg, key, max, fallback) {
