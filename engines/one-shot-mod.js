@@ -187,20 +187,86 @@
   }
 
   /** 注入块：把「只这一轮」的调制摊给模型看，并明写「用完就撤，别写成长期设定」 */
+  // v2.582.0：注入面**头截断**名额守卫（同形态第一批 v2.581.0 修的是尾部，这批修头）。
+  //   头截断与尾截断的唯一区别是方向：这一头的顺序是**刻意排好的**（谁该先被念），
+  //   所以本批不重排、不换判据，只做两件事——
+  //     ① 名额读坏时不许把整面静默清空：旧法 `slice(0, NaN)` / `slice(0, 'x')` 得空数组，
+  //        注入面就此消失，且一个字都不说（比截多了更坏：截多了还看得见项，清空连项都没了）；
+  //     ② 截掉多少条要自证：`stat.block` 留逐面读数（faces）与顶层求和（totals），
+  //        块尾写一行「共几条／念几条／另有几条未列出」。
+  //   名额只截断、不筛选：`headQuota` 只把坏值拉回合法区间，`pickHead` 只做 `slice(0, q)`。
+  const HEAD_FACES = {};
+  /** 每轮 buildBlock 开头清账：读数只报**这一轮**的数，不许叠上一轮（life 逐人物累加是轮内需要）。 */
+  function headRound() {
+    Object.keys(HEAD_FACES).forEach(function (k) { delete HEAD_FACES[k]; });
+    stat.block = null;
+  }
+  function headQuota(cfg, key, max, fallback) {
+    const n = Math.floor(Number(cfg && cfg[key]));
+    if (!isFinite(n) || n < 1) return Math.min(max, fallback);
+    return Math.min(max, Math.max(1, n));
+  }
+  /** 头截断取用：保持原顺序，只截断不筛选；同面多次调用按条累加（如逐人物取目标）。 */
+  function pickHead(list, quota, face) {
+    const all = (Array.isArray(list) ? list : []).filter(function (x) { return !!x; });
+    const q = (isFinite(quota) && quota >= 1) ? Math.floor(quota) : 1;
+    const picked = all.slice(0, q);
+    const hidden = Math.max(0, all.length - picked.length);
+    const prev = HEAD_FACES[face];
+    HEAD_FACES[face] = {
+      face: face,
+      candidates: (prev ? prev.candidates : 0) + all.length,
+      picked: (prev ? prev.picked : 0) + picked.length,
+      hidden: (prev ? prev.hidden : 0) + hidden,
+      quota: q,
+      rounds: (prev ? prev.rounds : 0) + 1,
+      mode: (prev && prev.mode === 'head-first') || hidden > 0 ? 'head-first'
+        : (all.length ? 'all-fit' : 'empty')
+    };
+    stat.block = blockOf();
+    return picked;
+  }
+  /** 每次重算成新对象：外部拿到的读数不会被后续面覆盖。 */
+  function blockOf() {
+    const faces = {};
+    let c = 0, p = 0, h = 0, n = 0;
+    Object.keys(HEAD_FACES).forEach(function (k) {
+      const f = HEAD_FACES[k];
+      faces[k] = { candidates: f.candidates, picked: f.picked, hidden: f.hidden,
+        quota: f.quota, rounds: f.rounds, mode: f.mode };
+      c += f.candidates; p += f.picked; h += f.hidden; n++;
+    });
+    const base = (stat.block && typeof stat.block === 'object' && !stat.block.totals) ? stat.block : {};
+    return Object.assign({}, base, { faces: faces,
+      totals: { faces: n, candidates: c, picked: p, hidden: h } });
+  }
+  /** 块尾自证：念了几条、还剩几条没念，说清楚。未列出不等于没有。 */
+  function proofOf() {
+    const ks = Object.keys(HEAD_FACES);
+    if (!ks.length) return '';
+    const parts = ks.map(function (k) {
+      const f = HEAD_FACES[k];
+      return f.face + ' ' + f.candidates + ' 条中念 ' + f.picked + ' 条'
+        + (f.hidden > 0 ? '，另有 ' + f.hidden + ' 条未列出' : '，全部列出');
+    });
+    return '（本面名额：' + parts.join('；')
+      + '。未列出不等于没有——还在登记表上；名额只截断不筛选，不改任何既有事实）';
+  }
   function buildBlock() {
+    headRound();
     const cfg = settings();
     if (!cfg.enabled) return '';
     const r = read();
-    if (!r.pending.length) return '';
+    if (!r.pending.length) { pickHead([], headQuota(cfg, 'maxBlockItems', 8, DEF.maxBlockItems), '临时调制'); return ''; }
     stat.leaked++;
     const lines = [];
     lines.push('[只这一轮的临时调制（' + r.pending.length + '/' + cfg.maxPending + '）]');
-    r.pending.slice(0, cfg.maxBlockItems).forEach(function (it, i) {
+    pickHead(r.pending, headQuota(cfg, 'maxBlockItems', 8, DEF.maxBlockItems), '临时调制').forEach(function (it, i) {
       lines.push((i + 1) + '. [' + it.kindCn + '｜还剩 ' + it.ttl + ' 轮] ' + it.text);
     });
-    if (r.pending.length > cfg.maxBlockItems) lines.push('（另有 ' + (r.pending.length - cfg.maxBlockItems) + ' 条未列）');
+    if ((HEAD_FACES['临时调制'] || {}).hidden > 0) lines.push('（另有 ' + HEAD_FACES['临时调制'].hidden + ' 条未列出，仍在待生效清单上）');
     lines.push('口径：这些**只在这一轮有效**——按它写，但别写进长期设定（下一轮它就不在了）；用掉之后不追述。');
-    return lines.join('\n') + '\n';
+    return lines.join('\n') + '\n' + proofOf() + '\n';
   }
 
   WA.oneShotMod = {

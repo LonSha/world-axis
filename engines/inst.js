@@ -456,9 +456,75 @@
         return n + ((o.successions || []).filter(function (r) { return r && r.consistent === false; }).length);
       }, 0) };
   }
+  // v2.582.0：注入面**头截断**名额守卫（同形态第一批 v2.581.0 修的是尾部，这批修头）。
+  //   头截断与尾截断的唯一区别是方向：这一头的顺序是**刻意排好的**（谁该先被念），
+  //   所以本批不重排、不换判据，只做两件事——
+  //     ① 名额读坏时不许把整面静默清空：旧法 `slice(0, NaN)` / `slice(0, 'x')` 得空数组，
+  //        注入面就此消失，且一个字都不说（比截多了更坏：截多了还看得见项，清空连项都没了）；
+  //     ② 截掉多少条要自证：`stat.block` 留逐面读数（faces）与顶层求和（totals），
+  //        块尾写一行「共几条／念几条／另有几条未列出」。
+  //   名额只截断、不筛选：`headQuota` 只把坏值拉回合法区间，`pickHead` 只做 `slice(0, q)`。
+  const HEAD_FACES = {};
+  /** 每轮 buildBlock 开头清账：读数只报**这一轮**的数，不许叠上一轮（life 逐人物累加是轮内需要）。 */
+  function headRound() {
+    Object.keys(HEAD_FACES).forEach(function (k) { delete HEAD_FACES[k]; });
+    stat.block = null;
+  }
+  function headQuota(cfg, key, max, fallback) {
+    const n = Math.floor(Number(cfg && cfg[key]));
+    if (!isFinite(n) || n < 1) return Math.min(max, fallback);
+    return Math.min(max, Math.max(1, n));
+  }
+  /** 头截断取用：保持原顺序，只截断不筛选；同面多次调用按条累加（如逐人物取目标）。 */
+  function pickHead(list, quota, face) {
+    const all = (Array.isArray(list) ? list : []).filter(function (x) { return !!x; });
+    const q = (isFinite(quota) && quota >= 1) ? Math.floor(quota) : 1;
+    const picked = all.slice(0, q);
+    const hidden = Math.max(0, all.length - picked.length);
+    const prev = HEAD_FACES[face];
+    HEAD_FACES[face] = {
+      face: face,
+      candidates: (prev ? prev.candidates : 0) + all.length,
+      picked: (prev ? prev.picked : 0) + picked.length,
+      hidden: (prev ? prev.hidden : 0) + hidden,
+      quota: q,
+      rounds: (prev ? prev.rounds : 0) + 1,
+      mode: (prev && prev.mode === 'head-first') || hidden > 0 ? 'head-first'
+        : (all.length ? 'all-fit' : 'empty')
+    };
+    stat.block = blockOf();
+    return picked;
+  }
+  /** 每次重算成新对象：外部拿到的读数不会被后续面覆盖。 */
+  function blockOf() {
+    const faces = {};
+    let c = 0, p = 0, h = 0, n = 0;
+    Object.keys(HEAD_FACES).forEach(function (k) {
+      const f = HEAD_FACES[k];
+      faces[k] = { candidates: f.candidates, picked: f.picked, hidden: f.hidden,
+        quota: f.quota, rounds: f.rounds, mode: f.mode };
+      c += f.candidates; p += f.picked; h += f.hidden; n++;
+    });
+    const base = (stat.block && typeof stat.block === 'object' && !stat.block.totals) ? stat.block : {};
+    return Object.assign({}, base, { faces: faces,
+      totals: { faces: n, candidates: c, picked: p, hidden: h } });
+  }
+  /** 块尾自证：念了几条、还剩几条没念，说清楚。未列出不等于没有。 */
+  function proofOf() {
+    const ks = Object.keys(HEAD_FACES);
+    if (!ks.length) return '';
+    const parts = ks.map(function (k) {
+      const f = HEAD_FACES[k];
+      return f.face + ' ' + f.candidates + ' 条中念 ' + f.picked + ' 条'
+        + (f.hidden > 0 ? '，另有 ' + f.hidden + ' 条未列出' : '，全部列出');
+    });
+    return '（本面名额：' + parts.join('；')
+      + '。未列出不等于没有——还在登记表上；名额只截断不筛选，不改任何既有事实）';
+  }
   function buildBlock() {
+    headRound();
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
-    const rows = orgsOf().slice(0, cfg.maxOrgs);
+    const rows = pickHead(orgsOf(), headQuota(cfg, 'maxOrgs', 24, DEF.maxOrgs), '组织');
     if (!rows.length) return '';
     const lines = rows.map(function (o) {
       const held = (o.posts || []).filter(function (p) { return p && p.holder; })
@@ -469,7 +535,7 @@
     });
     return '[组织制度]' + String.fromCharCode(10) + lines.join(String.fromCharCode(10))
       + String.fromCharCode(10) + '没有对应权限的人不得批准；没人能批的事不许挂起。'
-      + '职位空缺不等于制度消失——离任与交接都留有记录，旧承诺不因换人而自动作废。';
+      + '职位空缺不等于制度消失——离任与交接都留有记录，旧承诺不因换人而自动作废。' + String.fromCharCode(10) + proofOf();
   }
   WA.inst = {
     PERMS: PERMS.slice(), KINDS: KINDS.slice(), REASONS: REASONS.slice(), TERMINAL: TERMINAL.slice(),
