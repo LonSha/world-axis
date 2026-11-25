@@ -14093,7 +14093,12 @@ assert(r2900.dead.length === 2002 && r2900.uiDead.length === 6 && r2900.dataOnly
     //   源表 166 → 167。当时只加了源与分支、没同步本常量，故本趟全量在此现形；
     //   实测（去注释后逐项数）167 条、无重复。处置按纪律是「入表而不是放宽」：
     //   补常量 + 在此留账，不动判据本身。
-    assert((W.render.SOURCES || []).length === 167, "v2380: SOURCES 为 167 项（v2.569.0 实测回填：render/inject.js 源表 167 条，v2.567.0 新增 `mixedIndex`（常驻索引注入面）使 166 → 167，去注释逐项数 167 条且无重复。前记录：v2.529.0 回填 165 条，比旧值 151 多出的 14 条正是 V28 新增注入源（退场人物/行动回执/可察觉的痕迹/他们以为/长出来的线/暗线阶梯/该来的事/时间与期限/听来的/别处也在走/镜头之外/信/世界近况）；原记录：v2.524.0：+narrowConsumers「在用机制」；V9 新增四 owner、托管及变化摘要六源，109 → 115）（v2.294.0（V8）：新增结构汇流 injectCollector 注入源 ⇒ 108 → 109）（v2.292.0（EXV7-8）：新增世界自传 worldAutobiography 注入源 ⇒ 107 → 108）（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
+    // v2.583.0（R254/R255）跟位：本批给 render/inject.js 真加了一条注入源 `attireState`
+    //   （穿着状态；1583 行 `if (vis.attireState && WA.attireState)` 真读），源表 167 → 168。
+    //   与 attach 同批登记四处（SOURCES / vis 默认值 / panel 显示名 / inject-budget-tables 的
+    //   PRIORITY 与 ACCOUNTS_ROWS）—— 只加源不加表会让 settle-v2850 的 C1 当场红。
+    //   实测（去注释逐项数）168 条、无重复。处置仍是「入表而不是放宽」，不动判据本身。
+    assert((W.render.SOURCES || []).length === 168, "v2380: SOURCES 为 168 项（v2.583.0 实测回填：render/inject.js 源表 168 条，新增 `attireState`（穿着状态注入面）使 167 → 168，去注释逐项数 168 条且无重复。前记录：v2.569.0 回填 167 条，v2.567.0 新增 `mixedIndex`（常驻索引注入面）使 166 → 167 实测回填：render/inject.js 源表 167 条，v2.567.0 新增 `mixedIndex`（常驻索引注入面）使 166 → 167，去注释逐项数 167 条且无重复。前记录：v2.529.0 回填 165 条，比旧值 151 多出的 14 条正是 V28 新增注入源（退场人物/行动回执/可察觉的痕迹/他们以为/长出来的线/暗线阶梯/该来的事/时间与期限/听来的/别处也在走/镜头之外/信/世界近况）；原记录：v2.524.0：+narrowConsumers「在用机制」；V9 新增四 owner、托管及变化摘要六源，109 → 115）（v2.294.0（V8）：新增结构汇流 injectCollector 注入源 ⇒ 108 → 109）（v2.292.0（EXV7-8）：新增世界自传 worldAutobiography 注入源 ⇒ 107 → 108）（v2.189.0（缝 B1/B2）：beatReport / genGate 两条新注入源 ⇒ 82 → 84）（v2.173.0（TX4b）：dilemmacy/freight/storyChoice/commission/investigation/aftermath/operations 新增注入源 ⇒ 74 → 82）");
     // E. 负向自证：把 echoes 分支从源码里抹掉 ⇒ 门禁必须现形
     const broken2380 = srcIj2380.split("if (vis.echoes)").join("if (false)");
     assert(broken2380 !== srcIj2380, "v2380: （负向自证）破坏锚点在真源码中恰命中（可观测改行为）");
