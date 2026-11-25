@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.579.0';
+  const VERSION = '2.580.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1679,7 +1679,7 @@
   //   同一构建标识下取到的模块与本地是同一次产物,这才谈得上「同版容灾」。
   //   纪律:升版时 BUILD_ID 与 VERSION 同批推进(判据见 tests/index-build-v2211.js),
   //   不允许只改其一 —— 只改 VERSION 会让回退源指向旧代码,只改 BUILD_ID 会让版本账对不上现场。
-  const BUILD_ID = 'fec5691390482af064d2b24e032877fed106e44c';
+  const BUILD_ID = 'a2b789481579828f49ce172d439b77b797bc0e59';
   const CDN_BASES = [
     'https://cdn.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
     'https://fastly.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,

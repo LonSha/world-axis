@@ -67,7 +67,29 @@
     tall: ['仰头看人', '踮脚', '小鸟依人', '缩在角落', '矮了半头']
   };
 
-  const stat = { regs: 0, mirrors: 0, blocked: 0, lastReason: '', faults: {} };
+  // v2.580.0：注入名额（同形态尾部截断的第三处集中修法）。
+  //   旧法 `list.slice(-Math.max(1, cfg.maxRows))` 取**登记尾部**——与「哪条更新」无关；
+  //   且 `maxRows` 坏值时 `slice(NaN)` = `slice(0)` ⇒ **整环全念**（与上限正好相反）；
+  //   念了几条、还有几条没念，一个字都不说。
+  const ROWS_QUOTA_MAX = 48;
+  function quotaOf(cfg, key, max, fallback) {
+    const n = Math.floor(Number(cfg && cfg[key]));
+    if (!isFinite(n) || n < 1) return Math.min(max, fallback);
+    return Math.min(max, Math.max(1, n));
+  }
+  /** 取哪几条：按登记时间新→旧（同刻按第二键兜底，可复算）。名额只截断、不参与筛选。 */
+  function pickRows(list, quota, atOf, idOf) {
+    const arr = (Array.isArray(list) ? list : []).filter(function (x) { return !!x; }).slice();
+    arr.sort(function (a, b) {
+      const at = Number(atOf(a)) || 0, bt = Number(atOf(b)) || 0;
+      if (at !== bt) return bt - at;
+      const ai = String(idOf(a) || ''), bi = String(idOf(b) || '');
+      return ai < bi ? -1 : (ai > bi ? 1 : 0);
+    });
+    return { candidates: arr.length, picked: arr.slice(0, quota),
+      hidden: Math.max(0, arr.length - quota), mode: arr.length > quota ? 'newest-first' : 'all-fit' };
+  }
+  const stat = { regs: 0, mirrors: 0, blocked: 0, lastReason: '', block: null, faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store.get() || {}; }
@@ -213,12 +235,22 @@
       holding: body.capacity.holding, free: body.capacity.free, items: body.holding };
   }
 
+  /**
+   * 注入块（人体结构面）。
+   *   v2.580.0 名额：按登记时间新→旧取前 N 具（同刻按 who 兜底），名额只截断不参与筛选；
+   *   截断必自证「另有 K 具未列出」，`stat().block` 报 {candidates,picked,quota,hidden,mode}。
+   *   旧法取登记尾部且坏配置会整环全念 —— 与「最多念 maxRows 具」正好相反。
+   */
   function buildBlock() {
     const cfg = settings();
     if (!cfg.enabled) return '';
-    const list = rows().slice(-Math.max(1, cfg.maxRows));
-    if (!list.length) return '';
-    const lines = list.map(function (r) {
+    const quota = quotaOf(cfg, 'maxRows', ROWS_QUOTA_MAX, DEF.maxRows);
+    const pool = rows();
+    if (!pool.length) { stat.block = { candidates: 0, picked: 0, quota: quota, hidden: 0, mode: 'empty' }; return ''; }
+    const sel = pickRows(pool, quota, function (r) { return r && r.at; }, function (r) { return r && r.who; });
+    stat.block = { candidates: sel.candidates, picked: sel.picked.length, quota: quota,
+      hidden: sel.hidden, mode: sel.mode };
+    const lines = sel.picked.map(function (r) {
       const caps = capacity(r);
       const pins = BODY_VETO[r.tier];
       return '· ' + r.who + '（' + r.tierLabel + '）' + r.facingLabel + ' · 锚点「' + r.anchor + '」 · 头' +
@@ -226,7 +258,11 @@
         (caps.holding ? '（持 ' + r.holding.join('、') + '）' : '') +
         ' · 禁写：' + pins.join('/');
     });
-    return '[人体结构]\n' + lines.join('\n') +
+    const NL = String.fromCharCode(10);
+    const proof = '（本面名额：身体 ' + sel.picked.length + '/' + sel.candidates
+      + (sel.hidden > 0 ? ' 具，按登记时间新→旧取；另有 ' + sel.hidden + ' 具未列出，仍在场上，不是没有'
+        : ' 具，全部列出') + '）';
+    return '[人体结构]' + NL + lines.join(NL) + NL + proof +
       '\n左右映射：画面左/右是读者视角，角色左/右是角色自身视角 —— 面向读者时画面左 = 角色右，背向读者时画面左 = 角色左，侧身时画面左 = 角色身前或身后。同场同人朝向与锚点各只允许一个（换向须转身，换位须移动），头只有一个；可及距离与持物件数按上表算，不按「一臂之遥」算。\n';
   }
 
@@ -236,7 +272,8 @@
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     mirror: mirror, register: register, read: read, canReach: canReach, checkVeto: checkVeto,
     vetoOf: vetoOf, capacityOf: capacityOf, buildBlock: buildBlock,
-    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
+    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults),
+      block: stat.block ? JSON.parse(JSON.stringify(stat.block)) : null }); }
   };
 
   WA.registerModule('engines/body-anatomy.js', { kind: 'engine', ver: '2.411.0' });

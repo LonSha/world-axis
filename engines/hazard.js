@@ -75,7 +75,29 @@
     return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {})));
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  const stat = { bumps: 0, rolls: 0, hits: 0, reveals: 0, triggers: 0, blocked: 0, lastReason: '', faults: {} };
+  // v2.580.0：注入名额（同形态尾部截断的第三处集中修法）。
+  //   旧法 `list.slice(-Math.max(1, cfg.maxRows))` 取**登记尾部**——与「哪条更新」无关；
+  //   且 `maxRows` 坏值时 `slice(NaN)` = `slice(0)` ⇒ **整环全念**（与上限正好相反）；
+  //   念了几条、还有几条没念，一个字都不说。
+  const ROWS_QUOTA_MAX = 32;
+  function quotaOf(cfg, key, max, fallback) {
+    const n = Math.floor(Number(cfg && cfg[key]));
+    if (!isFinite(n) || n < 1) return Math.min(max, fallback);
+    return Math.min(max, Math.max(1, n));
+  }
+  /** 取哪几条：按登记时间新→旧（同刻按第二键兜底，可复算）。名额只截断、不参与筛选。 */
+  function pickRows(list, quota, atOf, idOf) {
+    const arr = (Array.isArray(list) ? list : []).filter(function (x) { return !!x; }).slice();
+    arr.sort(function (a, b) {
+      const at = Number(atOf(a)) || 0, bt = Number(atOf(b)) || 0;
+      if (at !== bt) return bt - at;
+      const ai = String(idOf(a) || ''), bi = String(idOf(b) || '');
+      return ai < bi ? -1 : (ai > bi ? 1 : 0);
+    });
+    return { candidates: arr.length, picked: arr.slice(0, quota),
+      hidden: Math.max(0, arr.length - quota), mode: arr.length > quota ? 'newest-first' : 'all-fit' };
+  }
+  const stat = { bumps: 0, rolls: 0, hits: 0, reveals: 0, triggers: 0, blocked: 0, lastReason: '', block: null, faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 60); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -346,17 +368,30 @@
     if (out && !out.ok && out.reason !== 'disabled') noteFault(out.reason);
     return out || { ok: false, reason: 'store-unavailable' };
   }
-  /** 注入块：**只出「有暗账在身」的计数纪律，不出概率数字**（预设明言结果不进正文）。 */
+  /**
+   * 注入块：**只出「有暗账在身」的计数纪律，不出概率数字**（预设明言结果不进正文）。
+   *   v2.580.0 名额：按登记时间新→旧取前 N 条（同刻按 key 兜底），名额只截断不参与筛选；
+   *   截断必自证「另有 K 条未列出」，`stat().block` 报 {candidates,picked,quota,hidden,mode}。
+   *   旧法取登记尾部且坏配置会整环全念 —— 与「最多念 maxRows 条」正好相反。
+   */
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
-    const list = rows().filter(function (r) { return r && ((Number(r.count) || 0) > 0 || r.pending || (Number(r.hits) || 0) > 0); });
-    if (!list.length) return '';
-    const lines = list.slice(-Math.max(1, cfg.maxRows)).map(function (r) {
+    const quota = quotaOf(cfg, 'maxRows', ROWS_QUOTA_MAX, DEF.maxRows);
+    const pool = rows().filter(function (r) { return r && ((Number(r.count) || 0) > 0 || r.pending || (Number(r.hits) || 0) > 0); });
+    if (!pool.length) { stat.block = { candidates: 0, picked: 0, quota: quota, hidden: 0, mode: 'empty' }; return ''; }
+    const sel = pickRows(pool, quota, function (r) { return r && r.at; }, function (r) { return r && r.key; });
+    stat.block = { candidates: sel.candidates, picked: sel.picked.length, quota: quota,
+      hidden: sel.hidden, mode: sel.mode };
+    const lines = sel.picked.map(function (r) {
       const tail = r.pending ? '（已暗记命中，等待身体自行显形）' : ('（累计 ' + (Number(r.count) || 0) + ' 次）');
       return '· ' + r.key + tail;
     });
-    return '[风险暗账] 重复行为的概率滑落（**禁止在正文写出任何数字、概率或术语**）：\n' + lines.join('\n')
-      + '\n风险铁律：结果不当场宣布；命中后必须隔几轮才允许身体自行显形（迟来的日期、犯困、反胃、忽然吃不下某样东西）；角色怎么反应由各自处境与性格决定，不预设喜忧、不替谁做决定。\n';
+    const NL = String.fromCharCode(10);
+    const proof = '（本面名额：暗账 ' + sel.picked.length + '/' + sel.candidates
+      + (sel.hidden > 0 ? ' 条，按登记时间新→旧取；另有 ' + sel.hidden + ' 条未列出，仍在风险暗账上，不是没有'
+        : ' 条，全部列出') + '；名额行只报清单条数，不是概率）';
+    return '[风险暗账] 重复行为的概率滑落（**禁止在正文写出任何数字、概率或术语**）：' + NL + lines.join(NL)
+      + NL + proof + NL + '风险铁律：结果不当场宣布；命中后必须隔几轮才允许身体自行显形（迟来的日期、犯困、反胃、忽然吃不下某样东西）；角色怎么反应由各自处境与性格决定，不预设喜忧、不替谁做决定。\n';
   }
   WA.hazard = {
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
@@ -370,7 +405,8 @@
     // v2.138.0（E7）：逐落地结算入口（主链消费者，非「等人手调」）与地点清单读口同批导出。
     rollAll: rollAll,
     targetFor: targetFor,
-    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
+    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults),
+      block: stat.block ? JSON.parse(JSON.stringify(stat.block)) : null }); }
   };
   /**
    * v2.138.0（E7）：**逐落地结算** —— 一次把「哪些地方此刻真有恶劣天气」过一遍。

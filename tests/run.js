@@ -22884,6 +22884,12 @@ await runScript('./plan-audit-quota-v2578.js');
     //   关闭开关时 block 保持 null（不冒充「空表」）。23 段 A/B/C/N。
     //   单独跑：node tests/world-bridge-block-quota-v2579.js
 await runScript('./world-bridge-block-quota-v2579.js');
+    // v2.580.0（同形态尾部截断·簇一）：hazard / lifeline / body-anatomy 三处 list.slice(-maxRows)。
+    //   三处都取登记尾部（≈登记顺序）、都零自证、maxRows 坏值时 slice(NaN)=slice(0) 整环全念。
+    //   实测（/tmp/probe580.js）：hazard 首条 h6→h0、'x' 时 20→16；lifeline w7→w0、14→12；body b7→b0、26→24。
+    //   改法 quotaOf + pickRows(时间新→旧, 同刻 id 兜底) + 块尾自证 + block 五栗 + stat() 深拷；36 段 A/B/C/N（三引擎各五条负控）。
+    //   单独跑：node tests/inject-block-quota-cluster1-v2580.js
+await runScript('./inject-block-quota-cluster1-v2580.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
@@ -23412,7 +23418,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.579.0';
+  const __wantPin293 = '2.580.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

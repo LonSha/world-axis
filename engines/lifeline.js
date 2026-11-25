@@ -94,7 +94,29 @@
       : Object.assign({}, DEF, next || {});
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
-  const stat = { regs: 0, advances: 0, reads: 0, blocked: 0, lastReason: '', faults: {} };
+  // v2.580.0：注入名额（同形态尾部截断的第三处集中修法）。
+  //   旧法 `list.slice(-Math.max(1, cfg.maxRows))` 取**登记尾部**——与「哪条更新」无关；
+  //   且 `maxRows` 坏值时 `slice(NaN)` = `slice(0)` ⇒ **整环全念**（与上限正好相反）；
+  //   念了几条、还有几条没念，一个字都不说。
+  const ROWS_QUOTA_MAX = 24;
+  function quotaOf(cfg, key, max, fallback) {
+    const n = Math.floor(Number(cfg && cfg[key]));
+    if (!isFinite(n) || n < 1) return Math.min(max, fallback);
+    return Math.min(max, Math.max(1, n));
+  }
+  /** 取哪几条：按最近更新（updatedAt，缺则 at）新→旧（同刻按第二键兜底，可复算）。名额只截断、不参与筛选。 */
+  function pickRows(list, quota, atOf, idOf) {
+    const arr = (Array.isArray(list) ? list : []).filter(function (x) { return !!x; }).slice();
+    arr.sort(function (a, b) {
+      const at = Number(atOf(a)) || 0, bt = Number(atOf(b)) || 0;
+      if (at !== bt) return bt - at;
+      const ai = String(idOf(a) || ''), bi = String(idOf(b) || '');
+      return ai < bi ? -1 : (ai > bi ? 1 : 0);
+    });
+    return { candidates: arr.length, picked: arr.slice(0, quota),
+      hidden: Math.max(0, arr.length - quota), mode: arr.length > quota ? 'newest-first' : 'all-fit' };
+  }
+  const stat = { regs: 0, advances: 0, reads: 0, blocked: 0, lastReason: '', block: null, faults: {} };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -266,19 +288,28 @@
   }
   /**
    * 注入块（纪律 + 在场病况的程段与限制档）。
+   *   v2.580.0 名额：按最近更新新→旧取前 N 条（同刻按 who|cond 兜底），名额只截断不参与筛选；
+   *   截断必自证「另有 K 条未列出」，`stat().block` 报 {candidates,picked,quota,hidden,mode}。
    *   只列**程段与限制**，不列症状细节 —— 症状名会暗示剧情走向（与 noesis 同一条防剧透纪律）。
    */
   function buildBlock() {
     const cfg = settings();
     if (!cfg.enabled || !WA.store) return '';
-    const list = rows().slice(-Math.max(1, cfg.maxRows));
-    if (!list.length) return '';
-    const lines = list.map(function (r) {
+    const quota = quotaOf(cfg, 'maxRows', ROWS_QUOTA_MAX, DEF.maxRows);
+    const pool = rows();
+    if (!pool.length) { stat.block = { candidates: 0, picked: 0, quota: quota, hidden: 0, mode: 'empty' }; return ''; }
+    const sel = pickRows(pool, quota, function (r) { return r && (r.updatedAt || r.at); }, function (r) { return r && (r.who + "|" + r.cond); });
+    stat.block = { candidates: sel.candidates, picked: sel.picked.length, quota: quota,
+      hidden: sel.hidden, mode: sel.mode };
+    const lines = sel.picked.map(function (r) {
       const lim = (Array.isArray(r.limits) && r.limits.length) ? r.limits.join('/') : '无限制登记';
       return r.who + '：' + r.cond + '（' + r.kind + '）此刻' + r.course + '，限制 ' + lim;
     });
     const NL = String.fromCharCode(10);
-    return '[生理与照护]' + NL + lines.join(NL) + NL
+    const proof = '（本面名额：病况 ' + sel.picked.length + '/' + sel.candidates
+      + (sel.hidden > 0 ? ' 条，按最近更新新→旧取；另有 ' + sel.hidden + ' 条未列出，仍在照护账上，不是没有'
+        : ' 条，全部列出') + '）';
+    return '[生理与照护]' + NL + lines.join(NL) + NL + proof + NL
       + '病况是持续状态：程段只前进或原地，不跳格、不即时痊愈；' + NL
       + '照护有流程与不可得（问诊/检查/诊断/治疗/康复），没有得到就是没有得到，不凭空完成。' + NL;
   }
@@ -299,7 +330,8 @@
     //   / 诊断 secLifeline / noesis.perceive（容量面削弱感知）。
     register: register, advance: advance, capacityOf: capacityOf, careGap: careGap, view: view,
     boundary: boundary, buildBlock: buildBlock,
-    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults), enabled: settings().enabled }); }
+    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults), enabled: settings().enabled,
+      block: stat.block ? JSON.parse(JSON.stringify(stat.block)) : null }); }
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/lifeline.js', { kind: 'engine', ver: '2.141.0' });
 })();
