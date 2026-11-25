@@ -6,6 +6,9 @@
  *   1 总开关默认关闭；关闭时不结算、不注入。
  *   2 只记已存在的势力或人物，不凭空创建组织。
  *   3 资源不足时拒绝转移，不把负数伪装成成功。
+ *   4 注入面名额只截断不参与筛选：资源键按字典序、人物按「持有种数→名字」，
+ *     整块行数上限 = maxItems + 2（人/项目/欠账各面另有限额）。每一处截断都要自证
+ *     「未列几条」—— 否则「三行」与「一共只有三行」在读数上同形（v2.576.0）。
  */
 (function () {
   'use strict';
@@ -21,7 +24,9 @@
   function saveSettings(next) { return WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, DEF, next || {}))); }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { grants: 0, transfers: 0, blocked: 0, assigns: 0, credits: 0,
-    promotions: 0, payrolls: 0, penalties: 0, lastReason: '' };
+    promotions: 0, payrolls: 0, penalties: 0, lastReason: '',
+    // v2.576.0：注入面名额读数。必须在这里声明 —— 没构建过（null）与构建过但空表（mode='empty'）要能分辨。
+    block: null };
   // ── v2.92.0（O5）：资源流水（观测面，**不参与判定**）──────────
   // 为什么需要它：本模块此前只有**累计计数**（grants / transfers / blocked），
   //   于是「某笔交易之后存量 = 存量 ± 流量」这句话在此之前**不可判定**——
@@ -161,34 +166,76 @@
     const row = holder(kind, name); if (!row) return false;
     return (stockOf(row)[clean(item, 30)] || 0) >= qty(amount);
   }
+  // ── v2.576.0（按序截断第十九处）：组织面四处静默截断 ──
+  //   旧写法一次砍四刀，刀刀不出声：
+  //     · 每个势力的资源键 Object.keys(stock).slice(0, maxItems)
+  //     · 人物面 Object.values(people).slice(0, maxItems)  ← 全库人物只念 3 个
+  //     · 项目行 projLines.length >= 4 / 欠账行 >= 5（循环里 return，无声）
+  //     · 整块 lines.slice(0, maxItems + 2)             ← 最后一行之后全消失
+  //   于是「三行」到底是全部还是抽样，读的人无从判断。现四刀都留痕，块尾自证。
+  const RES_KEY_MAX = 12;
+  const PROJ_LINES = 4;
+  const DEBT_LINES = 5;
+  function quotaOf(cfg) {
+    const n = Math.floor(Number(cfg && cfg.maxItems));
+    if (!isFinite(n) || n < 1) return DEF.maxItems;
+    return Math.min(RES_KEY_MAX, Math.max(1, n));
+  }
+  function keysOf(row, cap) {
+    const all = Object.keys(stockOf(row) || {}).sort();
+    return { picked: all.slice(0, cap), hidden: Math.max(0, all.length - cap), candidates: all.length };
+  }
+  // 人物按「持有种数多 → 名字字典序」取：同输入同输出，且先念账目最厚的人。
+  function peopleOf(list, cap) {
+    const arr = (list || []).filter(function (p) { return p && p.name; }).slice().sort(function (a, b) {
+      const ka = Object.keys(stockOf(a) || {}).length, kb = Object.keys(stockOf(b) || {}).length;
+      if (ka !== kb) return kb - ka;
+      return String(a.name).localeCompare(String(b.name));
+    });
+    const picked = arr.slice(0, cap);
+    return { picked: picked, hidden: Math.max(0, arr.length - picked.length), candidates: arr.length };
+  }
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
     const lines = [];
+    const faces = {};
+    const quota = quotaOf(cfg);
+    // 每面留痕：念了几条 / 一共几条 / 压掉几条。只有被压掉的面才记账，
+    // 免得「名额够」时冒出一堆 3/3 的噪声行。
+    function noteFace(name, r) {
+      if (r && r.hidden) {
+        const cur = faces[name] || { picked: 0, total: 0, hidden: 0 };
+        cur.picked += r.picked.length;
+        cur.total += r.candidates;
+        cur.hidden += r.hidden;
+        faces[name] = cur;
+      }
+      return r;
+    }
     ((state().evolution || {}).factions || []).forEach(function (f) {
-      const keys = Object.keys(stockOf(f)).slice(0, cfg.maxItems);
-      if (keys.length) lines.push(f.name + '：' + keys.map(function (k) { return k + stockOf(f)[k]; }).join('、'));
+      const ks = noteFace('势力资源键', keysOf(f, quota));
+      if (ks.picked.length) lines.push(f.name + '：' + ks.picked.map(function (k) { return k + stockOf(f)[k]; }).join('、'));
     });
-    Object.values(state().people || {}).slice(0, cfg.maxItems).forEach(function (p) {
-      const keys = Object.keys(stockOf(p)).slice(0, cfg.maxItems);
-      if (keys.length) lines.push(p.name + '：' + keys.map(function (k) { return k + stockOf(p)[k]; }).join('、'));
+    noteFace('人物', peopleOf(Object.values(state().people || {}), quota)).picked.forEach(function (p) {
+      const ks = noteFace('人物资源键', keysOf(p, quota));
+      if (ks.picked.length) lines.push(p.name + '：' + ks.picked.map(function (k) { return k + stockOf(p)[k]; }).join('、'));
     });
 
     // v2.117.0（计划二 B5）：共同项目与欠账——**同一条注入面**追加两段。
     //   为什么不能另开一条通道：「组织在办什么」与「组织有什么」是同一件事的两面，
     //   分开会让模型看到「会：粮30」却不知道这 30 是留着做什么的。
     //   只报未结项的项目（已结项的是历史，历史不占注入预算）；欠账只报有欠的、逐条带原因。
-    const projLines = [];
+    const projAll = [], projLines = [];
     (((state().evolution || {}).factions) || []).forEach(function (f) {
-      if (!f || projLines.length >= 4) return;
+      if (!f) return;
       projectRows(f).forEach(function (p) {
-        if (!p || projLines.length >= 4) return;
-        if (!isLive(p)) return;
+        if (!p || !isLive(p)) return;
         const tl = tierLine(p);
         const cov = coverageOf(f, p);
         // 两档分述：记了刻数的报「已备/需备」，只记了档位词的报词并注明**不计缺口**。
         const spec = cov.filter(function (x) { return x.need !== null; });
         const narr = cov.filter(function (x) { return x.need === null; });
-        projLines.push(clean(f.name, 40) + '「' + clean(p.what, 60) + '」' + (p.status === 'ongoing' ? '进行中' : '待办')
+        projAll.push(clean(f.name, 40) + '「' + clean(p.what, 60) + '」' + (p.status === 'ongoing' ? '进行中' : '待办')
           + (spec.length ? '：' + spec.map(function (x) { return x.item + ' ' + x.covered + '/' + x.need; }).join('、') : '')
           + (narr.length ? '；' + narr.map(function (x) { return x.item + ' ' + (x.tierWord || '未记数量'); }).join('、')
             + '（未记数量，不计缺口）' : '')
@@ -198,32 +245,54 @@
           + (tl.tier === 'narrative' ? '〔' + tl.words.join('、') + '〕' : ''));
       });
     });
-    const debtLines = [];
+    const debtAll = [], debtLines = [];
     const stNow = state();
     (((stNow.evolution || {}).factions) || []).forEach(function (f) {
       if (!f) return;
       const rs = rosterOf(f);
       Object.keys(rs).sort().forEach(function (p) {
-        if (debtLines.length >= 5) return;
         const amt = typeof rs[p].owed === 'number' ? rs[p].owed : 0;
-        if (amt > 0) debtLines.push(clean(f.name, 40) + ' 欠 ' + p + ' ' + clean(rs[p].owedItem || '粮', 30) + '×' + amt + '（薪俸未清）');
+        if (amt > 0) debtAll.push(clean(f.name, 40) + ' 欠 ' + p + ' ' + clean(rs[p].owedItem || '粮', 30) + '×' + amt + '（薪俸未清）');
       });
     });
     Object.keys(stNow.people || {}).forEach(function (pid) {
       const per = stNow.people[pid];
-      if (!per || debtLines.length >= 5) return;
+      if (!per) return;
       (Array.isArray(per.debts) ? per.debts : []).forEach(function (d) {
-        if (debtLines.length >= 5) return;
         if (d && (qty(d.amount) || 0) > 0) {
-          debtLines.push(clean(per.name || pid, 60) + ' 欠 ' + clean(d.to, 40) + ' '
+          debtAll.push(clean(per.name || pid, 60) + ' 欠 ' + clean(d.to, 40) + ' '
             + clean(d.item, 30) + '×' + (qty(d.amount) || 0) + (d.why ? '（' + clean(d.why, 80) + '）' : ''));
         }
       });
     });
+    projLines.push.apply(projLines, projAll.slice(0, PROJ_LINES));
+    if (projAll.length > PROJ_LINES) {
+      faces['项目'] = { picked: projLines.length, total: projAll.length, hidden: projAll.length - PROJ_LINES };
+    }
+    debtLines.push.apply(debtLines, debtAll.slice(0, DEBT_LINES));
+    if (debtAll.length > DEBT_LINES) {
+      faces['欠账'] = { picked: debtLines.length, total: debtAll.length, hidden: debtAll.length - DEBT_LINES };
+    }
     if (projLines.length) lines.push('共同项目：' + projLines.join('；'));
     if (debtLines.length) lines.push('欠账：' + debtLines.join('；'));
     if (projLines.length || debtLines.length) lines.push('项目缺料就照实说缺、照实算缺口；已结项的事不因进度重算而消失。');
-    return lines.length ? '[资源与组织]\n' + lines.slice(0, cfg.maxItems + 2).join('\n') + '\n资源不足时不得完成转移或消耗；不得凭空增加库存。' : '';
+    // 整块行数也是名额：多出来的行不许无声消失。
+    const lineCap = quota + 2;
+    const kept = lines.slice(0, lineCap);
+    const lineHidden = Math.max(0, lines.length - kept.length);
+    const sampleRow = [];
+    Object.keys(faces).forEach(function (k) {
+      sampleRow.push(k + ' ' + faces[k].picked + '/' + faces[k].total);
+    });
+    if (lineHidden) sampleRow.push('行 ' + kept.length + '/' + lines.length);
+    const hiddenTotal = lineHidden + Object.keys(faces).reduce(function (n, k) { return n + faces[k].hidden; }, 0);
+    // 读数落在这里、且落在所有早退之前：「没构建过」与「构建过但空表」必须能分辨。
+    stat.block = { candidates: lines.length, picked: kept.length, quota: quota,
+      hidden: hiddenTotal, mode: !lines.length ? 'empty' : (hiddenTotal ? 'ranked-first' : 'all-fit'),
+      faces: JSON.parse(JSON.stringify(faces)) };
+    if (!kept.length) return '';
+    if (sampleRow.length) kept.push('（本面名额：' + sampleRow.join('、') + '；未列者仍在组织账上，不是没有）');
+    return '[资源与组织]\n' + kept.join('\n') + '\n资源不足时不得完成转移或消耗；不得凭空增加库存。';
   }
   // ── v2.95.0（X2 · B3）：经济引擎——职册 / 功簿 / 薪俸 / 欠薪 / 罚没 ──────────
   // 治的病：本模块从 v2.54.0 起只有**库存**（谁持有多少资源）与**累计计数**，没有**组织**——
@@ -1093,6 +1162,13 @@
     openProject: openProject, projectView: projectView, closeProject: closeProject,
     deliverToProject: deliverToProject, oweTo: oweTo, settleDebt: settleDebt, debtsView: debtsView,
     TIERS: PROJECT_TIERS,
-    stat: function () { return Object.assign({}, stat); }
+    // v2.576.0：stat() 原先只做 Object.assign —— block 这一栗是对象，浅拷拷的是引用，
+    //   调用方改一次读数就等于改掉了引擎自己的读数（「观测不得改变被观测对象」）。
+    //   这层单独深拷，其余计数仍按原样浅拷（都是数字，语义不变）。
+    stat: function () {
+      const out = Object.assign({}, stat);
+      out.block = stat.block ? JSON.parse(JSON.stringify(stat.block)) : null;
+      return out;
+    }
   };
 })();

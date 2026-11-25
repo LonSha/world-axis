@@ -22850,6 +22850,15 @@ await runScript('./inject-collector-sample-window-v2574.js');
     //   改法 quotaOf + pickSkips（at 降序 + path 字典序）+ 「另有 M 处未列」+ block 五栗；
     //   22 段 A/B/C/N。单独跑：node tests/offline-tick-summary-quota-v2575.js
 await runScript('./offline-tick-summary-quota-v2575.js');
+    // v2.576.0（按序截断第十九处）：组织面**一次砍四刀**，刀刀不出声。
+    //   旧写法：每势力资源键 slice(0,maxItems)、人物面 slice(0,maxItems)（全库只念 3 人）、
+    //   项目行 >=4 / 欠账行 >=5（forEach 里 return）、整块 slice(0,maxItems+2)。
+    //   实测（/tmp/probe576.js + /tmp/probe576c.js）：六势力五键无一句自证、stat().block=null；
+    //   六项目七欠账只念 4/5 条；maxItems='x' 时 slice(0,NaN) 让整块塌成一行。
+    //   改法 quotaOf(cfg) + keysOf/peopleOf（键字典序、持有种数降序）+ 项目/欠账先攒再截断
+    //   + 块尾「本面名额」自证 + block 五栗（faces 分面）+ stat() 对 block 深拷（原为浅拷）；
+    //   25 段 A/B/C/N。单独跑：node tests/org-block-quota-v2576.js
+await runScript('./org-block-quota-v2576.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
@@ -23378,7 +23387,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.575.0';
+  const __wantPin293 = '2.576.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');
