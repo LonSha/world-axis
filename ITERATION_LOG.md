@@ -7405,3 +7405,44 @@ A6b 仍守窄区间（调用点 2449 < 2450，没有再向下压）。
 表现是 python 侧 `UnicodeDecodeError`（日志里有非法 UTF-8 字节）/ `OSError Errno 38` / 空错误消息。
 已改用两条口径绕过：**输出落文件 + 事后读文件**、**`setsid` 分离 + 轮询**。凡是看到「日志不增长」的现场，
 先分「进程死了」与「我的外壳被杀了」两件事，不要直接读成「那一节卡死」。
+
+## R256（v2.584.0 · 引擎深度：让「有原因」变成「原因说得通」+ 换装不得冒充新衣）
+
+**起点**：R255 把 70 红清零之后，按用户要求继续往引擎深度走。挑的是 `engines/attire-state.js` ——
+因为它的承诺里有一句自己没兑现：材料原文「**禁止角色在没有动作或环境变化时衣服自行改变**」，
+上一版只落成「update 必须有 cause」。于是这一句能过：
+
+    update({ who:'甲', cause:'坐下', kind:'posture', state:{ cleanliness:'rain-worn' } })
+
+坐姿不会把衣服淋湿。**有 cause 但原因解释不了这次变化，与「无因」是同一件事**，只是多写了个词。
+
+**两块深度（都可判定、都可反向验证）**
+
+1. `CAUSE_SCOPE`：原因 → 它物理上够得着的键（不是按美学，按可达性）
+   · action（动作）：开合 / 袖口 / 衣摆 / 褶皱 / 贴合度
+   · posture（姿态）：衣摆 / 褶皱 / 贴合度
+   · env（环境）：衣摆 / 整洁度 / 褶皱
+   · time（时间）：整洁度 / 褶皱（久穿起褶、变旧）
+   越界 ⇒ 新码 `cause-scope`，返回里带 `outside`（哪几键说不通）与 `allowed`（这一类能碰什么），
+   判语形如「姿态解释不了「整洁度」的变化」。**不是** `bad-cause-kind`（那是不在四类内）、
+   也**不是** `no-cause`（那是压根没给）—— 三类各答一件事，不合并。
+
+2. 换装 ≠ 新衣：上一版 `establish` 换装时一律用 `DEF_STATE()` 兜底，于是**衣橱里的旧衣**会被登记成
+   「整洁度:新衣」，模型照着写进正文 —— 那是一句假话。现在：非 `plot-gift` 的换装**继承上一套整洁度**，
+   并把继承结果放进返回的 `inherited`（可核验）；只有剧情给了新衣（plot-gift）才回到 `new`。
+
+**两条反向判据（否则测不出东西）**：H2 姿态改整洁度必须被拒、H3 同一改动换成 env 必须放行
+（证明判据不是「一律拒收」）；N5/N6 把「越界拒收」那句打掉后，「坐着淋湿」必须真的落地。
+专锁 `attire-state-v2583` **从 51 条涨到 60 条**，全绿。
+
+**机械面（全部跑各自的生成器，不手改）**：`gen-error-codes`（1935 码 / 见证 943 / 死表 52 / 基线 940，
+恒等式平）· `module-registry-gate --update`（2.584.0 / 文件 580 / ns 591 / 装载期边 476）·
+`dead-export-gate --update`（CAUSE_SCOPE / CAUSE_LABELS 按 **dataOnly** 记账，members 6101 → 6103、
+dataOnly 792 → 794）· `sync-hardcoded --write`（写后校验通过）· `plan-ledger --write` ·
+`evidence-index --write` · `consumer-types --register` · `release-manifest`（版本面 9 项同源）。
+`version-consistency` 的 22 条锚点逐条跟位（含 10 个 s3 专锁的白名单与 `|583|584` 正则交替、
+`run.js` 的 `__wantPin293`）。`reject-recovery-tables` 补 `cause-scope` 进拒收面（分词 cause/scope
+本就被规则表收在 adjust-input ⇒ 不写 OVERRIDES）。
+
+**未做（如实登记）**：① 本版仍未跑一遍全量（上一趟 4020f27 的回归在后台跑到 8349 ✓ 时仍在进行，
+与本版不同树）；② `gen-gates-doc` 待本版提交后再回填一次读数。

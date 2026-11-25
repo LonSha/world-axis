@@ -10089,6 +10089,13 @@ function runWitness(WA) {
       want('bad-view', 'R254 attire-state：crop 的视角不在六档内 ⇒ bad-view（视角裁剪不静默退化）');
       trip('bad-view', function () { return AS.crop({ who: W1, view: 'top-down' }).reason; });
 
+      // v2.584.0（引擎深度）：原因必须解释得了它改的键 —— 「坐着把衣服淋湿」这类
+      //   「有 cause 但原因说不通」的变更，此前能过（只校验 cause 存在）。
+      want('cause-scope', 'R584 attire-state：cause 的类别解释不了被改的键（姿态改整洁度）⇒ cause-scope');
+      trip('cause-scope', function () {
+        return AS.update({ who: W1, cause: '坐下', kind: 'posture', state: { cleanliness: 'rain-worn' } }).reason;
+      });
+
       // 收尾：见证留下的服装不留给后续节（本锁从不靠顺序活着）
       if (typeof AS.reset === 'function') AS.reset();
     }

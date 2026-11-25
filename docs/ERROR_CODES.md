@@ -1,15 +1,15 @@
 # WorldAxis 拒收码手册（自动生成：`node tools/gen-error-codes.js`）
 
-> 台账 version：`2.583.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
+> 台账 version：`2.584.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **1934** 个内联拒收码：见证 942 / 死表 52 / 基线 940
+共 **1935** 个内联拒收码：见证 943 / 死表 52 / 基线 940
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
 **基线**=存量未分类（新增未分类码即红灯）。
 
-## 见证（可执行）（942）
+## 见证（可执行）（943）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -214,6 +214,7 @@
 | `case-not-ruled` | engines/ruling.js | EXP-6：还没裁决就执行不了 ⇒ 如实报 case-not-ruled（处罚只能来自定罪后的裁决） |
 | `cases-full` | engines/probe.js, engines/ruling.js | probe.open：卷宗表已满 ⇒ 不静默丢弃旧案（先结案再立案）（拓展⑤） |
 | `causal-absent` | engines/story-loop.js, engines/world-lab.js | OPV28-09：结算依据对不上账 ⇒ causal-absent（不套话） |
+| `cause-scope` | engines/attire-state.js | R584 attire-state：cause 的类别解释不了被改的键（姿态改整洁度）⇒ cause-scope |
 | `chain-effects-full` | core/commit.js | U2 批次⑤：单链副作用登记数达上限（8 是常量）⇒ chain-effects-full —— 无上限的「做完没」清单就是读不完的读数 |
 | `chain-nested` | core/commit.js | U2：链嵌在链里（自己不嵌套自己）⇒ chain-nested 并报出外层那条的 opId |
 | `chains-full` | engines/rumor.js | rumor.startChain 超出 maxChains ⇒ 拒收（满员拒收不挤出，v2.96.0 X3） |

@@ -164,6 +164,31 @@
     a(mk.ok === true && mk.tier === 'C' && mk.upgradeCause === '',
       'G7 手动标记的角色不吃动态升级（材料：动态升级只对临时生成/无设定角色）');
 
+    // ═══ H 原因与改动的相称（v2.584.0 引擎深度）═══
+    //   上一版只校验「有没有 cause」，于是「坐着把衣服淋湿」也能过。H1–H5 钉的是
+    //   「原因必须解释得了它改的键」，H6/H7 钉的是「换装不等于新衣」。
+    const W8 = load('engines/attire-state.js');
+    const A8 = W8.attireState;
+    a(Object.keys(A8.CAUSE_SCOPE).length === 4, 'H1 四类原因各有一张可改键表（实 ' + Object.keys(A8.CAUSE_SCOPE).length + '）');
+    A8.establish({ who: '子', items: { main: '素衫' }, palette: { main: '白' } });
+    const h2 = A8.update({ who: '子', cause: '坐下', kind: 'posture', state: { cleanliness: 'rain-worn' } });
+    a(h2.reason === 'cause-scope' && h2.outside.join() === 'cleanliness' && h2.allowed.indexOf('hem') >= 0,
+      'H2 姿态解释不了「整洁度」的变化 ⇒ cause-scope（outside/allowed 可判定，实 '
+      + h2.reason + '/' + (h2.outside || []).join(',') + '）');
+    a(A8.update({ who: '子', cause: '淋雨', kind: 'env', state: { cleanliness: 'rain-worn' } }).ok === true,
+      'H3 同一次改动换成环境因 ⇒ 放行（判据不是「一律拒收」）');
+    a(A8.update({ who: '子', cause: '过了两日', kind: 'time', state: { cuffs: 'rolled' } }).reason === 'cause-scope',
+      'H4 时间解释不了「袖口」的变化 ⇒ cause-scope');
+    a(A8.update({ who: '子', cause: '抬手', kind: 'action', state: { cuffs: 'rolled', hem: 'swaying' } }).ok === true,
+      'H5 动作能碰袖口与衣摆 ⇒ 放行（表按物理可达性给，不是越收越窄）');
+    // 换装 ≠ 新衣：上一套已「受雨受风」，bath 换上的多半是衣橱里的旧衣 ⇒ 不得冒充新衣
+    const h6 = A8.establish({ who: '子', items: { main: '青灰比甲' }, palette: { main: '白' }, reason: 'bath', at: 99 });
+    a(h6.ok === true && A8.read('子').state.cleanliness === 'rain-worn' && h6.inherited && h6.inherited.cleanliness === 'rain-worn',
+      'H6 非 plot-gift 的换装继承上一套整洁度（不冒充新衣，继承结果可核验）');
+    const h7 = A8.establish({ who: '子', items: { main: '新赐锦袍' }, palette: { main: '白' }, reason: 'plot-gift', at: 100 });
+    a(h7.ok === true && A8.read('子').state.cleanliness === 'new' && h7.inherited === null,
+      'H7 plot-gift（剧情给了新衣）才允许整洁度回到 new');
+
     // ═══ N 反向：把实现打坏，判据必须变红 ═══
     const srcA = fs.readFileSync(path.join(ROOT, 'engines/attire-state.js'), 'utf8');
     const brokenA = srcA.replace("if (!cause) { noteFault('no-cause'); return { ok: false, reason: 'no-cause', who: who }; }", 'if (false) { }');
@@ -179,6 +204,21 @@
     An.establish({ who: '壬', items: { main: '衣' }, palette: { main: '白' } });
     a(An.update({ who: '壬', cause: '', kind: 'action', state: { cuffs: 'rolled' } }).ok === true,
       'N2 打掉「无因拒收」后，空 cause 但 kind 合法的变更真的落地（证明 B1 测的是实现，不是空气）');
+
+    const srcC = fs.readFileSync(path.join(ROOT, 'engines/attire-state.js'), 'utf8');
+    const brokenC = srcC.replace("if (outside.length) {", "if (false) {");
+    a(brokenC !== srcC, 'N5 能定位到「原因越界拒收」那句源码（否则 N6 无从验）');
+    const Wq = makeWA();
+    (function () {
+      const ctx = { window: { WorldAxis: Wq }, console: console };
+      ctx.window.window = ctx.window;
+      vm.createContext(ctx);
+      vm.runInContext(brokenC, ctx);
+    })();
+    const Aq = Wq.attireState;
+    Aq.establish({ who: '丑', items: { main: '衣' }, palette: { main: '白' } });
+    a(Aq.update({ who: '丑', cause: '坐下', kind: 'posture', state: { cleanliness: 'rain-worn' } }).ok === true,
+      'N6 打掉越界拒收后，「坐着淋湿」真的落地（证明 H2 测的是实现，不是空气）');
 
     const srcB = fs.readFileSync(path.join(ROOT, 'engines/appearance.js'), 'utf8');
     const brokenB = srcB.replace('if (!marked) { weighted = weight(tier, o.weighted); effTier = weighted.tier; }', 'weighted = weight(tier, o.weighted); effTier = weighted.tier;');

@@ -1129,6 +1129,11 @@
     //   实测 5 条无档 0）；`continuity-lock` 与 `downgrade-coverage` 词表收不住 ⇒ 见 OVERRIDES。
     'bad-cause-kind', 'bad-upgrade-cause', 'bad-view', 'continuity-lock',
     'downgrade-coverage', 'style-drift', 'unknown',
+    // ── v2.584.0（引擎深度）：`cause-scope` —— 有 cause 但原因解释不了被改的键。
+    //   它**不是** bad-cause-kind（那是不在四类白名单内），也不是 no-cause（那是压根没给）；
+    //   这一类是「原因给了、类别也合法，但这一类碰不到那个键」（姿态改整洁度）。
+    //   分词 cause/scope 正好被规则表收在 adjust-input（`scope` 在词表里）⇒ 不写 OVERRIDES。
+    'cause-scope',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。

@@ -97,6 +97,20 @@
   //   这里是这条禁令的**唯一**落点：state 只在 update 里变，update 必须有 cause。
   const CAUSE_KINDS = ['action', 'env', 'posture', 'time'];
 
+  // ── v2.584.0（引擎深度）：原因必须**解释得了**它改的那几键 ─────────────
+  //   上一版只校验「有没有 cause」，于是 `{kind:'posture', state:{cleanliness:'rain-worn'}}`
+  //   也能过 —— 而坐姿不会把衣服淋湿。材料那句「衣服不会自己变」的**反向**正是这一条：
+  //   变的原因必须解释得了这次变化，否则它跟「无因」是同一件事（只是多写了个词）。
+  //   口径按**物理可达性**逐键给（不是按美学）：动作能碰开合/袖口/衣摆/褶皱/贴合；
+  //   姿态只碰下半身与压痕；环境只碰衣摆/整洁/褶皱；时间只碰整洁与褶皱（久穿起褶、变旧）。
+  const CAUSE_SCOPE = {
+    action: ['closure', 'cuffs', 'hem', 'wrinkles', 'fit'],
+    posture: ['hem', 'wrinkles', 'fit'],
+    env: ['hem', 'cleanliness', 'wrinkles'],
+    time: ['cleanliness', 'wrinkles']
+  };
+  const CAUSE_LABELS = { action: '动作', env: '环境', posture: '姿态', time: '时间' };
+
   // ── 换装的合法理由（连续性锁）：不在这六条里的换装一律拒收 ──────────
   const CHANGE_REASONS = ['wardrobe-change', 'undress', 'bath', 'time-skip', 'plot-gift', 'weather-shift'];
   const CHANGE_REASON_LABELS = {
@@ -171,6 +185,18 @@
       noteFault(ns.bad[0].why);
       return { ok: false, reason: ns.bad[0].why, who: who, bad: ns.bad };
     }
+    // v2.584.0（引擎深度）：「换装」不等于「新衣」。
+    //   上一版换装时一律用 DEF_STATE() 兜底，于是**衣橱里的旧衣**会被登记成「整洁度:新衣」——
+    //   那是一句假话，而且模型会照着写在正文里。材料的「衣橱」概念本来就说换上的多半是旧衣；
+    //   只有 `plot-gift`（剧情给了新衣）才该是新衣。
+    //   处置：非 plot-gift 的换装**继承上一套的整洁度**（并如实回带 inherited，可被核验）。
+    const why = prev ? str(s.reason, 32) : '';
+    let inherited = null;
+    const base = DEF_STATE();
+    if (prev && why !== 'plot-gift') {
+      const prevClean = prev.state && prev.state.cleanliness;
+      if (prevClean) { base.cleanliness = prevClean; inherited = { cleanliness: prevClean }; }
+    }
     const row = {
       who: who,
       scene: str(s.scene, 40),
@@ -179,7 +205,7 @@
       material: str(s.material, 40),
       memory: str(s.memory, 60),
       outfitStyle: str(s.outfitStyle, 24),
-      state: Object.assign({}, DEF_STATE(), ns.state),
+      state: Object.assign({}, base, ns.state),
       at: Number(s.at) > 0 ? Number(s.at) : 0,
       changes: prev ? (prev.changes || 0) + 1 : 0
     };
@@ -205,7 +231,7 @@
     stat.establishes++;
     if (prev) stat.changes++;
     stat.lastReason = prev ? 'changed' : 'established';
-    return { ok: true, who: who, reused: !!prev, changes: row.changes };
+    return { ok: true, who: who, reused: !!prev, changes: row.changes, inherited: inherited };
   }
 
   /** 全新一套的默认状态：材料「穿着状态初始化」的落点（整洁=新衣，其余取中性档）。 */
@@ -238,6 +264,18 @@
     if (ns.bad.length) {
       noteFault(ns.bad[0].why);
       return { ok: false, reason: ns.bad[0].why, who: who, bad: ns.bad };
+    }
+    // v2.584.0：原因必须解释得了它改的键（见 CAUSE_SCOPE 的注释）。
+    //   放在 state 解析之后、落库之前：坏值先报坏值，值对了才谈「这个原因碰得到它吗」。
+    const allowed = CAUSE_SCOPE[kind] || [];
+    const outside = Object.keys(ns.state).filter(function (k) { return allowed.indexOf(k) < 0; });
+    if (outside.length) {
+      noteFault('cause-scope');
+      return {
+        ok: false, reason: 'cause-scope', who: who, kind: kind, kindLabel: CAUSE_LABELS[kind] || kind,
+        outside: outside, allowed: allowed.slice(),
+        why: (CAUSE_LABELS[kind] || kind) + '解释不了「' + outside.map(function (k) { return STATE_LABELS[k] || k; }).join('/') + '」的变化'
+      };
     }
     const before = clone(row.state);
     Object.assign(row.state, ns.state);
@@ -366,6 +404,8 @@
     STATE_KEYS: STATE_KEYS, STATE_LABELS: STATE_LABELS, STATE_VALUES: STATE_VALUES,
     VIEWS: VIEWS, VIEW_PARTS: VIEW_PARTS,
     CHANGE_REASONS: CHANGE_REASONS, CAUSE_KINDS: CAUSE_KINDS,
+    // v2.584.0：原因 → 它能解释的键（面板/诊断面读它；判据与数据同一份，不另写一遍）。
+    CAUSE_SCOPE: CAUSE_SCOPE, CAUSE_LABELS: CAUSE_LABELS,
     establish: establish, update: update, read: read, crop: crop, canChange: canChange,
     buildBlock: buildBlock, stateText: stateText,
     getSettings: settings, setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
