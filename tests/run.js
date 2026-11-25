@@ -22868,6 +22868,14 @@ await runScript('./org-block-quota-v2576.js');
     //   + 自证「另有 K 组未列出」+ block 五栗 + stat() 深拷；25 段 A/B/C/N。
     //   单独跑：node tests/settings-index-hit-quota-v2577.js
 await runScript('./settings-index-hit-quota-v2577.js');
+    // v2.578.0（按序截断第二十一处）：plan-audit 的安排名额与依据名额。
+    //   旧写法 items.slice(0, maxItems) 与 hitFacts.slice(0, evidenceCap)：前者按传入顺序、
+    //   后者连 at 都没带（排序退化成字典序）；两处都不说「还有几条」。
+    //   实测（/tmp/probe578.js）：八条安排念 3 条无 hidden／倒序结论变／'x' 配置整面误报 empty-input。
+    //   改法 quotaOf + pickItems(id 字典序) + pickEvidence(at 倒序) + 顶层与逐条自证 + block 五栗；
+    //   并把 landed 拒收提到截断之前（已写安排不能被名额藏掉）。23 段 A/B/C/N。
+    //   单独跑：node tests/plan-audit-quota-v2578.js
+await runScript('./plan-audit-quota-v2578.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
@@ -23396,7 +23404,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.577.0';
+  const __wantPin293 = '2.578.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

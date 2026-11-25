@@ -49,6 +49,9 @@
  *   7 **已写过的章不进本模块的输入面**：`audit` 只接受未被 `landed` 的安排；
  *      传进来的条目若自带 `landed:true` ⇒ `already-written` 拒收（不许拿它当待改项）。
  *   8 零 token 占用：本模块**没有** `buildBlock`（它不注入正文，只给面板与门禁读）。
+ *   9 复验名额只截断不参与判定：安排按 id/title 字典序取前 maxItems；每条安排的依据按
+ *     发生时间倒序取前 evidenceCap。顶层与逐条都要自证「还有几条未列」—— 否则「三条」
+ *     与「全部只有三条」在读数上同形（v2.578.0）。
  *
  * ── 与既有两个面的分工（不写清就会长出第三本账）────────────────
  *   · 与 `beat-mask`：mask 遮住**未来拍**防剧透（可见性）；本模块复验**未来拍还成不成立**
@@ -70,9 +73,40 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
-  const stat = { audits: 0, items: 0, stands: 0, needsAdjust: 0, unreadable: 0, equivs: 0, refused: 0, blocked: 0, lastReason: '', faults: {} };
+  const stat = { audits: 0, items: 0, stands: 0, needsAdjust: 0, unreadable: 0, equivs: 0, refused: 0, blocked: 0, lastReason: '', faults: {},
+    // v2.578.0：名额读数。没跑过 audit 是 null；跑过空输入/空依据则有 mode='empty'。
+    block: null };
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 120) : String(v == null ? '' : v).slice(0, max || 120); }
+  // ── v2.578.0（按序截断第二十一处）：复验安排 / 依据名额 ────────────────
+  const ITEM_QUOTA_MAX = 64;
+  const EVIDENCE_QUOTA_MAX = 12;
+  function quotaOf(cfg, key, max, fallback) {
+    const n = Math.floor(Number(cfg && cfg[key]));
+    if (!isFinite(n) || n < 1) return Math.min(max, fallback);
+    return Math.min(max, Math.max(1, n));
+  }
+  function itemOrder(a, b) {
+    const ai = String(a && a.id || ''), bi = String(b && b.id || '');
+    if (ai !== bi) return ai.localeCompare(bi);
+    return String(a && a.title || '').localeCompare(String(b && b.title || ''));
+  }
+  function pickItems(list, quota) {
+    const arr = (list || []).filter(function (x) { return !!x; }).slice().sort(itemOrder);
+    const picked = arr.slice(0, quota);
+    return { picked: picked, candidates: arr.length, hidden: Math.max(0, arr.length - picked.length) };
+  }
+  function pickEvidence(list, quota) {
+    const arr = (list || []).slice().sort(function (a, b) {
+      const at = Number(a && a.at) || 0, bt = Number(b && b.at) || 0;
+      if (at !== bt) return bt - at;
+      const af = String(a && a.from || ''), bf = String(b && b.from || '');
+      if (af !== bf) return af.localeCompare(bf);
+      return String(a && a.text || '').localeCompare(String(b && b.text || ''));
+    });
+    const picked = arr.slice(0, quota);
+    return { picked: picked, candidates: arr.length, hidden: Math.max(0, arr.length - picked.length) };
+  }
 
   /** 灾变词表（上游原话：「天降灾变 / 第三方插手 / 就在…即将…之际，突然…」一律不许）。 */
   const DISASTER_WORDS = ['突然', '忽然', '就在这时', '之际', '天降', '凭空', '不知为何', '怎料', '不料'];
@@ -134,13 +168,22 @@
   function audit(items) {
     const cfg = settings();
     if (!cfg.enabled) { noteFault('disabled'); return { ok: false, reason: 'disabled' }; }
-    const list = Array.isArray(items) ? items.slice(0, cfg.maxItems) : [];
-    if (!list.length) { noteFault('empty-input'); return { ok: false, reason: 'empty-input' }; }
-    // 边界 7：已写过的章不进输入面
-    const written = list.filter(function (it) { return it && it.landed === true; });
-    if (written.length) {
+    const itemQuota = quotaOf(cfg, 'maxItems', ITEM_QUOTA_MAX, DEF.maxItems);
+    const evidenceQuota = quotaOf(cfg, 'evidenceCap', EVIDENCE_QUOTA_MAX, DEF.evidenceCap);
+    // 先在全集上拒收 landed，再做名额截断；不能让一条已写安排藏在 quota 之后而逃过边界 7。
+    const rawList = Array.isArray(items) ? items.filter(function (x) { return !!x; }) : [];
+    const writtenAll = rawList.filter(function (it) { return it && it.landed === true; });
+    if (writtenAll.length) {
       noteFault('already-written');
-      return { ok: false, reason: 'already-written', count: written.length, detail: '已写过的不在复验面（它不再是可以改的东西）' };
+      return { ok: false, reason: 'already-written', count: writtenAll.length, detail: '已写过的不在复验面（它不再是可以改的东西）' };
+    }
+    const selected = pickItems(rawList, itemQuota);
+    const list = selected.picked;
+    if (!list.length) {
+      stat.block = { candidates: selected.candidates, picked: 0, quota: itemQuota, hidden: selected.hidden,
+        evidenceQuota: evidenceQuota, mode: 'empty' };
+      noteFault('empty-input'); return { ok: false, reason: 'empty-input', candidates: selected.candidates,
+        picked: 0, quota: itemQuota, hidden: selected.hidden };
     }
     const ev = evidence();
     const names = peopleNames();
@@ -164,15 +207,21 @@
       const keys = (title + ' ' + premise).split(/[\s，。、；：！？,.!?;:]+/).filter(function (w) { return w && w.length >= 2; });
       ev.facts.forEach(function (f) {
         for (let i = 0; i < keys.length; i++) {
-          if (f.text.indexOf(keys[i]) >= 0) { hitFacts.push({ from: f.from, key: keys[i], text: f.text }); return; }
+          // v2.578.0：依据必须**带发生时间**——早先这里只 push 了 {from,key,text}，at 被丢掉，
+          //   于是「按最近取前几条」在实现上无从成立（排序退化成字典序）。读数面丢字段，自证就不成立。
+          if (f.text.indexOf(keys[i]) >= 0) { hitFacts.push({ from: f.from, key: keys[i], text: f.text, at: f.at || 0 }); return; }
         }
       });
+      const ep = pickEvidence(hitFacts, evidenceQuota);
       const out = {
         id: clean(it.id, 40) || title,
         title: title,
         cast: cast.slice(),
         place: place,
-        evidence: hitFacts.slice(0, cfg.evidenceCap)
+        evidence: ep.picked,
+        // 逐条自证：依据名额只截断不改变 stands / needs-adjust / unreadable 判定。
+        evidenceMeta: { candidates: ep.candidates, picked: ep.picked.length, quota: evidenceQuota,
+          hidden: ep.hidden, mode: ep.hidden ? 'recent-first' : (ep.candidates ? 'all-fit' : 'empty') }
       };
       if (unknownCast.length) {
         out.state = 'needs-adjust';
@@ -195,8 +244,14 @@
     const unknown = results.filter(function (r) { return r.state === 'unreadable'; }).length;
     stat.audits++; stat.items += results.length;
     stat.stands += stands; stat.needsAdjust += adjust; stat.unreadable += unknown;
+    stat.block = { candidates: selected.candidates, picked: results.length, quota: itemQuota,
+      hidden: selected.hidden, evidenceQuota: evidenceQuota,
+      mode: selected.hidden ? 'ranked-first' : 'all-fit' };
     return {
       ok: true,
+      // 顶层自证：安排名额与依据名额都独立报读数。
+      candidates: selected.candidates, picked: results.length, quota: itemQuota, hidden: selected.hidden,
+      evidenceQuota: evidenceQuota,
       // 三态分开报（合成一个「不通过」之后用户答不出该补什么）
       total: results.length, stands: stands, needsAdjust: adjust, unreadable: unknown,
       sources: ev.sources,
@@ -273,7 +328,13 @@
     setSettings: function (patch) { return saveSettings(Object.assign(settings(), patch || {})); },
     audit: audit, equivalent: equivalent,
     evidence: evidence, diagnose: diagnose,
-    stat: function () { return Object.assign({}, stat, { faults: Object.assign({}, stat.faults) }); }
+    // v2.578.0：block/faults 都是对象，不能让面板改返回值就改掉引擎内部读数。
+    stat: function () {
+      const out = Object.assign({}, stat);
+      out.faults = Object.assign({}, stat.faults);
+      out.block = stat.block ? JSON.parse(JSON.stringify(stat.block)) : null;
+      return out;
+    }
   };
   if (typeof WA.registerModule === 'function') WA.registerModule('engines/plan-audit.js', { kind: 'engine', ver: '2.189.0' });
 })();
