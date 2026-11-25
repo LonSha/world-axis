@@ -3,13 +3,13 @@
 > 台账 version：`2.583.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **1934** 个内联拒收码：见证 933 / 死表 52 / 基线 940 / **未分类 9**
+共 **1934** 个内联拒收码：见证 942 / 死表 52 / 基线 940
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
 **基线**=存量未分类（新增未分类码即红灯）。
 
-## 见证（可执行）（933）
+## 见证（可执行）（942）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -31,6 +31,7 @@
 | `all-conflict` | engines/floor-settle.js | floorSettle.rollback：这一楼记的键全被后续楼层改过 ⇒ 无一可退，如实报 all-conflict |
 | `all-duplicates` | engines/world-bridge.js | worldBridge.importLegends：同一包再收一次 ⇒ all-duplicates（ok:true / added:0 的读数，不是坏状态） |
 | `all-steps-refused` | engines/rehearsal.js | rehearsal.preview：一步都没跑成 ⇒ 不登记预览（读的人会以为它被验证过）（B7） |
+| `allowed` | engines/attire-state.js | R254 attire-state：已建档 + 换装理由在六理由内 ⇒ allowed（前置询问与 establish 同口径） |
 | `already` | engines/coordinate.js, engines/world-blueprint.js, engines/world-seed.js | worldSeed.initConfirm：目标世界已带 meta.initFrom ⇒ 返回 already（ok:true 幂等，不是拒收）—— 确认后 _pending 已消费清空，再确认若先查 _pending 会误报 no-preview |
 | `already-adopted` | engines/stage.js | stage.adopt：已经采纳了一套玩法 ⇒ 换玩法必须显式 replace（拓展⑦） |
 | `already-answered` | engines/opportunity.js | opportunity.respond：已作废的行不得再作答（两态不可分）（B6） |
@@ -93,6 +94,7 @@
 | `bad-budget` | engines/rule-pack.js | E7：模板调用预算非法 ⇒ bad-budget（与轮次分开点名） |
 | `bad-callback` | engines/defer-token.js | deferToken：回调非函数 ⇒ bad-callback（schedule 与 serial 同判） |
 | `bad-cat` | ui/panel.js | V10 OPV10-9: ui.showCat 传入非法分类名 ⇒ bad-cat 拒收并返回 valid 列表 |
+| `bad-cause-kind` | engines/attire-state.js | R254 attire-state：update 的 cause kind 不在 action/env/posture/time 内 ⇒ bad-cause-kind |
 | `bad-chain` | core/commit.js | commit.commit / flush / retryEffects：链参数缺失或非对象 ⇒ 拒收 bad-chain（三条入口同一口径，不各自造一个码） |
 | `bad-char` | engines/kaleidoscope.js | formula 写不认识的单字符 |
 | `bad-choice` | engines/opportunity.js, engines/story-window.js | opportunity.respond：作答词必须落 take/decline/defer 之一（B6） |
@@ -175,9 +177,11 @@
 | `bad-token` | engines/session.js | session：票不对（指纹不符）⇒ 不认这张票（验票/发言/续传/卸座同一道闸）（拓展⑥） |
 | `bad-trigger` | engines/events.js | events.schedule 排期参数不成形（repeat 缺正 intervalMs / delayed 缺 at\|inMs / conditional 缺 condition） |
 | `bad-turn` | engines/body-anatomy.js | 换向理由码不在 turn 表里 ⇒ bad-turn |
+| `bad-upgrade-cause` | engines/appearance.js | R254 appearance：动态升级原因不在三因白名单内 ⇒ bad-upgrade-cause |
 | `bad-use` | engines/world.js | world.addUse：用途词必须在 USE_KINDS 里，不猜（B2） |
 | `bad-verdict` | engines/beat-report.js | A1：档位不在四值白名单 ⇒ 整次拒收并带回 allowed（不做「宽容降级」） |
 | `bad-version` | core/audit-log.js, core/rand.js, engines/org.js, engines/summarizer-adapter.js | 摘要适配：不支持的格式版本拒收 |
+| `bad-view` | engines/attire-state.js | R254 attire-state：crop 的视角不在六档内 ⇒ bad-view（视角裁剪不静默退化） |
 | `bad-weight` | engines/rivalry.js | rivalry.declare 传非数 / 非有限 weight（本版从静默降级改为如实拒收） |
 | `bad-word` | engines/kaleidoscope.js | formula 写裸单词 |
 | `beat-ledger-absent` | engines/world-lab.js | Y9：拍账（beatLedger.view）缺席 ⇒ 拍引擎联动拒收，不自造一份拍序 |
@@ -234,6 +238,7 @@
 | `consumer-missing` | engines/story-loop.js | N9:trace 的第三段(上游记忆账本)消费方缺席 ⇒ consumer-missing,不把两段说成三段齐 |
 | `continuation-seed-mismatch` | engines/player-archive.js | V9 real owner rejection: continuation-seed-mismatch |
 | `continuation-tail-required` | engines/world-seed.js | V9 real owner rejection: continuation-tail-required |
+| `continuity-lock` | engines/attire-state.js | R254 attire-state：已有一套时换装不带六理由之一 ⇒ continuity-lock（连续性锁，不自动顶掉） |
 | `contract-cancelled` | engines/act.js | act.advance：挂钩的委托已取消 ⇒ 如实记成失败并给出 contract-cancelled |
 | `contrast-failed` | render/inject.js | render.themeContrast：对照返回空 ⇒ 如实归因 contrast-failed（不把它读成「一致」）（X7） |
 | `contrast-thrown` | render/inject.js | render.themeContrast：模块级对照抛错 ⇒ 不吞掉，如实记为 contrast-thrown（X7） |
@@ -253,6 +258,7 @@
 | `distorted` | engines/noesis.js | noesis.fidelity：此人接到的是**被改写过的版本** ⇒ 答 faithful:false + distorted 并带出 drift（「他记岔了」与「他不该知道」是两回事：一个更正记录，一个拦住发言） |
 | `div-zero` | engines/kaleidoscope.js | formula 除以 0 |
 | `dnd` | engines/followup-gate.js | followupGate：全局免打扰开着时 due 一律 dnd（时段与已提醒都不再判） |
+| `downgrade-coverage` | engines/appearance.js | R254 appearance：升级那次把已登记的层覆盖数改小 ⇒ downgrade-coverage（不得推翻已有描写） |
 | `dream-unavailable` | engines/action-desk-routes.js | action-desk 路由「dream.weave」在 owner dream 缺席时如实归因 dream-unavailable |
 | `dropped` | engines/thread-sprout.js | V28 EXV28-12：放着不跟的线降成噪点，但留一条「你当时没去」的痕 ⇒ dropped |
 | `duplicate` | engines/collab.js, engines/events.js | events.schedule 同 id 且仍在活动态（不静默覆盖既有排期） |
@@ -307,6 +313,7 @@
 | `finished` | engines/campaign.js | campaign.advance：这一局已结束（要重开请点清进度） |
 | `first` | engines/offline-return.js | offlineReturn.recover：offlineTick 侧也没有结算点 ⇒ 只落基准（first）—— 「不知道你走了多久」≠「你走了零秒」 |
 | `first-baseline` | engines/offline-return.js | offlineReturn.recover：没有活动基准 ⇒ 只落两本账的起点、不结算（first-baseline） |
+| `first-establish` | engines/attire-state.js | R254 attire-state：canChange 时该角色还没有服装 ⇒ first-establish（首次建立本就不需换装理由） |
 | `first-tick` | engines/metabolism-clock.js | metabolismClock.worldTick：换存档 / 手动对钟后 rebaseline ⇒ 只重设基准、不补算未知时长 |
 | `flat-rounds` | engines/storage-forecast.js | storageForecast.forecast：样本够但最小二乘分母为零（数值退化，解不出斜率）⇒ 拒收（RP5） |
 | `flush-failed` | core/audit-log.js | auditLog.flush：setItem 抛错 ⇒ 吞成 flush-failed（落盘失败不许把调用方搞挂，与 record() 的「从不抛」同一条纪律，v2.112.0） |
@@ -813,6 +820,7 @@
 | `store-unreadable` | engines/fact-continuity.js | 事实诊断：存档不可读不冒充空世界 |
 | `storyclock-disabled` | engines/time-ledger.js | timeLedger.read：storyclock 总开关关 ⇒ storyclock-disabled（注桩没开，回读也不算） |
 | `strayed` | engines/stall.js | stall：摊在人已不在的地方 ⇒ strayed 并就地收摊（回来的人不能对着空气改摊） |
+| `style-drift` | engines/attire-state.js | R254 attire-state：换装时主色与版型双双不继承 ⇒ style-drift（风格防漂移） |
 | `suppressed-full` | engines/rumor.js | rumor.conceal 超出 maxSuppressed ⇒ 拒收（隐瞒与跳分列计数，v2.96.0 X3） |
 | `survival-unavailable` | engines/action-desk-routes.js | action-desk 路由「survival.set」在 owner survival 缺席时如实归因 survival-unavailable |
 | `sweep-throw` | ui/panel.js | panel：机会扫描抛错 ⇒ 回执如实报 sweep-throw（B6） |
@@ -864,6 +872,7 @@
 | `unexplained` | engines/intel.js | explain 后果存在但无可用原因 |
 | `unheard` | engines/hearsay-ledger.js | V28 EXV28-09：问一个没听过这件事的人 ⇒ unheard（不拿别人的版本顶替） |
 | `unjustified-flattery-blocked` | engines/persona-anchor.js | PA：无深羁绁下的突变式讨好 ⇒ unjustified-flattery-blocked（反 OOC 谄媚） |
+| `unknown` | engines/attire-state.js | R254 attire-state：对未建档的角色 read/update/crop ⇒ unknown（不凭空造一份衣服） |
 | `unknown-action` | engines/action-desk.js, engines/branch-continuity.js, engines/causal.js, engines/rule-pack.js | 分支证据：不认识的操作拒收 |
 | `unknown-actor` | engines/coop.js | coop.propose：提议涉及的角色世界不认得 ⇒ 不凭空建人（拓展⑨） |
 | `unknown-anchor` | engines/coordinate.js, engines/offline-tick.js | offlineTick.release：释放不存在的记忆锚明确拒收（v2.151.0 RX2） |
@@ -1948,18 +1957,4 @@
 | `write-fail` | engines/choice-board.js, actors/registry.js, render/theater.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `writeDesk-unavailable` | engines/action-desk-routes.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
 | `zone-unsolved` | engines/local-grid.js, engines/spatial-bridge.js | 存量未分类（v2.97.0 基线）；接上见证或列入死表即回收到前两档 |
-
-## 未分类（门禁红灯）（9）
-
-| 码 | 出现之处 | 说明 |
-| --- | --- | --- |
-| `allowed` | engines/attire-state.js | 未分类 —— 门禁红灯 |
-| `bad-cause-kind` | engines/attire-state.js | 未分类 —— 门禁红灯 |
-| `bad-upgrade-cause` | engines/appearance.js | 未分类 —— 门禁红灯 |
-| `bad-view` | engines/attire-state.js | 未分类 —— 门禁红灯 |
-| `continuity-lock` | engines/attire-state.js | 未分类 —— 门禁红灯 |
-| `downgrade-coverage` | engines/appearance.js | 未分类 —— 门禁红灯 |
-| `first-establish` | engines/attire-state.js | 未分类 —— 门禁红灯 |
-| `style-drift` | engines/attire-state.js | 未分类 —— 门禁红灯 |
-| `unknown` | engines/attire-state.js | 未分类 —— 门禁红灯 |
 

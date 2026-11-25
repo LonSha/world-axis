@@ -263,6 +263,16 @@ const EXEMPT = {
   //       其余三项毫无交集 —— **不许互相校验**。
   CATS: '同名不同义的「分类表」：eco-audit=世界一致性审计四类（timeline/space/cognition/causal，字符串数组，判据是这条指控属时间线/地点/越知/因果哪一类）、ui/panel=设置页分类页签（core/world/workshop/meta/all，每项 {id,icon,label} 对象，判据是这一页按哪个页签图标出）',
   CLS: '同名不同义的「分类表」：l3-registry=引擎入口调用分类（zero-arg/needs-input/decision/dead，判据是能否零参直调/需喂输入/需先决策/无人调用）、push-api-registry=推送 API 分类（drive/entry/ui/dead，判据是驱动轮转/仅入口/仅界面/无人使用）；两者共享的 dead 分母不同（引擎无调者 vs API 无用户），其余三项无交集',
+  // v2.583.0（R254）：本版新引擎 engines/attire-state.js 带一张 VIEWS 常量，与 v2.1xx 的
+  //   engines/perspective-lock.js 同名 —— **合法地**指向不同值域，逐条说清：
+  //     · attire-state 的 VIEWS 是**「这一身此刻从哪个角度看」的观察视角六档**
+  //       （front/back/side/close/moving/seated），判据是 crop() 该交出哪些部件、
+  //       哪些细节在「背面/侧面/近景/动态/坐姿」下看不见 —— 是**几何与遮挡**问题；
+  //     · perspective-lock 的 VIEWS 是**「谁在叙述」的叙事视角二档**
+  //       （omniscient/player），判据是叙述者有没有越过角色认知 —— 是**认知面**问题。
+  //   一个是「看的角度」，一个是「谁在看」—— 值域数量、语义、判据全不同，**不许互相校验**：
+  //   若强行统一，就会出现「衣服的观察角度必须等于叙事视角」这种语义错配。
+  VIEWS: '同名不同义的「视角表」：attire-state=穿着观察视角六档（front/back/side/close/moving/seated，判据是 crop() 该交哪些部件、哪些细节被遮挡）、perspective-lock=叙事视角二档（omniscient/player，判据是叙述者有没有越过角色认知）',
 
 };
 

@@ -7334,3 +7334,74 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - **未做（如实登记）**：① 全套回归 `node tests/run.js` 尚未跑（本轮改树量大，须在提交后统一跑）；
   ② `BUILD_ID` 待提交后按惯例二次提交指向交付提交；③ 材料一 Layer2 与要素库含大量露骨身体/私处词汇，
   **本轮刻意未纳入**（只缝三条可判定规则），纳入到什么抽象层级仍是产品决策，不由实现方单方面决定。
+
+## R255（v2.583.0 · 全量回归中断后的 70 红逐簇清偿：七根因全收口 + 一条读数撒谎的缺陷）
+
+**起点**：第六趟全量 `/tmp/worldaxis-regression-1ZNrcK` 跑到 89.3 分钟时 **worker 9148 被 OOM 杀掉**
+（`free -m` 现场：Mem 11354 / free 373，Swap 12287 / 已用 8099）。`childAlive no`、`run.log` 停在 17:23、
+`result.json` 永久 `running`。日志 451164 行 / 22692 ✓ / **70 ✗**。本轮不追「为什么这台机器内存不够」，
+只把 70 条红逐簇清偿。
+
+**七根因与处置（逐簇，每条都复验过）**
+1. **挂载方式**：`attire-state-v2583.js` 是自带 assert + `process.exitCode` 的纯脚本体，未导出 `runAll`，
+   却被 `runLock` 挂载 ⇒ `require(...)[m] is not a function`。改走 `runScript`（`run.js:400` 的既有档位：
+   子进程 rc 即结论，与 `tools/smoke.js` 同规）。复验 51/51。
+2. **LOAD 面漏装**（本轮最关键）：`engines/attire-state.js` 只进了 `index.js` 的 `LOAD_ORDER`，
+   漏了 `tests/run.js` 的 `LOAD` 面 —— 而 `reject-code-gate` 是用 `runSrc.match(/const LOAD = [\s\S]*?\];/)`
+   从 **tests/run.js** 提清单的。补齐后 reject-code-gate 由「未分类 9 个」变为「每个码都有归属」，
+   九条新见证（7 attire-state + 2 appearance）全部命中，见证 942 / 死表 52 / 基线 940 = 1934 平。
+3. **源面登记**：`engines/inject-budget-tables.js` 的 `PRIORITY` 与 `ACCOUNTS_ROWS` 补「穿着状态」
+   （rank 8、与「外貌契约」同档同层：一个答长相该多细，一个答这身衣服此刻怎样）；`ui/panel.js` 显示名
+   表补 `attireState`。⇒ `settle-v2850` **60/60**、`cost-v2880` rc=0、`inject-sources-v2560` **20/20**。
+4. **契约面**：`VIEWS` 是**真·同名不同义**（attire-state = 穿着观察视角六档 front/back/side/close/moving/seated，
+   判据是 crop() 交哪些部件；perspective-lock = 叙事视角二档 omniscient/player，判据是叙述者有没有越知），
+   按本仓既定处置进 `tools/contract-scan.js` 的 EXEMPT 并逐条给理由 ⇒ 豁免 38 / 分歧 38 / 过期 0 / 缺理由 0，
+   `contract-scan-v2150` **pass(55)**。
+5. **恢复档**：`engines/reject-recovery-tables.js` 补拒收面 7 条（bad-cause-kind / bad-upgrade-cause /
+   bad-view / continuity-lock / downgrade-coverage / style-drift / unknown）+ 成功面 2 条（allowed /
+   first-establish）；其中两条词表收不住（`lock` / `coverage` 不在六档词表，`locked`/`uncovered` 在）
+   ⇒ OVERRIDES 逐条补档并写明「同输入重试永远是它，该改的是输入」。⇒ `tools/reject-recovery.js`
+   「承诺与现场逐条一致」、`reject-recovery-lock-v2192` **pass(218)**。
+6. **模块面**：attire-state 入序后四处读数跟位 —— B1 604/604/601 → **605/605/602**、
+   B2 4051/4527 → **476 + 4054 = 4530**、B3 LOAD_ORDER 585 → **586**、B5 647/590/597 → **648/591/598**。
+   三条新调用期边**逐条核**（用 `tests/module-cycle-gate.js` 的 `scan()` 在 4ebf0e7 与工作区各扫一遍、
+   集合 diff、**零条消失**）：`(attire-state, settingsBus)` / `(attire-state, __settingsRegs)` /
+   `(render/inject.js, attireState)`。⇒ `module-cycle-gate-v2107` **65/65**。
+7. **硬读数与台账**：`sync-hardcoded --write`（namespaces 578→579、members 6082→6101、dead 1991→2002、
+   dataOnly 785→792，**写后校验通过**）；两本带 `_note` 的台账末词停在 v2.582.0 ⇒ 接上 v2.583.0；
+   `dead-export-gate --update`（dead 1991 → 2002，11 条 attireState 导出按 `self-only`/`unwired` 登记，
+   不是「补了引用」而是如实记账）；`s3-tx2-v2166` 白名单补 `2.583.0`。
+
+**两处判据跟位（不是放宽，注释里都写了理由）**：`module-cycle-gate-v2107` 的四处读数（一个新文件 + 三条新边，
+逐条可核）；`segment-extract-v2400` 的 A11 硬线 2375 → 2360（run.js 23635 行，本轮 +2 行真修复），
+A6b 仍守窄区间（调用点 2449 < 2450，没有再向下压）。
+
+**本轮抓到并修掉的新缺陷（读数撒谎的那一类）**：v2.582.0 的「节边界同步孤儿探测」只 `process.exit(75)`，
+**不写 result.json** ⇒ 父死之后读数永久停在 `running`，轮询方永远等下去 —— 这正是 R253 修定时器路径时
+漏掉的同型缺口（定时器在同步节面里一次都轮不到，所以同步探测这条路径必须自己写终态）。
+本轮两次实证：`1ZNrcK`（worker 被 OOM 杀）与 `dg1gtW`（外壳被沙箱杀，日志末行已打印「外壳已消失」
+而 `result.json` 仍是 `running`）。
+修法：`tests/isolated-runner.js` 新增 `markOrphaned(task, where)`，与 `watchParent` 的**定时器收尾段共用同一段口径**
+（不写第二份 —— 本仓点名过「同一件事两个真源」），`run.js` 的 `__orphanCheck` 先落终态再 `exit(75)`。
+
+**本轮复验清单（都是真跑的）**：`module-cycle-gate-v2107` 65/65 · `contract-scan-v2150` pass(55) ·
+`reject-recovery-lock-v2192` pass(218) · `settle-v2850` 60/60 · `inject-sources-v2560` 20/20 · `cost-v2880` rc=0 ·
+`switch-matrix-v2910` 73 · `readings-v2106`（stale 0 / ledger 0 / backfill plan 0）· `s3-tx2-v2166` rc=0 ·
+`backstage-stale-v2131` 23 · `ui-gate-sync.checkSrcMaps` 22/22 组 · `dead-export-gate` rc=0 ·
+`module-registry-gate` pass（文件 580 / ns 591 / 装载期边 476）· `test-surface-gate` rc=0 ·
+`ns-consumer-ledger` 72 · `u3-loose-readings` 35 · `q9-evidence-ledger` 67/0 · `settle-v2820` 160 ·
+`coord-v2970` 41 · `isolated-runner-lock` PASS×4 · `segment-extract-v2400` 128 · `u4-export-lifecycle` 41 ·
+`version-surface-gate` 14 · `story-export-wire` 30 · `version-consistency` 22/22 · `fact-report` rc=0 ·
+`loose-readings` rc=0 · `ledger-audit` / `release-manifest` / `plan-ledger` / `gen-plan-status` rc=0 ·
+`gen-gates-doc --write` 回填 8 道门禁读数。
+
+**未做（如实登记，不粉饰）**：
+① **全套回归仍未取得零失败凭据**。本轮所有红都是「单跑该门禁」收口的（判据一致，但不是一次完整跑）；
+   机器上另有 16 个 `lmp-fresh` 仓的 node 进程常年占内存（约 715MB），重跑随时可能再被 OOM 打断。
+② `gen-gates-doc` 只跑完 8/9 道：`readings-v2106` 属 slow 档（117s），按既有口径跳过。
+③ `BUILD_ID` 仍待提交后二次指向交付提交。
+
+**环境事实（写下来免得下一轮误读）**：本会话的 `code_runner` 调用在跑重活（整仓装载类）时会被沙箱连带杀掉，
+表现是 python 侧 `UnicodeDecodeError`（日志里有非法 UTF-8 字节）/ `OSError Errno 38` / 空错误消息。
+已改用两条口径绕过：**输出落文件 + 事后读文件**、**`setsid` 分离 + 轮询**。凡是看到「日志不增长」的现场，
+先分「进程死了」与「我的外壳被杀了」两件事，不要直接读成「那一节卡死」。

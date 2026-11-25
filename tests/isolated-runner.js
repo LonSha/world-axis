@@ -552,5 +552,40 @@ function workerGuard(root) {
   const work = fs.realpathSync(root || path.join(__dirname, '..'));
   return watchParent(path.dirname(work));
 }
-module.exports = { launch, isWorker, workerGuard, watchParent, probeOrphan, prepare, snapshot, identity,
+/**
+ * v2.583.0（R254 收尾）：**同步**把「父已消失」落成终态 —— 与 watchParent 里那段逐字同一份口径。
+ *
+ * 为什么需要第二个入口：watchParent 走 `setInterval`，而 run.js 的节面是**同步**的，
+ *   定时器在整个窗口里一次都轮不到（run.js:265 已记档）。v2.582.0 因此在 `section()`
+ *   入口加了同步探测 `__orphanCheck`，但那条路径当时只 `process.exit(75)` ——
+ *   **没写 result.json**，于是父死之后读数永久停在 `running`，轮询方永远等下去。
+ *   现场实证两次：`/tmp/worldaxis-regression-1ZNrcK`（worker 被 OOM 杀）与
+ *   `/tmp/worldaxis-regression-dg1gtW`（外壳被沙箱杀，日志末行已打印「外壳已消失」，result.json 仍是 running）。
+ *
+ * 只写 worker 自己知道的部分（谁杀的、什么时候、父是谁、停在哪一节），不猜测试结论；
+ * 已写终态则不覆盖（与定时器那条同规）。**不杀自己** —— 调用方紧接着退出。
+ * 不新增第二套口径：这里与 watchParent 的收尾段必须同步改。
+ */
+function markOrphaned(task, where) {
+  const out = { orphan: false, terminal: false };
+  try {
+    writeJson(path.join(task, 'orphan.json'),
+      { reason: 'parent-gone', where: where || null, at: Date.now(), pid: process.pid });
+    out.orphan = true;
+  } catch (e) { /* 收尾不许影响自杀路径 */ }
+  try {
+    const rf = path.join(task, 'result.json');
+    const r0 = json(rf);
+    if (r0 && !r0.finishedAt) {
+      r0.status = 'runner-failed';
+      r0.stopping = 'detached';
+      r0.finishedAt = Date.now();
+      r0.detached = { why: 'parent-gone', where: where || null, at: Date.now(), pid: process.pid };
+      writeJson(rf, r0);
+      out.terminal = true;
+    }
+  } catch (e) { /* 同上 */ }
+  return out;
+}
+module.exports = { launch, isWorker, workerGuard, watchParent, probeOrphan, markOrphaned, prepare, snapshot, identity,
   acquireLock, inspectLock, recoverLock, liveChild, cleanEnv, lockDirFor };

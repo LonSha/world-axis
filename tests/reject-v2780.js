@@ -10049,6 +10049,67 @@ function runWitness(WA) {
     const r = R({ unresolvedRounds: 0 });
     return r && r.reason;
   });
+  // ── v2.583.0（R254）：服装穿着状态机 + 外貌标记/动态升级的九个新码 ──
+  //   口径同 U2：新增的公开失败归因**必须带可执行见证**，不许靠基线养着。
+  //   两个 `ok:true` 的码（first-establish / allowed）也登记：`canChange` 是前置询问口，
+  //   「首次建立」与「准了」是它唯一能给出的两个放行理由，读不到就分不出「准了」与「没问」。
+  {
+    const AS = WA.attireState;
+    if (AS && typeof AS.establish === 'function') {
+      // 前序见证可能把开关关过；on 才有后面的路径（DEF.enabled 本就是 true）
+      if (typeof AS.setSettings === 'function') AS.setSettings({ enabled: true });
+      if (typeof AS.reset === 'function') AS.reset();
+      const W1 = '__witness_attire_R254';
+      want('unknown', 'R254 attire-state：对未建档的角色 read/update/crop ⇒ unknown（不凭空造一份衣服）');
+      trip('unknown', function () { return AS.read(W1).reason; });
+
+      want('first-establish', 'R254 attire-state：canChange 时该角色还没有服装 ⇒ first-establish（首次建立本就不需换装理由）');
+      trip('first-establish', function () { return AS.canChange({ who: W1 }).reason; });
+
+      want('continuity-lock', 'R254 attire-state：已有一套时换装不带六理由之一 ⇒ continuity-lock（连续性锁，不自动顶掉）');
+      trip('continuity-lock', function () {
+        AS.establish({ who: W1, items: { top: '交领衫' }, palette: { main: '靛' }, outfitStyle: '士人' });
+        return AS.establish({ who: W1, items: { top: '短打' }, palette: { main: '靛' }, outfitStyle: '士人' }).reason;
+      });
+
+      want('allowed', 'R254 attire-state：已建档 + 换装理由在六理由内 ⇒ allowed（前置询问与 establish 同口径）');
+      trip('allowed', function () { return AS.canChange({ who: W1, reason: 'wardrobe-change' }).reason; });
+
+      want('style-drift', 'R254 attire-state：换装时主色与版型双双不继承 ⇒ style-drift（风格防漂移）');
+      trip('style-drift', function () {
+        return AS.establish({ who: W1, reason: 'wardrobe-change', items: { top: '劲装' },
+          palette: { main: '朱' }, outfitStyle: '武人' }).reason;
+      });
+
+      want('bad-cause-kind', 'R254 attire-state：update 的 cause kind 不在 action/env/posture/time 内 ⇒ bad-cause-kind');
+      trip('bad-cause-kind', function () {
+        return AS.update({ who: W1, cause: '风起', kind: 'magic', state: { hem: 'swaying' } }).reason;
+      });
+
+      want('bad-view', 'R254 attire-state：crop 的视角不在六档内 ⇒ bad-view（视角裁剪不静默退化）');
+      trip('bad-view', function () { return AS.crop({ who: W1, view: 'top-down' }).reason; });
+
+      // 收尾：见证留下的服装不留给后续节（本锁从不靠顺序活着）
+      if (typeof AS.reset === 'function') AS.reset();
+    }
+    const AP = WA.appearance;
+    if (AP && typeof AP.register === 'function') {
+      if (typeof AP.setSettings === 'function') AP.setSettings({ enabled: true });
+      const A1 = '__witness_appearance_R254';
+      want('bad-upgrade-cause', 'R254 appearance：动态升级原因不在三因白名单内 ⇒ bad-upgrade-cause');
+      trip('bad-upgrade-cause', function () {
+        return AP.register(A1, 'B', { cover: { L1: 4, L2: 3, L3: 3, L4: 2 }, upgrade: 'because-i-say-so' }).reason;
+      });
+
+      want('downgrade-coverage', 'R254 appearance：升级那次把已登记的层覆盖数改小 ⇒ downgrade-coverage（不得推翻已有描写）');
+      trip('downgrade-coverage', function () {
+        AP.register(A1, 'B', { cover: { L1: 4, L2: 3, L3: 3, L4: 2 } });
+        // 同一人走 rescan + 升级原因，但 L2 从 3 掉到 1 ⇒ 必须在缩水处拒收
+        return AP.register(A1, 'B', { mode: 'rescan', upgrade: 'substantive-interaction',
+          cover: { L1: 4, L2: 1, L3: 3, L4: 2 } }).reason;
+      });
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

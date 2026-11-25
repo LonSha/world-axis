@@ -312,7 +312,9 @@ function runAll(A) {
   // v2.542.4（叙事脎柱 L3）：新增 engines/arc-phase.js ⇒ 文件面 / 别名面 +1、有引用 +1
   //   （它读 plotGauge / chapters / evolution / store 四个既有 ns；另外 L1 读它）。602/602/599 → 603/603/600，实测回填。
   // v2.542.5（L4）：engines/character-drive.js 进文件面 ⇒ 603/603/600 → 604/604/601（三数同步 +1，实测回填）。
-  A(a.files === 604 && a.aliasFiles === 604 && a.refFiles === 601,
+  // v2.583.0（R254）：新增 engines/attire-state.js 一文件 ⇒ 文件面 / 别名面 / 有引用三数同步 +1。
+  //   605/605/602 是实测回填（覆盖率口径「有人引用即算」零变化：它被 render/inject.js 的注入分支真读）。
+  A(a.files === 605 && a.aliasFiles === 605 && a.refFiles === 602,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -560,7 +562,15 @@ function runAll(A) {
 //   置信方式：`git worktree` 取 cdb0f32（常量最后一次写入）与 HEAD 各扫一遍，逐条 diff 得**恰好
 //   一条新增、零条消失**：`engines/weather.js -> sceneSlice [call]`；order-violation 仍 0、unprovided 仍 0。
 //   恒等式 476 + 4051 = 4527。供者 core/scene-slice.js 不在此边的装载期面上（weather 尾部才读）。
-A(a.edgesLoad === 476 && a.edgesCall === 4051 && a.edgesAll === 4527 && a.identityOk,
+// v2.583.0（R254）跟位：调用期 4051 → 4054（+3 对新的 (file, ns) 边，逐条可核，用
+//   `tests/module-cycle-gate.js` 的 scan() 在 4ebf0e7 与当前工作区各扫一遍、集合 diff 得到，
+//   零条消失）：
+//   · (engines/attire-state.js, settingsBus)    —— stateText/read 走 settingsBus.read
+//   · (engines/attire-state.js, __settingsRegs) —— 设置面登记（与其余引擎同一形态）
+//   · (render/inject.js,        attireState)     —— 注入分支 `if (vis.attireState && WA.attireState)`
+//   装载期仍 476（该文件不在装载期读 WA：它不碰 store、不调 registerModule）。
+//   恒等式 476 + 4054 = 4530。
+A(a.edgesLoad === 476 && a.edgesCall === 4054 && a.edgesAll === 4530 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -658,7 +668,9 @@ A(a.edgesLoad === 476 && a.edgesCall === 4051 && a.edgesAll === 4527 && a.identi
   // v2.542.23：LOAD_ORDER 582 -> 583（story-export 从惰性档回首帧：工具页两个按钮真调它）。
   // v2.542.24：LOAD_ORDER 583 -> 584（api-vault 从惰性档回首帧：api-router 首帧就调它）。
   // v2.545.0 跟位：584 -> 585（HEAD 65713bc 实测已 585，存量 +1 未跟位；本版按实测补账）
-  A(a.edgesLoad >= 20 && a.orderLen === 585,
+  // v2.583.0（R254）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1（attire-state 紧跟
+  //   appearance、早于 render/inject.js）⇒ 585 → 586。order-violation 仍 0（它读的 settingsBus 在前）。
+  A(a.edgesLoad >= 20 && a.orderLen === 586,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -755,7 +767,9 @@ A(a.edgesLoad === 476 && a.edgesCall === 4051 && a.edgesAll === 4527 && a.identi
 //   1998 行 `if (vis.mixedIndex && WA.mixedIndex)`），另 +1 来自 v2.568.0 的
 //   core/interceptor.js 调 metabolismClock.worldTick（`WA.metabolismClock.worldTick()`）。
 //   两者都是真读点，非噪声，故一并入账：596 → 597。
-A(a.nsProvided === 647 && a.nsLedger === 590 && a.nsRead === 597,
+// v2.583.0（R254）：三面各 +1 —— 静态提供方 648（attireState 命名空间）、账本 591
+//   （module-registry-gate --update 落定）、读面 598（render/inject.js 的注入分支真读它）。
+A(a.nsProvided === 648 && a.nsLedger === 591 && a.nsRead === 598,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽

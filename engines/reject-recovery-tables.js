@@ -99,6 +99,17 @@
     //   档位选 request-setup：这不是输入错，也不是重试能好，是**运行环境不满足前提**。
     'not-secure-context': { kind: 'request-setup', why: '非安全上下文（页面不是 https / localhost）下浏览器禁用该能力：把 SillyTavern 用 https 或本地回环地址打开再试' },
     'store-unreadable': { kind: 'manual-review', why: '存档读不到（不冒充空世界）：机器无从判断内容是否可用，需人先修存档再重跑诊断' },
+    // ── v2.583.0（R254）：attire-state 里**规则表收不住档**的两条（逐条读源码定因，不按词根猜）──
+    //     · continuity-lock —— 分词 continuity/lock，`locked` 在 rollback 词表里但 `lock` 不在，
+    //       `continuity` 更是没有 ⇒ 判不出。它不是「状态落不了」，而是**改输入**：
+    //       已有服装的人要换装，必须给六个理由之一（换装/卸下/沐浴/跳时/剧情赠予/天气骤变）。
+    //       补齐理由再提交即通过 —— 同输入重试永远还是它。
+    //     · downgrade-coverage —— 分词 downgrade/coverage，两个都不在六档词表里。
+    //       病因是「动态升级会推翻已有描写」（材料原文『升级后补写缺失层且不得推翻已有描写』）：
+    //       该改的仍是输入（换一条不缩覆盖的升级依据，或先补齐缺失层），不是重试。
+    //       ⚠ 两条都已在 REJECT_FACE 快照里（A8 要求），故此处只是补档、不改面。
+    'continuity-lock': { kind: 'adjust-input', why: '已有服装的人要换装却没给六个理由之一（换装/卸下/沐浴/跳时/剧情赠予/天气骤变）：补齐理由再提交，同输入重试永远是它' },
+    'downgrade-coverage': { kind: 'adjust-input', why: '这条动态升级会推翻已有描写（已登记覆盖子项变少）：换一条不缩覆盖的升级依据、或先补齐缺失层再升' },
     // ── v2.192.0 首轮分面后补登的 33 条（拒收面规则表判不了，逐条显式登记）──
     'aftermath-wait': { kind: 'retry-same-input', why: '章间冷却期未过：等窗口过去同输入再来' },
     'ahead-of-head': { kind: 'rollback', why: '客户端序号超过服务端头，说明这份状态不该落' },
@@ -1109,6 +1120,15 @@
     // v2.566.0：`settle-` 是 ARTIFACTS 登记的词法碎片（dream.js 拼接前缀），
     //   而 A8 要求 ARTIFACTS 的键必须在拒收面快照里（它确实出现在 ok:false 对象里）。
     'settle-',
+    // ── v2.583.0（R254）：新引擎 engines/attire-state.js 的七条**拒收面**码 ──
+    //   它们都是 `ok:false` 的真拒收（衣服不会自己变 / 已有服装者换装缺理由 /
+    //   主色与版型双双不继承 / 枚举越界 / 无档升级），此前只进了码面口径、没进本快照，
+    //   于是 reject-recovery 专锁的 B3（三面快照）/B4（problems 面）/C4（审计问题面）
+    //   三条齐红 —— 同一形态本仓已栽过八次（tools/smoke.js:82 那行注就是为此设的）。
+    //   恢复档：`unknown` / `bad-*` 四条与 `style-drift` 都被规则表收住（via:'rule'，
+    //   实测 5 条无档 0）；`continuity-lock` 与 `downgrade-coverage` 词表收不住 ⇒ 见 OVERRIDES。
+    'bad-cause-kind', 'bad-upgrade-cause', 'bad-view', 'continuity-lock',
+    'downgrade-coverage', 'style-drift', 'unknown',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。
@@ -1190,6 +1210,14 @@
     // v2.566.0：engines/spotlight.js:209 的 `followup-hold`（轻提静默闸：本轮先按住、
     //   等下一轮再说）—— 它是 ok:true 的**成功回执**，不是被拒，故归成功面、不配恢复档。
     'followup-hold',
+    // ── v2.583.0（R254）：attire-state 的两条**成功面**回执 ──
+    //   判据同本表：两条只出现在 `ok:true` 对象里（缺快照 ⇒ explain() 只能答 unknown，
+    //   面板会给「做成了」配一个恢复动作 —— 正是本面存在要挡住的那类假动作）。
+    //     · allowed：换装**获准**（`{ok:true, allowed:true}`）。它容易被当成「拒收被撤销」，
+    //       其实是查询结论 —— 与 v2.380.0 的 good-standing 同一条边界（ok:true, allowed:false
+    //       在那边是成功面，这边 allowed:true 更是）。
+    //     · first-establish：首次建档落账（这套衣着第一次被登记）。
+    'allowed', 'first-establish',
   ];
   /** 判不出面冻结快照（v2.192.0 现场实测 53 条），与 NEUTRAL_REVIEW 的键集**必须逐字相同**。 */
   const NEUTRAL_FACE = ['after-reply', 'already-done', 'already-json', 'already-running',
