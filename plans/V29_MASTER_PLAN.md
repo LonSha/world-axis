@@ -117,7 +117,7 @@
 
 ### Z1 跑得动（6 项）· 命题：**回归不该吃掉半小时**
 
-> **组读数**：`tests/*.js` **663** 个；`engines/*.js` **543**；全量回归实测 **≈29 分钟**（隔离器整仓复制 **85M** → 现 **35.5M→32.0M**，见 OPV29-03；`/tmp/worldaxis-regression-*`）；增量回归（OPV29-02）现场：当前与 `origin/master` 的全部差异 ⇒ **111 把锁**，建索引 **1.7s**；装载期边 **476**；八道契约门禁实测（OPV29-06）：七道快门禁合计 **19.5s**（最慢 reject-code-gate 7.5s），慢门禁 `readings-v2106` 单独 **86.0s** ⇒ 八道合计下界 **105.5s**；锁级分片（OPV29-01）：按节分片可并行面仅 **4.1%**（17 节 / 73.9s，N=4 ⇒ **1.03×**）而单节 `v2.82.0` 占 **792.2s = 44.5%**，其 38 把锁中 **34 把可并行**、4 把必须串行 ⇒ 并行段墙钟 **263.6s**，整节 ⏱ **792.2s → 344.6s**（省 **56.5%**；判据 **2853 ≥ 2843** 不缩水、该节 0 红；日志 `/tmp/worldaxis-regression-rbXajt/run.log`）。
+> **组读数**：`tests/*.js` **677** 个；`engines/*.js` **543**；全量回归实测 **≈29 分钟**（隔离器整仓复制 **85M** → 现 **35.5M→32.0M**，见 OPV29-03；`/tmp/worldaxis-regression-*`）；增量回归（OPV29-02）现场：当前与 `origin/master` 的全部差异 ⇒ **111 把锁**，建索引 **1.7s**；装载期边 **476**；八道契约门禁实测（OPV29-06）：七道快门禁合计 **19.5s**（最慢 reject-code-gate 7.5s），慢门禁 `readings-v2106` 单独 **86.0s** ⇒ 八道合计下界 **105.5s**；锁级分片（OPV29-01）：按节分片可并行面仅 **4.1%**（17 节 / 73.9s，N=4 ⇒ **1.03×**）而单节 `v2.82.0` 占 **792.2s = 44.5%**，其 38 把锁中 **34 把可并行**、4 把必须串行 ⇒ 并行段墙钟 **263.6s**，整节 ⏱ **792.2s → 344.6s**（省 **56.5%**；判据 **2853 ≥ 2843** 不缩水、该节 0 红；日志 `/tmp/worldaxis-regression-rbXajt/run.log`）。
 
 | 编号 | 项 | 机制 | 验收 / 边界 |
 | :--- | :--- | :--- | :--- |
@@ -130,7 +130,7 @@
 
 ### Z2 拆得开（6 项）· 命题：**六个巨文件是维护债**
 
-> **组读数**（`ls -S engines/*.js` 实测）：`tool-diag` **422K** / `action-desk` **83K** / `reject-recovery` **17K** / `inject-budget` **58K** / `backstage` **79K** / `world-lab` **83K** / `world.js` **80K** / `rule-pack` **80K**。
+> **组读数**（`ls -S engines/*.js` 实测）：`tool-diag` **422K** / `action-desk` **83K** / `reject-recovery` **17K** / `inject-budget` **58K** / `backstage` **79K** / `world-lab` **83K** / `world.js` **84K** / `rule-pack` **80K**。
 
 | 编号 | 项 | 机制 | 验收 / 边界 |
 | :--- | :--- | :--- | :--- |
@@ -266,7 +266,7 @@
 
 **「走完全程」靠的是调用侧两处修正，判据一条没放宽**：① `tests/run.js` 的 `runScript` 站点漏给 `maxBuffer`
 （node 默认 1MB，而 `v11-master-matrix` 正常输出 1.42MB ⇒ `ENOBUFS`），补 64MB（与同族两处同值）；
-② `tools/isolated-run.js` 加 `--timeout-ms` 透传（**默认 5100000ms 一个字不改** —— 该值由 `tests/gate-timeout.js`
+② `tools/isolated-run.js` 加 `--timeout-ms` 透传（**默认值一个字不改** —— 该值由 `tests/gate-timeout.js`
 与三处站点同值对账）。本组读数用 `--timeout-ms 9000000` 并加 `--max-old-space-size=4000`。
 **第 7 趟可以当 Z2/Z4 的可比基线**：源码在跑前跑后同一提交（`unchanged:true`），全程没有夹带修复，
 前段与后段读的是同一份码 —— 这正是旧口径里缺的那一样。

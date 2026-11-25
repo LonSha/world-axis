@@ -32,10 +32,16 @@ if (!__isolatedRunner.isWorker(require('path').join(__dirname, '..'))) {
     //     `result.json` 留 `结束原因 timeout` —— 与上面两次数值不同、形态逐字相同。
     //     按同一公式重算：2278.99 x 1.5 = 3418485 → 取整到分钟 = 5100000ms。
     //     （与 tools/slow-sections.js 对同一份日志给出的建议逐字一致）。
+    //   v2.582.0 收口：**第四次同型现形**。本轮实测节内合计 5004.52s，17 节超 60s
+    //     （最重 492.17s = V11 端到端矩阵），而默认值仍是 5100000ms（85.0 分钟）——
+    //     整趟跑到 465/466 节时被 SIGKILL，`result.json` 记 `停止原因 timeout` / `signal SIGKILL`，
+    //     差最后一节没跑完；读起来仍像环境问题。按同一公式重算：5004.52 x 1.5 = 7506.78
+    //     → 取整到分钟 = 7560000ms（与 tools/slow-sections.js 对本轮日志的建议逐字一致）。
+    //     **本批同改复算输入**（下面 v2203 判据钉的那个秒数）：只改默认值不改输入 ⇒ 下一轮判据必红。
     //   慢机/长局仍可用 WA_REGRESSION_TIMEOUT_MS 放宽；不设该变量时用下面这个实测口径值。
     //   注：本处**不许出现「超时建议 + 数字 + ms」的字面形态** —— tools/test-layers.js 的现场计数器
     //     按该形态全局匹配（不剥注释），注释里写一个就凭空多出一处没有判据的读数。
-    { timeoutMs: Number(process.env.WA_REGRESSION_TIMEOUT_MS) || 5100000 })
+    { timeoutMs: Number(process.env.WA_REGRESSION_TIMEOUT_MS) || 7560000 })
     .then(code => { process.exitCode = code; })
     .catch(error => { console.error(error.message); process.exitCode = 3; });
   return;
@@ -17299,9 +17305,9 @@ assert(r2900.dead.length === 1990 && r2900.uiDead.length === 6 && r2900.dataOnly
     //   后者要靠下一轮重跑 tools/slow-sections.js 才知道；本仓既有裁决：算不出来不得当作算过。
     const slowRT = require('../tools/slow-sections.js');
     assert(typeof slowRT.suggestTimeoutMs === 'function'
-      && slowRT.suggestTimeoutMs(3394.68) === declaredRT,
-      'v2203: 默认值可由 slow-sections 的同一公式复算（合计 3394.68s 得 '
-      + (typeof slowRT.suggestTimeoutMs === 'function' ? slowRT.suggestTimeoutMs(3394.68) : 'n/a')
+      && slowRT.suggestTimeoutMs(5004.52) === declaredRT,
+      'v2203: 默认值可由 slow-sections 的同一公式复算（合计 5004.52s 得 '
+      + (typeof slowRT.suggestTimeoutMs === 'function' ? slowRT.suggestTimeoutMs(5004.52) : 'n/a')
       + '，宣称 ' + declaredRT + '）—— 口径与工具一致，重算实测即须同批改默认值');
     // v2.257.0（回归修复）：**按形态定位，不许按数组下标定位**。
     //   病灶（全量回归实测）：判据写 `gt.ARMED_SITES[3]`，而本判据要守的是「管道形态」那个调用点。

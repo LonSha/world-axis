@@ -46,7 +46,7 @@ if (process.argv.indexOf('--recover-lock') >= 0) {
     process.exit(2);
   }
 }
-// v2.542.8（第三批偿还时补的 CLI 逃生口）：`launch()` 的总时长默认 5100000ms（85min），
+// v2.542.8（第三批偿还时补的 CLI 逃生口）：`launch()` 的总时长默认 7560000ms（126min），
 //   这个数立的时候全量还没到 26000 项；上一趟全量跑到 25904 项、只剩最后几节时被
 //   `stop('timeout')` 杀掉（result.json 记 status=interrupted / signal=SIGKILL /
 //   stopping=timeout，日志尾只有运行器补写的中断摘要）。那是**墙钟上限**，不是测试失败。
@@ -59,7 +59,7 @@ const argTimeout = (function () {
   const n = Number(process.argv[i + 1]);
   return Number.isFinite(n) && n >= 60000 ? n : 0;
 })();
-if (argTimeout) console.log('总时长上限：' + argTimeout + 'ms（命令行指定，默认 5100000ms 未改）');
+if (argTimeout) console.log('总时长上限：' + argTimeout + 'ms（命令行指定，总时长默认值见 tests/gate-timeout.js）');
 runner.launch(root, { onFinish: function (r) { final = r; }, timeoutMs: argTimeout || undefined }).then(function (code) {
   const ev = {
     status: final ? final.status : 'no-result',
