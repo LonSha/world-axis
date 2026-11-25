@@ -228,6 +228,39 @@ async function runGuard(a) {
     a(!fs.existsSync(path.join(t2, 'orphan.json')), 'isolation guard: no orphan evidence while parent is alive');
     c2.kill('SIGKILL'); await waitExit(c2, 2000);
 
+    // ①b v2.582.0 收口：**孤儿证据之外，还必须把盘上的 running 收成终态**。
+    //   病根（现场 /tmp/worldaxis-regression-D9FOP2）：外壳被 SIGKILL（不可捕获）后
+    //   result.json 永久停在 running —— 轮询方永远等下去，日志停在某节不动又读起来
+    //   像「那节卡死」。两句都是读数撒谎。本条钉的就是那一半。
+    const t1b = taskOf('orphan-finish');
+    fs.writeFileSync(path.join(t1b, MARK), JSON.stringify({ token: 'x', work: 'y', source: 'z', parent: freePid(69000), start: '1' }));
+    fs.writeFileSync(path.join(t1b, 'result.json'), JSON.stringify({ status: 'running', task: t1b, startedAt: 1, childPid: 999 }));
+    const c1b = spawnGuard(t1b);
+    await waitExit(c1b, 6000);
+    let fin = null;
+    try { fin = JSON.parse(fs.readFileSync(path.join(t1b, 'result.json'), 'utf8')); } catch (e) {}
+    a(fin && fin.status === 'runner-failed' && fin.stopping === 'detached' && !!fin.finishedAt,
+      'isolation guard: orphan worker closes a still-running result as runner-failed/detached (实 ' + JSON.stringify(fin) + ')');
+    a(fin && fin.detached && fin.detached.why === 'parent-gone',
+      'isolation guard: detached evidence names the cause (实 ' + JSON.stringify(fin && fin.detached) + ')');
+    // 已写终态时**不许覆盖**（正常收尾过的结果逐字不动）
+    const t1c = taskOf('orphan-finished');
+    fs.writeFileSync(path.join(t1c, MARK), JSON.stringify({ token: 'x', work: 'y', source: 'z', parent: freePid(69000), start: '1' }));
+    const doneRec = JSON.stringify({ status: 'passed', summary: '通过 1 / 失败 0', startedAt: 1, finishedAt: 2 });
+    fs.writeFileSync(path.join(t1c, 'result.json'), doneRec);
+    const c1c = spawnGuard(t1c);
+    await waitExit(c1c, 6000);
+    a(fs.readFileSync(path.join(t1c, 'result.json'), 'utf8') === doneRec,
+      'isolation guard: an already-finished result is not overwritten');
+    // 同步探测（每节边界用）：孤儿 ⇒ true / 父在 ⇒ false；未武装（无 mark）⇒ armed:false
+    const t1d = taskOf('probe');
+    fs.writeFileSync(path.join(t1d, MARK), JSON.stringify({ token: 'x', work: 'y', source: 'z', parent: freePid(69000), start: '1' }));
+    a(runner.probeOrphan(t1d).orphan === true, 'isolation guard: probeOrphan reports orphan synchronously (no timer needed)');
+    fs.writeFileSync(path.join(t1d, MARK), JSON.stringify({ token: 'x', work: 'y', source: 'z', parent: process.pid, start: runner.identity(process.pid) }));
+    a(runner.probeOrphan(t1d).orphan === false, 'isolation guard: probeOrphan stays quiet while parent is alive');
+    const t1e = taskOf('nomark2');
+    a(runner.probeOrphan(t1e).armed === false, 'isolation guard: probeOrphan is unarmed without a mark (零副作用)');
+
     // ③ pid 被复用（同 pid、不同 starttime）也算父已死 —— 只看「进程存在」会漏
     const t3 = taskOf('reused');
     fs.writeFileSync(path.join(t3, MARK), JSON.stringify({ token: 'x', work: 'y', source: 'z', parent: process.pid, start: String(BigInt(runner.identity(process.pid)) + 1n) }));

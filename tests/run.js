@@ -262,9 +262,30 @@ function __layerVerdict(t) {
   const v = require('../tools/test-layers.js').select(hit, __layerSel, t);
   return v.verdict;
 }
+// v2.582.0 收口：**每节边界同步查一次「外壳还在不在」**。
+//   现场（/tmp/worldaxis-regression-79RqRw）：外壳被 SIGKILL 后 worker 被 init 收养、
+//   继续跑了十几分钟，`orphan.json` 一个字没写 —— 因为孤儿看护走的是 `setInterval`，
+//   而本节面是**同步**的，定时器在整个窗口里一次都轮不到。「定时器会报」在这类形态下是假的。
+//   故在每节入口做一次同步探测：父真的没了 ⇒ 立刻收尾退出（不留一个被收养的 worker
+//   继续改副本、继续占 CPU）。这只在 worker 态生效；主仓直跑时 `armed:false`，零副作用。
+const __orphanTask = (function () {
+  try {
+    const w = require('path').join(__dirname, '..');
+    if (!__isolatedRunner.isWorker(w)) return null;
+    return require('path').dirname(require('fs').realpathSync(w));
+  } catch (e) { return null; }
+})();
+function __orphanCheck(where) {
+  if (!__orphanTask) return;
+  const r = __isolatedRunner.probeOrphan(__orphanTask);
+  if (!r.armed || !r.orphan) return;
+  console.log('\n✗ 外壳已消失（pid ' + r.parent + '，本进程 ' + process.pid + '）—— ' + where + '：立即收尾，不留被收养的 worker');
+  process.exit(75);
+}
 let __secT = 0, __secName = '起';
 let __slowSec119 = 0;
 function section(t) {
+  __orphanCheck('节边界');
   const __verdict = __layerVerdict(t);
   if (__verdict !== 'run') {
     if (__verdict === 'refuse') __layerRefused.push(t); else __layerSkipped.push(t);

@@ -83,6 +83,22 @@ function recoverLock(dir) {
  *   父 pid 消失或 starttime 变化（pid 被复用）即判定孤儿，留证据后自杀整个进程组。
  *   间隔取小值只影响孤儿发现延迟，不影响正常路径（父存活时零副作用）。
  */
+/**
+ * v2.582.0 收口：**同步**的孤儿探测。
+ *   为什么必须有同步版：`watchParent()` 用 `setInterval` 报孤儿，而 run.js 的断言面是
+ *   **同步**的 —— 一节若被同步测试占满（v2.82.0 那节实测 388s、UI 实机 214s），定时器
+ *   在整个窗口里**一次都轮不到**。现场实证（/tmp/worldaxis-regression-79RqRw）：外壳被
+ *   SIGKILL 后 worker 还活了很久，`orphan.json` 一个字都没写出来 —— 「定时器会报」在这一
+ *   类形态下是假的。故在每节边界（run.js 的 section()）调一次这个同步版。
+ *   返回 `{ orphan: true }` 时调用方应立刻走正常收尾路径（而不是让进程被静默收养）。
+ */
+function probeOrphan(task) {
+  let mark;
+  try { mark = json(path.join(task, MARK)); } catch (e) { return { armed: false }; }
+  let alive = false;
+  try { alive = identity(mark.parent) === mark.start; } catch (e) { alive = false; }
+  return { armed: true, orphan: !alive, parent: mark.parent, start: mark.start, mark: mark };
+}
 function watchParent(task, intervalMs) {
   let mark;
   try { mark = json(path.join(task, MARK)); } catch (e) { return { stop: function () {}, armed: false }; }
@@ -94,6 +110,23 @@ function watchParent(task, intervalMs) {
     state.stopped = true;
     try { writeJson(path.join(task, 'orphan.json'), { reason: 'parent-gone', parent: mark.parent, at: Date.now(), pid: process.pid }); }
     catch (e) {}
+    // v2.582.0 收口：**孤儿 worker 走之前要把 running 收成终态**。
+    //   现场（/tmp/worldaxis-regression-D9FOP2）：外壳连同会话被外部 SIGKILL（不可捕获，
+    //   故 launch() 的退出钩子没机会跑），worker 被 init 收养后继续跑到 UI 实机那一节才没的。
+    //   于是 result.json 永久停在 running —— 轮询方永远等下去，日志停在某一节不动又读起来
+    //   像「那一节卡死」。两句都是读数撒谎。本处只写 worker 自己知道的部分（谁杀的、什么时候、
+    //   父是谁），不去猜测试结论；已写终态时不覆盖。
+    try {
+      const rf = path.join(task, 'result.json');
+      const r0 = json(rf);
+      if (r0 && !r0.finishedAt) {
+        r0.status = 'runner-failed';
+        r0.stopping = 'detached';
+        r0.finishedAt = Date.now();
+        r0.detached = { why: 'parent-gone', parent: mark.parent, at: Date.now(), pid: process.pid };
+        writeJson(rf, r0);
+      }
+    } catch (e) { /* 收尾不许影响自杀路径 */ }
     try { process.kill(-process.pid, 'SIGKILL'); } catch (e) {}
     try { process.kill(process.pid, 'SIGKILL'); } catch (e) {}
   }, intervalMs || 2000);
@@ -254,11 +287,48 @@ async function launch(root, options) {
     hardTimer = setTimeout(() => { try { signalGroup(child, 'SIGKILL'); } catch (e) { result.signalError = e.code; } }, 2000);
   };
   const onTerm = () => stop('SIGTERM'), onInt = () => stop('SIGINT');
+  // v2.582.0 收口：**外壳自己被杀时也不许把 `running` 留在盘上**。
+  //   现场（/tmp/worldaxis-regression-D9FOP2，v2.582.0 收口轮第二趟全量）：外壳进程连同
+  //   整个会话一起被外部回收（SIGKILL，不可捕获），此时 `result.json` 永久停在
+  //   `{"status":"running"}`。而 worker 因为 `detached:true` 被 init 收养、**照常继续跑**，
+  //   Chromium 子进程成了孤儿又活了 20 分钟。现场读起来有两个误判：
+  //     ① 轮询 `result.json` 会永远等下去（「还在跑」是读数，不是事实）；
+  //     ② 日志停在某一节不动，看起来像「那一节卡死」（实际是外壳没了、没人收尾）。
+  //   已有的 `watchParent()` 只管**worker 侧**（父没了 ⇒ 留 orphan.json ⇒ 自杀），
+  //   反过来这一半没人管：**外壳死了，谁把 running 改成终态？**
+  //   落点：退出钩子里把仍为 running 的结果落成 `runner-failed` + `detached` 证据，
+  //   且**只在确实还在 running 时**改（正常路径 `finishedAt` 已写，逐字不动）。
+  //   注：SIGKILL 不可捕获，故本钩子治的是 SIGTERM/SIGINT/异常退出/uncaughtException；
+  //   SIGKILL 那一态如实留在 `running`，但**同时**留下 `detached.json`，好让轮询方
+  //   一眼看出「这趟没有终态」而不是「还在跑」—— 读数不许撒谎。
+  const finishDetached = (why) => {
+    try {
+      if (result.finishedAt) return;
+      const now = Date.now();
+      result.status = 'runner-failed'; result.stopping = why; result.finishedAt = now;
+      result.detached = { why: why, at: now, childPid: result.childPid || null };
+      save();
+      try {
+        const t = fs.readFileSync(logFile, 'utf8');
+        const secs = t.match(/^■ .*$/gm) || [];
+        const last = secs.length ? secs[secs.length - 1].replace(/^■ /, '') : '(尚未进入任何 section)';
+        fs.appendFileSync(logFile, String.fromCharCode(10) + '（失去外壳·由退出钩子补写）跑到「' + last + '」· 已完成节 '
+          + Math.max(0, secs.length - 1) + ' / ' + secs.length + ' 可见 · 结束原因 ' + why + String.fromCharCode(10));
+      } catch (e) { /* 日志不可读时只落 result.json */ }
+    } catch (e) { /* 钩子里不许再抛 */ }
+  };
   try {
     save(); console.log('Isolated regression:', task);
     prepared = prepare(root, task, fd);
     result.status = 'running'; result.sourceDigest = digest(JSON.stringify(prepared.before)); save();
     process.on('SIGTERM', onTerm); process.on('SIGINT', onInt);
+    // v2.582.0 收口：把「外壳死了但 running 还在盘上」这条路径接上（见 finishDetached 注释）。
+    process.on('SIGHUP', () => finishDetached('SIGHUP'));
+    process.on('uncaughtException', (e) => {
+      finishDetached('uncaughtException');
+      console.error('isolated-runner uncaughtException:', (e && e.message) || e);
+      process.exitCode = 3;
+    });
     // v2.187.0（O6）：**分层选区参数必须转发给 worker**。现场事实：worker 是
     //   `cp.spawn(execPath, [work/tests/run.js], {env})` —— argv 不转发、**env 会转发**
     //   （prepared.env 由 process.env 派生）。于是 `WA_ONLY_SECTION` 天然能进 worker，
@@ -472,6 +542,7 @@ async function launch(root, options) {
   } finally {
     clearTimeout(timer); clearTimeout(hardTimer);
     process.removeListener('SIGTERM', onTerm); process.removeListener('SIGINT', onInt);
+    process.removeAllListeners('SIGHUP');
     try { fs.closeSync(fd); } catch (e) { if (e.code !== 'EBADF') console.error('log close:', e.code); }
     try { lock.release(); } catch (e) { console.error('Lock retained:', e.message); }
   }
@@ -481,5 +552,5 @@ function workerGuard(root) {
   const work = fs.realpathSync(root || path.join(__dirname, '..'));
   return watchParent(path.dirname(work));
 }
-module.exports = { launch, isWorker, workerGuard, watchParent, prepare, snapshot, identity,
+module.exports = { launch, isWorker, workerGuard, watchParent, probeOrphan, prepare, snapshot, identity,
   acquireLock, inspectLock, recoverLock, liveChild, cleanEnv, lockDirFor };
