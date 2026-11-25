@@ -22859,6 +22859,15 @@ await runScript('./offline-tick-summary-quota-v2575.js');
     //   + 块尾「本面名额」自证 + block 五栗（faces 分面）+ stat() 对 block 深拷（原为浅拷）；
     //   25 段 A/B/C/N。单独跑：node tests/org-block-quota-v2576.js
 await runScript('./org-block-quota-v2576.js');
+    // v2.577.0（按序截断第二十处）：设置索引检索命中名额 —— 「命中 3 组」是全部还是抽样。
+    //   旧写法 entries.filter(...).slice(0, cap) + hitCount: hits.length：谁被念取决于
+    //   __settingsRegs 的注册顺序，hitCount 报的是截断后的长度，连「等」都被截断吃掉。
+    //   实测（/tmp/probe577.js）：12 组命中 cap3 ⇒ 旧版「命中 3 组」（无「等」）／倒注册序结论全变／
+    //   maxRows='x' 反把结果塌成 0 条（配置坏了显示成「没命中」）。
+    //   改法 quotaOf + rankOf（模块名精确>包含>中文名>键名）+ 同级字典序 + hitCount 报真总数
+    //   + 自证「另有 K 组未列出」+ block 五栗 + stat() 深拷；25 段 A/B/C/N。
+    //   单独跑：node tests/settings-index-hit-quota-v2577.js
+await runScript('./settings-index-hit-quota-v2577.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
@@ -23387,7 +23396,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.576.0';
+  const __wantPin293 = '2.577.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

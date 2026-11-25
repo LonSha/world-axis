@@ -10,6 +10,10 @@
  *   3 「关掉会怎样」对 `enabled` 有确定答复（整块停用、读数返回 disabled）；
  *      对其余键只答它管什么（上限/节奏/开关），不夸大不缩小。
  *   4 只读：read 走 settingsBus.read + normalize，**绝不写**（索引面写设置是最不该犯的错）。
+ *   5 检索命中名额只截断不参与筛选：按「模块名精确 > 模块名包含 > 中文名 > 键名」
+ *     分级、同级按模块名字典序（v2.577.0）。`hitCount` 报**真实命中总数**，`returned`
+ *     才是这一面念了几组；截断必须自证「另有几组未列出」—— 否则「命中 3 组」与
+ *     「一共只有 3 组」在读数上同形。
  */
 (function () {
   'use strict';
@@ -62,7 +66,40 @@
     return '其它';
   }
 
-  const stat = { builds: 0, searches: 0, lastQuery: '', lastHits: 0 };
+  // ── v2.577.0（按序截断第二十处）：检索命中名额 ──────────────────────────
+  //   旧写法 hits = entries.filter(...).slice(0, cap)：命中几组全凭**注册顺序**取前 cap 组，
+  //   而 hitCount 报的是截断后的长度 —— 于是「命中 3 组」既可能是全部、也可能是 12 组里的 3 组，
+  //   且截断发生在 `hits.length > 3 ? ' 等' : ''` 之前，连那个「等」都不会出现。
+  const QUOTA_MAX = 50;
+  function quotaOf(cfg, opts) {
+    const want = (opts && typeof opts.max === 'number') ? opts.max : (cfg && cfg.maxRows);
+    const n = Math.floor(Number(want));
+    if (!isFinite(n) || n < 1) return Math.min(QUOTA_MAX, DEF.maxRows);
+    return Math.min(QUOTA_MAX, Math.max(1, n));
+  }
+  /** 相关度：模块名精确 4 > 模块名包含 3 > 中文名 2 > 键名/键中文 1。 */
+  function rankOf(e, needle) {
+    const m = String(e.module || '').toLowerCase();
+    if (m === needle) return 4;
+    if (m.indexOf(needle) >= 0) return 3;
+    if (e.nameZh && String(e.nameZh).toLowerCase().indexOf(needle) >= 0) return 2;
+    return 1;
+  }
+  /** 名额只截断不参与筛选：先按「相关度降序 → 模块名字典序」定序，再切前 quota 个。 */
+  function pickHits(list, needle, quota) {
+    const arr = (list || []).slice().sort(function (a, b) {
+      const ra = rankOf(a, needle), rb = rankOf(b, needle);
+      if (ra !== rb) return rb - ra;
+      return String(a.module).localeCompare(String(b.module));
+    });
+    const picked = arr.slice(0, quota);
+    return { picked: picked, candidates: arr.length, hidden: Math.max(0, arr.length - picked.length) };
+  }
+
+  const stat = { builds: 0, searches: 0, lastQuery: '', lastHits: 0,
+    // v2.577.0：检索名额读数。必须在这里声明 —— 「没搜过」（null）与「搜了没命中」（mode='empty'）
+    //   要能分辨，否则「查无此组」与「还没查过」长得一模一样。
+    block: null };
 
   function regs() {
     const arr = WA.__settingsRegs;
@@ -119,8 +156,8 @@
     const needle = String(q == null ? '' : q).trim().toLowerCase();
     stat.searches++; stat.lastQuery = needle;
     if (!needle) return { ok: false, reason: 'empty-query', hits: [], text: '搜索词为空' };
-    const cap = (typeof o.max === 'number' && o.max > 0) ? o.max : s.maxRows;
-    const hits = idx.entries.filter(function (e) {
+    const quota = quotaOf(s, o);
+    const matched = idx.entries.filter(function (e) {
       if (String(e.module).toLowerCase().indexOf(needle) >= 0) return true;
       if (e.nameZh && e.nameZh.toLowerCase().indexOf(needle) >= 0) return true;
       if (String(e.key).toLowerCase().indexOf(needle) >= 0) return true;
@@ -128,14 +165,25 @@
         return String(k.key).toLowerCase().indexOf(needle) >= 0
           || (k.zh && k.zh.toLowerCase().indexOf(needle) >= 0);
       });
-    }).slice(0, cap);
+    });
+    const pk = pickHits(matched, needle, quota);
+    const hits = pk.picked;
     stat.lastHits = hits.length;
+    // 读数落在返回之前，且落在「没命中」分支之外：搜过但零命中要留下 mode='empty'。
+    stat.block = { candidates: pk.candidates, picked: hits.length, quota: quota,
+      hidden: pk.hidden,
+      mode: !pk.candidates ? 'empty' : (pk.hidden ? 'ranked-first' : 'all-fit') };
+    const shown = hits.slice(0, 3).map(function (e) {
+      return (e.nameZh || e.module) + '(' + e.module + ')';
+    }).join('、');
     return {
-      ok: true, query: needle, hits: hits, hitCount: hits.length,
+      // hitCount 是**真实命中总数**；returned 才是这一面念了几组（v2.577.0 起）。
+      ok: true, query: needle, hits: hits, hitCount: pk.candidates, returned: hits.length,
+      quota: quota, hidden: pk.hidden,
       text: hits.length
-        ? ('「' + needle + '」命中 ' + hits.length + ' 组：' + hits.slice(0, 3).map(function (e) {
-          return (e.nameZh || e.module) + '(' + e.module + ')';
-        }).join('、') + (hits.length > 3 ? ' 等' : ''))
+        ? ('「' + needle + '」命中 ' + pk.candidates + ' 组：' + shown
+          + (pk.candidates > hits.slice(0, 3).length ? ' 等' : '')
+          + (pk.hidden ? '（本面只列 ' + hits.length + ' 组，另有 ' + pk.hidden + ' 组未列出）' : ''))
         : ('「' + needle + '」没有命中任何设置组（' + idx.total + ' 组里没有这个名/这个键）')
     };
   }
@@ -159,7 +207,13 @@
     groups: function () { const i = build(); return i.groups; },
     coverage: function () { const i = build(); return { total: i.total, named: i.named, nameMissing: i.nameMissing, text: i.text }; },
     settings: settings,
-    stat: function () { return Object.assign({}, stat); }
+    // v2.577.0：stat() 原先只做 Object.assign —— block 是对象，浅拷拷的是引用，
+    //   调用方改一次读数就等于改掉了引擎自己的读数（观测不得改变被观测对象）。
+    stat: function () {
+      const out = Object.assign({}, stat);
+      out.block = stat.block ? JSON.parse(JSON.stringify(stat.block)) : null;
+      return out;
+    }
   };
   // 装载面登记与自述行：与全部引擎同形态（少这两行会在装载汇报里被算成「未自述」，
   //   而 module-registry 的装载期边也要靠 registerModule 才能记到这台）。
