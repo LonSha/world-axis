@@ -31,6 +31,44 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
   const stat = { sets: 0, blocked: 0, lastReason: '', faults: {}, networkBuilds: 0, networkRows: 0, networkEmpty: 0, networkLastReason: '' };
+  // v2.581.0：注入名额统一形态（「同形态尾部截断」簇二，与 v2.580.0 的三引擎同一口径）。
+  //   旧法 `X.slice(-Math.max(1, cfg.maxRows))` 三病俱在：取**登记尾部**（≈登记顺序，不是新旧）、
+  //   `maxRows` 坏值时 `slice(NaN)`=`slice(0)` **整环全念**（与上限正好相反）、念了几条一个字不说。
+  const ROWS_QUOTA_MAX = 24;
+  function quotaOf(cfg, key, max, fallback) {
+    const n = Math.floor(Number(cfg && cfg[key]));
+    if (!isFinite(n) || n < 1) return Math.min(max, fallback);
+    return Math.min(max, Math.max(1, n));
+  }
+  /** 取哪几条：按时间（updatedAt，缺则 at）新→旧，同刻按 who/key/id 兜底 —— 可复算。 */
+  function pickRows(list, quota, atOf, idOf) {
+    const arr = (Array.isArray(list) ? list : []).filter(function (x) { return !!x; }).slice();
+    arr.sort(function (a, b) {
+      const at = Number(atOf(a)) || 0, bt = Number(atOf(b)) || 0;
+      if (at !== bt) return bt - at;
+      const ai = String(idOf(a) || ''), bi = String(idOf(b) || '');
+      return ai < bi ? -1 : (ai > bi ? 1 : 0);
+    });
+    return { candidates: arr.length, picked: arr.slice(0, quota),
+      hidden: Math.max(0, arr.length - quota), mode: arr.length > quota ? 'newest-first' : 'all-fit' };
+  }
+  /** 名额取用（名额只截断、不参与筛选；坏配置回落 DEF，绝不放大成「全念」）。 */
+  function pickQuota(arr, cfg) {
+    const q = quotaOf(cfg, 'maxRows', ROWS_QUOTA_MAX, DEF.maxRows);
+    const sel = pickRows(arr, q, function (x) { return x && (x.updatedAt || x.at); },
+      function (x) { return x && (x.who || x.key || x.id || x.name || ''); });
+    stat.block = { candidates: sel.candidates, picked: sel.picked.length, quota: q,
+      hidden: sel.hidden, mode: sel.candidates ? sel.mode : 'empty' };
+    return sel.picked;
+  }
+  // block 用**取值器**持有：stat() 里那些 `Object.assign({}, stat)` 会当场取到一份深拷，
+  //   调用方改一次读数就改掉引擎读数的老坑（v2.576 org / v2.579 world-bridge）在这里一次性堵掉。
+  let __block = null;
+  Object.defineProperty(stat, 'block', {
+    enumerable: true, configurable: true,
+    get: function () { return __block ? JSON.parse(JSON.stringify(__block)) : null; },
+    set: function (v) { __block = v || null; }
+  });
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.blocked++; }
   function clean(v, max) { return WA.inputGuard.text(v, max || 40); }
   function state() { return WA.store && WA.store.get ? (WA.store.get() || {}) : {}; }
@@ -115,8 +153,8 @@
 
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
-    const list = rows().slice(-Math.max(1, cfg.maxRows));
-    if (!list.length) return '';
+    const list = pickQuota(rows(), cfg);
+    if (!list.length) { stat.block = { candidates: 0, picked: 0, quota: quotaOf(cfg, 'maxRows', ROWS_QUOTA_MAX, DEF.maxRows), hidden: 0, mode: 'empty' }; return ''; }
     const lines = list.map(function (r) { return r.key + '：' + r.types.join('、'); });
     return '[关系六型]\n' + lines.join('\n') + '\n六型是关系结构，与恩怨血仇分账并行；血仇记「做过什么」，这里记「是什么关系」，两账互不覆盖。\n';
   }
@@ -146,6 +184,19 @@
       guidance: '允许穿透防线触及核心动机，但在情感表达上保持对等重量，绝不盲目顺从。'
     };
   }
+
+  // v2.581.0 块尾名额自证：不动原正文拼接，只在末尾追加一行清单计数（名额够就说「全部列出」）。
+  buildBlock = (function (inner) {
+    return function () {
+      const out = inner();
+      const b = stat.block;
+      if (!out || !b) return out;
+      const NL = String.fromCharCode(10);
+      return out + NL + '（本面名额：关系 ' + b.picked + '/' + b.candidates
+        + (b.hidden > 0 ? ' 条，按时间新→旧取；另有 ' + b.hidden + ' 条未列出，仍在账上，不是没有'
+          : ' 条，全部列出') + '）';
+    };
+  })(buildBlock);
 
   WA.bonds = {
     TYPES: TYPES.slice(),
