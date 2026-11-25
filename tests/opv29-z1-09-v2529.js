@@ -107,10 +107,13 @@ a(!!WA.rejectRecoveryTables && Object.keys(WA.rejectRecoveryTables).length === 7
   WA.rejectRecoveryTables && Object.keys(WA.rejectRecoveryTables));
 // v2.569.0 跟位（判据形态不动，只跟现场）：拒收 1687→1689、成功 139→143、判不出 89→93。
 //   本轮世界时间耦合新增 advanced / first-tick / no-advance 三条成功面，其余由近两批引擎补入。
-a(R.REJECT_FACE.length === 1689 && R.SUCCESS_FACE.length === 143 && R.NEUTRAL_FACE.length === 93,
+// v2.584.0 跟位：拒收 1689 → 1697（R254 的七条 attire-state 码 + R256 的 cause-scope）、
+//   成功 143 → 145（allowed / first-establish）、例外表 136 → 138（continuity-lock / downgrade-coverage）。
+//   判据形态不动（三面逐项相等），跟的是现场真值。
+a(R.REJECT_FACE.length === 1697 && R.SUCCESS_FACE.length === 145 && R.NEUTRAL_FACE.length === 93,
   'A6 三面快照条目数与拆段前逐项相等（拒收 ' + R.REJECT_FACE.length
   + ' / 成功 ' + R.SUCCESS_FACE.length + ' / 判不出 ' + R.NEUTRAL_FACE.length + '）');
-a(R.RULES.length === 5 && Object.keys(R.OVERRIDES).length === 136
+a(R.RULES.length === 5 && Object.keys(R.OVERRIDES).length === 138
   && Object.keys(R.NEUTRAL_REVIEW).length === 93 && Object.keys(R.ARTIFACTS).length === 2,  // v2.569.0 跟位：判不出面登记 89→93、词法碎片 1→2
   'A7 规则表 / 例外表 / 判不出面登记 / 词法碎片条目不变（'
   + R.RULES.length + ' / ' + Object.keys(R.OVERRIDES).length + ' / '

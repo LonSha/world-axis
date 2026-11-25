@@ -120,7 +120,9 @@ function runB(WA) {
   // v2.542.8 跟位（第三次同一个病：v2.542.6 修了 capability-tier-v2257 与 theme-engines-v2258，
   //   漏了这一把）：探测集 117 → 132（叙事脊柱 L1–L4 四台引擎入场），悬空名单仍是 35，
   //   故 full 档规模 = 132 − 35 = 97。判据形态未变（「探测集 − L3_EXCLUDES」）。
-  eq(fullItem && fullItem.size, 97, 'B6: full 档规模为 97（现场实测：全开策略后探测集 132 − 悬空名单 35 = 97）');
+  // v2.584.0 跟位：attireState 出厂开启且有注入面 ⇒ 探测集 132 → 133，悬空名单仍 35 ⇒ 98。
+  //   判据形态未变（「探测集 − L3_EXCLUDES」），变的是分子上的读数。
+  eq(fullItem && fullItem.size, 98, 'B6: full 档规模为 98（现场实测：全开策略后探测集 133 − 悬空名单 35 = 98）');
   assert(fullItem && typeof fullItem.note === 'string' && fullItem.note.indexOf('35') >= 0, 'B7: full 档包含 35 排除注记');
 
   assert(Array.isArray(v.manualOnly) && v.manualOnly.length === 35, 'B8: view().manualOnly 暴露 35 个排除机制');
@@ -151,7 +153,7 @@ function runC(WA) {
   //   故本行必须跟位 —— 上一次的「不该变」是巧合，不是规律（探针实测 turnedOn 64）。
   //   v2.407.0：目标 74 → 80（+6），出厂仍 10（+0），差值 64 → 70 —— 本行再次跟位。
   const vFull = cap.view();
-  eq(vFull.running, 132, 'C5: full 档运行机制数为 132（全开，与 MECH 同源；v2.542.8 跟位 117 → 132）');
+  eq(vFull.running, 133, 'C5: full 档运行机制数为 133（全开，与 MECH 同源；v2.584.0 跟位 132 → 133）');
   eq(vFull.dormant, 0, 'C6: full 档休眠机制数为 0（全开）');
 
   // 验证 35 个排除机制无一被打开
@@ -176,7 +178,7 @@ function runC(WA) {
     'C10: 回滚只收回 full 开的那一个（实 ' + (rRoll && rRoll.turnedOff ? rRoll.turnedOff.join(',') : '无') + '）');
 
   const vLite = cap.view();
-  eq(vLite.running, 131, 'C11: 回滚后机制数 131（= MECH 132 − 那一个由 full 新开的 sceneIntent；档位不再收走出厂开关）');
+  eq(vLite.running, 132, 'C11: 回滚后机制数 132（= MECH 133 − 那一个由 full 新开的 sceneIntent；档位不再收走出厂开关）');
   //   v2.382.0：出厂 7 → 10（+3），休眠 98 → 99（+1）。现场实测 rollback 后 running=10 / dormant=99。
   //   注意这两条**不同步涨**：running +3、dormant +1，因为 MECH 105 → 109 只 +4，
   //   其中 3 台进了 BASE_ON（出厂即开），剩 1 台落在休眠面 —— 所以 C11 改 10、C12 改 99。

@@ -98,7 +98,8 @@ a(jObj && jObj.check && jObj.check.attributable === false && jObj.check.note,
 const meas = FB.measure();
 a(meas.ok === true && meas.pages.length === 34,
   'D1 逐页真量：' + meas.pages.length + ' 页量到（现场 34）', meas.pages.length);
-a(meas.totalControls === 1693, 'D2 逐页合计 1693 控件（实测 ' + meas.totalControls + '；v2.569.0 跟位：1683 → 1693）', meas.totalControls);
+// v2.584.0 跟位：1693 → 1694（穿着状态在设置页多出来的那一格控件）。
+  a(meas.totalControls === 1694, 'D2 逐页合计 1693 控件（实测 ' + meas.totalControls + '；v2.569.0 跟位：1683 → 1693）', meas.totalControls);
 const rowOv = (meas.pages || []).filter(function (x) { return x.page === 'overview'; })[0];
 a(rowOv && rowOv.controls === 46 && rowOv.bytes === 25230,   // v2.569.0 跟位：25206 → 25230B（overview 首屏多了那一个复选框及其标签）
   'D3 首屏 overview 实测 ' + (rowOv && rowOv.controls) + ' 控件 / ' + (rowOv && rowOv.bytes) + 'B', rowOv);

@@ -134,6 +134,15 @@
       phrase: '场上没有这件东西（没有人 / 没有那条线 / 没有这个存档…）：先把它造出来或换一个存在的对象。'
     },
     {
+      id: 'attire',
+      label: '穿着状态 / 外貌',
+      //   v2.584.0（R256）：这两个码是 attire-state / appearance 特有的，**逐名登记**而不是按词根猜 ——
+      //   `scope` 与 `coverage` 在别处指的是别的事（作用域 / 覆盖率），按词根归会给出一句与病因无关的话术。
+      //   实测：本批十个新码里只有这两条未被既有簇收住（其余八条各自命中 permission / absent / unmet 等）。
+      re: /^(cause-scope|downgrade-coverage)$/i,
+      phrase: '这身衣服的这次变更说不通：原因要解释得清（动作 / 环境 / 姿态 / 时间各只管自己够得着的那几处），升级也不能推翻已经写好的描写。'
+    },
+    {
       id: 'unmet', label: '条件还没满足',
       //   `not-authorized` 已被 permission 抢先命中（它更具体）；这里收剩下的 `not-*`。
       re: /^not(-|_)/i,

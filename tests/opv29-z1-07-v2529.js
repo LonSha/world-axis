@@ -42,7 +42,8 @@ const ENG_MAX_SECS = 130;
 const secCount = (RD(ENG).match(/function sec[A-Za-z0-9_]*\s*\(/g) || []).length;
 a(lines(ENG) <= ENG_MAX_LINES, 'A1 引擎行数在上限内（实 ' + lines(ENG) + ' ≤ ' + ENG_MAX_LINES + '；拆前 8425）', lines(ENG));
 a(secCount <= ENG_MAX_SECS, 'A1b 诊断节数在上限内（实 ' + secCount + ' ≤ ' + ENG_MAX_SECS + '）', secCount);
-a(lines(TAB) === 2500, 'A2 表体量（实 ' + lines(TAB) + ' 行 = 2500；v2.542.21 登记 json-repair 时 +4；v2.566.0 补登三台首帧面引擎 +12、技术债去重 -34、守卫表补 9 枚 id +10', lines(TAB));
+// v2.584.0 跟位：2500 → 2503（attireState 的登记行与段注）。
+a(lines(TAB) === 2503, 'A2 表体量（实 ' + lines(TAB) + ' 行 = 2500；v2.542.21 登记 json-repair 时 +4；v2.566.0 补登三台首帧面引擎 +12、技术债去重 -34、守卫表补 9 枚 id +10', lines(TAB));
 const tabSrc = RD(TAB);
 const namedFns = (tabSrc.match(/function\s+[A-Za-z_$]/g) || []).length;
 const iifes = (tabSrc.match(/\(function\s*\(\)/g) || []).length;
@@ -60,7 +61,8 @@ const T0 = ctx0.window.WorldAxis.toolDiagTables || {};
 //   对象字面量后写覆盖前写，冗余 25 条），已删副本 ⇒ 字面量 578 = 生效条数 578。
 //   去重不动任何 ns 与顺序，故本条数字不变 —— 变的是它从此与字面量条数可互相印证，
 //   「重复登记」不会再被误算成「新登记」。
-a(T0.MODULE_EXPORTS && Object.keys(T0.MODULE_EXPORTS).length === 578,
+// v2.584.0 跟位：578 → 579（attireState 入册）。
+a(T0.MODULE_EXPORTS && Object.keys(T0.MODULE_EXPORTS).length === 579,
   'A4a MODULE_EXPORTS 578 条（实 ' + (T0.MODULE_EXPORTS ? Object.keys(T0.MODULE_EXPORTS).length : 'null') + '；v2.542.21 起 jsonRepair 入册；v2.566.0 补登三台首帧面引擎 575→578、去重后字面量同数）');
 a(Array.isArray(T0.OPTIONAL_EXPORTS) && T0.OPTIONAL_EXPORTS.length === 26,
   'A4b OPTIONAL_EXPORTS 26 条（实 ' + (T0.OPTIONAL_EXPORTS ? T0.OPTIONAL_EXPORTS.length : 'null') + '）');

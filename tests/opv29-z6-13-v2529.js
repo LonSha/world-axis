@@ -103,12 +103,12 @@ function runA() {
   //   1905 → 1915、在用码 1853 → 1863；同时本版给「场上没有」家族补了簇命中，
   //   有玩家话 837 → 845、裸码 1016 → 1018、覆盖率 45.2 → 45.4。
   //   判据形态（五个数互相咬合：在用 = 扫描面 − 死表；covered + uncovered = total）未动。
-  a(base.json.scanned === 1925, 'A2 扫描面 = 1925（reject-code-gate.scan 命中数；v2.569.0 跟位 1915 → 1925）', String(base.json.scanned));
+  a(base.json.scanned === 1935, 'A2 扫描面 = 1925（reject-code-gate.scan 命中数；v2.569.0 跟位 1915 → 1925）', String(base.json.scanned));
   a(base.json.dead === 52, 'A3 死表 = 52（reject-v2780.DEAD 键数）', String(base.json.dead));
-  a(base.json.total === 1873, 'A4 在用码 = 1873 = 扫描面 − 死表（v2.569.0 跟位）', String(base.json.total));
+  a(base.json.total === 1883, 'A4 在用码 = 1873 = 扫描面 − 死表（v2.569.0 跟位）', String(base.json.total));
   a(base.json.base === 940, 'A5 基线表 = 940 条（ledger.base 数组长度；v2.569.0 跟位）', String(base.json.base));
-  a(base.json.covered === 1422, 'A6 有玩家话 = 1422 条（v2.569.0 二批：八簇再补面 1115 → 1422）', String(base.json.covered));
-  a(base.json.uncovered === 231, 'A7 裸码 = 231 条（必须点名，不许只报百分比；v2.569.0 二批：分母剔非拒收面 220 后的真裸码）', String(base.json.uncovered));
+  a(base.json.covered === 1428, 'A6 有玩家话 = 1422 条（v2.569.0 二批：八簇再补面 1115 → 1422）', String(base.json.covered));
+  a(base.json.uncovered === 233, 'A7 裸码 = 231 条（必须点名，不许只报百分比；v2.569.0 二批：分母剔非拒收面 220 后的真裸码）', String(base.json.uncovered));
   a(base.json.percent === 86, 'A8 覆盖率 = 86%（v2.569.0 二批：口径修正剔非拒收面 220 + 八簇补面，1422/1653）', String(base.json.percent));
   a(base.json.baselinePercent === base.json.percent, 'A9 达标线 ≡ 实测覆盖率（冻结基线与现场同值）',
     String(base.json.baselinePercent) + ' vs ' + String(base.json.percent));

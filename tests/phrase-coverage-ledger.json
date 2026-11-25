@@ -1,17 +1,17 @@
 {
   "_note": "拒收码话术覆盖率读数（由 tools/phrase-coverage.js 生成，勿手改）。口径：在用码 = 见证 + 基线；死表不算（不可达的码给它写话术是给死路修路灯）。",
-  "version": "2.569.0",
+  "version": "2.584.0",
   "baselinePercent": 86,
-  "total": 1873,
-  "covered": 1422,
-  "uncovered": 231,
+  "total": 1883,
+  "covered": 1428,
+  "uncovered": 233,
   "percent": 86,
   "byCluster": {
     "capacity": 97,
     "permission": 23,
-    "missing": 524,
+    "missing": 527,
     "timing": 25,
-    "owner": 147,
+    "owner": 148,
     "already": 45,
     "unavailable": 168,
     "threw": 45,
@@ -22,8 +22,9 @@
     "switched-off": 8,
     "unconfigured": 15,
     "absent": 142,
+    "attire": 2,
     "unmet": 50
   },
-  "missingTotal": 231,
+  "missingTotal": 233,
   "generatedBy": "tools/phrase-coverage.js --ledger"
 }
