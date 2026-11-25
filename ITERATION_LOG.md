@@ -7206,3 +7206,39 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 - **提交**：`9a7633e`（12 文件 +668/−656）。**未做**：新一轮全量回归（用 7560000 上限重跑）尚未出终态 ——
   **本批 9 处全判预存，但「预存」≠「已全部清偿」**：第 4/5 条已修，其余（如 `narrative-depth-wire-v2545`
   的超时假红）待下一趟全量复核。BUILD_ID 待首笔提交后随惯例补。
+
+## R253（v2.582.0 · 外壳被杀的终态回写 + 全量首次跑通）
+
+- **病根是现场实证的**：第二趟全量（`/tmp/worldaxis-regression-D9FOP2`）外壳被外部 SIGKILL 后，
+  `result.json` 永久停在 `{"status":"running"}`；日志停在 UI 实机那一节不动，读起来像「那节卡死」；
+  而 worker 因 `detached:true` 被 init 收养、**照常继续跑**（Chromium 成孤儿又活很久）。
+  三句都是读数在撒谎，且互相掩盖。
+- **已有的一半**：`watchParent()` 只管 worker 侧（父没了 ⇒ 写 `orphan.json` ⇒ 自杀）。
+  反过来这一半没人管：**外壳死了，谁把 running 改成终态？**
+- **补的两处**：① `watchParent` 内发现父已死时，除写 `orphan.json` 外，把仍为 running 的
+  `result.json` 收成 `runner-failed` + `stopping:'detached'` + detached 证据；
+  已写 `finishedAt` 的结果**逐字不动**。② `launch()` 补 `SIGHUP` / `uncaughtException` 钩子
+  （原来只有 SIGTERM/SIGINT，而 SIGHUP 正是「会话没了」那一路）。
+- **本轮最关键的一条（同步探测）**：孤儿看护原本走 `setInterval`，而 run.js 的断言面是**同步**的
+  —— 一节被同步测试占满时（v2.82.0 实测 388s、UI 实机 214s），定时器在整个窗口里
+  **一次都轮不到**。现场实证（`/tmp/worldaxis-regression-79RqRw`）：外壳死后 worker 又活十几分钟，
+  `orphan.json` 一个字没写出来 ——「定时器会报」在这类形态下是假的。
+  新增 `probeOrphan()`（同步、不依赖定时器），并在 `section()` 入口每节调一次：
+  父真没了 ⇒ 立刻收尾退出。非 worker 态 `armed:false`，零副作用。
+- **一手实测（不是只靠锁）**：起一趟全量 → `kill -9` 外壳 → 30s 后 `result.json` 变
+  `runner-failed` / `detached.why:parent-gone`，`orphan.json` 同时在，worker 已终止。
+  改回前用同一手法复现了「running 永久挂着 + worker 被收养继续跑」。
+- **专锁** `tests/isolated-runner-lock.js` 43 → **49/0**，新增六条全是反向判据
+  （孤儿把 still-running 收成终态 / 已写终态不被覆盖 / `probeOrphan` 三态）。
+- **判据跟位**：`segment-extract-v2400.js` 的 A6b（调用点区间上限 2430→2450）与 A11
+  （run.js 减重硬线 2400→2381，实测 23620 行）。按本仓既有做法按实测跟位、不预支。
+- **全量首趟跑通**（`/tmp/worldaxis-regression-UTMUj7`）：`assertion-failed`、
+  **通过 26011 / 失败 2**、`unchanged:true`、未触发超时 —— v2.582.0 第一次拿到完整终态。
+  两条失败**都是本批引入**（这次不能再说预存）：
+  1. `q9 C6` stale 3 条（改过的三个文件 sha 变了）⇒ `evidence-index --write`，判据该红。
+  2. `opv29-z1-11 A3a` `world.js` 1399 行 > 预算 1340。证据链清楚：本批前 1333 行判据绿，
+     簇三给 world 加四条注入面守卫 +71 行 ⇒ 真超支，按实测跟位 `engMax 1340→1400`。
+- **提交**：`0df83be`（终态回写 + 专锁 + 跟位，4 文件 +133/−3）、`917ca2d`（两处失败修绿，2 文件）。
+- **未做（如实登记）**：修完后再起的最终确认全量（`bRBJWB`）在跑，终态未出。
+  真实 SillyTavern 宿主上的 `v10-ui-pills` / `v10-r3-persist-hosted` 两件**本趟未执行即未证明通过**，
+  仍按如实登记留在原处。
