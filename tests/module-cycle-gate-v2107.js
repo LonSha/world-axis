@@ -553,7 +553,14 @@ function runAll(A) {
 //   · (engines/mood-glide.js, playtime)      —— v2.568.0 情绪回落优先读世界钟 worldMinutes()
 //   四条都是真调用点（不是「文件里出现过」），集合去重后各算一对；装载期仍 476
 //   （四个文件都不在装载期读 WA）。恒等式 476 + 4050 = 4526。
-A(a.edgesLoad === 476 && a.edgesCall === 4050 && a.edgesAll === 4526 && a.identityOk,
+//   v2.579.0 复算补账（**上一批漏跟位的既有欠账，不是本批新增**）：v2.570.0 天气直方图名额批
+//   给 engines/weather.js 加了 sceneSlice 读（第 134 行 `WA.sceneSlice.read()`，注入面按玩家所在
+//   地点取切片）⇒ 调用期边 +1。当时只登记了那条直方图截断，没回填本常量，于是 B2 在 v2.570.0
+//   之后就一直红着（本批发现时 HEAD 的实测已是 4051 / 4527，而常量还写着 4050 / 4526）。
+//   置信方式：`git worktree` 取 cdb0f32（常量最后一次写入）与 HEAD 各扫一遍，逐条 diff 得**恰好
+//   一条新增、零条消失**：`engines/weather.js -> sceneSlice [call]`；order-violation 仍 0、unprovided 仍 0。
+//   恒等式 476 + 4051 = 4527。供者 core/scene-slice.js 不在此边的装载期面上（weather 尾部才读）。
+A(a.edgesLoad === 476 && a.edgesCall === 4051 && a.edgesAll === 4527 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'

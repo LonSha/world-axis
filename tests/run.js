@@ -22876,6 +22876,14 @@ await runScript('./settings-index-hit-quota-v2577.js');
     //   并把 landed 拒收提到截断之前（已写安排不能被名额藏掉）。23 段 A/B/C/N。
     //   单独跑：node tests/plan-audit-quota-v2578.js
 await runScript('./plan-audit-quota-v2578.js');
+    // v2.579.0（按序截断第二十二处）：跨世界传说注入名额。
+    //   旧写法 v.rows.slice(-cfg.maxItems)：取**登记尾部**（≈导入顺序，不是新旧），
+    //   且 maxItems 坏值时 slice(-'x')=slice(NaN)=slice(0) 会**整环全念**；念了几条/还剩几条一个字不说。
+    //   实测（/tmp/probe579.js）：六条传说名额2 ⇒ 旧版念最旧两条、零自证／block=undefined／'x' 时 6 条全念。
+    //   改法 pickLegends(at 倒序 + id 兜底) + 块尾自证「另有 K 条未列出」+ block 五栗 + stat() 深拷；
+    //   关闭开关时 block 保持 null（不冒充「空表」）。23 段 A/B/C/N。
+    //   单独跑：node tests/world-bridge-block-quota-v2579.js
+await runScript('./world-bridge-block-quota-v2579.js');
     // v2.529.0（V29 优化线 Z3）：OPV29-16 红门禁最小复现 —— 18 项。
     //   病：全量回归≈29 分钟。跑红了只打印「[脚本 ./xxx.js 子进程 rc=1] …」，
     //     不给怎么单独跑它。重跑代价高到人会「先记下来待会儿看」，然后就忘了 ——
@@ -23404,7 +23412,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.578.0';
+  const __wantPin293 = '2.579.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

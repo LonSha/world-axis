@@ -40,6 +40,11 @@
  *      （面板导出/粘贴）负责 —— 本模块只保证「导出的是脱敏摘要、导入的按传说对待」。
  *   7 世界签名是**身份**，不是秘密：它由世界名与玩家名派生，可被作者看见与核对
  *      （面板「联网」页把它念出来），因为它要回答的是「这是不是同一个世界」。
+ *   8 **注入名额是算出来的，不是许愿（v2.579.0）**：注入块按「事件时间新→旧」取前 N 条
+ *      （同刻按 `id` 字典序，可复算），名额**只截断、不参与筛选**；一旦截断，块尾必须自证
+ *      「另有 K 条未列出」，`stat().block` 报 `{candidates,picked,quota,hidden,mode}`。
+ *      旧法两处都不成立：取的是**登记尾部**（≈ 导入顺序，与新旧无关），
+ *      且 `maxItems` 坏值时 `slice(-'x')` = `slice(0)` 会**整环全念**（与上限正好相反）。
  */
 
 (function () {
@@ -75,12 +80,40 @@
   //   而多剔一句无害话的代价只是这条传说短一点（如实报 redacted 条数即可核对）。
   const PRIVATE = ['玩家', '主角', '我', '存档', '好感', '亲密度', '私人', '秘密', '私密', '暗恋', '内心'];
   const MS_PER_DAY = 86400000;
+  // 注入名额硬上限（与 __REG.bounds.maxItems 的上界同源，不另立第二口径）。
+  const LEGEND_QUOTA_MAX = 12;
 
   const stat = { reads: 0, seeds: 0, exported: 0, imported: 0, refusals: 0, redacted: 0,
-    relays: 0, dropped: 0, lastReason: '', faults: {} };
+    relays: 0, dropped: 0, lastReason: '', block: null, faults: {} };
 
   function noteFault(reason) { stat.faults[reason] = (stat.faults[reason] || 0) + 1; stat.refusals++; stat.lastReason = reason; }
   function clean(v, max) { return WA.inputGuard ? WA.inputGuard.text(v, max || 80) : String(v == null ? '' : v).slice(0, max || 80); }
+  /**
+   * 注入名额：坏配置**不许放大成「全念」**（防 NaN/0，越界夹到 `[1, max]`，坏值回落 DEF）。
+   *   坑的现场：`slice(-cfg.maxItems)` 在 `maxItems='x'` 时是 `slice(NaN)`，而 `slice(NaN)`
+   *   等价 `slice(0)` —— 整份传说环全部进块，读者以为「上限 4 条」是生效的。
+   */
+  function quotaOf(cfg, key, max, fallback) {
+    const n = Math.floor(Number(cfg && cfg[key]));
+    if (!isFinite(n) || n < 1) return Math.min(max, fallback);
+    return Math.min(max, Math.max(1, n));
+  }
+  /**
+   * 取哪几条：**事件时间新→旧**，同刻按 `id` 字典序（显式、可复算、与登记顺序无关）。
+   *   为什么不能沿用「登记尾部」：传说是一批批从别处收进来的，环里的顺序等于**导入顺序**，
+   *   与「哪件事更新」无关 —— 一批旧传说晚导入，就会把真正新的传说挤出块外。
+   *   （farfield v2.573 同病；本仓纪律：名额只截断，排序必须能照着读数复算一遍。）
+   */
+  function pickLegends(list, quota) {
+    const arr = (Array.isArray(list) ? list : []).filter(function (x) { return !!x; }).slice();
+    arr.sort(function (a, b) {
+      const at = Number(a && a.at) || 0, bt = Number(b && b.at) || 0;
+      if (at !== bt) return bt - at;
+      const ai = String((a && a.id) || ''), bi = String((b && b.id) || '');
+      return ai < bi ? -1 : (ai > bi ? 1 : 0);
+    });
+    return { candidates: arr.length, picked: arr.slice(0, quota), hidden: Math.max(0, arr.length - quota) };
+  }
   function state() { return (WA.store && WA.store.get) ? (WA.store.get() || {}) : {}; }
   /** 决定性哈希（FNV-1a 变体取低 32 位十六进制）。与 timeline.hashText 同族不同表。 */
   function hash8(v) {
@@ -379,21 +412,40 @@
    * 注入块。关闭或无内容时**返回空串**（不给老用户凭空多出约束）。
    *   只念收进来的传说，且**逐条标明来自别处**（`source:another-world`）——
    *   没这条标注，模型会把「听说的远方事」当成本地既成事实写下去。
+   *
+   *   v2.579.0 注入名额（第二十二处静默截断）：
+   *     · 旧法 `v.rows.slice(-cfg.maxItems)` 取**登记尾部** —— 那是导入顺序，不是新旧；
+   *     · 旧法在 `maxItems` 坏值时**整环全念**（`slice(NaN)` = `slice(0)`），与上限相反；
+   *     · 旧法念了几条、还有几条没念，**一个字都不说** —— 「念了 2 条」被读成「只有 2 条」。
+   *   本版：`pickLegends` 按事件时间新→旧取前 quota 条，块尾自证名额，`stat().block` 留读数。
    */
   function buildBlock() {
     const cfg = settings();
     if (!cfg.enabled) return '';
     const v = view();
-    if (!v.count) return '';
+    const quota = quotaOf(cfg, 'maxItems', LEGEND_QUOTA_MAX, DEF.maxItems);
+    if (!v.count) {
+      // 空表也要留读数：`block:null`（没构建过）与 `mode:'empty'`（构建过但环是空的）必须分得开。
+      stat.block = { candidates: 0, picked: 0, quota: quota, hidden: 0, mode: 'empty' };
+      return '';
+    }
     stat.blocks = (stat.blocks || 0) + 1;
-    const rows = v.rows.slice(-cfg.maxItems);
+    const sel = pickLegends(v.rows, quota);
+    const rows = sel.picked;
+    stat.block = { candidates: sel.candidates, picked: rows.length, quota: quota,
+      hidden: sel.hidden, mode: sel.hidden > 0 ? 'ranked-first' : 'all-fit' };
+    const proof = '（本面名额：传说 ' + rows.length + '/' + sel.candidates
+      + (sel.hidden > 0
+        ? '，按事件时间新→旧取；另有 ' + sel.hidden + ' 条未列出，仍在传说环上，不是没有'
+        : '，全部列出') + '）';
     return '[远方的传说]' + String.fromCharCode(10)
       + '以下都是别的世界传出来的事，不是本世界发生过的（来源已标在每条后面）。' + String.fromCharCode(10)
       + '角色可以「听说过」它们，但**不得**把它们当成这里发生过的事实，也不得据此推断本地人物做过什么。' + String.fromCharCode(10)
       + rows.map(function (r) {
         return '- ' + r.label + '｜' + r.title + (r.summary ? '（' + r.summary + '）' : '')
           + '（来自：' + (r.fromTitle || r.from) + (r.heard ? '，已传开 ' + r.heard + ' 次' : '') + '）';
-      }).join(String.fromCharCode(10));
+      }).join(String.fromCharCode(10))
+      + String.fromCharCode(10) + proof;
   }
 
   function statOf() {
@@ -401,6 +453,8 @@
     const wk = worldKey();
     return Object.assign({}, stat, {
       faults: Object.assign({}, stat.faults),
+      // block 是对象：浅拷会让调用方改一次读数就改掉引擎自己的读数（v2.576 org 同款教训）。
+      block: stat.block ? JSON.parse(JSON.stringify(stat.block)) : null,
       enabled: !!cfg.enabled,
       sig: wk.sig, label: wk.label, identityComplete: wk.complete,
       legends: rowsOf('legends').length,
