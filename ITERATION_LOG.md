@@ -7129,3 +7129,80 @@ disabled 闸、buildBlock 纪律段计数+零链名）+ 负控制 N0/N0b/N1×3/N
 ## R250（v2.410.0 · 收尾读数）
 
 - **BUILD_ID** → `acd16d586342a4d474b613b3ee183fd2cd8a4eca`（首笔 `v2.410.0 收口：全量回归 98 红逐簇修绿——幻影 def 注释剥离（driver-ledger 真缺陷）+ 13 模块设置口接线（真缺陷）+ first-run 四态判定链修复（真缺陷）+ UI 接线锁 9 文件换 panel-source 重组面 + stamp 锚定收紧 + capability-tier 基线跟位 + O8/U4 账本 268 条（R250）`，41 文件 +706/−295）。已推送 872293a..acd16d5。全量回归随即起跑（干净 HEAD 上的最终裁决面）。
+
+## R251（v2.582.0 · 同形态头截断·簇三：14 引擎 18 处注入名额一次统一。补记——日志自 v2.410.0/R250 起断档）
+
+- **先说断档（如实登记，不补造）**：本文件最后一条 R 条目是 R250（v2.410.0）。v2.411.0～v2.581.0 这段
+  的搬运与交付在 git 提交信息里逐条在（`git log --oneline v2.410.0..v2.581.0`），但没有回写本文件，
+  而 `docs/contributing.md` 第 7 步要求「每轮追加一条 R 条目」。本条目与 R252 **只补本批（v2.580.0～v2.582.0）**，
+  中间的断档**不在这里凭空复述**（复述等于制造第二真源，且没有当时的门禁读数可引）。
+- **病灶形态（与簇一/簇二互补）**：v2.580.0 簇一（hazard/lifeline/body-anatomy 3 引擎）与
+  v2.581.0 簇二（13 引擎）治的都是**取尾部**——`list.slice(-Math.max(1, cfg.maxRows))`，
+  把「登记最旧的那几条」念给模型，且零自证。本批治**取头部**：
+  `arr.slice(0, cfg.maxX)` 共 18 处站点、跨 14 个引擎（affect/economy/inst/life×3/mend/
+  one-shot-mod/opportunity/plan/probe/region/shadow/stall/threads/world×4）。
+- **为什么头截断要单独治、不能照搬簇二**：头部顺序是**刻意排好的**（谁该先被念），
+  簇二的「按时间新→旧重排」在这里是**破坏语义**。故 `pickHead` 体内**禁止出现 `sort`**，
+  并把这条写成静态判据 `head.indexOf('.sort(')<0` —— 判据不只钉「做对了」，还钉「没做错那件事」。
+- **真正要堵的两件事**（都不是「截多了」）：
+  1. **名额读坏时不许把整面静默清空**：旧法在 `maxX` 读到 `NaN`/`'x'`/负数时得空数组 ⇒
+     整个注入面消失且一个字不说，比截多了更坏（截多了还看得见项，清空连项都没了）。
+     落点 `headQuota(cfg,key,max,fallback)`：坏值一律拉回 `bounds` 上界内的 DEF。
+  2. **截掉多少条要自证**：`stat.block` 留 `faces`（逐面 candidates/picked/hidden/quota/rounds/mode）
+     + `totals`（顶层求和），块尾独立成行写「X 条中念 Y 条，另有 K 条未列出」。
+- **落点五件套**：`headQuota` / `pickHead(list,quota,face)`（只 `all.slice(0,q)`，同面多次调用按条累加）/
+  `blockOf()`（每次重算新对象）/ `proofOf()` / `headRound()`（在 `buildBlock` 入口清账）。
+- **逐引擎特例**：life 三面（人物/目标/约定，`maxPeople=2` 只念 2 人 ⇒ 三面读数 `[2,2,0]`）；
+  world 四条（地点/共同日程/道路固定 6 只记账不读设置/在途，`maxJourneys` 无 bounds 自定上界 12）；
+  opportunity 的**顺序权仍归 v2.561.0 的 `pickBlock`**（按谁先关窗口），本批只接它给出的 `rs`，
+  在专锁里以 `prefix:false` 显式标为不适用——**不适用要写出来，不能默默少检**；
+  one-shot-mod 原有的「另有 K 条未列」改为读同一份 `HEAD_FACES[...].hidden`（同一判据不许写两遍）。
+- **补丁自身犯的两个错（已修并写负控钉死）**：
+  1. 块尾自证贴在正文最后一句引号后 ⇒ **与正文同一行**，视觉上等于没写（13 家里只有 affect/life 自带换行）。
+     全部补 `String.fromCharCode(10)` / `nl` 独立成行。「说了」和「看得见」是两件事。
+  2. `HEAD_FACES` 为 life 逐人物累加而设计，却会**跨轮叠数**（重复调用 `buildBlock` 读数翻倍）⇒
+     补 `headRound()` 入口清账，并写 N4 负控（拆掉清账 ⇒ 读数必变 ⇒ 必须红）。
+- **专锁** `tests/inject-block-quota-cluster3-v2582.js` **100 项**：A 静态（旧刀 `.slice(0,` 不得留在
+  `buildBlock` 体内、`pickHead` 内无 `sort`、四函数在位）/ B 行为（逐面 candidates/picked/hidden 精确值 +
+  渲染出的 id 必须是**原顺序前缀**，不写死名额）/ C 读数（坏配置回落 DEF 且 `picked>=1`——正是旧法
+  `slice(0,NaN)` 的缺口；空表 `mode:'empty'`；连跑两轮读数不翻倍；`block` 每次新对象）/ D 求和自洽 /
+  N 四类负控（拆守卫、头改尾、去自证、拆清账）。首跑 19 红，归六类逐一处置后 **100/100**。
+- **同族零回归**：cluster1 36 / cluster2 101 / cluster3 100 / opportunity 29 / probe 23 / world-bridge 23 /
+  plan-audit 23 / org-block 25，20 个 `*quota*` 锁零失败。
+- **版本面与六本账本跟位**：VERSION/manifest → 2.582.0、入口钉版 `__wantPin293`、三账本 `--update`、
+  `evidence-index --write`（676 条）、`consumer-types --register`、`gen-error-codes`（1925 码）、
+  `gates.md` 回填、`segment-extract BASE_TEST_FILES 679→680`、`repo-hygiene --gc`。快档 14/14。
+- **提交**：`2eb573e`（38 文件 +1478/−200）。**未做**：全量回归未跑（收口门槛，交 R252）。
+
+## R252（v2.582.0 · 全量回归 9 红逐簇处置 + 外壳硬超时第四次现形）
+
+- **首趟全量终态不是「有红」，是「没跑完」**（`/tmp/worldaxis-regression-7Gg6mk`）：
+  `status=source-changed` / `signal=SIGKILL` / `stopping=timeout`，跑完 **465/466 节**时被墙钟上限杀掉。
+  **这一条必须单独写**：它读起来像环境问题，实际是「预算没跟上实测」。
+- **外壳硬超时（第四次同型现形）**：`tools/slow-sections.js` 对本轮日志实测
+  **416 节合计 5004.52s（83.4 分钟）**、17 节超 60s、最重 492.17s（V11 端到端矩阵）。
+  默认值 5100000ms（85.0 分钟）只多 1.6 分钟。沿革四次
+  600000/660000/2280000/5100000 病根**逐字相同**：取值只跟到「上一次实测」，本轮新增的节没人重算。
+  按项目自己的公式重算 **7560000ms（126.0 分钟）**，与工具建议逐字一致。
+  三处站点同改（`tests/gate-timeout.js` / `tests/run.js` / `tests/isolated-runner.js`）
+  **并把 v2203 判据的复算输入同批改**（3394.68 → 5004.52s）——只改默认值不改输入，下一轮判据必红。
+- **9 处红全部定性为预存（无一为本批引入）**，定性方法是干净 HEAD 复跑：
+  `/tmp/wa-clean2582b@1816f3e`。新增的 4 个面孔逐个双跑：`v11-master-matrix` CLEAN rc=1 / CUR rc=0；
+  `opv29-z3-18` 与 `z4` 两侧 rc=1 且失败项逐字相同；`narrative-depth-wire-v2545` 两侧 rc=0（超时假红）。
+  1. `s3-tx2-v2166.js` L113/L116 白名单最大版本 569 未跟 582 ⇒ 连带 v2166/tx2 A10/A11 + v2185/vs + N4。扩到 `'2.582.0'`。
+  2. 四个 plans 的现场读数块过期（O7 计划树门禁 7 红）⇒ `gen-plan-status.js --write`。
+  3. `q9 C6` stale 11~12 条 sha-changed ⇒ `evidence-index --write` 重建 676 条。
+  4. `opv29-z3-18` A2/A4 stale 2 条：改 plan 文本后的**真漂移**⇒ `plans/V29_MASTER_PLAN.md`
+     组读数跟位（tests **663→677**、world.js **80K→84K**）。
+  5. `opv29-z4` B10 的根因即上一条（plan 读数漂移 ⇒ z3-18 输出不逐字节相同）。
+- **门禁复验**：smoke 14/0；s3-tx2 47/0；version-surface-gate 14/14；o7-plan-tree 69 pass；
+  gate-timeout rc=0 且三处同值 + 公式复算自洽（7560000 / 126.0 分钟）；gate-timeout-v2105 54 项；
+  q9 67/0；opv29-z3-18 27/0；opv29-z4 25/0；`fact-report` 九项无新增红；`loose-readings` 全绿。
+- **两个值得记住的坑**（都是判据侧的，不是产品的）：
+  1. **注释里的同款写法会被当成站点**：`re.finditer(r'\.slice\(0,')` 在 probe 上多抓一处 ——
+     那是 v2.560.0 注释里**原样引用**了同一句。必须按行内 `//` 过滤（过滤后 18/18 全对）。
+  2. **门禁失败行前缀不统一**：`o7-plan-tree-gate-v2187.js` 用**小写 `x ` 前缀**而非 `✗`，
+     只按 `✗` 过滤会一次漏掉 7 条红。
+- **提交**：`9a7633e`（12 文件 +668/−656）。**未做**：新一轮全量回归（用 7560000 上限重跑）尚未出终态 ——
+  **本批 9 处全判预存，但「预存」≠「已全部清偿」**：第 4/5 条已修，其余（如 `narrative-depth-wire-v2545`
+  的超时假红）待下一趟全量复核。BUILD_ID 待首笔提交后随惯例补。
