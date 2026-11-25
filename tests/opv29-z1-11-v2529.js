@@ -28,7 +28,10 @@ const TRIPLE = [
     tabLines: 167, tabKeys: 8, ns: 'backstageProtocols', varName: 'backstageProtocols' },
   { eng: 'engines/world-lab.js', tab: 'engines/world-lab-tables.js', engMax: 1290,
     tabLines: 66, tabKeys: 15, ns: 'worldLabTables', varName: 'worldLabTables' },
-  { eng: 'engines/world.js', tab: 'engines/world-tables.js', engMax: 1340,
+  // v2.582.0 回填：1340 → 1400。本批（头截断·簇三）给 world 加了四条注入面的名额守卫
+  //   +块尾自证（headQuota/pickHead/blockOf/proofOf/headRound），实测 +71 行（1333 → 1399）。
+  //   这一笔不是「拆段成果被吃掉」（world.js 仍远低于拆前），是预算没跟上新增面；按实测跟位。
+  { eng: 'engines/world.js', tab: 'engines/world-tables.js', engMax: 1400,
     tabLines: 61, tabKeys: 10, ns: 'worldTables', varName: 'worldTables' }
 ];
 const RD = function (rel) {
