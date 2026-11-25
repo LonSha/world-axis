@@ -173,7 +173,9 @@ function turnOffTierEngines(WA) {
 //   带 buildBlock 的引擎分批进面（V7/V8/EXV 各批），常量没跟着重算 —— 同一个病第三次犯。
 //   现在的真源是 capability-tier-v2257 的 `RUNNING0 = 131`（出厂开 **且** 有注入面的机制），
 //   两处必须同值：本条一旦单独改就会与那条打架，故一并注明。
-const FACTORY_RUNNING = 131;
+// v2.584.0 跟位：attireState 出厂开启且有注入面 ⇒ 131 → 132（真源仍是
+//   capability-tier-v2257 的 RUNNING0，两处必须同值）。
+const FACTORY_RUNNING = 132;
 function runB(a) {
   const env = fresh();
   const WA = env.WA;

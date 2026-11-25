@@ -486,7 +486,15 @@ async function launch(root, options) {
     //   「外壳给多少内存都不作数」是同一件事的第二个侧面（那版修了转发，没修默认）。
     //   取值 3072 MB：本机 available 约 4.5 GB，单趟只有一个 worker，留够给父进程与 tar/git。
     //   显式传了 `--max-old-space-size` 时以调用方为准（既有行为逐字不变）。
-    if (!memArgv.some(function (a) { return /^--max-old-space-size/.test(a); })) memArgv.push('--max-old-space-size=3072');
+    //   v2.584.0：3072 → 5120。现场实证（/tmp/worldaxis-regression-PBhwNd，v2.584.0 前夜）：
+    //     跑到 25339 ✓ / 12 ✗、4156 秒时 `FATAL ERROR: Reached heap limit`，
+    //     Mark-Compact 已到 2983.3 → 2992.3 / 3144 MB —— **卡的是 V8 堆上限，不是内核 OOM**。
+    //     前几趟（1ZNrcK / PqiJnz）我一直把它当「机器内存不够」，那两趟的现场也确实有
+    //     Mem free 只剩几百 MB，但这一趟给出了更硬的归因：在同一位置、同一句 FATAL，
+    //     heap 触顶后进程才死，日志因此停在某一节不动 —— 「读数不动」不等于「那节卡死」。
+    //   本机 available 约 2–4 GB（另有 16 个 lmp-fresh 的 node 进程常年占内存），
+    //   5120 是「够跑完全程且不至于把父进程挤掉」的折中；显式传 `--max-old-space-size` 仍以调用方为准。
+    if (!memArgv.some(function (a) { return /^--max-old-space-size/.test(a); })) memArgv.push('--max-old-space-size=5120');
     child = cp.spawn(process.execPath, memArgv.concat([path.join(prepared.work, 'tests/run.js')]).concat(fwd),
       { cwd: prepared.work, env: prepared.env, detached: true, stdio: ['ignore', fd, fd] });
     result.childPid = child.pid; save();

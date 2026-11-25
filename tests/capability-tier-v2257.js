@@ -134,18 +134,24 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //     这次不是新引擎批量入场，而是**有注入面的机制也涨了**（MECH 117 → 131），
 //     说明上一批 EXV27 之后又有一批带 buildBlock 的引擎进了装载面，而登记没跟。
 //     判据本身没动：仍是「本测试面的实测值写进常量，断了就红」。
-const BASE_ON = 290;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
+// v2.584.0 跟位：attireState（穿着状态，v2.583.0 入场）**出厂 enabled:true 且有 buildBlock**，
+//   ⇒ 四数同批 +1：BASE_ON 290 → 291、MECH 132 → 133、RUNNING0 131 → 132、FULL_MECH 132 → 133。
+//   恒等式不动：MECH − RUNNING0 = DORMANT 仍成立（133 − 132 = 1），
+//   FULL_RUNNING = MECH + (BASE_ON − RUNNING0) 仍由恒等式算出，不写魔法数。
+//   为什么这不是「放宽」：四个常量都是**读数**，判据（出厂态自洽 / full 后真涨 / 回滚真收回）
+//   一条没动；新引擎默认开启这件事本身若被改成关闭，这四数会再次红。
+const BASE_ON = 291;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
 // v2.542.6 跟位：叙事脊柱 L1 的 sceneIntent **有 buildBlock（有注入面）但出厂 enabled:false**。
 //   为什么它必须是出厂关：L1 的零 token 边界——它被打开之前，注入字节必须与 v2.541.7 逐字节一致
 //   （判据见 tests/scene-intent-v2542.js 的 A 段）。于是它成为**第一个**「关着但有注入面」的机制，
 //   这不是漂移，是有意的设计：MECH 131→132、DORMANT 0→1、FULL_MECH 131→132，
 //   恒等式 MECH − RUNNING0 = DORMANT 仍成立（132 − 131 = 1）。
-const MECH = 132;           // 有注入面的机制数
+const MECH = 133;           // 有注入面的机制数（v2.584.0: +attireState）
 const DORMANT = 1;          // 关着但有注入面的（= sceneIntent：出厂关、有注入面，见上）
-const RUNNING0 = 131;        // 出厂开 且 有注入面的
+const RUNNING0 = 132;        // 出厂开 且 有注入面的（v2.584.0: +attireState）
 // full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
 // v2.294.0：= MECH(103) − L3_EXCLUDES(35)。排除名单本身未变，变的只有 MECH。
-const FULL_MECH = 132; // 全开策略后 full 与出厂一致（132；v2.542.6 随 MECH 131→132 跟位）
+const FULL_MECH = 133; // 全开策略后 full 与出厂一致（133；v2.584.0 随 MECH 132→133 跟位）
 const FULL_RUNNING = FULL_MECH + (BASE_ON - RUNNING0);
 
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
