@@ -102,7 +102,7 @@
 
 ## 四、这把锁锁了什么
 
-`tests/orphan-engine-adjudication-v2550.js`：A/B/C/D/E 五组，共 21 段。
+`tests/orphan-engine-adjudication-v2550.js`：A/B/C/D/E 五组（21 段）+ F 组（第二批，14 段），共 35 段。
 
 - **A 定义面**（A0–A3）五台都在 `WA` 上、关键方法在场、`WA.<ns> = {` 在各自文件里恰 1 处、
   `getSettings().enabled` 均为 `true`（把「默认开着」也钉住：改成默认关要回来改本文）。
@@ -117,6 +117,76 @@
   三个排除面确实存在、`autoHide` 仍在窄消费者台账里（本裁决不新增也不注销条目）。
 
 负控：在 `render/inject.js` 里加一行 `WA.polish` 引用 ⇒ C 段立刻红并点名该文件；删掉即绿。
+
+## 四点五、第二批（v2.588.0 / R264）：又七台「定义面完整、故事面零读」
+
+> 起因：R264 盘「项目最欠缺」时按 `tests/ns-consumer-ledger.json` 逐条复算，
+> 发现零读名单里除上面五台，还有七台处于同一状态（合计约 1,188 行）。
+> 本轮**不接线**，只把裁决补齐 —— 否则账本说「零读」、本文说「五台」，
+> 第八台起就没有任何地方回答「为什么它有定义面却没人读」。
+
+这七台的形态与前五台不同，所以**不塞进同一张表**：其中三台（`observationProjection` /
+`unifiedPending` / `fieldWriters`）根本没有设置面，硬套「`getSettings().enabled` 必为 true」
+会要求它们凭空长出一个设置面 —— 那是为了迁就锁而改产品。
+
+| 引擎 | 命名空间 | 文件 | 面板开关 | 工具表 | 行动台 | 注册行 | 故事面 |
+|---|---|---|---|---|---|---|---|
+| 输入润色与合并 | `refine` | `engines/refine.js` | 1 行 | 0 | 0 | 1 行 | **零** |
+| 观察面投影 | `observationProjection` | `engines/observation-projection.js` | 0 | 0 | 0 | 1 行 | **零** |
+| 作用域绑定 | `binding` | `engines/binding.js` | 1 行 | 0 | 0 | 1 行 | **零** |
+| 自定义历法规划 | `calendarPlan` | `engines/calendar-custom.js` | 1 行 | 0 | 0 | 1 行 | **零** |
+| 净域保护 | `purifyScope` | `engines/purify-scope.js` | 1 行 | 0 | 0 | 1 行 | **零** |
+| 统一待办聚合器 | `unifiedPending` | `core/unified-pending.js` | 0 | 0 | 0 | 1 行 | **零** |
+| 字段写者登记 | `fieldWriters` | `engines/field-writers.js` | 0 | 0 | 0 | 1 行 | **零** |
+
+逐个的「为什么现在不接」与改判触发器：
+
+- **`refine`（`engines/refine.js`，与 `polish` 同族）** —— 它与 `polish` 真正的区别是
+  `merge` / `condense`：把多段玩家输入合并、压缩成一段。缺的是同一件事：
+  **一个「玩家要求改写原话」的显式入口**。没有它，接进输入侧就是把玩家原话改掉。
+  改判触发器：与 `polish` 共用一条（显式按钮 + 原文独立保存），且合并/压缩的行为要**分别**
+  给玩家开关（合并与润色不是一回事，一条开关盖两项是另一类假读数）。
+- **`observationProjection`（`engines/observation-projection.js`）** ——
+  `project` / `sole` 判的是「同一个观察被几个视角提到、哪些视角是唯一来源」。
+  这需要一份**观察者维度**的上下文，而本仓的注入装配是按「楼层 + 角色」组织的，
+  没有「这条信息是谁看到的」这个坐标。硬接的后果：所有观察被投影成同一个来源，
+  读数看起来有值，实际全是恒定值。
+  改判触发器：`engines/geo-tracker.js` 之外出现第二个「视角/在场」坐标系（例如
+  某个场景锁开始按在场者筛信息），届时投影才有输入。
+- **`binding`（`engines/binding.js`）** —— `bind` / `read` / `unbind` 是**作用域级**的
+  变量绑定（`SCOPES` 是常量表），与 `corridor` / `变量驱动条款` 有交集但语义更宽。
+  缺的是「谁在什么作用域里写变量」这条纪律落地 —— 本仓的变量写点目前是扁平的。
+  先接它会得到「绑定表能查，但没人绑」的空表。
+  改判触发器：`ui/pages` 出现「按作用域编辑变量」的编辑面，或注入层开始按作用域取变量。
+- **`calendarPlan`（`engines/calendar-custom.js`）** —— 自定义历法（`setMonths` / `getMonths`）
+  需要玩家先定一套历，然后全仓按它算日期。而 `engines/clock.js` 已是时间唯一真源，
+  两者并存必须先回答「谁覆盖谁」，否则同一天会有两种读法（这是本仓治过多次的
+  「同形不可分辨」）。
+  改判触发器：历法成为**clock 的一个可配置字段**（而不是第二条时间真源）时，本台并入 clock 或退役。
+- **`purifyScope`（`engines/purify-scope.js`）** —— `protect` / `restore` 是「某些文本
+  不该被注入净化掉」的白名单机制。它的前提是**已有一条会误伤的净化路径**；本仓的
+  净化是逐条显式规则（`PATTERNS`），没有「先净化再恢复」的两段式。
+  改判触发器：出现「批量净化 + 事后回滚」的真实需求（例如导入既有世界后统一清洗）。
+- **`unifiedPending`（`core/unified-pending.js`）** —— 这是**最可惜的一台**：它把
+  `todo` / `beat` / `chapter` / `intel` 四处的「待办」合并成一份视图
+  （`collect` 返回 total / high / hands / skipped），正是「待办中心」页最该读的东西，
+  而待办页读的是分散的各家读口。它的 3 处 `WA.unifiedPending` 全在同一文件里，
+  其中 2 处在**文档注释**里 —— 这正是它「看起来定义面完整、实际无人读」的成因。
+  改判触发器：`ui/pages` 的待办页（`todo`）改读 `collect()` 一次成表；这条改动**可以现在做**，
+  但它会改一页的读面，必须与那一页的专锁同批（不在本裁决的范围内）。
+- **`fieldWriters`（`engines/field-writers.js`）** —— `conflicts` / `undeclaredConflicts`
+  判的是「同一个字段被两个写者写过」，是一把**静态审计**刀，天然该由 `tool-diag` 侧消费，
+  而不是故事面。它零读的结论与 `autoHide` 同型：**它不是欠接，是它本来就该停在工具面**。
+  改判触发器：若它被接进故事面（例如写前查冲突），那时它不是「审计」而是「闸」，
+  本裁决应改判为「已接」并改锁。
+
+### 与零读账本的关系（第二批）
+
+七台全部仍在 `tests/ns-consumer-ledger.json` 的 `entries` 里，分类不变；
+本裁决**不注销任何条目**——同一句话再说一遍：注销需要读点。
+
+台账里 `fieldWriters` 与 `unifiedPending` 的档位是「程序或宿主消费」，本文的档位是
+「故事面有没有人读」。两个问题不同，所以两处都不注销。
 
 ## 五、复算命令
 
@@ -139,8 +209,20 @@ done
 # 宿主隐藏动作是否存在（预期：只有注释提到 /hide，没有调用）
 grep -rnE 'hideMessage|/hide' --include=*.js core render ui engines | wc -l
 
+# 第二批七台的零读复算（应全为 0；行尾注释里提到的 `WA.x = {...}` 不算读点）
+for n in refine observationProjection binding calendarPlan purifyScope unifiedPending fieldWriters; do
+  printf '%-22s ' "$n"
+  grep -rn "WA\.$n" --include=*.js engines core render ui actors direction index.js     | grep -vE 'tool-diag|narrow-consumers|action-desk-routes' | wc -l
+done
+
+# 第二批的「行首 `WA.<ns> = {`」恰一处（`unifiedPending` 有 2 处在注释里，故不能用全文 grep -c）
+for f in engines/refine.js engines/observation-projection.js engines/binding.js          engines/calendar-custom.js engines/purify-scope.js core/unified-pending.js engines/field-writers.js; do
+  printf '%-40s %s
+' "$f" "$(grep -cE '^[[:space:]]*WA\.[A-Za-z]+ = \{' "$f")"
+done
+
 # 裁决锁
-node tests/orphan-engine-adjudication-v2550.js    # ⇒ pass (21 段)
+node tests/orphan-engine-adjudication-v2550.js    # ⇒ pass (35 段)
 ```
 
 ## 六、与 `ns-consumer-ledger` 的关系

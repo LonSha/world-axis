@@ -319,6 +319,13 @@
     //   插在 find 之后：第四批的页序即批次语义 ——「搬运 → 检索 → 图谱」是
     //   「把东西搬出去 / 把东西找出来 / 把关系看成一幅图」的同一条线。
     { id: 'graph', icon: '🕸', label: '图谱' },
+    // v2.588.0（R264 / MAP-5）：地图页 —— 底图不预设，按角色卡/世界书素材现场生成。
+    //   页 id 纯小写字母（tests/run.js 的 C11 按 id/icon 形态解析页清单）。
+    //   插在 graph 之后：图谱答「关系长什么样」，本页答「地方长什么样、谁挨着谁」——
+    //   同一族的「把已有的东西看成一张面」，且两者共享同一份世界坐标口径。
+    //   为什么此前没有这一页：v2.587.0 只缝了编辑模型（map-editor）与渲染分支（viewport），
+    //   产品面唯一读点是 geo-tracker 的 locate —— 有引擎、有渲染，没有入口。
+    { id: 'map', icon: '🗺', label: '地图' },
     // v2.210.0（拓展 8）：地图上的行动与行程工作台（engines/travel-desk.js）。
     //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
     //   插在 graph 之后：图谱答「关系长什么样」，本页答「这一趟到底走不走得成、要多久、
@@ -400,6 +407,8 @@
   const PAGE_CAT = {
     overview: 'core', chapter: 'core', beat: 'core', todo: 'core', events: 'core', director: 'core', actiondesk: 'core',
     world: 'world', people: 'world', memory: 'world', enemies: 'world', parallel: 'world', travel: 'world', sediment: 'world', offline: 'world',
+    // v2.588.0（R264）：地图页归「世界」类（地理是世界的一部分，与 world/people/travel 同类）。
+    map: 'world',
     inject: 'workshop', supply: 'workshop', evidence: 'workshop', branchdiff: 'workshop', storyloop: 'workshop', retrieval: 'workshop', port: 'workshop', find: 'workshop', graph: 'workshop', net: 'workshop',
     settings: 'meta', health: 'core', connect: 'meta', assistant: 'meta', tools: 'meta', logs: 'meta',
     desk: 'meta',
@@ -3564,7 +3573,18 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     }
     return renderPeople();
   }
+  /** v2.588.0（R264 / MAP-5）：地图页的渲染转发。
+   *  页面体在 ui/pages/map-page.js（与 tools-page / now-page 同一契约：页面模块只拼 HTML，
+   *  按钮行为由面板 bindBody 调它的 bind）。缺席时**报读数缺口**，不返回空串假装「这页本来就没东西」。 */
+  function renderMapDesk() {
+    if (!(WA.panelMapPage && typeof WA.panelMapPage.render === 'function')) {
+      return '<div class="wa-dim" id="wa-map-page-absent">地图页模块缺席（ui/pages/map-page.js 未装载）—— 这不是「没有地图」，是读数缺口</div>';
+    }
+    return WA.panelMapPage.render();
+  }
   const RENDERERS = { actiondesk: renderActionDesk, overview: renderOverview, world: renderWorld, people: renderPeoplePlayerAware, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs, desk: renderWriteDesk, boot: renderBootDesk, drive: renderDriveDesk,
+    // v2.588.0（R264 / MAP-5）：地图页。渲染体在 ui/pages/map-page.js，此处只转发（缺席即报缺口）。
+    map: renderMapDesk,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -4874,6 +4894,13 @@ ${emptyDrill}
           if (ta && typeof ta.focus === 'function') ta.focus();
         });
       }
+      // v2.588.0（R264 / MAP-5）：地图页按钮在这里绑（页模块只出 HTML，行为归面板 ——
+      //   与「此刻」「人物」页同一口径）。幂等由页模块自己保证：DOM 每次重绘都是新节点。
+      try {
+        if (currentPage === 'map' && WA.panelMapPage && typeof WA.panelMapPage.bind === 'function') {
+          WA.panelMapPage.bind(panelEl);
+        }
+      } catch (e) { /* 页面缺席或宿主查询失败：如实不绑，不假装可用 */ }
     } catch (e) { /* 页面缺席或宿主查询失败：如实不绑，不假装可用 */ }
     // v2.271.0（V6 EXV6-7）：开局引导「去做」按钮的点击实现。
     //   出口来自引擎 next()（面板不自己编动作）；本处置的是「点了之后该去哪」：

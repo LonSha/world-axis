@@ -145,7 +145,13 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //   恒等式照旧成立：FULL_RUNNING = MECH + (BASE_ON − RUNNING0) = 133 + (292 − 132) = 293（实测 293）。
 //   ⚠ 这一条与 v2.584.0 那批的区别就在这里：那批是「有注入面的机制」涨，这批只是「出厂开着的观测/编辑型」
 //   涨一个 —— 只改 BASE_ON 一个数是**对的**，把 MECH 也 +1 才是造数据。
-const BASE_ON = 292;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
+// v2.588.0（R264 / MAP-4）跟位：mapGenerator（底图生成器）出厂 `enabled:true`，同样**没有 buildBlock**
+//   —— 它不往注入面里塞任何字节（底图是几何，不是每轮都要喂给模型的文本）。
+//   与 v2.587.0 的 mapEditor 同一形态：**只动开集、不动注入面** ⇒ BASE_ON 292 → 293；
+//   MECH 133 / DORMANT 1 / RUNNING0 132 / FULL_MECH 133 全不动。
+//   恒等式照旧成立：FULL_RUNNING = MECH + (BASE_ON − RUNNING0) = 133 + (293 − 132) = 294。
+//   涨一个 —— 只改 BASE_ON 一个数是对的；把 MECH 也 +1 才是造数据。
+const BASE_ON = 293;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
 // v2.542.6 跟位：叙事脊柱 L1 的 sceneIntent **有 buildBlock（有注入面）但出厂 enabled:false**。
 //   为什么它必须是出厂关：L1 的零 token 边界——它被打开之前，注入字节必须与 v2.541.7 逐字节一致
 //   （判据见 tests/scene-intent-v2542.js 的 A 段）。于是它成为**第一个**「关着但有注入面」的机制，

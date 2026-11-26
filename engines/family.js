@@ -35,7 +35,12 @@
  *      转交时**如实记下交接时间与原因**，不静默换人。
  *   ④ **继承事件**（`unit.inheritances`）：`inherit()` 在明确事件触发时
  *      按规则分配已故/离队成员的资产。**资产从被继承者的资源面扣出、分配给继承人** ——
- *      不凭空复制（验收原文「不能凭空复制财产」）。当前均分（最后一名接收浮点余量）；自定义比例尚未实现。
+ *      不凭空复制（验收原文「不能凭空复制财产」）。均分是默认（最后一名接收浮点余量）；
+ *      v2.588.0（R264 / EXP-9b）起支持**自定义比例**：`inherit(unitId, deceased, heirs, event, shares)`
+ *      的第五参数是权重表（`{ '张三': 3, '李四': 2 }`，任意正数，内部归一）。四条边界：
+ *      不传 = 均分（旧行为逐字不变）；权重非数/负数/全 0 ⇒ `invalid-shares` 拒收；
+ *      `shares` 里写了**非继承人**的名字 ⇒ `invalid-shares`（写错名字不得静默少分）；
+ *      权重为 0 或未列出的继承人 ⇒ 不参与分配但**如实报 `excluded`**（不静默消失）。
  *   ⑤ **不继承私密记忆**：继承事件只搬**资源**，不搬**记忆/认知/关系档案**
  *      （那是 vitals.know / registry.profile / intel.believe 的领域）。
  *      验收原文「后继角色保留自身经历而不是继承所有人的私密记忆」。
@@ -334,12 +339,49 @@
   }
 
   /**
+   * 归一化继承比例（v2.588.0 / EXP-9b）。
+   *   `shares`：`{ '张三': 3, '李四': 2 }`（权重表，任意正数，内部归一化为比例）。
+   *   返回 `{ ok:true, mode:'even'|'weighted', weights, excluded }` 或 `{ ok:false, reason }`。
+   *   四条边界见文件头 ④：不传即均分 / 非法值拒收 / 非继承人名字拒收 / 零权重如实报 excluded。
+   * @param {Array} heirNames 已校验的继承人名册
+   * @param {Object|null} shares 权重表（可选）
+   * @returns {Object} { ok, mode, weights, excluded } 或 { ok:false, reason }
+   */
+  function normalizeShares(heirNames, shares) {
+    if (shares === undefined || shares === null) return { ok: true, mode: 'even', weights: null, excluded: [] };
+    if (typeof shares !== 'object' || Array.isArray(shares)) return { ok: false, reason: 'invalid-shares' };
+    const keys = Object.keys(shares);
+    if (!keys.length) return { ok: false, reason: 'invalid-shares' };
+    // 键名先洗一遍再比对：`' 张三'` 与 `'张三'` 是同一人，不许因为空格静默少分。
+    const map = {};
+    for (let i = 0; i < keys.length; i++) {
+      const k = clean(keys[i], 40);
+      if (!k) return { ok: false, reason: 'invalid-shares' };
+      if (heirNames.indexOf(k) < 0) return { ok: false, reason: 'invalid-shares', who: String(keys[i]) };
+      map[k] = shares[keys[i]];
+    }
+    const weights = heirNames.map(function (h) {
+      if (!Object.prototype.hasOwnProperty.call(map, h)) return 0;
+      const n = num(map[h]);
+      return n === null ? NaN : n;   // 非数 / 负数 / Infinity 一律 NaN ⇒ 拒收
+    });
+    for (let i = 0; i < weights.length; i++) {
+      if (weights[i] !== weights[i]) return { ok: false, reason: 'invalid-shares', who: heirNames[i] };
+    }
+    const sum = weights.reduce(function (a, b) { return a + b; }, 0);
+    if (!(sum > 0)) return { ok: false, reason: 'invalid-shares' };   // 全 0 = 谁都不给，不是分配
+    const norm = weights.map(function (w) { return w / sum; });
+    const excluded = heirNames.filter(function (h, i) { return !(weights[i] > 0); });
+    return { ok: true, mode: 'weighted', weights: norm, excluded: excluded };
+  }
+
+  /**
    * 继承事件：按规则分配被继承者的资产。
    *   - 资产从被继承者的资源面扣出，分配给继承人
    *   - 不凭空复制财产（不够则扣到 0 并报差额）
    *   - 不继承私密记忆（只搬资源，不搬 knowledge/profile/persona）
    */
-  function inherit(unitId, deceased, heirs, event) {
+  function inherit(unitId, deceased, heirs, event, shares) {
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
     const uid = clean(unitId, 30);
@@ -354,6 +396,9 @@
     for (let i = 0; i < heirNames.length; i++) {
       if (!knownPerson(heirNames[i])) return refuse('unknown-member', { who: heirNames[i] });
     }
+    // v2.588.0：比例校验放在写事务**之前** —— 拒收不许进事务（进去一次就算污染）。
+    const plan = normalizeShares(heirNames, shares);
+    if (!plan.ok) return refuse(plan.reason, plan.who ? { who: plan.who } : null);
     let out = null;
     WA.store.transact(function (draft) {
       const b = ensure(draft);
@@ -364,13 +409,19 @@
       const resources = Object.assign({}, person.resources || {});
       const distributed = {};
       const shortfalls = {};
+      // 参与分配的索引：均分 = 全体；比例 = 只取权重 > 0 者（其余如实进 excluded，不静默消失）。
+      const slots = plan.mode === 'even'
+        ? heirNames.map(function (_, i) { return i; })
+        : plan.weights.map(function (w, i) { return w > 0 ? i : -1; }).filter(function (i) { return i >= 0; });
       Object.keys(resources).forEach(function (mat) {
         const total = num(resources[mat]) || 0;
         if (total <= 0) return;
-        const perHeir = total / heirNames.length;
         let remaining = total;
-        heirNames.forEach(function (h, index) {
-          const give = index === heirNames.length - 1 ? remaining : Math.min(perHeir, remaining);
+        slots.forEach(function (index, k) {
+          const h = heirNames[index];
+          const rate = plan.mode === 'even' ? (1 / slots.length) : plan.weights[index];
+          // 最后一名拿浮点余量：守恒靠这一行，不靠四舍五入（不造钱也不销毁）。
+          const give = (k === slots.length - 1) ? remaining : Math.min(total * rate, remaining);
           if (give > 0) {
             if (!draft.people['p_' + h].resources) draft.people['p_' + h].resources = {};
             draft.people['p_' + h].resources[mat] = (num(draft.people['p_' + h].resources[mat]) || 0) + give;
@@ -382,10 +433,14 @@
         person.resources[mat] = 0;
         // 最后一名接收余量；没有舍入余额被销毁。
       });
-      const record = { deceased: dec, heirs: heirNames, event: evt, distributed: distributed, shortfalls: shortfalls,
+      const record = { deceased: dec, heirs: heirNames, event: evt, mode: plan.mode,
+        weights: plan.weights ? plan.weights.slice() : null, excluded: plan.excluded.slice(),
+        distributed: distributed, shortfalls: shortfalls,
         noMemoryTransfer: true, at: clockNow('family') };
       unit.inheritances.push(record);
-      out = { ok: true, id: uid, deceased: dec, heirs: heirNames, distributed: distributed, shortfalls: shortfalls,
+      out = { ok: true, id: uid, deceased: dec, heirs: heirNames, mode: plan.mode,
+        weights: plan.weights ? plan.weights.slice() : null, excluded: plan.excluded.slice(),
+        distributed: distributed, shortfalls: shortfalls,
         noMemoryTransfer: true };
       return true;
     }, 'family:inherit');
@@ -418,7 +473,7 @@
       members: unit.members.map(function (m) { return { who: m.who, role: m.role, joinedAt: m.joinedAt }; }),
       treasury: Object.assign({}, unit.treasury || {}),
       care: (unit.care || []).map(function (c) { return { caregiver: c.caregiver, ward: c.ward, active: c.active, assignedAt: c.assignedAt, notes: c.notes, endReason: c.endReason, history: JSON.parse(JSON.stringify(c.history || [])) }; }),
-      inheritances: (unit.inheritances || []).map(function (i) { return { deceased: i.deceased, heirs: i.heirs.slice(), event: i.event, distributed: Object.assign({}, i.distributed), shortfalls: Object.assign({}, i.shortfalls), noMemoryTransfer: i.noMemoryTransfer }; }) };
+      inheritances: (unit.inheritances || []).map(function (i) { return { deceased: i.deceased, heirs: i.heirs.slice(), event: i.event, mode: i.mode || 'even', excluded: (i.excluded || []).slice(), distributed: Object.assign({}, i.distributed), shortfalls: Object.assign({}, i.shortfalls), noMemoryTransfer: i.noMemoryTransfer }; }) };
   }
 
   /** 从存档重建 */

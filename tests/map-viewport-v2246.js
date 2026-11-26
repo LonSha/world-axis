@@ -92,7 +92,7 @@ function runAll(a) {
   const diag = WA.mapViewport.diagnose();
   // v2.587.0（R263）：本模块加了 `opts.doc` 分支（吃 mapEditor 文档，传 doc 时按几何画；
   //   不传 doc 输出逐字不变），故模块自报版本跟到本版。判据仍是**精确等值**，不是放宽。
-  a(diag.ok && diag.version === '2.587.0', 'map-viewport/F1: 诊断接口正常自检通过');
+  a(diag.ok && diag.version === '2.588.0', 'map-viewport/F1: 诊断接口正常自检通过');
 }
 
 function runNegative(a) {

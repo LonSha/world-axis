@@ -54,6 +54,46 @@ const TARGETS = [
   { ns: 'archiveHide', file: 'engines/archive-hide.js', zh: '归档楼层隐藏' },
   { ns: 'autoHide', file: 'engines/auto-hide.js', zh: '自动隐去' }
 ];
+
+// ── 第二批（v2.588.0 / R264）：又七台「定义面完整、故事面零读」的引擎 ──
+//   前五台的形态是「面板开关 + 注册行」；这七台形态不同，所以**不塞进 TARGETS**：
+//   硬套 A3（getSettings().enabled 必为 true）会要求三台没有设置面的引擎凭空长出一个，
+//   那就是为了迁就锁而改产品。故另起 SECOND_WAVE，只钉三件与形态无关的事实：
+//   ① 命名空间在位且方法不是空壳；② 定义文件各一处行首赋值（不是靠注释冒充）；
+//   ③ 故事面零读。可达面读数照样逐台记（大多为 0，如实报）。
+//   其中 `unifiedPending` 落在 core/ 而不是 engines/ —— 它是聚合器不是引擎，
+//   但「零读」的后果完全一样（产品面拿不到聚合器，待办中心就读不到合并视图）。
+const SECOND_WAVE = [
+  { ns: 'refine', file: 'engines/refine.js', zh: '输入润色与合并（与 polish 同族但不可替代）' },
+  { ns: 'observationProjection', file: 'engines/observation-projection.js', zh: '观察面投影与归一' },
+  { ns: 'binding', file: 'engines/binding.js', zh: '作用域绑定（bind / read / unbind）' },
+  { ns: 'calendarPlan', file: 'engines/calendar-custom.js', zh: '自定义历法规划' },
+  { ns: 'purifyScope', file: 'engines/purify-scope.js', zh: '净域保护（protect / restore）' },
+  { ns: 'unifiedPending', file: 'core/unified-pending.js', zh: '统一待办聚合器' },
+  { ns: 'fieldWriters', file: 'engines/field-writers.js', zh: '字段写者登记与冲突' }
+];
+const ALL_TARGETS = TARGETS.concat(SECOND_WAVE);
+// 第二批的关键方法（逐台现场实读导出面，不是照抄注释）。
+const KEYS2 = {
+  refine: ['getSettings', 'normalize', 'merge', 'condense', 'polish'],
+  observationProjection: ['project', 'sole', 'merge', 'settings'],
+  binding: ['getSettings', 'bind', 'read', 'unbind', 'list'],
+  calendarPlan: ['getSettings', 'setMonths', 'getMonths', 'label', 'labelNow', 'clear'],
+  purifyScope: ['getSettings', 'protect', 'restore', 'applyWith', 'kinds'],
+  unifiedPending: ['collect', 'pending', 'diagnose', 'stat'],
+  fieldWriters: ['entryOf', 'writersOf', 'conflicts', 'undeclaredConflicts', 'view']
+};
+// 第二批可达面实测（v2.588.0 现场，node tools 复算命令见文档 D3）。
+//   `assign` = 行首顶格后的 `WA.<ns> = {` 处数：必须恰 1 —— 注释里写 `= {...}` 不算。
+const FACES2 = {
+  refine: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
+  observationProjection: { switchN: 0, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
+  binding: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
+  calendarPlan: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
+  purifyScope: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
+  unifiedPending: { switchN: 0, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
+  fieldWriters: { switchN: 0, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 }
+};
 // 每台至少要有这些方法才算「定义面完整」（不是空对象挂在 WA 上）。
 const KEYS = {
   preflight: ['preview', 'getSettings', 'setSettings'],
@@ -98,11 +138,16 @@ function readsOf(list, ns) {
   list.forEach(function (rel) {
     const base = rel.split('/').pop().replace(/\.js$/, '');
     if (EXCLUDE_BASENAME.test(base)) return;
-    if (TARGETS.some(function (t) { return t.file === rel; })) return;
+    if (ALL_TARGETS.some(function (t) { return t.file === rel; })) return;
     const src = fs.readFileSync(path.join(BASE, rel), 'utf8');
     if (re.test(src)) hits.push(rel);
   });
   return hits;
+}
+/** 行首计数：只数「整行 strip 后以 needle 开头」的行 —— 注释里提到 `WA.x = {...}` 不算。 */
+function countLineStart(rel, needle) {
+  return fs.readFileSync(path.join(BASE, rel), 'utf8').split('\n')
+    .filter(function (ln) { return ln.trim().indexOf(needle) === 0; }).length;
 }
 function countIn(rel, needle) {
   const src = fs.readFileSync(path.join(BASE, rel), 'utf8');
@@ -235,4 +280,65 @@ ok('E2 台账口径：autoHide 已被窄消费者台账登记（本裁决不新�
   assert.ok(src.indexOf("ns: 'autoHide'") >= 0, 'autoHide 应仍在窄消费者台账里');
 });
 
-console.log('\norphan-engine-adjudication-2550: pass (' + pass + ' 段：五台零故事面读点已裁决，不接线)');
+
+// ═════════ F 第二批：七台零读引擎（v2.588.0 / R264）═════════
+ok('F0 第二批命名空间都在 WA 上且是对象', function () {
+  SECOND_WAVE.forEach(function (t) {
+    assert.ok(W[t.ns], 'WA.' + t.ns + ' 缺席（' + t.file + '）');
+    assert.strictEqual(typeof W[t.ns], 'object', 'WA.' + t.ns + ' 不是对象');
+  });
+});
+ok('F1 第二批关键方法都在（不是空壳挂着）', function () {
+  SECOND_WAVE.forEach(function (t) {
+    KEYS2[t.ns].forEach(function (k) {
+      assert.strictEqual(typeof W[t.ns][k], 'function', 'WA.' + t.ns + '.' + k + ' 缺席');
+    });
+  });
+});
+ok('F2 定义面：文件在场，且行首 `WA.<ns> = {` 恰一处（注释不算）', function () {
+  SECOND_WAVE.forEach(function (t) {
+    assert.ok(fs.existsSync(path.join(BASE, t.file)), t.file + ' 不存在');
+    const n = countLineStart(t.file, 'WA.' + t.ns + ' = {');
+    assert.strictEqual(n, FACES2[t.ns].assign, t.file + ' 行首 `WA.' + t.ns + ' = {` 应为 '
+      + FACES2[t.ns].assign + ' 处，实 ' + n);
+  });
+});
+ok('F3 可达面读数与现场逐台相等（面板开关 / 工具表 / 行动台）', function () {
+  SECOND_WAVE.forEach(function (t) {
+    const f = FACES2[t.ns];
+    const sw = countIn('ui/settings.js', 'data-sw-ns="' + t.ns + '"');
+    const tt = countIn('engines/tool-diag-tables.js', 'WA.' + t.ns + '.');
+    const dr = countIn('engines/action-desk-routes.js', 'WA.' + t.ns + '.');
+    assert.strictEqual(sw, f.switchN, t.ns + ' 开关行 ' + sw + ' ≠ ' + f.switchN);
+    assert.strictEqual(tt, f.toolTable, t.ns + ' 工具表条目 ' + tt + ' ≠ ' + f.toolTable);
+    assert.strictEqual(dr, f.deskRoute, t.ns + ' 行动台引用 ' + dr + ' ≠ ' + f.deskRoute);
+  });
+});
+ok('F4 注册表面：七台各一行「文件 → 命名空间」（注册≠读点）', function () {
+  SECOND_WAVE.forEach(function (t) {
+    const n = countIn('engines/tool-diag-tables.js', "'" + t.file + "': '" + t.ns + "'");
+    assert.strictEqual(n, FACES2[t.ns].registry, t.ns + ' 注册行应为 ' + FACES2[t.ns].registry + '，实 ' + n);
+  });
+});
+SECOND_WAVE.forEach(function (t) {
+  ok('C2·' + t.ns + ' 故事面零读：除自身/工具表/窄台账/行动台外，全仓无 `WA.' + t.ns + '`', function () {
+    const hits = readsOf(FILES, t.ns);
+    assert.strictEqual(hits.length, 0, 'WA.' + t.ns + ' 出现了故事面读点：' + JSON.stringify(hits)
+      + ' —— 若是有意接线，请先改 docs/ORPHAN_ENGINES_ADJUDICATION.md 的裁决与改判触发器，再改本锁');
+  });
+});
+ok('F5 文档含第二批七台的命名空间与文件（裁决写进文档才算数）', function () {
+  const doc = fs.readFileSync(path.join(BASE, DOC_REL), 'utf8');
+  SECOND_WAVE.forEach(function (t) {
+    assert.ok(doc.indexOf(t.ns) >= 0, '文档里没有 ' + t.ns);
+    assert.ok(doc.indexOf(t.file) >= 0, '文档里没有 ' + t.file);
+  });
+});
+ok('F6 非空转：行首计数不把注释里的 `= {...}` 算成定义', function () {
+  // 合成样本：一行注释提及 + 一行真赋值 ⇒ 必须计 1（若计 2，F2 就变成「靠注释也能过」）
+  const probe = '//   `WA.probeNs = {...}` 也因此没进 nsOwner\n  WA.probeNs = { a: 1 };\n';
+  const n = probe.split('\n').filter(function (ln) { return ln.trim().indexOf('WA.probeNs = {') === 0; }).length;
+  assert.strictEqual(n, 1, '行首计数口径失效：注释被算成定义（实 ' + n + '）');
+});
+
+console.log('\norphan-engine-adjudication-2550: pass (' + pass + ' 段：12 台零故事面读点已裁决（五台 + 第二批七台），不接线)');

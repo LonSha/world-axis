@@ -32,7 +32,7 @@
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
 
-  const VERSION = '2.587.0';
+  const VERSION = '2.588.0';
   const SETTING_KEY = 'worldaxis_map_editor_settings_v1';
   const FORMAT = 'worldaxis-map';
   const SCHEMA = 1;

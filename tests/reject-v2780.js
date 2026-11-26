@@ -10132,6 +10132,26 @@ function runWitness(WA) {
       });
     }
   }
+  // ── v2.588.0（R264 / MAP-4）：底图生成器的「素材不够」拒收码 ──
+  //   这一条是**用户面最常遇到**的失败：世界书没读/没勾选，或条目里根本没地名。
+  //   它必须能真跑出来 —— 否则面板上那句「补几条带地名的设定」永远是理论。
+  {
+    const MG = WA.mapGenerator;
+    if (MG && typeof MG.generate === 'function') {
+      const keepFp = WA.mapEditor && typeof WA.mapEditor.fingerprint === 'function' ? WA.mapEditor.fingerprint() : null;
+      want('no-place-names', '底图生成：有素材但抽不出地名（如实报，不凭空造图）');
+      trip('no-place-names', function () {
+        return MG.generate({ texts: ['这里只有天气和心情，没有一处地名。'] }).reason;
+      });
+      // 见证面不许留状态：文档指纹必须原样（no-place-names 在 newDoc 之前就返回了）
+      if (WA.mapEditor && typeof WA.mapEditor.fingerprint === 'function') {
+        const now = WA.mapEditor.fingerprint();
+        if (keepFp !== null && now !== keepFp) {
+          throw new Error('见证副作用：no-place-names 改变了文档指纹（应零污染）');
+        }
+      }
+    }
+  }
   // ── v2.587.0（R263 / MAP-3）：地图编辑模型的拒收面 ──
   //   编辑类引擎第一次进码表。为什么逐条见证而不塞进 base：这些码全是**公开失败归因**
   //   （「为什么不让我改」），模型与面板都要读；不给见证就等于让门禁替我们说「没人会跑到」。
@@ -10216,6 +10236,51 @@ function runWitness(WA) {
       }
     }
   }
+  // ── v2.588.0（R264 / EXP-9b）：继承比例表的非法输入 ──
+  //   `invalid-shares` 是一条**用户面会真撞上**的码：比例表里把「张三」写成「张叁」。
+  //   它必须拒收并**点名那个人** —— 否则钱照样分完，账上一点痕迹都没有。
+  //   见证要真跑，所以本块临时播两个人物 + 一个单位，末尾无条件还原（与 MAP-3/MAP-4 同规）。
+  {
+    const F = WA.family;
+    if (F && typeof F.inherit === 'function' && WA.store && WA.store.transact) {
+      const people = ['p_rs甲', 'p_rs乙'];
+      const unitName = '见证比例单位';
+      let uid = null;
+      try {
+        WA.store.transact(function (d) {
+          d.people = d.people || {};
+          d.people['p_rs甲'] = { id: 'p_rs甲', name: 'rs甲', resources: { 金币: 10 }, updatedAt: 1 };
+          d.people['p_rs乙'] = { id: 'p_rs乙', name: 'rs乙', resources: {}, updatedAt: 1 };
+          return true;
+        }, 'reject:shares-seed');
+        const u = F.createUnit({ name: unitName, type: '合伙', by: 'rs甲' });
+        uid = u && u.ok ? u.id : null;
+        if (uid) F.addMember(uid, 'rs乙', '成员');
+      } catch (e) { uid = null; }
+      try {
+        if (uid) {
+          want('invalid-shares', '继承：比例表里写了非继承人的名字（写错名字不许静默少分）');
+          trip('invalid-shares', function () {
+            const sh = {};
+            sh['rs乙'] = 1;
+            sh['查无此人'] = 1;
+            return F.inherit(uid, 'rs甲', ['rs乙'], '见证：写错名字', sh).reason;
+          });
+        }
+      } finally {
+        try {
+          WA.store.transact(function (d) {
+            people.forEach(function (k) { if (d.people) delete d.people[k]; });
+            if (d.family && Array.isArray(d.family.units)) {
+              d.family.units = d.family.units.filter(function (x) { return x.name !== unitName; });
+            }
+            return true;
+          }, 'reject:shares-restore');
+        } catch (e2) { /* 还原失败不许掩盖真判据 */ }
+      }
+    }
+  }
+
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

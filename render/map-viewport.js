@@ -23,7 +23,7 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
 
   // v2.587.0（R263）：本文件接 mapEditor 时改过，版本号跟上（头注释保留 MAP-1/MAP-2 出处）。
-  const VERSION = '2.587.0';
+  const VERSION = '2.588.0';
   const SETTING_KEY = 'worldaxis_map_viewport_settings_v1';
 
   // 默认视口与渲染配置
