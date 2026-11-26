@@ -72,7 +72,10 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 //   而那道桥有真产品读面（工具页「事实老化面」段）。**这不等于原来的缺口被治好**：
 //   桥今天报的正是「no-last-turn，本读数不可用」—— 出表的是「零读」，不是「无数据」。
 //   复算：grep -rn 'WA.factAge' engines/fact-age-bridge.js
-const BASE_DEAD_NS = 48;  // v2.594.0：实测 49（基线原写 55，自 v2.569.0 起未跟位） —— greenKeys 出表（engines/worldbook.js 的 constGate 用 deriveGreenKeys 给常驻条目派生短键，成为“本轮聊到没聊到”的事前判据；零读 ns 真少一条，不是判据放宽）
+const BASE_DEAD_NS = 47;   // v2.597.0（ENS-1）：48 → 47 = ensemble 出表（engines/ensemble-bridge.js 成为它第一个产品面读者：
+//   读 getSettings / STRATEGIES / stat，且不调 run）。**这不等于原来的缺口被治好**：桥今天报的正是 no-channel-ready / no-runs
+//   —— 出表的是「零读」，不是「无数据」。
+// v2.594.0：实测 49（基线原写 55，自 v2.569.0 起未跟位）  // v2.594.0：实测 49（基线原写 55，自 v2.569.0 起未跟位） —— greenKeys 出表（engines/worldbook.js 的 constGate 用 deriveGreenKeys 给常驻条目派生短键，成为“本轮聊到没聊到”的事前判据；零读 ns 真少一条，不是判据放宽）
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。

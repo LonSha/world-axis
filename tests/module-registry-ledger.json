@@ -1,14 +1,14 @@
 {
- "version": "2.596.0",
+ "version": "2.597.0",
  "loadOrderCount": 596,
- "lazyCount": 19,
- "loadedCount": 589,
+ "lazyCount": 20,
+ "loadedCount": 590,
  "uiCount": 26,
- "nsCount": 600,
+ "nsCount": 601,
  "totals": {
-  "loadEdges": 483,
+  "loadEdges": 484,
   "hardEdges": 0,
-  "callRefs": 782,
+  "callRefs": 784,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -137,6 +137,7 @@
     "engines/elapsed-evidence.js",
     "engines/elsewhere.js",
     "engines/enemies.js",
+    "engines/ensemble-bridge.js",
     "engines/ensemble.js",
     "engines/entry-router.js",
     "engines/environmental-capacity.js",
@@ -738,6 +739,7 @@
     "engines/ecosystem-predation.js",
     "engines/elapsed-evidence.js",
     "engines/elsewhere.js",
+    "engines/ensemble-bridge.js",
     "engines/ensemble.js",
     "engines/environmental-capacity.js",
     "engines/epidemic-contagion.js",
@@ -11451,6 +11453,25 @@
   "engines/contrast.js": {
    "ns": [
     "contrast"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/ensemble-bridge.js": {
+   "ns": [
+    "ensembleBridge"
    ],
    "requires": [
     "registerModule"

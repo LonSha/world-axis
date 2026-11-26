@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.596.0';
+  const VERSION = '2.597.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1686,6 +1686,9 @@
     'engines/card-file.js',
     'engines/chat-guard.js',
     'engines/contrast.js',
+    // v2.597.0（ENS-1）：仲裁面的体检面。与被读方 ensemble 同族，但**它自己进惰性档** ——
+    //   它只被工具页面板读，提到首帧只会让首帧多装一个模块。零写、零调用：不调 run，一次通道调用都不发。
+    'engines/ensemble-bridge.js',
     'engines/fact-age.js',
     // v2.596.0（FAG-1）：事实老化的落地面。与 fact-age 同档装载 —— 它离开被委托方只剩一句“未装载”，
     //   提到首帧只会让面板在首帧读到 module-missing。零写：只读 store，不补 lastTurn、不改 active。

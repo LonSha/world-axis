@@ -8041,3 +8041,85 @@ version-consistency 22 · release-manifest 可发 · evidence-index 690 条 stal
 **未做（如实登记）**：① `lastTurn` 的**生产者**仍未出现 —— 本节只是把「没有」变成一行可读的读数与 65 条判据，
 不是把它填上；想真跑分档，得先有「上次被引用第几轮」的写入方（大概率在注入/回述路径上，属下一批）。
 ② 整趟全量回归仍按分面批次验，未一口气跑完。③ BUILD_ID 仍指向上版。
+
+## R272（v2.597.0 · ENS-1：仲裁面体检 —— 就绪不等于真配）
+
+**它治什么**：`engines/ensemble.js`（306 行，v2.138.0）把“同一个问题问 N 个模型然后呢”答到了三档
+仲裁（first / vote / blend）、一致性分数、分歧点、逐成员耗时，全在 `stat()` 里算好了。可它
+**一次都没被产品面读过**（零读 ns 名单里一直在）。两个后果：用户永远答不出“我这套通道稳不稳”；
+更贵的是——**“就绪”与“真配”被当成了同一件事**。
+`apiRouter.getChannel(n)` 是 `cfg[n] || cfg.default` 回退，于是未配的通道读出来的 baseUrl / model / key
+**全是 default 的**。拿两条这样的通道当两个成员去 vote，实际是同一个模型答了两遍 —— 一致性 1.0，
+而这 1.0 是 `ensemble` 自己的去重（按通道名 + 模型名）**管不住**的伪造。
+
+**新模块 `engines/ensemble-bridge.js`（327 行）只做三件事**：
+- `governance()` —— 开关 / 策略（对封闭三值）/ maxModels / 合并通道 / 超时；
+- `channels()` —— 逐条报 baseUrl / model / key 的**有无**，并**单列 `inherited`**（自身 cfg 没配、
+  effective 有值 ⇒ 走到了 default 回退）；`dupRisk = ready ≥ 2 && inherited ≥ 1`；
+- `audit()` / `lineOf()` —— 一行读数：能跑吗、上次一致性多少、何以致此。
+
+**八条边界（全是否定式）**：
+1 **一次模型调用都不发**：不引用也不调 `ensemble.run` —— 诊断面不是入口，花 token 的事留给推演链路。
+   这条只能靠源码级证据，所以专锁 A4 钉的就是“源码里没有 `.run(`”。
+2 **只报 key 有没有，不报 key**：明文只在一次 `!!String(e.apiKey).trim()` 里用，**不进任何返回值与读数**。
+3 **不改设置**：零 `setSettings` / 零 `settingsBus.save` / 零 store 写口。
+4 **未知策略不猜**：不在三档表里就报 `bad-strategy` 并**原样带回那个值** —— 静默回落 first
+   会让“我明明设了 vote”永远变成 first。
+5 **两套表对照**：本面自带一份封闭表用于校验，同时和 `ensemble.STRATEGIES` 对照，
+   不一致就报 `strategy-drift`，不挑一个用。
+6 **读数只一个出口**：`lineOf`，`summaryText` 只是兜底包一层。
+7 **不另攒计数**：`stat()` 只透传引擎的进程内计数 + 本面调用次数（另攒一份必然漂移）。
+8 **读不到就说读不到**：出厂默认值在 `DEF` 闭包里、不在导出面 ⇒ `defEnabled` 报 `null`，
+   不从文件头注释里抄。这里有一处**现成的反例**：v2.412.0 的“全开策略”把 `DEF.enabled`
+   改成了 true，而文件头第 1 条注释至今还写着“总开关默认关闭” —— 抄注释就会抄出一个反的答案。
+
+**why 十值封闭表**：`ok` / `module-missing` / `settings-error` / `disabled` / `bad-strategy` /
+`strategy-drift` / `no-router` / `router-error` / `no-channel-ready` / `no-runs`。
+`no-runs` 与 `ok` 的差别不是措辞：前者是“能跑但一次没跑过”，一致性**没有读数**（不是 0）；
+后者是“跑过且读得到”。把两者合成一个“正常”，会让“从没验证过”和“验证过且稳”长得一样。
+
+**新锁 `tests/ensemble-bridge-v2597.js`（307 行 / 82 判据四组）**：
+- **A 静态**：十三导出 / 零写口 / **不引用 run** / 没有任何字段叫 `apiKey` / key 只在唯一一处取真值 /
+  三档表与 why 表封闭 / 真调 `listChannels()` / 装载三处接线 / 面板段与折叠表同批登记。
+- **B 行为**：fresh 默认（一条也没配 ⇒ `no-channel-ready`）/ 仅 default 真配 / seeded 六条（ready 3 ·
+  own 1 · **inherited 2** · dupRisk）/ 继承通道单看报 `inherited` 而不是 ok / 缺 model 就不算就绪 /
+  `no-runs` 不算绿且读数写“不是 0，是没有” / 造一份账（0.67 · judge 1200ms · 已同意 2 分歧 1）/
+  单成员时一致性为 null 且**不会写出“一致性 0 ”** / 连着体检两次后引擎 `runs` 未变（零调用实测）。
+- **C 缺件**：九个不可用态各自报自己的原因，且**顺序**不能被下位支枝盖掉；C 组收尾还重跑一次，
+  证明 C 组不是“把环境搞坏后恒红”。
+- **D 现场**：真渲染出读数行 / 段内没有按钮（没有“点一下跑一次”）/ 段内 0 写口 /
+  `wa-ens-line` 全页唯一 / `__reset` 只清本面的账、**不动引擎的账**。
+
+**两处真缺陷（写锁之前修掉的，写进判据当基线）**：
+- ① 断言 A10 一开始用 `'ensemble-bridge.js'` 去 tool-diag 表里找 —— 表里写的是带目录的全路径，
+  于是这条永远红。教训：**路径类断言要按真源里写的形态写，不能靠记忆里的短名**。
+- ② D4b 用固定 6000 字符窗口截段——窗口溢出到了旁的 `refine` 段，把那一段的按钮当成了自己的。
+  改成“截到下一个 `foldSec` 为止”。这两条都是“判据自己错”，不是产品错 —— 但它们会把人引向
+  错误的方向，所以也写进锁头。
+
+**顺手清掉的一笔历史欠账（不是本轮改动引起的）**：`tests/v7-cap-tier-2283.js` 的六条
+（B6 / C4 / C4b / C5 / C10 / C12）停在 **v2.584.0 的现场**：v2.591.0 的 `arc-guide-bridge`
+（`DEF.enabled=false` + 有注入面 + 有 setSettings）上线时这把锁没跟着跑，于是“出厂关、有注入面”的
+机制数一直是 1，而现场是 2。本轮全量回归才现形，逐条跟位（探测集 133 → 134、full 99、
+新开 `arcGuideBridge,sceneIntent`、running 134、休眠 2），并在注释里写明“这是跟位不是放宽”。
+
+**零读名单出表（48 → 47）**：`ensemble` 原登记 `cls=stale`（tests 面有专锁消费、产品源面零读），
+现在桥成了它第一个**产品面**读者，按纪律⑤销行。必须同时说清两件事：
+① 这不是“仲裁面已经能用了” —— 桥今天报的正是 `no-channel-ready` / `no-runs`；
+② 出表的是“零读”，不是“无数据”。
+
+**跟位**：module-registry **590 文件 / 601 ns / 484 边 / 硬边 0 / 784 调用期**；
+ dead-export **dead 2040 → 2046**（+6）、dataOnly **810 → 813**（+3）—— `_note` 写明为何不是 +13；
+reject-code 码面零新增（why 十值是读面态不入码表）；readings **61**（refs 13250 / ns 586 / members 6188）；
+segment **128**（section 470 / 测试面 696 / 重组面 19050 / 硬线 2228）；z1-04 **46/46**（惰性 20 / 契约面 590）；
+settle **55**（nsCount 601 / loadedCount 590 / 边 484 / 调用 784）；plan-readings **16**；
+release-manifest 可发；evidence-index 692 条 stale 0。
+
+**读数**：ENS-1 **82/0** · cap-tier **35/0**（欠账消清） · q8 **80/0** · q9 **67/0** ·
+ns-consumer-ledger **72** · module-cycle 零读 **47** 条 · version-consistency 22 · ui-a11y 1776/1776 ·
+readme-slim 72 · tpl-comment 9/9 · tests-surface 过 · rel-contract 23。
+
+**未做（如实登记）**：① `ensemble.stat()` 里**没有 `lastAt`**，所以本面报不出“多久前跑过”，
+只能报“跑过几次” —— 这是引擎侧的空位，本面不编一个时间戳补上；
+② `run` 一次都没被真调过（没有真实通道可跑），所以“三档仲裁的行为”仍在 `tests/ensemble-v2138.js`
+的桩上验证，本轮只覆盖“读面”；③ 整趟全量回归仍按分面批次验，未一口气跑完。

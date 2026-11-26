@@ -411,6 +411,9 @@
     //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
     //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。
     'engines/ensemble.js': 'ensemble',
+    // v2.597.0（ENS-1）：仲裁面的体检面。登记在此 = 该文件缺席时 secModules 会**如实报 missing**。
+    //   不登记的话，一个只读面就会在自检的“定义面”上不存在（看不见的黑盒）。
+    'engines/ensemble-bridge.js': 'ensembleBridge',
     // v2.139.0（E9）：势力关系动态图。登记为**必载**——它读 evolution（档位/状态词表的
     //   单一真源）与 store，缺席就是「关系网读数缺席」，那本身就是断裂，不该被静默兜住。
     'engines/faction-graph.js': 'factionGraph',

@@ -122,7 +122,11 @@ function runB(WA) {
   //   故 full 档规模 = 132 − 35 = 97。判据形态未变（「探测集 − L3_EXCLUDES」）。
   // v2.584.0 跟位：attireState 出厂开启且有注入面 ⇒ 探测集 132 → 133，悬空名单仍 35 ⇒ 98。
   //   判据形态未变（「探测集 − L3_EXCLUDES」），变的是分子上的读数。
-  eq(fullItem && fullItem.size, 98, 'B6: full 档规模为 98（现场实测：全开策略后探测集 133 − 悬空名单 35 = 98）');
+  // v2.597.0 跟位（**历史欠账**，如实登记）：v2.591.0 的 engines/arc-guide-bridge.js
+  //   （DEF.enabled = false + 有注入面 + 有 setSettings）上线时，这把锁没跟着跑 —— 于是 C4/C4b/C5/
+  //   C10/C12/B6 六条一起停在 v2.584.0 的现场，直到本轮全量回归才现形。探测集 133 → 134 ⇒ full 99。
+  //   这不是「本轮改动引起」：arcGuideBridge 是第二个「出厂关、有注入面」的机制，与 ENS-1 无关。
+  eq(fullItem && fullItem.size, 99, 'B6: full 档规模为 99（现场实测：全开策略后探测集 134 − 悬空名单 35 = 99）');
   assert(fullItem && typeof fullItem.note === 'string' && fullItem.note.indexOf('35') >= 0, 'B7: full 档包含 35 排除注记');
 
   assert(Array.isArray(v.manualOnly) && v.manualOnly.length === 35, 'B8: view().manualOnly 暴露 35 个排除机制');
@@ -142,10 +146,10 @@ function runC(WA) {
   //   sceneIntent（L1 零 token 边界：开关默认关，注入分支与显示名都已就位）。
   //   full 档的探测口径是「带 enabled + 有 buildBlock + 有 setSettings」，它必然命中，
   //   故这里新开恰 1 个，且必须点名是它。原判据 `length === 0` 是 v2.542.6 之前的现场。
-  eq(rFull.turnedOn.length, 1,
-    'C4: 全开下 full 只新开那 1 个出厂休眠的注入机制（实 ' + rFull.turnedOn.length + '）');
-  eq(rFull.turnedOn[0], 'sceneIntent',
-    'C4b: 新开的就是 sceneIntent（L1 零 token 边界：出厂关、有注入面）');
+  eq(rFull.turnedOn.length, 2,
+    'C4: 全开下 full 新开 2 个出厂休眠的注入机制（arcGuideBridge 与 sceneIntent；实 ' + rFull.turnedOn.length + '）');
+  eq(rFull.turnedOn.join(','), 'arcGuideBridge,sceneIntent',
+    'C4b: 新开的就是 arcGuideBridge 与 sceneIntent（两者都是 L1 零 token 边界：出厂关、有注入面）');
   //   注：v2.293.0 复核发现本行**与 B6/C5 自相矛盾**（65 目标下新开应为 60，随目标
   //   涨到 67、出厂涨到 7，新开仍恰为 60 —— 60 = 67 − 7 与 65 − 5 同值，故**本行不该变**）。
   //   这正是「只改登记值」的边界：目标与出厂同涨同落时，差值判据保持不变。
@@ -153,7 +157,7 @@ function runC(WA) {
   //   故本行必须跟位 —— 上一次的「不该变」是巧合，不是规律（探针实测 turnedOn 64）。
   //   v2.407.0：目标 74 → 80（+6），出厂仍 10（+0），差值 64 → 70 —— 本行再次跟位。
   const vFull = cap.view();
-  eq(vFull.running, 133, 'C5: full 档运行机制数为 133（全开，与 MECH 同源；v2.584.0 跟位 132 → 133）');
+  eq(vFull.running, 134, 'C5: full 档运行机制数为 134（全开，与 MECH 同源；v2.597.0 跟位 133 → 134：arcGuideBridge 入面；v2.584.0 跟位 132 → 133）');
   eq(vFull.dormant, 0, 'C6: full 档休眠机制数为 0（全开）');
 
   // 验证 35 个排除机制无一被打开
@@ -174,7 +178,7 @@ function runC(WA) {
   const rRoll = cap.rollback();
   assert(rRoll.ok === true && typeof rRoll.tier === 'string',
     'C9: 全开（真开了 1 个）后回滚成立且档位有落点（实 ' + (rRoll && (rRoll.tier || rRoll.reason)) + '）');
-  assert(Array.isArray(rRoll.turnedOff) && rRoll.turnedOff.join(',') === 'sceneIntent',
+  assert(Array.isArray(rRoll.turnedOff) && rRoll.turnedOff.join(',') === 'arcGuideBridge,sceneIntent',
     'C10: 回滚只收回 full 开的那一个（实 ' + (rRoll && rRoll.turnedOff ? rRoll.turnedOff.join(',') : '无') + '）');
 
   const vLite = cap.view();
@@ -184,7 +188,7 @@ function runC(WA) {
   //   其中 3 台进了 BASE_ON（出厂即开），剩 1 台落在休眠面 —— 所以 C11 改 10、C12 改 99。
   //   v2.407.0：MECH 109 → 115 共 +6，BASE_ON 不变（出厂仍 10），六台全落休眠面
   //   —— C11 保持 10、C12 改 105。
-  eq(vLite.dormant, 1, 'C12: 回滚后休眠机制数 1（= 出厂关着、有注入面的 sceneIntent；v2.542.8 跟位 0 → 1）');
+  eq(vLite.dormant, 2, 'C12: 回滚后休眠机制数 2（= 出厂关着、有注入面的 arcGuideBridge 与 sceneIntent；v2.597.0 跟位 1 → 2；v2.542.8 跟位 0 → 1）');
 }
 
 function runD() {

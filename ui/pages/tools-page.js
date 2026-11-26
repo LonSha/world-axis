@@ -74,6 +74,8 @@
     // v2.596.0（FAG-1）：惰性档引擎的装载失败要**记一笔**（同 ui/settings.js 的 __engEnsureFail）。
   //   不记的话，每次重绘都会再 ensure 一次、每次都回“装载中”，把“装不上”写成“正在装”。
   let __fagEnsureFail = 0;
+  // v2.597.0（ENS-1）：同款。仲裁面也是惰性档，装不上与正在装必须分得开。
+  let __ensEnsureFail = 0;
   const rfaLine = function () {
       const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
       if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
@@ -518,6 +520,37 @@
           + '<div class="wa-dim">本面只读：不删事实、不改 <code>active</code>、不改 <code>at</code>，也不给任何一行补 <code>lastTurn</code>。'
           + '「写入时刻」与「上次被引用时刻」不是一回事：前者答“多久没更新过”，后者才答“多久没被引用过”——'
           + '所以后者没有数据时本面直说不可用，不拿前者冒充分档。</div>';
+      })()}
+      `)}
+      ${foldSec('tools', 'ensemble', '仲裁面</div><div class="wa-dim">（ENS-1：多模型投票到底稳不稳 / “就绪”里有几条其实借了 default 的配置 —— 只读，一次模型调用都不发）', () => `
+      ${(function () {
+        // 被读方（ensemble）与本体都在惰性档：首帧未装载是常态，走 ensure + 失败记忆（同 factage 段）。
+        const rel = 'engines/ensemble-bridge.js';
+        const eb = WA.ensembleBridge;
+        if (!eb || typeof eb.audit !== 'function') {
+          if (__ensEnsureFail) return '<div class="wa-dim">仲裁面装载失败（' + rel + '）—— 这不是“没有分歧”，是这台引擎装不上</div>';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              if (p && typeof p.catch === 'function') p.catch(function () { __ensEnsureFail = 1; });
+              return '<div class="wa-dim">仲裁面在惰性档，装载中（成功后下次渲染自愈）</div>';
+            }
+          } catch (e) { /* 落到下面统一记失败 */ }
+          __ensEnsureFail = 1;
+          return '<div class="wa-dim">仲裁面装载失败（' + rel + '）</div>';
+        }
+        let a0 = null;
+        try { a0 = eb.audit({}); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const rows = ((a0 && a0.ch && a0.ch.rows) || []).map(function (r) {
+          let dg = null;
+          try { dg = eb.view(r.name); } catch (e) { dg = null; }
+          return '<div class="wa-item"><div class="wa-dim">' + esc(dg && dg.line) + '</div></div>';
+        }).join('');
+        return '<div class="wa-dim" id="wa-ens-line">' + esc(eb.summaryText(a0)) + '</div>' + rows
+          + '<div class="wa-dim">本面只读：不改开关、不改策略，也不调 <code>run</code> —— <b>一次模型调用都不发</b>'
+          + '（诊断面不是入口；花 token 的事留给推演链路）。'
+          + '“继承 default”指的是：那条通道自身没配 baseUrl / model，读到的是 default 的回退值 ——'
+          + '拿它与 default 一起投票等于同一个模型答两遍，一致性会假高。</div>';
       })()}
       `)}
       ${foldSec('tools', 'refine', '档案精编预览</div><div class="wa-dim">（RFA-1：三处只增不减的台账能省几条 —— 只预览，不删一条）', () => `
