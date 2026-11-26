@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.584.0';
+  const VERSION = '2.585.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -861,6 +861,9 @@
     'engines/beast-bond.js',
     // v2.69.0: 外貌分级契约 / 原型阶梯。位置与 tool-diag MODULE_EXPORTS 同批登记。
     'engines/appearance.js',
+    // v2.585.0（R261）：外貌**要素库**（描写词表，data-only）。紧跟 appearance 之后装载，
+    //   与它同版本交付、不同记账：appearance 的 register() 不看本文件一眼，拒收面一条都不依赖它。
+    'engines/appearance-lexicon.js',
     'engines/ladder.js',
     // v2.411.0 (R251 缝合批)：人体结构契约。位置与 tests/run.js 的 LOAD 同序，早于 render/inject.js。
     'engines/body-anatomy.js',

@@ -60,7 +60,11 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 // v2.542.23：66 -> 65（storyExport 按纪律④出表：panel「导出正文」真调 storyExport.build，
 //   接线完成即删除本行——这正是 _classes.pending-wire 的原文，不是判据放宽）。
 // v2.542.24：65 -> 64（apiVault 按纪律④出表：api-router 的读写链真调它）。
-const BASE_DEAD_NS = 54;  // v2.568.0：55 → 54 —— greenKeys 出表（engines/worldbook.js 的 constGate 用 deriveGreenKeys 给常驻条目派生短键，成为“本轮聊到没聊到”的事前判据；零读 ns 真少一条，不是判据放宽）
+// v2.585.0（R261）：54 → 55 —— appearanceLexicon 入库（外貌描写词表，data-only）。
+//   零读是**设计**：判据在 engines/appearance.js 的 LAYER_ITEMS，词表只供预设/注入拼装取词；
+//   刻意性由 tests/appearance-items-v2585.js 的 C5 静态钉住（appearance.js 里不出现该名）。
+//   故条目按 readonly-api 入账，不是 pending-wire（不是欠接线，是刻意不接）。
+const BASE_DEAD_NS = 55;  // v2.568.0：55 → 54 —— greenKeys 出表（engines/worldbook.js 的 constGate 用 deriveGreenKeys 给常驻条目派生短键，成为“本轮聊到没聊到”的事前判据；零读 ns 真少一条，不是判据放宽）
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。

@@ -1,6 +1,6 @@
 # WorldAxis 拒收码手册（自动生成：`node tools/gen-error-codes.js`）
 
-> 台账 version：`2.584.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
+> 台账 version：`2.585.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
 共 **1935** 个内联拒收码：见证 943 / 死表 52 / 基线 940
@@ -424,7 +424,7 @@
 | `missing-hook` | engines/thread-sprout.js | V28 EXV28-11：支线没有「钩子」（读者为什么想跟）⇒ missing-hook |
 | `missing-hurt` | engines/mend.js | mend.mark：没说伤的是什么事 ⇒ 记一条「为什么受伤」都答不出的账（拓展②） |
 | `missing-id` | engines/act-step.js, engines/consequence-schedule.js, engines/dormant-ladder.js, engines/eccentric-threads.js, engines/hearsay-ledger.js, engines/interlude.js, engines/letter-post.js, engines/misbelief.js, engines/offstage-queue.js, engines/one-shot-mod.js, engines/opportunity.js, engines/spatial-topology.js, engines/story-window.js, engines/tech-lineage.js, engines/thread-sprout.js, engines/world-graph.js | opportunity.respond：没给机会 id ⇒ 拒收（B6） |
-| `missing-item` | engines/followup-gate.js | followupGate：item 为空 ⇒ missing-item（fire 与 due 同一个前置闸） |
+| `missing-item` | engines/appearance.js, engines/followup-gate.js | R585 appearance：给了名单但该级必盖项没盖全 ⇒ missing-item（带中文名，人能读懂缺哪处） |
 | `missing-keys` | engines/checkpoints.js | checkpoints 取 module/scene 范围却不给键 |
 | `missing-kind` | engines/pending-center.js | pendingCenter.describe：没填类型 ⇒ 拒收（缺参数与查不到必须不同因） |
 | `missing-knows` | engines/interlude.js | V28 EXV28-31：没声明这场里的人知道什么 ⇒ missing-knows（否则第一句就可能越界） |
@@ -893,7 +893,7 @@
 | `unknown-good` | engines/economy.js, engines/stall.js | economy.buy：这件货没登记过 ⇒ 不凭空交易（拓展③） |
 | `unknown-hook` | core/plugin.js | plugin.fire：钩子名不在四钩子封闭集合里（init/beforeSave/afterLoad/onRender）⇒ unknown-hook，不把拼错的钩子名当成「没人监听」（v2.114.0） |
 | `unknown-hypothesis` | engines/probe.js | probe：线索指的假说不在这张卷宗里 ⇒ 不新建一条假说兜住（拓展⑤） |
-| `unknown-item` | engines/gear.js | EXP-2：这一件不在台账里（id 对不上）⇒ 如实报 unknown-item（不静默当成一次成功使用） |
+| `unknown-item` | engines/appearance.js, engines/gear.js | R585 appearance：子项 id 不在四层名单内（或挂错层）⇒ unknown-item（不按 id 全局认账） |
 | `unknown-keys` | engines/checkpoints.js | checkpoints 点名了骨架里没有的顶层键 |
 | `unknown-kind` | engines/act-step.js, engines/arc-settle.js, engines/dep-check.js, engines/habit-tell.js, engines/pending-center.js, engines/rehearsal.js, engines/world-lab.js, engines/world.js | pendingCenter.describe：未知来源类型 ⇒ 拒收并回带该类型（本中心不认识的类型不编路由） |
 | `unknown-legend` | engines/world-bridge.js | worldBridge.toRumor：传说 id 不在传说链里 ⇒ 拒收（不替世界编一条事实） |

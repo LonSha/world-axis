@@ -7480,3 +7480,50 @@ dataOnly 792 → 794）· `sync-hardcoded --write`（写后校验通过）· `pl
 · `gen-gates-doc --write` 回填 8 道门禁读数（`readings-v2106` 属 slow 档 117s，按既有口径跳过），
   `q1-load-integrity-v2211` 64/0、`version-consistency` 22/22、`release-manifest` 可发。
 
+
+## R261（v2.585.0 · 外貌子项名单进引擎（判据面）+ 描写词表 data-only 落地）
+
+**用户两条硬约束先落**：① 方案 A 与 B 都做（子项名单进引擎 = 判据面；词表进仓但 data-only = 交付物面）；
+② **代码里不预设年龄/自愿/题材边界** —— `appearance-lexicon.js` 文件头原写「不写未成年、不写非自愿」，
+整段删除，改成「本表**不对题材作任何预设**：谁是成年、谁自愿、写多露骨，全是角色设定与预设层的事」。
+`engines/` 全目录复核，除 `reply-guard.js` 的既有安全话术映射（非本轮新增）外无残留。
+
+**A 面：`engines/appearance.js` 补四层子项名单。** `LAYER_ITEMS`（L1 十二 / L2 十二 / L3 六 / L4 六，共 36 项，id 全局唯一，
+含 L2 的 `pubic`）、`requiredOf(tier,layer)`（必盖项 = 名单**前 N 项**，N 取既有 `COVERAGE_REQ` —— **不设第三张表**）、
+`normItems` / `missingItems` / `coveragePlan`。登记面加 `o.items` 分支：**名单优先于数字**，名单外 ⇒ `unknown-item`（带 `outside`），
+缺必盖项 ⇒ `missing-item`（带中文名）。理由：`COVERAGE_REQ` 只说「L2 要 8 项」，八项全写在手上也算盖住身体 —— 判据是数字，不是「哪几处」。
+
+**一处真缺陷被自己抓出来（本轮最该记的一笔）**：首次跑专锁 `D1a` 就红 —— 往 `LAYER_ITEMS` 追加一项后，同一条登记仍被判
+`unknown-item`。根因是我先把名单编译成装载期缓存的反查表 `ITEM_INDEX`：运行时改表它不跟着变，**这就是第二份真源**。
+改成现场查的 `itemAt(layer,id)`（每层十来项，线性扫成本可忽略），`D1a`/`D1b` 两向自证才立住。缓存型反查表在本仓是第三次现形。
+
+**B 面：`engines/appearance-lexicon.js`（data-only）。** 按同一套 id 组织（L1 12 组 / L2 12 组 / L3 6 组 / L4 6 组，约 190 词，
+只到「解剖与质感」层：形状/色/质/光/状态；行为与节奏留给文风层）。导出面只有 `LEXICON` / `COUNTS` / `DATA_ONLY` / `NOTE`，
+**没有函数、没有 settings，不被任何引擎 require** —— 一条静态判据 C5 直接把「引擎不消费词库」钉在源码上
+（`appearance.js` 源码里不出现 `appearanceLexicon`）。装载两面**同批**：`index.js` 的 `LOAD_ORDER` 与 `tests/run.js` 的 `LOAD`
+（v2.583.0 的 attire-state 就栽在只加了一面）。
+
+**专锁 `tests/appearance-items-v2585.js`（A/B/C/D 四组，全绿 74/0）**：A 名单表本身（含 A5 `requiredOf` 逐格 == `COVERAGE_REQ` 16 组、
+A6 前缀性）、B 名单级登记（B6 数字填满也掩护不了名单）、C 词库面（C2 id 集合与 `LAYER_ITEMS` 逐字相等、C5 引擎不消费）、
+D 两向自证（加一项 ⇒ 放行 / 还原 ⇒ 必拒；下限改 0 ⇒ 空名单放行 / 还原 ⇒ 必拒）。
+
+**「新用途 ≠ 新码」的一课**：我先把 `unknown-item` / `missing-item` 加进 `REJECT_FACE` 快照，`reject-recovery-lock` B3 当场红
+（产品快照 1697 vs 现场 1699）。查证：两个码**早已存在**于 `gear.js` 与 `followup-gate.js`，本轮只是用在**外貌名单**上 ——
+码面记账按**码**不按**调用点**。撤回快照改动、只留注释，218 项复绿；同时给 `reject-v2780.js` 补两条**见证**
+（两码各答一件事：名单外 / 必盖项没盖全），码面 1935 不变、基线 940 不变。
+
+**机械面跟位（每处都在注释里写了理由）**：module-registry 文件 581 / ns 592 / 装载期边 476 / 调用期引用 768；
+dead-export dead 2004 / uiDead 6 / dataOnly 795；module-cycle 606/606/602 · orderLen 587 · 649/592/598 · deadNs 55
+（`appearanceLexicon` 按 readonly-api 入库、刻意零读）；segment-extract A6b 区间 2240-2460 · A11 硬线 2352 ·
+BASE_SECTION_CC 456 · BASE_TEST_FILES 682；ns-consumer `BASE_DEAD_NS` 55。`sync-hardcoded --write` / `consumer-types --register` /
+`gen-error-codes --write` 三处生成物已重算。
+
+**台账三级同源**：`reject-code-ledger` 的 version 与 `_note` 末次版本词跟到 2.585.0（本版码面零新增，base 940、history 不加条目 ——
+只接版本词与说明）。随后 `readings-v2106` **pass（61 项）**。
+
+**门禁实跑**：`appearance-items-v2585` 74/0、`module-cycle-gate-v2107` 65/65、`ns-consumer-ledger-v2400` 72 项、
+`reject-recovery-lock-v2192` 218 项、`reject-code-gate` rc=0（1935 码 / 见证 985 / 死表 52 / 基线 940）、`dead-export-gate` rc=0、
+`q9-evidence-ledger-v2226` 67/0、`attire-state-v2583` 60/60、`version-consistency` 22/22、`release-manifest` 可发。
+
+**未做（如实登记）**：① 本版整趟全量回归见下一条（本段写作时尚未跑）；② 真宿主两项（`v10-ui-pills` / `v10-r3-persist-hosted`）
+仍需真 SillyTavern @ 8000。

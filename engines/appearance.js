@@ -21,6 +21,11 @@
  * 外貌要素库（几千词汇）是创作词库，不进引擎；比喻结构要求/行文顺序规则/光影权重/
  * 情绪绑定属文风层，留给预设。
  *
+ * v2.585.0（R261）修正上一行的一半：**子项清单不是词库，是判据** —— 「这一处写了没」可判定、
+ *   可拒收，故 `LAYER_ITEMS` 进引擎（每层前 N 项 = 该级必盖，N 取既有 `COVERAGE_REQ`，
+ *   不设第三张表）。仍然不进引擎的是**描写词表**：它放 `engines/appearance-lexicon.js`，
+ *   data-only、引擎不消费、不参与任何拒收。原文这两件事被并成一句，是本轮要拆开的那句。
+ *
  * 本模块不替写任何外貌描写，只核验「该写的地方写了没」：
  *   1 总开关默认关闭。关闭时 register() 返回 reason:'disabled'，不记账。
  *   2 分级白名单 S/A/B/C（bad-tier）。
@@ -57,6 +62,141 @@
   const FORM_LABELS = { humanoid: '拟人态', half: '半人态', true: '真身态' };
   const LAYERS = ['L1', 'L2', 'L3', 'L4'];
   const LAYER_LABELS = { L1: '五官', L2: '身体', L3: '穿着', L4: '身材' };
+  // ── v2.585.0（R261 · A 面）：四层子项名单 —— 把「下限数字」补成「名单」 ────────
+  //   它治的病：COVERAGE_REQ 只说「L2 要 8 项」。于是①同一处被数两次也算 8 项、
+  //   ②八项全写在手上也算盖住了身体 —— 判据是数字，不是「哪几处」。
+  //
+  //   口径（与 R50/R51/R254 三次裁决一致，不是本轮新发明）：
+  //     · **名单进引擎** —— 它是判据：这一处写没写，可判定、可拒收；
+  //     · **描写词表不进引擎** —— 那是词库，放 engines/appearance-lexicon.js，data-only、不参与判定。
+  //
+  //   为什么表里不另存「必盖项」：顺序即语义 —— 每层**前 N 项**就是该级必盖项，
+  //   N 取 COVERAGE_REQ[tier][L]。表 + 既有下限数合起来已是单一真源，
+  //   再加一张「必盖项表」就是本仓反复治过的第二份真源（改一处忘一处）。
+  //
+  //   名单来源如实标注：材料原表（《五官构建》）本仓只有「每层要几项」的下限，没有逐项名目，
+  //   故本表是**按既有下限重建**的（每层多留 2 项余量给 B/C 档的「精选」）。
+  //   若材料原表更细：替换本表即可，判据（前 N 项必盖 + 名单外拒收 + 去重不计数）一条不用改。
+  const LAYER_ITEMS = {
+    L1: [
+      { id: 'eye-shape', label: '眼型' },
+      { id: 'eye-color', label: '眼色' },
+      { id: 'brow', label: '眉形' },
+      { id: 'nose', label: '鼻型' },
+      { id: 'lip', label: '唇形' },
+      { id: 'face-shape', label: '脸型' },
+      { id: 'cheekbone', label: '颧骨' },
+      { id: 'jaw', label: '下颌' },
+      { id: 'ear', label: '耳形' },
+      { id: 'skin', label: '肤质' },
+      { id: 'hair-color', label: '发色' },
+      { id: 'hair-style', label: '发型' }
+    ],
+    L2: [
+      { id: 'neck', label: '颈' },
+      { id: 'shoulder', label: '肩' },
+      { id: 'collarbone', label: '锁骨' },
+      { id: 'back', label: '背' },
+      { id: 'chest', label: '胸' },
+      { id: 'waist', label: '腰' },
+      { id: 'hip', label: '臀' },
+      { id: 'hand', label: '手' },
+      { id: 'finger', label: '指节' },
+      { id: 'thigh', label: '腿' },
+      { id: 'pubic', label: '私处' },
+      { id: 'foot', label: '足' }
+    ],
+    L3: [
+      { id: 'top', label: '上装' },
+      { id: 'bottom', label: '下装' },
+      { id: 'outer', label: '外搭' },
+      { id: 'shoes', label: '鞋' },
+      { id: 'accessory', label: '配饰' },
+      { id: 'fabric', label: '面料' }
+    ],
+    L4: [
+      { id: 'height', label: '身高' },
+      { id: 'build', label: '体型' },
+      { id: 'bust-line', label: '胸线' },
+      { id: 'waist-hip', label: '腰臀比' },
+      { id: 'leg-line', label: '腿线' },
+      { id: 'posture', label: '体态' }
+    ]
+  };
+  /**
+   * 该层里有没有这个 id（**现场查表、不缓存**）。
+   * 为什么不做 `ITEM_INDEX` 缓存：缓存就是第二份真源 —— 改名单忘改索引，判据就与表脱节，
+   * 而这正是本仓反复治过的病。名单每层十来项，现场线性查一次的成本可以忽略。
+   */
+  function itemAt(layer, id) {
+    const list = LAYER_ITEMS[layer] || [];
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].id === id) return list[i];
+    }
+    return null;
+  }
+  /**
+   * 该级某层的**必盖项** id：名单前 N 项，N = COVERAGE_REQ[tier][layer]。
+   * 不写第二份数字：改下限就改 COVERAGE_REQ，名单顺序不动。
+   */
+  function requiredOf(tier, layer) {
+    const req = COVERAGE_REQ[tier] || COVERAGE_REQ.C;
+    const all = LAYER_ITEMS[layer] || [];
+    const n = Math.max(0, Math.min(all.length, Number(req[layer]) || 0));
+    return all.slice(0, n).map(function (x) { return x.id; });
+  }
+  /**
+   * 名单归一：去空白 / 去重 / 点名名单外。三件事各留读数，一条都不静默：
+   *   · 名单外 ⇒ 交给调用方拒收 `unknown-item`（**不**当成「未知项也算一个」，那是把判据变松）；
+   *   · 重复 ⇒ 只计一次并回带 `duplicates`（同一处写两遍不是两处）。
+   */
+  function normItems(raw) {
+    const byLayer = {}, unknown = [], duplicates = [];
+    LAYERS.forEach(function (L) {
+      const list = raw && Array.isArray(raw[L]) ? raw[L] : [];
+      const seen = {}, keep = [];
+      list.forEach(function (x) {
+        const id = clean(x, 32);
+        if (!id) return;
+        if (!itemAt(L, id)) { unknown.push({ layer: L, id: id }); return; }
+        if (seen[id]) { duplicates.push({ layer: L, id: id }); return; }
+        seen[id] = 1; keep.push(id);
+      });
+      byLayer[L] = keep;
+    });
+    return { byLayer: byLayer, unknown: unknown, duplicates: duplicates };
+  }
+  /** 必盖项核验：该级每层的前 N 项是否都命中。miss 带中文名（人能直接读懂缺哪处）。 */
+  function missingItems(tier, byLayer) {
+    const miss = [];
+    LAYERS.forEach(function (L) {
+      const got = byLayer[L] || [];
+      requiredOf(tier, L).forEach(function (id) {
+        if (got.indexOf(id) < 0) miss.push({ layer: L, id: id, label: (itemAt(L, id) || {}).label || id });
+      });
+    });
+    return miss;
+  }
+  /**
+   * 该级的**写作计划**（给注入与推演方：「这一级该写哪几处」）。
+   * required = 前 N 项必写；optional = 同层其余（可写可不写，写了不扣分也不会多计）。
+   * 纯查询、不登记、不落盘 —— 所以它不会替谁记账。
+   */
+  function coveragePlan(tier) {
+    const t = TIERS.indexOf(tier) >= 0 ? tier : 'C';
+    const out = { tier: t, layers: {} };
+    LAYERS.forEach(function (L) {
+      const req = requiredOf(t, L);
+      const all = (LAYER_ITEMS[L] || []).map(function (x) { return x.id; });
+      out.layers[L] = {
+        label: LAYER_LABELS[L],
+        required: req,
+        optional: all.filter(function (id) { return req.indexOf(id) < 0; }),
+        need: req.length
+      };
+    });
+    return out;
+  }
   // 关系加权：恋人/血亲/宿敌 自动升一级（C→B→A→S 单向）。纯登记在册的关系才加权，
   // 不猜——weighted 由调用方显式给出（bonds 六型 / family / 宿敌 均可作为依据）。
   const WEIGHT_RELATIONS = ['lover', 'family', 'rival'];
@@ -198,7 +338,18 @@
       let effTier = marked;
       if (!marked) { weighted = weight(tier, o.weighted); effTier = weighted.tier; }
       // C 级只允许 1 个覆盖子项（「至少 1 个可识别特征」的上限）
-      const cov = o.cover || {};
+      // v2.585.0：**给了名单就以名单为准**（名单是现场，数字是手填；两个都给时不取大、不取小，
+      //   只认名单 —— 否则「数字 8 项、名单 3 项」会互相掩护）。
+      let byLayer = null;
+      let dupCount = 0;
+      let cov = o.cover || {};
+      if (o.items != null) {
+        const ni = normItems(o.items);
+        if (ni.unknown.length) { out = { ok: false, reason: 'unknown-item', who: w, outside: ni.unknown }; return false; }
+        byLayer = ni.byLayer;
+        dupCount = ni.duplicates.length;
+        cov = { L1: byLayer.L1.length, L2: byLayer.L2.length, L3: byLayer.L3.length, L4: byLayer.L4.length };
+      }
       // v2.583.0 ②：动态升级。**只对无手动标记的角色生效** —— 材料把动态升级
       //   限定在「临时生成、无设定的角色」上，标记级是作者定档，不跟着出场次数漂。
       let upCause = '';
@@ -222,6 +373,12 @@
       const total = LAYERS.reduce(function (n, L) { return n + (typeof cov[L] === 'number' ? cov[L] : 0); }, 0);
       if (finalTier === 'C' && total > C_MAX_COVERAGE) { out = { ok: false, reason: 'too-many-coverage', who: w }; return false; }
       // 升级后的覆盖校验按**新档位**要求（材料：升级后那次出场须按新等级补写缺失层）
+      // v2.585.0：先按**名单**核验（更具体：缺的是哪一处，带中文名），再退回数字核验。
+      //   顺序不是美化 —— 数字核验更松（8 项可以全写在手上），先跑名单才有意义。
+      if (byLayer) {
+        const miss = missingItems(finalTier, byLayer);
+        if (miss.length) { out = { ok: false, reason: 'missing-item', who: w, missing: miss }; return false; }
+      }
       const covChk = checkCoverage(finalTier, cov);
       if (!covChk.ok) { out = { ok: false, reason: covChk.reason, missing: covChk.missing, who: w }; return false; }
       // 场景排他断言：同场景已有人占用了 眼型+脸型 组合或同色系服装 → 拒收
@@ -242,6 +399,9 @@
       const row = { who: w, tier: tier, effTier: finalTier, weighted: weighted.weighted, weightedBy: weighted.by || '',
         marked: marked || '', upgradeCause: upCause || '', baseTier: effTier,
         cover: { L1: cov.L1 || 0, L2: cov.L2 || 0, L3: cov.L3 || 0, L4: cov.L4 || 0 },
+        // v2.585.0：名单也入账（谁写了哪几处，下一轮 rescan 要能对着账核，不能只核数字）。
+        items: byLayer ? { L1: byLayer.L1.slice(), L2: byLayer.L2.slice(), L3: byLayer.L3.slice(), L4: byLayer.L4.slice() } : null,
+        dupItems: dupCount,
         form: form, scene: scene, eye: eye || '', face: face || '', outfit: outfit || '', style: style || '',
         rescan: o.mode === 'rescan', at: clockNow('appearance') };
       if (prev) {
@@ -267,6 +427,10 @@
     return { ok: true, who: hit.who, tier: hit.tier, effTier: hit.effTier, weighted: hit.weighted,
       weightedBy: hit.weightedBy, marked: hit.marked || '', baseTier: hit.baseTier || hit.tier,
       upgradeCause: hit.upgradeCause || '', cover: Object.assign({}, hit.cover), form: hit.form,
+      // v2.585.0：名单也进只读视图（注入/推演要能拿到「写了哪几处」；深拷一份，别让调用方改到账上）
+      items: hit.items ? { L1: (hit.items.L1 || []).slice(), L2: (hit.items.L2 || []).slice(),
+        L3: (hit.items.L3 || []).slice(), L4: (hit.items.L4 || []).slice() } : null,
+      dupItems: Number(hit.dupItems) || 0,
       formLabel: FORM_LABELS[hit.form], scene: hit.scene, reason: 'applied' };
   }
   /** 场景排他断言：核验当前场景里是否有人违反 眼型+脸型 / 服装 唯一性。返回冲突清单。 */
@@ -321,6 +485,8 @@
   WA.appearance = {
     TIERS: TIERS, TIER_LABELS: TIER_LABELS, FORMS: FORMS, FORM_LABELS: FORM_LABELS,
     LAYERS: LAYERS, LAYER_LABELS: LAYER_LABELS, WEIGHT_RELATIONS: WEIGHT_RELATIONS,
+    // v2.585.0：名单面（判据的一部分，导出给注入/推演/专锁共用同一份）：表 + 必盖项推导 + 写作计划。
+    LAYER_ITEMS: LAYER_ITEMS, requiredOf: requiredOf, coveragePlan: coveragePlan,
     UPGRADE_CAUSES: UPGRADE_CAUSES, UPGRADE_CAUSE_LABELS: UPGRADE_CAUSE_LABELS,
     markOf: markOf,
     COVERAGE_REQ: COVERAGE_REQ,

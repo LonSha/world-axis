@@ -10108,6 +10108,21 @@ function runWitness(WA) {
         return AP.register(A1, 'B', { cover: { L1: 4, L2: 3, L3: 3, L4: 2 }, upgrade: 'because-i-say-so' }).reason;
       });
 
+      // v2.585.0（R261）：名单级拒收 —— 两个码各答一件事：名单外（表里没这处）/ 名单内但该级必盖项没盖。
+      //   与 missing-coverage（数字不够）分立：那个答「项数不够」，这两个答「哪一处不对」。
+      want('unknown-item', 'R585 appearance：子项 id 不在四层名单内（或挂错层）⇒ unknown-item（不按 id 全局认账）');
+      trip('unknown-item', function () {
+        if (typeof AP.setSettings === 'function') AP.setSettings({ enabled: true });
+        return AP.register('__witness_appearance_R261_a', 'B', { items: { L1: ['eye-shape', 'tail'], L2: [], L3: [], L4: [] } }).reason;
+      });
+
+      want('missing-item', 'R585 appearance：给了名单但该级必盖项没盖全 ⇒ missing-item（带中文名，人能读懂缺哪处）');
+      trip('missing-item', function () {
+        if (typeof AP.setSettings === 'function') AP.setSettings({ enabled: true });
+        return AP.register('__witness_appearance_R261_b', 'B', {
+          items: { L1: ['eye-shape', 'eye-color', 'brow', 'nose'], L2: ['neck'], L3: [], L4: [] } }).reason;
+      });
+
       want('downgrade-coverage', 'R254 appearance：升级那次把已登记的层覆盖数改小 ⇒ downgrade-coverage（不得推翻已有描写）');
       trip('downgrade-coverage', function () {
         AP.register(A1, 'B', { cover: { L1: 4, L2: 3, L3: 3, L4: 2 } });

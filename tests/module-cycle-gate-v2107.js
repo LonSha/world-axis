@@ -314,7 +314,10 @@ function runAll(A) {
   // v2.542.5（L4）：engines/character-drive.js 进文件面 ⇒ 603/603/600 → 604/604/601（三数同步 +1，实测回填）。
   // v2.583.0（R254）：新增 engines/attire-state.js 一文件 ⇒ 文件面 / 别名面 / 有引用三数同步 +1。
   //   605/605/602 是实测回填（覆盖率口径「有人引用即算」零变化：它被 render/inject.js 的注入分支真读）。
-  A(a.files === 605 && a.aliasFiles === 605 && a.refFiles === 602,
+  // v2.585.0（R261）：engines/appearance-lexicon.js 进文件面（data-only 也是产品文件，装载在案）
+  //   ⇒ 605/605/602 → 606/606/602（三数同步 +1）。有引用数不变：没有任何产品文件 require 它
+  //   —— 这正是「词表不参与判定」的可读出后果，不是漏接线。
+  A(a.files === 606 && a.aliasFiles === 606 && a.refFiles === 602,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -670,7 +673,8 @@ A(a.edgesLoad === 476 && a.edgesCall === 4054 && a.edgesAll === 4530 && a.identi
   // v2.545.0 跟位：584 -> 585（HEAD 65713bc 实测已 585，存量 +1 未跟位；本版按实测补账）
   // v2.583.0（R254）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1（attire-state 紧跟
   //   appearance、早于 render/inject.js）⇒ 585 → 586。order-violation 仍 0（它读的 settingsBus 在前）。
-  A(a.edgesLoad >= 20 && a.orderLen === 586,
+  // v2.585.0：appearance-lexicon 紧跟 appearance 装载 ⇒ LOAD_ORDER 586 → 587（order-violation 仍 0）。
+  A(a.edgesLoad >= 20 && a.orderLen === 587,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -769,7 +773,10 @@ A(a.edgesLoad === 476 && a.edgesCall === 4054 && a.edgesAll === 4530 && a.identi
 //   两者都是真读点，非噪声，故一并入账：596 → 597。
 // v2.583.0（R254）：三面各 +1 —— 静态提供方 648（attireState 命名空间）、账本 591
 //   （module-registry-gate --update 落定）、读面 598（render/inject.js 的注入分支真读它）。
-A(a.nsProvided === 648 && a.nsLedger === 591 && a.nsRead === 598,
+// v2.585.0（R261）：appearanceLexicon 命名空间入库（静态提供方 +1）且无产品读点（读面不动）
+//   ⇒ 静态提供方 648 → 649、账本 591 → 592、读面仍 598。差额 649−592=57 与回填前**同量**
+//   （三面同步记账，B6 漂移口径不动）。
+A(a.nsProvided === 649 && a.nsLedger === 592 && a.nsRead === 598,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -822,7 +829,10 @@ A(a.nsProvided === 648 && a.nsLedger === 591 && a.nsRead === 598,
 // v2.569.0 跟位：55 → 54（metabolismClock 出零读面：core/interceptor.js 在 moodGlide.glide
 //   之后同一处世界推进点真调 `WA.metabolismClock.worldTick()`；该 ns 的零读定性条目
 //   已在 v2.568.0 从 ns-consumer-ledger.json 注销，两处同源，故本常量跟着降到 54。
-A(a.deadNs.length === 54, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+// v2.585.0（R261）：零读 ns 54 → 55 —— appearanceLexicon 入库后产品面零读。这不是漏接线，
+//   而是本版要钉住的事实：词表 data-only、引擎不消费（appearance.js 源码不出现 appearanceLexicon，
+//   由 tests/appearance-items-v2585.js 的 C5 静态锁住）。
+A(a.deadNs.length === 55, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
