@@ -114,6 +114,22 @@
       "reviewAfter": "2.529.0",
       "disposition": "keep"
     },
+    "mapEditor.getSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.593.0",
+      "disposition": "keep"
+    },
+    "mapEditor.setSettings": {
+      "shape": "settings-registry-only",
+      "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
+      "purpose": "settings-registry-only",
+      "nextConsumer": "面板该模块的设置区（读口 → 控件）",
+      "reviewAfter": "2.593.0",
+      "disposition": "keep"
+    },
     "sceneIntent.stat": {
       "shape": "query-api",
       "why": "程序化查询口：由调用方按需派生（面板与诊断当前未接）",
