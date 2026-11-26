@@ -253,6 +253,37 @@ for n in unifiedPending refine fieldWriters observationProjection; do
 done
 ```
 
+## 五点六、改判记录（v2.597.0 / v2.600.0）：又两台出列
+
+同上节口径：出列不是「忘了这一座」，是裁决真的被推翻了。这两台的推翻理由与前四台不同 ——
+前四台是**功能被接上**，这两台是**读数本身成了产品**：原先没有任何地方能回答的问题，
+现在有了一个只读的回答者。两座桥都不代它做事，只把它已经能算的东西说出来。
+
+| 命名空间 | 文件 | 出列版本 | 故事面读点 | 为什么这算是真读点 |
+|---|---|---|---|---|
+| `ensemble` | `engines/ensemble.js` | **v2.597.0**（ENS-1） | `engines/ensemble-bridge.js` | 仲裁面体检：读 `getSettings` / `STRATEGIES` / `stat`，**一次 `run` 都不发**——它量的是「两套三档表是否漂移、配好的通道是不是全是继承来的」，不替用户仲裁 |
+| `binding` | `engines/binding.js` | **v2.600.0**（BND-1） | `engines/binding-bridge.js` | 配置绑定遮蔽表：逐层调 `list` 只取键名、读 `SCOPES` 与 `getSettings` 判开关，**不 bind 不 unbind**——它回答「我在角色层改的那条为什么没生效」，不替用户改 |
+
+两条边界（与「开关≠读点」同源，写在这里防止被读成「补了个最小读点销账」）：
+
+1. **读数面成产品 ≠ 功能面成产品。** `ensemble` 今天的读数是 `no-channel-ready` / `no-runs`，
+   `binding` 今天的读数是「三层各几键、哪一键被遮住」。它们出列是因为**这两个问题现在有人回答**，
+   不是因为仲裁与绑定已经真在跑。销的是「零读」，不是「无数据」。
+2. **读点必须恰等于落地面。** 两台的命中集各自只有一个文件（两座桥），锁的 `G1` 逐步比对，
+   多一处就红 —— 否则「出列」会变成「随便找个人引用一下」。
+
+复算（应各只打印一行，即各自的桥）：
+
+```bash
+for n in ensemble binding; do
+  printf '%-12s ' "$n"
+  grep -rln "WA\.$n\b" --include=*.js engines core render ui actors direction index.js     | grep -vE 'tool-diag|narrow-consumers|action-desk-routes' | tr '\n' ' '; echo
+done
+```
+
+本期自查：`ensemble` 的改判是 v2.597.0 做的产品接线，但本锁当时没跟位（与上节那两台同款病，
+**第二次复发**）；`binding` 的改判则同批完成。两台一起在本版补齐，锁的 G 段从四台扩到六台。
+
 ## 六、与 `ns-consumer-ledger` 的关系
 
 这五台仍在零读账本的 `entries` 里，分类不变。本文不注销任何条目——

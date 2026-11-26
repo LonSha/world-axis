@@ -50,7 +50,7 @@ function ok(name, fn) {
 const TARGETS = [
   { ns: 'preflight', file: 'engines/rehearse.js', zh: '写前预演与检查存档' },
   { ns: 'polish', file: 'engines/polish.js', zh: '输入润色' },
-  { ns: 'ensemble', file: 'engines/ensemble.js', zh: '多模型并发推演与仲裁' },
+  // v2.597.0（ENS-1）改判出列：ensemble 已被 engines/ensemble-bridge.js 真读（见 WIRED_WAVE）。
   { ns: 'archiveHide', file: 'engines/archive-hide.js', zh: '归档楼层隐藏' },
   { ns: 'autoHide', file: 'engines/auto-hide.js', zh: '自动隐去' }
 ];
@@ -64,7 +64,7 @@ const TARGETS = [
 //   其中 `unifiedPending` 落在 core/ 而不是 engines/ —— 它是聚合器不是引擎，
 //   但「零读」的后果完全一样（产品面拿不到聚合器，待办中心就读不到合并视图）。
 const SECOND_WAVE = [
-  { ns: 'binding', file: 'engines/binding.js', zh: '作用域绑定（bind / read / unbind）' },
+  // v2.600.0（BND-1）改判出列：binding 已被 engines/binding-bridge.js 真读（见 WIRED_WAVE）。
   { ns: 'calendarPlan', file: 'engines/calendar-custom.js', zh: '自定义历法规划' },
   { ns: 'purifyScope', file: 'engines/purify-scope.js', zh: '净域保护（protect / restore）' },
 ];
@@ -78,7 +78,12 @@ const WIRED_WAVE = [
   // 这两台的读点比另两台早（v2.590.0 / v2.593.0 就接了），本锁 v2.594.0 一并出列 ——
   //   当时只改了产品与账本、没改裁决，导致锁红了 4 轮没人看见。**接线三件套缺一件就是潜伏红。**
   { ns: 'unifiedPending', file: 'core/unified-pending.js', ver: 'v2.590.0', readers: ['engines/pending-recon.js', 'ui/panel.js'] },
-  { ns: 'fieldWriters', file: 'engines/field-writers.js', ver: 'v2.593.0', readers: ['ui/pages/tools-page.js'] }
+  { ns: 'fieldWriters', file: 'engines/field-writers.js', ver: 'v2.593.0', readers: ['ui/pages/tools-page.js'] },
+  // 这两台是本锁第二次改判（第一次四台见上）：裁决被推翻的理由不是「补了个最小读点销账」，
+  //   而是它们的读数面本身成了产品 —— ensemble 的「两套三档表漂移」与 binding 的「谁遮住了谁」
+  //   都是原先根本没有读者能回答的问题。桥是只读的：一个不发模型调用，一个不 bind/unbind。
+  { ns: 'ensemble', file: 'engines/ensemble.js', ver: 'v2.597.0', readers: ['engines/ensemble-bridge.js'] },
+  { ns: 'binding', file: 'engines/binding.js', ver: 'v2.600.0', readers: ['engines/binding-bridge.js'] }
 ];
 const ALL_TARGETS = TARGETS.concat(SECOND_WAVE).concat(WIRED_WAVE);
 // 第二批的关键方法（逐台现场实读导出面，不是照抄注释）。
@@ -376,4 +381,4 @@ ok('F6 非空转：行首计数不把注释里的 `= {...}` 算成定义', funct
   assert.strictEqual(n, 1, '行首计数口径失效：注释被算成定义（实 ' + n + '）');
 });
 
-console.log('\norphan-engine-adjudication-2550: pass (' + pass + ' 段：' + (TARGETS.length + SECOND_WAVE.length) + ' 台零故事面読点已裁决（五台 + 第二批五台）；另 ' + WIRED_WAVE.length + ' 台已出列接线（' + WIRED_WAVE.map(function (t) { return t.ns; }).join(' / ') + '），出列同样留痕)');
+console.log('\norphan-engine-adjudication-2550: pass (' + pass + ' 段：' + (TARGETS.length + SECOND_WAVE.length) + ' 台零故事面読点已裁决（TARGETS ' + TARGETS.length + ' + 第二批 ' + SECOND_WAVE.length + '，v2.600.0 起四台已改判出列）；另 ' + WIRED_WAVE.length + ' 台已出列接线（' + WIRED_WAVE.map(function (t) { return t.ns; }).join(' / ') + '），出列同样留痕)');

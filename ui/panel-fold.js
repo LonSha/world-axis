@@ -96,6 +96,8 @@
     { page: 'tools', id: 'bytebudget', label: '字节预算（SLT-1）' },
     // v2.599.0（CNT-1）：配色面是第 22 个折叠段。同批登记（口径已定死，不留“下一轮再补”）。
     { page: 'tools', id: 'contrast', label: '配色可读性（CNT-1）' },
+    // v2.600.0（BND-1）：绑定面是第 23 个折叠段。同批登记（口径已定死，不留“下一轮再补”）。
+    { page: 'tools', id: 'bindings', label: '配置绑定遮蔽（BND-1）' },
   ];
   const __REG = {
     key: LS_KEY,

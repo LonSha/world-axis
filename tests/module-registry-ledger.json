@@ -1,14 +1,14 @@
 {
- "version": "2.599.0",
+ "version": "2.600.0",
  "loadOrderCount": 596,
- "lazyCount": 22,
- "loadedCount": 592,
+ "lazyCount": 23,
+ "loadedCount": 593,
  "uiCount": 26,
- "nsCount": 603,
+ "nsCount": 604,
  "totals": {
-  "loadEdges": 486,
+  "loadEdges": 487,
   "hardEdges": 0,
-  "callRefs": 788,
+  "callRefs": 790,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -70,6 +70,7 @@
     "engines/beat-report.js",
     "engines/beat.js",
     "engines/betrothal-alliance.js",
+    "engines/binding-bridge.js",
     "engines/binding.js",
     "engines/blackmarket-usury.js",
     "engines/body-anatomy.js",
@@ -680,6 +681,7 @@
     "engines/beat-report.js",
     "engines/beat.js",
     "engines/betrothal-alliance.js",
+    "engines/binding-bridge.js",
     "engines/binding.js",
     "engines/blackmarket-usury.js",
     "engines/body-anatomy.js",
@@ -11414,6 +11416,25 @@
    "stateKeys": [
     "worldaxis_degrade_audit_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/binding-bridge.js": {
+   "ns": [
+    "bindingBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/card-file.js": {

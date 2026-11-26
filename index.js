@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.599.0';
+  const VERSION = '2.600.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1683,6 +1683,9 @@
   //   惰性档非空、首帧装载边严格小于全量、每条都能 ensure 装回来、失败可重试。
   //   本节注释同样不放方括号 —— 门禁用正则从本段取清单。
   const LAZY_ORDER = [
+    // v2.600.0（BND-1）：配置绑定的遮蔽表。被读方 binding 在首帧档（它被 read 消费），
+    //   本模块只被工具页面板读，故进惰性档。零写：不 bind / 不 unbind。
+    'engines/binding-bridge.js',
     'engines/card-file.js',
     'engines/chat-guard.js',
     'engines/contrast.js',

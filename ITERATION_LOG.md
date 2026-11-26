@@ -8253,3 +8253,84 @@ module-cycle 零读 **45** 条 · version-consistency 22。
 
 **未做（如实登记）**：① 不读背景图，所以“图上的字”仍然没量（那需要像素，得另开工）；② 不算透明叠加，rgba 一律 unparsed；
 ③ 只在宿主页面上量，Popup / iframe 不在范围；④ 整趟全量回归仍按分面批次验。
+
+## R275（v2.600.0 · BND-1：配置绑定遮蔽表 —— 数据在，解释不在）
+
+**它治什么**：`engines/binding.js`（145 行）有三层作用域（`SCOPES = ['chat','char','default']`）、
+`bind` / `unbind` / `list` 与一个 `read().from`，全仓零产品读者。
+于是有一个问题从来没被任何读数回答过：**「我明明在角色层改了那条规则，为什么没生效」** ——
+因为聊天层有同名键把它遮住了。数据一直在（三层都在 store 里），解释一直没有。
+这类病在本仓有名字：**同形不可分辨**。三层里哪一层赢，此刻只能靠人去猜。
+
+**它做什么**：新增 `engines/binding-bridge.js`（212 行，十三导出）。
+`layers()` 逐层列**键名与条数**、`shadow()` 指出谁赢谁被遮（`winner` / `hidden` / `effective`）、
+`view(key)` 给单键三态（`shadowed` / `single` / `unknown-key`）、`audit()` 合成 verdict、
+`lineOf()` / `summaryText()` 一行读数、`diagnose()` 逐层 + 遮蔽明细、`stat()` 本面计数。
+
+**六条边界（写进源注释，不可回退）**：
+
+1. **只报键名，不报值。** 绑定里可能存接口地址与提示词片段。`layers()` 只取 `r.key`，
+   源码里连 `.value` 都不出现 —— 专锁 A5 是静态判据，不是口头纪律。
+   专锁 B5 把同一个秘密值 `SECRET-VALUE-MUST-NOT-LEAK` 塞进三层所有值，
+   再对整个返回体做字符串搜索：一个字节都不许漏。
+2. **零写。** 不 `bind`、不 `unbind`、不 `transact`、不 `setSettings` —— 专锁 A4 钉死六个写口字面量。
+   这台引擎的回答是「谁遮住了谁」，改不改是用户的事。
+3. **优先级取自被读方的 `SCOPES`。** 桥不自带一份三层顺序（A6 静态钉住 `B.SCOPES.join`）；
+   并且**每次都比对** `B.SCOPES.join(',')` 与本面 `ORDER` —— 两处一旦不一致就报 `scope-drift`
+   并拒绝硬算一个“谁赢”。读数是「同一件事两套顺序」，不是「我猜一个」。
+4. **开关关着时不分层。** `binding.read()` 的 order 是
+   `settings().enabled ? ['chat','char','default'] : ['default']`。
+   所以开关关着时「被遮」这件事**在语义上不成立**：那一刻 `read` 只读默认层，
+   上两层遮谁都不影响结果。读数会自己写明这一点（`effective:false` + 一句「分层优先级不生效」），
+   而不是把一份不成立的遮蔽当成事实报出来。
+5. **`empty` 与 `no-store` 分开。** 三层真的一个键都没有（`empty`）与 store 读不到（`no-store`）
+   是两种处置：前者不用管，后者要先修存储。读数措辞分开写。
+6. **读数唯一出口。** `lineOf` 只有一处实现，`summaryText` 内部回它，`diagnose` 第一行也是它。
+   一处口径，不另攒第二份。
+
+**why 五值**：`ok` / `module-missing` / `no-store` / `empty` / `scope-drift`。
+表外值不编一个说法（`whyText('zzz')` 返回「未登记」开头）。
+
+**落地与接线**：`index.js` 惰性档（被读方 `binding` 在首帧档；本模块只被工具页面板读，
+提首帧只会让首帧多装一个模块）；`tests/run.js` LOAD 面 + 专锁挂载；
+`engines/tool-diag-tables.js` 登记 `'engines/binding-bridge.js': 'bindingBridge'`；
+`ui/pages/tools-page.js` 新增「配置绑定遮蔽表」段（第 23 个折叠段，`wa-bnd-line`，零按钮零写口）；
+`ui/panel-fold.js` **同批登记**（本仓在这一格上栽过四次，口径已定死）。
+
+**专锁**：`tests/binding-bridge-v2600.js`（194 行，**57 判据**）。A 组静态（十三导出 / 零写 / 无 value / 取自 SCOPES / 三处接线）、
+B 组行为（自造三层含一个三层同键、一个只在字符层、一个只在默认层：6 条 / 键集 4 / 遮蔽 1 / winner=chat /
+值不泄漏 / 单键三态 / 开关关着 effective=false / empty / scope-drift / no-store / module-missing / 诊断 1+3+1）、
+C 组现场（真渲染、段内 0 写口、无按钮、`stat` 计数、`__reset` 归零）。
+
+**顺带清偿两笔历史欠账**（本轮真正的意外收获，都是「接线三件套缺一件」这个老病）：
+
+- `tests/module-cycle-gate-v2107.js` **自 v2.587.0 起十三个版本未跟位**，一次结清：
+  B1 文件面 607/607/603 → 620/620/616；B2 边恒等式 477/4059/4536 → 487/4120/4607；
+  B3 LOAD_ORDER 588 → 596；B5 命名空间三面 650/593/599 → 663/604/623；B6 漂移口径 57 → 59；
+  B7 零读 ns 55 → 44；B10 登记面 39/46 → 41/48；B11 账本缺项 25 → 27。
+  口径一字未改 —— 全是现场复算读数，不是放宽判据。
+- `tests/orphan-engine-adjudication-v2550.js`：`ensemble` 在 v2.597.0 已被 `ensemble-bridge` 真读，
+  但裁决锁与裁决文档当时都没跟位（**同款病第二次复发**，上一次是 v2.590.0/v2.593.0 两台）。
+  本轮与 `binding` 一起改判出列，写进 `docs/ORPHAN_ENGINES_ADJUDICATION.md` 五点六节，
+  并新增两条边界：**读数面成产品 ≠ 功能面成产品**、**读点必须恰等于落地面**。
+  锁从 35 段变 33 段（两台的 C 段判据移入 G 段，判据变强不变弱）。
+
+**一处踩过的坑（如实记）**：跟位 `settle` 与 `z1-04` 时先改了断言**消息里的数字**，
+断言**比较值**在另一行、仍是旧数 —— 两条判据照旧红。这是本仓一个反复出现的形态：
+「读数写在两处，一处是文案一处是判据」。修法不是改文案，是找到 `=== N` 那一行。
+
+**读数**：version-consistency **22** · module-registry **593 文件 / 604 ns / 487 边 / 硬边 0 / 790 调用期** ·
+dead-export **dead 2068 / uiDead 6 / dataOnly 823**（证据 2074 条）· readings-v2106 **61**（refs 13272 / ns 589 / members 6226）·
+segment-extract **128**（section 473 / 测试面 699 / 重组面 19146 / 硬线 2215）· z1-04 **46/46**（惰性 23 / 契约面 593 / 首帧 596）·
+settle **55**（nsCount 604 / loadedCount 593 / 边 487 / 调用 790）· plan-readings **16**（696 / 557 / 487）·
+loose-readings 绿 · evidence-index **695 条 stale 0** · reject-code **1967 码 / 见证 974 / 死表 52 / 基线 941 / 零新增** ·
+ns-consumer-ledger **零读 44**（binding 出表）· module-cycle 零读 **44** · orphan-adjudication **33 段** ·
+BND-1 专锁 **57/0** · q8 **80/0** · q9 **67/0** · cap-tier **35/0** · capability-ui **61/0** · inject-sources 20 · overview-fold 106 ·
+ev1 **88/0** · ev6 **180/0** · v11-pages-cats 12/0 · ui-a11y **1781/1781** · readme-slim 72 · tpl-comment 9/9 ·
+rel-contract 23 · p3-x1 54 · opv29-z5-27 23 · release-manifest 可发 · export-contract RC=0 ·
+settings-bus-api ✓ · field-liveness 无幽灵 · dup-decl 0 · engines-ns 596/596 · rel-contract 绿 · player-guide 25 · U9-fact-report 51。
+
+**未做（如实登记）**：① 桥不判断「这条遮蔽是不是 bug」—— 同名键在三层都写是合法用法，
+本面只把关系说出来；② 不读值就判断不了「三层写的是不是同一个东西」，那需要值比较，
+而值恰恰是这台引擎决定不碰的东西；③ 不改设置、不动点缀，用户要动请去原来的绑定面；
+④ 整趟全量回归仍按分面批次验。

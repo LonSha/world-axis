@@ -72,7 +72,10 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 //   而那道桥有真产品读面（工具页「事实老化面」段）。**这不等于原来的缺口被治好**：
 //   桥今天报的正是「no-last-turn，本读数不可用」—— 出表的是「零读」，不是「无数据」。
 //   复算：grep -rn 'WA.factAge' engines/fact-age-bridge.js
-const BASE_DEAD_NS = 45;   // v2.599.0（CNT-1）：46 → 45 = contrast 出表（contrast-bridge 按 CSS 变量对算 WCAG，
+const BASE_DEAD_NS = 44;   // v2.600.0（BND-1）：45 → 44 = binding 出表（binding-bridge 逐层调 binding.list 只取键名、读 SCOPES 与 getSettings 判开关，成了它第一个产品面读者）。
+//   销行销的是「零读」，不是「绑定已经能用」—— 桥今天只报三层各多少键、谁遮住了谁，不 bind 不 unbind。
+//   复算：grep -rn 'WA.binding' engines/binding-bridge.js
+// v2.599.0（CNT-1）：46 → 45 = contrast 出表（contrast-bridge 按 CSS 变量对算 WCAG，
 //   顺带补上全仓 `getComputedStyle` 0 命中的空白）。销行销的是「零读」，不是「配色都合格」。
 // v2.598.0（SLT-1）：47 → 46 = slotFormat 出表   // v2.598.0（SLT-1）：47 → 46 = slotFormat 出表（byte-budget-bridge 成为它第一个产品面读者：
 //   用 byteLength 量全仓字符串、用 MAX_NAME_BYTES 算存档名余量）。销行销的是「零读」，不是「无数据」。

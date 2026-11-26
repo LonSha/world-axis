@@ -411,6 +411,8 @@
     'engines/byte-budget-bridge.js': 'byteBudgetBridge',
     // v2.599.0（CNT-1）：配色可读性体检面。
     'engines/contrast-bridge.js': 'contrastBridge',
+    // v2.600.0（BND-1）：配置绑定遮蔽表。
+    'engines/binding-bridge.js': 'bindingBridge',
     // v2.138.0（E5）：多模型并发推演与结果仲裁。登记在此 = 该文件缺席时 secModules 会**如实报 missing**。
     //   漏登记的后果不是「少一行字」：inventory 的定义面与出口面契约都从本表取，
     //   漏了就等于它在定义面上不存在（自检看不见的黑盒）。

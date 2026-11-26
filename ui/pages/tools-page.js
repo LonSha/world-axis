@@ -80,6 +80,8 @@
   let __bbEnsureFail = 0;
   // v2.599.0（CNT-1）：同款。配色面也是惰性档。
   let __cntEnsureFail = 0;
+  // v2.600.0（BND-1）：同款。绑定面也是惰性档（被读方 binding 在首帧档）。
+  let __bndEnsureFail = 0;
   const rfaLine = function () {
       const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
       if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
@@ -614,6 +616,37 @@
           + '比值走 <code>contrast</code> 的 WCAG 公式，阈值取它的 MIN_RATIO（本面不写死 4.5）。'
           + '“按不透明算” —— 透明叠加与背景图压暗不在本面结论里；认不出颜色的对单列，既不假绿也不假红。'
           + '读不到计算样式时直说不可用，<b>不内置兜底色</b>。</div>';
+      })()}
+      `)}
+      ${foldSec('tools', 'bindings', '配置绑定遮蔽表</div><div class="wa-dim">（BND-1：我在角色层改的那条规则为什么没生效 —— 谁遮住了谁，只报键名）', () => `
+      ${(function () {
+        // 被读方（binding）在首帧档，本体在惰性档：首帧未装载是常态，走 ensure + 失败记忆。
+        const rel = 'engines/binding-bridge.js';
+        const bb2 = WA.bindingBridge;
+        if (!bb2 || typeof bb2.audit !== 'function') {
+          if (__bndEnsureFail) return '<div class="wa-dim">绑定面装载失败（' + rel + '）—— 这不是“三层没有遮蔽”，是这台引擎装不上</div>';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              if (p && typeof p.catch === 'function') p.catch(function () { __bndEnsureFail = 1; });
+              return '<div class="wa-dim">绑定面在惰性档，装载中（成功后下次渲染自愈）</div>';
+            }
+          } catch (e) { /* 落到下面统一记失败 */ }
+          __bndEnsureFail = 1;
+          return '<div class="wa-dim">绑定面装载失败（' + rel + '）</div>';
+        }
+        let a0 = null;
+        try { a0 = bb2.audit({}); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const rows = ((a0 && a0.shadow && a0.shadow.rows) || []).slice(0, 8).map(function (r) {
+          return '<div class="wa-dim">· ' + esc(r.key) + '：生效的是 ' + esc(r.winner) + ' 层，被遮住的是 '
+            + esc((r.hidden || []).join(' / ')) + ' 层' + (r.effective === false ? '（此刻开关关着，不算数）' : '') + '</div>';
+        }).join('');
+        return '<div class="wa-dim" id="wa-bnd-line">' + esc(bb2.summaryText(a0)) + '</div>' + rows
+          + '<div class="wa-dim">本面只量：不 bind、不 unbind、不写盘，<b>只报键名不报值</b>'
+          + '（绑定里可能存接口地址与提示词片段，值本身不该出现在任何读数里）。'
+          + '优先级取自 <code>binding</code> 的 SCOPES 并每次比对：两处顺序一旦不一致就报漂移，'
+          + '不硬算一个“谁赢”。开关关着时 read 只读默认层，此刻“被遮”不成立 —— 读数会自己写明。'
+          + '</div>';
       })()}
       `)}
       ${foldSec('tools', 'refine', '档案精编预览</div><div class="wa-dim">（RFA-1：三处只增不减的台账能省几条 —— 只预览，不删一条）', () => `

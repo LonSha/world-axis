@@ -317,7 +317,7 @@ function runAll(A) {
   // v2.585.0（R261）：engines/appearance-lexicon.js 进文件面（data-only 也是产品文件，装载在案）
   //   ⇒ 605/605/602 → 606/606/602（三数同步 +1）。有引用数不变：没有任何产品文件 require 它
   //   —— 这正是「词表不参与判定」的可读出后果，不是漏接线。
-  A(a.files === 607 && a.aliasFiles === 607 && a.refFiles === 603,
+  A(a.files === 620 && a.aliasFiles === 620 && a.refFiles === 616,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -573,7 +573,13 @@ function runAll(A) {
 //   · (render/inject.js,        attireState)     —— 注入分支 `if (vis.attireState && WA.attireState)`
 //   装载期仍 476（该文件不在装载期读 WA：它不碰 store、不调 registerModule）。
 //   恒等式 476 + 4054 = 4530。
-A(a.edgesLoad === 477 && a.edgesCall === 4059 && a.edgesAll === 4536 && a.identityOk,
+// v2.600.0（BND-1）跟位：本锁自 v2.587.0 起十三个版本未跟位，本轮一次结清 ——
+//   B2 边恒等式 477 / 4059 / 4536 → 487 / 4120 / 4607；B3 LOAD_ORDER 588 → 596；
+//   B5 命名空间三面 650 / 593 / 599 → 663 / 604 / 623；B6 漂移口径 57 → 59；
+//   B7 零读 ns 55 → 44（本轮 BND-1 销的是 binding 一条，其余是这十三版累积）；
+//   B10 登记面 39/46 → 41/48（未在用 7 个）；B11 账本缺项 25 → 27。
+//   口径一字未改：这些都是现场复算读数，不是放宽判据。
+A(a.edgesLoad === 487 && a.edgesCall === 4120 && a.edgesAll === 4607 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -674,7 +680,7 @@ A(a.edgesLoad === 477 && a.edgesCall === 4059 && a.edgesAll === 4536 && a.identi
   // v2.583.0（R254）：index.js LOAD_ORDER 与 tests/run.js LOAD 双登记各 +1（attire-state 紧跟
   //   appearance、早于 render/inject.js）⇒ 585 → 586。order-violation 仍 0（它读的 settingsBus 在前）。
   // v2.585.0：appearance-lexicon 紧跟 appearance 装载 ⇒ LOAD_ORDER 586 → 587（order-violation 仍 0）。
-  A(a.edgesLoad >= 20 && a.orderLen === 588,
+  A(a.edgesLoad >= 20 && a.orderLen === 596,
     'B3 次序判据只在运行时定案的 ' + a.edgesLoad + ' 条装载期边上判（LOAD_ORDER ' + a.orderLen + ' 条）');
   A(a.orderViolation.length === 0,
     'B4 装载期边零次序违规（供者 LOAD_ORDER 下标恒 < 消费方）');
@@ -776,7 +782,7 @@ A(a.edgesLoad === 477 && a.edgesCall === 4059 && a.edgesAll === 4536 && a.identi
 // v2.585.0（R261）：appearanceLexicon 命名空间入库（静态提供方 +1）且无产品读点（读面不动）
 //   ⇒ 静态提供方 648 → 649、账本 591 → 592、读面仍 598。差额 649−592=57 与回填前**同量**
 //   （三面同步记账，B6 漂移口径不动）。
-A(a.nsProvided === 650 && a.nsLedger === 593 && a.nsRead === 599,
+A(a.nsProvided === 663 && a.nsLedger === 604 && a.nsRead === 623,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -792,7 +798,7 @@ A(a.nsProvided === 650 && a.nsLedger === 593 && a.nsRead === 599,
   // v2.194.0（U2 批次④）：差**仍为 39**（与批次③持平）—— 本轮一度写成 41（照抄批次③
   //   的自证槽增量），但两个自证槽实测不可达已撤除 ⇒ 静态提供方没涨，差自然也不涨。
   // v2.401.0(OPV23):实测回填（差 46 → 50——静态提供方 +12 / 账本 +8，差额仍全有登记理由：入口/UI/内部前缀）
-  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 57,
+  A(a.nsFaceDrift.length === 0 && a.nsProvided - a.nsLedger === 59,
     'B6 ns 面差 ' + (a.nsProvided - a.nsLedger) + ' 个全部有登记理由（入口/UI/内部前缀），零未登记漂移');
   // v2.153.0（RX5+RX6）：零读 ns 22 → 21（plotGauge 与 branchTree 都被 tool-diag 与面板真读，
   //   从零读名单里离场）。
@@ -832,7 +838,7 @@ A(a.nsProvided === 650 && a.nsLedger === 593 && a.nsRead === 599,
 // v2.585.0（R261）：零读 ns 54 → 55 —— appearanceLexicon 入库后产品面零读。这不是漏接线，
 //   而是本版要钉住的事实：词表 data-only、引擎不消费（appearance.js 源码不出现 appearanceLexicon，
 //   由 tests/appearance-items-v2585.js 的 C5 静态锁住）。
-A(a.deadNs.length === 55, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+A(a.deadNs.length === 44, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
@@ -848,16 +854,16 @@ A(a.deadNs.length === 55, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不�
   //   新增第六个 UI 层命名空间 panelFold(ui/panel-fold.js),它**有真读者**
   //   (ui/panel.js 的 foldSec() 直写 `WA.panelFold.isCollapsed(...)`),故计入「在用」而非零读。
   // v2.401.0(OPV23):实测回填（28/35 → 32/39——panelOverviewMain/panelToolsPage/uiDashboards 三段 ns 接上真读者）
-  A(a.registeredUsed === 39 && a.registeredTotal === 46,
+  A(a.registeredUsed === 41 && a.registeredTotal === 48,
     'B10 登记面在用 ' + a.registeredUsed + '/' + a.registeredTotal
-    + '（未在用的 5 个是取数型入口 ns，只在 index.js 内部自用；v2.181.0：UI 主题层 9 个 ns 全部接上真读者）');
+    + '（v2.600.0 实测：未在用的 7 个均属取数型入口 ns，只在 index.js 内部自用；v2.181.0：UI 主题层 9 个 ns 全部接上真读者）');
   // v2.153.0（RX5+RX6）：两个新引擎进账本 ⇒ 账本缺项文件面收缩，缺项 5 不变（UI 层仍 4 文件）。
   // v2.401.0(OPV23):实测回填（缺项 15 → 19——ui/pages 四段文件入账本外文件面）
   // v2.529.0（V29 OPV29-10/09）：实测仍是 **22**，且 22 条逐条未变（index.js + 21 个
   //   ui 文件）。两个新表文件曾一度使缺项变 24（它们进文件面、账本还没收），
   //   `node tests/module-registry-gate.js --update` 把账本落定后即回到 22 ——
   //   这一轮记下这个中间态，是因为「+2 就该把常量写 24」会让判据在 --update 之后反而红。
-  A(a.runtimeMissing === 25 && a.ledgerAvailable,
+  A(a.runtimeMissing === 27 && a.ledgerAvailable,
     'B11 账本缺项文件 ' + a.runtimeMissing + ' 个（入口 + 十二个 ui 文件，如实报出）');
   // 次序判据方向的两向自证（用假产品面，不碰真文件）
   const fakeOk = M.audit({
