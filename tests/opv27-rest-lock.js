@@ -95,7 +95,11 @@ console.log('\n【OPV27-7】拒收码五簇话术与覆盖率');
   ok(cov.percent < 100, '覆盖率**不是** 100%（943 条里还有没归簇的，不硬凑）');
   const cov2 = rp.coverage(ledger.base);
   eq(cov2.covered, cov.covered, '同输入两次覆盖率逐字相同（读数可复跑）');
-  ok(cov.byCluster && Object.keys(cov.byCluster).length === 16, '十六簇逐簇给出命中数（v2.569.0 二批：五簇 + already/unavailable/threw + failed/conflict/closed/off-target/switched-off/unconfigured/absent/unmet 八簇）');
+  // 十七簇逐簇给命中数。v2.584.0 前是十六簇（五簇 + already/unavailable/threw + failed/
+  //   conflict/closed/off-target/switched-off/unconfigured/absent/unmet 八簇）；本轮新增 `attire`
+  //   一簇（穿着状态的两个新码 cause-scope / downgrade-coverage），故 +1。簇表是判据，不是数字：
+  //   这里只跟位数，簇的语义边界（为什么必须逐名登记、不按词根猜）见 engines/reject-phrase.js 原注释。
+  ok(cov.byCluster && Object.keys(cov.byCluster).length === 17, '十七簇逐簇给出命中数（v2.584.0 三批：五簇 + 上述八簇 + attire 一簇）');
 
   // 负控制②：未命中簇也返回 ok ⇒ 943 条全「覆盖」
   const src = rd('engines/reject-phrase.js');
