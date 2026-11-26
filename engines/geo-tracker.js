@@ -36,7 +36,8 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const WA = window.WorldAxis = window.WorldAxis || {};
 
-  const VERSION = '2.245.0';
+  // v2.587.0（R263）：本文件接 mapEditor 时改过，版本号跟上（头注释保留 MAP-1/MAP-2 出处）。
+  const VERSION = '2.587.0';
   const SETTING_KEY = 'worldaxis_geo_tracker_settings_v1';
   const FEED_KEY = 'worldaxis_geo_nearby';
 
@@ -125,6 +126,21 @@
   /**
    * 登记与同步已知地点坐标库
    */
+  /**
+   * v2.587.0（R263）：坐标来源三级 —— 显式给 ⇒ 用；未给且底图在 ⇒ 向 mapEditor.locate 要；
+   * 否则 0。底图坏掉不许让「落位」这件事失败（整段 try 包死，取不到就退回去）。
+   */
+  function locateFallback(def, name) {
+    if (def && typeof def.x === 'number' && typeof def.y === 'number') return { x: def.x, y: def.y, src: 'explicit' };
+    try {
+      if (WA.mapEditor && typeof WA.mapEditor.locate === 'function') {
+        const h = WA.mapEditor.locate(name);
+        if (h && h.ok === true && typeof h.x === 'number' && typeof h.y === 'number') return { x: h.x, y: h.y, src: 'map' };
+      }
+    } catch (e) { /* 底图不可用 ⇒ 当作没有底图 */ }
+    return { x: 0, y: 0, src: 'none' };
+  }
+
   function registerPlace(placeDef) {
     if (!placeDef || !placeDef.name) return { ok: false, reason: 'missing-name' };
     const name = cleanText(placeDef.name, 80);
@@ -132,12 +148,15 @@
     const geo = s.geoTracker || {};
     const places = geo.places || {};
 
+    // v2.587.0（R263）：坐标兜底。底图在时向 mapEditor 要坐标，不在时**照旧 0**
+    //   （没导入底图的工程不该因为多了一个引擎就变了坐标 —— 旧行为逐字不变）。
+    const fb = locateFallback(placeDef, name);
     places[name] = {
       name: name,
       aka: Array.isArray(placeDef.aka) ? placeDef.aka.slice(0, 10) : [],
       region: cleanText(placeDef.region || '', 40),
-      x: typeof placeDef.x === 'number' ? placeDef.x : 0,
-      y: typeof placeDef.y === 'number' ? placeDef.y : 0,
+      x: fb.x,
+      y: fb.y,
       kind: cleanText(placeDef.kind || 'poi', 20),
       desc: cleanText(placeDef.desc || '', 120),
       sceneId: cleanText(placeDef.sceneId || '', 40),

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.586.0';
+  const VERSION = '2.587.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -556,6 +556,9 @@
     'engines/institutional-inertia.js',
     // v2.234.0 (Living World V5): 真实世界自治演化与偶遇痕迹中枢
     'engines/living-world.js',
+    // v2.587.0（R263 / MAP-3）：地图编辑模型。**早于 geo-tracker** —— geo-tracker 缺坐标时会
+    //   在调用期向 mapEditor.locate 要（调用期引用不构成装载约束，但同序更省心，且与本 LOAD 一致）。
+    'engines/map-editor.js',
     // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
     'engines/geo-tracker.js',
     // v2.328.0 (MAP-ADVANCED): 分形空间拓扑、通勤滞留仲裁、视听阻抗遮蔽与现场物理痕迹
@@ -861,7 +864,7 @@
     'engines/beast-bond.js',
     // v2.69.0: 外貌分级契约 / 原型阶梯。位置与 tool-diag MODULE_EXPORTS 同批登记。
     'engines/appearance.js',
-    // v2.586.0（R261）：外貌**要素库**（描写词表，data-only）。紧跟 appearance 之后装载，
+    // v2.587.0（R261）：外貌**要素库**（描写词表，data-only）。紧跟 appearance 之后装载，
     //   与它同版本交付、不同记账：appearance 的 register() 不看本文件一眼，拒收面一条都不依赖它。
     'engines/appearance-lexicon.js',
     'engines/ladder.js',

@@ -7557,3 +7557,70 @@ segment-extract 的 A11 硬线按实测 2352 → **2323**（run.js 23678 行，E
 **未做（如实登记）**：① 本版全量回归尚未拿到整趟凭据（上一版 5af585a 的整趟在跑，本版另起一趟）；
 ② 词表仍**没有产品消费方**（零读 ns 仍 55）—— 评估里的 R6 就是它，下一步是让 `render/inject.js` 按
 `coveragePlan` 取词；③ 真宿主两项（`v10-ui-pills` / `v10-r3-persist-hosted`）仍需真 SillyTavern @8000。
+
+## R263（v2.587.0 · 缝「地图编辑器的功能」而不是那张图：`engines/map-editor.js` + 几何判据面）
+
+**方向被纠偏了一次，这是本版最该记住的事**：用户给的材料是一个 154 KB 单页「江城市地图编辑器」HTML
+（世界坐标 9617×7354，3 地形 / 5 主区 / 231 街区 / 309 POI / 67 条道路，几何顶点 1399）。
+第一版做法是把 HTML 里的 `const DATA = {...}` 抠成 `data/jianghai-map.json` 塞进引擎 —— 用户当场纠正：
+**「我们缝合的应该是那个编辑器的功能，而不是地图吧」**。这句话把任务从「导入一份数据」重定义为
+「把**编辑模型**搬进来」：几何/图层/编辑操作/撤销/冲突检查/导入导出。引擎因此叫 `map-editor` 不叫 `geo-map`，
+`data/jianghai-map.json` 降格为**示例底图资产**（data-only，进 dataOnly 计数，不进引擎常量）。
+
+**七条写死的纪律（`engines/map-editor.js` 头注释，都是「下一轮容易走回头路」的地方）**：
+① **不在装载期建索引** —— id→实体现场线性扫（v2.586 的 `ITEM_INDEX` 是反例）；
+② **失败不污染** —— 拒收 ⇒ `version` 与 `exportJSON()` 逐字不变；
+③ **撤销可核** —— undo 后必须与编辑前**逐字相等**，不是「看起来回去了」；
+④ **`check()` 是纯函数** —— 跑完文档不动（冲突报告不改文档）；
+⑤ **id 单调不复用** —— `meta.seq` 只增；
+⑥ **选择不是文档状态** —— 不进文档、不耗撤销；
+⑦ **不猜单位** —— `unitMeter=0` ⇒ `span().meters = null` + `needsCalibration`（同 `region.js` 的基准点口径）。
+
+**文档只在内存里**（150 KB 几何塞 store 会让每次 `transact` 深拷贝），要落盘显式 `exportJSON()` 交宿主。
+信封 `FORMAT='worldaxis-map'` / `SCHEMA=1`，更高 schema 一律 `schema-too-new` 拒收。
+设置键 `worldaxis_map_editor_settings_v1`（`enabled/unitMeter/maxUndo/maxVertices/checkEps`）。
+
+**四处接线（缺一处就是死引擎）**：
+- `render/map-viewport.js` 增 `opts.doc` 分支 —— 传文档时按几何画（**不传 doc 输出逐字不变**）；顺手修掉「头注释承诺画道路折线、实现里 `grep -c road` = 0」的假账。
+- `engines/geo-tracker.js` 增 `locateFallback()` —— 显式坐标 > `mapEditor.locate()` > 0，旧行为不变。
+- `index.js` 的 `LOAD_ORDER` 与 `tests/run.js` 的 `LOAD` **两面同批**加 `engines/map-editor.js`（紧贴 `geo-tracker.js` 之前）。
+- `tests/run.js` 挂 `runLock('./map-editor-v2587.js')`。
+
+**四件现场实测的真缺陷（都是探针咬出来的，不是看出来的）**：
+1. **`esc()` 的引号实体被文件层还原**：返回 `'&quot;'` 会被还原成字面 `'"'`，SVG 属性直接逃逸 ⇒ 改成
+   `String.fromCharCode(38) + 'quot;'` 拼出来。
+2. **`nextId()` 闭包了全局 `DOC.meta.seq` 而不是草稿**：两次 `addRect` 都返回 `subs-616`（同一个 id）⇒
+   改成 `nextId(d, layer)` 作用在草稿上。
+3. **`snapToRoad` 吸中心线会把街区吸塌**：一个 120×90 街区 4 个顶点全落到同一段直路上，面积 10800 → 211。
+   改为吸**路缘**（中心线沿法向外扩半个路宽，按顶点在路哪侧定向），并加「面积塌一半以上 ⇒ 整笔拒收
+   `degenerate`」保护。阈值不是拍的：先试 `<=0`（永不触发）、再试 `0.05`（误杀正常微调），最终定 **0.5**。
+4. **`importJSON` 的键名与信封不对称**：`desc/region/sub` vs `description/main_region/sub_region`、
+   `meta.source/meta.name` —— 结果「导出→导入」指纹变了（`d027c26c → dd494e98`）⇒ 全部改成两键并用。
+
+**判据 `tests/map-editor-v2587.js`（286 行 / 八组 A·D·E·F·B·C·G·H）：RESULT pass 93 / fail 0。**
+其中四处判据口径是本轮修出来的（D4b 界外点会同时踩 `poi-on-water` + `poi-outside-region` 报 5 而非 4；
+D5b 挪出底图；E6 定标被 settingsBus 归一成整数；C6 `maxUndo=0` 仍允许编辑、只是历史不留）。
+
+**示例底图自带 3 处真冲突（导入即报，不是我们制造的）**：`poly-self-intersect`（澜江多边形自交）、
+`dup-name`（「南湾城便利店」重名）、`region-overlap`（江湾区 × 云鼎区重叠 2 个顶点）。
+另有一条干净的 0 基线值得记：**231 个街区质心全部落在它声明的区内、无落水；309 个 POI 全在陆域且都在声明的街区与区内**，
+所以导入判据是从「0 违规」起步的。
+
+**跟位读数（改一处必改其余，全部按实测、不按预期）**：装载文件 **582** / 命名空间 **593** / 首帧 `LOAD_ORDER` **588** /
+契约面 **582** / 装载期边 **477** / 调用期引用 **770** / 测试文件面 **683** / section 基线 **457** /
+A11 减重硬线 **2315**（run.js 23686 行）/ 计划表 `tests 680 · engines 546 · 装载期边 477` / refs **13160** /
+证据 679 条。落点：`settle-v2830`、`opv29-z1-04-v2529`（:143/:168）、`segment-extract-v2400`（:97/:167/:432）、
+`module-cycle-gate-v2107`（B1/B2/B3/B5/B11 五处字面量，B11 runtimeMissing 试改 26 后实测 **25**、已回退）、
+`plans/V29_MASTER_PLAN.md:120`。
+
+**码面 +26（全部来自 map-editor 的内联 reason 字串）**：`bad-class/bad-distance/bad-index/bad-layer/bad-point/
+bad-points/bad-size/bad-width/degenerate/import-rejected-entities/need-2-points/need-3-points/no-document/
+no-region/no-road-nearby/no-roads/no-such-entity/noop/not-a-path/not-assignable/redo-empty/schema-too-new/
+too-few-points/too-many-points/undo-empty/unresolved-endpoint`。在 `tests/reject-v2780.js` 插一段 MAP-3 见证块，
+逐条 `want()+trip()` 真跑出 `reason`（前后保存并还原底图与设置）；`no-document` 需要「根本没有底图」的环境，
+只能按 base 收下（base 940 → **941**，changelog 冠了说明）。结论：`reject-code-gate` rc=0，
+**1961 码 / 见证 1010 / 死表 52 / 基线 941**（`gen-error-codes --write` 口径不同：见证 968 —— 引用时须说明来源）。
+
+**未做（如实登记）**：① `atlas.js` / `terrain-hazard.js` 尚未用几何接线（M4 未动 —— 它们仍按**名字**连边）；
+② `docs/PROJECT_ASSESSMENT.md` 的 R6（词表进注入面）本轮未做；③ 真宿主两项（`v10-ui-pills` /
+`v10-r3-persist-hosted`）仍需真 SillyTavern @ `http://127.0.0.1:8000`，一直没执行；④ 整趟全量回归待本版跑。

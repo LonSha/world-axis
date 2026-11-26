@@ -14,12 +14,16 @@
  *      - 支持初星学园、大楼、校园等封闭场景的场景过滤与楼层（1F/2F/3F）切换
  *   5. SVG 渲染管线装配（renderSvgScene）：
  *      - 纯函数生成干净规范的 SVG 节点字符串（地图网格、区域底色、道路折线、地标图标、角色徽章）
+ *      - v2.587.0（R263）补上：上面「区域底色、道路折线」原本是**注释先写、实现没做**
+ *        （`grep -c road render/map-viewport.js` 当时返回 0）。本版接 engines/map-editor.js 的
+ *        文档后真的画面与线，且**不传 doc 时输出逐字不变**（专锁 M5/M6 钉住）。
  */
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
 
-  const VERSION = '2.246.0';
+  // v2.587.0（R263）：本文件接 mapEditor 时改过，版本号跟上（头注释保留 MAP-1/MAP-2 出处）。
+  const VERSION = '2.587.0';
   const SETTING_KEY = 'worldaxis_map_viewport_settings_v1';
 
   // 默认视口与渲染配置
@@ -277,6 +281,49 @@
     // 场景标题水印
     if (sceneId) {
       svg += `<text x="20" y="35" fill="rgba(255,255,255,0.25)" font-size="18" font-weight="bold">【情境域】${sceneId}${floor ? ' · ' + floor : ''}</text>`;
+    }
+
+    // ── v2.587.0（R263）：底图（面与线）──
+    //   只认 opts.doc（engines/map-editor.js 的文档）。**不传就不产出任何字节** ⇒ 既有输出面、
+    //   既有专锁逐字不变（同 v2.586 planHints 的口径：加能力不许改老输出）。
+    //   坐标直接用世界坐标、viewBox 也用世界坐标 —— **不重采样**：重采样就是第二份几何。
+    if (opts.doc && opts.doc.layers) {
+      const dl = opts.doc.layers;
+      const esc = function (s) {
+        return String(s == null ? '' : s).replace(/[<>&"]/g, function (c) {
+          if (c === '<') return '&lt;';
+          if (c === '>') return '&gt;';
+          if (c === '&') return '&amp;';
+          // 引号用码点拼，不写字面实体：文件层会把某些实体还原成原字符（现场踩过）。
+          return String.fromCharCode(38) + 'quot;';
+        });
+      };
+      const r1 = function (v) { const n = Number(v); return isFinite(n) ? Math.round(n * 10) / 10 : 0; };
+      const pts = function (arr) { return (arr || []).map(function (q) { return r1(q[0]) + ',' + r1(q[1]); }).join(' '); };
+      (dl.terrains || []).forEach(function (x) {
+        svg += '<polygon class="wa-map-terrain" data-layer="terrains" data-name="' + esc(x.name)
+          + '" points="' + pts(x.points) + '" fill="' + (esc(x.color) || '#a9c9d6') + '" fill-opacity="0.95" stroke="none"/>';
+      });
+      (dl.regions || []).forEach(function (x) {
+        svg += '<polygon class="wa-map-region" data-layer="regions" data-name="' + esc(x.name)
+          + '" points="' + pts(x.points) + '" fill="' + (esc(x.color) || '#d8d2c6') + '" fill-opacity="0.55"'
+          + ' stroke="rgba(255,255,255,0.35)" stroke-width="3"/>';
+      });
+      (dl.subs || []).forEach(function (x) {
+        svg += '<polygon class="wa-map-sub" data-layer="subs" data-name="' + esc(x.name)
+          + '" points="' + pts(x.points) + '" fill="' + (esc(x.color) || '#cfc08a') + '" fill-opacity="0.85"'
+          + ' stroke="rgba(0,0,0,0.35)" stroke-width="2"/>';
+      });
+      (dl.roads || []).forEach(function (x) {
+        svg += '<polyline class="wa-map-road" data-layer="roads" data-name="' + esc(x.name)
+          + '" data-class="' + esc(x.class) + '" points="' + pts(x.points) + '" fill="none" stroke="#5b5348"'
+          + ' stroke-width="' + (r1(x.width) || 4) + '" stroke-linecap="round" stroke-linejoin="round"/>';
+      });
+      (dl.pois || []).forEach(function (q) {
+        svg += '<circle class="wa-map-poi" data-layer="pois" data-name="' + esc(q.name)
+          + '" data-type="' + esc(q.type) + '" cx="' + r1(q.x) + '" cy="' + r1(q.y) + '" r="4"'
+          + ' fill="' + (esc(q.color) || '#64b5f6') + '" stroke="#0d1117" stroke-width="1"/>';
+      });
     }
 
     // 地点图钉与文字

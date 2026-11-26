@@ -10132,6 +10132,90 @@ function runWitness(WA) {
       });
     }
   }
+  // ── v2.587.0（R263 / MAP-3）：地图编辑模型的拒收面 ──
+  //   编辑类引擎第一次进码表。为什么逐条见证而不塞进 base：这些码全是**公开失败归因**
+  //   （「为什么不让我改」），模型与面板都要读；不给见证就等于让门禁替我们说「没人会跑到」。
+  //   收尾把底图与设置原样放回（见证面不许留状态给后面的节）。
+  {
+    const ME = WA.mapEditor;
+    if (ME && typeof ME.apply === 'function') {
+      const keepDoc = ME.exportJSON();
+      const keepSet = ME.getSettings();
+      try {
+        ME.importJSON({ width: 1000, height: 1000, terrains: [], regions: [], subs: [], pois: [], roads: [] });
+
+        want('undo-empty', '地图编辑：还没改过就撤销');
+        trip('undo-empty', function () { return ME.undo().reason; });
+        want('redo-empty', '地图编辑：没有可重做的编辑');
+        trip('redo-empty', function () { return ME.redo().reason; });
+
+        want('bad-layer', '地图编辑：往不存在的图层加面');
+        trip('bad-layer', function () { return ME.apply({ op: 'addPoly', layer: 'pois', name: 'x', points: [[0, 0], [1, 0], [1, 1]] }).reason; });
+        want('bad-points', '地图编辑：坐标不是数');
+        trip('bad-points', function () { return ME.apply({ op: 'addPoly', layer: 'subs', name: 'x', points: [[0, 0], [1, 'a'], [1, 1]] }).reason; });
+        want('need-3-points', '地图编辑：两点画不出面');
+        trip('need-3-points', function () { return ME.apply({ op: 'addPoly', layer: 'subs', name: 'x', points: [[0, 0], [10, 0]] }).reason; });
+        want('degenerate', '地图编辑：三点共线，面积为零');
+        trip('degenerate', function () { return ME.apply({ op: 'addPoly', layer: 'subs', name: 'x', points: [[0, 0], [1, 1], [2, 2]] }).reason; });
+        want('bad-size', '地图编辑：拖框尺寸为负');
+        trip('bad-size', function () { return ME.apply({ op: 'addRect', layer: 'subs', name: 'x', x: 0, y: 0, w: -5, h: 5 }).reason; });
+        want('need-2-points', '地图编辑：单点画不出路');
+        trip('need-2-points', function () { return ME.apply({ op: 'addRoad', name: 'x', points: [[0, 0]] }).reason; });
+        want('bad-width', '地图编辑：路宽为零');
+        trip('bad-width', function () { return ME.apply({ op: 'addRoad', name: 'x', points: [[0, 0], [1, 1]], width: 0 }).reason; });
+        want('bad-class', '地图编辑：未知道路等级');
+        trip('bad-class', function () { return ME.apply({ op: 'addRoad', name: 'x', points: [[0, 0], [1, 1]], class: 'runway' }).reason; });
+
+        const poly = ME.apply({ op: 'addRect', layer: 'subs', name: '见证地块', x: 100, y: 100, w: 40, h: 40 });
+        const poi = ME.apply({ op: 'addPoi', name: '见证点', x: 120, y: 120 });
+        want('bad-index', '地图编辑：顶点下标越界');
+        trip('bad-index', function () { return ME.apply({ op: 'setVertex', id: poly.id, index: 99, pt: [1, 1] }).reason; });
+        want('too-many-points', '地图编辑：顶点数超过上限');
+        trip('too-many-points', function () {
+          ME.setSettings({ maxVertices: 8 });
+          const pts = [];
+          for (let i = 0; i < 10; i++) pts.push([i * 10, (i % 2) ? 50 : 0]);
+          const r = ME.apply({ op: 'addPoly', layer: 'subs', name: 'x', points: pts });
+          ME.setSettings({ maxVertices: keepSet.maxVertices });
+          return r.reason;
+        });
+        want('too-few-points', '地图编辑：删到画不成面');
+        trip('too-few-points', function () {
+          ME.apply({ op: 'deleteVertex', id: poly.id, index: 0 });
+          return ME.apply({ op: 'deleteVertex', id: poly.id, index: 0 }).reason;
+        });
+        want('no-such-entity', '地图编辑：改一个不存在的对象');
+        trip('no-such-entity', function () { return ME.apply({ op: 'move', id: 'nope', dx: 1, dy: 1 }).reason; });
+        want('not-a-path', '地图编辑：对 POI 拖顶点');
+        trip('not-a-path', function () { return ME.apply({ op: 'setVertex', id: poi.id, index: 0, pt: [1, 1] }).reason; });
+        want('noop', '地图编辑：位移为零（那不算一次编辑）');
+        trip('noop', function () { return ME.apply({ op: 'move', id: poi.id, dx: 0, dy: 0 }).reason; });
+        want('bad-distance', '地图编辑：贴合距离为零');
+        trip('bad-distance', function () { return ME.apply({ op: 'snapToRoad', id: poly.id, maxDist: 0 }).reason; });
+        want('no-roads', '地图编辑：一张没有路的图上贴路');
+        trip('no-roads', function () { return ME.apply({ op: 'snapToRoad', id: poly.id, maxDist: 10 }).reason; });
+        ME.apply({ op: 'addRoad', name: '远路', points: [[900, 900], [950, 950]] });
+        want('no-road-nearby', '地图编辑：附近没有可贴的路');
+        trip('no-road-nearby', function () { return ME.apply({ op: 'snapToRoad', id: poly.id, maxDist: 5 }).reason; });
+        want('no-region', '地图编辑：重算归属时那点不在任何区内');
+        trip('no-region', function () { return ME.apply({ op: 'reassign', id: poi.id }).reason; });
+        const reg = ME.apply({ op: 'addPoly', layer: 'regions', name: '见证区', points: [[90, 90], [200, 90], [200, 200], [90, 200]] });
+        want('not-assignable', '地图编辑：给主区本身重算归属');
+        trip('not-assignable', function () { return ME.apply({ op: 'reassign', id: reg.id }).reason; });
+        want('bad-point', '地图编辑：点查询的坐标不是数');
+        trip('bad-point', function () { return ME.at('x', 1).reason; });
+        want('unresolved-endpoint', '地图编辑：量距两端有一个名字在图上找不到');
+        trip('unresolved-endpoint', function () { return ME.span('__图上没有甲__', '__图上没有乙__').reason; });
+        want('schema-too-new', '地图编辑：更高 schema 一律不接');
+        trip('schema-too-new', function () { return ME.importJSON({ format: 'worldaxis-map', schema: 9, width: 10, height: 10 }).reason; });
+        want('import-rejected-entities', '地图编辑：有实体坏掉就整次拒收');
+        trip('import-rejected-entities', function () { return ME.importJSON({ width: 10, height: 10, roads: [{ name: 'x', points: [[0, 0]] }] }).reason; });
+      } finally {
+        ME.setSettings(keepSet);
+        if (keepDoc) { try { ME.importJSON(keepDoc); } catch (e2) { /* 还原失败不许掩盖真判据 */ } }
+      }
+    }
+  }
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

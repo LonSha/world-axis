@@ -140,7 +140,7 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const parse = function (mm) { return mm ? (mm[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); }) : null; };
   const eager = parse(mOrd), lazy = parse(mLazy);
   // v2.542.23 跟位：582 → 583（story-export 从惰性档回首帧：工具页「导出正文」两个按钮真调它）。
-  a(!!eager && eager.length === 587, 'B1 首帧清单 LOAD_ORDER 解析出 587 条（v2.585.0 跟位：586 → 587 = appearance-lexicon（data-only 词表）入首帧）（v2.583.0 跟位：585 → 586 = attire-state 归位首帧）（v2.542.24：583 → 584 = api-vault 归位）（v2.542.21 跟位：575 → 581 → 582 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目 + json-repair 归位；v2.542.23 → 583 = story-export 归位）', eager && eager.length);
+  a(!!eager && eager.length === 588, 'B1 首帧清单 LOAD_ORDER 解析出 588 条（v2.585.0 跟位：586 → 587 = appearance-lexicon（data-only 词表）入首帧）（v2.583.0 跟位：585 → 586 = attire-state 归位首帧）（v2.542.24：583 → 584 = api-vault 归位）（v2.542.21 跟位：575 → 581 → 582 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目 + json-repair 归位；v2.542.23 → 583 = story-export 归位）', eager && eager.length);
   // A0b / A0e：惰性档非空 ——防「删空档换下降」
   a(!!lazy && lazy.length >= 10, 'B2 惰性档**非空**且成规模（≥10 条；删空换下降会在这里红）', lazy && lazy.length);
   // v2.542.23 跟位：21 → 20（story-export 同病：产品面真读，不能再懒）。
@@ -165,8 +165,8 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   //   于是恒等式变成 `loaded = loadOrder − ui + lazy`。原式在结构上再也不可能成立，
   //   继续留着一个必然为假的等式只会逼后来人改数字骗过它。这里换成真恒等式：
   //   任何一项漂移（少一台引擎 / 惰性档被删空 / ui 条目被塞进契约面）都会在这里红。
-  a(led.loadedCount === 581 && led.loadOrderCount === 587 && led.lazyCount === 18 && led.uiCount === 24,
-    'B10 契约面 581 = 首帧 587 − ui 24 + 惰性 18（契约面 = 首帧非 ui ∪ 惰性；实测 '
+  a(led.loadedCount === 582 && led.loadOrderCount === 588 && led.lazyCount === 18 && led.uiCount === 24,
+    'B10 契约面 582 = 首帧 588 − ui 24 + 惰性 18（契约面 = 首帧非 ui ∪ 惰性；实测 '
       + [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount].join(' / ') + '）',
     [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount]);
   // 首帧装载边 vs 全量装载边（验收原话的读数）

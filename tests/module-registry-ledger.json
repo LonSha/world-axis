@@ -1,14 +1,14 @@
 {
- "version": "2.586.0",
- "loadOrderCount": 587,
+ "version": "2.587.0",
+ "loadOrderCount": 588,
  "lazyCount": 18,
- "loadedCount": 581,
+ "loadedCount": 582,
  "uiCount": 24,
- "nsCount": 592,
+ "nsCount": 593,
  "totals": {
-  "loadEdges": 476,
+  "loadEdges": 477,
   "hardEdges": 0,
-  "callRefs": 768,
+  "callRefs": 770,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -215,6 +215,7 @@
     "engines/local-grid.js",
     "engines/lost-and-found.js",
     "engines/macro-guard.js",
+    "engines/map-editor.js",
     "engines/maritime-navigation.js",
     "engines/memory-relay.js",
     "engines/memory-tiers.js",
@@ -802,6 +803,7 @@
     "engines/local-grid.js",
     "engines/lost-and-found.js",
     "engines/macro-guard.js",
+    "engines/map-editor.js",
     "engines/maritime-navigation.js",
     "engines/memory-relay.js",
     "engines/memory-tiers.js",
@@ -2945,6 +2947,27 @@
    "ghostRefs": [],
    "stateKeys": [
     "worldaxis_living_world_settings_v1"
+   ],
+   "consumedBy": []
+  },
+  "engines/map-editor.js": {
+   "ns": [
+    "mapEditor"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_map_editor_settings_v1"
    ],
    "consumedBy": []
   },
