@@ -69,6 +69,14 @@
       return (WA.capabilityAudit && WA.capabilityAudit.getSettings) ? WA.capabilityAudit.getSettings() : null;
     });
     const capSummaryOn = lazy(function () { const c = capAuditCfgL(); return !!(c && c.showSummary === true); });
+    // v2.592.0（RFA-1）：档案精编读数 —— 跟着 foldSec 的惰性走（收起态不读）。
+    //   「引擎未装载 / 读数抛错 / 三源都空 / 有东西可编」四种状态在这一行里必须分得开。
+    const rfaLine = function () {
+      const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
+      if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
+      try { return B.summaryText() || '档案精编：读数不可用'; }
+      catch (e) { return '档案精编：读数抛错（' + (e && e.message) + '）'; }
+    };
     // v2.274.0：capability 段的两个读数改为**模板外 lazy 辅助**（与上面 pblOn / capSummaryOn 同惯例）。
     //   为什么不能留在段体内：那两段读数要在模板里做三元与字符串拼接，写成段体内局部量就得
     //   用语句块（箭头函数直接花括号 + const + return），收尾形态变成「分号 + 三闭合符」，
@@ -425,6 +433,11 @@
        </div>
 
        <div id="wa-wl-out" class="wa-out"></div>
+      `)}
+      ${foldSec('tools', 'refine', '档案精编预览</div><div class="wa-dim">（RFA-1：三处只增不减的台账能省几条 —— 只预览，不删一条）', () => `
+      <div class="wa-row"><button class="wa-btn" id="wa-rfa-scan" title="扫一遍世界事实 / 长期记忆事实 / 纪事，报出：原 N 条 → 精编后 M 条、可省几条、超长几条、重复组明细。本面零写：不删除任何一条档案、不写盘">精编预览</button></div>
+      <div class="wa-dim" id="wa-rfa-line">${esc(rfaLine())}</div>
+      <div id="wa-rfa-out" class="wa-out"></div>
       `)}
       ${foldSec('tools', 'capacity', '存储压力面与义务清点</div><div class="wa-dim">（O4：仓库还剩多少、哪些不能丢、能不能搬走）', () => `
       <div class="wa-dim">区分<b>可回收历史</b>与<b>不可丢义务</b>（在途货物 / 待履约条款 / 未结阶段 / 回执去重索引）——

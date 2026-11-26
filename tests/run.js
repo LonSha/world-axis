@@ -852,7 +852,12 @@ const LOAD = [
   'engines/stale-guard.js', 'engines/purify-scope.js', 'engines/group-refuse.js',
   'engines/reasoning.js', 'engines/story-tone.js', 'engines/calendar-custom.js',
   'engines/rehearse.js', 'engines/archive-hide.js', 'engines/word-budget.js',
-  'engines/binding.js', 'engines/refine.js', 'engines/polish.js',
+  'engines/binding.js', 'engines/refine.js',
+  // v2.592.0（RFA-1）：档案精编落地面。与 index.js LOAD_ORDER 同序（紧跟 refine.js）。
+  //   必须进 LOAD：专锁的破坏副本与现场读数都在同一 vm 上下文里跑，装载面没给它模块，
+  //   A 面的静态契约与空转反向自证就会整段静默跳过。
+  'engines/refine-bridge.js',
+  'engines/polish.js',
   // v2.138.0（E5）：多模型并发推演与结果仲裁。位置与 index.js LOAD_ORDER 同序。
   //   本文件必须进 LOAD：专锁（tests/ensemble-v2138.js）的破坏副本与正负探针都在同一 vm
   //   上下文里跑，装载面没给它模块，锚点核对与负向探针就整段静默跳过。
@@ -21634,6 +21639,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./arc-guide-bridge-v2591.js');
   }
+  // ── v2.592.0 (RFA-1): 档案精编落地面专锁（零写 / 只收正文不收键 / 空源不冒充干净）──
+  section('v2.592.0 (RFA-1): 档案精编落地面专锁（只预览不落盘 · 可省条数现场复算）');
+  {
+    await runLock('./refine-bridge-v2592.js');
+  }
   // ── v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁 ──
   section('v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁');
   {
@@ -23568,7 +23578,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.591.0';
+  const __wantPin293 = '2.592.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

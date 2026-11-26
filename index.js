@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.591.0';
+  const VERSION = '2.592.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1055,6 +1055,9 @@
     'engines/word-budget.js',
     'engines/binding.js',
     'engines/refine.js',
+    // v2.592.0（RFA-1）：档案精编的落地面。供者先装（refine 在前）。
+    //   它零写、零 settings、不产注入块（不进 SOURCES）：只把三处档案台账的读数摆出来。
+    'engines/refine-bridge.js',
     'engines/polish.js',
     // v2.138.0（E5）：多模型并发推演与结果仲裁。
     //   位置与 tests/run.js 的 LOAD 同序，且**须早于** render/inject.js 之后的任何消费者。

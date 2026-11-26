@@ -879,7 +879,10 @@
     //   而那正是这张表存在的理由（v2.273.0 立表时写的第一句）。
     'engines/pending-recon.js': 'pendingRecon',
     // v2.591.0（R266 / NAR-1）：引导弧的落地面（窗口委托 arc-guide，弧定义存 store）。
-    'engines/arc-guide-bridge.js': 'arcGuideBridge'
+    'engines/arc-guide-bridge.js': 'arcGuideBridge',
+    // v2.592.0（R267 / RFA-1）：档案精编落地面（三处只增不减的台账能省几条）。
+    //   同前两条同理：不进本表，它的装载失败与契约漂移会被「覆盖全部磁盘模块」那条判据一并吞掉。
+    'engines/refine-bridge.js': 'refineBridge'
   };
 
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选

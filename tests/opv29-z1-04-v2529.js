@@ -140,7 +140,7 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const parse = function (mm) { return mm ? (mm[1].match(/'([^']+\.js)'/g) || []).map(function (q) { return q.slice(1, -1); }) : null; };
   const eager = parse(mOrd), lazy = parse(mLazy);
   // v2.542.23 跟位：582 → 583（story-export 从惰性档回首帧：工具页「导出正文」两个按钮真调它）。
-  a(!!eager && eager.length === 594, 'B1 首帧清单 LOAD_ORDER 解析出 594 条（v2.591.0 跟位：592 → 594 = engines/arc-guide-bridge.js 与 v2.590.0 的 engines/pending-recon.js 各入一条首帧，两步合一补记）（v2.589.0 跟位：588 → 592 = engines/settings-desk.js + ui/pages/faces-page.js 两表各 +2）（v2.585.0 跟位：586 → 587 = appearance-lexicon（data-only 词表）入首帧）（v2.583.0 跟位：585 → 586 = attire-state 归位首帧）（v2.542.24：583 → 584 = api-vault 归位）（v2.542.21 跟位：575 → 581 → 582 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目 + json-repair 归位；v2.542.23 → 583 = story-export 归位）', eager && eager.length);
+  a(!!eager && eager.length === 595, 'B1 首帧清单 LOAD_ORDER 解析出 595 条（v2.592.0 跟位：594 → 595 = engines/refine-bridge.js 入首帧）（v2.591.0 跟位：592 → 594 = engines/arc-guide-bridge.js 与 v2.590.0 的 engines/pending-recon.js 各入一条首帧，两步合一补记）（v2.589.0 跟位：588 → 592 = engines/settings-desk.js + ui/pages/faces-page.js 两表各 +2）（v2.585.0 跟位：586 → 587 = appearance-lexicon（data-only 词表）入首帧）（v2.583.0 跟位：585 → 586 = attire-state 归位首帧）（v2.542.24：583 → 584 = api-vault 归位）（v2.542.21 跟位：575 → 581 → 582 = 叙事脊柱 L1–L4 四台引擎 + ui/* 首帧条目 + json-repair 归位；v2.542.23 → 583 = story-export 归位）', eager && eager.length);
   // A0b / A0e：惰性档非空 ——防「删空档换下降」
   a(!!lazy && lazy.length >= 10, 'B2 惰性档**非空**且成规模（≥10 条；删空换下降会在这里红）', lazy && lazy.length);
   // v2.542.23 跟位：21 → 20（story-export 同病：产品面真读，不能再懒）。
@@ -174,8 +174,9 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   //     ui 26 与惰性 18 都不动；恒等式 585 = 593 − 26 + 18 成立。
   //   v2.591.0（R266 / NAR-1）：新增 engines/arc-guide-bridge.js（纯引擎、无新 ui 文件）⇒
   //     loaded 585 → 586、loadOrder 593 → 594（两表各 +1）；恒等式 586 = 594 − 26 + 18 成立。
-  a(led.loadedCount === 586 && led.loadOrderCount === 594 && led.lazyCount === 18 && led.uiCount === 26,
-    'B10 契约面 586 = 首帧 594 − ui 26 + 惰性 18（契约面 = 首帧非 ui ∪ 惰性；实测 '
+  // v2.592.0（RFA-1）：首帧 594 → 595、契约面 586 → 587（engines/refine-bridge.js）。
+  a(led.loadedCount === 587 && led.loadOrderCount === 595 && led.lazyCount === 18 && led.uiCount === 26,
+    'B10 契约面 587 = 首帧 595 − ui 26 + 惰性 18（契约面 = 首帧非 ui ∪ 惰性；实测 '
       + [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount].join(' / ') + '）',
     [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount]);
   // 首帧装载边 vs 全量装载边（验收原话的读数）

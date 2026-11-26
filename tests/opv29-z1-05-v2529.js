@@ -29,7 +29,7 @@ const cold = FB.coldBoot();
 const stat = FB.check({ cold: cold });
 a(stat.pages === 51, 'A1 页 50（实测 ' + stat.pages + '）', stat.pages);
 a(stat.playerPages === 6, 'A2 玩家页 6（实测 ' + stat.playerPages + '）', stat.playerPages);
-a(stat.controlsTotal === 1845, 'A3 静态控件 1841 处（v2.591.0 跟位：1841 → 1845 = 注入页「引导弧诊断」按钮 1 个 + 该区块缺席分支的 id 一处 + 逐弧读数行无控件，另 2 处来自注入页弧况两分支的 id；v2.590.0：1838 → 1841 = 待办页「两账对读」按钮 + 读数行两处缺席分支 id）', stat.controlsTotal);
+a(stat.controlsTotal === 1848, 'A3 静态控件 1848 处（v2.592.0 跟位：1845 → 1848 = 工具页「档案精编预览」按钮 1 个 + 读数行 id 1 处 + 输出区 id 1 处；v2.591.0 跟位：1841 → 1845 = 注入页「引导弧诊断」按钮 1 个 + 该区块缺席分支的 id 一处 + 逐弧读数行无控件，另 2 处来自注入页弧况两分支的 id；v2.590.0：1838 → 1841 = 待办页「两账对读」按钮 + 读数行两处缺席分支 id）', stat.controlsTotal);
 a(cold.ok === true && cold.controls === 45 && cold.bytes === 4303,
   'A4 冷开读数：' + cold.controls + ' 控件 / ' + cold.bytes + 'B（打开面板那一瞬）', cold);
 a(stat.coldControls < stat.controlsTotal * 0.1,
@@ -102,7 +102,9 @@ a(meas.ok === true && meas.pages.length === 36,
   'D1 逐页真量：' + meas.pages.length + ' 页量到（现场 36）', meas.pages.length);
 // v2.588.0 跟位：1694 → 1704（地图页 10 个控件：生成/体检/预演/校验/清空/导出 6 个按钮
   //   + 画布宽/高 2 个输入 + 应用按钮 + 导出文本框）。**控件总数涨是被新增入口撑起来的，不是页变胖。**
-  a(meas.totalControls === 1728, 'D2 逐页合计 1728 控件（实测 ' + meas.totalControls + '；v2.591.0 跟位：1726 → 1728 = 注入页「引导弧诊断」按钮 1 个 + 弧况行（逐页真量只渲染在场分支，缺席分支不进读数）；v2.590.0：1725 → 1726 = 待办页「两账对读」按钮）', meas.totalControls);
+  // v2.592.0（RFA-1）：1728 → 1730 = 工具页「档案精编预览」段的 1 个按钮 + 1 行读数（段体惰性：收起态不计入逐页真量，
+  //   与注入页引导弧同一口径）。
+  a(meas.totalControls === 1730, 'D2 逐页合计 1730 控件（实测 ' + meas.totalControls + '；v2.592.0 跟位：1728 → 1730 = 工具页「档案精编预览」按钮 + 读数行；v2.591.0 跟位：1726 → 1728 = 注入页「引导弧诊断」按钮 1 个 + 弧况行（逐页真量只渲染在场分支，缺席分支不进读数）；v2.590.0：1725 → 1726 = 待办页「两账对读」按钮）', meas.totalControls);
 const rowOv = (meas.pages || []).filter(function (x) { return x.page === 'overview'; })[0];
 a(rowOv && rowOv.controls === 46 && rowOv.bytes === 25230,   // v2.569.0 跟位：25206 → 25230B（overview 首屏多了那一个复选框及其标签）
   'D3 首屏 overview 实测 ' + (rowOv && rowOv.controls) + ' 控件 / ' + (rowOv && rowOv.bytes) + 'B', rowOv);

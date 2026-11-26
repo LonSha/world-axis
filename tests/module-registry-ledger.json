@@ -1,14 +1,14 @@
 {
- "version": "2.591.0",
- "loadOrderCount": 594,
+ "version": "2.592.0",
+ "loadOrderCount": 595,
  "lazyCount": 18,
- "loadedCount": 586,
+ "loadedCount": 587,
  "uiCount": 26,
- "nsCount": 597,
+ "nsCount": 598,
  "totals": {
-  "loadEdges": 481,
+  "loadEdges": 482,
   "hardEdges": 0,
-  "callRefs": 778,
+  "callRefs": 780,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -292,6 +292,7 @@
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
     "engines/redact-layer.js",
+    "engines/refine-bridge.js",
     "engines/refine.js",
     "engines/region.js",
     "engines/regional.js",
@@ -879,6 +880,7 @@
     "engines/reasoning-strip.js",
     "engines/reasoning.js",
     "engines/redact-layer.js",
+    "engines/refine-bridge.js",
     "engines/refine.js",
     "engines/region.js",
     "engines/rehearse.js",
@@ -7737,6 +7739,25 @@
    "stateKeys": [
     "worldaxis_refine_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/refine-bridge.js": {
+   "ns": [
+    "refineBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/polish.js": {

@@ -13645,6 +13645,17 @@ on('#wa-desk-show', showDesk);
       const sel = $('#wa-pw-mode'), inp = $('#wa-pw-int');
       if (sel && inp) sel.onchange = () => { inp.disabled = sel.value !== 'every_n'; renderBody(); };
     })();
+    // ══ v2.592.0（RFA-1）：档案精编预览 ══
+    //   零写：只看「能省几条」。落盘是另一件事（要事务 / 权限 / 挤出），本面不做 ——
+    //   仍是本仓那句：「只预览」比「预览 + 一个没有确认的写接口」安全得多。
+    {
+      const rfaOut = function (text) { const o = $('#wa-rfa-out'); if (o) o.textContent = String(text == null ? '' : text); };
+      on('#wa-rfa-scan', () => {
+        const B = WA.refineBridge;
+        if (!B || typeof B.diagnose !== 'function') { rfaOut('refineBridge 模块未加载（engines/refine-bridge.js）'); return; }
+        try { rfaOut(B.diagnose()); } catch (e) { rfaOut('预览失败：' + (e && e.message)); }
+      });
+    }
     // v2.34.0: 记忆采样预览
     on('#wa-samp-preview', () => {
       const o = $('#wa-samp-out');
