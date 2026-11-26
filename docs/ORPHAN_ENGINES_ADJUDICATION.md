@@ -284,9 +284,55 @@ done
 本期自查：`ensemble` 的改判是 v2.597.0 做的产品接线，但本锁当时没跟位（与上节那两台同款病，
 **第二次复发**）；`binding` 的改判则同批完成。两台一起在本版补齐，锁的 G 段从四台扩到六台。
 
+## 五点七、改判记录（v2.601.0）：polish 出列
+
+第三次同款改判。前两次治的分别是「两套三档表漂移」与「谁遮住了谁」，这一次治的是
+**「我用的是谁」**——三个问题都不属于引擎自己的能力，而属于引擎的**配置走向**，
+而配置走向此前在全仓没有任何读者。
+
+| 命名空间 | 文件 | 出列版本 | 故事面读点 | 为什么这算是真读点 |
+|---|---|---|---|---|
+| `polish` | `engines/polish.js` | **v2.601.0**（PLS-1） | `engines/polish-bridge.js` | 润色通道归位表：读 `CHANNEL` / `getSettings` / `stat`，**一次 `variants` 都不调**（那会真发一次模型请求）——它回答「润色到底用的是哪个模型」，不替用户润色 |
+
+这台为什么必须出列，写清楚缘由：
+
+1. **注释里写了边界，实现层没兑现，而读数为零。** `engines/polish.js` 的边界 4 写着
+   「只走 `rewrite` 通道，**不回落别的通道**：回落会让『润色』悄悄变成『推演正文』」。
+   事实上 `rewrite` 不在 `core/api-router.js` 的 `CHANNELS`
+   （`['default','inference','digest','judge','choices','observe']`）里，
+   而 `getChannel(name)` 的实现是 `cfg[name] || cfg.default` —— 这一次调用**恒回落 default**。
+   于是那条边界的实际效果是：polish 自己没写回落，router 替它回落了，落到的正是推演用的那个通道。
+2. **「参数是自己的，连接是别人的」。** 桥的 `params()` 把六项分成三比三：
+   温度 / 上限 / 超时由 polish 发出并**覆盖**通道里的值（`opts.temperature != null`），
+   模型 / 地址 / 密钥 polish 一个字都不发、全部来自通道。用户想让润色用个便宜模型时，
+   唯一的入口是改 `default` —— 那同时改掉了推演。这条不对称此前无法被任何人读到。
+3. **空段会截断回落。** `cfg[name] || cfg.default` 是**真值**判定：盘上若有一段 `rewrite: {}`，
+   空对象为真 ⇒ 不回落 ⇒ `baseUrl` 为空 ⇒ 调用期 `not-configured`。
+   「盘上有一段空配置」与「盘上什么都没」在旧读数上完全同形，后果相反。桥把这一态单列为
+   `channel-off-list-empty`（`via: 'empty-seg'`）。
+
+边界（与前两节同源，防止被读成「补了个最小读点销账」）：
+
+1. **读数面成产品 ≠ 功能面成产品。** 桥出列是因为「润色到底用的哪个模型」这个问题的答案是产品面的一部分，
+   不是因为润色功能变了。polish 自 v2.130.0 起就在，一行未改。
+2. **读点必须恰等于落地面。** 命中集只有 `engines/polish-bridge.js` 一个文件（`G1` 逐步比对）。
+3. **桥零跑。** 这是三座桥里唯一一座「顺手就能产生副作用」的：`variants()` 会真发一次
+   `apiRouter.call`，`pick()` / `split()` 会改 `stat.blocked`。桥的专锁 B18 用三个探针钉住
+   `call` / `save` / `setSettings` 计数全 0，并断言调用前后 `polish.stat()` 逐字相等。
+
+复算（应只打印一行）：
+
+```bash
+grep -rln "WA\.polish" --include=*.js engines core render ui actors direction index.js   | grep -vE 'tool-diag|narrow-consumers|action-desk-routes'
+# → engines/polish-bridge.js
+```
+
+本期自查：这是同款病的**第三次**（v2.597.0 只改产品没改锁、v2.600.0 补齐后，v2.601.0 是提前同批做的）。
+本版没有复发——接线、账本销行（44 → 43）、锁的改判、文档五节七与专锁三件同批完成。
+
 ## 六、与 `ns-consumer-ledger` 的关系
 
-这五台仍在零读账本的 `entries` 里，分类不变。本文不注销任何条目——
+仍在本锁名下的这几台（TARGETS 3 + 第二批 2）都在零读账本的 `entries` 里，分类不变；已出列的六台里 `polish` / `binding` 已同批销行（销的是「零读」，不是「功能已完成」），`ensemble` 未在账本内，另三台的读点形态见上两节。本文不注销任何条目——
 **注销需要读点，而本文的结论正是「现在没有合法读点」**。
 两者的分工是：账本说「它零读」，本文说「为什么零读是对的、什么条件下不再对」。
 

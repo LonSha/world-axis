@@ -72,7 +72,8 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 //   而那道桥有真产品读面（工具页「事实老化面」段）。**这不等于原来的缺口被治好**：
 //   桥今天报的正是「no-last-turn，本读数不可用」—— 出表的是「零读」，不是「无数据」。
 //   复算：grep -rn 'WA.factAge' engines/fact-age-bridge.js
-const BASE_DEAD_NS = 44;   // v2.600.0（BND-1）：45 → 44 = binding 出表（binding-bridge 逐层调 binding.list 只取键名、读 SCOPES 与 getSettings 判开关，成了它第一个产品面读者）。
+const BASE_DEAD_NS = 43;   // v2.601.0（PLS-1）：44 → 43 = polish 出表（polish-bridge 现读 CHANNEL / getSettings / stat，成了它第一个产品面读者 —— 读的是「通道名不在名单、实际回落 default」这条用户看不见的走向）。
+//   v2.600.0（BND-1）：45 → 44 = binding 出表（binding-bridge 逐层调 binding.list 只取键名、读 SCOPES 与 getSettings 判开关）。
 //   销行销的是「零读」，不是「绑定已经能用」—— 桥今天只报三层各多少键、谁遮住了谁，不 bind 不 unbind。
 //   复算：grep -rn 'WA.binding' engines/binding-bridge.js
 // v2.599.0（CNT-1）：46 → 45 = contrast 出表（contrast-bridge 按 CSS 变量对算 WCAG，

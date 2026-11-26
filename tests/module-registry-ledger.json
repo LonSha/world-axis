@@ -1,14 +1,14 @@
 {
- "version": "2.600.0",
+ "version": "2.601.0",
  "loadOrderCount": 596,
- "lazyCount": 23,
- "loadedCount": 593,
+ "lazyCount": 24,
+ "loadedCount": 594,
  "uiCount": 26,
- "nsCount": 604,
+ "nsCount": 605,
  "totals": {
-  "loadEdges": 487,
+  "loadEdges": 488,
   "hardEdges": 0,
-  "callRefs": 790,
+  "callRefs": 792,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -278,6 +278,7 @@
     "engines/playtime.js",
     "engines/plot-gauge.js",
     "engines/pmem.js",
+    "engines/polish-bridge.js",
     "engines/polish.js",
     "engines/populate.js",
     "engines/portal.js",
@@ -872,6 +873,7 @@
     "engines/player-knowledge.js",
     "engines/playtime.js",
     "engines/plot-gauge.js",
+    "engines/polish-bridge.js",
     "engines/polish.js",
     "engines/populate.js",
     "engines/portal.js",
@@ -11416,6 +11418,25 @@
    "stateKeys": [
     "worldaxis_degrade_audit_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/polish-bridge.js": {
+   "ns": [
+    "polishBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/binding-bridge.js": {

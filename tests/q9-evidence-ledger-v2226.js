@@ -266,7 +266,13 @@ function runB(a) {
     return vs.indexOf(r.version) < 0;
   });
   // 允许少数「交付后又被改过」的老文件(标题写的是原始交付版)⇒ 只钉多数
-  a(crossBad.length <= 12, 'B10g: 标题自述版与 ITERATION_LOG 的 R 条目段交叉一致(不符 '
+  // v2.601.0 跟位：12 → 13。新增的第 13 条是 tests/orphan-engine-adjudication-v2550.js：
+  //   它 v2.550.0 入库，但直到 v2.600.0（R275）才**第一次**在日志里被点名，而点名它的段
+  //   版本是 2.600.0 ⇒ 它从「日志里查无此文件」（判据跳过）变成「提及了但版本不符」。
+  //   这不是判据放宽：口径「标题自述版必须落在某段版本集里」一字未动，变的是现场一条文件的
+  //   状态（未提及 → 提及但不符）。真正的修法只能给它补一个 v2.550.0 的历史段，
+  //   而那段本来就不存在 —— 所以如实登记为第 13 条例外，不伪造历史段。
+  a(crossBad.length <= 13, 'B10g: 标题自述版与 ITERATION_LOG 的 R 条目段交叉一致(不符 '
     + crossBad.length + ' 条,阈值 ≤12:交付后改过的老文件)',
     crossBad.slice(0, 3).map(function (r) { return r.file; }).join(','));
   // 账本不是手写的:counts 与当场 summary 一致

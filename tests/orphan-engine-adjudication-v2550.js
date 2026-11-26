@@ -49,7 +49,7 @@ function ok(name, fn) {
 //   `enabled` 在 A3 钉住：默认开着却无人读，正是这份裁决最要紧的那句话（见文档「开关≠读点」）。
 const TARGETS = [
   { ns: 'preflight', file: 'engines/rehearse.js', zh: '写前预演与检查存档' },
-  { ns: 'polish', file: 'engines/polish.js', zh: '输入润色' },
+  // v2.601.0（PLS-1）改判出列：polish 已被 engines/polish-bridge.js 真读（见 WIRED_WAVE）。
   // v2.597.0（ENS-1）改判出列：ensemble 已被 engines/ensemble-bridge.js 真读（见 WIRED_WAVE）。
   { ns: 'archiveHide', file: 'engines/archive-hide.js', zh: '归档楼层隐藏' },
   { ns: 'autoHide', file: 'engines/auto-hide.js', zh: '自动隐去' }
@@ -83,7 +83,12 @@ const WIRED_WAVE = [
   //   而是它们的读数面本身成了产品 —— ensemble 的「两套三档表漂移」与 binding 的「谁遮住了谁」
   //   都是原先根本没有读者能回答的问题。桥是只读的：一个不发模型调用，一个不 bind/unbind。
   { ns: 'ensemble', file: 'engines/ensemble.js', ver: 'v2.597.0', readers: ['engines/ensemble-bridge.js'] },
-  { ns: 'binding', file: 'engines/binding.js', ver: 'v2.600.0', readers: ['engines/binding-bridge.js'] }
+  { ns: 'binding', file: 'engines/binding.js', ver: 'v2.600.0', readers: ['engines/binding-bridge.js'] },
+  // 第三次改判（v2.601.0）：polish。理由与上两台同构 —— 推翻不是「补了个最小读点销账」，
+  //   而是它的读数面本身成了产品。用户看不见的那件事是「润色到底用的哪个模型」：
+  //   通道名 'rewrite' 不在 apiRouter 的 CHANNELS 里，getChannel 走 cfg[name] || cfg.default
+  //   静默落回 default，而 polish 自己的注释写着「不回落别的通道」。桥只读、零跑（不调 variants）。
+  { ns: 'polish', file: 'engines/polish.js', ver: 'v2.601.0', readers: ['engines/polish-bridge.js'] }
 ];
 const ALL_TARGETS = TARGETS.concat(SECOND_WAVE).concat(WIRED_WAVE);
 // 第二批的关键方法（逐台现场实读导出面，不是照抄注释）。
@@ -102,7 +107,7 @@ const FACES2 = {
 // 每台至少要有这些方法才算「定义面完整」（不是空对象挂在 WA 上）。
 const KEYS = {
   preflight: ['preview', 'getSettings', 'setSettings'],
-  polish: ['variants', 'pick', 'getSettings'],
+  // polish 于 v2.601.0 出列（见 WIRED_WAVE）—— 本表只服务 TARGETS，故同批移除，免得留下无人读的旧判据。
   ensemble: ['run', 'agreementOf', 'getSettings'],
   archiveHide: ['plan', 'shouldHide', 'getSettings'],
   autoHide: ['plan', 'mark', 'revoke', 'isHidden']
@@ -111,7 +116,7 @@ const KEYS = {
 //   数字变了 = 入口变了 = 裁决要重看，锁必须红。`ensemble` 三项全 0 是结论的一部分。
 const FACES = {
   preflight: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1 },
-  polish: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1 },
+  // polish 同上（FACES 只服务 TARGETS）。
   ensemble: { switchN: 0, toolTable: 0, deskRoute: 0, registry: 1 },
   archiveHide: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1 },
   autoHide: { switchN: 0, toolTable: 11, deskRoute: 14, registry: 1 }
@@ -332,8 +337,8 @@ SECOND_WAVE.forEach(function (t) {
       + ' —— 若是有意接线，请先改 docs/ORPHAN_ENGINES_ADJUDICATION.md 的裁决与改判触发器，再改本锁');
   });
 });
-// ═════════ G 已接线出列：两台的改判是真的（v2.592.0 / v2.594.0）═════════
-ok('G0 已接线的两台不在第二批名单里（出列不是漏写）', function () {
+// ═════════ G 已接线出列：改判是真的（六台，v2.592.0 起逐台出列）═════════
+ok('G0 已接线的各台不在第二批名单里（出列不是漏写）', function () {
   const names = SECOND_WAVE.map(function (t) { return t.ns; });
   WIRED_WAVE.forEach(function (t) {
     assert.ok(names.indexOf(t.ns) < 0, t.ns + ' 仍在 SECOND_WAVE 里：两边都列会让读数自相矛盾');
@@ -347,7 +352,7 @@ ok('G1 故事面読点恰等于各自的落地面（接线不是又长出一堆�
       + '（实 ' + JSON.stringify(hits) + '）—— 多一处/少一处都要重新裁决');
   });
 });
-ok('G2 出列的两台定义面仍在位、关键方法没被拆走（接线不代替定义）', function () {
+ok('G2 出列的各台定义面仍在位、关键方法没被拆走（接线不代替定义）', function () {
   WIRED_WAVE.forEach(function (t) {
     assert.ok(W[t.ns], 'WA.' + t.ns + ' 缺席');
     assert.ok(fs.existsSync(path.join(BASE, t.file)), t.file + ' 不存在');
@@ -356,7 +361,7 @@ ok('G2 出列的两台定义面仍在位、关键方法没被拆走（接线不�
     });
   });
 });
-ok('G3 文档写了这两台的改判记录（改判要留痕，不许只改锁）', function () {
+ok('G3 文档写了各台的改判记录（改判要留痕，不许只改锁）', function () {
   const doc = fs.readFileSync(path.join(BASE, DOC_REL), 'utf8');
   WIRED_WAVE.forEach(function (t) {
     assert.ok(doc.indexOf(t.ns) >= 0, '文档里没有 ' + t.ns + ' 的改判记录');
@@ -381,4 +386,4 @@ ok('F6 非空转：行首计数不把注释里的 `= {...}` 算成定义', funct
   assert.strictEqual(n, 1, '行首计数口径失效：注释被算成定义（实 ' + n + '）');
 });
 
-console.log('\norphan-engine-adjudication-2550: pass (' + pass + ' 段：' + (TARGETS.length + SECOND_WAVE.length) + ' 台零故事面読点已裁决（TARGETS ' + TARGETS.length + ' + 第二批 ' + SECOND_WAVE.length + '，v2.600.0 起四台已改判出列）；另 ' + WIRED_WAVE.length + ' 台已出列接线（' + WIRED_WAVE.map(function (t) { return t.ns; }).join(' / ') + '），出列同样留痕)');
+console.log('\norphan-engine-adjudication-2550: pass (' + pass + ' 段：' + (TARGETS.length + SECOND_WAVE.length) + ' 台零故事面読点已裁决（TARGETS ' + TARGETS.length + ' + 第二批 ' + SECOND_WAVE.length + '，v2.592.0 起逐台已改判出列）；另 ' + WIRED_WAVE.length + ' 台已出列接线（' + WIRED_WAVE.map(function (t) { return t.ns; }).join(' / ') + '），出列同样留痕)');

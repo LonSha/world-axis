@@ -8334,3 +8334,93 @@ settings-bus-api ✓ · field-liveness 无幽灵 · dup-decl 0 · engines-ns 596
 本面只把关系说出来；② 不读值就判断不了「三层写的是不是同一个东西」，那需要值比较，
 而值恰恰是这台引擎决定不碰的东西；③ 不改设置、不动点缀，用户要动请去原来的绑定面；
 ④ 整趟全量回归仍按分面批次验。
+
+## R276（v2.601.0 · PLS-1：润色通道归位表 —— 参数是自己的，连接是别人的）
+
+**它治什么**：`engines/polish.js`（148 行，v2.130.0）的通道名是 `'rewrite'`，
+它的边界 4 还专门写了一句：「只走 `rewrite` 通道，**不回落别的通道**：回落会让『润色』悄悄变成『推演正文』。」
+而 `core/api-router.js` 的名单是 `['default','inference','digest','judge','choices','observe']`
+—— **`rewrite` 不在其中**。这份名单的语义是「设置面列哪几张卡片」，不是「router 接受哪些名字」：
+`getChannel(name)` 的实现是 `cfg[name] || cfg.default`，于是这一次调用**恒回落 default**。
+
+所以那条注释里的边界，在实现层从来没有兑现过：polish 自己确实没写回落，是 router 替它回落了，
+落到的正是推演正文用的那个通道。界面上六张卡片，没有一处告诉过用户「润色用的是 default」；
+而当他想让润色用个便宜模型时，唯一入口是改 default —— 那同时改掉了推演。
+这是 BND-1 的同源病灶换了层：BND-1 治作用域层「谁遮住了谁」，本表治通道层「我用的到底是谁」。
+
+**它做什么**：新增 `engines/polish-bridge.js`（约 430 行，十五导出）。
+`known()` 现读名单判名字在不在、`route()` 报落点四态（own / fallback→default / empty-seg / none）
+与 `sameAsDefault`、`params()` 把六项参数分成三比三并标出谁覆盖谁、
+`clamp()` 比**落盘值**与**生效值**的差（夹取真源是 settingsBus 的 bounds，本表不自己再夹一遍）、
+`faults()` 给七个失败码的用户可见含义并暴露**表外码**（表自己过时了会被读出来）、
+`audit()` 合成 verdict、`lineOf()` / `summaryText()` / `diagnose()` / `stat()` / `__reset()`。
+
+**六条边界（写进源注释，不可回退）**：
+
+1. **零跑。** 绝不调 `variants()` —— 那个函数会真发一次 `apiRouter.call`，
+   一张体检表不该因为被打开就消耗用户的 token。`pick()` / `split()` 也不调：
+   它们走 `noteFault()` 改 `stat`，体检把失败计数改掉之后读出来的就不是现场。
+   专锁 B18 用探针钉住 `call` / `save` / `setSettings` 计数全 0，并断言调用前后
+   `polish.stat()` 五计数与 faults 字典**逐字相等**。
+2. **零写。** 不 `setSettings`、不 `setChannel`、不 `save` —— 只 `read`。
+3. **只报有没有，不报值。** `apiKey` 只出 `hasKey` 布尔；`baseUrl` 只出 `hasBaseUrl` 布尔
+   （可能是用户自建的内网地址）。`model` 照报 —— 「润色实际用哪个模型」是本表存在的唯一理由，
+   不报它等于没答。专锁 B3/B3b 把密钥与内网地址一起塞进桩，对全出口做字符串搜索。
+4. **名字每次现读。** `WA.polish.CHANNEL` 与名单现比对，既不在名单又不是 `rewrite` 时报 `drift`
+   拒绝硬算。将来有人改掉通道名，本表**不需要跟着改**（它会自己报 drift）。
+5. **`off-list` 与 `no-router` 分开。** 前者是配置形态（router 在、名字不在名单），
+   后者是装载缺失（router 或名单本身读不到）—— 处置完全不同。
+6. **读数唯一出口。** 四个事实面只在 `audit()` 里合成，UI 段与 tool-diag 都读这一处。
+
+**why 五值**：`ok` / `module-missing` / `no-router` / `off-list` / `drift`。
+**verdict 八值**：在 why 之外，把「名单外」按落点细分成四态
+（`channel-off-list-fallback` / `-own` / `-empty` / `-none`）+ `channel-ok`。
+
+**最有价值的一条发现（`empty-seg` 这一态）**：`cfg[name] || cfg.default` 是**真值**判定 ——
+空对象为真。盘上若有一段 `rewrite: {}`，它**截断**了到 default 的回落，`baseUrl` 取到空串，
+调用期报 `not-configured`。而「盘上有一段空配置」与「盘上什么都没」在旧读数上完全同形，
+后果却相反（前者直接不可用，后者继承 default 能用）。这一态是本表单列出来的理由。
+
+**另一处口径不对称（`params().notes` 里写明）**：`maxTokens` 走 `||`，`temperature` 走 `!= null`。
+于是 `temperature = 0` 仍然覆盖成功，而 `maxTokens = 0` 会被当成「没传」改用通道值。
+当前 bounds 下限 128 让现场走不到后半句，但那条下限一旦放宽，这一格就会静默失真。
+
+**落地与接线**：`index.js` **惰性档**（被读方 polish 与 apiRouter/settingsBus 都在首帧档；
+本模块只被工具页面板与专锁读 —— 与 binding/contrast/byte 同一条口径，提首帧只会多装一个模块）；
+`tests/run.js` LOAD 面 + 专锁挂载；`engines/tool-diag-tables.js` 登记；
+`ui/pages/tools-page.js` 新增「润色通道归位」段（第 24 个折叠段，`wa-pls-line`，零按钮零写口）；
+`ui/panel-fold.js` **同批登记**。
+
+**专锁**：`tests/polish-bridge-v2601.js`（约 380 行，**84 判据**）。
+A 组静态（十五导出 / why 五值 / verdict 八值 / 0 写口 / 不调 variants·pick·split /
+名字与名单都现读 / 登记项取自 `__settingsRegs` 不硬编码 LS key / 四处接线 / 段内真委托）；
+B 组行为（回落四态 + 参数三比三 + 夹取比对 + 七码含义与表外码 + 三种不可用态 + **零跑零写实测**）；
+C 组现场（真渲染、参数分家表真画出来、段内 0 写口无按钮）。
+
+**顺带改判一台**：`polish` 从 orphan 裁决锁的 TARGETS 出列，移入 WIRED_WAVE。
+这是**第三次同款改判**（前两次 ensemble v2.597.0 / binding v2.600.0），口径已定：
+推翻的理由不是「补了个最小读点销账」，而是**它的读数面本身成了产品**。
+同步 `tests/ns-consumer-ledger.json` 销行（44 → 43）、`BASE_DEAD_NS` 跟位、
+`docs/ORPHAN_ENGINES_ADJUDICATION.md` 新增五点七节（含三条边界与复算命令）。
+
+**一处踩过的坑（如实记）**：polish-bridge 第一版我放进了 `index.js` 的首帧表（理由写的是「供者相邻」），
+现场一跑才发现本仓所有 `*-bridge` 都在**惰性档** —— 首帧档多一个模块与「首帧不装面板专用面」的既有口径冲突。
+移进 `LAZY_ORDER` 后读数整体换了一批（`lazyCount 23 → 24`、`loadOrderCount` 不动）。
+教训是同一个：**排布理由要抄现行的口径，不能照着对自己方便的样子写一条新的**。
+
+**另一处（判据读文案）**：专锁 C4 第一版用 `segSrc.indexOf('setSettings') < 0` 判「段内 0 写口」，
+结果段内收尾语写着「不 setSettings」—— 说明文字被当成调用抓了。改成看**调用形态**（`.setSettings(` 带点前缀），
+与段里点名不碰哪几个函数这件事不再冲突。
+
+**读数**：version-consistency **22** · module-registry **594 文件 / 605 ns / 488 边 / 硬边 0 / 792 调用期** ·
+dead-export **dead 2075 / uiDead 6 / dataOnly 827**（证据 2081 条）· readings-v2106 **61**（refs 13282 / ns 590 / members 6240）·
+segment-extract **128**（section 473 / 测试面 700 / 重组面 19185 / 硬线 2209）· z1-04 **46/46**（惰性 24 / 契约面 594 / 首帧 596）·
+settle **55**（nsCount 605 / loadedCount 594 / 边 488 / 调用 792）· plan-readings **16**（697 / 558 / 488）·
+ns-consumer-ledger **零读 43**（polish 出表）· module-cycle **65**（零读 43）· orphan-adjudication **32 段** ·
+PLS-1 专锁 **84/0** · q8 **80/0** · q9 **66/1**（唯一红是 B10g 的日志交叉，写本节前必红）· 
+cap-tier **35/0** · inject-sources 20 · overview-fold 106。
+
+**未做（如实登记）**：① 本表不判断「该不该让润色走独立通道」—— 那是产品决策，
+本面只把现状说出来；② 不报 `model` 的等价性（两个不同名字可能是同一个模型，本表不猜）；
+③ 不代为写通道配置：要让润色用独立模型，仍然需要给 apiRouter 的名单加一个名字，
+那属于会改变路由语义的改动；④ 整趟全量回归仍按分面批次验。

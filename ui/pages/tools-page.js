@@ -82,6 +82,8 @@
   let __cntEnsureFail = 0;
   // v2.600.0（BND-1）：同款。绑定面也是惰性档（被读方 binding 在首帧档）。
   let __bndEnsureFail = 0;
+  // v2.601.0（PLS-1）：同款。润色通道面也是惰性档（被读方 polish 在调用期档）。
+  let __plsEnsureFail = 0;
   const rfaLine = function () {
       const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
       if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
@@ -646,6 +648,43 @@
           + '（绑定里可能存接口地址与提示词片段，值本身不该出现在任何读数里）。'
           + '优先级取自 <code>binding</code> 的 SCOPES 并每次比对：两处顺序一旦不一致就报漂移，'
           + '不硬算一个“谁赢”。开关关着时 read 只读默认层，此刻“被遮”不成立 —— 读数会自己写明。'
+          + '</div>';
+      })()}
+      `)}
+      ${foldSec('tools', 'polishroute', '润色通道归位</div><div class="wa-dim">（PLS-1：润色到底用的是哪个模型 —— 通道名不在名单里时，它静默落到了谁）', () => `
+      ${(function () {
+        // 被读方（polish）在调用期档、router 与 settingsBus 在首帧档：首帧未装载是常态，走 ensure + 失败记忆。
+        const rel = 'engines/polish-bridge.js';
+        const pb = WA.polishBridge;
+        if (!pb || typeof pb.audit !== 'function') {
+          if (__plsEnsureFail) return '<div class="wa-dim">通道面装载失败（' + rel + '）—— 这不是“润色没配通道”，是这台引擎装不上</div>';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              if (p && typeof p.catch === 'function') p.catch(function () { __plsEnsureFail = 1; });
+              return '<div class="wa-dim">通道归位面在惰性档，装载中（成功后下次渲染自愈）</div>';
+            }
+          } catch (e) { /* 落到下面统一记失败 */ }
+          __plsEnsureFail = 1;
+          return '<div class="wa-dim">通道归位面装载失败（' + rel + '）</div>';
+        }
+        let a0 = null;
+        try { a0 = pb.audit({}); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const rows = ((a0 && a0.params) || []).map(function (r) {
+          const who = (r.by === 'polish') ? '本模块发' : '通道给';
+          const val = (r.by === 'polish') ? esc(String(r.emit))
+            : (r.has === true ? '有' : (r.has === false ? '没有' : esc(String(r.chan))));
+          const tail = (r.by === 'channel') ? '（polish 一个字都不发）'
+            : (r.overridden ? '（覆盖了通道里的 ' + esc(String(r.chan)) + '）' : '（与通道同值）');
+          return '<div class="wa-dim">· ' + esc(r.key) + '：' + who + ' ' + val + tail + '</div>';
+        }).join('');
+        return '<div class="wa-dim" id="wa-pls-line">' + esc(pb.summaryText(a0)) + '</div>' + rows
+          + '<div class="wa-dim">' + esc(pb.lineOf(a0)) + '</div>'
+          + '<div class="wa-dim">本面只量：<b>一次模型调用都不发</b>（润色的 <code>variants()</code> 会真发请求，本面绝不调它）、'
+          + '不 setSettings、不 setChannel、不写盘。<code>apiKey</code> 只报有没有，'
+          + '<code>baseUrl</code> 也只报有没有（可能是你自建的内网地址）；<code>model</code> 照报 ——'
+          + '「润色实际用哪个模型」就是这张表唯一的用处。名单每次现读 <code>apiRouter.CHANNELS</code>，'
+          + '不抄副本；通道名与勘察值不一致时报漂移，不硬算一个落点。'
           + '</div>';
       })()}
       `)}

@@ -317,7 +317,7 @@ function runAll(A) {
   // v2.585.0（R261）：engines/appearance-lexicon.js 进文件面（data-only 也是产品文件，装载在案）
   //   ⇒ 605/605/602 → 606/606/602（三数同步 +1）。有引用数不变：没有任何产品文件 require 它
   //   —— 这正是「词表不参与判定」的可读出后果，不是漏接线。
-  A(a.files === 620 && a.aliasFiles === 620 && a.refFiles === 616,
+  A(a.files === 621 && a.aliasFiles === 621 && a.refFiles === 617,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -579,7 +579,14 @@ function runAll(A) {
 //   B7 零读 ns 55 → 44（本轮 BND-1 销的是 binding 一条，其余是这十三版累积）；
 //   B10 登记面 39/46 → 41/48（未在用 7 个）；B11 账本缺项 25 → 27。
 //   口径一字未改：这些都是现场复算读数，不是放宽判据。
-A(a.edgesLoad === 487 && a.edgesCall === 4120 && a.edgesAll === 4607 && a.identityOk,
+// v2.601.0（PLS-1）跟位：新增 engines/polish-bridge.js 一个文件、六个调用期 ns 对
+//   （apiRouter / settingsBus / __settingsRegs / polish / clock / Date）⇒
+//   B1 文件面 620/620/616 → 621/621/617；B2 488 + 4126 = 4614；B3 LOAD_ORDER 596 不动；
+//   B5 三面 663/604/623 → 664/605/625；B7 零读 ns 44 → 43（本轮销的就是 polish 一条）。
+//   PS：polish-bridge 进的是**惰性档**（LAZY_ORDER，与 binding/contrast/byte 同口径），不是首帧，
+//   故 LOAD_ORDER 不动 —— 我第一版把它放进首帧，是照着「供者相邻」写的，现场口径不是那样。
+//   B6 漂移（664 - 605 = 59）与 B10 登记面（41/48，本桥不注册 settings）两处不动 —— 不动也是结论。
+A(a.edgesLoad === 488 && a.edgesCall === 4126 && a.edgesAll === 4614 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -782,7 +789,7 @@ A(a.edgesLoad === 487 && a.edgesCall === 4120 && a.edgesAll === 4607 && a.identi
 // v2.585.0（R261）：appearanceLexicon 命名空间入库（静态提供方 +1）且无产品读点（读面不动）
 //   ⇒ 静态提供方 648 → 649、账本 591 → 592、读面仍 598。差额 649−592=57 与回填前**同量**
 //   （三面同步记账，B6 漂移口径不动）。
-A(a.nsProvided === 663 && a.nsLedger === 604 && a.nsRead === 623,
+A(a.nsProvided === 664 && a.nsLedger === 605 && a.nsRead === 625,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -838,7 +845,7 @@ A(a.nsProvided === 663 && a.nsLedger === 604 && a.nsRead === 623,
 // v2.585.0（R261）：零读 ns 54 → 55 —— appearanceLexicon 入库后产品面零读。这不是漏接线，
 //   而是本版要钉住的事实：词表 data-only、引擎不消费（appearance.js 源码不出现 appearanceLexicon，
 //   由 tests/appearance-items-v2585.js 的 C5 静态锁住）。
-A(a.deadNs.length === 44, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+A(a.deadNs.length === 43, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '
