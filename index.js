@@ -1682,7 +1682,7 @@
   //   同一构建标识下取到的模块与本地是同一次产物,这才谈得上「同版容灾」。
   //   纪律:升版时 BUILD_ID 与 VERSION 同批推进(判据见 tests/index-build-v2211.js),
   //   不允许只改其一 —— 只改 VERSION 会让回退源指向旧代码,只改 BUILD_ID 会让版本账对不上现场。
-  const BUILD_ID = 'c348504a0a6874f0a90991a024bcebb25f2c0d6a';
+  const BUILD_ID = 'b404b77dda830731ff72c87418cde88fdb8f60b1';
   const CDN_BASES = [
     'https://cdn.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,
     'https://fastly.jsdelivr.net/gh/LonSha/world-axis@' + BUILD_ID,

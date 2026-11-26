@@ -7446,3 +7446,37 @@ dataOnly 792 → 794）· `sync-hardcoded --write`（写后校验通过）· `pl
 
 **未做（如实登记）**：① 本版仍未跑一遍全量（上一趟 4020f27 的回归在后台跑到 8349 ✓ 时仍在进行，
 与本版不同树）；② `gen-gates-doc` 待本版提交后再回填一次读数。
+
+## v2.584.0 R259/R260：把最后 2 红清掉，并拿到整趟零失败凭据
+
+**上一趟（U6Alvo，跑 1d43ac4）到底停在哪**：26136 ✓ / 2 ✗，`status: assertion-failed` ——
+这是第一次真跑到尾（不再是 running / OOM）。两条红都不是缺陷：
+
+1. `✗ [脚本 ./opv27-rest-lock.js 子进程 rc=1]` —— 我先前的日志里只有一行 `Node.js v24.18.0`，
+   看着像 `MODULE_NOT_FOUND`，**读错了**。真身是脚本自己抛的 `AssertionError`：
+   「十六簇逐簇给出命中数」把 `Object.keys(cov.byCluster).length` 硬锁成 `=== 16`，而本轮给
+   `engines/reject-phrase.js` 新增了 `attire` 一簇（`cause-scope` / `downgrade-coverage` 归这儿），
+   簇表实为 **17**。改成 `=== 17` 并把「二批八簇 / 三批 attire」的来历写进注释 —— 判据跟位，
+   簇的语义边界一条没动。
+   **教训**：`rc=1` + 末行只有 `Node.js v24.18.0` 是两种东西的同一张脸（require 崩 / assert 崩），
+   必须看 `tail` 而不是看第一屏装载日志。
+
+2. `✗ C6: 库里的账本与现场同源(stale 7 条)` —— 全是 `sha-changed`、`added 0`，
+   正是本轮做读数跟位改过的那七个文件（`opv29-z1-05/z1-07/z1-09/z1-10/z6-13`、
+   `v11-source-contract`、`v7-cap-tier-2283`）。`tools/evidence-index.js --write` 现场重算收敛
+   （该工具 `--write` 幂等、只写账本），之后 `--check` 报「证据文件 677 条 · stale 0」，
+   `q9-evidence-ledger-v2226` 复验 **67 / 失败 0**。
+
+**R260 整趟全量（wYp74d，跑 599a23e+b404b77 这棵树，堆 5120）**：
+`通过 26021 / 失败 0`、`status: passed`、`sourceChanged: false`、超 60s 的节 21 个。
+真宿主 2 项仍未执行（`v10-ui-pills.js` / `v10-r3-persist-hosted.js` @ `http://127.0.0.1:8000`），
+按既有口径如实登记 —— 已执行的判据全部通过，但**不据此宣称整仓全绿**。
+
+**收尾两件**：
+· `BUILD_ID` 从 `c348504…` 跟位到本版最后一个代码提交 `b404b77dda830731ff72c87418cde88fdb8f60b1`。
+  过程里我先手敲了一串「看着像 sha」的十六进制（`b404b77c4f6f…`）—— 短 sha 只有 7 位，
+  剩下 33 位是我编的。这正是本仓反复治过的「写第二份真源」：**立刻用 `git rev-parse` 取真值改回**。
+  纪律上记一笔：BUILD_ID 只能从 git 取，不能从记忆里拼。
+· `gen-gates-doc --write` 回填 8 道门禁读数（`readings-v2106` 属 slow 档 117s，按既有口径跳过），
+  `q1-load-integrity-v2211` 64/0、`version-consistency` 22/22、`release-manifest` 可发。
+
