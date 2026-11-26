@@ -17505,7 +17505,17 @@ assert(r2900.dead.length === 2004 && r2900.uiDead.length === 6 && r2900.dataOnly
     //   ⚠ 但「不读别人」≠「没人读它」：放行名单必须同时自证有真消费方，否则白名单会静默吸收死文件
     //   （这正是 v2.111.0 把「至多一个」改成逐一具名的初衷）。故下面另算 orphan——
     //   零引用且**读它的文件数为 0** = 真死文件，一条都不许有。
-    const NO_REF_OK = ['core/input-guard.js', 'core/sanitize.js', 'ui/schema-view.js'];
+    // v2.585.0（R261）：第四种同型合法形态 —— **data-only 资产**（只出不进）。
+    //   engines/appearance-lexicon.js 是描写词表：产品源面**刻意**不读它（判据在 appearance.js
+    //   的 LAYER_ITEMS；词表只供预设/注入拼装与人读诊断取词），「非消费」本身由专锁
+    //   tests/appearance-items-v2585.js 的 C5 静态钉住（appearance.js 源码里不出现该名）。
+    //   ⚠ 但「刻意不读」不许靠一句自述放行 —— 豁免要**两条机器可核的旁证同时成立**：
+    //     ① 文件自己声明 `DATA_ONLY: true`（防「误把引擎写进豁免表」）；
+    //     ② 它的 ns 在 tests/ns-consumer-ledger.json 里登记为 `readonly-api`
+    //        （该账的口径见 _classes：零读是设计，由专锁钉住非消费）。
+    //   两条缺一条 ⇒ 照样算孤儿（白名单不许静默吸收死文件，v2.111.0 的老账）。
+    const NO_REF_OK = ['core/input-guard.js', 'core/sanitize.js', 'ui/schema-view.js', 'engines/appearance-lexicon.js'];
+    const DATA_ONLY_OK = { 'engines/appearance-lexicon.js': 'appearanceLexicon' };
     const readByOthers = {};
     Object.keys(a.graph.refs).forEach(function (rel) {
       a.graph.refs[rel].forEach(function (ns) { (readByOthers[ns] = readByOthers[ns] || []).push(rel); });
@@ -17515,7 +17525,20 @@ assert(r2900.dead.length === 2004 && r2900.uiDead.length === 6 && r2900.dataOnly
       const mine = Object.keys(a.providers).filter(function (ns) {
         return (a.providers[ns] || []).indexOf(rel) >= 0;
       });
-      return !mine.some(function (ns) { return (readByOthers[ns] || []).length > 0; });
+      if (mine.some(function (ns) { return (readByOthers[ns] || []).length > 0; })) return false;
+      const ns = DATA_ONLY_OK[rel];
+      if (!ns) return true;                       // 未登记的零引用文件：照旧算孤儿
+      let selfDeclared = false;
+      try {
+        selfDeclared = /DATA_ONLY:\s*true/.test(fs.readFileSync(path.join(BASE, rel), 'utf8'));
+      } catch (e) { selfDeclared = false; }
+      let ledgerOk = false;
+      try {
+        const nl = JSON.parse(fs.readFileSync(path.join(BASE, 'tests/ns-consumer-ledger.json'), 'utf8'));
+        const row = (nl.entries || {})[ns];
+        ledgerOk = !!row && row.cls === 'readonly-api';
+      } catch (e) { ledgerOk = false; }
+      return !(selfDeclared && ledgerOk);
     });
     assert(a.aliasFiles === a.files && a.refFiles === a.aliasFiles - noRef2107.length,
       'v2107: 别名覆盖率 ' + a.aliasFiles + '/' + a.files + '（三种 alias 形态全认；'
@@ -17557,7 +17580,13 @@ assert(r2900.dead.length === 2004 && r2900.uiDead.length === 6 && r2900.dataOnly
     // v2.569.0 跟位：56 → 54（mixedIndex 与 metabolismClock 两口出零读面 —— 前者由
     //   render/inject.js 的注入分支真读，后者由 core/interceptor.js 在同一处世界推进点真调；
     //   与 tests/module-cycle-gate-v2107.js 的 B7 同源，两处必须一起动）。
-    assert(a.deadNs.length === 54 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
+    // v2.585.0（R261）跟位：54 → 55 —— appearanceLexicon（描写词表，data-only）登记为
+    //   readonly-api 后成为第 55 个零读 ns：产品源面**刻意**不读，由专锁 C5 静态钉住。
+    //   这一条与上面 orphan 豁免**成对**：豁免说「它不是死文件」，这 55 说「它确实没人读」，
+    //   两句话必须同时为真 —— 只改一处就会在下一轮变成「白名单里躺着一个读不出来的读数」。
+    //   同源三处：tests/module-cycle-gate-v2107.js 的 B7、tests/ns-consumer-ledger-v2400.js 的
+    //   BASE_DEAD_NS、本行。
+    assert(a.deadNs.length === 55 && !a.deadNs.some(function (x) { return x.ns === 'clock'; }),
       'v2107: 零读 ns 恰 ' + a.deadNs.length + ' 个且不含任何核心 ns（读数只报不红）');
 
     // v2.131.0（O16 收口）：**端到端读数与账本现场同源**（把 R115/R116 的人工漏改面接进自动化）。
