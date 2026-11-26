@@ -63,6 +63,10 @@
     //   默认 **false**（见 __REG.def）：开启只多一段候选词，切不影响任何契约判定；
     //   关着时注入逐字与旧版相同（这是它能现在上线的唯一理由）。
     'appearanceLexicon',
+    // v2.591.0（R266 / NAR-1）：引导弧的注入块（多拍长线引导：只说窗口内该在场的拍）。
+    //   默认 true，理由与「模块总开关默认为关」那一批相同：引擎 enabled 默认 **false**，
+    //   关着时 buildBlock 返回空串 —— 老用户的注入正文逐字不变。
+    'arcGuideBridge',
     // v2.583.0(R254): 'attireState'。与注入分支同批登记，否则开关点了零效果。
     'attireState',
     // v2.70.0: 'sceneSlice', 'gauge', 'rivalry'
@@ -271,6 +275,9 @@ style: false,
         // v2.588.0（R6）：外貌词库。与上面那一排相反 —— 它是**词库**不是判据，默认取 false：
         //   默认 true 会让所有老用户凭空多出一段候选词（他们从没开过这个开关，也看不出哪来的）。
         appearanceLexicon: false,
+        // v2.591.0（R266 / NAR-1）：引导弧。取 true —— 它自己的总开关默认关（__REG.def.enabled=false），
+        //   两开关同时开才会有内容；只开这里等于零 token。
+        arcGuideBridge: true,
         worldBrief: true, offstageQueue: true, actStep: true, tracePost: true, misbelief: true, threadSprout: true, dormantLadder: true, consequenceSchedule: true, appointment: true, timeLedger: true, hearsayLedger: true, farAccount: true, interlude: true, letterPost: true,
         // v2.96.0：传播与辟谣。取默认 true（同四条理由——其模块总开关默认为关）。
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
@@ -548,6 +555,8 @@ style: false,
     beastBond: '驯兽', appearance: '外貌契约', ladder: '原型阶梯', attireState: '穿着状态', sceneSlice: '情境切片',
     // v2.588.0（R6）：词库源的显示名。不加这一行，开关列表会报英文键名，用户看不懂。
     appearanceLexicon: '外貌词库',
+    // v2.591.0（R266 / NAR-1）：与 SOURCES 同批登记（不加显示名 ⇒ 失败台账报英文键名，用户看不懂）。
+    arcGuideBridge: '引导弧',
     gauge: '阻尼量规', rivalry: '竞争焦点', enigma: '信息暗礁', tempo: '节奏齿轮',
     quota: '伏笔配给', spotlight: '焦点分配', karma: '业力账', hazard: '风险账',
     marginal: '边际折旧', tolerance: '手段耐受', events: '事件调度', checkpoints: '快照与分支',
@@ -1624,7 +1633,14 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
         const lx = lexiconHintBlock();
         if (lx) items.push({ source: '外貌词库', content: lx });
       }
-      if (vis.ladder && WA.ladder) { const ld = engineCall('ladder', function () { return WA.ladder.buildBlock(); }); if (ld) items.push({ source: '原型阶梯', content: ld }); }
+      // v2.591.0（R266 / NAR-1）：引导弧。**只出窗口内该在场的拍**（窗口由 engines/arc-guide.js
+      //   算，本处不重算）；楼层读不到 / 全出窗 / 无弧 / 总开关关 —— 四种空都返回空串，零 token。
+      //   这与 beat-mask 的分工：那一条遮「还没到的」，这一条放「已经该在场的」，两者不重叠。
+      if (vis.arcGuideBridge && WA.arcGuideBridge) {
+        const ag = engineCall('arcGuideBridge', function () { const r = WA.arcGuideBridge.buildBlock(); return (r && r.ok && r.text) ? r.text : ''; });
+        if (ag) items.push({ source: '引导弧', content: ag });
+      }
+            if (vis.ladder && WA.ladder) { const ld = engineCall('ladder', function () { return WA.ladder.buildBlock(); }); if (ld) items.push({ source: '原型阶梯', content: ld }); }
       // v2.583.0：穿着状态。与外貌契约紧邻——一个答「这人该写多细」，一个答「这身衣服此刻怎样」。
       //   总开关关闭/无登记时 buildBlock 返回空串，零 token。
       if (vis.attireState && WA.attireState) { const at = engineCall('attireState', function () { return WA.attireState.buildBlock(); }); if (at) items.push({ source: '穿着状态', content: at }); }

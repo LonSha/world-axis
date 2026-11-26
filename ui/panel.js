@@ -78,6 +78,9 @@
   // v2.588.0（R6）：外貌词库。词库源的显示名必须与源表同批登记 ——
   //   不加这一行，面板开关会报英文键名，用户看不懂（tests/inject-sources-v2560 的 [D] 组会当场红）。
   appearanceLexicon: '外貌词库',
+  // v2.591.0（R266 / NAR-1）：引导弧。与 render/inject.js 的 SOURCES 同批登记 ——
+  //   只加源表不加显示名 ⇒ 注入页/失败台账裸露英文键名 arcGuideBridge。
+  arcGuideBridge: '引导弧',
     // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。与 SOURCES 同批登记 ——
     //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 `plan`/`mend`，
     //   而那是用户唯一能开关这两个注入源的地方（同 v2.56.0 / v2.96.0 / v2.117.0 的理由）。
@@ -2330,6 +2333,35 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         rows.push('<div class="wa-kv"><span>时间</span><b>' + esc(_msTs(snap.at)) + '</b></div>');
         return '<div class="wa-item">' + rows.join('') + '</div>';
       } catch (e) { return '<div class="wa-empty">读取注入快照失败（' + esc(e && e.message) + '）</div>'; }
+    })();
+    // v2.591.0（R266 / NAR-1）：引导弧窗口。**只读**这一格 —— 弧定义由 plan() 写入（作者侧），
+    //   面板这里只回答「这一刻窗口里有哪几拍、出窗几拍、为什么是空」。
+    //   与「信息暗礁 / 伏笔配给」的分工：那两条管埋与回收，这一条管**在场窗口**。
+    out += '<div class="wa-sec">引导弧<span class="wa-dim">（多拍长线：只说窗口内该在场的拍，出窗即退场）</span></div>';
+    out += (function () {
+      const G = WA.arcGuideBridge;
+      if (!G || typeof G.view !== 'function') {
+        return '<div class="wa-item" id="wa-inj-arc-absent"><b>引导弧</b>：引擎缺席'
+          + '（<code>engines/arc-guide-bridge.js</code> 未装载）—— 这不是「没有弧」，是读数缺口</div>';
+      }
+      let v = null;
+      try { v = G.view({}); } catch (e) { v = null; }
+      if (!v || v.ok !== true) {
+        return '<div class="wa-item" id="wa-inj-arc-absent"><b>引导弧</b>：读不出来'
+          + '（' + esc(String((v && v.why) || 'read-threw')) + '）—— 不拿空账冒充</div>';
+      }
+      let line = '';
+      try { line = G.summaryText(v); } catch (e) { line = ''; }
+      return '<div class="wa-item">' + esc(line) + '</div>'
+        + (v.rows.length ? '<div class="wa-dim">' + v.rows.map(function (r) {
+            return '· ' + esc(String(r.id)) + '　深度 ' + esc(String(r.depth))
+              + '　在场 ' + esc(String(r.active === null ? '—' : r.active))
+              + '　窗口 ' + esc(String(r.inject.length)) + ' 拍'
+              + (r.expired ? '　出窗 ' + esc(String(r.expired)) : '')
+              + (r.why ? '　' + esc(String(r.why)) : '');
+          }).join('<br/>') + '</div>' : '')
+        + '<div class="wa-row"><button class="wa-btn" id="wa-inj-arc" title="引导弧诊断：每弧的深度 / 在场拍 / 窗口内拍数 / 出窗拍数 / 未到拍 / 为什么是空 + 关键词登记（真源 arcGuideBridge.diagnose()）—— 只读，不改弧定义">引导弧诊断</button></div>'
+        + '<div id="wa-inj-arc-out" class="wa-out"></div>';
     })();
     out += '<div class="wa-sec">注入预算裁决</div>';
     out += (function () {
@@ -13376,6 +13408,40 @@ on('#wa-desk-show', showDesk);
       setOut('#wa-er-out', r.applied ? ('已落覆写：隐藏 ' + r.hidden + ' 条') : ('未落覆写：' + (r.reason || '无可用轮次')));
       if (r.applied) renderBody();
     });
+    // ── v2.591.0（R266 / NAR-1）：引导弧诊断（只读）────────────────────────
+    //   本按钮不写弧定义：plan()/advance() 是作者侧写口，面板不替用户编拍。
+    on('#wa-inj-arc', () => {
+      const o = $('#wa-inj-arc-out');
+      const put = function (h) { if (o) { o.innerHTML = h; bindNavs(o); } };
+      const G = WA.arcGuideBridge;
+      if (!G || typeof G.diagnose !== 'function') {
+        return put('<div class="wa-log wa-log-err">引导弧引擎未加载（engines/arc-guide-bridge.js）—— 这一格读的是它的读数，缺席时不拿空表冒充</div>');
+      }
+      let d = null;
+      try { d = G.diagnose(); } catch (e) {
+        return put('<div class="wa-log wa-log-err">读诊断失败：' + esc(String((e && e.message) || e)) + '</div>');
+      }
+      let k = null;
+      try { k = (typeof G.keys === 'function') ? G.keys() : null; } catch (e) { k = null; }
+      put('<div class="wa-log wa-log-info">引导弧诊断（真源 <code>WA.arcGuideBridge.diagnose()</code> · v' + esc(String(d.version)) + '）：'
+        + (d.enabled ? '总开关<b>开</b>' : '总开关<b>关</b>（buildBlock 返回空串）') + '　楼层 '
+        + (d.floor === null ? '<b>读不到</b>（不动推测）' : esc(String(d.floor)) + '（' + esc(String(d.floorSource)) + '）') + '</div>'
+        + '<div class="wa-item">弧 <b>' + esc(String(d.arcs)) + '</b> · 拍 <b>' + esc(String(d.beats)) + '</b> · 窗口内 <b>'
+        + esc(String(d.injectCount)) + '</b> · 出窗 <b>' + esc(String(d.expiredCount)) + '</b> · 关键词 <b>'
+        + esc(String(d.keys)) + '</b> · 被拒 <b>' + esc(String(d.rejected)) + '</b>'
+        + (d.why ? '　空因 <code>' + esc(String(d.why)) + '</code>' : '') + '</div>'
+        + (d.rows.length ? '<div class="wa-dim">' + d.rows.map(function (r) {
+            return '· ' + esc(String(r.id)) + '　在场 ' + esc(String(r.active === null ? '—' : r.active))
+              + '　窗口 ' + esc(String(r.inject)) + ' 拍　出窗 ' + esc(String(r.expired))
+              + '　未到 ' + esc(String(r.upcoming === null ? '—' : r.upcoming))
+              + (r.why ? '　' + esc(String(r.why)) : '');
+          }).join('<br/>') + '</div>' : '<div class="wa-dim">（还没有登记任何弧：plan() 写入后这里才会出现窗口）</div>')
+        + ((k && k.ok && k.rows.length) ? '<div class="wa-item">关键词登记（给世界书扫描面，去重保序）：'
+            + k.rows.slice(0, 12).map(function (x) { return esc(String(x.key)) + '（' + esc(String(x.arc)) + ' 第' + esc(String(x.no)) + '拍）'; }).join('、')
+            + (k.rows.length > 12 ? '　<span class="wa-dim">另有 ' + esc(String(k.rows.length - 12)) + ' 个未列出</span>' : '') + '</div>' : '')
+        + '<div class="wa-dim">' + esc(String(d.note || '')) + '</div>');
+    });
+
     on('#wa-inj-diag', () => {
       // v2.137.0（O14）：`querySelectorAll` 返回 **NodeList**（有 forEach、**没有 filter**）。
       //   本行原写 `.filter(...)` —— 在 mini-DOM 里能过是因为替身的 `qsa()` 返回的是**普通数组**，

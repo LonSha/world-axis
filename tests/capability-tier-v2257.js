@@ -151,18 +151,25 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //   MECH 133 / DORMANT 1 / RUNNING0 132 / FULL_MECH 133 全不动。
 //   恒等式照旧成立：FULL_RUNNING = MECH + (BASE_ON − RUNNING0) = 133 + (293 − 132) = 294。
 //   涨一个 —— 只改 BASE_ON 一个数是对的；把 MECH 也 +1 才是造数据。
+//   v2.591.0 跟位（NAR-1）：新增 engines/arc-guide-bridge.js —— **只动注入面、不动开集**：
+//   它有 buildBlock 且 def.enabled=false（与 sceneIntent 同一形态：零 token 边界，
+//   总开关关着时 buildBlock 返回空串），故 MECH 133 → 134、DORMANT 1 → 2、
+//   FULL_MECH 133 → 134，BASE_ON 293 不动。恒等式 134 − 132 = 2 成立。
+//   ⚠ 它**不进** standard 白名单：进白名单等于替所有存量用户把新机制静默打开，
+//     那是另一件事，不能搭在「补落地面」这一版里做。玩家想开请在设置面自己开。
+
 const BASE_ON = 293;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
 // v2.542.6 跟位：叙事脊柱 L1 的 sceneIntent **有 buildBlock（有注入面）但出厂 enabled:false**。
 //   为什么它必须是出厂关：L1 的零 token 边界——它被打开之前，注入字节必须与 v2.541.7 逐字节一致
 //   （判据见 tests/scene-intent-v2542.js 的 A 段）。于是它成为**第一个**「关着但有注入面」的机制，
 //   这不是漂移，是有意的设计：MECH 131→132、DORMANT 0→1、FULL_MECH 131→132，
 //   恒等式 MECH − RUNNING0 = DORMANT 仍成立（132 − 131 = 1）。
-const MECH = 133;           // 有注入面的机制数（v2.584.0: +attireState）
-const DORMANT = 1;          // 关着但有注入面的（= sceneIntent：出厂关、有注入面，见上）
+const MECH = 134;           // 有注入面的机制数（v2.591.0: +arcGuideBridge；v2.584.0: +attireState）
+const DORMANT = 2;          // 关着但有注入面的（= sceneIntent + arcGuideBridge：出厂关、有注入面，见上）
 const RUNNING0 = 132;        // 出厂开 且 有注入面的（v2.584.0: +attireState）
 // full 后的 running 不是魔法数，是恒等式：全部有注入面的 + 出厂就开着的无注入面那些
 // v2.294.0：= MECH(103) − L3_EXCLUDES(35)。排除名单本身未变，变的只有 MECH。
-const FULL_MECH = 133; // 全开策略后 full 与出厂一致（133；v2.584.0 随 MECH 132→133 跟位）
+const FULL_MECH = 134; // 全开策略后 full 与出厂一致（134；v2.591.0 随 MECH 133→134 跟位；v2.584.0 随 MECH 132→133 跟位）
 const FULL_RUNNING = FULL_MECH + (BASE_ON - RUNNING0);
 
 // ═══ 装载环境 ═══════════════════════════════════════════════════════
@@ -332,7 +339,11 @@ function runB(a) {
   // B4 full：本次新开 38 个（70 个 full 机制 − 其中已开 32 个）
   const r3 = T.applyTier('full');
   a(r3.ok === true, 'B4: 切 full 成功');
-  a(r3.turnedOn.length === DORMANT && r3.turnedOn[0] === 'sceneIntent',
+  // v2.591.0：出厂休眠机制从 1 个变 2 个（sceneIntent + arcGuideBridge）。
+  //   这里不写成 turnedOn[0] === 'sceneIntent' —— 顺序取决于 ns 枚举序，
+  //   那是在赌实现细节；问「集合是否恰为这两个」才是判据本身。
+  a(r3.turnedOn.length === DORMANT
+    && r3.turnedOn.indexOf('sceneIntent') >= 0 && r3.turnedOn.indexOf('arcGuideBridge') >= 0,
     'B4b: 全开后 full 只新开那 ' + DORMANT + ' 个「出厂关着但有注入面」的机制（实 '
       + r3.turnedOn.join(',') + '）—— 其余 ' + RUNNING0 + ' 个本就在跑，不是「一键开整个世界」的假象',
     r3.turnedOn);
@@ -344,7 +355,7 @@ function runB(a) {
   a(r4.ok === true && r4.tier === 'standard',
     'B5: full → standard 回滚成功且档位真回到 standard（实 ' + (r4 && (r4.tier || r4.reason)) + '）'
       + ' —— v2.542.6 之前这里是 no-history：full 无可开故不写栈，现在 full 真开了那一个', r4);
-  a(r4.turnedOff.join(',') === 'sceneIntent' && r4.granted.length === 0,
+  a(r4.turnedOff.slice().sort().join(',') === 'arcGuideBridge,sceneIntent' && r4.granted.length === 0,
     'B5b: 回滚只收回 full 开的那一个（turnedOff ' + r4.turnedOff.join(',') + ' / granted ' + r4.granted.length + '）',
     r4.turnedOff);
   a(T.view().running === MECH - DORMANT,
@@ -442,7 +453,7 @@ function runC(a) {
   // C7 档位与归因交叉：applyTier('standard') 后 defaultOff 应降到 61
   T.applyTier('standard');
   const a4 = A.audit();
-  a(a4.byReason.defaultOff === DORMANT, 'C7: standard 后出厂关只剩 ' + DORMANT + ' 个（= sceneIntent：有注入面但不在 34 条白名单里，实 ' + a4.byReason.defaultOff + '）—— 两个模块读的是同一个现场');
+  a(a4.byReason.defaultOff === DORMANT, 'C7: standard 后出厂关只剩 ' + DORMANT + ' 个（= sceneIntent + arcGuideBridge：有注入面但不在白名单里，实 ' + a4.byReason.defaultOff + '）—— 两个模块读的是同一个现场');
 }
 
 // ═══ D 面：边界与不变量 ═════════════════════════════════════════════
@@ -483,8 +494,8 @@ function runD(a) {
   a(T2.view().granted.length === 0, 'D2: 出厂 granted 为空（出厂机制不进 granted，实 ' + T2.view().granted.length + '）');
   T2.applyTier('full');
   const g = T2.view().granted;
-  a(g.length === DORMANT && g[0] === 'sceneIntent',
-    'D2b: 全开只把出厂休眠的 sceneIntent 记进 granted（' + g.join(',') + '）'
+  a(g.length === DORMANT && g.indexOf('sceneIntent') >= 0 && g.indexOf('arcGuideBridge') >= 0,
+    'D2b: 全开只把出厂休眠的 sceneIntent / arcGuideBridge 记进 granted（' + g.join(',') + '）'
       + ' —— 出厂就开着的 ' + RUNNING0 + ' 个一个都不进（否则 lite 回滚会误关它们）', g);
   a(g.indexOf('livingWorld') < 0, 'D2c: 出厂就开着的 livingWorld 不在 granted 里 —— 它不该被档位收回');
   // D3 回滚栈只装启用面（不装世界键、不装引擎设置副本）

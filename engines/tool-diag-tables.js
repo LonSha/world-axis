@@ -877,7 +877,9 @@
     // v2.590.0（R265 / PBS-1）：两套待办聚合器的对读面。**不是引擎族的例外**：它同样要进本表，
     //   否则「诊断清单覆盖全部磁盘模块」这条判据会把它的装载失败与契约漂移一并吞掉 ——
     //   而那正是这张表存在的理由（v2.273.0 立表时写的第一句）。
-    'engines/pending-recon.js': 'pendingRecon'
+    'engines/pending-recon.js': 'pendingRecon',
+    // v2.591.0（R266 / NAR-1）：引导弧的落地面（窗口委托 arc-guide，弧定义存 store）。
+    'engines/arc-guide-bridge.js': 'arcGuideBridge'
   };
 
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选

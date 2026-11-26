@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.590.0';
+  const VERSION = '2.591.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -381,6 +381,9 @@
     //   ⇒ 按 Z1-04 的 B16「wired 不许懒」退出惰性档、进首帧面：它们全是纯函数，
     //   只依赖 store 的 registerModule，排在 store/commit 之后即可。
     'engines/arc-guide.js',
+    // v2.591.0（R266 / NAR-1）：引导弧的落地面。**必须排在 arc-guide 之后** —— 它全部窗口/关键词
+    //   都委托 arcGuide（纯函数真源），供者先装（装载期次序判据按「供者下标 ≤ 消费方」验）。
+    'engines/arc-guide-bridge.js',
     'engines/ctx-boundary.js',
     'engines/replica-family.js',
     'engines/save-audit.js',

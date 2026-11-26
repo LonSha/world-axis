@@ -478,7 +478,7 @@ const LOAD = [
   'core/exec.js',
   'engines/backstage-protocols.js', 'engines/backstage.js', 'engines/evolution.js', 'engines/enemies.js', 'engines/regional.js', 'engines/parallel-world.js', 'engines/horizon.js', 'engines/digest.js', 'engines/inline-tags.js', 'engines/periodicals.js', 'engines/limits.js', 'engines/calendar.js', 'engines/memory.js',
   'engines/fact-age.js',
-  'engines/json-repair.js', 'engines/replica-family.js', 'engines/ctx-boundary.js', 'engines/write-rehearsal.js', 'engines/arc-guide.js', 'engines/save-audit.js',
+  'engines/json-repair.js', 'engines/replica-family.js', 'engines/ctx-boundary.js', 'engines/write-rehearsal.js', 'engines/arc-guide.js', 'engines/arc-guide-bridge.js', 'engines/save-audit.js',
   'engines/lazy-load.js',
   'engines/save-migrate.js',
   'engines/worldbook.js', 'engines/ledger.js', 'engines/timeline.js', 'engines/entities.js', 'engines/preset.js', 'engines/chatcache.js', 'engines/pmem.js', 'engines/rules.js', 'engines/theme.js', 'engines/summarizer.js',
@@ -21629,6 +21629,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./pending-recon-v2590.js');
   }
+  // ── v2.591.0 (NAR-1): 引导弧落地面专锁（默认关 / 零窗口重写 / 三楼层窗口复算 / 不猜楼层 / 注入块 / 关键词）──
+  section('v2.591.0 (NAR-1): 引导弧落地面专锁（只放窗口内的拍 · 出窗即退场 · 不猜楼层）');
+  {
+    await runLock('./arc-guide-bridge-v2591.js');
+  }
   // ── v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁 ──
   section('v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁');
   {
@@ -23563,7 +23568,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.590.0';
+  const __wantPin293 = '2.591.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

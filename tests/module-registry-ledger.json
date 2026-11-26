@@ -1,14 +1,14 @@
 {
- "version": "2.590.0",
- "loadOrderCount": 593,
+ "version": "2.591.0",
+ "loadOrderCount": 594,
  "lazyCount": 18,
- "loadedCount": 585,
+ "loadedCount": 586,
  "uiCount": 26,
- "nsCount": 596,
+ "nsCount": 597,
  "totals": {
-  "loadEdges": 480,
+  "loadEdges": 481,
   "hardEdges": 0,
-  "callRefs": 776,
+  "callRefs": 778,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -52,6 +52,7 @@
     "engines/anomaly-mutation.js",
     "engines/api-vault.js",
     "engines/appointment.js",
+    "engines/arc-guide-bridge.js",
     "engines/arc-guide.js",
     "engines/arc-phase.js",
     "engines/archive-hide.js",
@@ -657,6 +658,7 @@
     "engines/anomaly-mutation.js",
     "engines/api-vault.js",
     "engines/appointment.js",
+    "engines/arc-guide-bridge.js",
     "engines/arc-guide.js",
     "engines/arc-phase.js",
     "engines/archive-hide.js",
@@ -1327,6 +1329,27 @@
    ],
    "ghostRefs": [],
    "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/arc-guide-bridge.js": {
+   "ns": [
+    "arcGuideBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [
+    "worldaxis_arc_guide_bridge_v1"
+   ],
    "consumedBy": []
   },
   "engines/ctx-boundary.js": {
