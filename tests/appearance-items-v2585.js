@@ -229,6 +229,41 @@ function runAll(a) {
     a(r10.ok === true, 'D2a: 下限改 0 后空名单放行（证明必盖项由 COVERAGE_REQ 推、不是写死的）');
     a(r11.ok === false && r11.reason === 'missing-item',
       'D2b: 还原下限后空名单必拒（实 ' + r11.reason + '）—— 两向才叫自证');
+    // ── E（v2.586.0 / R262）：名单面接进**注入面** ── 判据此前只落「L1×4」这种数字，
+    //   「哪四处」要人去查表。planHints 默认关，开启后 buildBlock 多一段【该写】清单。
+    //   E 面钉三件事：默认关时逐字不变 / 开启后与名单同源 / 改下限即改清单（两向）。
+    const NL = String.fromCharCode(10);
+    AP.setSettings({ enabled: true, planHints: false });
+    const off1 = AP.buildBlock();
+    a(off1.indexOf('[该写]') < 0, 'E1: planHints 默认关 ⇒ 输出里没有【该写】段（默认行为逐字不变）');
+    AP.setSettings({ enabled: true, planHints: true });
+    const on1 = AP.buildBlock();
+    a(on1.indexOf('[该写]') >= 0, 'E2: 开启后出现【该写】段（判据面真的接进注入面）');
+    const needLabel = function (tier, L) {
+      const id = AP.requiredOf(tier, L)[0];
+      const it = (AP.LAYER_ITEMS[L] || []).filter(function (x) { return x.id === id; })[0];
+      return it ? it.label : id;
+    };
+    const needC1 = needLabel('C', 'L1');
+    a(on1.indexOf(needC1) >= 0, 'E3: 清单里出现该级必盖项的**中文名**（实查「' + needC1 + '」）—— 名字与名单同源');
+    AP.setSettings({ enabled: true, planHints: true });
+    const rowsC = [];
+    const lineC = on1.split(NL).filter(function (l) { return l.indexOf('单一特征：') === 0; })[0] || '';
+    rowsC.push(lineC);
+    const cntC = (lineC ? lineC.split('、').length : 0);
+    a(cntC === 1, 'E4: C 档清单恰 1 处（=' + AP.requiredOf('C', 'L1').length + '；读数 ' + cntC + '）—— 清单条数就是该级必盖项数');
+    const oldC = REQ.C.L1;
+    REQ.C.L1 = 3;
+    const on2 = AP.buildBlock();
+    REQ.C.L1 = oldC;
+    const lineC2 = on2.split(NL).filter(function (l) { return l.indexOf('单一特征：') === 0; })[0] || '';
+    a((lineC2 ? lineC2.split('、').length : 0) === 3,
+      'E5: 把 C 档下限临时改成 3 ⇒ 清单跟着变 3 处（两向：判据与注入面共用同一份表，实 '
+      + (lineC2 ? lineC2.split('、').length : 0) + '）');
+    const on3 = AP.buildBlock();
+    a(on3 === on1, 'E6: 还原下限后输出与改动前**逐字相等**（清单不是写死的）');
+    AP.setSettings({ enabled: true, planHints: false });
+    a(AP.buildBlock() === off1, 'E7: 关回去后输出与开启前逐字相等（不是“加了就删不掉”）');
   } finally {
     if (AP.setSettings && was) AP.setSettings({ enabled: !!was.enabled });
   }

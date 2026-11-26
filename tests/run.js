@@ -763,7 +763,7 @@ const LOAD = [
   'engines/era-cycle.js', 'engines/survival.js', 'engines/warrant.js', 'engines/beast-bond.js',
   // v2.69.0：外貌分级契约 / 原型阶梯。位置与 index.js LOAD_ORDER 同序（都早于 render/inject.js 消费点）。
   'engines/appearance.js', 'engines/ladder.js',
-  // v2.585.0（R261）：外貌要素库（描写词表，data-only）。**必须两面都加** ——
+  // v2.586.0（R261）：外貌要素库（描写词表，data-only）。**必须两面都加** ——
   //   index.js 的 LOAD_ORDER 给产品面，本 LOAD 给所有「从 tests/run.js 提清单」的门禁
   //   （reject-code-gate / module-cycle / v2840 哨兵面）。v2.583.0 的 attire-state 就栽在只加了
   //   index.js 那一面：见证跑不出、哨兵装不上，全量回归当场报回。这次两面同批。
@@ -16498,8 +16498,8 @@ assert(r2900.dead.length === 2004 && r2900.uiDead.length === 6 && r2900.dataOnly
   //   与 runLock 的 `[m](assert)` 约定不兼容 —— 挂上去必抛 `require(...)[m] is not a function`，
   //   全量回归当场取证）。按本仓既有档位改用 runScript（子进程 rc 即结论，同 tools/smoke.js 的 cli 档）。
   await runScript('./attire-state-v2583.js');
-  // v2.585.0（R261）：外貌子项名单（判据）+ 要素库（data-only 词表）。同族紧邻 settle-v2690/appearance 面。
-  section('v2.585.0 appearance-items lock (四层子项名单 × 词库 data-only 两向自证)');
+  // v2.586.0（R261）：外貌子项名单（判据）+ 要素库（data-only 词表）。同族紧邻 settle-v2690/appearance 面。
+  section('v2.586.0 appearance-items lock (四层子项名单 × 词库 data-only 两向自证)');
   await runLock('./appearance-items-v2585.js');
 
   section('v2.70.0 scene-slice x gauge x rivalry lock');
@@ -17505,7 +17505,7 @@ assert(r2900.dead.length === 2004 && r2900.uiDead.length === 6 && r2900.dataOnly
     //   ⚠ 但「不读别人」≠「没人读它」：放行名单必须同时自证有真消费方，否则白名单会静默吸收死文件
     //   （这正是 v2.111.0 把「至多一个」改成逐一具名的初衷）。故下面另算 orphan——
     //   零引用且**读它的文件数为 0** = 真死文件，一条都不许有。
-    // v2.585.0（R261）：第四种同型合法形态 —— **data-only 资产**（只出不进）。
+    // v2.586.0（R261）：第四种同型合法形态 —— **data-only 资产**（只出不进）。
     //   engines/appearance-lexicon.js 是描写词表：产品源面**刻意**不读它（判据在 appearance.js
     //   的 LAYER_ITEMS；词表只供预设/注入拼装与人读诊断取词），「非消费」本身由专锁
     //   tests/appearance-items-v2585.js 的 C5 静态钉住（appearance.js 源码里不出现该名）。
@@ -17580,7 +17580,7 @@ assert(r2900.dead.length === 2004 && r2900.uiDead.length === 6 && r2900.dataOnly
     // v2.569.0 跟位：56 → 54（mixedIndex 与 metabolismClock 两口出零读面 —— 前者由
     //   render/inject.js 的注入分支真读，后者由 core/interceptor.js 在同一处世界推进点真调；
     //   与 tests/module-cycle-gate-v2107.js 的 B7 同源，两处必须一起动）。
-    // v2.585.0（R261）跟位：54 → 55 —— appearanceLexicon（描写词表，data-only）登记为
+    // v2.586.0（R261）跟位：54 → 55 —— appearanceLexicon（描写词表，data-only）登记为
     //   readonly-api 后成为第 55 个零读 ns：产品源面**刻意**不读，由专锁 C5 静态钉住。
     //   这一条与上面 orphan 豁免**成对**：豁免说「它不是死文件」，这 55 说「它确实没人读」，
     //   两句话必须同时为真 —— 只改一处就会在下一轮变成「白名单里躺着一个读不出来的读数」。
@@ -23518,7 +23518,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.585.0';
+  const __wantPin293 = '2.586.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

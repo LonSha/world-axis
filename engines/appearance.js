@@ -46,7 +46,9 @@
   const WA = window.WorldAxis = window.WorldAxis || {};
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const LS_KEY = 'worldaxis_appearance_settings_v1';
-  const DEF = { enabled: true, maxRows: 24 };
+  // v2.586.0（R262）：planHints 默认关 —— 开启后 buildBlock 会多一段「这一级该写哪几处」的
+  //   中文清单。关着的时候输出**逐字不变**（专锁 P1 用字节相等钉住，防“悄悄变长”）。
+  const DEF = { enabled: true, maxRows: 24, planHints: false };
   const __REG = { key: LS_KEY, def: DEF, module: 'appearance', bounds: { maxRows: [4, 48] } };
   function settings() {
     const raw = WA.settingsBus ? WA.settingsBus.read(__REG) : DEF;
@@ -454,6 +456,25 @@
     });
     return { ok: conflicts.length === 0, conflicts: conflicts };
   }
+  /**
+   * v2.586.0（R262）：把「这一级该写哪几处」摊成一行中文清单。
+   * **不是新判据**：required 仍由 requiredOf 从前 N 项推出来，这里只是同一份表的第二种视图
+   * （数字 → 名字）。于是「L1×4」这句话里藏着的「哪四处」不再需要人去查表。
+   * cap 只截断**显示**，total 照实报 —— 截断不是「少了几处」。
+   */
+  function planHintOf(tier, cap) {
+    const plan = coveragePlan(tier);
+    const items = [];
+    LAYERS.forEach(function (L) {
+      (plan.layers[L] || { required: [] }).required.forEach(function (id) {
+        const it = itemAt(L, id);
+        items.push((LAYER_LABELS[L] || L) + '·' + ((it && it.label) || id));
+      });
+    });
+    const n = Math.max(1, Number(cap) || 8);
+    const shown = items.slice(0, n);
+    return { total: items.length, shown: shown, more: Math.max(0, items.length - shown.length) };
+  }
   function buildBlock() {
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
     const list = pickQuota(rows(), cfg);
@@ -467,7 +488,19 @@
         + (r.weighted && !r.marked ? '【关系加权】' : '') +
         (r.form !== 'humanoid' ? '（' + (FORM_LABELS[r.form] || r.form) + '）' : '');
     });
-    return '[外貌契约]\n' + lines.join('\n') + '\n分级决定扫描深度：S 完整四层、A 完整五官+精选身体、B 精选四件套、C 至少 1 个可识别特征；恋人/血亲/宿敌自动升一级；再出场只写当前视角最值得看的 1-3 个细节。\n';
+    const hintBlock = function () {
+      if (!cfg.planHints) return '';
+      const tiers = [];
+      list.forEach(function (r) { if (tiers.indexOf(r.effTier) < 0) tiers.push(r.effTier); });
+      const rows2 = tiers.map(function (t) {
+        const h = planHintOf(t, 8);
+        return (TIER_LABELS[t] || t) + '：' + h.shown.join('、')
+          + (h.more ? ' …（该级共 ' + h.total + ' 处）' : '');
+      });
+      return '[该写]\n' + rows2.join('\n') + '\n（名单口径：必盖项 = 每层名单前 N 项，N 取自该级覆盖下限；换档即换清单。）\n';
+    };
+    const head = '[外貌契约]\n' + lines.join('\n') + '\n分级决定扫描深度：S 完整四层、A 完整五官+精选身体、B 精选四件套、C 至少 1 个可识别特征；恋人/血亲/宿敌自动升一级；再出场只写当前视角最值得看的 1-3 个细节。\n';
+    return head + hintBlock();
   }
   // v2.581.0 块尾名额自证：不动原正文拼接，只在末尾追加一行清单计数（名额够就说「全部列出」）。
   buildBlock = (function (inner) {
