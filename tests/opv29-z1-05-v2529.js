@@ -104,7 +104,7 @@ a(meas.ok === true && meas.pages.length === 36,
   //   + 画布宽/高 2 个输入 + 应用按钮 + 导出文本框）。**控件总数涨是被新增入口撑起来的，不是页变胖。**
   // v2.592.0（RFA-1）：1728 → 1730 = 工具页「档案精编预览」段的 1 个按钮 + 1 行读数（段体惰性：收起态不计入逐页真量，
   //   与注入页引导弧同一口径）。
-  a(meas.totalControls === 1730, 'D2 逐页合计 1730 控件（实测 ' + meas.totalControls + '；v2.592.0 跟位：1728 → 1730 = 工具页「档案精编预览」按钮 + 读数行；v2.591.0 跟位：1726 → 1728 = 注入页「引导弧诊断」按钮 1 个 + 弧况行（逐页真量只渲染在场分支，缺席分支不进读数）；v2.590.0：1725 → 1726 = 待办页「两账对读」按钮）', meas.totalControls);
+  a(meas.totalControls === 1731, 'D2 逐页合计 1731 控件（实测 ' + meas.totalControls + '；v2.593.0 跟位：1730 → 1731 = 工具页「字段写权与覆盖冲突」段；v2.592.0 跟位：1728 → 1730 = 工具页「档案精编预览」按钮 + 读数行；v2.591.0 跟位：1726 → 1728 = 注入页「引导弧诊断」按钮 1 个 + 弧况行（逐页真量只渲染在场分支，缺席分支不进读数）；v2.590.0：1725 → 1726 = 待办页「两账对读」按钮）', meas.totalControls);
 const rowOv = (meas.pages || []).filter(function (x) { return x.page === 'overview'; })[0];
 a(rowOv && rowOv.controls === 46 && rowOv.bytes === 25230,   // v2.569.0 跟位：25206 → 25230B（overview 首屏多了那一个复选框及其标签）
   'D3 首屏 overview 实测 ' + (rowOv && rowOv.controls) + ' 控件 / ' + (rowOv && rowOv.bytes) + 'B', rowOv);

@@ -15,7 +15,7 @@
     "④ 本账本的键集与门禁 deadNs 读数双向一致：门禁多一个 → 未定性；账本多一个 → 过期登记。",
     "⑤ pending-wire 是**有时限**的定性：只用于「缝合件已入库、接线是下一步」的中间态。若某条 pending-wire 超过一个版本周期仍无人读，必须改判 stale（进 dead-export-ledger）或补消费点，不许靠改 evidence 文字续命。"
   ],
-  "version": "2.592.0",
+  "version": "2.593.0",
   "entries": {
     "LEAK_THRESHOLD": {
       "cls": "gate-selfwitness",
@@ -136,12 +136,6 @@
       "provider": "engines/festival-fair.js",
       "evidence": "v2.524.0 EXV27-7 灯会庙市与纸扎。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
       "recompute": "grep -n 'festivalFair' tests/scenario-v71-v27-money-night-fire.js | head -2"
-    },
-    "fieldWriters": {
-      "cls": "stale",
-      "provider": "engines/field-writers.js",
-      "evidence": "字段写入方清册：导出全部在 dead-export-ledger 冻结。产品面零读。消费方只有 tests 面：tests/v11-field-writers.js 是它的专锁（真调 view / conflicts / stat / undeclaredConflicts）。engines/tool-diag.js:3432 的 'engines/field-writers.js': 'fieldWriters' 只是模块名登记表的一行，不是读取。另见 tests/module-cycle-gate-v2107.js:546 的历史读数：v2.300.0 时该 ns 就被记为『只有测试与面板候选消费』。",
-      "recompute": "grep -n 'WA.fieldWriters' tests/v11-field-writers.js | head -3"
     },
     "fireWatch": {
       "cls": "readonly-api",

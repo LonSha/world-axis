@@ -434,6 +434,25 @@
 
        <div id="wa-wl-out" class="wa-out"></div>
       `)}
+      ${foldSec('tools', 'writers', '字段写权与覆盖冲突</div><div class="wa-dim">（同一字段谁写、谁覆盖谁 —— 只读表，不改任何写者）', () => {
+        const fw = WA.fieldWriters;
+        if (!fw || typeof fw.view !== 'function') return '<div class="wa-dim">字段写权表未装载（engines/field-writers.js）</div>';
+        let v = null;
+        try { v = fw.view(); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const st = (v && v.stat) || {};
+        const rows = (v && v.fields) || [];
+        const head = '共 ' + st.fields + ' 个字段 / ' + st.writers + ' 个写者 · 真冲突 ' + st.conflicted
+          + '（已登记 ' + st.declared + ' · 未登记 ' + st.undeclared + '）';
+        const body = rows.map(function (f) {
+          const ow = (f.overwriters || []).length;
+          const badge = ow >= 2 ? ('⚠ ' + ow + ' 个覆盖型') : (ow ? '1 个覆盖型' : '无覆盖型');
+          return '<div class="wa-item"><b>' + esc(f.field) + '</b> · 责任方 ' + esc(f.owner) + ' · ' + esc(badge)
+            + (f.conflict === 'declared' ? ' · <span class="wa-dim">已登记待治理</span>' : '')
+            + '<div class="wa-dim">' + esc((f.writers || []).map(function (w) { return w.file + '(' + w.mode + ')'; }).join('、')) + '</div></div>';
+        }).join('');
+        return '<div class="wa-dim">' + esc(head) + '</div>' + body
+          + '<div class="wa-dim">本面只读：不改任何写者的 mode，也不改写入语义。未登记的真冲突由专锁判红，不在本面被吞掉。</div>';
+      })}
       ${foldSec('tools', 'refine', '档案精编预览</div><div class="wa-dim">（RFA-1：三处只增不减的台账能省几条 —— 只预览，不删一条）', () => `
       <div class="wa-row"><button class="wa-btn" id="wa-rfa-scan" title="扫一遍世界事实 / 长期记忆事实 / 纪事，报出：原 N 条 → 精编后 M 条、可省几条、超长几条、重复组明细。本面零写：不删除任何一条档案、不写盘">精编预览</button></div>
       <div class="wa-dim" id="wa-rfa-line">${esc(rfaLine())}</div>
