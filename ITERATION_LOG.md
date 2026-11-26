@@ -7645,3 +7645,283 @@ too-few-points/too-many-points/undo-empty/unresolved-endpoint`。在 `tests/reje
 **未做（如实登记）**：① `atlas.js` / `terrain-hazard.js` 尚未用几何接线（M4 未动 —— 它们仍按**名字**连边）；
 ② `docs/PROJECT_ASSESSMENT.md` 的 R6（词表进注入面）本轮未做；③ 真宿主两项（`v10-ui-pills` /
 `v10-r3-persist-hosted`）仍需真 SillyTavern @ `http://127.0.0.1:8000`，一直没执行；④ 整趟全量回归待本版跑。
+
+---
+
+## 回填说明（R257–R260 / R264–R269，v2.594.0 补记）
+
+日志在这里断了两段：**R257–R260（v2.584.0）** 与 **R264–R269（v2.588.0～v2.594.0）**。
+补记时先核了一件事：`03292b3`（R260）的提交正文写着「ITERATION_LOG.md 补 R259/R260 一节」，
+而文件里**没有**这两节 —— 那一步的写入没落地（同批的 `4ebf0e7` 声称补 R253，那一节在）。
+如实登记：这是第二次「提交正文声称补了日志、文件里没有」。机制上的漏洞很具体：
+**日志不被任何门禁读**（`grep -rln ITERATION_LOG --include=*.js` 命中的都是把文件名当样本的锁），
+所以漏写永远不会有红。要么下一版给它一把可跑的锁（「本轮提交必须在日志里有对应条目」），
+要么就得承认它是自觉项。本版选前者写进待办，先把债还上。
+
+下面十节的取材口径写明：R257–R260 / R264–R266 按**提交正文 + 台账现场复算**回填，
+不重述当时没有记录下来的思考过程；R267–R269 是近三轮，材料完整（含门禁读数与踩坑）。
+
+---
+
+## R257（v2.584.0 · 出厂启用面跟位 + 堆上限 3072→5120）
+
+**先把「跑不完」归因准了**。全量跑到 25339✓ / 12✗、4156 秒时 `FATAL ERROR: Reached heap limit`
+（Mark-Compact 已到 2983/3144 MB）。前几趟把它读成「机器内存不够」不算错（当时 free 只剩几百 MB），
+但**不准**：同一位置、同一句 FATAL、heap 触顶才死 ⇒ 卡的是 **V8 堆上限**，不是内核 OOM。
+`tests/isolated-runner.js` 的建堆参数 3072 → **5120**（显式传 `--max-old-space-size` 仍以调用方为准）。
+
+**12 条红是同一根因的读数跟位**：`attireState`（v2.583.0 入场）出厂 `enabled:true` **且有 buildBlock**
+⇒ 「出厂启用面」四数各 +1：`BASE_ON 290→291` · `MECH 132→133` · `RUNNING0 131→132` ·
+`FULL_MECH 132→133`；`theme-engines-v2258` 的 `FACTORY_RUNNING 131→132`（真源是 RUNNING0，两处必须同值）。
+恒等式 `MECH − RUNNING0 = DORMANT` 与 `FULL_RUNNING = MECH + (BASE_ON − RUNNING0)` 一条没动，
+判据（出厂态自洽 / full 后真涨 / 回滚真收回）一条没动 —— **这不是放宽，是读数跟位**。
+复验：capability-tier 92/0 · theme-engines 73/0 · isolated-runner-lock 49/0 · settle-v2820 160。
+
+## R258（v2.584.0 · 全量 19 红逐条跟位）
+
+上一趟（跑的是 R257）**跑到了底**：26123✓ / 19✗ —— 堆上限提上去之后不再 OOM，这一条先落定。
+19 红归四类逐条跟位：
+
+1 **出厂启用面**（capability-tier / theme-engines / v7-cap-tier-2283）：七个数一起 +1
+   （`BASE_ON 290→291`、`MECH 132→133`、`RUNNING0 131→132`、`FULL_MECH 132→133`、
+   full 档规模 `97→98`、`C5 132→133`、`C11 131→132`、`FACTORY_RUNNING 131→132`），恒等式不动。
+2 **版本面**：`s3-tx3` 的 A8 **双引号**白名单漏补 2.584.0（anchor 轮只改到单引号那一处）——
+   这与 v2.594.0 那次「三种收尾形态」是同一个坑的两次不同表现。
+3 **OPV29 计数**（五个锁）：z1-09 三面快照 1689/143→1697/145、例外表 136→138；z1-10 科目行 165→166；
+   z1-07 MODULE_EXPORTS 578→579、表体量 2500→2503；z1-05 逐页控件 1693→1694；
+   z6-13 扫描面 1925→1935 / 在用 1873→1883 / 有玩家话 1422→1428 / 裸码 231→233。
+4 **计划表与证据库**：`plans/V29_MASTER_PLAN.md` 的 Z1/Z3/Z4 组读数按现场改（tests 677→678、
+   engines 543→544、内联码 1925→1935、见证 933→943）；`evidence-index --write` 收敛 4 条 stale；
+   `gen-plan-status --write` 回填 O/E/TP 三份状态块（v2187 的 7 条红由此清零）。
+
+另补一条**真缺口**（不是读数）：新码 `cause-scope` / `downgrade-coverage` **没有玩家话术**，
+phrase-coverage 掉到 86% 以下。按「逐名登记、不按词根猜」补话术，不改覆盖率下限。
+
+## R259（v2.584.0 · 最后 2 红：opv27 簇数 + 证据账本）
+
+26136✓ / 2✗，两条都不是缺陷，是读数没跟位：
+1 `opv27-rest-lock` 的「十六簇逐簇给出命中数」硬编码 `===16`，而本版给 `reject-phrase.js` 新增了
+   attire 一簇（`cause-scope` / `downgrade-coverage` 归在这里），实为 **17**。改判据并写下二批/三批的来历：
+   **簇的语义边界一条没动，只跟位数**；为什么必须逐名登记而不按词根猜，仍以 `reject-phrase.js` 原注释为准。
+2 `evidence-ledger.json` 的 C6 报 7 条 stale（**全是 sha-changed、added 0**）：正是本轮做读数跟位的
+   七个文件。`evidence-index --write` 现场重算收敛（该工具幂等、只写账本）⇒ `--check` 677 条 stale 0。
+
+R259b 把 V29 计划台账按提交集合重算 digest（`plan-ledger` 36/36）。
+
+## R260（v2.584.0 · 整趟全量零失败凭据 + BUILD_ID 跟位）
+
+1 整趟全量 **26021✓ / 0✗**、`status=passed`、`sourceChanged=false`、超 60s 的节 21 个。
+  真宿主 2 项（`v10-ui-pills` / `v10-r3-persist-hosted` @ `127.0.0.1:8000`）仍未执行 ——
+  如实登记：已执行的判据全通过，**但不据此宣称整仓全绿**。
+2 BUILD_ID 跟位到 `b404b77dda830731ff72c87418cde88fdb8f60b1`。过程记录一笔：我先手敲了一串假 sha
+  （前 7 位是真的、后 33 位是编的），随即用 `git rev-parse` 取真值改回 —— **BUILD_ID 只能从 git 取**，
+  这是「不写第二份真源」在元数据上的同一句话。
+3 生成器回填：`gen-gates-doc --write` · `evidence-index --write` · `plan-ledger --write` · `release-manifest` 可发。
+
+**这一节本应存在却没存在**（参见上面的回填说明），而且它自己就是「日志没被门禁读」的证据。
+
+## R264（v2.588.0–v2.589.0 · 四项真空一次做完 + 三次续：地图生成 / 零读裁决 / 继承比例 / 设置总账台）
+
+这一轮的主线是「把 `docs/PROJECT_ASSESSMENT.md` 里六项真空一次清完」。四项落在本版，分四个提交：
+
+**一 · MAP-4/5（地图不再预设，按素材现场生成）**：新引擎 `engines/map-generator.js`（559 行）从世界书条目抽地名
+→ 出版图 ops → 逐条走 `WA.mapEditor.apply()`。**关键判断：不持有第二份几何真源** —— 生成器只产 ops，
+几何仍归编辑器，于是编辑器的七条纪律（失败不污染 / 撤销可核 / check 纯函数 / id 单调不复用 / 选择不是文档状态 /
+不猜单位 / 不在装载期建索引）全部自然继承。新页面 `ui/pages/map-page.js`（308 行）+ panel 三处接线。
+素材不足如实报 `no-source` / `no-place-names`；`dryRun` 不碰用户底图；抽名从后缀左扫（不吃虚词）。
+专锁 `tests/map-generator-v2588.js`（59 判据九组）。
+
+**二 · 七台零读引擎补裁决**：`refine / observationProjection / binding / calendarPlan / purifyScope /
+unifiedPending / fieldWriters` 逐台写「为什么现在不接」与改判触发器（`docs/ORPHAN_ENGINES_ADJUDICATION.md`），
+锁从 21 段扩到 35 段，并加「行首 `WA.<ns> = {` 恰一处」防止注释冒充定义。
+**这一段是下一版两次潜伏红的源头**（v2.590.0 起陆续接线，却没回头改裁决 —— 直到 v2.594.0 才补齐）。
+
+**三 · `family.inherit` 支持自定义比例（EXP-9b）**：第五参数 `shares` 权重表，内部归一；不传 = 均分
+（旧行为逐字不变）。新拒收码 `invalid-shares`（非继承人名字 / 负数 / 非数 / 全零 / 传数组），见证 1011→1012。
+校验在写事务之前（零污染）；零权重如实报 `excluded`；最后一名拿余量保证守恒。专锁 46 判据（含六路拒收零污染指纹比对）。
+
+**续一 · 注入分档从影子到落地（L2-apply，双道默认关）**：`inject-tier` 此前 `mode:apply` 一律报
+`apply-not-implemented`，分档永远停在读数面（能算没人叫它算）。新增 `tierUp(items)` 六条性质：
+默认 `enabled:false` ⇒ 原引用原样返回（连拷贝都不做）· `mode:shadow` 开着也不裁 · 只裁 off 档
+（focus / backdrop 一律保留）· 不改入参 · 零裁剪也返回原引用 · 每条裁掉进 `stat().lastDropped`。
+`observe` 仍是只读口（拿到 apply 照旧报 `apply-not-implemented`，那句话仍是真的）。可逆：内容一变下轮即回队 ——
+**分档不是删除，是「这一轮不必重复喂」**。`render/inject.js` 一处接线（预算裁决之后）。专锁 34 判据。
+
+**续二 · 外貌词库进注入面（R6）**：`render/inject.js` 四处登记（SOURCES / def / SRC_NAME / 注入分支）+
+`lexiconHintBlock()`；`ui/panel.js` 补 VIS_NAMES（`inject-sources-v2560` 当场咬出）。
+裁决口径写死在专锁里：**词库不是判据** —— C1/C2 逐字断言 `engines/appearance.js` 里不出现
+`appearanceLexicon` 与 `LEXICON`。
+
+**续三 · 设置面总账台（C 项，v2.589.0）**：79+ 个「改不了的设置面」终于有统一入口。`engines/settings-desk.js`：
+清单读口 `list`（**由 `__settingsRegs` 现场生成，不持有第二份清单**）/ 写回 `flip`（normalize + saveOrThrow +
+**读回复核**）/ `restore` / `diagnose` / `summaryText` / `face`。`ui/pages/faces-page.js` 总账页（搜索 / 六种筛选 /
+行数上限 / 截断自报 / 结果留痕）。四条新拒收码见证（`invalid-key` / `no-enabled` / `invalid-bool` /
+`write-unverified`，后者用写桩构造 —— 「写回去了」必须是与读回比对，不是与自己的入参比）。专锁 81 判据。
+
+**门禁（R264 首提交现场）**：module-registry 583/594/478/772 · dead-export 2018 · reject 1963 码 / 见证 1012 /
+死表 52 / 基线 941 · capability-tier 92/0 · opv29 21/21 · segment-extract 128 · version-consistency 22 ·
+plan-readings 16 · evidence-index 681 stale 0 · release-manifest 可发。
+
+## R265（v2.590.0 · PBS-1：两套待办聚合器的对读面）
+
+**它治什么**：全仓两套「现在等我做什么」各自一半人在用 —— `pendingCenter`（八源 + 开关 + `act()` 透传写口，
+待办页读它）与 `unifiedPending`（七探针 + 三态 `hands/skipped/faults`，**产品面零读**，只在两把锁里被消费）。
+两套管的不止不同大小、而是不同集合：A 独两源、B 独一源 —— 这件事此前**没有任何读数说过**。
+
+**不做第三份清单**：再写一份待办列表就是第二份真源，两份一漂移玩家会看到两个数、两个都不对
+（与设置面总账台同一条理由）。本面只回答一个问题的**可证伪版本**：「这两套读数说的是同一个世界吗？」
+
+**三条判读纪律（写死在锁里）**：① **不可读就不对读**：任一侧关着 / 缺席 / 读失败 / 形状坏 ⇒
+`comparable=false`、`divergences` 恒空、summary 明说「对读不成立」—— 缺席不冒充一致；
+② **条数不作分歧判读**：A 只收「有待处理动作」的行、B 收 `pending()` 全量，口径差不是证据；
+③ **只报能证伪的分歧**：`presence`（一侧读到、一侧判缺席）与 `fault`（一侧看到异常、一侧当它正常）；
+覆盖差（`aOnly/bOnly`）单列 `coverage` —— 那是范围事实，不是错误。
+
+**零硬编码源名单**：引擎里 0 处模块名字面量（锁 A4 逐名断言 11 个名），名单全部从两侧现场返回体里取。
+写死名单会让「对读」只对读我当初记得的源 —— **那比不做更坏，因为它看上去是绿的**。
+
+**顺带把既有形状问题变成读数**：A 把「抛异常」与「缺席」都塞进 `skipped`，只靠 `reason` 字符串
+（`source-threw`）区分。本面按字符串把故障拎出来重报（`a.faults`），**不改 A 的返回体** —— 那是它的边界；
+本面要的只是「读面能不能分辨」。三处不可达兜底**刻意不给拒收码**（一条永不执行的见证比没有见证更坏）。
+
+**门禁**：新增 `tests/pending-recon-v2590.js`（83 判据）；销 `ns-consumer-ledger` 的 `unifiedPending`（54→53）；
+dead-export 2017→2016（`unifiedPending.collect` 转活）；module-registry 585 文件 / 596 ns / 480 边 / 776 调用期；
+reject **1967 码零新增**（三处兜底改为不编词）；顺手清 ui-a11y 存量缺口 4 个无名控件 ⇒ 1770/1770。
+
+## R266（v2.591.0 · NAR-1：引导弧落地面）
+
+**它治什么**：`engines/arc-guide.js` 的窗口算法是干净的纯函数，但每个入口都要调用方传 `arcs`；
+全仓没任何一处保存「弧长什么样」，`WA.arcGuide` 产品面零命中 —— 这台引擎写得再对也从来没真的跑过一次。
+新增 `engines/arc-guide-bridge.js` 只补两个缺口：**弧存在哪**（store 桶）、**楼层从哪来**
+（现场 chat → 手动 advance → null，绝不默认 0）。窗口算法不重写：全部委托 `arcGuide.plan / parseArcs / keysOf`。
+
+**三条不可回退口径**：① **楼层不猜**：读不到 chat 就是 `null`，`why=no-floor`（不拿 0 冒充）；
+② **楼层单调不减**：`advance(t)` 且 `t < cur` 报 `bad-value`，绝不回退；③ **默认关是上线前提**：
+`def.enabled=false`；注入面 `vis` 取 true，**两开关同时开才有内容**（只开注入面等于零 token）。
+
+**接线**：`index.js`（排在 `arc-guide.js` 之后，供者先装）/ `tests/run.js` / `render/inject.js` 四处 /
+`ui/panel.js` 注入页「引导弧」区块 + 诊断按钮 / `tool-diag-tables` 登记。
+
+**锁** `tests/arc-guide-bridge-v2591.js`（65 判据七组）：静态契约逐字断言引擎里 **0 处** `.at <=` / `.at >` / `sort(`
+（窗口不重写）；默认关四连拒；写口自报 `cut` / 楼层单调；三楼层窗口复算；注入块四种空串原因都写进 `why`。
+
+**门禁跟位**：销 `arcGuide`（53→52，从零读变真被消费）；module-registry 586/597/481/778；dead 2031；
+reject 1967 零新增；segment-extract 128；settle 55；z1-04 46/46；z1-05 21；plan-readings 16；
+capability-tier 92/0（新机制计入 `MECH 134 / DORMANT 2`，**不进 standard 白名单**）；版本面 22 + 白名单 25。
+
+## R267（v2.592.0 · RFA-1：档案精编落地面）
+
+**它治什么**：`engines/refine.js` 的三件事（`normalize` / `merge` / `condense`）都是纯函数，
+写得再对也从来没被任何产品面调用过（`WA.refine` 产品面零命中，只在设置面登记了一个总开关）。
+于是「同一件事被记了三遍、同一条设定写了两处、短句堆成一堆」这件事，在界面上只有「看着难受」这一个状态 ——
+**没人能说出「能省几条」**。
+
+**不重写精编算法**：三个变换全部委托 `WA.refine.merge` / `WA.refine.condense`。`engines/refine-bridge.js`（210 行）
+只补两个缺口：① **从哪取档案** —— 三处只增不减且已在 `core/store.js` 物化的台账（`worldFacts`@:93 /
+`memory.facts`@:173 / `chronicle`@:167）；② **取出来给人看** —— 每源「原 N → 精编 M（可省 X）· 超长 Y · 重复组 Z」。
+
+**三条口径**：① **只预览不落盘** —— 落盘要事务/权限/挤出，是另一件事，「只预览」比「预览 + 一个没有确认的写接口」
+安全得多（引擎 0 处 `transact(`/`patch(`/`setItem(`/`saveOrThrow(`）；② **只收正文不收键** —— `worldFacts` 收 `value`、
+`memory.facts` 收 `value`、`chronicle` 收 `summary`；键是标识不是文本，拿键去重会把「两个不同的人同名」判成一条；
+③ **空源不是错误、总开关关不是干净** —— 某源 0 条就报 0 条并写 `why`；`disabled` 用本仓既有码，
+**不编 `refine-disabled` 这种带模块名的新码**（新码要配可跑见证）。
+
+**搭锁踩的坑（两个都得记）**：① A4 报引擎里有 `transact(`/`setItem(` 各 1 处 —— 真因是**头注释里列了这四个写口的名字**，
+改用 `codeOf()` 剥掉注释行再计；② 首版 `summaryText` 里 `return v.line` 被注释吞掉成函数体结尾同一行，
+返回 `undefined`，测试报 `Cannot read properties of undefined (reading 'indexOf')` —— **「唯一读数出口」类的函数，
+改动时最容易把 return 写进注释行尾**。
+
+**锁** 46 判据五组（A 静态 / B 现场 / C 桩 / D 零写 / E 页面），含三条最硬的反空转：
+键相同正文不同**不得被并**、三源全空时读数写「均为空」并逐字否认「已经很干净」、`refine` 缺失报 `module-missing` 且 `summaryText` 空串。
+
+**门禁**：销 `refine`（52→51）；dead 2031→2032（−3 出表 / +4 入冻，净 +1）；reject 1967 零新增；
+segment-extract 128（section 465→466 / 测试面 691→692 / 重组面 18931→18950 / 硬线 2263→2258）；
+z1-04 46（首帧 594→595、契约面 586→587）；z1-05 21（控件 1845→1848、逐页 1728→1730）；
+settle 55；plan-readings 16；capability-tier 92/0（无 buildBlock ⇒ 常量一个不动）。
+
+## R268（v2.593.0 · FWR-1：字段写权表的读面）
+
+**它治什么**：`engines/field-writers.js` 已经把「同一字段被谁写、谁覆盖谁」算得清清楚楚
+（五字段 / 36 写者 / 2 个真冲突），但产品面零读 —— 于是「这个字段有三个人在写、谁负责」这件事，
+玩家与作者两方都只能靠读源码猜。
+
+**一条不可让步的口径**：**面板不另算一份写权表**。一行读数与逐字段行全部来自 `fieldWriters.view()` / `stat()`，
+面板里 **0 处**手写字段名与写者名（专锁 A2/A7 两向钉）；**「看写权不等于改写权」**：该段 0 处 `transact`/`patch`/`setItem`，
+也不提供任何「改 mode」入口。
+
+**不可读分两档**：模块未装载 / 读数抛错各自写明原因，不拿空表冒充「没有冲突」；并加 D3 双向自证 ——
+还原后读数又回来，证明 D1/D2 不是恒假。
+
+**实测读数（锁内返回体，可直接复算）**：`{fields:5, writers:36, conflicted:2, undeclared:0}` ——
+**未登记的真冲突 = 0** 是这一段的真正 payoff：真冲突要么治好、要么登记在案，界面上的 ⚠ 与「已登记待治理」
+是同一份账的两种说法。
+
+**搭锁踩的坑**：`render()` 辅助必须手动 `bind({esc, foldSec})` —— `ui/panel.js` 的真 bind 在面板渲染时才调，
+单测里不 bind 会落到 tools-page 里的空壳桩，`foldSec` 会把 body 直接拼不回 label。
+
+**门禁**：销 `fieldWriters`（51→50）；dead 2032→2031；reject 1967 零新增；segment-extract 128
+（section 466→467 / 测试面 692→693 / 重组面 18950→18969）；z1-05 21（控件 1848→1849、逐页 1731→1732）；
+settle 55；plan-readings 16；ui-a11y 1775/1775。
+
+**本版一次真事故（必须记）**：`io.open(p,'w',...).write(io.open(p,...).read().replace(...))` 一行读-改-写把
+`index.js` **截成 0 字节**（`'w'` 在参数求值前就截断了文件）。靠 `git checkout -- index.js` 恢复（168048 字节、
+`node --check` OK），再单独重做替换。**纪律：读-改-写必须两行，先 read 再 write，绝不写成一行嵌套调用。**
+
+## R269（v2.594.0 · OPJ-1：观察投影落地面）
+
+**它治什么**：`observation-projection.js` 能把一份公共事实按观察者投成 N 座私有块，但它按边界②
+不读 store、不查信念库 —— 版本要调用方给。`epistemicView.buildView()` 已能做「单条目 × 单持有者」，
+缺的正是**同一条事实同时有 N 个持有者、每人手里是不同版本时，把它们摆在一起**。
+
+**新引擎 `engines/projection-bridge.js`（363 行）**不重写投影：座位划分 / 缺席者 / 每座独立对象全部委托
+`observationProjection.project`。只补两个缺口：版本从哪来（`epistemicStore.beliefs`，`registerBelief` 是唯一写口，
+本文件 0 处写它）、摆出来给人看（每话题「几座 / 几种说法 / 谁一无所知 / 谁那版与事实不符」）。
+
+**六条口径（源注释里写死不回退）**：
+1 **零写**：投影是读侧计算，落账仍是 `epistemicView` 的事。
+2 **不解析复合键**：`beliefs` 的键是 `pId + 冒号 + tId`，而 `personId('a:b')` 得 `p_a:b` ⇒ 键**天然不可反解**。
+  逐行只认行内自带的 `personId` / `topicId`，缺任一计入 `legacy` 跳过 —— 不猜、不按冒号切。
+3 **说法按正文全等分组，不按 version 标签**：两人可能都写 `v1` 却是完全不同的说法，按标签分组会把两个说法并成一个
+  （那正是交叉污染在读侧的翻版）。专锁为此造了三行「标签 v1/v1/v2 而正文两说」的账，实测 `distinct=2`。
+4 **三档分开数**：`held`（有说法）/ `bare`（登记了但没写内容）/ `unaware`（这条账上根本没他）。三档都只拿公共段时
+  长得一样，混成一个数就再也分不出来了（B5/B5b/B5c + 「三档和 = 总座数」）。
+5 **总开关关不是「没人知道」**：`project` 在 disabled 时回 `degraded:true` 与空 seats，本模块据此报 `disabled`，
+  读数写明「这不是『场上所有人都知道同一版』」；被 `maxSeats` 截断则记 `truncated/lost`，**不并进 `unaware`**。
+6 **一行读数只有一份**：`lineOf` 唯一出口，`summaryText` 直接回它（RFA-1 那一格踩过 `return` 被注释吞掉）。
+
+**与 RFA-1 不同的一处判断**：被委托方缺席时**不逐话题编行** —— 没有投影就没有座，编一车「0 座」比不报更坑
+（第一版就这么干了，专锁 D1b 当场抓出）。故 `scan` 在缺 OP 时早早返回 `all:[]`，页面只渲染 `g.ok` 的行。
+
+**锁** `tests/projection-bridge-v2594.js`（71 判据五组）：A 静态（八导出 / 真委托 / 零写 / 不按冒号切 / 两张装载表各一条
+且排在 `observation-projection` 之后 / 工具页三件齐）；B 现场（自造账：2 话题 / 5 行有效 / 1 行 legacy / 5 座 / 三档 3-1-1 /
+`distinct=2` / `distorted` 只落在王五 / **公共段不泄私版** / view 与 scan 三档同源 / `summaryText === lineOf`）；
+C 渲染 6 条；D 四档 why（`module-missing`/`disabled`/`no-beliefs`/`truncated`）+ 零写实测 + 两向自证；
+E 页面纪律（id 唯一 / 0 写口 / 无交互件 / 自己写明不写信念账）。
+
+**本版顺带清偿的两笔潜伏红**（都不是本版引入，但都该记）：
+1 **`orphan-engine-adjudication-v2550` 已红 4 轮**：v2.590.0 `unifiedPending`、v2.592.0 `refine`、v2.593.0 `fieldWriters`
+  三次接线都只改产品与零读账本，没改裁决文档与锁。本版把四台（含 `observationProjection`）一并出列：
+  新增 G 段把「零读」换成更强的「**命中集恰等于登记读点集**」（多一处少一处都红），
+  并补 `docs/ORPHAN_ENGINES_ADJUDICATION.md` 的「五点五、改判记录」表 + 复算命令。
+  **教训一句话：接线三件套 = 产品读点 / 零读账本注销 / 裁决文档与锁跟位，缺一件就是潜伏红。**
+2 **两份基线早已过期**：`ns-consumer-ledger-v2400` 的 `BASE_DEAD_NS` 写着 55（实测 49，自 v2.569.0 起没跟）、
+  `reject-code-ledger` 的 `_note` 末次版本词停在 v2.587.0。均按实测补正，**不猜中间值**。
+
+**门禁读数**：version-consistency 22 · version-surface 14（25 条白名单）· module-registry **588 文件 / 599 ns / 482 边 /
+0 硬边 / 780 调用期** · dead-export **dead 2034**（2031 →−1 `project` 出表 →+4 `projectionBridge` 过度导出入冻）/ uiDead 6 /
+ dataOnly 808 · reject 1967 码（见证 974 / 死表 52 / 基线 941，**零新增**）· reject-lock 51 · module-cycle 零读 ns **49/49** ·
+ o8 38/0 · segment-extract 128（硬线 2258→2252 / section 466→467 / 测试面 692→693 / 重组面 18950→18969）·
+ z1-04 46（首帧 595→596、契约面 587→588）· z1-05 21（控件 1848→1849、逐页 1731→1732）· readings-v2106 61
+ （refs 13231 / ns 584 / members 6165 / dead 2034 / dataOnly 808 回填五族）· settle 55 · ns-consumer-ledger 72
+ （`BASE_DEAD_NS` 55→49）· orphan-adjudication 35 段 · export-contract 529 ns / 3168 成员 · dup-decl 0 ·
+ engines-ns 596/596 · ui-a11y 1776/1776（缺口 0）· cap-tier 92/0 · cap-ui 61/0 · ev1 88/0 · ev6 180/0 ·
+ v11-pages-cats 12/0 · o6 71/0 · o7 69 · plan-readings 16 · plan-ledger 36/36 · evidence 689 条 stale 0 ·
+ release-manifest 可发 · overview-fold 106 · p3-x1 54 · q1-load 64/0 · opv29-z5-27 23 · test-surface 全过。
+四把既有专锁复核：runopj 71 / runfw 27 / runrfa 46 / runarc 65 / runrecon 83。
+
+**一次 --update ≠ 登记完了**（本版实测教训）：先跑一次 `dead-export --update` 得 2030，补完 G 段与页面分支后
+再跑一次才把四个新导出收进冻结面（2030 → 2034）—— **判据的读点集本身会被同批改动改变**。
+
+**未做（如实登记）**：① BUILD_ID 仍沿用上版（形态判据通过，本版未做两段提交指向交付提交）；
+② 无人机值守未跑整趟全量回归（29 分钟超出单次 shell 窗口），按分面批次逐道验完为止；
+③ 日志无门禁这件事仍未修（本节就是补债，不是根治）。
