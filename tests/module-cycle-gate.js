@@ -226,6 +226,14 @@ const UI_NS = {
   //   分支，不影响「谁提供这个 ns」这件静态事实。
   panelPeoplePage: 'UI 玩家面人物页(ui/pages/people-page.js)',
   panelNowPage: 'UI 玩家面此刻页(ui/pages/now-page.js)',
+  // v2.588.0（R264 / MAP-5）补登：地图页命名空间。**这是 v2.588.0 落地时漏掉的第四处**
+  //   （v2.589.0 盘门禁时现场报「ns 面漂移 static-only：panelMapPage」才发现）。
+  //   漏在本表的后果与上面几条完全同型：提供方在 ui/pages/ 子目录、读者在 ui/panel.js，
+  //   静态看不见 ⇒ 被判「未登记的一对一差」，读数上长得像接线断了，实际是登记表少一行。
+  panelMapPage: 'UI 地图页(ui/pages/map-page.js)',
+  // v2.589.0（R264 / CFG-2）：设置面总账页命名空间（同型：提供方 ui/pages/faces-page.js，
+  //   读者 ui/panel.js 的 renderFacesDesk 与 bindBody 分派）。
+  panelFacesPage: 'UI 设置面总账页(ui/pages/faces-page.js)',
   // v2.539.7（账本工程）：第 17 个 UI 层命名空间。
   //   v2.535.0 新增 ui/schema-view.js（声明式视图层），读者在 ui/panel.js 的事件页
   //   （`WA.schemaView` 的运行期惰性读）。与前 6 条**完全同型**：提供方是 ui/ 下的文件，

@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.588.0';
+  const VERSION = '2.589.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -563,6 +563,8 @@
     //   生成结果表达成一批 addPoly/addRect/addRoad/addPoi，逐条走 mapEditor.apply()。
     //   零装载期依赖（只在调用期读 mapEditor / worldbook），故顺序上紧随其后即可。
     'engines/map-generator.js',
+    // v2.589.0（R264 / CFG-1）：设置面总账台（清单在调用期读 __settingsRegs，写回走 settingsBus）。
+    'engines/settings-desk.js',
     // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
     'engines/geo-tracker.js',
     // v2.328.0 (MAP-ADVANCED): 分形空间拓扑、通勤滞留仲裁、视听阻抗遮蔽与现场物理痕迹
@@ -1644,6 +1646,10 @@
     //   panel.js 的 renderMapDesk 在渲染期惰性读 WA.panelMapPage，先装会一直显示「页面缺席」降级行。
     //   零世界写、零落盘、零控件 id 冲突（wa-map-* 前缀独占）。
     'ui/pages/map-page.js',
+    // v2.589.0（R264 / CFG-2）：设置面总账页（391 个设置面的统一开关入口）。**排在 ui/panel.js 之后**：
+    //   panel.js 的 renderFacesDesk 在渲染期惰性读 WA.panelFacesPage，先装会一直显示「页面缺席」降级行。
+    //   零世界写、零落盘、零控件 id 冲突（wa-faces-* 前缀独占）；写回一律委托 engines/settings-desk。
+    'ui/pages/faces-page.js',
     // v2.535.0：声明式视图层（schema → DOM）。必须排在 ui/panel.js **之后**：panel.js
     //   的事件页在渲染期惰性读 WA.schemaView，先装会让首帧拿到 undefined（降级行一直显示）。
     //   零世界读、零落盘、零控件绑定（只出结构，绑定归消费方）。

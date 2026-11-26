@@ -10281,6 +10281,48 @@ function runWitness(WA) {
     }
   }
 
+  // ── v2.589.0（R264 / CFG-1）：设置面总账台的四条拒收码 ──
+  //   这四条都是**用户面会真撞上**的，不是为凑数造的：
+  //     · invalid-key      —— 面板上勾了一个已经不存在的面（旧书签 / 引擎被删）；
+  //     · no-enabled       —— 给纯参数面（阈值/比例/上限）硬塞一个开关；
+  //     · invalid-bool     —— 前端把字符串 "true" 递下来；
+  //     · write-unverified —— 写盘说成功、读回是旧值（配额满但 setItem 不抛 / 被第三方覆盖）。
+  //   第四条用**写桩**构造：把 saveOrThrow 临时换成「返回 ok 但不写盘」，复核必然读到旧值。
+  //   这不是编造现场 —— 「写成功 ≠ 存住了」正是这条码存在的唯一理由（v2.10.0 的读侧对偶）。
+  {
+    const SD = WA.settingsDesk;
+    if (SD && typeof SD.flip === 'function' && WA.settingsBus) {
+      want('invalid-key', '设置面台：勾一个不存在的面 ⇒ 明说键不在登记表（不静默当默认值处理）');
+      trip('invalid-key', function () { return SD.flip('worldaxis_nope_face_v1', true).reason; });
+      const regs = WA.__settingsRegs || [];
+      const pure = regs.filter(function (r) {
+        return r && r.key && r.def && !Object.prototype.hasOwnProperty.call(r.def, 'enabled');
+      })[0];
+      const sw = regs.filter(function (r) {
+        return r && r.key && r.def && Object.prototype.hasOwnProperty.call(r.def, 'enabled');
+      })[0];
+      if (pure) {
+        want('no-enabled', '设置面台：纯参数面没有 enabled，给开关等于凭空发明一个语义');
+        trip('no-enabled', function () { return SD.flip(pure.key, false).reason; });
+      }
+      if (sw) {
+        want('invalid-bool', '设置面台：on 传字符串 "true" 一律不收（不做隐式转换）');
+        trip('invalid-bool', function () { return SD.flip(sw.key, 'true').reason; });
+        want('write-unverified', '设置面台：写成功但读回不符 ⇒ 明说没存住（写成功 ≠ 存住了）');
+        trip('write-unverified', function () {
+          const sb = WA.settingsBus;
+          const bak = sb.saveOrThrow;
+          const cur = SD.face(sw.key);
+          try {
+            // 写桩：只回 { ok:true }，一个字节也不写 —— 模拟「说成功、没落盘」。
+            sb.saveOrThrow = function () { return { ok: true }; };
+            return SD.flip(sw.key, !cur.on).reason;
+          } finally { sb.saveOrThrow = bak; }
+        });
+      }
+    }
+  }
+
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
 

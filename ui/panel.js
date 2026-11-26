@@ -374,6 +374,14 @@
     { id: 'events', icon: '⚡', label: '事件', ask: "回答：正在发生什么、我还欠谁 —— 未收的线、未还的债。" },
     { id: 'director', icon: '🎬', label: '导演' },
     { id: 'settings', icon: '⚙️', label: '设置', ask: "回答：哪些开关会改变你看到的东西 —— 按标签找，别背名字。" },
+    // v2.589.0（R264 / CFG-2）：设置面总账页 —— 391 个设置面的统一开关入口。
+    //   为什么必须有这一页：`settingsBus.faces()` 现场 391 个面，而本文件里手写的
+    //   `getSettings` 读取点只有 117 处。差值那批面**值存在、引擎在读、默认值生效**，
+    //   而玩家没有任何入口能翻它 —— 界面上它与「这一页设计上就不给你改」完全同形。
+    //   本页的清单**不写在这里**（那是第二份真源）：一律由 `WA.__settingsRegs` 现场生成，
+    //   新引擎一登记就自动出现在台上，本文件一行都不用改。
+    //   页 id 一律纯小写（C11 按 id/icon 形态解析；此处不写完整正则，否则会被页数扫描算成一项）。
+    { id: 'faces', icon: '🎚', label: '设置面', ask: "回答：这个机制到底开没开、我能不能翻它、翻完存住了没有。" },
     { id: 'connect', icon: '🔌', label: 'API', ask: "回答：外面通不通、我的数据去哪了 —— 模型、存档、导出。" },
     // v2.294.0（V8 EXV8-2）：写口台 —— 悬空引擎的统一手动写入口。
     //   页 id 纯小写字母（tests/run.js 的 C11 用 /\{ id: '([a-z]+)', icon:/ 解析）。
@@ -414,6 +422,8 @@
     map: 'world',
     inject: 'workshop', supply: 'workshop', evidence: 'workshop', branchdiff: 'workshop', storyloop: 'workshop', retrieval: 'workshop', port: 'workshop', find: 'workshop', graph: 'workshop', net: 'workshop',
     settings: 'meta', health: 'core', connect: 'meta', assistant: 'meta', tools: 'meta', logs: 'meta',
+    // v2.589.0（R264 / CFG-2）：设置面总账页归「元信息」类（与设置页同类：都不改剧情，只改视图/机制）。
+    faces: 'meta',
     desk: 'meta',
     // v2.301.0（V11 EXV11-1/-3）：新页归属（EXV11-8 双向断言：PAGES ⊂ PAGE_CAT 闭合）
     boot: 'core', drive: 'meta'
@@ -3585,9 +3595,20 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
     }
     return WA.panelMapPage.render();
   }
+  /** v2.589.0（R264 / CFG-2）：设置面总账页的渲染转发。
+   *  页面体在 ui/pages/faces-page.js（与 map/tools/now 同一契约：页面模块只拼 HTML，
+   *  按钮行为由面板 bindBody 调它的 bind）。缺席时**报读数缺口**，不返回空表假装「没有设置面」。 */
+  function renderFacesDesk() {
+    if (!(WA.panelFacesPage && typeof WA.panelFacesPage.render === 'function')) {
+      return '<div class="wa-dim" id="wa-faces-page-absent">设置面总账页模块缺席（ui/pages/faces-page.js 未装载）—— 这不是「没有设置面」，是读数缺口</div>';
+    }
+    return WA.panelFacesPage.render();
+  }
   const RENDERERS = { actiondesk: renderActionDesk, overview: renderOverview, world: renderWorld, people: renderPeoplePlayerAware, memory: renderMemory, enemies: renderEnemies, parallel: renderParallelWorld, inject: renderInject, sediment: renderSediment, offline: renderOffline, net: renderNet, health: renderHealth, beat: renderBeatCenter, chapter: renderChapterWorkbench, todo: renderTodoCenter, port: renderPortCenter, find: renderFindCenter, graph: renderGraphCenter, travel: renderTravelDesk, supply: renderSupplyChain, evidence: renderEvidenceBoard, events: renderEvents, director: renderDirector, connect: renderConnect, tools: renderTools, branchdiff: renderBranchDiff, storyloop: renderStoryLoop, retrieval: renderRetrieval, logs: renderLogs, desk: renderWriteDesk, boot: renderBootDesk, drive: renderDriveDesk,
     // v2.588.0（R264 / MAP-5）：地图页。渲染体在 ui/pages/map-page.js，此处只转发（缺席即报缺口）。
     map: renderMapDesk,
+    // v2.589.0（R264 / CFG-2）：设置面总账页。同上：只转发，缺席即报缺口。
+    faces: renderFacesDesk,
     settings: () => WA.uiSettings ? WA.uiSettings.render() : '<div class="wa-empty">设置模块未加载</div>',
     assistant: renderAssistant };
 
@@ -4902,6 +4923,11 @@ ${emptyDrill}
       try {
         if (currentPage === 'map' && WA.panelMapPage && typeof WA.panelMapPage.bind === 'function') {
           WA.panelMapPage.bind(panelEl);
+        }
+        // v2.589.0（R264 / CFG-2）：设置面总账页的勾选框在这里绑。
+        //   页模块自己按 data-key 委托（不逐个手写 id —— 那是第二份清单），幂等由它保证。
+        if (currentPage === 'faces' && WA.panelFacesPage && typeof WA.panelFacesPage.bind === 'function') {
+          WA.panelFacesPage.bind(panelEl);
         }
       } catch (e) { /* 页面缺席或宿主查询失败：如实不绑，不假装可用 */ }
     } catch (e) { /* 页面缺席或宿主查询失败：如实不绑，不假装可用 */ }

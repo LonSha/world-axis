@@ -363,7 +363,10 @@ async function judge(a) {
   //   与历次新增引擎同型：不是放宽判据，四处必须同批跟位。
     // v2.588.0（R264 / MAP-5）：新增 engines/map-generator.js（mapGenerator 命名空间）—— 尾部调 registerModule
   //   ⇒ 装载期边 +1；调用期读 mapEditor / worldbook / settingsBus ⇒ 调用期引用 +2。477/770 → 478/772。
-a(led.totals.loadEdges === 478 && led.totals.callRefs === 772,
+  // v2.589.0（R264 / CFG-1）：新增 engines/settings-desk.js（settingsDesk 命名空间）—— 尾部调 registerModule
+  //   ⇒ 装载期边 +1；调用期读 settingsBus / __settingsRegs ⇒ 调用期引用 +2。478/772 → 479/774。
+  //   命名空间 594 → 595、装载文件 583 → 584（同批四处跟位，判据仍是精确值）。
+a(led.totals.loadEdges === 479 && led.totals.callRefs === 774,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 装载期边 +1(尾部调 registerModule)、调用期引用 +2(读 store 的 registerModule 与 settingsBus)、命名空间 +1、装载文件 +1 —— 本处四个数字由 U3 散装读数核对器(node tools/loose-readings.js)一次报出,不必等全量回归;\\n    v2830/mr: 装载期边 108 / 调用期引用 212（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（引用多 ≠ 必须先装载；v2.187.0（第三批 E4/E6/E8）：新增 engines/campaign.js / engines/atlas.js / engines/dep-check.js ⇒ 装载期边 +3（尾部各调 registerModule）、调用期 +4；v2.135.0（E6）：新增 engines/foreshadow.js ⇒ 装载期边 +1（尾部调 registerModule）、调用期 +2（读 store/clock）；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）：十二个新引擎尾部各调 registerModule ⇒ 装载期边 +12；其调用期读 store/clock/evict/settingsBus/apiRouter ⇒ 调用期 +24；v2.129.0（缝 A1–A10）：十个新引擎尾部各调 registerModule ⇒ 装载期边 +10；其调用期读 store/clock/evict/settingsBus/inputGuard/apiRouter/worldbook ⇒ 调用期 +20；'
     + 'v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js / '
     + 'engines/recipe.js 三模块（act / opportunity 尾读 WA.registerModule ⇒ 装载期边 +1；'
@@ -424,7 +427,7 @@ a(led.totals.loadEdges === 478 && led.totals.callRefs === 772,
   //   所以「命名 592 / 装载 581」仍然同增同减（比例不失真），不是放宽判据。
   // v2.587.0（R263）：同一件引擎提供一个命名空间与一个装载文件 ⇒ 592/581 → 593/582。
     // v2.588.0（R264 / MAP-5）：同一件引擎提供一个命名空间与一个装载文件 ⇒ 593/582 → 594/583。
-a(led.nsCount === 594 && led.loadedCount === 583,
+a(led.nsCount === 595 && led.loadedCount === 584,
     'v2.224.0(拓展 N8):新增 engines/branch-diff.js(branchDiff 命名空间)⇒ 两边各 +1(装载期边与调用期引用另计,见上一条);本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出,不必等全量回归;\n    v2830/mr: 命名空间 213 / 装载文件 205（v2.193.0（第二批 · U1）：新增 engines/beat-facade.js（beatFacade 命名空间）⇒ 装载期边 +1（尾部调 registerModule）、调用期引用 +2（读四个拍引擎家族成员与 rejectRecovery，并在 engines/tool-diag.js 的诊断表被登记）、命名空间 +1、装载文件 +1；本组四处读数由 tests/u3-loose-readings-v2191.js 在分钟级报出，不必等全量回归）（v2.189.0 实测回填：四个新引擎 beat-report / plan-audit / beat-ledger / gen-gate）（v2.187.0（第三批 E4/E6/E8）：campaign / atlas / depCheck 三命名空间 ⇒ 两边各 +1，叠加 ui/* 三件后装载文件面 194 → 197；v2.135.0（E6）新增 engines/foreshadow.js ⇒ 两边各 +1；v2.130.0（缝 A1–A4 / B1 / C1 / C2 / D1–D4）十二个新引擎 ⇒ 两边各 +12；v2.129.0（缝 A1–A10）十个新引擎 ⇒ 两边各 +10；与 LOAD_ORDER 的 149 差 3 个 ui/*——'
     + 'LOAD_ORDER 含 ui/* 三项而装载文件面排除 ui：127 - 3 = 124；'
     + 'v2.117.0（计划二 B1–B6）新增 engines/act.js / engines/opportunity.js / '

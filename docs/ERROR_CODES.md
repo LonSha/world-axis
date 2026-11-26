@@ -1,15 +1,15 @@
 # WorldAxis 拒收码手册（自动生成：`node tools/gen-error-codes.js`）
 
-> 台账 version：`2.588.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
+> 台账 version：`2.589.0`。**不要手改本文件** —— 生成源是 `reject-v2780.js`（见证/死表）、
 > `reject-code-ledger.json`（基线）与产品源码扫描面，手改的内容下一次生成即被覆盖。
 
-共 **1963** 个内联拒收码：见证 970 / 死表 52 / 基线 941
+共 **1967** 个内联拒收码：见证 974 / 死表 52 / 基线 941
 
 三档的含义：**见证**=用产品真 API 把它跑出来过（行为改动会让见证失败，红灯）；
 **死表**=已证结构不可达，且钉住「为何不可达」的锚点（锚点消失即红灯）；
 **基线**=存量未分类（新增未分类码即红灯）。
 
-## 见证（可执行）（970）
+## 见证（可执行）（974）
 
 | 码 | 出现之处 | 说明 |
 | --- | --- | --- |
@@ -367,8 +367,10 @@
 | `intel-threw` | engines/evidence-board.js, engines/probe.js | probe.confront：情报面抛错不吞掉 ⇒ 记为 intel-threw（拓展⑤） |
 | `interior-blocked` | engines/perspective-lock.js | perspective.allows：内心腔只属于视角人物本人 —— 不在视角里的人写内心 / 客观镜头写内心 / 用推断档冒充心声，三者各自拒收并带 via |
 | `interlude-missing` | engines/interlude.js | V28 EXV28-31：往一段不存在的插曲里写 ⇒ interlude-missing |
+| `invalid-bool` | engines/settings-desk.js | 设置面台：on 传字符串 "true" 一律不收（不做隐式转换） |
 | `invalid-definition` | engines/periodicals.js | 期刊：刊物标识或排期形状不合法时拒绝配置 |
 | `invalid-input` | core/schema.js | schema.validate：字段缺失或类型不符 ⇒ invalid-input + errors 数组（v2.110.0 plan-1 #22） |
+| `invalid-key` | engines/settings-desk.js | 设置面台：勾一个不存在的面 ⇒ 明说键不在登记表（不静默当默认值处理） |
 | `invalid-plan` | engines/campaign.js | campaign.planSave：计划机械校验不过（谓词不在既有四类 / 缺参数 / 奖励越界）⇒ 整批拒收 |
 | `invalid-shares` | engines/family.js | 继承：比例表里写了非继承人的名字（写错名字不许静默少分） |
 | `investigation-threw` | engines/evidence-board.js | N4：调查动作时线索面抛错 ⇒ 顶层的 investigation-threw（不折成编排层自造码，现场据此去查线索面） |
@@ -531,6 +533,7 @@
 | `no-draft` | engines/farfield.js, engines/offline-tick.js, engines/region.js, engines/world-bridge.js | region.tickOffline：没拿到事务草稿 ⇒ 拒收（不把「我拿不到草稿」说成「你走了零秒」）（X3） |
 | `no-economy` | engines/recipe.js | OPT-8：配方未声明经济面 ⇒ 如实报 no-economy（不回落成银元 —— 回落会让「声明了元」与「没声明」长得一样） |
 | `no-elapsed` | engines/credit-ledger.js, engines/farfield.js, engines/offline-tick.js | offlineTick.tick：离线间隔为零时不伪装为一次结算（v2.151.0 RX2） |
+| `no-enabled` | engines/settings-desk.js | 设置面台：纯参数面没有 enabled，给开关等于凭空发明一个语义 |
 | `no-entry` | core/unified-pending.js, engines/chrono.js | chrono.undo：记录 id 不在图里 ⇒ no-entry（读面同样要如实归因，不返回空计划，v2.112.0） |
 | `no-established-state` | engines/branch-continuity.js | 分支恢复：无既有状态时拒绝猜测 |
 | `no-evidence` | engines/act-step.js, engines/consequence-schedule.js, engines/elapsed-evidence.js, engines/misbelief.js | 时间证据：模型声称时长却没有给出证据原文 ⇒ 拒收（不是补默认值） |
@@ -801,7 +804,7 @@
 | `self-cause` | engines/intel.js | addLink cause === effect |
 | `self-origin` | engines/world-bridge.js | worldBridge.importLegends：本世界自己的包回灌 ⇒ 硬拒收（「拒收」退化成「导入 0 条」，就与「别处刚好传了空的」长得一样） |
 | `self-parent` | engines/world.js | 地点不得以自己为父级（v2.85.0 B2） |
-| `settings-bus-absent` | engines/arc-phase.js, engines/branch-continuity.js, engines/character-drive.js, engines/director.js, engines/fact-continuity.js, engines/inject-tier.js, engines/reading-bookmark.js, engines/rule-pack.js, engines/scene-intent.js, engines/summarizer-adapter.js | E7：切换包时发现写入口缺席 ⇒ 不逐键半写，先整体拒收 |
+| `settings-bus-absent` | engines/arc-phase.js, engines/branch-continuity.js, engines/character-drive.js, engines/director.js, engines/fact-continuity.js, engines/inject-tier.js, engines/reading-bookmark.js, engines/rule-pack.js, engines/scene-intent.js, engines/settings-desk.js, engines/summarizer-adapter.js | E7：切换包时发现写入口缺席 ⇒ 不逐键半写，先整体拒收 |
 | `settle-failed` | core/commit.js, engines/agency.js | commit.settle：事务外补记回执时写盘失败 ⇒ 拒收 settle-failed（如实报「补账没成功」，不粉饰成 ok） |
 | `settle-not-here` | engines/liaison.js | liaison.advance：终档不许从推进面走 ⇒ 结算只有一个出口（拓展⑧） |
 | `settled` | engines/consequence-schedule.js | V28 EXV28-21：到点且条件满足、带证据才结算 ⇒ settled |
@@ -979,8 +982,9 @@
 | `window-too-short` | engines/plan.js, engines/world.js | world.canBeAt：窗口容不下这件事 ⇒ 报短多少，不硬塞（B2） |
 | `world-missing` | engines/act.js, engines/action-desk-routes.js, engines/intel.js, engines/weather.js | travelOf 在 world 未装载时 |
 | `worn-out` | engines/gear.js | EXP-2：这一件已耗尽 ⇒ 如实报 worn-out（不静默当一次成功使用）—— 与「没持有」分列：一个要修、一个要拿回来 |
-| `write-failed` | core/settings-bus.js, engines/appointment.js, engines/arc-phase.js, engines/checkpoints.js, engines/consequence-schedule.js, engines/floor-settle.js, engines/gen-gate.js, engines/interlude.js, engines/letter-post.js, engines/life.js, engines/playtime.js, engines/preset-world.js, engines/relation-graph.js, engines/rule-pack.js, engines/thread-sprout.js, engines/wb-inject.js, engines/world-snapshot.js, engines/worldbook.js | life.tick：游标落盘时 setItem 抛错 ⇒ 吞成 write-failed 并如实进返回值（不假装落盘成功，也不让异常穿出去把调用方搞挂；v2.132.0 O19） |
-| `write-threw` | engines/populate.js | EXV7-9：写口抛错由 safe() 吞住并逐笔记 write-threw（整批不中断，也不吞成「播种成功」） |
+| `write-failed` | core/settings-bus.js, engines/appointment.js, engines/arc-phase.js, engines/checkpoints.js, engines/consequence-schedule.js, engines/floor-settle.js, engines/gen-gate.js, engines/interlude.js, engines/letter-post.js, engines/life.js, engines/playtime.js, engines/preset-world.js, engines/relation-graph.js, engines/rule-pack.js, engines/settings-desk.js, engines/thread-sprout.js, engines/wb-inject.js, engines/world-snapshot.js, engines/worldbook.js | life.tick：游标落盘时 setItem 抛错 ⇒ 吞成 write-failed 并如实进返回值（不假装落盘成功，也不让异常穿出去把调用方搞挂；v2.132.0 O19） |
+| `write-threw` | engines/populate.js, engines/settings-desk.js | EXV7-9：写口抛错由 safe() 吞住并逐笔记 write-threw（整批不中断，也不吞成「播种成功」） |
+| `write-unverified` | engines/settings-desk.js | 设置面台：写成功但读回不符 ⇒ 明说没存住（写成功 ≠ 存住了） |
 | `writes-absent` | engines/populate.js | EXV7-9：写口缺席（摘掉 world.addRoad）⇒ writes-absent 且 missing 点名 addRoad（拒绝在半套写面上播种） |
 | `wrongs-full` | engines/probe.js | probe.wrong：误指留痕达上限 ⇒ 不静默丢弃（查错人也要留下痕迹）（拓展⑤） |
 
