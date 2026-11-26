@@ -21603,6 +21603,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./family-shares-v2588.js');
   }
+  // ── v2.588.0 (L2-apply): 注入分档落地面专锁（默认零变化 / 只裁 off / 不改入参 / 可逆可核）──
+  section('v2.588.0 (L2-apply): 注入分档落地专锁（默认零变化 · 只裁 off · 可逆）');
+  {
+    await runLock('./inject-tier-apply-v2588.js');
+  }
   // ── v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁 ──
   section('v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁');
   {

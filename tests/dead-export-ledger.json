@@ -6914,14 +6914,6 @@
       "tref": 14,
       "own": 1
     },
-    "injectTier.stat": {
-      "reason": "test-only",
-      "detail": "仅测试引用（tests/run.js），产品代码零引用",
-      "src": "engines/inject-tier.js",
-      "refs": 0,
-      "tref": 2,
-      "own": 1
-    },
     "inlineTags.normalizeDate": {
       "reason": "self-only",
       "detail": "engines/inline-tags.js 内部自用、外部零引用（过度导出）",

@@ -2063,6 +2063,20 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
           }
         }
       } catch (e) { WA.log('warn', '预算裁决失败，回退全量注入', e); planInfo = null; finalItems = items; }
+      // v2.588.0（L2-apply）：注入分档的**落地面**。默认 enabled:false 且 mode:shadow，
+      //   两种默认下 tierUp 都**原样返回同一个数组**（零行为变化，连拷贝都不做）；
+      //   只有显式开 enabled:true + mode:apply 才裁 off 档（连续 offRounds 轮未变 + 与本幕零交集），
+      //   focus（本幕相关 / pinned 底座）与 backdrop 一律保留 —— 折叠 backdrop 要改写正文，不在本口。
+      try {
+        if (WA.injectTier && typeof WA.injectTier.tierUp === 'function') {
+          const __tiered = WA.injectTier.tierUp(finalItems);
+          if (Array.isArray(__tiered) && __tiered !== finalItems) {
+            WA.log('info', '注入分档落地：裁 ' + (finalItems.length - __tiered.length) + ' 源（'
+              + (WA.injectTier.stat().lastDropped || []).map(function (x) { return x.source; }).join('/') + '）');
+            finalItems = __tiered;
+          }
+        }
+      } catch (e) { WA.log('warn', '注入分档落地失败，回退全量注入', e); }
       // v2.542.3：分档读数挂在裁决结果上（与 planInfo.delta 同形，纯附加字段），供诊断节与测试读。
       if (planInfo && tierShadow) planInfo.tier = tierShadow;
       // v2.524.0 OPV27-9：信息增量账——只读注面，逐源「唯一片段 / 总片段 / 与谁重复」。
