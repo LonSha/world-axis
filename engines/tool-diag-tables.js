@@ -674,6 +674,9 @@
     //   tool-diag 诊断面的唯一来源，漏登记 = secModules 假缺席 + export-contract 的 OWNER 不认。
     'engines/projection-bridge.js': 'projectionBridge',
     'engines/scene-budget.js': 'sceneBudget',
+    // v2.596.0（FAG-1）：事实老化的落地面。登记在此 = 该文件缺席时 secModules 如实报 missing，
+    //   而不是被 OPTIONAL_EXPORTS 静默兜住（漏登记的后果见上面 OPJ-1 那条）。
+    'engines/fact-age-bridge.js': 'factAgeBridge',
     // v2.257.0（V6 OPV6-1 / OPV6-2）：能力档位 + 启用面可见。
     //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它们的真消费方是
     //   设置页 / 概览页 / 诊断节（本表），缺席就是断裂，不该被 OPTIONAL_EXPORTS 静默兜住。

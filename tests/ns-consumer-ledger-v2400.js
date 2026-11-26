@@ -68,7 +68,11 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 //   R267 refine / R268 fieldWriters / R269 observationProjection）按纪律④逐条出表，但只有本轮记得同步本常量；
 //   故 55 这个值早已过期 —— 本轮不猜中间值，只把实测 49 写上并把口径写清：「零读 ns 真少四台（+ 一台历史差额），不是判据放宽」。
 //   复算：node tests/module-cycle-gate.js 的「零读 ns 49/49」与本账本 entries 长度同源。
-const BASE_DEAD_NS = 49;  // v2.594.0：实测 49（基线原写 55，自 v2.569.0 起未跟位） —— greenKeys 出表（engines/worldbook.js 的 constGate 用 deriveGreenKeys 给常驻条目派生短键，成为“本轮聊到没聊到”的事前判据；零读 ns 真少一条，不是判据放宽）
+// v2.596.0（R271 FAG-1）：49 → 48。factAge 按纪律④出表 —— 它的新消费方是 engines/fact-age-bridge.js，
+//   而那道桥有真产品读面（工具页「事实老化面」段）。**这不等于原来的缺口被治好**：
+//   桥今天报的正是「no-last-turn，本读数不可用」—— 出表的是「零读」，不是「无数据」。
+//   复算：grep -rn 'WA.factAge' engines/fact-age-bridge.js
+const BASE_DEAD_NS = 48;  // v2.594.0：实测 49（基线原写 55，自 v2.569.0 起未跟位） —— greenKeys 出表（engines/worldbook.js 的 constGate 用 deriveGreenKeys 给常驻条目派生短键，成为“本轮聊到没聊到”的事前判据；零读 ns 真少一条，不是判据放宽）
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。

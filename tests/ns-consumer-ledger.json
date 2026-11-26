@@ -15,7 +15,7 @@
     "④ 本账本的键集与门禁 deadNs 读数双向一致：门禁多一个 → 未定性；账本多一个 → 过期登记。",
     "⑤ pending-wire 是**有时限**的定性：只用于「缝合件已入库、接线是下一步」的中间态。若某条 pending-wire 超过一个版本周期仍无人读，必须改判 stale（进 dead-export-ledger）或补消费点，不许靠改 evidence 文字续命。"
   ],
-  "version": "2.595.0",
+  "version": "2.596.0",
   "entries": {
     "LEAK_THRESHOLD": {
       "cls": "gate-selfwitness",
@@ -118,12 +118,6 @@
       "provider": "engines/ensemble.js",
       "evidence": "多通道合成引擎导出全部在 dead-export-ledger 冻结。注：engines/perspective-lock.js 里有同名字符串，但不是 WA.ensemble 读点。",
       "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('ensemble.')).length)\""
-    },
-    "factAge": {
-      "cls": "readonly-api",
-      "provider": "engines/fact-age.js",
-      "evidence": "世界事实的老化分层（plan(facts, nowTurn) 产 rows）。**上游字段语义不匹配**：它需要「最近引用轮次 lastTurn」才能算 age，而 core/store.js 的 upsertFact 只写 at（写入时点），全仓产品面无 lastTurn。用 at 顶替 lastTurn 会把「写于第3轮」算成「第3轮引用过」——那是伪造读数。消费者是 tests（opv29-z6-factage-jsonrepair）。改判触发器：upsertFact 开始写 lastTurn（且事实被注入侧回读时打点）后改判 wired。",
-      "recompute": "grep -n \"WA.factAge\" engines/fact-age.js | head -3; grep -rln \"WA.factAge\" engines core ui render tests | head"
     },
     "faultContext": {
       "cls": "readonly-api",

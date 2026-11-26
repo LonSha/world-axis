@@ -144,7 +144,7 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   // A0b / A0e：惰性档非空 ——防「删空档换下降」
   a(!!lazy && lazy.length >= 10, 'B2 惰性档**非空**且成规模（≥10 条；删空换下降会在这里红）', lazy && lazy.length);
   // v2.542.23 跟位：21 → 20（story-export 同病：产品面真读，不能再懒）。
-  a(!!lazy && lazy.length === 18, 'B3 惰性档 18 条（v2.569.0 跟位：19 → 18 = 惰性档一台归位首帧）（v2.542.24：20 → 19 = api-vault 归位）（v2.542.21 跟位：22 → 21；v2.542.23：21 → 20 —— 惰性档只放「产品源面零出现」的模块）', lazy && lazy.length);
+  a(!!lazy && lazy.length === 19, 'B3 惰性档 19 条（v2.596.0 跟位：18 → 19 = engines/fact-age-bridge.js 与 fact-age 同档装载——它离开被委托方只剩一句“未装载”，提首帧只会让面板首帧读到 module-missing）（v2.569.0 跟位：19 → 18 = 惰性档一台归位首帧）（v2.542.24：20 → 19 = api-vault 归位）（v2.542.21 跟位：22 → 21；v2.542.23：21 → 20 —— 惰性档只放「产品源面零出现」的模块）', lazy && lazy.length);
   const inter = (eager || []).filter(function (x) { return (lazy || []).indexOf(x) >= 0; });
   a(inter.length === 0, 'B4 首帧清单与惰性档**零交集**（不双登记：否则「下降」是假的）', inter);
   a((lazy || []).every(function (x) { return x.indexOf('ui/') !== 0; }), 'B5 惰性档不含 ui/*（UI 层本来就不在装载序）');
@@ -155,7 +155,7 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   const led = JSON.parse(RD('tests/module-registry-ledger.json'));
   const notInLedger = (lazy || []).filter(function (x) { return !led.modules[x]; });
   a(notInLedger.length === 0, 'B8 惰性档每条仍在 registry 账本里（门禁眼里没有「消失的模块」）', notInLedger);
-  a(led.lazyCount === 18, 'B9 账本记录 lazyCount=18（v2.569.0 跟位）（registry 报告的惰性面读数；v2.542.23 跟位）', led.lazyCount);
+  a(led.lazyCount === 19, 'B9 账本记录 lazyCount=19（v2.596.0 跟位：18 → 19 = fact-age-bridge 入惰性档）（v2.569.0 跟位）（registry 报告的惰性面读数；v2.542.23 跟位）', led.lazyCount);
   // v2.542.8：原判据「loadedCount === loadOrderCount」是 v2.529 之前的巧合 —— 那时
   //   LOAD 只等于 LOAD_ORDER、且首帧表里没有 ui/*，两数自然相等。v2.529.0（OPV29-04）把
   //   契约面改成 `LOAD_ORDER ∪ LAZY_ORDER` 并剔掉 ui/* 之后，这两个数**各有定义**：
@@ -175,9 +175,10 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   //   v2.591.0（R266 / NAR-1）：新增 engines/arc-guide-bridge.js（纯引擎、无新 ui 文件）⇒
   //     loaded 585 → 586、loadOrder 593 → 594（两表各 +1）；恒等式 586 = 594 − 26 + 18 成立。
   // v2.592.0（RFA-1）：首帧 594 → 595、契约面 586 → 587（engines/refine-bridge.js）。
+  // v2.596.0（FAG-1）：契约面 588 → 589、惰性 18 → 19（engines/fact-age-bridge.js）—— 首帧不动，  //   因为它的被委托方 fact-age 本身在惰性档。
   // v2.594.0（OPJ-1）：首帧 595 → 596、契约面 587 → 588（engines/projection-bridge.js）。
-  a(led.loadedCount === 588 && led.loadOrderCount === 596 && led.lazyCount === 18 && led.uiCount === 26,
-    'B10 契约面 588 = 首帧 596 − ui 26 + 惰性 18（v2.594.0：projection-bridge 入首帧与契约面各 +1）（契约面 = 首帧非 ui ∪ 惰性；实测 '
+  a(led.loadedCount === 589 && led.loadOrderCount === 596 && led.lazyCount === 19 && led.uiCount === 26,
+    'B10 契约面 589 = 首帧 596 − ui 26 + 惰性 19（v2.596.0：fact-age-bridge 入惰性档 ⇒ 契约面 +1）（v2.594.0：projection-bridge 入首帧与契约面各 +1）（契约面 = 首帧非 ui ∪ 惰性；实测 '
       + [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount].join(' / ') + '）',
     [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount]);
   // 首帧装载边 vs 全量装载边（验收原话的读数）

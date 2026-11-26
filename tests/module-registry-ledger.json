@@ -1,14 +1,14 @@
 {
- "version": "2.595.0",
+ "version": "2.596.0",
  "loadOrderCount": 596,
- "lazyCount": 18,
- "loadedCount": 588,
+ "lazyCount": 19,
+ "loadedCount": 589,
  "uiCount": 26,
- "nsCount": 599,
+ "nsCount": 600,
  "totals": {
-  "loadEdges": 482,
+  "loadEdges": 483,
   "hardEdges": 0,
-  "callRefs": 780,
+  "callRefs": 782,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -146,6 +146,7 @@
     "engines/events.js",
     "engines/evidence-board.js",
     "engines/evolution.js",
+    "engines/fact-age-bridge.js",
     "engines/fact-age.js",
     "engines/fact-continuity.js",
     "engines/faction-chronicle.js",
@@ -742,6 +743,7 @@
     "engines/epidemic-contagion.js",
     "engines/epochal-transition.js",
     "engines/evidence-board.js",
+    "engines/fact-age-bridge.js",
     "engines/fact-age.js",
     "engines/fact-continuity.js",
     "engines/faction-chronicle.js",
@@ -11468,6 +11470,25 @@
   "engines/fact-age.js": {
    "ns": [
     "factAge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/fact-age-bridge.js": {
+   "ns": [
+    "factAgeBridge"
    ],
    "requires": [
     "registerModule"

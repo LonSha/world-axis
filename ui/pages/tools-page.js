@@ -71,7 +71,10 @@
     const capSummaryOn = lazy(function () { const c = capAuditCfgL(); return !!(c && c.showSummary === true); });
     // v2.592.0（RFA-1）：档案精编读数 —— 跟着 foldSec 的惰性走（收起态不读）。
     //   「引擎未装载 / 读数抛错 / 三源都空 / 有东西可编」四种状态在这一行里必须分得开。
-    const rfaLine = function () {
+    // v2.596.0（FAG-1）：惰性档引擎的装载失败要**记一笔**（同 ui/settings.js 的 __engEnsureFail）。
+  //   不记的话，每次重绘都会再 ensure 一次、每次都回“装载中”，把“装不上”写成“正在装”。
+  let __fagEnsureFail = 0;
+  const rfaLine = function () {
       const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
       if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
       try { return B.summaryText() || '档案精编：读数不可用'; }
@@ -480,6 +483,41 @@
         return '<div class="wa-dim" id="wa-opj-line">' + esc(opj.summaryText(r)) + '</div>' + body
           + '<div class="wa-dim">本面只读：不写信念账、不改任何人的说法与确信度，也不判「该不该让他知道」（那是反全知与隐瞒面的事）。'
           + '说法按<b>正文全等</b>分组，不按版本标签 —— 两个人可能都写 v1 却是完全不同的说法。</div>';
+      })()}
+      `)}
+      ${foldSec('tools', 'factage', '事实老化面</div><div class="wa-dim">（FAG-1：哪些事实已经陈了 / 这个读数今天根本测不出 —— 只读，不删一条事实）', () => `
+      ${(function () {
+        // 两个被委托方（fact-age / 本桥）都在**惰性档**：首帧未装载是常态。
+        //   所以这里走 ensure + 失败记忆（同 ui/settings.js 的写法），而不是把“还没装”写成“没有陈事实”。
+        const rel = 'engines/fact-age-bridge.js';
+        const fag = WA.factAgeBridge;
+        if (!fag || typeof fag.audit !== 'function') {
+          if (__fagEnsureFail) return '<div class="wa-dim">事实老化面装载失败（' + rel + '）—— 这不是“没有陈事实”，是这台引擎装不上</div>';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              if (p && typeof p.catch === 'function') p.catch(function () { __fagEnsureFail = 1; });
+              return '<div class="wa-dim">事实老化面在惰性档，装载中（成功后下次渲染自愈）</div>';
+            }
+          } catch (e) { /* 落到下面统一记失败 */ }
+          __fagEnsureFail = 1;
+          return '<div class="wa-dim">事实老化面装载失败（' + rel + '）</div>';
+        }
+        let a = null;
+        try { a = fag.audit({}); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const rows = ((a && a.sources) || []).map(function (s2) {
+          let dg = null;
+          try { dg = fag.view(s2.name); } catch (e) { dg = null; }
+          return '<div class="wa-item"><b>' + esc(s2.name) + '</b> · ' + s2.keep + ' 条事实'
+            + (s2.inactive ? ' · <span class="wa-dim">旧版本 ' + s2.inactive + ' 行不入档</span>' : '')
+            + '<div class="wa-dim">' + esc(s2.path) + ' · 身份列 ' + esc(s2.idField)
+            + ' · 带 lastTurn ' + s2.lastTurn + ' 行 · 带 at ' + s2.at + ' 行</div>'
+            + '<div class="wa-dim">' + esc(dg && dg.line) + '</div></div>';
+        }).join('');
+        return '<div class="wa-dim" id="wa-fag-line">' + esc(fag.summaryText(a)) + '</div>' + rows
+          + '<div class="wa-dim">本面只读：不删事实、不改 <code>active</code>、不改 <code>at</code>，也不给任何一行补 <code>lastTurn</code>。'
+          + '「写入时刻」与「上次被引用时刻」不是一回事：前者答“多久没更新过”，后者才答“多久没被引用过”——'
+          + '所以后者没有数据时本面直说不可用，不拿前者冒充分档。</div>';
       })()}
       `)}
       ${foldSec('tools', 'refine', '档案精编预览</div><div class="wa-dim">（RFA-1：三处只增不减的台账能省几条 —— 只预览，不删一条）', () => `

@@ -86,6 +86,9 @@
     { page: 'tools', id: 'refine', label: '档案精编预览（RFA-1）' },
     { page: 'tools', id: 'writers', label: '字段写权与覆盖冲突（FWR-1）' },
     { page: 'tools', id: 'projection', label: '观察投影与说法分歧（OPJ-1）' },
+    // v2.596.0（FAG-1）：事实老化面是第 19 个折叠段。**同批登记** —— 上一轮才因为三段落了这张表
+    //   把 A10c/B1d/C5/C6/E2c 一起拖红（本仓第四次栽那一格），这次面板侧与表一次写齐。
+    { page: 'tools', id: 'factage', label: '事实老化面（FAG-1）' },
   ];
   const __REG = {
     key: LS_KEY,

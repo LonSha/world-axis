@@ -7970,3 +7970,74 @@ runopj 71 · runfw 27 · runrfa 46 · 本锁（A/B/C/D 四组）。
 
 **未做（如实登记）**：① 整趟全量回归仍未一口气跑完（29 分钟超出单外壳窗口），按分面批次逐道验；
 ② BUILD_ID 仍指向上版；③ 老节 `### R` 那代的乱序与缺口没有动 —— 本锁只把“从现在起不许再断”写成了判据。
+
+## R271（v2.596.0 · FAG-1：事实老化面落地 —— 只量、不冒充）
+
+**它治什么**：`engines/fact-age.js`（R 前代，105 行）要的是 `{id,lastTurn,weight,text}` —— 四档
+`fresh/aging/stale/dead` + `unknown` 不判死、阈值严格递增、闭区间下界。可它要的**核心输入全库无人生产**：
+两个真源都只有 `at`（写入时刻），没有 `lastTurn`（上次被引用时刻）。
+这正是 v2.568.0 裁决过的 C8「`lastTurn` 全库无人写」：`backstage.js:771` 写 `worldFacts` 为
+`{id,key,value,scope,source,at,branchId}`；`memory.js:210` 的 `upsertFact` 写
+`{key,value,version,active,reason,at}` —— **连 id 都没有**。
+于是这台引擎进「七台零读引擎」名单不是因为它不好，而是因为没有消费方愿意拿写入时刻冒充引用时刻。
+本轮的立场：**冒充比零读更坏**。所以这一版搭的是「能量到哪就报到哪」的面，不是「让它看起来能用」。
+
+**新模块 `engines/fact-age-bridge.js`（381 行）只做三件事**：
+- `sources()` / `audit()` —— 生产面体检：逐源报 `count / bad / keep / inactive / hasLastTurn / hasAt / fields`，
+  四结论 `module-missing` / `no-store` / `no-facts` / `no-last-turn` / `ok`。
+- `plan()` —— **真委托** `factAge.plan`（`FA.plan(` 唯一调用点），`aged === 0` 就早返回 `no-last-turn`
+  且 `counts` 全 0：**不给行**。没装引擎就直说 `module-missing`，不自己算一份假的。
+- `degraded()` —— 显式降级把 `at` 当基准，是**另一个问题**（多久没更新过 ≠ 多久没被引用过），
+  每行带 `degraded:'at-as-age'`，读数里逐字写明两者不是一回事。
+
+**六条边界（写进源注释，当不可回退口径）**：
+1. **零写**：全模块只读 `store.get()`，不 `setItem` / 不 `transact` / 不 `.patch(` / 不 `store.save(`。
+2. **不猜时间**：`lastTurn` 缺失就是缺失。没有任何「用 at 顶上」的静默分支 —— 想要 `at` 只有一个入口 `degraded()`。
+3. **不解析不拼装**：id 取哪列按源表声明（`worldFacts` 取 `id`、`memory.facts` 取 `key`）。
+   统一成 id 就只能在 `memory.facts` 上编一个字段 —— 那是伪造，不是适配。
+4. **旧版本 `active:false` 不入档**：同一条事实多版本各算一次会把分档顶歪（与 OPJ-1「三档分开数」同源纪律）。
+5. **测不到就说测不到**：`WA.clock` 读不到就提前回 `why:'no-now'`，不是当成第 0 轮算成 ok。
+6. **一行读数只有一份**：`lineOf` 是唯一出口，`summaryText` 只是兜底包一层。
+
+**面板侧**：`ui/pages/tools-page.js` 加 `factage` 段（模板体 + 段内 IIFE，34 行）：三档装载
+（装载失败 / 装载中 / 走装载器）、逐源一行、`#wa-fag-line` 放读数、末尾两条只读声明。
+`ui/panel-fold.js` 的 `SECTIONS` **同批**登记 —— 上一轮才因为三段落了这张表把 A10c/B1d/C5/C6/E2c 一起拖红
+（本仓第四次栽那一格），这次面板侧与表一次写齐，q8 当场 80/0。
+
+**新锁 `tests/fact-age-bridge-v2596.js`（250 行 / 65 判据四组）**：
+- **A 布局**：版本面 / 恰好十二导出 / 真委托 `FA.plan(` / 剥注释后零写口 / `lastTurn` 只透传不赋值
+  （正则只咬 `某行.lastTurn =`，不咬本地计数器 `let lastTurn = 0` —— 第一版就是被这个咬红 1 条）
+  / `degraded` 是唯一设 `ageField='at'` 的地方 / 源表封闭且两源身份列不同 / 装载三处接线 / 面板段与折叠表。
+- **B 行为**：两源各 3 行、身份列按源声明、旧版本不入档（worldFacts 3 / memoryFacts 2 · 旧版本 1）、
+  两源都无 `lastTurn` ⇒ `no-last-turn` + 5 条事实 / 0 行 lastTurn / 5 行 at / usable 0 / blocked 2、
+  plan 不可用不给行、degraded 分档 0/2/1/1/1 且五档和 == 总行数、无时间戳落 `unknown`、
+  源表外名拒收、**造一行带 lastTurn ⇒ 体检转 ok 且 plan 真打档**（两向自证，避免假判据）。
+- **C 缺件**：module-missing / no-store / no-facts / no-now，且显式给 `now` 时不依赖 clock。
+- **D 现场**：真渲染出读数行、零写实测（账本逐字未变、set 0 / tx 0）、id 全页一次、段内零写口、无交互件、
+  自己写明不拿写入时刻冒充、`stat()` 记到跑过（末次审的是原账）。
+
+**两处真缺陷（写锁之前修掉的，写进判据当基线）**：
+- ① `lineOf` 里一句字符串被写成跨行未闭合引号 ⇒ `node --check` 报 `Invalid or unexpected token`。
+  教训同 R270 那两次：**模板字面量/多行字符串是这一代最高频的翻车点**，每次改完必 `node --check`。
+- ② `Number(null) === 0`：`WA.clock=null` 时 `isFinite(now)` 守卫失效，被当成「第 0 轮」算成 ok。
+  修法是 `now === null || now === undefined || !isFinite(Number(now))` 三连，并在注释里写明这个 ECMAScript 坑。
+  另外 `lineOf` 的不可用态分支必须提到 `r.ok !== true` 之前，否则「不可用」会被「为什么不可用」盖掉。
+
+**零读名单出表（49 → 48，并明写这不是治好）**：`tests/ns-consumer-ledger.json` 删掉 `factAge`、
+`BASE_DEAD_NS 49 → 48`、加五行注释：**桥今天报的正是「no-last-turn，本读数不可用」—— 出表的是「零读」，
+不是「无数据」**。`module-cycle-gate` 的零读名单同步消失一条（48 条）。
+
+**跟位（本轮最重的连锁区）**：module-registry **589 文件 / 600 ns / 483 边 / 硬边 0 / 782 调用期**；
+dead-export **dead 2034 → 2040**（+6）、dataOnly **808 → 810**（+2）—— `_note` 写明为什么不是 +12：
+产品面真读了 `audit`/`view`/`summaryText`，`lineOf` 由 `summaryText` 内部回它，
+`SOURCES`/`version` 是数据面/版本面，剩下六个按过度导出入冻；`reject-code` 码面零新增（why 五值是读面态不入码表）；
+readings **61**（refs 13241 / ns 585 / members 6176）；segment **128**（section 469 / 测试面 695 / 重组面 19017 / 硬线 2235）；
+z1-04 **46/46**（惰性 19 / 契约面 589）；settle **55**；plan-readings **16**（Z1.tests 692 / engines 553 / 装载边 483）。
+
+**读数**：FAG-1 **65/0** · q8 **80/0** · q9 **67/0** · LOG-1 **19/0** · ns-consumer-ledger **72** ·
+orphan-adjudication 35 段 · export-contract RC=0 · dup-decl 0 · engines-ns 596/596 · ui-a11y 1776/1776 ·
+version-consistency 22 · release-manifest 可发 · evidence-index 690 条 stale 0。
+
+**未做（如实登记）**：① `lastTurn` 的**生产者**仍未出现 —— 本节只是把「没有」变成一行可读的读数与 65 条判据，
+不是把它填上；想真跑分档，得先有「上次被引用第几轮」的写入方（大概率在注入/回述路径上，属下一批）。
+② 整趟全量回归仍按分面批次验，未一口气跑完。③ BUILD_ID 仍指向上版。
