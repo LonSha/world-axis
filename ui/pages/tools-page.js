@@ -434,8 +434,13 @@
 
        <div id="wa-wl-out" class="wa-out"></div>
       `)}
-      ${foldSec('tools', 'writers', '字段写权与覆盖冲突</div><div class="wa-dim">（同一字段谁写、谁覆盖谁 —— 只读表，不改任何写者）', () => {
+      ${foldSec('tools', 'writers', '字段写权与覆盖冲突</div><div class="wa-dim">（同一字段谁写、谁覆盖谁 —— 只读表，不改任何写者）', () => `
+      ${(function () {
         const fw = WA.fieldWriters;
+        // v2.594.0（OPJ-1 收口）：本段此前用**语句体**收尾（`() => { … })`），与其余 16 段不同形。
+        //   后果：按形态计数的 q8 B1d 当场只数到 16/18，「每段都有模板收尾」这条纪律在这两段
+        //   等于空转（v2.274.0 的 capability 段踩过同一格）。改法：段体回到模板，读数走段内 IIFE。
+        //   惰性不变：收起态整段不拼接，IIFE 也就不执行（同 OPT-9 的惰性约定）。
         if (!fw || typeof fw.view !== 'function') return '<div class="wa-dim">字段写权表未装载（engines/field-writers.js）</div>';
         let v = null;
         try { v = fw.view(); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
@@ -452,9 +457,13 @@
         }).join('');
         return '<div class="wa-dim">' + esc(head) + '</div>' + body
           + '<div class="wa-dim">本面只读：不改任何写者的 mode，也不改写入语义。未登记的真冲突由专锁判红，不在本面被吞掉。</div>';
-      })}
-      ${foldSec('tools', 'projection', '观察投影与说法分歧</div><div class="wa-dim">（OPJ-1：同一条事实，场上每人手里是哪一版 —— 只读摆出来，不改任何人的说法）', () => {
+      })()}
+      `)}
+      ${foldSec('tools', 'projection', '观察投影与说法分歧</div><div class="wa-dim">（OPJ-1：同一条事实，场上每人手里是哪一版 —— 只读摆出来，不改任何人的说法）', () => `
+      ${(function () {
         const opj = WA.projectionBridge;
+        // v2.594.0（OPJ-1）：与 writers 段同一次收口 —— 模板体 + 段内 IIFE（原因见上段注释）。
+        //   读数行 id 仍只出现一次（E1），段内仍无交互件（E3）。
         if (!opj || typeof opj.scan !== 'function') return '<div class="wa-dim">观察投影落地面未装载（engines/projection-bridge.js）</div>';
         let r = null;
         try { r = opj.scan({ top: 6 }); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
@@ -471,7 +480,8 @@
         return '<div class="wa-dim" id="wa-opj-line">' + esc(opj.summaryText(r)) + '</div>' + body
           + '<div class="wa-dim">本面只读：不写信念账、不改任何人的说法与确信度，也不判「该不该让他知道」（那是反全知与隐瞒面的事）。'
           + '说法按<b>正文全等</b>分组，不按版本标签 —— 两个人可能都写 v1 却是完全不同的说法。</div>';
-      })}
+      })()}
+      `)}
       ${foldSec('tools', 'refine', '档案精编预览</div><div class="wa-dim">（RFA-1：三处只增不减的台账能省几条 —— 只预览，不删一条）', () => `
       <div class="wa-row"><button class="wa-btn" id="wa-rfa-scan" title="扫一遍世界事实 / 长期记忆事实 / 纪事，报出：原 N 条 → 精编后 M 条、可省几条、超长几条、重复组明细。本面零写：不删除任何一条档案、不写盘">精编预览</button></div>
       <div class="wa-dim" id="wa-rfa-line">${esc(rfaLine())}</div>

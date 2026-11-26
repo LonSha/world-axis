@@ -164,11 +164,21 @@ section('B 运行时:表内/表外/有界/落盘');
   //   (tools/_q8wrap4.py),且带 `|| true` 恒真 —— 那是「判据写着但永远不会红」。
   //   改成可复算的真判据:每一段 foldSec(…, ` … `) 的**模板收尾**
   //   形态(以 ` 反引号加 )}` 收尾)都在——不收尾就会把后续段吃进模板字面量。
-  const secCallRe = /\$\{foldSec\('tools', '[a-z]+',[\s\S]*?`\)\}/g;
-  const closed = (pnl.match(secCallRe) || []).length;
-  a(closed === WA.panelFold.SECTIONS.length,
-    'B1d: 每段都有模板收尾(实 ' + closed + ' / 表 ' + WA.panelFold.SECTIONS.length
-      + ') —— 不收尾会把后续段吃进模板字面量');
+  // v2.594.0(OPJ-1 收口):段体只能是**模板体**(`() => ` … `)}`)。v2.593.0 / v2.594.0 的
+  //   writers / projection 两段曾用**语句体**收尾 ⇒ 本正则只数到 16/18,而「每段都有模板收尾」
+  //   这条纪律在它们身上等于空转(v2.274.0 的 capability 段同形态,当时也是改回模板体)。
+  //   两段已改回模板体;同时把缺收尾的**段 id** 写进失败消息 —— 只报总数(16/18)要一段段对,
+  //   报 id 才能一眼定位(这是本判据与 A10c 的分工:A10c 看调用数,本判据看形态)。
+  const secCallRe = /\$\{foldSec\('tools', '([a-z]+)',[\s\S]*?`\)\}/g;
+  const got = {};
+  let sm;
+  while ((sm = secCallRe.exec(pnl))) got[sm[1]] = (got[sm[1]] || 0) + 1;
+  const lacking = WA.panelFold.SECTIONS.map(function (x) { return x.id; })
+    .filter(function (id) { return !got[id]; });
+  a(lacking.length === 0,
+    'B1d: 每段都有模板收尾(实 ' + (WA.panelFold.SECTIONS.length - lacking.length) + ' / 表 '
+      + WA.panelFold.SECTIONS.length + ') —— 不收尾会把后续段吃进模板字面量'
+      + (lacking.length ? ';缺收尾的段: ' + lacking.join(', ') : ''));
   // 表内
   const r0 = pf.isCollapsed('tools', 'traces');
   a(r0 && r0.ok === true && r0.collapsed === false, 'B2: 表内段默认为展开(不改默认态)');
