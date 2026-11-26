@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.597.0';
+  const VERSION = '2.598.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1704,6 +1704,9 @@
     'engines/save-migrate.js',
     'engines/setup-plan.js',
     'engines/slot-format.js',
+    // v2.598.0（SLT-1）：字节预算体检面。**须晚于** slot-format（字节算法与预算常量的单一真源在那里，
+    //   本模块不自带第二套）。进惰性档：它只被工具页面板读；零写、零截断。
+    'engines/byte-budget-bridge.js',
     'engines/store-merge.js',
     'engines/stream-gate.js',
     'engines/write-serial.js',

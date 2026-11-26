@@ -92,6 +92,8 @@
     // v2.597.0（ENS-1）：仲裁面是第 20 个折叠段。**同批登记** —— 本仓在这一格上栽过四次，
     //   所以口径定死：调 foldSec 的那一次提交里必须有这一行，不留“下一轮再补”。
     { page: 'tools', id: 'ensemble', label: '仲裁面（ENS-1）' },
+    // v2.598.0（SLT-1）：字节面是第 21 个折叠段。同批登记（本仓在这一格上栽过四次，口径定死）。
+    { page: 'tools', id: 'bytebudget', label: '字节预算（SLT-1）' },
   ];
   const __REG = {
     key: LS_KEY,

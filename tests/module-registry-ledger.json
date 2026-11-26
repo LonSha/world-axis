@@ -1,14 +1,14 @@
 {
- "version": "2.597.0",
+ "version": "2.598.0",
  "loadOrderCount": 596,
- "lazyCount": 20,
- "loadedCount": 590,
+ "lazyCount": 21,
+ "loadedCount": 591,
  "uiCount": 26,
- "nsCount": 601,
+ "nsCount": 602,
  "totals": {
-  "loadEdges": 484,
+  "loadEdges": 485,
   "hardEdges": 0,
-  "callRefs": 784,
+  "callRefs": 786,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -79,6 +79,7 @@
     "engines/bridge.js",
     "engines/broker-house.js",
     "engines/bureaucracy-ascension.js",
+    "engines/byte-budget-bridge.js",
     "engines/calendar-custom.js",
     "engines/calendar.js",
     "engines/call-timeline.js",
@@ -686,6 +687,7 @@
     "engines/branch-tree.js",
     "engines/broker-house.js",
     "engines/bureaucracy-ascension.js",
+    "engines/byte-budget-bridge.js",
     "engines/calendar-custom.js",
     "engines/call-timeline.js",
     "engines/campaign.js",
@@ -11719,6 +11721,25 @@
   "engines/slot-format.js": {
    "ns": [
     "slotFormat"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/byte-budget-bridge.js": {
+   "ns": [
+    "byteBudgetBridge"
    ],
    "requires": [
     "registerModule"

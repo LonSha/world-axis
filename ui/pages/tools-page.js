@@ -76,6 +76,8 @@
   let __fagEnsureFail = 0;
   // v2.597.0（ENS-1）：同款。仲裁面也是惰性档，装不上与正在装必须分得开。
   let __ensEnsureFail = 0;
+  // v2.598.0（SLT-1）：同款。字节面也是惰性档。
+  let __bbEnsureFail = 0;
   const rfaLine = function () {
       const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
       if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
@@ -551,6 +553,35 @@
           + '（诊断面不是入口；花 token 的事留给推演链路）。'
           + '“继承 default”指的是：那条通道自身没配 baseUrl / model，读到的是 default 的回退值 ——'
           + '拿它与 default 一起投票等于同一个模型答两遍，一致性会假高。</div>';
+      })()}
+      `)}
+      ${foldSec('tools', 'bytebudget', '字节预算</div><div class="wa-dim">（SLT-1：字符数会骗人 —— 中文 1 字 3 字节、emoji 2 字 4 字节；只量不截）', () => `
+      ${(function () {
+        // 被委托方（slot-format）与本体都在惰性档：首帧未装载是常态，走 ensure + 失败记忆。
+        const rel = 'engines/byte-budget-bridge.js';
+        const bb = WA.byteBudgetBridge;
+        if (!bb || typeof bb.audit !== 'function') {
+          if (__bbEnsureFail) return '<div class="wa-dim">字节面装载失败（' + rel + '）—— 这不是“没有长文本”，是这台引擎装不上</div>';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              if (p && typeof p.catch === 'function') p.catch(function () { __bbEnsureFail = 1; });
+              return '<div class="wa-dim">字节面在惰性档，装载中（成功后下次渲染自愈）</div>';
+            }
+          } catch (e) { /* 落到下面统一记失败 */ }
+          __bbEnsureFail = 1;
+          return '<div class="wa-dim">字节面装载失败（' + rel + '）</div>';
+        }
+        let a0 = null;
+        try { a0 = bb.audit({}); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const rows = ((a0 && a0.rows) || []).map(function (r) {
+          return '<div class="wa-dim">· ' + esc(r.path) + '：' + r.chars + ' 字符 / ' + r.bytes
+            + ' 字节（×' + r.ratio + '）</div>';
+        }).join('');
+        return '<div class="wa-dim" id="wa-byte-line">' + esc(bb.summaryText(a0)) + '</div>' + rows
+          + '<div class="wa-dim">本面只量<b>不替你截</b>：不改任何字段、不调截断函数、不写盘。'
+          + '“字符”是 UTF-16 码元数，“字节”才是配额与截断口径 —— 中文一字 3 字节，emoji 按 length 算 2、按字节算 4。'
+          + '字段名命中 key / secret / token / password 的子树整枝跳过，<b>连长度也不报</b>（长度本身也是信息）。</div>';
       })()}
       `)}
       ${foldSec('tools', 'refine', '档案精编预览</div><div class="wa-dim">（RFA-1：三处只增不减的台账能省几条 —— 只预览，不删一条）', () => `
