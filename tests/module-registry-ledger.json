@@ -1,10 +1,10 @@
 {
- "version": "2.593.0",
- "loadOrderCount": 595,
+ "version": "2.594.0",
+ "loadOrderCount": 596,
  "lazyCount": 18,
- "loadedCount": 587,
+ "loadedCount": 588,
  "uiCount": 26,
- "nsCount": 598,
+ "nsCount": 599,
  "totals": {
   "loadEdges": 482,
   "hardEdges": 0,
@@ -3971,6 +3971,18 @@
    "stateKeys": [
     "worldaxis_observationprojection_settings_v1"
    ],
+   "consumedBy": []
+  },
+  "engines/projection-bridge.js": {
+   "ns": [
+    "projectionBridge"
+   ],
+   "requires": [],
+   "requiresFiles": [],
+   "providerOrderOk": true,
+   "callRefs": [],
+   "ghostRefs": [],
+   "stateKeys": [],
    "consumedBy": []
   },
   "engines/dream-settle.js": {

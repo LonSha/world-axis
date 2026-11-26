@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.593.0';
+  const VERSION = '2.594.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -658,6 +658,10 @@
     // v2.251.0（拓展 OPJ-1）：同一事实的多观察者投影（cf. rain-go viewMatch）。
     //   排在 epistemic-view 之后、注入之前：不自己翻信念账，只把调用方给的版本按人物物理分开。
     'engines/observation-projection.js',
+    // v2.594.0（OPJ-1）：投影的落地面。必须在 observation-projection 之后装载——
+    //   本模块只负责从信念账取版本、再把 (shared, holders) 交给 observationProjection.project，
+    //   重写投影算法的事一概不做。零写：不写 beliefs，落账仍是 epistemicView 的事。
+    'engines/projection-bridge.js',
     // v2.251.0（拓展 DS-1）：梦境结算的空稿闸与去现实标记（cf. dreams EMPTY_DREAM_RE）。
     //   须晚于 word-budget（有效字数走它，不另算一套）；与 dream.js 正交：那里管线，这里管稿。
     'engines/dream-settle.js',

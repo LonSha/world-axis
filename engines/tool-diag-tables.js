@@ -670,6 +670,9 @@
     'engines/interest-face.js': 'interestFace',
     'engines/stall.js': 'stall',
     'engines/observation-projection.js': 'observationProjection',
+    // v2.594.0（OPJ-1）：投影的落地面。登记在此不是「多一行字」—— 本表是 inventory 定义面与
+    //   tool-diag 诊断面的唯一来源，漏登记 = secModules 假缺席 + export-contract 的 OWNER 不认。
+    'engines/projection-bridge.js': 'projectionBridge',
     'engines/scene-budget.js': 'sceneBudget',
     // v2.257.0（V6 OPV6-1 / OPV6-2）：能力档位 + 启用面可见。
     //   登记在此 = 该文件缺席时 secModules 会**如实报 missing**——它们的真消费方是

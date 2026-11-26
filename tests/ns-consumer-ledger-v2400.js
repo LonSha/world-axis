@@ -64,7 +64,11 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 //   零读是**设计**：判据在 engines/appearance.js 的 LAYER_ITEMS，词表只供预设/注入拼装取词；
 //   刻意性由 tests/appearance-items-v2585.js 的 C5 静态钉住（appearance.js 里不出现该名）。
 //   故条目按 readonly-api 入账，不是 pending-wire（不是欠接线，是刻意不接）。
-const BASE_DEAD_NS = 55;  // v2.568.0：55 → 54 —— greenKeys 出表（engines/worldbook.js 的 constGate 用 deriveGreenKeys 给常驻条目派生短键，成为“本轮聊到没聊到”的事前判据；零读 ns 真少一条，不是判据放宽）
+// v2.594.0（本版补记，如实说明 54 → 49 这段空白）：v2.569.0 以后的四轮接线（R265 unifiedPending /
+//   R267 refine / R268 fieldWriters / R269 observationProjection）按纪律④逐条出表，但只有本轮记得同步本常量；
+//   故 55 这个值早已过期 —— 本轮不猜中间值，只把实测 49 写上并把口径写清：「零读 ns 真少四台（+ 一台历史差额），不是判据放宽」。
+//   复算：node tests/module-cycle-gate.js 的「零读 ns 49/49」与本账本 entries 长度同源。
+const BASE_DEAD_NS = 49;  // v2.594.0：实测 49（基线原写 55，自 v2.569.0 起未跟位） —— greenKeys 出表（engines/worldbook.js 的 constGate 用 deriveGreenKeys 给常驻条目派生短键，成为“本轮聊到没聊到”的事前判据；零读 ns 真少一条，不是判据放宽）
 //   为什么这 9 条不是本批引入的：本批五个新 ns（injectDelta / narrowConsumers / rejectPhrase /
 //   settingsIndex / saveCurve）**都**被产品源面真读（render/inject.js 读前两个、
 //   engines/action-desk.js 读 rejectPhrase、engines/tool-diag.js 读后两个），所以它们不在零读面上。

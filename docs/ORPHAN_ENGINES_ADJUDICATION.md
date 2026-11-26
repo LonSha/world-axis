@@ -225,6 +225,34 @@ done
 node tests/orphan-engine-adjudication-v2550.js    # ⇒ pass (35 段)
 ```
 
+## 五点五、改判记录（v2.590.0 → v2.594.0）：四台已出列
+
+本文第五节的口径是「零读是对的」，一旦出现真读点，裁决就被推翻 —— 推翻必须留痕，
+**不能只改锁**。下面四台已从「第二批零故事面读点」名单出列，读点逐条列在这里。
+出列后锁不再要求「零命中」，而是要求**命中集恰等于下表**（多一处/少一处都红）。
+
+| 命名空间 | 文件 | 出列版本 | 故事面读点 | 为什么这算是真读点 |
+|---|---|---|---|---|
+| `unifiedPending` | `core/unified-pending.js` | **v2.590.0**（PBS-1） | `engines/pending-recon.js`、`ui/panel.js` | 对读面真调 `collect()` 把两套聚合器的分歧摆出来，面板段消费该读数 |
+| `refine` | `engines/refine.js` | **v2.592.0**（RFA-1） | `engines/refine-bridge.js` | 精编预览真调 `merge` / `condense`，工具页把「能省几条」显示出来 |
+| `fieldWriters` | `engines/field-writers.js` | **v2.593.0**（FWR-1） | `ui/pages/tools-page.js` | 「字段写权与覆盖冲突」段真读 `view()`，面板不另算一份写权表 |
+| `observationProjection` | `engines/observation-projection.js` | **v2.594.0**（OPJ-1） | `engines/projection-bridge.js` | 把信念账的行装箱成 `(shared, holders)` 交给 `project()` 划座 |
+
+**本期自查（如实记）**：前两台出列时只改了产品与零读账本，没改本文与锁 ⇒ 裁决锁
+红了 4 轮没人看见（锁是独立脚本，不在快门禁批次里）。接线三件套 = 产品读点 / 零读账本注销 /
+**本文改判 + 锁跟位**，缺一件就是潜伏红。本版一次性补上，并在锁里新增 G 段把「出列」
+也变成可复算的：`G1` 查命中集恰等于上表、`G3` 查本文真的写了改判记录。
+
+复算（应逐台打印出上表的读点，不多不少）：
+
+```bash
+for n in unifiedPending refine fieldWriters observationProjection; do
+  printf '%-24s ' "$n"
+  grep -rln "WA\.$n\b" --include=*.js engines core render ui actors direction index.js \
+    | grep -vE 'tool-diag|narrow-consumers|action-desk-routes' | tr '\n' ' '; echo
+done
+```
+
 ## 六、与 `ns-consumer-ledger` 的关系
 
 这五台仍在零读账本的 `entries` 里，分类不变。本文不注销任何条目——

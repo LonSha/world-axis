@@ -15,7 +15,7 @@
     "④ 本账本的键集与门禁 deadNs 读数双向一致：门禁多一个 → 未定性；账本多一个 → 过期登记。",
     "⑤ pending-wire 是**有时限**的定性：只用于「缝合件已入库、接线是下一步」的中间态。若某条 pending-wire 超过一个版本周期仍无人读，必须改判 stale（进 dead-export-ledger）或补消费点，不许靠改 evidence 文字续命。"
   ],
-  "version": "2.593.0",
+  "version": "2.594.0",
   "entries": {
     "LEAK_THRESHOLD": {
       "cls": "gate-selfwitness",
@@ -202,12 +202,6 @@
       "provider": "engines/night-watch.js",
       "evidence": "v2.524.0 EXV27-5 更夫巡夜与夜禁。产品面当前零读是**如实记账**：本批先交付引擎本体与场景 71 贯通专锁（真调 API），把「谁该读它」留到 OPV27-5 的窄消费面接线批 —— 那批要动 backstage / action-desk / 面板读数块，属「会改变世界推进结果」的改动，不在本批边界内。证据面：tests/scenario-v71-v27-money-night-fire.js 逐条真调。",
       "recompute": "grep -n 'nightWatch' tests/scenario-v71-v27-money-night-fire.js | head -2"
-    },
-    "observationProjection": {
-      "cls": "stale",
-      "provider": "engines/observation-projection.js",
-      "evidence": "观测投影导出全部在 dead-export-ledger 冻结。产品面零读。",
-      "recompute": "node -e \"const L=require('./tests/dead-export-ledger.json');console.log(Object.keys(L.dead).filter(k=>k.startsWith('observationProjection.')).length)\""
     },
     "off": {
       "cls": "readonly-api",

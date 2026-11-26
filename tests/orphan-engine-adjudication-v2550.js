@@ -64,35 +64,35 @@ const TARGETS = [
 //   其中 `unifiedPending` 落在 core/ 而不是 engines/ —— 它是聚合器不是引擎，
 //   但「零读」的后果完全一样（产品面拿不到聚合器，待办中心就读不到合并视图）。
 const SECOND_WAVE = [
-  { ns: 'refine', file: 'engines/refine.js', zh: '输入润色与合并（与 polish 同族但不可替代）' },
-  { ns: 'observationProjection', file: 'engines/observation-projection.js', zh: '观察面投影与归一' },
   { ns: 'binding', file: 'engines/binding.js', zh: '作用域绑定（bind / read / unbind）' },
   { ns: 'calendarPlan', file: 'engines/calendar-custom.js', zh: '自定义历法规划' },
   { ns: 'purifyScope', file: 'engines/purify-scope.js', zh: '净域保护（protect / restore）' },
-  { ns: 'unifiedPending', file: 'core/unified-pending.js', zh: '统一待办聚合器' },
-  { ns: 'fieldWriters', file: 'engines/field-writers.js', zh: '字段写者登记与冲突' }
 ];
-const ALL_TARGETS = TARGETS.concat(SECOND_WAVE);
+// ═════════ G 已接线出列：两台（v2.592.0 RFA-1 / v2.594.0 OPJ-1）═════════
+//   出列不是「忘了这座」，是裁决真的被推翻了 —— 但推翻必须留痕：
+//   ① 它们仍留在 ALL_TARGETS 里（readsOf 靠它排除自身文件，否则定义行会被当成读点）；
+//   ② 本锁把「零读」改成更强的一条：**故事面読点恰等于各自的落地面**（不是又长出一堆读点）。
+const WIRED_WAVE = [
+  { ns: 'refine', file: 'engines/refine.js', ver: 'v2.592.0', readers: ['engines/refine-bridge.js'] },
+  { ns: 'observationProjection', file: 'engines/observation-projection.js', ver: 'v2.594.0', readers: ['engines/projection-bridge.js'] },
+  // 这两台的读点比另两台早（v2.590.0 / v2.593.0 就接了），本锁 v2.594.0 一并出列 ——
+  //   当时只改了产品与账本、没改裁决，导致锁红了 4 轮没人看见。**接线三件套缺一件就是潜伏红。**
+  { ns: 'unifiedPending', file: 'core/unified-pending.js', ver: 'v2.590.0', readers: ['engines/pending-recon.js', 'ui/panel.js'] },
+  { ns: 'fieldWriters', file: 'engines/field-writers.js', ver: 'v2.593.0', readers: ['ui/pages/tools-page.js'] }
+];
+const ALL_TARGETS = TARGETS.concat(SECOND_WAVE).concat(WIRED_WAVE);
 // 第二批的关键方法（逐台现场实读导出面，不是照抄注释）。
 const KEYS2 = {
-  refine: ['getSettings', 'normalize', 'merge', 'condense', 'polish'],
-  observationProjection: ['project', 'sole', 'merge', 'settings'],
   binding: ['getSettings', 'bind', 'read', 'unbind', 'list'],
   calendarPlan: ['getSettings', 'setMonths', 'getMonths', 'label', 'labelNow', 'clear'],
   purifyScope: ['getSettings', 'protect', 'restore', 'applyWith', 'kinds'],
-  unifiedPending: ['collect', 'pending', 'diagnose', 'stat'],
-  fieldWriters: ['entryOf', 'writersOf', 'conflicts', 'undeclaredConflicts', 'view']
 };
 // 第二批可达面实测（v2.588.0 现场，node tools 复算命令见文档 D3）。
 //   `assign` = 行首顶格后的 `WA.<ns> = {` 处数：必须恰 1 —— 注释里写 `= {...}` 不算。
 const FACES2 = {
-  refine: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
-  observationProjection: { switchN: 0, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
   binding: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
   calendarPlan: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
-  purifyScope: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
-  unifiedPending: { switchN: 0, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
-  fieldWriters: { switchN: 0, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 }
+  purifyScope: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 }
 };
 // 每台至少要有这些方法才算「定义面完整」（不是空对象挂在 WA 上）。
 const KEYS = {
@@ -327,6 +327,41 @@ SECOND_WAVE.forEach(function (t) {
       + ' —— 若是有意接线，请先改 docs/ORPHAN_ENGINES_ADJUDICATION.md 的裁决与改判触发器，再改本锁');
   });
 });
+// ═════════ G 已接线出列：两台的改判是真的（v2.592.0 / v2.594.0）═════════
+ok('G0 已接线的两台不在第二批名单里（出列不是漏写）', function () {
+  const names = SECOND_WAVE.map(function (t) { return t.ns; });
+  WIRED_WAVE.forEach(function (t) {
+    assert.ok(names.indexOf(t.ns) < 0, t.ns + ' 仍在 SECOND_WAVE 里：两边都列会让读数自相矛盾');
+  });
+});
+ok('G1 故事面読点恰等于各自的落地面（接线不是又长出一堆读点）', function () {
+  WIRED_WAVE.forEach(function (t) {
+    const hits = readsOf(FILES, t.ns).slice().sort();
+    const want = t.readers.slice().sort();
+    assert.deepStrictEqual(hits, want, 'WA.' + t.ns + ' 的故事面読点应为 ' + JSON.stringify(want)
+      + '（实 ' + JSON.stringify(hits) + '）—— 多一处/少一处都要重新裁决');
+  });
+});
+ok('G2 出列的两台定义面仍在位、关键方法没被拆走（接线不代替定义）', function () {
+  WIRED_WAVE.forEach(function (t) {
+    assert.ok(W[t.ns], 'WA.' + t.ns + ' 缺席');
+    assert.ok(fs.existsSync(path.join(BASE, t.file)), t.file + ' 不存在');
+    t.readers.forEach(function (r) {
+      assert.ok(fs.existsSync(path.join(BASE, r)), r + ' 不存在：出列后读点必须是真文件');
+    });
+  });
+});
+ok('G3 文档写了这两台的改判记录（改判要留痕，不许只改锁）', function () {
+  const doc = fs.readFileSync(path.join(BASE, DOC_REL), 'utf8');
+  WIRED_WAVE.forEach(function (t) {
+    assert.ok(doc.indexOf(t.ns) >= 0, '文档里没有 ' + t.ns + ' 的改判记录');
+    t.readers.forEach(function (r) {
+      assert.ok(doc.indexOf(r) >= 0, '文档里没写 ' + t.ns + ' 的读点 ' + r);
+    });
+    assert.ok(doc.indexOf(t.ver) >= 0, '文档里没写 ' + t.ns + ' 的改判版本 ' + t.ver);
+  });
+});
+
 ok('F5 文档含第二批七台的命名空间与文件（裁决写进文档才算数）', function () {
   const doc = fs.readFileSync(path.join(BASE, DOC_REL), 'utf8');
   SECOND_WAVE.forEach(function (t) {
@@ -341,4 +376,4 @@ ok('F6 非空转：行首计数不把注释里的 `= {...}` 算成定义', funct
   assert.strictEqual(n, 1, '行首计数口径失效：注释被算成定义（实 ' + n + '）');
 });
 
-console.log('\norphan-engine-adjudication-2550: pass (' + pass + ' 段：12 台零故事面读点已裁决（五台 + 第二批七台），不接线)');
+console.log('\norphan-engine-adjudication-2550: pass (' + pass + ' 段：' + (TARGETS.length + SECOND_WAVE.length) + ' 台零故事面読点已裁决（五台 + 第二批五台）；另 ' + WIRED_WAVE.length + ' 台已出列接线（' + WIRED_WAVE.map(function (t) { return t.ns; }).join(' / ') + '），出列同样留痕)');

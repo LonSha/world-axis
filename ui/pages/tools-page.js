@@ -453,6 +453,25 @@
         return '<div class="wa-dim">' + esc(head) + '</div>' + body
           + '<div class="wa-dim">本面只读：不改任何写者的 mode，也不改写入语义。未登记的真冲突由专锁判红，不在本面被吞掉。</div>';
       })}
+      ${foldSec('tools', 'projection', '观察投影与说法分歧</div><div class="wa-dim">（OPJ-1：同一条事实，场上每人手里是哪一版 —— 只读摆出来，不改任何人的说法）', () => {
+        const opj = WA.projectionBridge;
+        if (!opj || typeof opj.scan !== 'function') return '<div class="wa-dim">观察投影落地面未装载（engines/projection-bridge.js）</div>';
+        let r = null;
+        try { r = opj.scan({ top: 6 }); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const tops = ((r && r.top) || []).filter(function (g) { return g.ok; });
+        const body = tops.map(function (g) {
+          const gs = (g.groups || []).map(function (x) { return '「' + x.text.slice(0, 18) + '」×' + x.who.length; }).join('、');
+          return '<div class="wa-item"><b>' + esc(g.topic) + '</b> · ' + g.seats + ' 座 · 说法 ' + g.distinct + ' 种'
+            + (g.distorted ? (' · <span class="wa-dim">与事实不符 ' + g.distorted + '</span>') : '')
+            + '<div class="wa-dim">有说法 ' + g.held + ' · 登记无内容 ' + g.bare + ' · 一概不知 ' + g.unaware
+            + (g.truncated ? (' · 被上限截断 ' + g.lost) : '') + '</div>'
+            + (gs ? '<div class="wa-dim">' + esc(gs) + '</div>' : '')
+            + '</div>';
+        }).join('');
+        return '<div class="wa-dim" id="wa-opj-line">' + esc(opj.summaryText(r)) + '</div>' + body
+          + '<div class="wa-dim">本面只读：不写信念账、不改任何人的说法与确信度，也不判「该不该让他知道」（那是反全知与隐瞒面的事）。'
+          + '说法按<b>正文全等</b>分组，不按版本标签 —— 两个人可能都写 v1 却是完全不同的说法。</div>';
+      })}
       ${foldSec('tools', 'refine', '档案精编预览</div><div class="wa-dim">（RFA-1：三处只增不减的台账能省几条 —— 只预览，不删一条）', () => `
       <div class="wa-row"><button class="wa-btn" id="wa-rfa-scan" title="扫一遍世界事实 / 长期记忆事实 / 纪事，报出：原 N 条 → 精编后 M 条、可省几条、超长几条、重复组明细。本面零写：不删除任何一条档案、不写盘">精编预览</button></div>
       <div class="wa-dim" id="wa-rfa-line">${esc(rfaLine())}</div>
