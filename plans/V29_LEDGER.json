@@ -2,8 +2,8 @@
   "tool": "plan-ledger",
   "schema": 1,
   "version": "2.584.0",
-  "sourceDigest": "ac1c5331bde5f2c1a0841a3de6c6a5a46ba217c8a0904fb69442300c8d5ac910",
-  "sourceCommits": 36,
+  "sourceDigest": "83ed656dd2e8ad9f4c52a31c31dee2a29cc0ce644bcc7040b2835653a8c3313e",
+  "sourceCommits": 37,
   "total": 36,
   "delivered": {
     "OPV29-01": {
@@ -557,6 +557,10 @@
     ],
     "unparsedForm": [
       {
+        "commit": "1d43ac4",
+        "subject": "v2.584.0 R258：全量 19 红逐条跟位（出厂启用面 / OPV29 计数 / 计划读数 / 话术面）"
+      },
+      {
         "commit": "81d90e4",
         "subject": "v2.542.11（探针跟位）：desk-coverage 的 ROUTES 锚点随 OPV29 拆段搬迁"
       }
@@ -618,7 +622,7 @@
     "pending": 0,
     "rangeForm": 1,
     "noRecompute": 8,
-    "unparsedForm": 1,
+    "unparsedForm": 2,
     "dupClaims": 7
   }
 }
