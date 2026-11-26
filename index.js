@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.598.0';
+  const VERSION = '2.599.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1686,6 +1686,9 @@
     'engines/card-file.js',
     'engines/chat-guard.js',
     'engines/contrast.js',
+    // v2.599.0（CNT-1）：配色可读性体检面。须晚于 contrast（WCAG 公式与 MIN_RATIO 在那里）。
+    //   进惰性档：只被工具页面板读；零写（连 style 都不碰）、不内置色值兜底。
+    'engines/contrast-bridge.js',
     // v2.597.0（ENS-1）：仲裁面的体检面。与被读方 ensemble 同族，但**它自己进惰性档** ——
     //   它只被工具页面板读，提到首帧只会让首帧多装一个模块。零写、零调用：不调 run，一次通道调用都不发。
     'engines/ensemble-bridge.js',

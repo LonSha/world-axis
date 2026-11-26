@@ -94,6 +94,8 @@
     { page: 'tools', id: 'ensemble', label: '仲裁面（ENS-1）' },
     // v2.598.0（SLT-1）：字节面是第 21 个折叠段。同批登记（本仓在这一格上栽过四次，口径定死）。
     { page: 'tools', id: 'bytebudget', label: '字节预算（SLT-1）' },
+    // v2.599.0（CNT-1）：配色面是第 22 个折叠段。同批登记（口径已定死，不留“下一轮再补”）。
+    { page: 'tools', id: 'contrast', label: '配色可读性（CNT-1）' },
   ];
   const __REG = {
     key: LS_KEY,

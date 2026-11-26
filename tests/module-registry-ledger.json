@@ -1,14 +1,14 @@
 {
- "version": "2.598.0",
+ "version": "2.599.0",
  "loadOrderCount": 596,
- "lazyCount": 21,
- "loadedCount": 591,
+ "lazyCount": 22,
+ "loadedCount": 592,
  "uiCount": 26,
- "nsCount": 602,
+ "nsCount": 603,
  "totals": {
-  "loadEdges": 485,
+  "loadEdges": 486,
   "hardEdges": 0,
-  "callRefs": 786,
+  "callRefs": 788,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -109,6 +109,7 @@
     "engines/contest.js",
     "engines/continuity-guard.js",
     "engines/contraband.js",
+    "engines/contrast-bridge.js",
     "engines/contrast.js",
     "engines/controllability.js",
     "engines/coop.js",
@@ -714,6 +715,7 @@
     "engines/contest.js",
     "engines/continuity-guard.js",
     "engines/contraband.js",
+    "engines/contrast-bridge.js",
     "engines/contrast.js",
     "engines/controllability.js",
     "engines/coop.js",
@@ -11455,6 +11457,25 @@
   "engines/contrast.js": {
    "ns": [
     "contrast"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/contrast-bridge.js": {
+   "ns": [
+    "contrastBridge"
    ],
    "requires": [
     "registerModule"

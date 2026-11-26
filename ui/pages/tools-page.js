@@ -78,6 +78,8 @@
   let __ensEnsureFail = 0;
   // v2.598.0（SLT-1）：同款。字节面也是惰性档。
   let __bbEnsureFail = 0;
+  // v2.599.0（CNT-1）：同款。配色面也是惰性档。
+  let __cntEnsureFail = 0;
   const rfaLine = function () {
       const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
       if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
@@ -582,6 +584,36 @@
           + '<div class="wa-dim">本面只量<b>不替你截</b>：不改任何字段、不调截断函数、不写盘。'
           + '“字符”是 UTF-16 码元数，“字节”才是配额与截断口径 —— 中文一字 3 字节，emoji 按 length 算 2、按字节算 4。'
           + '字段名命中 key / secret / token / password 的子树整枝跳过，<b>连长度也不报</b>（长度本身也是信息）。</div>';
+      })()}
+      `)}
+      ${foldSec('tools', 'contrast', '配色可读性</div><div class="wa-dim">（CNT-1：这行字在自己的底色上读不读得出来 —— 读运行时配色，只量不改）', () => `
+      ${(function () {
+        // 被委托方（contrast）与本体都在惰性档：首帧未装载是常态，走 ensure + 失败记忆。
+        const rel = 'engines/contrast-bridge.js';
+        const cb = WA.contrastBridge;
+        if (!cb || typeof cb.audit !== 'function') {
+          if (__cntEnsureFail) return '<div class="wa-dim">配色面装载失败（' + rel + '）—— 这不是“配色都没问题”，是这台引擎装不上</div>';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              if (p && typeof p.catch === 'function') p.catch(function () { __cntEnsureFail = 1; });
+              return '<div class="wa-dim">配色面在惰性档，装载中（成功后下次渲染自愈）</div>';
+            }
+          } catch (e) { /* 落到下面统一记失败 */ }
+          __cntEnsureFail = 1;
+          return '<div class="wa-dim">配色面装载失败（' + rel + '）</div>';
+        }
+        let a0 = null;
+        try { a0 = cb.audit({}); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const rows = ((a0 && a0.matrix && a0.matrix.rows) || []).filter(function (r) { return r.pass === false; })
+          .slice(0, 8).map(function (r) {
+            return '<div class="wa-dim">· 不达标 ' + esc(r.text) + ' 在 ' + esc(r.bg) + '：' + r.ratio + ':1</div>';
+          }).join('');
+        return '<div class="wa-dim" id="wa-cnt-line">' + esc(cb.summaryText(a0)) + '</div>' + rows
+          + '<div class="wa-dim">本面只量：不改任何样式、不改 CSS 变量、不写盘。'
+          + '比值走 <code>contrast</code> 的 WCAG 公式，阈值取它的 MIN_RATIO（本面不写死 4.5）。'
+          + '“按不透明算” —— 透明叠加与背景图压暗不在本面结论里；认不出颜色的对单列，既不假绿也不假红。'
+          + '读不到计算样式时直说不可用，<b>不内置兜底色</b>。</div>';
       })()}
       `)}
       ${foldSec('tools', 'refine', '档案精编预览</div><div class="wa-dim">（RFA-1：三处只增不减的台账能省几条 —— 只预览，不删一条）', () => `

@@ -72,7 +72,9 @@ const CLASSES = ['wired', 'readonly-api', 'stale', 'derived-handle', 'gate-selfw
 //   而那道桥有真产品读面（工具页「事实老化面」段）。**这不等于原来的缺口被治好**：
 //   桥今天报的正是「no-last-turn，本读数不可用」—— 出表的是「零读」，不是「无数据」。
 //   复算：grep -rn 'WA.factAge' engines/fact-age-bridge.js
-const BASE_DEAD_NS = 46;   // v2.598.0（SLT-1）：47 → 46 = slotFormat 出表（byte-budget-bridge 成为它第一个产品面读者：
+const BASE_DEAD_NS = 45;   // v2.599.0（CNT-1）：46 → 45 = contrast 出表（contrast-bridge 按 CSS 变量对算 WCAG，
+//   顺带补上全仓 `getComputedStyle` 0 命中的空白）。销行销的是「零读」，不是「配色都合格」。
+// v2.598.0（SLT-1）：47 → 46 = slotFormat 出表   // v2.598.0（SLT-1）：47 → 46 = slotFormat 出表（byte-budget-bridge 成为它第一个产品面读者：
 //   用 byteLength 量全仓字符串、用 MAX_NAME_BYTES 算存档名余量）。销行销的是「零读」，不是「无数据」。
 // v2.597.0（ENS-1）：48 → 47 = ensemble 出表   // v2.597.0（ENS-1）：48 → 47 = ensemble 出表（engines/ensemble-bridge.js 成为它第一个产品面读者：
 //   读 getSettings / STRATEGIES / stat，且不调 run）。**这不等于原来的缺口被治好**：桥今天报的正是 no-channel-ready / no-runs
