@@ -8162,6 +8162,142 @@
       "tref": 0,
       "own": 3
     },
+    "mapEditor.apply": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "mapEditor.at": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 16
+    },
+    "mapEditor.check": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "mapEditor.counts": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 5
+    },
+    "mapEditor.diagnose": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "mapEditor.doc": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "mapEditor.exportJSON": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 4
+    },
+    "mapEditor.fingerprint": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 9
+    },
+    "mapEditor.getSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "mapEditor.importJSON": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "mapEditor.metersPerUnit": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "mapEditor.newDoc": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "mapEditor.redo": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "mapEditor.setSettings": {
+      "reason": "unwired",
+      "detail": "产品与测试均零引用（能力未接线）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 1
+    },
+    "mapEditor.span": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
+    "mapEditor.stat": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 15
+    },
+    "mapEditor.undo": {
+      "reason": "self-only",
+      "detail": "engines/map-editor.js 内部自用、外部零引用（过度导出）",
+      "src": "engines/map-editor.js",
+      "refs": 0,
+      "tref": 0,
+      "own": 3
+    },
     "marginal.cool": {
       "reason": "test-only",
       "detail": "engines/marginal.js 内部自用、外部零引用（过度导出）",
@@ -16086,6 +16222,6 @@
     }
   },
   "advisory": {
-    "dataOnly": 795
+    "dataOnly": 802
   }
 }

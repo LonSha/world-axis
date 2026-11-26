@@ -98,6 +98,19 @@
     //   拒收面的一员，却没进快照，于是 B3/B4/C4 自 v2.28x 起恒红（同「新码没进快照」旧账）。
     //   档位选 request-setup：这不是输入错，也不是重试能好，是**运行环境不满足前提**。
     'not-secure-context': { kind: 'request-setup', why: '非安全上下文（页面不是 https / localhost）下浏览器禁用该能力：把 SillyTavern 用 https 或本地回环地址打开再试' },
+    // ── v2.587.0（R263）：map-editor 的三条**规则表收不住**的拒收码（其余 23 条 via:'rule'）。
+    //   ⚠ 三条都已在 REJECT_FACE 快照里（A8 要求），此处只补档、不改面。
+    //     · degenerate —— 分词只有一个词且不在六档词表里。它发生在两处：顶点不足 / 面积 0，
+    //       以及「贴合路缘后面积塌了一半以上」。两种都是**输入几何本身不成立**：该改的是
+    //       那几个顶点（挪开 / 别吸这条路 / 放大地块），不是补前置、也不是同输入重试 ⇒ adjust-input。
+    //     · import-rejected-entities —— 分词 import / rejected / entities，`rejected` 不是词表里的
+    //       `reject`（词形不同不命中）。语义是「导入的信封里有几条实体不合规，整份被拒并如实报出
+    //       下标」：改那几条再导，不是判死那份图 ⇒ adjust-input。
+    //     · unresolved-endpoint —— 分词 endpoint 不在词表（`unreachable` 才是）。语义是道路端点
+    //       指不到任何街区 / 道路：先把端点指对（或先建那个街区）再连 ⇒ adjust-input。
+    'degenerate': { kind: 'adjust-input', why: '几何本身不成立（顶点不足 / 面积 0 / 贴合后面积塌一半以上）：改那几个顶点再提交，不是同输入重试' },
+    'import-rejected-entities': { kind: 'adjust-input', why: '导入信封里有几条实体不合规（已按下标报出）：改那几条再导，其余照收' },
+    'unresolved-endpoint': { kind: 'adjust-input', why: '道路端点指不到任何街区或道路：先把端点指对（或先建那个街区）再连' },
     'store-unreadable': { kind: 'manual-review', why: '存档读不到（不冒充空世界）：机器无从判断内容是否可用，需人先修存档再重跑诊断' },
     // ── v2.583.0（R254）：attire-state 里**规则表收不住档**的两条（逐条读源码定因，不按词根猜）──
     //     · continuity-lock —— 分词 continuity/lock，`locked` 在 rollback 词表里但 `lock` 不在，
@@ -1139,6 +1152,19 @@
     //   语义不变（名单外 / 该级必盖项没盖）。故本快照不动：往这里加两条会把 1697 抬成 1699，
     //   而现场仍是 1697 —— reject-recovery 专锁 B3 当场报「快照与现场不一致」（本轮实测）。
     //   「新用途 ≠ 新码」：码面记账按**码**，不按**调用点**。
+    //
+    // ── v2.587.0（R263）：engines/map-editor.js 的 26 条内联拒收码一次入面。
+    //   它们全是 `{ ok:false, reason }` 的返回体（编辑 / 导入 / 贴合的失败出口），按面口径就是拒收面；
+    //   此前只进了码面（reject-code-gate 1961 / 见证 1010），没进本快照 ⇒ 专锁 B3/B4/C4 立刻红 26 条
+    //   （本仓第九次栽在同一个形态上：新码进了码面、忘了这一个面 —— v2.203/209/221/222/231/292/524/542）。
+    //   23 条由规则表收住（via:'rule'）；3 条词表收不住，另在 OVERRIDES 逐条给档并写 why：
+    //     degenerate / import-rejected-entities / unresolved-endpoint。
+    //   面值 1697 → 1723，与现场复算逐条对齐（tools/reject-recovery.js 实测）。
+    'bad-class', 'bad-distance', 'bad-index', 'bad-layer', 'bad-point', 'bad-points',
+    'bad-size', 'bad-width', 'degenerate', 'import-rejected-entities', 'need-2-points',
+    'need-3-points', 'no-document', 'no-region', 'no-road-nearby', 'no-roads',
+    'no-such-entity', 'noop', 'not-a-path', 'not-assignable', 'redo-empty',
+    'schema-too-new', 'too-few-points', 'too-many-points', 'undo-empty', 'unresolved-endpoint',
   ];
   /** 成功面冻结快照（v2.192.0 现场实测 34 条）。
    *  它们**只**出现在 `ok:true` 对象里 —— 不配恢复动作，`explain()` 对它们给 `kind:null`。

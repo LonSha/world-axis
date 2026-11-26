@@ -7621,6 +7621,27 @@ too-few-points/too-many-points/undo-empty/unresolved-endpoint`。在 `tests/reje
 只能按 base 收下（base 940 → **941**，changelog 冠了说明）。结论：`reject-code-gate` rc=0，
 **1961 码 / 见证 1010 / 死表 52 / 基线 941**（`gen-error-codes --write` 口径不同：见证 968 —— 引用时须说明来源）。
 
+**全量回归咬出的五簇潜伏红（本版清偿，全部是「接线完成但跟位没完成」）**：
+1. `工具 diag 清单漏登记`：`engines/tool-diag-tables.js` 的 `MODULE_EXPORTS` 没加 `map-editor.js` ⇒
+   「诊断清单覆盖全部磁盘模块」红。这不是多一行字：本表是 inventory 定义面与 tool-diag 诊断面的**唯一来源**，
+   漏登记 = secModules 假缺席 + export-contract 的 OWNER 不认 + 契约串里调用点被静默跳过。
+2. **R261 起就没被照到的潜伏红**：`NO_REF_OK` 白名单追加 `appearance-lexicon` 时没按字母序放，
+   而判据用的是 `join` 的**字面**比较 ⇒ 名单没错、判据也没错，是「顺序被当成了语义」。
+   修法是把右侧 `slice().sort()`（集合等价，多一个少一个照样红），判据强度不变。
+3. **拒收恢复面**：26 条新码只进了码面、没进 `REJECT_FACE` 快照（本仓第九次栽这一格）。
+   23 条由规则表收住；`degenerate` / `import-rejected-entities` / `unresolved-endpoint` 词表收不住，
+   逐条在 `OVERRIDES` 给 `adjust-input` 并写 why（都是「改那几个顶点/那几条实体/那个端点」，不是重试）。
+   面值 1697 → **1723**，专锁 221/0。
+4. `map-viewport` 的模块自报版本被自家专锁钉着（`diag.version === '2.246.0'`）：本版给它加了 `opts.doc` 分支，
+   版本跟到 2.587.0，专锁同步 —— 仍是精确等值。
+5. **能力档位基线**：`mapEditor` 出厂 `enabled:true` 但**没有 buildBlock** ⇒ 只动开集、不动注入面：
+   `BASE_ON` 291 → **292**，`MECH 133 / DORMANT 1 / RUNNING0 132 / FULL_MECH 133` 全不动，
+   恒等式 `FULL_RUNNING = 133 + (292 − 132) = 293` 与实测一致。**只改 BASE_ON 才对，把 MECH 也 +1 是造数据。**
+
+**跟位的二次连锁（登记进定义面之后的真实代价，如实记）**：dead 2004 → **2021**（mapEditor 的 17 个导出
+进冻结面）、ns **579 → 580**、members **6106 → 6131**、dataOnly **795 → 802**、refs **13160 → 13162**；
+计划面 Z3 组读数 1935/943/940 → **1961/968/941**（plan-readings 16 条全等）。
+
 **未做（如实登记）**：① `atlas.js` / `terrain-hazard.js` 尚未用几何接线（M4 未动 —— 它们仍按**名字**连边）；
 ② `docs/PROJECT_ASSESSMENT.md` 的 R6（词表进注入面）本轮未做；③ 真宿主两项（`v10-ui-pills` /
 `v10-r3-persist-hosted`）仍需真 SillyTavern @ `http://127.0.0.1:8000`，一直没执行；④ 整趟全量回归待本版跑。

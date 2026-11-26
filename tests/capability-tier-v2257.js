@@ -140,7 +140,12 @@ const A_DEF = "  const DEF = { tier: 'lite', granted: [], history: [] };";
 //   FULL_RUNNING = MECH + (BASE_ON − RUNNING0) 仍由恒等式算出，不写魔法数。
 //   为什么这不是「放宽」：四个常量都是**读数**，判据（出厂态自洽 / full 后真涨 / 回滚真收回）
 //   一条没动；新引擎默认开启这件事本身若被改成关闭，这四数会再次红。
-const BASE_ON = 291;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
+// v2.587.0 跟位：mapEditor（地图编辑器，v2.587.0 入场）出厂 `enabled:true`，但**没有 buildBlock**
+//   ⇒ 只动开集、不动注入面：BASE_ON 291 → 292，MECH 133 / DORMANT 1 / RUNNING0 132 / FULL_MECH 133 全不动。
+//   恒等式照旧成立：FULL_RUNNING = MECH + (BASE_ON − RUNNING0) = 133 + (292 − 132) = 293（实测 293）。
+//   ⚠ 这一条与 v2.584.0 那批的区别就在这里：那批是「有注入面的机制」涨，这批只是「出厂开着的观测/编辑型」
+//   涨一个 —— 只改 BASE_ON 一个数是**对的**，把 MECH 也 +1 才是造数据。
+const BASE_ON = 292;        // 本测试面：出厂就开着的带 enabled 引擎数（全开策略 v2.412.0）
 // v2.542.6 跟位：叙事脊柱 L1 的 sceneIntent **有 buildBlock（有注入面）但出厂 enabled:false**。
 //   为什么它必须是出厂关：L1 的零 token 边界——它被打开之前，注入字节必须与 v2.541.7 逐字节一致
 //   （判据见 tests/scene-intent-v2542.js 的 A 段）。于是它成为**第一个**「关着但有注入面」的机制，

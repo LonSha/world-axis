@@ -757,7 +757,7 @@
     },
     {
       "file": "tests/capability-tier-v2257.js",
-      "sha": "283520c5beab",
+      "sha": "6321c1e2f042",
       "version": "2.257.0",
       "versionSource": "title",
       "fileAnchor": "2257",
@@ -3992,7 +3992,7 @@
       "version": "2.587.0",
       "versionSource": "title",
       "fileAnchor": "2587",
-      "commit": null,
+      "commit": "7f66618",
       "wired": {
         "form": "runLock",
         "line": 21593
@@ -4007,7 +4007,7 @@
     },
     {
       "file": "tests/map-viewport-v2246.js",
-      "sha": "1454571f28d3",
+      "sha": "5f9fe25b93ca",
       "version": "2.246.0",
       "versionSource": "title",
       "fileAnchor": "2246",

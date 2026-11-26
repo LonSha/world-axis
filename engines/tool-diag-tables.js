@@ -344,6 +344,10 @@
     // v2.583.0(R254)：服装穿着状态机。漏登记的后果同 world-reader：secModules 报 missing
     //   （假缺席）、export-contract 的 OWNER 不认 ⇒ 契约串里所有调用点被静默跳过。
     'engines/attire-state.js': 'attireState',
+    // v2.587.0（R263）：地图编辑器引擎。漏登记的后果与上面同型：secModules 报假缺席、
+    //   export-contract 的 OWNER 不认 ⇒ 契约串里 mapEditor 的调用点被静默跳过。
+    //   本表是 inventory 定义面与 tool-diag 诊断面的唯一来源，故「接了线但没登记」也算漏。
+    'engines/map-editor.js': 'mapEditor',
     'engines/body-anatomy.js': 'bodyAnatomy',
     'engines/ladder.js': 'ladder',
     'engines/scene-slice.js': 'sceneSlice',
