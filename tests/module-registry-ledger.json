@@ -1,14 +1,14 @@
 {
- "version": "2.601.0",
+ "version": "2.602.0",
  "loadOrderCount": 596,
- "lazyCount": 24,
- "loadedCount": 594,
+ "lazyCount": 25,
+ "loadedCount": 595,
  "uiCount": 26,
- "nsCount": 605,
+ "nsCount": 606,
  "totals": {
-  "loadEdges": 488,
+  "loadEdges": 489,
   "hardEdges": 0,
-  "callRefs": 792,
+  "callRefs": 794,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -292,6 +292,7 @@
     "engines/production.js",
     "engines/psyche-dissociation.js",
     "engines/public-agenda.js",
+    "engines/purify-scope-bridge.js",
     "engines/purify-scope.js",
     "engines/push-api-registry.js",
     "engines/reading-bookmark.js",
@@ -886,6 +887,7 @@
     "engines/production.js",
     "engines/psyche-dissociation.js",
     "engines/public-agenda.js",
+    "engines/purify-scope-bridge.js",
     "engines/purify-scope.js",
     "engines/push-api-registry.js",
     "engines/reading-bookmark.js",
@@ -11423,6 +11425,25 @@
   "engines/polish-bridge.js": {
    "ns": [
     "polishBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/purify-scope-bridge.js": {
+   "ns": [
+    "purifyScopeBridge"
    ],
    "requires": [
     "registerModule"

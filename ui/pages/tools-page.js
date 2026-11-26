@@ -84,6 +84,8 @@
   let __bndEnsureFail = 0;
   // v2.601.0（PLS-1）：同款。润色通道面也是惰性档（被读方 polish 在调用期档）。
   let __plsEnsureFail = 0;
+  // v2.602.0（PSC-1）：同款。净化保护面也是惰性档（被读方 purifyScope 在调用期档）。
+  let __pscEnsureFail = 0;
   const rfaLine = function () {
       const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
       if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
@@ -685,6 +687,46 @@
           + '<code>baseUrl</code> 也只报有没有（可能是你自建的内网地址）；<code>model</code> 照报 ——'
           + '「润色实际用哪个模型」就是这张表唯一的用处。名单每次现读 <code>apiRouter.CHANNELS</code>，'
           + '不抄副本；通道名与勘察值不一致时报漂移，不硬算一个落点。'
+          + '</div>';
+      })()}
+      `)}
+      ${foldSec('tools', 'purifyscope', '净化保护配对</div><div class="wa-dim">（PSC-1：状态栏为什么忽然不见了 —— 保护出得去回不来，比没保护更坏）', () => `
+      ${(function () {
+        // 被读方（purify-scope）在调用期档：首帧未装载是常态，走 ensure + 失败记忆。
+        const rel = 'engines/purify-scope-bridge.js';
+        const psc = WA.purifyScopeBridge;
+        if (!psc || typeof psc.audit !== 'function') {
+          if (__pscEnsureFail) return '<div class="wa-dim">净化保护面装载失败（' + rel + '）—— 这不是“保护已生效”，是这台引擎装不上</div>';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              if (p && typeof p.catch === 'function') p.catch(function () { __pscEnsureFail = 1; });
+              return '<div class="wa-dim">净化保护面在惰性档，装载中（成功后下次渲染自愈）</div>';
+            }
+          } catch (e) { /* 落到下面统一记失败 */ }
+          __pscEnsureFail = 1;
+          return '<div class="wa-dim">净化保护面装载失败（' + rel + '）</div>';
+        }
+        let a0 = null;
+        try { a0 = psc.audit({}); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const pr = a0.pairing || {};
+        const rows = [
+          '<div class="wa-dim">· 保护 / 还原：' + esc(String(pr.protects == null ? '—' : pr.protects))
+            + ' / ' + esc(String(pr.restored == null ? '—' : pr.restored))
+            + '（差 ' + esc(String(pr.gap == null ? '—' : pr.gap)) + '）'
+            + '，共保 ' + esc(String(pr.blocks == null ? 0 : pr.blocks)) + ' 块</div>',
+          '<div class="wa-dim">· 受保护面图案：' + esc((a0.kinds || []).join(' / '))
+            + '（围栏 / 注释块 / 成对标签；语义一律不猜，宁漏不放）</div>',
+          '<div class="wa-dim">· cap = ' + esc(String(a0.maxBlocks == null ? '—' : a0.maxBlocks))
+            + '：' + esc(a0.capSilent || '') + '</div>'
+        ].join('');
+        return '<div class="wa-dim" id="wa-psc-line">' + esc(psc.summaryText(a0)) + '</div>' + rows
+          + '<div class="wa-dim">' + esc(psc.lineOf(a0)) + '</div>'
+          + '<div class="wa-dim">本面只量：<b>不调 protect / restore / applyWith</b>（它们会改 stat 的六个计数，'
+          + '体检把失败计数改掉之后读出来的就不是现场）、不 setSettings、不写盘。'
+          + '残留占位符只报<b>个数</b>，不回显正文（那是楼层正文，可能含剧透）。'
+          + '“从来没跑过”与“跑了但每次无块可保”与“保了没还原”在这台引擎的自有读数上完全同形 —— '
+          + '本面把它们拆成五态，是为了让这三种“什么都没发生”不再长得一样。'
           + '</div>';
       })()}
       `)}

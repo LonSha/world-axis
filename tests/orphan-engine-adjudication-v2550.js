@@ -66,7 +66,7 @@ const TARGETS = [
 const SECOND_WAVE = [
   // v2.600.0（BND-1）改判出列：binding 已被 engines/binding-bridge.js 真读（见 WIRED_WAVE）。
   { ns: 'calendarPlan', file: 'engines/calendar-custom.js', zh: '自定义历法规划' },
-  { ns: 'purifyScope', file: 'engines/purify-scope.js', zh: '净域保护（protect / restore）' },
+  // v2.602.0（PSC-1）改判出列：purifyScope 已被 engines/purify-scope-bridge.js 真读（见 WIRED_WAVE）。
 ];
 // ═════════ G 已接线出列：两台（v2.592.0 RFA-1 / v2.594.0 OPJ-1）═════════
 //   出列不是「忘了这座」，是裁决真的被推翻了 —— 但推翻必须留痕：
@@ -88,21 +88,26 @@ const WIRED_WAVE = [
   //   而是它的读数面本身成了产品。用户看不见的那件事是「润色到底用的哪个模型」：
   //   通道名 'rewrite' 不在 apiRouter 的 CHANNELS 里，getChannel 走 cfg[name] || cfg.default
   //   静默落回 default，而 polish 自己的注释写着「不回落别的通道」。桥只读、零跑（不调 variants）。
-  { ns: 'polish', file: 'engines/polish.js', ver: 'v2.601.0', readers: ['engines/polish-bridge.js'] }
+  { ns: 'polish', file: 'engines/polish.js', ver: 'v2.601.0', readers: ['engines/polish-bridge.js'] },
+  // 第四次改判（v2.602.0）：purifyScope。同一条口径 —— 推翻不是「补了个最小读点销账」，
+  //   而是读数面本身成了产品。引擎自己写着「保护出得去回不来是比没保护更坏的结局」，
+  //   但「从来没跑过 / 跑了但每次无块可保 / 保了没还原 / 实锤回不来」这四种形态，
+  //   在它的自有读数上完全同形。桥零跑（不调 protect / restore / applyWith）。
+  { ns: 'purifyScope', file: 'engines/purify-scope.js', ver: 'v2.602.0', readers: ['engines/purify-scope-bridge.js'] }
 ];
 const ALL_TARGETS = TARGETS.concat(SECOND_WAVE).concat(WIRED_WAVE);
 // 第二批的关键方法（逐台现场实读导出面，不是照抄注释）。
 const KEYS2 = {
   binding: ['getSettings', 'bind', 'read', 'unbind', 'list'],
   calendarPlan: ['getSettings', 'setMonths', 'getMonths', 'label', 'labelNow', 'clear'],
-  purifyScope: ['getSettings', 'protect', 'restore', 'applyWith', 'kinds'],
+  // purifyScope 于 v2.602.0 出列（见 WIRED_WAVE）—— KEYS2 只服务 SECOND_WAVE，故同批移除。
 };
 // 第二批可达面实测（v2.588.0 现场，node tools 复算命令见文档 D3）。
 //   `assign` = 行首顶格后的 `WA.<ns> = {` 处数：必须恰 1 —— 注释里写 `= {...}` 不算。
 const FACES2 = {
   binding: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
   calendarPlan: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
-  purifyScope: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 }
+  // purifyScope 同上（FACES2 只服务 SECOND_WAVE）。
 };
 // 每台至少要有这些方法才算「定义面完整」（不是空对象挂在 WA 上）。
 const KEYS = {
@@ -291,7 +296,7 @@ ok('E2 台账口径：autoHide 已被窄消费者台账登记（本裁决不新�
 });
 
 
-// ═════════ F 第二批：七台零读引擎（v2.588.0 / R264）═════════
+// ═════════ F 第二批：零读引擎（v2.588.0 / R264 时为七台，后逐台出列；现余台数以 SECOND_WAVE 为准）═════════
 ok('F0 第二批命名空间都在 WA 上且是对象', function () {
   SECOND_WAVE.forEach(function (t) {
     assert.ok(W[t.ns], 'WA.' + t.ns + ' 缺席（' + t.file + '）');
@@ -324,7 +329,7 @@ ok('F3 可达面读数与现场逐台相等（面板开关 / 工具表 / 行动�
     assert.strictEqual(dr, f.deskRoute, t.ns + ' 行动台引用 ' + dr + ' ≠ ' + f.deskRoute);
   });
 });
-ok('F4 注册表面：七台各一行「文件 → 命名空间」（注册≠读点）', function () {
+ok('F4 注册表面：第二批各台都有且只有一行「文件 → 命名空间」（注册≠读点）', function () {
   SECOND_WAVE.forEach(function (t) {
     const n = countIn('engines/tool-diag-tables.js', "'" + t.file + "': '" + t.ns + "'");
     assert.strictEqual(n, FACES2[t.ns].registry, t.ns + ' 注册行应为 ' + FACES2[t.ns].registry + '，实 ' + n);
@@ -337,7 +342,7 @@ SECOND_WAVE.forEach(function (t) {
       + ' —— 若是有意接线，请先改 docs/ORPHAN_ENGINES_ADJUDICATION.md 的裁决与改判触发器，再改本锁');
   });
 });
-// ═════════ G 已接线出列：改判是真的（六台，v2.592.0 起逐台出列）═════════
+// ═════════ G 已接线出列：改判是真的（v2.592.0 起逐台出列，台数以 WIRED_WAVE 为准）═════════
 ok('G0 已接线的各台不在第二批名单里（出列不是漏写）', function () {
   const names = SECOND_WAVE.map(function (t) { return t.ns; });
   WIRED_WAVE.forEach(function (t) {
@@ -372,7 +377,7 @@ ok('G3 文档写了各台的改判记录（改判要留痕，不许只改锁）'
   });
 });
 
-ok('F5 文档含第二批七台的命名空间与文件（裁决写进文档才算数）', function () {
+ok('F5 文档含第二批各台的命名空间与文件（裁决写进文档才算数）', function () {
   const doc = fs.readFileSync(path.join(BASE, DOC_REL), 'utf8');
   SECOND_WAVE.forEach(function (t) {
     assert.ok(doc.indexOf(t.ns) >= 0, '文档里没有 ' + t.ns);

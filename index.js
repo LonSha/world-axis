@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.601.0';
+  const VERSION = '2.602.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1688,6 +1688,10 @@
     //   首帧不装，首帧后由 engines/lazy-load.js 串行补装）。三个边界写在文件头：零跑（绝不调
     //   variants —— 那会真发一次模型请求）、零写（不 setSettings / 不 setChannel）、只报有没有不报值。
     'engines/polish-bridge.js',
+    // v2.602.0（PSC-1）：净化保护的配对表。被读方 purifyScope 在首帧档，本模块进惰性档
+    //   （与上面几台同一条口径）。三个边界：零跑（不调 protect/restore/applyWith ——
+    //   它们会改 stat 的六个计数）、零写、只报残留个数不回显正文。
+    'engines/purify-scope-bridge.js',
     // v2.600.0（BND-1）：配置绑定的遮蔽表。被读方 binding 在首帧档（它被 read 消费），
     //   本模块只被工具页面板读，故进惰性档。零写：不 bind / 不 unbind。
     'engines/binding-bridge.js',

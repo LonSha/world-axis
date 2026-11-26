@@ -102,6 +102,8 @@
     //   与 BND-1 相邻：两表治的是同一句话的两半 —— 一个是「我改的那条为什么没生效」，
     //   一个是「我没改的那个为什么用的是别人的」。
     { page: 'tools', id: 'polishroute', label: '润色通道归位（PLS-1）' },
+    // v2.602.0（PSC-1）：净化保护面是第 25 个折叠段。同批登记（口径已定死，不留“下一轮再补”）。
+    { page: 'tools', id: 'purifyscope', label: '净化保护配对（PSC-1）' },
   ];
   const __REG = {
     key: LS_KEY,

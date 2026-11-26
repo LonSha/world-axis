@@ -330,9 +330,52 @@ grep -rln "WA\.polish" --include=*.js engines core render ui actors direction i
 本期自查：这是同款病的**第三次**（v2.597.0 只改产品没改锁、v2.600.0 补齐后，v2.601.0 是提前同批做的）。
 本版没有复发——接线、账本销行（44 → 43）、锁的改判、文档五节七与专锁三件同批完成。
 
+## 五点八、改判记录（v2.602.0）：purifyScope 出列
+
+第四次同款改判（前三次：v2.592.0 四台、v2.597.0 ensemble、v2.600.0 binding、v2.601.0 polish）。
+这一次治的是**净化链的一次文本变换**，而它的失败形态比前几次更隐蔽。
+
+| 命名空间 | 文件 | 出列版本 | 故事面读点 | 为什么这算是真读点 |
+|---|---|---|---|---|
+| `purifyScope` | `engines/purify-scope.js` | **v2.602.0**（PSC-1） | `engines/purify-scope-bridge.js` | 净化保护配对表：读 `kinds` / `getSettings` / `stat`，**一次 `protect` / `restore` / `applyWith` 都不调**——它回答「净化链到底有没有走过保护、走过几次、还原回来几次」 |
+
+这台为什么必须出列：
+
+1. **它自己的注释就写着「保护出得去回不来是比没保护更坏的结局」，而没有人能回答那天发生了哪一种。**
+   `purify-scope.js` 的边界 4 逐字写着：占位符被净化规则吃掉时返回失败体，
+   因为「正文会永久残留占位符」。但这个失败体只能被**调用方**看见，而调用方不存在。
+2. **四种「什么都没发生」在它的自有读数上同形。** `protects` / `restored` / `blocks` 三个数
+   不区分：从来没跑过（`protects === 0`）、跑了但每次无块可保（`blocks === 0`）、
+   保了没还原（`restored < protects`）、实锤回不来（`faults[not-found] > 0`）。
+   而这四种的处置完全不同：第一种要接线，第二种要改图案，后两种要回滚正文。
+3. **cap 处是静默截断。** `if (outer.length >= cap) break` —— 第 `maxBlocks` 块之后的受保护段
+   **不报错、不计数**。返回体的 `count` 只说「保护了几块」，不说「还剩几块没保」。
+   这不是 bug，是判据的静默部分；它必须被写成一条读数，否则「保护全了」与「保护到上限为止」同形。
+
+边界（与前三节同源）：
+
+1. **读数面成产品 ≠ 功能面成产品。** 今天桥的 verdict 是 `never-run` —— 这恰恰证明
+   引擎本体一行未改、链路一次没走。
+2. **读点必须恰等于落地面。** 命中集只有 `engines/purify-scope-bridge.js`（`G1` 逐步比对）。
+3. **桥零跑，这一条比前几台更硬。** `protect` / `restore` 都会改 `stat` 的六个计数，
+   `applyWith` 还会连带调两者。专锁 B12 用三个探针钉住调用计数全 0，
+   并断言调用前后 `purifyScope.stat()` 逐字相等。
+4. **只报结构不报正文。** `residue()` 只回「含几个占位符」，绝不把残留文本带出来 ——
+   那是楼层正文，可能含剧透。专锁 B11e 用「秘密正文」做样本，断言返回体里搜不到那四个字。
+
+复算（应只打印一行）：
+
+```bash
+grep -rln "WA\.purifyScope\b" --include=*.js engines core render ui actors direction index.js \
+  | grep -vE 'tool-diag|narrow-consumers|action-desk-routes'
+# → engines/purify-scope-bridge.js
+```
+
+本期自查：接线、账本销行（43 → 42）、锁的改判、文档本节与专锁五件**同批**完成，未复发旧病。
+
 ## 六、与 `ns-consumer-ledger` 的关系
 
-仍在本锁名下的这几台（TARGETS 3 + 第二批 2）都在零读账本的 `entries` 里，分类不变；已出列的六台里 `polish` / `binding` 已同批销行（销的是「零读」，不是「功能已完成」），`ensemble` 未在账本内，另三台的读点形态见上两节。本文不注销任何条目——
+仍在本锁名下的这几台（TARGETS 3 + 第二批 1）都在零读账本的 `entries` 里，分类不变；已出列的八台里 `polish` / `purifyScope` / `binding` 已同批销行（销的是「零读」，不是「功能已完成」），`ensemble` 未在账本内，另四台的读点形态见上两节。本文不注销任何条目——
 **注销需要读点，而本文的结论正是「现在没有合法读点」**。
 两者的分工是：账本说「它零读」，本文说「为什么零读是对的、什么条件下不再对」。
 
