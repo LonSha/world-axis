@@ -21608,6 +21608,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./inject-tier-apply-v2588.js');
   }
+  // ── v2.588.0 (R6): 外貌词库进注入面专锁（五处同批 / 默认关 / 词库不参与判定）──
+  section('v2.588.0 (R6): 外貌词库进注入面专锁（五处同批 · 默认关 · 不进判据引擎）');
+  {
+    await runLock('./appearance-lexicon-inject-v2588.js');
+  }
   // ── v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁 ──
   section('v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁');
   {

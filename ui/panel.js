@@ -75,6 +75,9 @@
     affect: '情绪通道', bonds: '关系六型', masks: '假面', temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', parallelEvents: '场外事件',
     eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉', beastBond: '驯兽',
     appearance: '外貌契约', attireState: '穿着状态', ladder: '原型阶梯', sceneSlice: '情境切片', gauge: '阻尼量规', rivalry: '竞争焦点', enigma: '信息暗礁', tempo: '节奏齿轮', quota: '伏笔配给', spotlight: '焦点分配', karma: '业力双轴', hazard: '累积风险', marginal: '边际折旧', tolerance: '手段耐受', events: '事件调度', checkpoints: '快照与分支',
+  // v2.588.0（R6）：外貌词库。词库源的显示名必须与源表同批登记 ——
+  //   不加这一行，面板开关会报英文键名，用户看不懂（tests/inject-sources-v2560 的 [D] 组会当场红）。
+  appearanceLexicon: '外貌词库',
     // v2.119.0（拓展计划 ①②）：人物多步计划 / 关系修复。与 SOURCES 同批登记 ——
     //   只加源表不加显示名 ⇒ 注入页/导演页裸露英文键名 `plan`/`mend`，
     //   而那是用户唯一能开关这两个注入源的地方（同 v2.56.0 / v2.96.0 / v2.117.0 的理由）。

@@ -101,7 +101,7 @@ a(meas.ok === true && meas.pages.length === 35,
   'D1 逐页真量：' + meas.pages.length + ' 页量到（现场 35）', meas.pages.length);
 // v2.588.0 跟位：1694 → 1704（地图页 10 个控件：生成/体检/预演/校验/清空/导出 6 个按钮
   //   + 画布宽/高 2 个输入 + 应用按钮 + 导出文本框）。**控件总数涨是被新增入口撑起来的，不是页变胖。**
-  a(meas.totalControls === 1704, 'D2 逐页合计 1704 控件（实测 ' + meas.totalControls + '；v2.588.0 跟位：1694 → 1704）', meas.totalControls);
+  a(meas.totalControls === 1705, 'D2 逐页合计 1705 控件（实测 ' + meas.totalControls + '；v2.588.0 跟位：1694 → 1705 = 地图页 10 个 + 外貌词库开关 1 个）', meas.totalControls);
 const rowOv = (meas.pages || []).filter(function (x) { return x.page === 'overview'; })[0];
 a(rowOv && rowOv.controls === 46 && rowOv.bytes === 25230,   // v2.569.0 跟位：25206 → 25230B（overview 首屏多了那一个复选框及其标签）
   'D3 首屏 overview 实测 ' + (rowOv && rowOv.controls) + ' 控件 / ' + (rowOv && rowOv.bytes) + 'B', rowOv);

@@ -58,6 +58,11 @@
     'eraCycle', 'survival', 'warrant', 'beastBond',
     // v2.69.0: 'appearance' / 'ladder'。与注入分支同批登记（键名 = 命名空间名）。
     'appearance', 'ladder',
+    // v2.588.0（R6）：外貌要素库（描写词库）进注入面。**这是第四类源：词库源** ——
+    //   它不答「世界怎么了」，只给「某一处可以怎么形容」的候选词。
+    //   默认 **false**（见 __REG.def）：开启只多一段候选词，切不影响任何契约判定；
+    //   关着时注入逐字与旧版相同（这是它能现在上线的唯一理由）。
+    'appearanceLexicon',
     // v2.583.0(R254): 'attireState'。与注入分支同批登记，否则开关点了零效果。
     'attireState',
     // v2.70.0: 'sceneSlice', 'gauge', 'rivalry'
@@ -263,6 +268,9 @@ style: false,
         // v2.62.0：因果结算。同四条理由取默认 true（其模块总开关默认为关）。
         // v2.63.0：世界织体 / 社交漩涡 / 悬案。同四条理由取默认 true（其模块总开关默认为关）。
         causal: true, world: true, shadow: true, threads: true, weather: true, difficulty: true, affect: true, bonds: true, masks: true, temporalLock: true, temperament: true, fondness: true, affectionNexus: true, intimateArbiter: true, parallelEvents: true, eraCycle: true, survival: true, warrant: true, beastBond: true, appearance: true, ladder: true, attireState: true, sceneSlice: true, gauge: true, rivalry: true, enigma: true, tempo: true, quota: true, spotlight: true, karma: true, hazard: true, marginal: true, tolerance: true, events: true, checkpoints: true,
+        // v2.588.0（R6）：外貌词库。与上面那一排相反 —— 它是**词库**不是判据，默认取 false：
+        //   默认 true 会让所有老用户凭空多出一段候选词（他们从没开过这个开关，也看不出哪来的）。
+        appearanceLexicon: false,
         worldBrief: true, offstageQueue: true, actStep: true, tracePost: true, misbelief: true, threadSprout: true, dormantLadder: true, consequenceSchedule: true, appointment: true, timeLedger: true, hearsayLedger: true, farAccount: true, interlude: true, letterPost: true,
         // v2.96.0：传播与辟谣。取默认 true（同四条理由——其模块总开关默认为关）。
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
@@ -498,6 +506,36 @@ style: false,
    * 源显示名表（与 SOURCES / VIS_NAMES 同批，仅供失败台账报「用户看得懂的名字」）。
    *   内部常量，不进接口面——避免为观测面付接口冻结的代价。
    */
+  /**
+   * 外貌候选词块（v2.588.0 / R6）。
+   *   词库只给候选，**不当判据**：这里没有一条规则会因为「没用到某个词」而拒收任何东西。
+   *   取值口径：逐层（L1 五官 / L2 身体 / L3 穿着 / L4 身材）每个子项取前 2 个词，
+   *   层内去重后取 8 个 —— 再多就不是「提示」而是「塞满上下文」了。
+   *   词库缺席或全空 ⇒ 返回 空串（不编造、也不报错：注入链上多一段空白比多一个错误好）。
+   * @returns {string} 候选词块（空串 = 没有可给的）
+   */
+  function lexiconHintBlock() {
+    const LX = WA.appearanceLexicon;
+    if (!LX || !LX.LEXICON || typeof LX.LEXICON !== 'object') return '';
+    const ZH = { L1: '五官', L2: '身体', L3: '穿着', L4: '身材' };
+    const groups = [];
+    Object.keys(LX.LEXICON).forEach(function (layer) {
+      const items = LX.LEXICON[layer];
+      if (!items || typeof items !== 'object') return;
+      const words = [];
+      Object.keys(items).forEach(function (k) {
+        const arr = Array.isArray(items[k]) ? items[k] : [];
+        arr.slice(0, 2).forEach(function (w) {
+          const t = String(w == null ? '' : w).trim();
+          if (t && words.indexOf(t) < 0) words.push(t);
+        });
+      });
+      if (words.length) groups.push((ZH[layer] || layer) + '：' + words.slice(0, 8).join('、'));
+    });
+    if (!groups.length) return '';
+    return '[外貌候选词]（仅是候选：可用可不用，也不必逐项对上；没写到的地方不必硬凑）\n' + groups.join('\n');
+  }
+
   const SRC_NAME = {
     sceneIntent: '本幕（场景意图）',
     clock: '世界时间', pulse: '世界脉搏', background: '世界背景', people: '人物此刻',
@@ -508,6 +546,8 @@ style: false,
     temporalLock: '时间锁', temperament: '双层性格', fondness: '好感审计', affectionNexus: '情感中枢', intimateArbiter: '亲密生理',
     parallelEvents: '场外事件', eraCycle: '资料片周期', survival: '生存三轴', warrant: '通缉',
     beastBond: '驯兽', appearance: '外貌契约', ladder: '原型阶梯', attireState: '穿着状态', sceneSlice: '情境切片',
+    // v2.588.0（R6）：词库源的显示名。不加这一行，开关列表会报英文键名，用户看不懂。
+    appearanceLexicon: '外貌词库',
     gauge: '阻尼量规', rivalry: '竞争焦点', enigma: '信息暗礁', tempo: '节奏齿轮',
     quota: '伏笔配给', spotlight: '焦点分配', karma: '业力账', hazard: '风险账',
     marginal: '边际折旧', tolerance: '手段耐受', events: '事件调度', checkpoints: '快照与分支',
@@ -1577,6 +1617,13 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.beastBond && WA.beastBond) { const bb = engineCall('beastBond', function () { return WA.beastBond.buildBlock(); }); if (bb) items.push({ source: '驯兽', content: bb }); }
       // v2.69.0 外貌分级契约 / 原型阶梯。总开关关闭时 buildBlock 返回空串，零 token。
       if (vis.appearance && WA.appearance) { const ap = engineCall('appearance', function () { return WA.appearance.buildBlock(); }); if (ap) items.push({ source: '外貌契约', content: ap }); }
+      // v2.588.0（R6）：外貌候选词进正文注面。**默认关**（__REG.def.appearanceLexicon=false）。
+      //   它只给候选词，不做任何判定：词表里没有的词照样能写，词表里的词也可以一个不用。
+      //   与 appearance 分支的关系：那一条答「这个角色的契约是什么」，本条答「可以怎么形容」。
+      if (vis.appearanceLexicon && WA.appearanceLexicon) {
+        const lx = lexiconHintBlock();
+        if (lx) items.push({ source: '外貌词库', content: lx });
+      }
       if (vis.ladder && WA.ladder) { const ld = engineCall('ladder', function () { return WA.ladder.buildBlock(); }); if (ld) items.push({ source: '原型阶梯', content: ld }); }
       // v2.583.0：穿着状态。与外貌契约紧邻——一个答「这人该写多细」，一个答「这身衣服此刻怎样」。
       //   总开关关闭/无登记时 buildBlock 返回空串，零 token。
