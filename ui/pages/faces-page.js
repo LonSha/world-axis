@@ -96,7 +96,7 @@
 
     const bar = '<div class="wa-row">'
       + '<input id="wa-faces-kw" class="wa-input" style="max-width:200px" placeholder="按键名/模块名搜（如 map、inject）" value="' + esc(VIEW.kw) + '"/>'
-      + '<select id="wa-faces-only" class="wa-input" style="max-width:130px">'
+      + '<select id="wa-faces-only" class="wa-input" title="筛选：只看开着的 / 只看关着的 / 只看改过的 / 只看可翻的 / 只看纯参数面" style="max-width:130px">'
       + ['all:全部', 'switchable:只看有开关的', 'off:只看关着的', 'on:只看开着的', 'changed:只看改过的', 'no-enabled:只看纯参数']
         .map(function (x) { const p = x.split(':'); return '<option value="' + p[0] + '"' + (VIEW.only === p[0] ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('')
       + '</select>'

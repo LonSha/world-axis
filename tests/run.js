@@ -585,6 +585,8 @@ const LOAD = [
     //   `WA.__settingsRegs`（登记在各引擎执行期 concat），写回走调用期的 settingsBus。
     //   故位置无关，排这里只为与 index.js 的 LOAD_ORDER 同序。
     'engines/settings-desk.js',
+  // v2.590.0（R265 / PBS-1）：两套待办聚合器的对读面。与 index.js 的 LOAD_ORDER 同序。
+  'engines/pending-recon.js',
     // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
     'engines/geo-tracker.js',
   'engines/ruin-mechanism.js',
@@ -21622,6 +21624,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   {
     await runLock('./settings-desk-v2589.js');
   }
+  // ── v2.590.0 (PBS-1): 两套待办聚合器对读面专锁（零模块名 · 五条判读分支 · 四种不可比较 · 非空转）──
+  section('v2.590.0 (PBS-1): 两套待办聚合器对读面专锁（只报能证伪的分歧 · 不可读就不对读）');
+  {
+    await runLock('./pending-recon-v2590.js');
+  }
   // ── v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁 ──
   section('v2.246.0 (MAP-2): SVG 视口平滑飞行漫游、动态避让与同地聚类专锁');
   {
@@ -23556,7 +23563,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.589.0';
+  const __wantPin293 = '2.590.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

@@ -121,9 +121,9 @@
 
     const setBar = '<div class="wa-row">'
       + '<span class="wa-dim">画布</span>'
-      + '<input id="wa-map-w" class="wa-input" type="number" style="width:82px" value="' + (gs ? n(gs.width) : 1600) + '"/>'
+      + '<input id="wa-map-w" class="wa-input" type="number" title="底图宽度（像素）—— 生成器按此比例铺路网与街区" style="width:82px" value="' + (gs ? n(gs.width) : 1600) + '"/>'
       + '<span class="wa-dim">×</span>'
-      + '<input id="wa-map-h" class="wa-input" type="number" style="width:82px" value="' + (gs ? n(gs.height) : 1200) + '"/>'
+      + '<input id="wa-map-h" class="wa-input" type="number" title="底图高度（像素）—— 与宽度共同决定街区密度" style="width:82px" value="' + (gs ? n(gs.height) : 1200) + '"/>'
       + '<button class="wa-btn wa-mini" id="wa-map-set" title="写进生成器设置（走设置总线，带边界校验）">应用</button>'
       + '<span class="wa-dim">改动只影响下一次生成</span>'
       + '</div>';
@@ -167,7 +167,7 @@
     return head + bar + setBar + out + stat
       + '<div id="wa-map-canvas" class="wa-map-canvas" style="height:420px;overflow:auto;border:1px solid rgba(255,255,255,0.08);border-radius:6px;margin-top:8px">' + canvas + '</div>'
       + '<div class="wa-dim">读法：面（水/区/街区）在下、路（线）在中、点（POI）在上；每个面/点都带 data-name，可在控制台按名字查。</div>'
-      + '<textarea id="wa-map-json" class="wa-input" style="display:none;width:100%;height:120px;margin-top:6px" readonly></textarea>';
+      + '<textarea id="wa-map-json" class="wa-input" title="生成结果原文（只读）—— 逐条 addPoly/addRect/addRoad/addPoi，点「导出」后可复制" style="display:none;width:100%;height:120px;margin-top:6px" readonly></textarea>';
   }
 
   /** 重绘本页（goPage 同页也会 renderBody，见 ui/panel.js 的 goPage）。 */

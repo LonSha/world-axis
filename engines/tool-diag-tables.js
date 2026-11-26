@@ -873,7 +873,11 @@
     //   不认这三个 ns ⇒ 调用点被静默跳过。ns 名取自各文件 `WA.<ns> = {`。
     'engines/api-vault.js': 'apiVault',
     'engines/import-kind.js': 'importKind',
-    'engines/story-export.js': 'storyExport'
+    'engines/story-export.js': 'storyExport',
+    // v2.590.0（R265 / PBS-1）：两套待办聚合器的对读面。**不是引擎族的例外**：它同样要进本表，
+    //   否则「诊断清单覆盖全部磁盘模块」这条判据会把它的装载失败与契约漂移一并吞掉 ——
+    //   而那正是这张表存在的理由（v2.273.0 立表时写的第一句）。
+    'engines/pending-recon.js': 'pendingRecon'
   };
 
   // 无头环境（tests/命令行）不加载 UI 层，故这些导出为可选

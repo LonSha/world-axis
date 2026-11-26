@@ -169,8 +169,11 @@ const tick = function () { return new Promise(function (r) { setImmediate(r); })
   //     ⇒ loaded 582 → 584、loadOrder 588 → 592（引擎 +1、页面 +1、index.js 的 ui/pages/faces-page.js 一条、
   //     tests/run.js LOAD 一条，两表各 +2）、ui 24 → 26（faces-page 与 panelFacesPage 的读者面）。
   //     惰性档 18 不动；恒等式 584 = 592 − 26 + 18 成立。
-  a(led.loadedCount === 584 && led.loadOrderCount === 592 && led.lazyCount === 18 && led.uiCount === 26,
-    'B10 契约面 584 = 首帧 592 − ui 26 + 惰性 18（契约面 = 首帧非 ui ∪ 惰性；实测 '
+  //   v2.590.0（R265 / PBS-1）：新增 engines/pending-recon.js（纯引擎、无新 ui 文件）⇒
+  //     loaded 584 → 585、loadOrder 592 → 593（index.js 与 tests/run.js 两表各 +1）；
+  //     ui 26 与惰性 18 都不动；恒等式 585 = 593 − 26 + 18 成立。
+  a(led.loadedCount === 585 && led.loadOrderCount === 593 && led.lazyCount === 18 && led.uiCount === 26,
+    'B10 契约面 585 = 首帧 593 − ui 26 + 惰性 18（契约面 = 首帧非 ui ∪ 惰性；实测 '
       + [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount].join(' / ') + '）',
     [led.loadedCount, led.loadOrderCount, led.lazyCount, led.uiCount]);
   // 首帧装载边 vs 全量装载边（验收原话的读数）

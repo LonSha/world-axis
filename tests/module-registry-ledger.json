@@ -1,14 +1,14 @@
 {
- "version": "2.589.0",
- "loadOrderCount": 592,
+ "version": "2.590.0",
+ "loadOrderCount": 593,
  "lazyCount": 18,
- "loadedCount": 584,
+ "loadedCount": 585,
  "uiCount": 26,
- "nsCount": 595,
+ "nsCount": 596,
  "totals": {
-  "loadEdges": 479,
+  "loadEdges": 480,
   "hardEdges": 0,
-  "callRefs": 774,
+  "callRefs": 776,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -255,6 +255,7 @@
     "engines/parallel-world.js",
     "engines/pawn-redemption.js",
     "engines/pending-center.js",
+    "engines/pending-recon.js",
     "engines/perf-baseline.js",
     "engines/periodical-ideology.js",
     "engines/periodicals.js",
@@ -842,6 +843,7 @@
     "engines/overhear-split.js",
     "engines/pawn-redemption.js",
     "engines/pending-center.js",
+    "engines/pending-recon.js",
     "engines/perf-baseline.js",
     "engines/periodical-ideology.js",
     "engines/periodicals.js",
@@ -2999,6 +3001,25 @@
   "engines/settings-desk.js": {
    "ns": [
     "settingsDesk"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/pending-recon.js": {
+   "ns": [
+    "pendingRecon"
    ],
    "requires": [
     "registerModule"

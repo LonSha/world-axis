@@ -4082,6 +4082,32 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           return esc(String(x.name)) + (x.available ? ' ✓' : ' <span class="wa-dim">✗(缺席)</span>');
         }).join('　') + '</span>';
   }
+  /** v2.590.0（R265 / PBS-1）：两套聚合器的对读一行读数（真源 `pendingRecon.read()`）。
+   *  本页**不自己比两边的条数** —— 口径差不是分歧（引擎 note 逐字写明），这里只显示引擎的判读结果。
+   *  引擎缺席 / 不可比较时如实报，**不显示「一致」**：这一侧没有读数与两边一致是两件事。 */
+  function todoReconLine() {
+    const R = WA.pendingRecon;
+    if (!R || typeof R.read !== 'function') {
+      return '<div class="wa-item" id="wa-td-recon-absent"><b>两账对读</b>：引擎缺席'
+        + '（<code>engines/pending-recon.js</code> 未装载）　<span class="wa-dim">这不是「两套读数一致」，是对读这一面没有读数</span></div>';
+    }
+    let r = null;
+    try { r = R.read({}); } catch (e) { r = null; }
+    if (!r || r.ok !== true) {
+      return '<div class="wa-item" id="wa-td-recon-absent"><b>两账对读</b>：读不出来'
+        + '（<code>pendingRecon.read()</code> 抛异常或返回非法）　<span class="wa-dim">不拿空表冒充</span></div>';
+    }
+    const c = r.counts || {};
+    const dv = (r.divergences || []).length;
+    return '<div class="wa-item"><b>两账对读</b>（<code>WA.pendingCenter</code> 与 <code>WA.unifiedPending</code>，'
+      + '真源 <code>pendingRecon.read()</code>）：'
+      + (r.comparable
+        ? ('交集 <b>' + c.shared + '</b> 源（一致 <b>' + c.agree + '</b> / 分歧 <b>'
+          + (dv ? '⚠ ' + dv : '0') + '</b>）　覆盖差 A 独 <b>' + c.aOnly + '</b> / B 独 <b>' + c.bOnly + '</b>'
+          + (dv ? '　<span class="wa-dim">分歧逐条见下方「两账对读」按钮</span>' : ''))
+        : ('<span class="wa-dim">' + esc(String(r.summary || '')) + '</span>'))
+      + '</div>';
+  }
   function renderTodoCenter() {
     const P = WA.pendingCenter;
     const on = !!(P && typeof P.getSettings === 'function' && (P.getSettings() || {}).enabled);
@@ -4121,6 +4147,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
         读得到 <b>${readOk ? '是' : '否'}</b>、条目 <b>${rows.length}</b>。
         </div>
       <div class="wa-row">${todoSourceLine()}</div>
+      ${todoReconLine()}
       <div class="wa-item"><b>按归属</b>（世界 / 人物 / … —— 取自引擎 <code>describe().page</code>）：${ownerLine}</div>
       <div class="wa-dim">${TODO_DUE_NOTE}</div>
 ${emptyDrill}
@@ -4130,6 +4157,7 @@ ${emptyDrill}
         <button class="wa-btn" id="wa-td-src" title="逐源可用性：八源各自在场与否 + 各读过几条 —— 缺席的如实报缺，不静默消失">逐源可用性</button>
         <button class="wa-btn" id="wa-td-drill" title="下钻一条：只给路由（去哪看 / 看哪条 / 哪个设置键），不执行确认动作">下钻一条</button>
         <button class="wa-btn" id="wa-td-flags" title="三旗标：unavailable（读不到）/ emptyAll（有源且全部自报无数据）/ allClear（读过且此刻没有待办）逐条分开报">空态三旗标</button>
+        <button class="wa-btn" id="wa-td-recon" title="两账对读：把 WA.pendingCenter（八源）与 WA.unifiedPending（七探针）在**交集源**上逐条对照 —— 只报能证伪的分歧（在场性 / 故障）；条数不比相等，覆盖差不算错误；任一侧读不到时明说「对读不成立」而不是「一致」">两账对读</button>
         <button class="wa-btn" id="wa-td-diag" title="自证面：八源在场性、empty 申报面（emptyAll 这盏灯能不能亮）、拒收与故障计数">诊断</button>
         <button class="wa-btn" id="wa-td-act" title="可处理：把第一条带动作的待办**经来源模块自己的写口**处理掉（真源 pendingCenter.act()）—— 本页不新增确认逻辑，也不替玩家编参数">处理第一条</button>
       </div>
@@ -15395,6 +15423,68 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
           + ' 次 · 最近原因 ' + esc(String(st.lastReason || '无'))
           + '　故障键 ' + esc(Object.keys(st.faults || {}).length) + ' 个</div>' : '')
         + '<div class="wa-dim">本页读它只为自证在场性 —— 面板不是新的状态容器（Y4 边界 1）。</div>');
+    });
+
+    // ── v2.590.0（R265 / PBS-1）：两账对读（一枚**只读**按钮）──────────────────
+    //   边界与整页一致：本按钮**不产生第三条清单**—— 它只把两套聚合器在交集源上的
+    //   在场性与故障并列出来，逐条报能证伪的分歧。条数不比相等（口径差），覆盖差不算错误，
+    //   任一侧读不到时明说「对读不成立」—— 这三条都是引擎的判据，本页只负责不把它渲染错。
+    on('#wa-td-recon', () => {
+      const R = WA.pendingRecon;
+      if (!R || typeof R.read !== 'function') return tdMiss('两账对读引擎（engines/pending-recon.js）');
+      let r = null;
+      try { r = R.read({}); } catch (e) {
+        return tdOut('<div class="wa-log wa-log-err">两账对读读失败：'
+          + esc(String((e && e.message) || e)) + ' —— 不拿空表冒充</div>');
+      }
+      if (!r || r.ok !== true) return tdOut('<div class="wa-log wa-log-err">两账对读返回非法 —— 不拿空表冒充</div>');
+      const bits = [];
+      const clean = r.comparable && !(r.divergences || []).length;
+      bits.push('<div class="wa-log ' + (clean ? 'wa-log-info' : 'wa-log-warn') + '">对读'
+        + '（真源 <code>WA.pendingRecon.read()</code> · v' + esc(String(r.version)) + '）：'
+        + esc(String(r.summary)) + '</div>');
+      if (!r.comparable) {
+        bits.push('<div class="wa-dim">不可比较的原因逐字：<code>' + esc(String(r.notComparable)) + '</code>'
+          + (r.a && r.a.detail ? '　A 侧细节 ' + esc(String(r.a.detail)) : '')
+          + (r.b && r.b.detail ? '　B 侧细节 ' + esc(String(r.b.detail)) : '') + '</div>');
+        bits.push('<div class="wa-dim">本面<b>没有</b>报出任何分歧：不是因为没有分歧，'
+          + '是因为至少一侧没有读数（「读不到」与「一致」两件事）。</div>');
+      } else {
+        bits.push('<div class="wa-item"><b>交集逐源</b>（' + r.counts.shared + ' 源）：'
+          + (r.shared.length ? '' : '<span class="wa-dim">交集为空 —— 两套聚合器的源名单没有一处重叠，'
+            + '此时「对读」本身没有对象</span>') + '</div>');
+        r.shared.forEach(function (x) {
+          const mark = (x.verdict === 'agree') ? '✓ 一致'
+            : ((x.verdict === 'both-absent') ? '<span class="wa-dim">两侧都缺席</span>' : '<b>⚠ 分歧</b>');
+          bits.push('<div class="wa-dim">　· <code>' + esc(String(x.name)) + '</code>　A '
+            + esc(String(x.a.state)) + '（' + esc(String(x.a.reason || '—')) + '）　B '
+            + esc(String(x.b.state)) + '（' + esc(String(x.b.reason || '—')) + '）　' + mark
+            + (x.note ? '　' + esc(String(x.note)) : '') + '</div>');
+        });
+        if ((r.divergences || []).length) {
+          bits.push('<div class="wa-log wa-log-warn">分歧 ' + r.divergences.length
+            + ' 条（只列能证伪的在场性与故障两类）：</div>');
+          r.divergences.forEach(function (d) {
+            bits.push('<div class="wa-dim">　· <b>' + esc(String(d.kind)) + '</b> <code>'
+              + esc(String(d.name)) + '</code>：' + esc(String(d.note || '')) + '</div>');
+          });
+        }
+        bits.push('<div class="wa-item">覆盖差（<b>不是错误</b>）：A 独 ' + r.counts.aOnly + ' 源'
+          + (r.aOnly.length ? '（' + r.aOnly.map(function (n) { return esc(String(n)); }).join('、') + '）' : '')
+          + '　｜　B 独 ' + r.counts.bOnly + ' 源'
+          + (r.bOnly.length ? '（' + r.bOnly.map(function (n) { return esc(String(n)); }).join('、') + '）' : '') + '</div>');
+        bits.push('<div class="wa-dim">条数并列：A total <b>' + esc(String(r.a.total)) + '</b>'
+          + (r.a.capped ? '（已截断，shown ' + esc(String(r.a.shown)) + '）' : '')
+          + '　B total <b>' + esc(String(r.b.total)) + '</b>　—— <b>不比相等</b>（A 只收有待处理动作的行、'
+          + 'B 收全量，口径差不是分歧）。</div>');
+        bits.push('<div class="wa-dim">A 三旗标 unavailable '
+          + (r.a.flags && r.a.flags.unavailable ? '✓' : '—') + '　emptyAll '
+          + (r.a.flags && r.a.flags.emptyAll ? '✓' : '—') + '　allClear '
+          + (r.a.flags && r.a.flags.allClear ? '✓' : '—')
+          + '　｜　B 三态 <b>' + esc(String(r.b.state)) + '</b>（fault 优先：有模块坏了就必须报）。</div>');
+        bits.push('<div class="wa-dim">本面零写：不调任何写口、不建事务、不缓存 —— 真源仍是两套聚合器各自返回体（引擎头「零硬编码源名单」一节）。</div>');
+      }
+      tdOut(bits.join(''));
     });
 
     // ── v2.200.0（Y5）：世界快照与整包搬运（四枚只读 + 一枚写口 + 库操作）──────

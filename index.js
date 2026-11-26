@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.589.0';
+  const VERSION = '2.590.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -565,6 +565,9 @@
     'engines/map-generator.js',
     // v2.589.0（R264 / CFG-1）：设置面总账台（清单在调用期读 __settingsRegs，写回走 settingsBus）。
     'engines/settings-desk.js',
+    // v2.590.0（R265 / PBS-1）：两套待办聚合器的对读面。**零装载期依赖**：两侧都只在调用期读
+    //   （pendingCenter / unifiedPending），名单也在调用期从它们的返回体里取。位置无关，排此只为同序。
+    'engines/pending-recon.js',
     // v2.245.0 (MAP-1): 具象物理坐标、角色落位追踪与生活圈透镜
     'engines/geo-tracker.js',
     // v2.328.0 (MAP-ADVANCED): 分形空间拓扑、通勤滞留仲裁、视听阻抗遮蔽与现场物理痕迹
