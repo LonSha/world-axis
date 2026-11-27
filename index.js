@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.608.0';
+  const VERSION = '2.609.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -2258,7 +2258,7 @@
     //     与同步/备份开关（def.syncToChat / def.autoBackup，v2.19.0 补声明）配合生效。
     //   两者均幂等（自持已挂载标记，重复调用返回 false）。
     //   · [v2.20.0] 移除 v2.19.0 加入的 `WA.inspector.init()` 接线——其前提为误判：
-    //     经实测，engines/inspector.js（WA.inspector）与 engines/inject-inspector.js
+    //     经实测，engines/inspector.js（WA.inspector；v2.20.0 已删除）与 engines/inject-inspector.js
     //     （WA.injectInspector）订阅**同一批**宿主 prompt-ready 事件；而 injectInspector 是
     //     前者的严格超集（多 memory 作用域、MISSING/SKIPPED_REROLL/SUCCESS_SLOTS_ONLY 状态、
     //     订阅重试、快照 clone 隔离、flatten/safe），且只有它被面板/诊断消费

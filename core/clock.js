@@ -45,7 +45,9 @@
  *
  * 不做什么：**不写 localStorage**。时钟不新增任何持久键——键预算由 store 登记表管着，
  *   时钟没有资格占地。代价：刷新页面即解除冻结（冻结是会话内的显式动作）。
- *   要跨会话复现就带着 tape 走，那是回放台（core/replay.js）的责任，不是时钟的。
+ *   要跨会话复现就带着 tape 走，那是回放的责任（`core/rand.js` 的 `replay`；跨会话先经
+ *   `engines/tape-store.js` 取卷），不是时钟的。（v2.609.0 校正：原文写的 `core/replay.js`
+ *   在本仓从未存在过——回放一直在 `core/rand.js`，「回放台」是它的旧称。）
  *   也**不接管** `new Date()`：全库 `new Date(...)` 只出现在格式化输出路径上
  *   （`toLocaleString` / `toISOString`，见 store/tool-diag/panel），
  *   它们的入参本来就是决策时间戳或纯展示时刻，改它没有收益、只增加漂移面。

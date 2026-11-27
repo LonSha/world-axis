@@ -887,7 +887,7 @@
     'contract-unavailable', 'control-usage-unavailable', 'engine-missing', 'not-on-desk',
     'panel-yield-unavailable', 'projection-failed', 'ui-not-loaded',
     // ── v2.295.0（V9 十八项）：本批 18 个续接链路新拒收码（engines/world-seed.js /
-    //   engines/continuation.js 等续接面）。此前只在码面口径里，没进本快照 —— 与本仓
+    //   engines/player-archive.js 等续接面）。此前只在码面口径里，没进本快照 —— 与本仓
     //   已栽过六次的同形态（v2.203.0 / v2.209.0 / v2.221.0 / v2.222.0 / v2.231.0 / 体检批次）。
     //   两侧比对前都会 sort，故追加在末尾不改任何既有位置。
     //   恢复档：16 条由规则表词族收住（bad-* / stale-* / missing / changed / nothing-to-* /

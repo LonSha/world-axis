@@ -2,8 +2,8 @@
  * WorldAxis engines/inspector-state.js (v0.9.0) — 跨引擎状态一致性检查器（纯只读）
  * 缝合来源：DlSNlGHT World —— world-engine-ui.js 注入自检 + 各面板枚举校验逻辑
  *
- * 定位：与 engines/inspector.js 的区别
- *  - inspector.js  ：检查「注入是否真的进了正文」（运行时哨兵，看 prompt 组装结果）
+ * 定位：与 engines/inject-inspector.js 的区别
+ *  - inject-inspector.js：检查「注入是否真的进了正文」（运行时哨兵，看 prompt 组装结果）
  *  - 本引擎        ：检查「store 里的世界状态自身是否自洽」（数据层体检）
  *
  * 铁律：

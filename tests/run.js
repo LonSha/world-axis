@@ -17187,6 +17187,9 @@ assert(r2900.dead.length === 2093 && r2900.uiDead.length === 6 && r2900.dataOnly
   //   127 台全部对应 v2.412.0 全开策略（35d2c93）；本轮把四个字改成「默认开启」，
   //   并把 127 台点名进「只减不增」名单。纯脚本体，故同规走 runScript。
   await runScript('./default-face-v2608.js');
+  // v2.609.0（PTH-1）：注释指路面 —— 注释里的路径引用是否走得通。
+  //   1652 处引用：1637 在位 / 12 上游（带主体词）/ 1 占位 / 2 历史 / 0 缺失（本轮改出）。
+  await runScript('./path-face-v2609.js');
   await runLock('./org-v2540.js');
   await runLock('./orphan-lock-v2750.js');
   await runLock('./orphan-lock-v2750.js', 'runNegative');
@@ -23659,7 +23662,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.608.0';
+  const __wantPin293 = '2.609.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');
