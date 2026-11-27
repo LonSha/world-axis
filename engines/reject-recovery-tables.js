@@ -80,6 +80,9 @@
     'pre-violation': { kind: 'manual-review', why: '违规前置态，需人确认是否已发生' },
     'tries-exhausted': { kind: 'permanent-reject', why: '重试次数已用尽，别再试' },
     'cannot-afford': { kind: 'request-setup', why: '资源不够：先补资源再提交' },
+    // v2.615.0: settings-desk 的写后读回失败 —— 规则表判不出档；它不是输入错、也不是永久拒，
+    //   而是刚写入的状态没能从存档复读回来，需人工核对存档/缓存一致性。
+    'write-unverified': { kind: 'manual-review', why: '写成功但读回不符：核对存档与内存读口是否一致，再决定是否重做' },
     // ── v2.295.0（V9 十八项）：续接链路两条分词判不出档的新码（词表收不住，逐条显式登记）。
     'continuation-tail-required': { kind: 'request-setup', why: '续接前须先回放尾巴：先补齐尾巴前置，再重发同一次续接' },
     'dangling-continuation-relation': { kind: 'manual-review', why: '续接指向的关系已悬空：修边还是弃续接，机器判不了' },
@@ -346,7 +349,8 @@
     // v2.566.0：engines/dream.js:219 的 `reason: 'settle-' + (g.reason || 'unknown')` 同款拼接式。
     //   扫描面只看到前缀 `settle-`，真码在运行期成形（settle-*）—— 不是码，不猜恢复动作。
     'settle-': "拼接式 reason（`'settle-' + (g.reason || 'unknown')`，engines/dream.js 梦卷结算）：词法面只能看到前缀",
-    'store-': "拼接式 reason（`'store-' + String((r2 && r2.error) || '?')`）：词法面只能看到前缀，真码在运行期成形"
+    'store-': "拼接式 reason（`'store-' + String((r2 && r2.error) || '?')`）：词法面只能看到前缀，真码在运行期成形",
+    'dice-': "拼接式 reason（`'dice-' + verdict/band`，engines/act.js 与 engines/story-window.js）：词法面只看到前缀，真码在运行期成形"
   };
   /** 判不出面（源码里那个对象不带 `ok`）的**逐条人工判定**。
    *  语义机器判不出来：决策理由（`{action:'pause',reason:'crisis'}`）、
@@ -657,7 +661,9 @@
     'change-not-applied', 'checksum-mismatch', 'choose-failed', 'claimed-by-other', 'clear-throw', 'closed',
     'clues-full', 'coalesced', 'conflicts-unresolved', 'consume-failed', 'consumer-missing', 'contract-mismatch', 'contracts-full',
     'contrast-failed', 'contrast-thrown', 'crowd', 'cycle', 'dangling-ref', 'deals-full',
-    'debts-throw', 'dedup', 'deferred-full', 'disabled', 'div-zero', 'dup-rung',
+    'debts-throw', 'dedup', 'deferred-full', 'disabled', 'div-zero', 'dice-', 'dup-rung',
+    // v2.615.0: `dice-` 是拼接式前缀（act/story-window 的 'dice-' + verdict/band），
+    //   A8 要求 ARTIFACTS 的键同时在 REJECT_FACE 快照里。
     'dup-text', 'duplicate', 'duplicate-blueprint', 'duplicate-enact', 'duplicate-event', 'duplicate-hypothesis',
     'duplicate-id', 'duplicate-op', 'duplicate-project', 'duplicate-receipt', 'duplicate-seed', 'duplicate-settle',
     'duplicate-tick', 'effects-full', 'emotion-word', 'empty', 'empty-blueprint', 'empty-goal',
@@ -689,16 +695,17 @@
     'missing-route', 'missing-source', 'missing-span', 'missing-stamp', 'missing-steps', 'missing-text',
     'missing-thread', 'missing-title', 'missing-token', 'missing-transit-time', 'missing-trigger', 'missing-user',
     'missing-what', 'missing-who', 'missing-why', 'missing-window', 'missing-with', 'module-absent',
+    'invalid-bool', 'invalid-key', 'invalid-shares',
     'module-missing', 'name-taken', 'need-confirm', 'need-receipt', 'need-resync', 'need-steps', 'need-unmet',
     'negative-span', 'nested-deferred', 'never-swept', 'no-action', 'no-active-goal', 'no-actor',
     'no-aftermath', 'no-authority', 'no-base', 'no-baseline', 'no-basis', 'no-batch',
     'no-budget', 'no-bytes', 'no-campaign', 'no-candidates', 'no-capacity', 'no-cause', 'no-change',
     'no-channel', 'no-chat', 'no-chronicle', 'no-clock', 'no-companion', 'no-conflict',
     'no-debt', 'no-draft', 'no-entry', 'no-factions', 'no-goal', 'no-history',
-    'no-host', 'no-id', 'no-input-el', 'no-journey', 'no-lab', 'no-legends',
+    'no-enabled', 'no-host', 'no-id', 'no-input-el', 'no-journey', 'no-lab', 'no-legends',
     'no-localStorage', 'no-merit', 'no-migration', 'no-name', 'no-needs', 'no-negative-step',
     'no-new-remedy', 'no-ops', 'no-options', 'no-outline', 'no-pack', 'no-pending',
-    'no-perf-trace', 'no-plan', 'no-preview', 'no-proposal', 'no-reading', 'no-receipt',
+    'no-place-names', 'no-perf-trace', 'no-plan', 'no-preview', 'no-proposal', 'no-reading', 'no-receipt',
     'no-relation-face', 'no-result', 'no-rotation', 'no-rules', 'no-scene',
     'no-sections', 'no-seed', 'no-session', 'no-shadow', 'no-signal', 'no-snapshot',
     'no-stages', 'no-step', 'no-steps', 'no-storage', 'no-store', 'no-story-clock', 'no-subject', 'no-such-experience',
@@ -753,7 +760,7 @@
     'unknown-shipment', 'unknown-site', 'unknown-source', 'unknown-span', 'unknown-stage', 'unknown-subject',
     'unknown-theme', 'unknown-transition', 'unknown-user', 'unparseable', 'unreachable', 'unreadable',
     'verify', 'weak-evidence', 'window-closed', 'window-too-short', 'world-missing', 'write',
-    'write-fail', 'write-failed', 'wrongs-full',
+    'write-fail', 'write-failed', 'write-unverified', 'wrongs-full',
     // ── v2.203.0 补登：四条线的拒收面新码（此前只进码面口径、没进本快照）──
     'ambiguous-label', 'bad-edge-kind', 'bad-snapshot-ver', 'budget-exceeded', 'empty-snapshot',
     'empty-world', 'ls-write-failed', 'schema-ahead', 'source-absent',

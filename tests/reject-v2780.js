@@ -10322,6 +10322,9 @@ function runWitness(WA) {
       }
     }
   }
+  // dice- 是扫描器读到的拼接前缀，不是 resolve() 的返回码。
+  // tests/dice-wiring-v2611.js 的 D3/D7 从真实 choose() 出口验证成品码与重按结果。
+
 
   const missing = Object.keys(expect).filter(function (c) { return !seen[c]; });
   const unexpected = Object.keys(seen).filter(function (c) { return !expect[c]; });
