@@ -288,8 +288,12 @@ async function main() {
       const m = /id: '([a-z]+)'/.exec(line);
       if (m) askPages.push(m[1]);
     });
-    assert(askPages.length === 6,
-      '带 ask 的页恰 6 页（实 ' + askPages.length + '：' + askPages.join('、') + '）—— 新增页请同时给它一张结论卡');
+    // v2.615.0（R291）：ask 结论卡面已从原六页扩到七页（faces 页补入）。
+    //   判据不再是『恰好六页』的历史快照，而是『有 ask 页必有一张结论卡』的契约：
+    //   新增页只要带 ask，就必须同时给玩家结论卡，否则当场红。
+    const known = ['overview','world','people','events','settings','faces','connect'];
+    assert(known.every(function (id) { return askPages.indexOf(id) >= 0; }),
+      '已登记的七个 ask 页不可丢失（实：' + askPages.join('、') + '）');
     // ⚠ 顺序很要紧：**先 open() 再 transact**。反过来写实测过一次红 —— open() 之后的装载
     //   收尾会把盘里的旧世界盖回内存，之前 transact 的 clock/people 一起消失，
     //   于是概览页退回 bootCard、人物页退回 empty（两页合法地没有结论卡），
@@ -331,7 +335,7 @@ async function main() {
       if (pos < 0) { bad.push(id + ':结论卡文字不在正文里'); return; }
       if (pos > 60) bad.push(id + ':位置太靠后(第 ' + pos + ' 字)');
     });
-    assert(bad.length === 0, '六页首屏都有非空结论卡且在细节之前（异常：' + (bad.join('；') || '无') + '）');
+    assert(bad.length === 0, '每个 ask 页首屏都有非空结论卡且在细节之前（异常：' + (bad.join('；') || '无') + '）');
   }
 
   // ── G17-L「豁免 ≠ 允许腐烂」：手动探针也要有人定期跑 ───────────────────────

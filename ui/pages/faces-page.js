@@ -88,8 +88,15 @@
     const dg = (typeof d.diagnose === 'function') ? d.diagnose() : null;
     const l = d.list({ only: VIEW.only, kw: VIEW.kw, limit: VIEW.limit });
     const t = l.totals || {};
+    const summary = typeof d.summaryText === 'function' ? d.summaryText(dg) : '';
+    const verdict = '<div class="wa-verdict"><b>此刻</b><ul>'
+      + '<li>这个机制开没开：' + esc(summary || '设置面台读数不可用 —— 这不是「没有设置面」') + '</li>'
+      + '<li>能不能翻：行内标着「纯参数，不可翻」的没有开关；其余勾选走设置总线写回并读回复核</li>'
+      + '<li>翻完存住没有：每次操作结果留在下方「上一次」，拒收写明原因，不静默还原</li>'
+      + '</ul></div>';
     const head = '<div class="wa-sec">设置面总账（清单由登记表现场生成，页面上不存第二份）</div>'
-      + '<div class="wa-dim" id="wa-faces-head">' + esc(typeof d.summaryText === 'function' ? d.summaryText(dg) : '') + '</div>'
+      + verdict
+      + '<div class="wa-dim" id="wa-faces-head">' + esc(summary) + '</div>'
       + (dg && dg.sameOrigin === false
         ? ('<div class="wa-dim" id="wa-faces-dup"><b>警告：</b>' + esc(dg.note || '') + '</div>') : '')
       + (dg && n(dg.dupKeys) ? ('<div class="wa-dim">重复键 <b>' + n(dg.dupKeys) + '</b> 个 —— 两个模块抢同一个键，必有一方读到别人的值</div>') : '');
