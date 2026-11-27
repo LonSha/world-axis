@@ -60,7 +60,8 @@
   function totalBytes() {
     // 单一真源：store 的字节数读数（auditTotal 在 store 内部派生 memCache/saveStat）。
     // ⚠ v2.270.0 修：本条第一优先级**曾读 `r.totalBytes`** —— 而 `store.sizeAudit()` 返回的
-    //   字段叫 **`total`**（`totalBytes` 是 `sizeAll()` 那支的名字，两处不同源）。
+    //   字段叫 **`total`**（`totalBytes` 是 `store.storageStat()` 那支的名字，两处不同源 ——
+    //   盘点支在 core/store.js，返回 `totalBytes` 的是它，不是 `sizeAudit`）。
     //   于是第一优先级**永远读不到**，静默退到 `saveStat().bytes`（未落盘时为 0）——
     //   实测同现场：`sizeAudit().total = 6692`、`sizeAudit().totalBytes = undefined`、
     //   `saveStat().bytes = 0`。后果是预测器把水位记成一串 0、斜率恒 0、永远「到不了顶」，

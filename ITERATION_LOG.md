@@ -8767,3 +8767,66 @@ R5 一个名字只能有一个状态（GHOSTS 与 RESOLVED 不许同时收录）
 **未做（如实登记）**：① 剩下五条不推进（等裁决，不是忘了）；
 ② 不改 `engines/calendar-custom.js` 的 `labelBack`（R278 就登记着的同一笔）；
 ③ 不给 RESOLVED 加「关闭后可以删行」的口子 —— 删行就等于忘了它曾经骗过人。
+
+## R282（v2.607.0 · GNS-3：五条 claim 的裁决 —— 「借名」不是缺口，是归属欠标）
+
+**为何选它**：R281 把两条 claim 关掉后留了五条，并在日志里写「等裁决」。裁决不能靠再报一次数，
+只能逐条读到源码层：注释那句话在讲谁、那个名字的本体在哪、本仓有没有对应物。本轮就是这五次的读源码。
+
+**结论：五条分两类，不是一种东西**
+
+| 名字 | 位置 | 源码事实 | 裁决 |
+|---|---|---|---|
+| `onCommit` | `core/commit.js:710/715` | JSDoc 详述链提交后钩子 + 漏账进 faults，`chain()` 体一次没读 `o.onCommit` | **不关**（行为承诺） |
+| `effectPending` | `core/commit.js:474` | 说「`effectPending()` 读它」，`markPending` 是唯一落盘点、导出表无读口 | **不关**（API 面欠账） |
+| `undoTurns` | `engines/source-reconcile.js:5` | npc-life 那台 `timeline.js` 的 API；本仓对应物 `undoFrom(timeline, fromIndex)`（141 行 / 271 行导出） | **关**（attribute） |
+| `exclusive` | `engines/defer-token.js:17` | dsh-toy 的 API（`index.js:674` 早已带该前缀）；本仓对应物 `serial()`（195 行导出） | **关**（attribute） |
+| `sizeAll` | `engines/storage-forecast.js:63` | 本仓从来没有这个名；返回 `totalBytes` 的是 `store.storageStat()`（store.js:5213-5246） | **关**（rename） |
+
+一句话分界：**①② 是「注释承诺了一个没有的行为」（补实现就改行为、删注释就撕契约，两边都是产品判断）；③④⑤ 是「注释提了一个别处的名字、却没说是别处的」——名字没错、实现也有，错的是归属。**
+
+**三条的改法（全是注释，零行代码）**
+
+| 文件 | 改前 | 改后 |
+|---|---|---|
+| `engines/source-reconcile.js` | ``与 `timeline.js`（`proposeTurn` 纯函数事务 / `undoTurns(fromIndex)`）`` | 「与**该项目的** `timeline.js`（... / `undoTurns` 撤销面）」+ 「主体别认错：这是 npc-life 那台，不是本仓 `engines/timeline.js`」+ 本仓落点 `undoFrom(timeline, fromIndex)` 与语义映射（取 `turns[from].before` 整快照、`revoked` 回带） |
+| `engines/defer-token.js` | 「全部传输操作再经 `exclusive()` 串进一条尾链」 | 「再经 **dsh-toy 的** `exclusive` 面串进一条尾链」+ 「本仓对应物是 `serial()`」+ 与 `index.js:674` 同口径 |
+| `engines/storage-forecast.js` | 「`totalBytes` 是 `sizeAll()` 那支的名字」 | 「`totalBytes` 是 `store.storageStat()` 那支的名字……盘点支在 core/store.js，返回 `totalBytes` 的是它，不是 `sizeAudit`」 |
+
+**R281 判「不能关」的那两条，本轮改判——原因写清，不是反悔**
+
+- `sizeAll`：R281 的理由是「那句是历史叙述，改它等于改写当时的对账场景」。本轮读清了：那句叙述的**事件**
+  （v2.270.0 读错字段、静默退化成一串 0、实测三行读数）一字未动，错的只是「另一支」的**人名**。
+  把错误的人名供在历史里，下一批人还是会去找那个函数——历史叙述不必连错名字一起供着。
+- `exclusive`：R281 的理由是「得先查清它原本指哪台才谈得上改」。查清了：`index.js:674` 同一典故**早就带着**
+  「cf. dsh-toy StopTimer token + exclusive」。同一句话两处注释，一处带主体一处不带，这就是「被读成本仓 API」的全部原因。
+- `undoTurns`：R281 判它「timeline 该不该有回退是产品判断」。本轮发现**本仓本来就有**：`undoFrom(timeline, fromIndex)`。
+  「有没有」早有答案，缺的只是注释里那一步主体（而 `timeline.js` 同名，正是误导源）。
+
+**门禁升级：关闭方式分两种**
+
+`RESOLVED` 加 `mode` 必填：`rename`（旧名就是错的 ⇒ 换真名、旧名连子串都不许留）/ `attribute`（旧名是对的、主体是错的 ⇒ 名字留下、但不得再写成调用形态，且必须补 `owner` 与 `ours`）。
+对应判据：
+- **R4 改 mode 感知**：不许再写成调用形态；rename 型更严（零子串）。
+- **R6 新**：attribute 型的**主体词必须在本行或上两行**——不能只写在表里。
+- **R7 新**：attribute 型的 `ours` 必须在**代码面真存在**——不许拿一个也还没写的名字当退路。
+- **B10 新**：claim 类必须都是「行为承诺」型，`why` 里得说得出一处「代码没读 / 有写无读」。**防的是把「借名」混进 claim、再靠改注释「关」掉——那不叫关，叫洗。**
+- **D3 新**：裁决文档在位（五个名字 + 两类分界 + 两条未关的改判触发器 + 复算命令）。
+
+判据 29 → **33**。
+
+**读数**：幽灵 **12 → 9** · 真缺口 **5 → 2** · 已关 **2 → 5** · 注释点名 534（不去重旧名后少 1）。
+版本锚点 **22 项全过**；证据 700 条 stale 0；dead / uiDead / dataOnly 三面全部不动（2093 / 6 / 841）——
+改了三个产品文件而引用面零变化，同上轮的正面用例。
+
+**未做（如实登记）**：① `onCommit` / `effectPending` 一个字没动——它们的改判触发器写在 `docs/PROMISE_FACE_ADJUDICATION.md` 第三节；
+② 不新增第五类（三个「借名」不是一种新幽灵，是「关得掉的那类」，开类只会让它们长期留在表里）；
+③ 不把改判记录写进源注释（现场留着旧名会让 R4 失效；记录进本文与裁决文档）。
+
+**附带发现一笔已存在的真红（顺手治了）**：本仓 `docs/gates.md` 的读数表停在 **v2.587.0**，
+而 `gates-doc-gen-v2400` 一直报 FAIL 5 / 35（B1 / B3 / B4 / B5 / N3）—— 它不是本轮弄红的，
+是**自 2.587.0 起就没有人回填过**（每次升版都只动了版本面，没动这张表）。
+治法：`node tools/gen-gates-doc.js --write`（8 道门禁现场跑一遍，慢门禁 `readings-v2106` 按既定口径不参与快 check）
+⇒ `--check` 转绿、专锁 **35/35**。
+这一笔正好是本轮主题的现场版：**文档比实现多走一步是病，落后二十版也是病** ——
+后者更安静，因为「表里有一个数」长得就像「表是对的」。

@@ -44,6 +44,20 @@
  *     本面只把「有这几处」摆到台面上。
  *   4 **零写库**：本面只读、只打印；不产生任何账本文件（连 `--update` 都没有）。
  *
+ * ── v2.607.0 补记：五条 claim 不是同一种东西 ────────────────────
+ *   R282 逐条读了源码（结论见 `docs/PROMISE_FACE_ADJUDICATION.md`），发现 claim
+ *   这一类里混着两种事：
+ *     ① **注释承诺了一个没有的行为**（`onCommit` / `effectPending`）—— 补上就改行为，
+ *        删注释就是撕承认欠账，两边都是产品判断，本面不得自己关。
+ *     ② **注释提了一个别处的名字、却没说是别处的**（`undoTurns` 是 npc-life 的、
+ *        `exclusive` 是 dsh-toy 的、一个是当年记错的那支名）—— 这类不是承诺，
+ *        是**归属欠标**；治法只有一个：把主体写进注释（纯注释、零行为影响）。
+ *   所以本面**不新增第五类**：② 不是一种新的「幽灵」，而是「本来就能关掉」的一类。
+ *   `RESOLVED` 因此分两种关闭方式（两边不许串）：
+ *     `rename`    旧名是错的 ⇒ 换成真名 ⇒ 旧名必须在该文件零出现
+ *     `attribute` 旧名是对的、主体是错的 ⇒ 旧名留下、但不得再写成调用形态，
+ *                 且**主体与本仓对应物都必须真在文件里**（R6 / R7 两条钉住）
+ *
  * 跑：`node tests/promise-face-v2605.js`
  */
 (function () {
@@ -71,12 +85,6 @@
       why: 'chain(opt) 的 JSDoc 写着 onCommit(scope) 在链事务提交之后调用、并据此把邀约漏账记进 faults；而 opt.onCommit 在代码面一次没读' },
     effectPending: { kind: 'claim', file: 'core/commit.js',
       why: '注释说「effectPending() 读它」，而 commit 的导出表里没有这个读口 —— 副作用队列有写无读' },
-    undoTurns: { kind: 'claim', file: 'engines/source-reconcile.js',
-      why: '注释把 timeline.js 描述成「proposeTurn 纯函数事务 / undoTurns(fromIndex)」，而 timeline 的导出表里没有 undo 面' },
-    sizeAll: { kind: 'claim', file: 'engines/storage-forecast.js',
-      why: '注释说 totalBytes 是 sizeAll() 那支的名字，而 store 的导出表里没有 sizeAll' },
-    exclusive: { kind: 'claim', file: 'engines/defer-token.js',
-      why: '注释说传输操作「再经 exclusive() 串进一条尾链」，全仓没有这个函数 —— 被借喻的那台已改名或消失' },
     impactOf: { kind: 'history', file: 'engines/perf-ledger.js',
       why: '注释原文写着「删掉两个零消费方的出口——原设计的 impactOf(path)」，读的人不会被误导' },
     addRule: { kind: 'history', file: 'render/purifier.js',
@@ -102,12 +110,28 @@
    *   判据两向：① 旧名必须**从现场幽灵名单里消失**（注释真改了）；
    *   ② 文件里必须真出现 `newName`（不是删了名字改成一句含糊话）；
    *   ③ 旧名在该文件里**零出现**（不许「新名留着，旧名也留着」）。
+   *   v2.607.0 起分两种关闭方式（`mode` 必填）：
+   *     `rename`    旧名就是错的（拼错 / 指错支）⇒ 换成真名，旧名在该文件连子串都不许留。
+   *     `attribute` 旧名本就是别处的 API（上游 / 外部项目）⇒ 名字留下，但必须补两列：
+   *                 `owner`（主体词，R6 钉「它就在名字旁边」）与 `ours`
+   *                 （本仓对应物，R7 钉「它在代码面真存在」）。
    */
   const RESOLVED = {
-    fsec: { version: '2.606.0', file: 'ui/panel-fold.js', newName: 'foldSec(',
+    fsec: { version: '2.606.0', mode: 'rename', file: 'ui/panel-fold.js', newName: 'foldSec(',
       how: '注释改成真名与真签名 foldSec(page, sec, label, body) —— ui/panel.js 里就是这么定义的（第三参是 label、第四参是 body 函数）' },
-    devSettingsHtml: { version: '2.606.0', file: 'engines/tool-diag.js', newName: 'if (!__dev) return playerSettingsHtml();',
-      how: '设置页并没有两个分支函数：同一函数里一行早退切两侧（ui/settings.js:875）。注释改成这个真形态' }
+    devSettingsHtml: { version: '2.606.0', mode: 'rename', file: 'engines/tool-diag.js',
+      newName: 'if (!__dev) return playerSettingsHtml();',
+      how: '设置页并没有两个分支函数：同一函数里一行早退切两侧（ui/settings.js:875）。注释改成这个真形态' },
+    // ── v2.607.0 关的三条：名字在、主体错（判据见 R4 / R6 / R7）──────────
+    sizeAll: { version: '2.607.0', mode: 'rename', file: 'engines/storage-forecast.js',
+      newName: 'store.storageStat()',
+      how: '本仓从来没有 sizeAll 这个名；返回 totalBytes 的是 store.storageStat()（盘点支，core/store.js:5213-5246）。改的是「另一支」的人名，叙述的事实（两处不同源、曾静默退化）一字未动' },
+    undoTurns: { version: '2.607.0', mode: 'attribute', file: 'engines/source-reconcile.js',
+      newName: '`undoTurns` 撤销面', owner: 'npc-life', ours: 'undoFrom(',
+      how: 'undoTurns 是 npc-life 那台 timeline.js 的 API；本仓对应物叫 undoFrom(timeline, fromIndex)，已在导出表（271 行）。注释把主体、退路与语义映射一并写清' },
+    exclusive: { version: '2.607.0', mode: 'attribute', file: 'engines/defer-token.js',
+      newName: 'dsh-toy 的** `exclusive` 面', owner: 'dsh-toy', ours: 'serial(',
+      how: 'exclusive 是外部项目 dsh-toy 的 API（index.js:674 早就写着 cf. dsh-toy ... + exclusive）；本仓对应物是 serial()。两处注释现在同口径' },
   };
 
   /** 占位形态：`Xxx` / `xxx` / 连续大写 X —— 只在**词尾或词腰**出现即算。 */
@@ -219,11 +243,11 @@
       assert.ok(GHOSTS[Object.keys(GHOSTS).filter(function (i) { return GHOSTS[i].kind === k; })[0]].why, k + ' 类缺 why');
     });
   });
-  ok('B3 四类计数 = claim 5 / history 4 / testSide 1 / placeholder 2（v2.606.0 关了两条：fsec / devSettingsHtml）', function () {
+  ok('B3 四类计数 = claim 2 / history 4 / testSide 1 / placeholder 2（v2.607.0 又关了三条：undoTurns / exclusive / sizeAll）', function () {
     const c = {};
     KINDS.forEach(function (k) { c[k] = 0; });
     Object.keys(GHOSTS).forEach(function (id) { c[GHOSTS[id].kind] += 1; });
-    assert.deepStrictEqual(c, { claim: 5, history: 4, testSide: 1, placeholder: 2 });
+    assert.deepStrictEqual(c, { claim: 2, history: 4, testSide: 1, placeholder: 2 });
   });
   ok('B4 每条都给了所在文件与理由，且文件真存在', function () {
     Object.keys(GHOSTS).forEach(function (id) {
@@ -278,6 +302,13 @@
     assert.ok(!isPlaceholder('onCommit'), 'onCommit 不该被判成占位');
     assert.ok(isPlaceholder('secXxx'), 'secXxx 应判成占位');
   });
+  ok('B10 claim 类必须都是「行为承诺」型（why 里得说得出一处代码没读 / 有写无读）', function () {
+    // 防的是一种退步：把「借名」当成真缺口混进来，再靠改注释「关」掉 —— 那就不是关，是洗。
+    Object.keys(GHOSTS).forEach(function (id) {
+      if (GHOSTS[id].kind !== 'claim') return;
+      assert.ok(/没读|有写无读|导出表里没有/.test(GHOSTS[id].why), id + ' 的 why 里没有行为面证据，不该归 claim');
+    });
+  });
 
   // ═══════════ R 已关闭的检点（关掉要能自证关掉了）═══════════
   ok('R1 已关条目的旧名真的从现场幽灵名单里消失（注释改了才算关）', function () {
@@ -299,17 +330,40 @@
       assert.ok(src.indexOf(r.newName) >= 0, id + ' 的 newName 不在文件里：' + r.newName);
     });
   });
-  ok('R4 旧名在该文件里零出现（不许「新名留着、旧名也留着」）', function () {
+  ok('R4 关掉后旧名不得再以调用形态出现（rename 型还要更严：旧名在该文件零出现）', function () {
     Object.keys(RESOLVED).forEach(function (id) {
       const r = RESOLVED[id];
       const src = fs.readFileSync(path.join(BASE, r.file), 'utf8');
-      const hit = new RegExp('\\b' + id + '\\b').test(src);
-      assert.strictEqual(hit, false, id + ' 在该文件里仍然出现');
+      assert.strictEqual(src.indexOf('`' + id + '('), -1, id + ' 仍写成调用形态');
+      if (r.mode === 'rename') {
+        assert.strictEqual(src.indexOf(id), -1, id + ' 是 rename 型，旧名连子串都不许留');
+      }
     });
   });
   ok('R5 GHOSTS 与 RESOLVED 不许同时收录同一个名字（一个名字只有一个状态）', function () {
     Object.keys(RESOLVED).forEach(function (id) {
       assert.strictEqual(Object.prototype.hasOwnProperty.call(GHOSTS, id), false, id + ' 两边都在');
+    });
+  });
+  ok('R6 attribute 型的名字旁边真有主体（主体词必须在本行或上两行，不能只写在表里）', function () {
+    Object.keys(RESOLVED).forEach(function (id) {
+      const r = RESOLVED[id];
+      if (r.mode !== 'attribute') return;
+      const lines = fs.readFileSync(path.join(BASE, r.file), 'utf8').split('\n');
+      const at = lines.findIndex(function (ln) { return ln.indexOf('`' + id + '`') >= 0; });
+      assert.ok(at >= 0, id + ' 在该文件里找不到带反引号的这个名字');
+      const win = lines.slice(Math.max(0, at - 2), at + 1).join('\n');
+      assert.ok(win.indexOf(r.owner) >= 0, id + ' 所在行及上两行都没有主体词：' + r.owner);
+    });
+  });
+  ok('R7 attribute 型的「本仓对应物」在代码面真存在（不许拿一个也还没写的名字当退路）', function () {
+    Object.keys(RESOLVED).forEach(function (id) {
+      const r = RESOLVED[id];
+      if (r.mode !== 'attribute') return;
+      const code = TS.stripComments(fs.readFileSync(path.join(BASE, r.file), 'utf8'));
+      const m = /^([A-Za-z_$][A-Za-z0-9_$]*)\($/.exec(r.ours);
+      assert.ok(m, id + ' 的 ours 不是「名字(」形态：' + r.ours);
+      assert.ok(code.indexOf(m[1]) >= 0, id + ' 的对应物在代码面不存在：' + m[1]);
     });
   });
 
@@ -370,6 +424,14 @@
     assert.strictEqual(/fs\s*\.\s*(?:write|append)FileSync\s*\(/.test(self), false, '本文件不该写盘');
     assert.strictEqual(/require\s*\(\s*['"]child_process/.test(self), false, '本面不起子进程');
   });
+  ok('D3 裁决文档在位：五个名字 + 两类分界 + 两条未关的触发器 + 复算命令', function () {
+    const src = fs.readFileSync(path.join(BASE, 'docs/PROMISE_FACE_ADJUDICATION.md'), 'utf8');
+    ['onCommit', 'effectPending', 'undoTurns', 'exclusive', 'sizeAll'].forEach(function (id) {
+      assert.ok(src.indexOf(id) >= 0, id + ' 不在裁决文档里');
+    });
+    assert.ok(src.indexOf('改判触发器') >= 0, '缺改判触发器');
+    assert.ok(src.indexOf('node tests/promise-face-v2605.js') >= 0, '缺复算命令');
+  });
 
   // ═══════════ E 读数出口 ═══════════
   ok('E1 一行读数含「文件面 / 点名 / 幽灵 / 真缺口」四个数', function () {
@@ -379,7 +441,7 @@
     const line = '点名面：产品文件 ' + LIVE.files + ' · 注释点名 ' + LIVE.ids.length +
       ' · 幽灵 ' + LIVE.ghosts.length + ' · 真缺口 ' + c.claim + ' · 已关 ' + Object.keys(RESOLVED).length +
       '（history ' + c.history + ' / testSide ' + c.testSide + ' / 占位 ' + c.placeholder + '）';
-    assert.ok(/产品文件 \d+/.test(line) && /幽灵 12/.test(line) && /真缺口 5/.test(line) && /已关 2/.test(line), line);
+    assert.ok(/产品文件 \d+/.test(line) && /幽灵 9/.test(line) && /真缺口 2/.test(line) && /已关 5/.test(line), line);
   });
   ok('E2 每条 claim 都能报出 file:line（读数要能带人去现场）', function () {
     Object.keys(GHOSTS).forEach(function (id) {

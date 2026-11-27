@@ -2,7 +2,11 @@
  * WorldAxis engines/source-reconcile.js (v2.409.0) — 来源编辑 → **依赖后缀撤销** + 复合票据
  *
  *  缝合来源：npc-life 3.0.0-beta.4 的 `world-service.js`（`capture` / `current` / `reconcile` /
- *  `resetBaseline`）与 `timeline.js`（`proposeTurn` 纯函数事务 / `undoTurns(fromIndex)`）。
+ *  `resetBaseline`）与**该项目的** `timeline.js`（`proposeTurn` 纯函数事务 / `undoTurns` 撤销面）。
+ *  ⚠ 主体别认错：这里的 `timeline.js` **是 npc-life 那台**，不是本仓的 `engines/timeline.js`
+ *  （本仓那台只有 `sourceRef` / `auditRefs` 报告面，没有撤销动作）。撤销面在本仓的落点是
+ *  `undoFrom(timeline, fromIndex)` —— 名字换了、语义同源：取 `turns[from].before` 整快照回退
+ *  （不做逆序补丁），并把 `revoked` 回带给调用方。
  *
  *  ── 治什么 ──────────────────────────────────────────────────
  *  本仓已有 `engines/timeline.js` 的 `auditRefs`：它能算出 `valid / inherited / changed /
