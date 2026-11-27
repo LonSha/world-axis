@@ -4,7 +4,8 @@
  * 锁什么：`WA.calendarPlanBridge` 的读数是不是真的（而不是照着注释抄的）。
  * 核心三条实锤各自一条判据：
  *   ① 注释 ③ 承诺 `labelBack` 而导出表里没有（contract().missing）
- *   ② `DEF.enabled = true` 而边界 1 原文写「总开关默认关闭」（switches().contradict）
+ *   ② 实现默认值 vs 文档口径（switches().contradict）—— v2.608.0 起两边同向（都 true），
+ *      故判据从「现场相反」改为「现场同向 + 改一字必报」（C1 / C3）
  *   ③ `clear()` 不看开关（bypass().unguarded = ['clear']）
  * ③ 是用 `Function.prototype.toString` 静态判的 —— 本锁要证它「判得出真假两种情形」，
  * 否则一个恒 true/恒 false 的实现也能全绿。
@@ -124,26 +125,26 @@
   });
 
   console.log('\nC 开关面（实现默认值 vs 文档口径）\n');
-  ok('C1 现场默认值相反：实现 true / 文档 false / contradict=true', function () {
+  ok('C1 现场默认值同向：实现 true / 文档 true / contradict=false（v2.608.0 校正后）', function () {
     const s = B.switches();
     assert.strictEqual(s.ok, true);
     assert.strictEqual(s.regs, 1, '\u5f15\u64ce\u5e94\u81ea\u6ce8\u518c\u4e00\u6761 __REG');
     assert.strictEqual(s.defEnabled, true);
-    assert.strictEqual(s.docEnabledDefault, false);
-    assert.strictEqual(s.contradict, true);
+    assert.strictEqual(s.docEnabledDefault, true);
+    assert.strictEqual(s.contradict, false, '实现与文档同向却报相反：DOC_ENABLED_DEFAULT 没跟位');
   });
   ok('C2 maxMonths 与 bounds 同源（48 / [1,128]）', function () {
     const s = B.switches();
     assert.strictEqual(s.maxMonths, 48);
     assert.deepStrictEqual(s.bounds, [1, 128]);
   });
-  ok('C3 改默认值为 false 后 contradict 转假（判据不是恒真）', function () {
+  ok('C3 改默认值为 false 后 contradict 转真（判据不是恒假）', function () {
     const regs = W.__settingsRegs;
     const target = regs.filter(function (r) { return r && r.module === 'calendarPlan'; })[0];
     const saveDef = Object.assign({}, target.def);
     try {
       target.def.enabled = false;
-      assert.strictEqual(B.switches().contradict, false, '把实现改成与文档一致后仍报相反：判据恒真');
+      assert.strictEqual(B.switches().contradict, true, '把实现改成与文档不一致后仍报同向：判据恒假');
     } finally { target.def.enabled = saveDef.enabled; }
   });
   ok('C4 无 __settingsRegs 条目时报 no-settings（与 never-set 分开）', function () {
@@ -321,14 +322,24 @@
       assert.ok(B.lineOf().indexOf('\u7f3a\u5f00\u5173') === 0);
     } finally { W.__settingsRegs = saveRegs; }
   });
-  ok('H3 diagnose 对现场三条实锤各给一条修法（且给出「改注释」这个选项）', function () {
+  ok('H3 diagnose 只给仍然成立的实锤配修法（开关那条已关，故不再出修法）', function () {
     const d = B.diagnose();
     assert.strictEqual(d.verdict, 'drift');
     const all = d.fixes.join(' | ');
-    assert.ok(all.indexOf('labelBack') >= 0);
-    assert.ok(all.indexOf('DEF.enabled') >= 0);
-    assert.ok(all.indexOf('clear') >= 0);
+    assert.ok(all.indexOf('labelBack') >= 0, 'labelBack 的修法应该在');
+    assert.ok(all.indexOf('clear') >= 0, 'clear 的修法应该在');
+    assert.strictEqual(all.indexOf('DEF.enabled'), -1, '开关已同向却仍出修法：修法列表是写死的，不是跟着现场走');
     assert.ok(all.indexOf('\u6539\u6210') >= 0 || all.indexOf('\u6ce8\u91ca') >= 0, '应给出「要么补实现、要么改注释」两条路');
+  });
+  ok('H3b 造一次相反：修法列表里立刻出现 DEF.enabled（证明 H3 的「不出修法」不是恒真）', function () {
+    const regs = W.__settingsRegs;
+    const target = regs.filter(function (r) { return r && r.module === 'calendarPlan'; })[0];
+    const saveDef = target.def.enabled;
+    try {
+      target.def.enabled = false;
+      const all = B.diagnose().fixes.join(' | ');
+      assert.ok(all.indexOf('DEF.enabled') >= 0, '造出相反后仍不出修法：修法列表与现场脱钩');
+    } finally { target.def.enabled = saveDef; }
   });
   ok('H4 summaryText 与 audit 同源（verdict 不会两个出口不一样）', function () {
     const a = B.audit();
@@ -367,9 +378,10 @@
   });
 
   console.log('\nJ 源口径钉住（注释改了而桥接没改，本锁要红）\n');
-  ok('J1 源文件仍写着「总开关默认关闭」（桥接的 DOC_ENABLED_DEFAULT=false 的依据）', function () {
+  ok('J1 源文件边界 1 写「默认开启」，与桥接的 DOC_ENABLED_DEFAULT=true 同向', function () {
     const src = fs.readFileSync(path.join(BASE, 'engines/calendar-custom.js'), 'utf8');
-    assert.ok(src.indexOf('\u603b\u5f00\u5173\u9ed8\u8ba4\u5173\u95ed') >= 0, '边界 1 原文已改 —— 桥接的文档口径常量需要同批跟位');
+    assert.ok(src.indexOf('\u603b\u5f00\u5173\u9ed8\u8ba4\u5f00\u542f') >= 0, '边界 1 没写默认开启 —— 桥接的文档口径常量需要同批跟位');
+    assert.strictEqual(src.indexOf('\u603b\u5f00\u5173\u9ed8\u8ba4\u5173\u95ed'), -1, '边界 1 又写回了默认关闭');
   });
   ok('J2 源文件仍写着 labelBack（承诺仍在，实锤就仍成立）', function () {
     const src = fs.readFileSync(path.join(BASE, 'engines/calendar-custom.js'), 'utf8');

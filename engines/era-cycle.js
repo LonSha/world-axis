@@ -13,7 +13,7 @@
  * 本模块管「世界的注意力现在处在周期的哪一档」——阶段是节奏，不是日期。
  *
  * 边界（全是否定式）：
- *   1 总开关默认关闭。关闭时 tick() 返回 reason:'disabled'，不推进。
+ *   1 总开关默认开启。关闭时 tick() 返回 reason:'disabled'，不推进。
  *   2 阶段枚举固定四档：fallow(长草)/buildup(预热)/eruption(爆发)/settle(结算)。
  *     表外阶段整次拒收（bad-stage）。
  *   3 倒计时只收正整数（bad-countdown）；跨档推进**连续进行**直到余量为正，

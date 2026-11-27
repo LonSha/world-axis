@@ -15,7 +15,7 @@
  * 骨架：显式登记阶梯、升级必须带事件、禁止跳档。原型正文词库不进引擎，留给预设。
  *
  * 本模块不替写任何心理演出，只核验「升级有据、跳档现形」：
- *   1 总开关默认关闭。关闭时 define()/escalate() 返回 reason:'disabled'，不记账。
+ *   1 总开关默认开启。关闭时 define()/escalate() 返回 reason:'disabled'，不记账。
  *   2 定义一条阶梯：define(who, kind, rungs)——rungs 是档位名数组（至少 2 档），
  *     表空/单档拒收（bad-rungs），重复定义拒收（exists）。
  *   3 升级：escalate(who, kind, event)——必须带 event（missing-event）；只能逐档

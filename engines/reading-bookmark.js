@@ -17,7 +17,7 @@
  * ── 八条否定式边界 ─────────────────────────────────────────────
  *   ① 唯一 store 写面：只写 `draft.reading.marks`（骨架已声明，evict 站点
  *      'reading.marks' cap 24）。不碰任何其他容器。
- *   ② 总开关默认关闭（settingsBus），关闭时 mark/catchUpBlock 一律空转。
+ *   ② 总开关默认开启（settingsBus），关闭时 mark/catchUpBlock 一律空转。
  *   ③ 书签只前进不后退：新锚 idx < 已存 idx 的回退请求**如实拒绝**（ rewind
  *      是显式 reset，不是静默覆盖——静默回退会让「已读」变成假账）。
  *   ④ 补读块只点名「哪几楼没进过上下文」，不伪造内容——楼的内容由

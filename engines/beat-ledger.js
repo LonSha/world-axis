@@ -26,7 +26,7 @@
  *   ④ `transition()`  —— 换场必须给出过渡桥段（`from !== to` 而无 `via` ⇒ `hard-cut`）。
  *
  * ── 边界（全是否定式）────────────────────────────────────────
- *   1 总开关默认关闭。关闭时 `plan` / `land` / `claim` / `transition` 报 `disabled`。
+ *   1 总开关默认开启。关闭时 `plan` / `land` / `claim` / `transition` 报 `disabled`。
  *   2 **拍号单调不减**，且 `land` 只认**当前拍**：跳拍报 `out-of-order` 并带 `expected`。
  *      跳拍会让「第几拍落了」失去意义（那是本模块唯一的计量真源）。
  *   3 **模型自改拍号不算数**：`claim(no)` 与引擎账不符 ⇒ `beat-order-locked`，

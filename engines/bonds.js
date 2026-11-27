@@ -7,7 +7,7 @@
  * 不能靠模型现场即兴。
  *
  * 边界（全是否定式）：
- *   1 总开关默认关闭。关闭时 read() 返回 reason:'disabled'，不猜关系型。
+ *   1 总开关默认开启。关闭时 read() 返回 reason:'disabled'，不猜关系型。
  *   2 六型之外不收。类型表外的任何值整次拒收（bad-type），不「宽容降级」。
  *   3 两人必须不同。自己对自己的关系型是空话（same-person），拒收。
  *   4 与 enemies 的血仇/恩怨**正交**：本表不读写 evolution.enemies，

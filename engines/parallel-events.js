@@ -9,7 +9,7 @@
  * （尚未发生）整次拒收（future-event）。
  *
  * 边界（全是否定式）：
- *   1 总开关默认关闭。关闭时 add() 返回 reason:'disabled'。
+ *   1 总开关默认开启。关闭时 add() 返回 reason:'disabled'。
  *   2 三要素（title/location/persons）缺一整次拒收（missing-fields）。
  *   3 与主时钟同步：startedAt 晚于主时钟读数拒收（future-event）——没发生的事不是
  *     「正在别处发生」。

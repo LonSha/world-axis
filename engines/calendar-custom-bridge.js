@@ -17,7 +17,8 @@
  *   `contract()`  现读导出表 vs 三条承诺 → 报 `missing` / `extra`
  *                 （多出来的导出不算缺口，只是没写进承诺的“超额”）
  *   `switches()`  报实现默认值与文档口径，相**反**时报 `contradict`。
- *                 现场：`DEF.enabled = true`，而边界 1 原文写着「总开关默认关闭」。
+ *                 现场：`DEF.enabled = true`，边界 1 原文也是「默认开启」
+ *                 （v2.608.0 校正前写的是「总开关默认关闭」，那一版会把这里报成 contradict）。
  *   `table()`     月表读数：月数 / 一年总天数 / 坏项数（月名逐个不回显）
  *   `bypass()`    写口是否受开关约束 —— 用 `Function.prototype.toString` **静态**判，
  *                 不真调（`clear()` 会写盘）。现场：`setMonths` 看开关、`clear` **不看**。
@@ -57,8 +58,8 @@
   const VERDICT = ['module-missing', 'no-settings', 'drift', 'disabled', 'never-set', 'table-empty', 'unknown-only', 'ok'];
   /** 注释里承诺的三个方法（① 算两条）。顺序即注释顺序。 */
   const CONTRACT = ['setMonths', 'getMonths', 'label', 'labelBack'];
-  /** engines/calendar-custom.js 边界 1 的原文口径：「总开关默认关闭」。 */
-  const DOC_ENABLED_DEFAULT = false;
+  /** engines/calendar-custom.js 边界 1 的原文口径：「总开关默认开启」（v2.608.0 起）。 */
+  const DOC_ENABLED_DEFAULT = true;
   const FAULT_TEXT = {
     'disabled': '开关关着 —— 但只有写月表与 label 看它，clear() 不看（见 bypass）',
     'bad-value': '月表形态不对（非 [{name,days}] 或 days 非正整数）—— 整批拒收，不做半份生效',

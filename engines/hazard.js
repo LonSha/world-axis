@@ -21,7 +21,7 @@
  * 因而随冻结种子可复现（同种子同序列）。
  *
  * 边界（全是否定式）：
- *   1 总开关默认关闭。关闭时写路径报 reason:'disabled'，不掷骰也不计数。
+ *   1 总开关默认开启。关闭时写路径报 reason:'disabled'，不掷骰也不计数。
  *   2 对象名缺或空整次拒收（missing-fields）。
  *   3 未登记过的对象 bump/roll 报 missing，不建空行（「没发生过的事不该有风险账」）。
  *   4 命中后重复 roll 拒收（already-pending）；未命中时不计 pending。

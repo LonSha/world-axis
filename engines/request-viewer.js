@@ -33,7 +33,7 @@
  *      「刚才发了什么」是会话内的诊断事实，不是世界事实。写进 store 会污染存档，
  *      写进 localStorage 会把密钥副本留在磁盘上（见边界 2）。故本模块无 evict 站点、
  *      无 store 骨架键、无 `__BOUNDED_CAPS` 登记。
- *   6 开关默认关闭：关闭时 `capture` 报 `disabled`（**只读面不受限**——
+ *   6 开关默认开启：关闭时 `capture` 报 `disabled`（**只读面不受限**——
  *      `preview` / `list` / `get` / `text` 照常可用：用户关掉开关不该连「看一眼」都被锁死）。
  *   7 空报文如实拒收（`empty-text`）；非数组 / 畸形消息条目整条跳过（不静默补 `''`）。
  *   8 `channel` 必须是 `apiRouter.CHANNELS` 里的具名通道（`bad-channel`）：

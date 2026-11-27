@@ -40,7 +40,7 @@
  *     不改写任何既有信念层字段。
  *
  *  ── 七条否定式边界 ────────────────────────────────────────────
- *   ① 总开关默认关闭；关闭时 admit / pick 一律返回 `{ ok:false, skipped:true }`。
+ *   ① 总开关默认开启；关闭时 admit / pick 一律返回 `{ ok:false, skipped:true }`。
  *   ② 零 store 写、零落盘、零模型调用、零网络。
  *   ③ **不推进计划、不扣时间**：admit 只判准入，返回 problems 列表，不改任何对象。
  *   ④ 不发明路线、不补全成员：缺数据一律拒（`missing-route` / `member-not-found`），不猜。

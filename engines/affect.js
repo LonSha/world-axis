@@ -6,7 +6,7 @@
  *   一个角色此刻能被看见的，是动作，不是「他很生气」这种词。
  *
  * 边界（全是否定式）：
- *   1 总开关默认关闭。关闭时 channel() 返回 reason:'disabled'，不给动作，也不猜一个。
+ *   1 总开关默认开启。关闭时 channel() 返回 reason:'disabled'，不给动作，也不猜一个。
  *   2 情绪词不进任何出口。setChannel 若把词写进 open/closed/fallback，整次拒收（emotion-word）。
  *   3 开放通道与硬关闭通道不得相交。相交整次拒收（overlap），不留下「一半合法」。
  *   4 过载回退必须是已登记的开放动作之一。不在开放表里的回退等于凭空造行为（bad-fallback）。

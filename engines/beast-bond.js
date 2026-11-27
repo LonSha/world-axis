@@ -16,7 +16,7 @@
  * 驯服有——两套语义不合流。
  *
  * 边界（全是否定式）：
- *   1 总开关默认关闭。关闭时 register()/feed() 返回 reason:'disabled'。
+ *   1 总开关默认开启。关闭时 register()/feed() 返回 reason:'disabled'。
  *   2 转化方式三档白名单：subdue(压制)/feed(投喂)/rescue(救助)，表外拒收（bad-method）。
  *   3 驯服度只收 0..100 数值（bad-value）；满 100 必须转化（满而不转 = 静默卡死，拒收）。
  *   4 忠诚度只收 0..100 数值（bad-value）；危险档（≤20）+ 挨饿必须报出（starving: true），

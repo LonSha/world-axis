@@ -43,7 +43,7 @@
  *   而把后者报成前者，作者会去加人，加完人这句仍然越界。
  *
  * ── 八条否定式边界（本模块存在的全部理由）────────────────────
- *   ① 总开关默认关闭。关闭时 assign / current / allows / audit / leakScan 一律拒收 disabled。
+ *   ① 总开关默认开启。关闭时 assign / current / allows / audit / leakScan 一律拒收 disabled。
  *   ② **不写正文、不改正文、不改人物认知**：本文件只有一处 store.transact（assign）——
  *      零 `WA.store.patch`、零对人们认知容器的写入。leakScan 检出越界**只留痕不删文**：
  *      删文是叙事决定，不是引擎决定（与 noesis 边界 2 同规）。

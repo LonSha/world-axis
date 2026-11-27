@@ -13,7 +13,7 @@
  * 「公罪」（城邦对人的通缉），两本账不串：仇可私了，罪走公堂。
  *
  * 边界（全是否定式）：
- *   1 总开关默认关闭。关闭时 report() 返回 reason:'disabled'，不记账。
+ *   1 总开关默认开启。关闭时 report() 返回 reason:'disabled'，不记账。
  *   2 罪度三档白名单：minor/moderate/major，表外拒收（bad-level）。
  *   3 三要素：人、罪名、地点缺一拒收（missing-fields）——「有人在某地犯了某罪」
  *     没说全就是没发生。

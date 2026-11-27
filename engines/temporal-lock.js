@@ -11,7 +11,7 @@
  * 「叙事推进的跨度是否被允许」——锁定期内 jump > 上限、缺跨度，都拒。
  *
  * 边界（全是否定式）：
- *   1 总开关默认关闭。关闭时 check() 返回 reason:'disabled'，不猜跨度。
+ *   1 总开关默认开启。关闭时 check() 返回 reason:'disabled'，不猜跨度。
  *   2 锁定必须显式登记（lock()），未锁定时 advance 不设限（reason:'unlocked'）。
  *   3 锁定期内缺跨度字段整轮拒收（missing-fields）——「这段过了多久」没说就是没说。
  *   4 超过 maxMinutes 上限整轮拒收（too-long），绝不静默放行或截断。

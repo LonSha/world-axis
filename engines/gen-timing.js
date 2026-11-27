@@ -21,12 +21,12 @@
  *      效用低于阈判 `low-utility` 不发。**只推断，不臆造**：无观测时用先验。
  *
  * ── 硬闸（先于一切软判，命中即返回，不再往下算）──────────────────
- *   · `disabled`        总开关默认关闭；
+ *   · `disabled`        总开关关着（默认开启）；
  *   · `quiet-hours`     安静时段（可跨零点）内一律不发（默认 00:00–08:00）；
  *   · `min-interval`    距上次发送不足最小间隔（小时）一律不发，防连发。
  *
  * ── 六条否定式边界（全是「换个写法就会撒谎」的那种）──────────────
- *   ① 总开关默认关闭。关闭时 `tick()` 返回 `shouldSend:false, reason:'disabled'`，不掷骰。
+ *   ① 总开关默认开启。关闭时 `tick()` 返回 `shouldSend:false, reason:'disabled'`，不掷骰。
  *   ② **只有三闸全过才发**。任一闸未过都如实带 reason 返回，不把「没发」说成「发了」。
  *   ③ 贝叶斯后验**必须归一化**。观测全空 ⇒ 用先验，不得留下和为 0 的空分布（`bad-posterior`）。
  *   ④ 效用**由后验加权**，不得只读单一状态；被判 `asleep` 时睡意权重压倒一切（0 效用）。
@@ -41,7 +41,7 @@
 
   const LS_KEY = 'worldaxis_gen_timing_settings_v1';
   const DEF = {
-    enabled: true,                  // 总开关默认关闭（与仓内其余引擎同规）
+    enabled: true,                  // 总开关默认开启（v2.412.0 全开策略，与仓内其余引擎同规）
     lambdaRate: 0.15,                // 基础渴望率（每 tick 命中的基准密度）
     growthFactor: 0.08,              // 未命中时渴望的累积系数
     maxProbability: 0.95,            // 渴望封顶

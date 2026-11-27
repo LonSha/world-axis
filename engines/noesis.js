@@ -73,7 +73,7 @@
  *   稀释成「总体倾向知道」——那正是全知漏进来的缝。
  *
  * ── 边界（全是否定式）────────────────────────────────────────
- *   1 总开关默认关闭。关闭时 knows / gateScene / leakScan / perceive 一律拒收 \`disabled\`。
+ *   1 总开关默认开启。关闭时 knows / gateScene / leakScan / perceive 一律拒收 \`disabled\`。
  *   2 **只读世界，不改世界**：本文件零 \`WA.store.transact\` / 零 \`WA.store.patch\`（源码级可核，
  *     专锁 N 面钉的就是这条）。leakScan 检出穿帮**只留痕不删文**——删文是叙事决定，不是引擎决定。
  *   3 **不自动改正文**：gateScene 只回答「哪些人不该知道哪些事」，把处置权交还作者/模型。

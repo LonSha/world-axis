@@ -21,7 +21,7 @@
  * 与 fondness.js 的分工：fondness 是「人与人」的好感；本模块是「人与世界」的因果。
  *
  * 边界（全是否定式）：
- *   1 总开关默认关闭。关闭时写路径报 reason:'disabled'，不记账。
+ *   1 总开关默认开启。关闭时写路径报 reason:'disabled'，不记账。
  *   2 轴名双值白名单（merit/debt）。表外任何值整次拒收（bad-kind）。
  *   3 对象名缺或空整次拒收（missing-fields）；金额须为正有限数（bad-amount）。
  *   4 未登记过的对象查账报 missing，不猜、不建空行。

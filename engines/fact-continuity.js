@@ -9,7 +9,7 @@
  *   G 写权分离 / 状态签名 ← AVS_UI「状态写入由 Core 独占」+ VisualStateSignature
  *
  *  ── 八条否定式边界 ──────────────────────────────────────────────
- *   ① 总开关默认关闭；关闭时 diagnose/buildBlock 一律空转。
+ *   ① 总开关默认开启；关闭时 diagnose/buildBlock 一律空转。
  *   ② 零 store 写：全文无 transact / save / localStorage。纯只读聚合。
  *   ③ 零模型调用：诊断是本地确定性判据，不花一次 token。
  *   ④ 不采用任何题材规则：不搬恋爱四轴 / 足部物性 / ACGN 视觉硬规则 / 成人内容。
