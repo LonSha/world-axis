@@ -1,6 +1,6 @@
 {
   "_note": "WorldAxis 证据索引(Q9,v2.226.0)。每行 = 一个证据文件,六栏全部**现场复算**(文件 / sha / version / commit / wired / env、runnable),本表不存第二真源。**version 只认文件自述**(标题行提到本文件名的那行 > 头部前六行首个版本词),并回带 versionSource(title / head / null)自证来源;取不到如实标 null,**不猜**。fileAnchor = 文件名 `-v2NNN` 后缀**原样**,仅备查 —— 该后缀有损且二义(2.117.0 写作 2117、2.97.0 写作 2970;`2100` 既可读成 2.10.0 也可读成 2.100.0),**不作判据、不填进 version**。acceptance 四档:verified(被 run.js 引用 **且** 另有真跑面:导出 runAll 一族**且**带真源码破坏锚点)/ wired(存在 + 被 run.js 引用)/ consumed(未被 run.js 直接引用,但被其它测试 require 当公共基建)/ unwired。计划 Q9 原文「现有计划顶部存在+引用不等于功能验收」落在 verified 与 wired 的分界上 —— wired 一律不许写成 verified。stale 只认三档可复算的硬事实:sha-changed / file-missing / wired-lost;**不**把「version 落后于当前版本」算 stale(历史证据本就停在它交付的那一版)。边界:输出摘要不进记录;只登记 tests/ 下的 .js(不含 run.js 与账本 json)。",
-  "version": "2.605.0",
+  "version": "2.606.0",
   "counts": {
     "total": 700,
     "verified": 28,
@@ -6724,11 +6724,11 @@
     },
     {
       "file": "tests/promise-face-v2605.js",
-      "sha": "45971f7fd2be",
+      "sha": "562079464ccb",
       "version": "2.605.0",
       "versionSource": "title",
       "fileAnchor": "2605",
-      "commit": null,
+      "commit": "e510550",
       "wired": {
         "form": "runScript",
         "line": 17185
@@ -7535,7 +7535,7 @@
     },
     {
       "file": "tests/s3-b1-e3-v2184.js",
-      "sha": "068bca11e1d1",
+      "sha": "724dd1733421",
       "version": "2.184.0",
       "versionSource": "title",
       "fileAnchor": "2184",
@@ -7573,7 +7573,7 @@
     },
     {
       "file": "tests/s3-b2-e2-v2182.js",
-      "sha": "97ae84b7ed80",
+      "sha": "03d50f16579c",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -7590,7 +7590,7 @@
     },
     {
       "file": "tests/s3-b2-e5-v2182.js",
-      "sha": "c0442db2703f",
+      "sha": "82e17c01a935",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -7607,7 +7607,7 @@
     },
     {
       "file": "tests/s3-b2-o3-v2182.js",
-      "sha": "f40dc18291cf",
+      "sha": "987cee3e9177",
       "version": "2.182.0",
       "versionSource": "title",
       "fileAnchor": "2182",
@@ -7925,7 +7925,7 @@
     },
     {
       "file": "tests/s3-b4-n11-v2229.js",
-      "sha": "a5cba290c09b",
+      "sha": "3d973ec641d6",
       "version": "2.229.0",
       "versionSource": "title",
       "fileAnchor": "2229",
@@ -8180,7 +8180,7 @@
     },
     {
       "file": "tests/s3-tx2-v2166.js",
-      "sha": "ddbe7b926489",
+      "sha": "c06596a2ef98",
       "version": "2.166.0",
       "versionSource": "head",
       "fileAnchor": "2166",
@@ -8200,7 +8200,7 @@
     },
     {
       "file": "tests/s3-tx3-v2167.js",
-      "sha": "bbc2861287b4",
+      "sha": "a66458c2eddc",
       "version": "2.167.0",
       "versionSource": "head",
       "fileAnchor": "2167",
@@ -8217,7 +8217,7 @@
     },
     {
       "file": "tests/s3-tx4-v2168.js",
-      "sha": "861ef5aaa2d6",
+      "sha": "f62ef1be8a6d",
       "version": "2.168.0",
       "versionSource": "head",
       "fileAnchor": "2168",
@@ -8254,7 +8254,7 @@
     },
     {
       "file": "tests/s3-tx6-v2169.js",
-      "sha": "73549f852dfe",
+      "sha": "6d7207ee6ea3",
       "version": "2.169.0",
       "versionSource": "head",
       "fileAnchor": "2169",
@@ -8271,7 +8271,7 @@
     },
     {
       "file": "tests/s3-tx7-v2170.js",
-      "sha": "7e1c06af1427",
+      "sha": "45cc85cb4287",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2170",
@@ -8305,7 +8305,7 @@
     },
     {
       "file": "tests/s3-tx9-v2172.js",
-      "sha": "aa941d644302",
+      "sha": "edf6b001e897",
       "version": null,
       "versionSource": null,
       "fileAnchor": "2172",

@@ -4283,7 +4283,7 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
         const dynMissing = (grp.dynamic || []).filter(miss);
         // v2.381.0 收口：**渲染面互斥**的第三层——「只在玩家分支里才有的控件」。
         //   病灶（本版实测）：`ui/settings.js` 自 v2.325.0「界面简化动线」起有两个互斥分支
-        //   （`playerSettingsHtml()` / `devSettingsHtml()`），而 UI_BINDINGS 的 settings 组
+        //   （`if (!__dev) return playerSettingsHtml();` 的早退两侧），而 UI_BINDINGS 的 settings 组
         //   把两个分支的 id 混装在同一份 `ids` 里。于是**任何单一模式下都会有一撮必缺**：
         //     · 开发者模式：[wa-set-devmode, wa-set-simple-mode, wa-set-simple-save] 缺
         //       （这三枚只由玩家分支拼出——玩家分支出厂就渲染，它是玩家的「出口」）

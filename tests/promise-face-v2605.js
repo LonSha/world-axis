@@ -67,8 +67,6 @@
 
   /** 四类归类表。每一条必须给 `why` —— 没有理由的分类等于没分类。 */
   const GHOSTS = {
-    fsec: { kind: 'claim', file: 'ui/panel-fold.js',
-      why: '两处注释把面板折叠段的渲染口写成 fsec(page, sec, headerHtml, bodyHtml)，而本文件导出的是 foldSec 一族' },
     onCommit: { kind: 'claim', file: 'core/commit.js',
       why: 'chain(opt) 的 JSDoc 写着 onCommit(scope) 在链事务提交之后调用、并据此把邀约漏账记进 faults；而 opt.onCommit 在代码面一次没读' },
     effectPending: { kind: 'claim', file: 'core/commit.js',
@@ -79,8 +77,6 @@
       why: '注释说 totalBytes 是 sizeAll() 那支的名字，而 store 的导出表里没有 sizeAll' },
     exclusive: { kind: 'claim', file: 'engines/defer-token.js',
       why: '注释说传输操作「再经 exclusive() 串进一条尾链」，全仓没有这个函数 —— 被借喻的那台已改名或消失' },
-    devSettingsHtml: { kind: 'claim', file: 'engines/tool-diag.js',
-      why: '注释说设置页有两个互斥分支 playerSettingsHtml() / devSettingsHtml()，前者存在、后者不存在' },
     impactOf: { kind: 'history', file: 'engines/perf-ledger.js',
       why: '注释原文写着「删掉两个零消费方的出口——原设计的 impactOf(path)」，读的人不会被误导' },
     addRule: { kind: 'history', file: 'render/purifier.js',
@@ -95,6 +91,23 @@
       why: 'Xxx 是占位形态，说的是「每个诊断节」，不是某个具体函数' },
     xxxOn: { kind: 'placeholder', file: 'ui/pages/tools-page.js',
       why: '同上：xxxOn() 是「段体里那个取值函数」的占位写法' }
+  };
+
+  /**
+   * 已关闭的检点（v2.606.0 立）。
+   *   一条 `claim` 只有两种下场：**改注释**（注释就是错的）或**补实现**（行为欠账）；
+   *   两者都不做也行，但必须留在 GHOSTS 里 —— 「报出来但没人理」与「关掉了」必须分开。
+   *   本表只收**改注释**这一类（无行为影响；改实现是产品判断，不在这里）。
+   *   每条必须带三栏：`version`（哪个版本关的）/ `file` / `newName`（注释现在写的是什么）。
+   *   判据两向：① 旧名必须**从现场幽灵名单里消失**（注释真改了）；
+   *   ② 文件里必须真出现 `newName`（不是删了名字改成一句含糊话）；
+   *   ③ 旧名在该文件里**零出现**（不许「新名留着，旧名也留着」）。
+   */
+  const RESOLVED = {
+    fsec: { version: '2.606.0', file: 'ui/panel-fold.js', newName: 'foldSec(',
+      how: '注释改成真名与真签名 foldSec(page, sec, label, body) —— ui/panel.js 里就是这么定义的（第三参是 label、第四参是 body 函数）' },
+    devSettingsHtml: { version: '2.606.0', file: 'engines/tool-diag.js', newName: 'if (!__dev) return playerSettingsHtml();',
+      how: '设置页并没有两个分支函数：同一函数里一行早退切两侧（ui/settings.js:875）。注释改成这个真形态' }
   };
 
   /** 占位形态：`Xxx` / `xxx` / 连续大写 X —— 只在**词尾或词腰**出现即算。 */
@@ -206,11 +219,11 @@
       assert.ok(GHOSTS[Object.keys(GHOSTS).filter(function (i) { return GHOSTS[i].kind === k; })[0]].why, k + ' 类缺 why');
     });
   });
-  ok('B3 四类计数 = claim 7 / history 4 / testSide 1 / placeholder 2', function () {
+  ok('B3 四类计数 = claim 5 / history 4 / testSide 1 / placeholder 2（v2.606.0 关了两条：fsec / devSettingsHtml）', function () {
     const c = {};
     KINDS.forEach(function (k) { c[k] = 0; });
     Object.keys(GHOSTS).forEach(function (id) { c[GHOSTS[id].kind] += 1; });
-    assert.deepStrictEqual(c, { claim: 7, history: 4, testSide: 1, placeholder: 2 });
+    assert.deepStrictEqual(c, { claim: 5, history: 4, testSide: 1, placeholder: 2 });
   });
   ok('B4 每条都给了所在文件与理由，且文件真存在', function () {
     Object.keys(GHOSTS).forEach(function (id) {
@@ -264,6 +277,40 @@
     });
     assert.ok(!isPlaceholder('onCommit'), 'onCommit 不该被判成占位');
     assert.ok(isPlaceholder('secXxx'), 'secXxx 应判成占位');
+  });
+
+  // ═══════════ R 已关闭的检点（关掉要能自证关掉了）═══════════
+  ok('R1 已关条目的旧名真的从现场幽灵名单里消失（注释改了才算关）', function () {
+    Object.keys(RESOLVED).forEach(function (id) {
+      assert.strictEqual(LIVE.ghosts.indexOf(id), -1, id + ' 还在幽灵名单里 —— 注释没改干净');
+    });
+  });
+  ok('R2 已关条目三栏齐全（version / file / newName），且文件真存在', function () {
+    Object.keys(RESOLVED).forEach(function (id) {
+      const r = RESOLVED[id];
+      assert.ok(r.version && r.file && r.newName && r.how, id + ' 缺栏');
+      assert.ok(fs.existsSync(path.join(BASE, r.file)), id + ' 的文件不存在');
+    });
+  });
+  ok('R3 文件里真出现新名字（不是把名字删掉换成一句含糊话）', function () {
+    Object.keys(RESOLVED).forEach(function (id) {
+      const r = RESOLVED[id];
+      const src = fs.readFileSync(path.join(BASE, r.file), 'utf8');
+      assert.ok(src.indexOf(r.newName) >= 0, id + ' 的 newName 不在文件里：' + r.newName);
+    });
+  });
+  ok('R4 旧名在该文件里零出现（不许「新名留着、旧名也留着」）', function () {
+    Object.keys(RESOLVED).forEach(function (id) {
+      const r = RESOLVED[id];
+      const src = fs.readFileSync(path.join(BASE, r.file), 'utf8');
+      const hit = new RegExp('\\b' + id + '\\b').test(src);
+      assert.strictEqual(hit, false, id + ' 在该文件里仍然出现');
+    });
+  });
+  ok('R5 GHOSTS 与 RESOLVED 不许同时收录同一个名字（一个名字只有一个状态）', function () {
+    Object.keys(RESOLVED).forEach(function (id) {
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(GHOSTS, id), false, id + ' 两边都在');
+    });
   });
 
   // ═══════════ C 两向自证（造真）═══════════
@@ -330,9 +377,9 @@
     KINDS.forEach(function (k) { c[k] = 0; });
     Object.keys(GHOSTS).forEach(function (id) { c[GHOSTS[id].kind] += 1; });
     const line = '点名面：产品文件 ' + LIVE.files + ' · 注释点名 ' + LIVE.ids.length +
-      ' · 幽灵 ' + LIVE.ghosts.length + ' · 真缺口 ' + c.claim +
+      ' · 幽灵 ' + LIVE.ghosts.length + ' · 真缺口 ' + c.claim + ' · 已关 ' + Object.keys(RESOLVED).length +
       '（history ' + c.history + ' / testSide ' + c.testSide + ' / 占位 ' + c.placeholder + '）';
-    assert.ok(/产品文件 \d+/.test(line) && /幽灵 14/.test(line) && /真缺口 7/.test(line), line);
+    assert.ok(/产品文件 \d+/.test(line) && /幽灵 12/.test(line) && /真缺口 5/.test(line) && /已关 2/.test(line), line);
   });
   ok('E2 每条 claim 都能报出 file:line（读数要能带人去现场）', function () {
     Object.keys(GHOSTS).forEach(function (id) {
@@ -362,7 +409,7 @@
     console.log('\u70b9\u540d\u9762\uff1a\u4ea7\u54c1\u6587\u4ef6 ' + LIVE.files +
       ' \u00b7 \u6ce8\u91ca\u70b9\u540d ' + LIVE.ids.length +
       ' \u00b7 \u5e7d\u7075 ' + LIVE.ghosts.length +
-      ' \u00b7 \u771f\u7f3a\u53e3 ' + c.claim +
+      ' \u00b7 \u771f\u7f3a\u53e3 ' + c.claim + ' \u00b7 \u5df2\u5173 ' + Object.keys(RESOLVED).length +
       '\uff08history ' + c.history + ' / testSide ' + c.testSide + ' / \u5360\u4f4d ' + c.placeholder + '\uff09');
     Object.keys(GHOSTS).forEach(function (id) {
       if (GHOSTS[id].kind !== 'claim') return;
