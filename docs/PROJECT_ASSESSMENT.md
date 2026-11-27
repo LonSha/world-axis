@@ -71,6 +71,8 @@
 | R4 | 真宿主证据长期缺席 | `v10-ui-pills` / `v10-r3-persist-hosted` 需真 SillyTavern @8000，一直未执行 | 注入/持久化两处只有 headless 证据 |
 | R5 | 死子面体量大 | dead 2,004「其余 1,423」+ dataOnly 795 | 归因需要持续维护，否则退化成「没人读的登记」 |
 | R6 | 词表仍无产品消费 | 零读 ns 55 含 `appearanceLexicon` | 词表「有交付物但没接线」，下一步应让 render 真读 |
+| R7 | **五把 V11 锁挂载失配：判据从未跑过** | 五把 `v11-*.js` 只有 `module.exports` 无顶层执行，却用 `runScript`（spawn，rc 即结论）挂载 ⇒ 子进程什么都不跑就 rc=0。实测：pending-state 33 / inject-dualface 20 / l3-registry 22 全绿（已改 runLock）；field-writers 报 W8a/W8b 两红（已随 R285 修好）；push-api-registry 报 A1 红（现场 42 vs 表 40：`arcGuideBridge.advance`、`panelFacesPage.refresh` 两条零调用未登记） | 「绿」有两种：断言通过，和**断言没跑**。后者在总账上与前者同形 |
+| R8 | 账本读数落后现场 | `tests/field-liveness-ledger.json` 的 `schemaTopKeys` 停在 209，而 `Object.keys(store.get())` 现场 239（差 30，全是 EXV29 批新建的状态键） | 任何以该账本为扫描面的判据都会漏 30 个键；R285 的锁已改用现场真源 |
 
 ## 6. 下一步（按性价比排序）
 

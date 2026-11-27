@@ -22321,21 +22321,24 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   全是 `catch (e) {}`，异常静默消失，读面永远看到「没事」。
   section('v2.298.0 (V11 OPV11-7): unifiedPending 三态（empty / ok / fault）可分');
   {
-    await runScript('./v11-pending-state.js');
+    await runLock('./v11-pending-state.js');
+    await runLock('./v11-pending-state.js', 'runNegative');
   }
   // ── v2.298.0（V11 OPV11-2）：主路径与宿主槽位双面同账 ────────────────────
   //   现场复测推翻了立项读数的一半：入参 injections 是**输入槽位**不是产出面，
   //   「items=0」是正确行为。本项只做契约显式化（lastInjection.hosted）与两面可对账。
   section('v2.298.0 (V11 OPV11-2): 主路径与宿主槽位双面同账（lastInjection.hosted）');
   {
-    await runScript('./v11-inject-dualface.js');
+    await runLock('./v11-inject-dualface.js');
+    await runLock('./v11-inject-dualface.js', 'runNegative');
   }
   // ── v2.299.0（V11 OPV11-3）：L3 分级登记表 ───────────────────────────────
   //   28 台未驱动引擎的四类裁决。判据核心是「表与现场双向一致」+
   //   「A 类必须真接进 DRIVERS」——只在表里写「可驱动」而没接进去，等于把同形问题换位置。
   section('v2.299.0 (V11 OPV11-3): L3 分级登记表（zero-arg / needs-input / decision / dead）');
   {
-    await runScript('./v11-l3-registry.js');
+    await runLock('./v11-l3-registry.js');
+    await runLock('./v11-l3-registry.js', 'runNegative');
   }
   // ── v2.299.0（V11 OPV11-4）：推进类 API 死面裁决表 ────────────────────────
   //   现场重测口径（真零调用：产品面不存在 `WA.ns.method(` / `ns.method(`）：23 条。
@@ -23434,7 +23437,23 @@ await runScript('./story-window-evidence-v2518.js');
   //   核心判据是「声明 vs 现场静态扫描」双向对账 —— 不做对账，声明表只是文档。
   section('v2.300.0 (V11 OPV11-6): 多写者字段写权声明（append / merge / overwrite + 冲突登记）');
   {
-    await runScript('./v11-field-writers.js');
+    // v2.610.0（R285 WRA-1）：这里原本是 runScript（spawn 子进程，rc 即结论），而本文件只有
+    //   module.exports = { runAll, runNegative }、**没有顶层执行** —— 子进程什么都不跑就 rc=0。
+    //   不是「总是绿」，是**从未跑过**：改成 runLock 后它当场报了两条真红（W8a 字段数 / W8b 写者总数）。
+    //   同批同型的另外四把锁已逐个实测：三把全绿（已一并改成 runLock），
+    //   v11-push-api-registry 跑真后报 A1 红（现场 42 vs 表 40），留待下一轮，记在 docs/PROJECT_ASSESSMENT.md R7。
+    await runLock('./v11-field-writers.js');
+    await runLock('./v11-field-writers.js', 'runNegative');
+  }
+  // ── v2.610.0（R285 WRA-1）：写权面覆盖面 ──────────────────────────
+  //   本锁把扫描面从 FIELDS 改成骨架**全部顶层键**（239），按「是否吃掉现值」分档：
+  //   239 → 多写者 27 → 吃掉型 9（必须进表）→ 已声明 11 / 冻结基线 16（写者 48 个站点）。
+  //   上一版的读数（27 / 10 / 17）把建行守卫当成了「整块替换」，
+  //   于是「必须进表」的集合与已声明的集合对不上，差距数本身就是假的。
+  section('v2.610.0 (R285 WRA-1): 写权面覆盖面（全顶层键扫描 + 吃掉型必须进表 + 冻结基线）');
+  {
+    await runLock('./write-authority-v2610.js');
+    await runLock('./write-authority-v2610.js', 'runNegative');
   }
   {
   // ── v2.380.0（历史欠账消红 · orphan 族）：把 75 个「从不执行」的回归资产接回执行面 ──
@@ -23662,7 +23681,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.609.0';
+  const __wantPin293 = '2.610.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

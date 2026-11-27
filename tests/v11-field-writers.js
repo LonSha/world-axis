@@ -9,6 +9,7 @@
 //
 // 【判据】
 //   W1  五个字段都存在且有 owner / conflict / note（缺一个即红）。
+//       （v2.610.0：本锁的扫描面仍然只有这五个 —— 全顶层键的覆盖面由新锁管；两把分工写在各自头注里）。
 //   W2  **双向对账**：声明里的写者集合 == 静态扫描出的写者集合（多一个少一个都红）。
 //       ⚠ 这是本项的核心：不做对账，声明表就只是一份「看起来对」的文档。
 //   W3  每个写者的 mode ∈ ['append','merge','overwrite']（拼错即红）。
@@ -17,7 +18,7 @@
 //       未登记的冲突 ⇒ `undeclaredConflicts()` 非空 ⇒ 红。
 //   W6  登记过的冲突必须有**非空且够长**的 note（>20 字）：空说明 = 遮羞布。
 //   W7  无冲突字段（<2 覆盖者）不得标成 'declared'（虚报治理项同样是把账本弄脏）。
-//   W8  stat 自洽：fields == 5，writers == 各字段写者数之和，declared == 已登记数。
+//   W8  stat 自洽：fields == 表长，writers == 各字段写者数之和，declared == 已登记数。
 //   W9  纯只读：调 view/conflicts/stat 前后 store 深比较相等。
 //
 // 【两向自证】
@@ -144,8 +145,11 @@ function runAll(a) {
   // W8 stat 自洽
   {
     const s = FW.stat();
-    const sum = FIELDS.reduce(function (n, f) { const e = FW.entryOf(f); return n + (e ? e.writers.length : 0); }, 0);
-    a(s.fields === 5, 'v11fw: [W8a] 字段数 == 5（实 ' + s.fields + '）');
+    // v2.610.0（R285 WRA-1）：本条原写 `s.fields === 5` —— 它把「声明表比 5 个多了」当成红，
+    //   于是加字段就得改测试。改成与 stat 自身对账（字段数 == 表长），
+    //   而「实场到底有多少多写者字段」由 tests/write-authority-v2610.js 的冻结值管。
+    const sum = FW.FIELDS.reduce(function (n, e) { return n + e.writers.length; }, 0);
+    a(s.fields === FW.FIELDS.length, 'v11fw: [W8a] 字段数 == 声明表长度（' + s.fields + ' vs ' + FW.FIELDS.length + '）');
     a(s.writers === sum, 'v11fw: [W8b] 写者总数自洽（' + s.writers + ' vs ' + sum + '）');
     a(s.declared === FW.conflicts().filter(function (c) { return c.declared; }).length,
       'v11fw: [W8c] declared 计数自洽（' + s.declared + '）');
@@ -162,12 +166,15 @@ function runAll(a) {
 
 function runNegative(a) {
   const src = fs.readFileSync(path.join(BASE, TARGET), 'utf8');
-  const A_PEOPLE = "{ file: 'engines/intel.js', mode: 'merge' },";
+  // v2.610.0（R285 WRA-1）：锚点从 intel.js 换成 whisper-backchannel.js —— 前者在 chronicle/currents 表里
+  //   也出现了，同一行在源码里恰中 2 次，N0a「锚点唯一」当场红。锚点选择本来就要选一条不会被新条目撞上的。
+  const A_PEOPLE = "{ file: 'engines/whisper-backchannel.js', mode: 'merge' },";
   const n1 = src.split(A_PEOPLE).length - 1;
   a(n1 === 1, 'v11fw: [N0a] 写者条目锚点在真源码中恰中 1 次（实 ' + n1 + '）');
   const A_DECL = "conflict: 'declared',";
   const n2 = src.split(A_DECL).length - 1;
-  a(n2 === 2, 'v11fw: [N0b] declared 标记在真源码中恰中 2 次（实 ' + n2 + '）');
+  // v2.610.0（R285 WRA-1）：从 2 跟到 7（people / evolution / chronicle / currents / echoes / worldPulse / nextTurnInjection）。
+  a(n2 === 7, 'v11fw: [N0b] declared 标记在真源码中恰中 7 次（实 ' + n2 + '）');
 
   // N1：加一个现场不存在的写者 ⇒ W2 现形
   {
