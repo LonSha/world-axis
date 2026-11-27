@@ -17169,10 +17169,20 @@ assert(r2900.dead.length === 2093 && r2900.uiDead.length === 6 && r2900.dataOnly
   await runLock('./purify-scope-bridge-v2602.js');
   // v2.603.0（CAL-1）：自定义历法面 —— 三条实锤（labelBack 无实现 / 默认值相反 /
   //   clear 绕过开关）各自一条判据；另加 J 组钉住源文件注释原文，防止口径漂了锁还绿。
-  await runLock('./calendar-custom-bridge-v2603.js');
+  // ⚠ v2.605.0 修（本轮实测）：此锁与下面两把都是**纯脚本体**（顶层 IIFE 自跑即退，
+  //   没有 `module.exports`）—— 而 `runLock` 的语义是 `require(spec).runAll(assert)`，
+  //   挂上去必抛 `require(...)[m] is not a function`，在全量里记一条红，单跑却全绿。
+  //   本轮逐个实测坐实：`node -e "require('./tests/calendar-custom-bridge-v2603.js')"` 跑完即退、
+  //   `typeof m.runAll === 'undefined'`。故按本仓对纯脚本体的既有档位改用
+  //   `runScript`（spawn 子进程，退出码即结论），与 attire-state / living-world 同规。
+  await runScript('./calendar-custom-bridge-v2603.js');
   // v2.604.0（TLX-1）：时间轴对账面 —— 四源的基约定（clock 0 基 / 标签 1 基 / 历法 0 基 /
   //   暗流日历 dayIndex+1）逐条钉源码原文；D 组用炸弹钉住两个会改计数的计算函数一次没调。
-  await runLock('./time-axis-bridge-v2604.js');
+  await runScript('./time-axis-bridge-v2604.js');
+  // v2.605.0（GNS-1）：点名面 —— 注释里以「调用形态」点名、而产品代码面一次也没出现的名字。
+  //   它不是运行时读数（引擎内 fs 静态扫描已在 v2.282.0 因三处宿主全不可达而撤回），
+  //   所以只能锁在 Node 侧；C 组四条负控制保证判据不是「见过就报」。
+  await runScript('./promise-face-v2605.js');
   await runLock('./org-v2540.js');
   await runLock('./orphan-lock-v2750.js');
   await runLock('./orphan-lock-v2750.js', 'runNegative');
@@ -23645,7 +23655,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.604.0';
+  const __wantPin293 = '2.605.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

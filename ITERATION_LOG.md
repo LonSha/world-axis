@@ -8533,7 +8533,7 @@ F 段小节注释保留「v2.588.0 / R264 时为七台」并注明「后逐台�
    （`sets > 0` 但月表 0 项）、开关关着、只产出过「待确认」。四种处置完全不同，
    旧读数上都只是「一份空月表」。
 
-**做了什么（15 导出 / 240 行）**：`engines/calendar-custom-bridge.js` ——
+**做了什么（15 导出 / 240 行）**：`engines/calendar-custom-bridge.js`（配套专锁 `tests/calendar-custom-bridge-v2603.js`，39 项）——
 `contract()` 现读导出表对三条承诺、`switches()` 比对实现默认值与文档口径、
 `table()` 只报月数与年天数（月名一个都不出）、`bypass()` 静态判「写口是否受开关约束」、
 `faults()` 五码、`audit()` / `lineOf()` / `summaryText()` / `diagnose()` / `stat()` / `__reset()`。
@@ -8662,3 +8662,69 @@ v11-pages-cats 12/0 · inject-sources 20 · evidence-index **699 条 stale 0** �
 ② 不补「标签反解」（`labelBack`）—— 那是 R278 就登记着的同一笔欠账。
 ③ 不动 `getBaseStoryDay` 的返回体 —— 但今天它 `day` 与 `label` 相差 1 这件事
 已经被读数固定下来，任何一方改动都会在专锁 B 组红。④ 整趟全量回归仍按分面批次验。
+
+## R280（v2.605.0 · GNS-1：点名面 —— 把「手数」变成可复算的面）
+
+**为何选它**：R278 的 `labelBack` 是**手数**出来的（读头部注释 → 发现导出表里没有 → `grep` 坐实全仓只命中那句注释）。
+一个靠手数才能发现的缺口，下一次还是只能靠手数。本轮问的是：这种「只在注释里活着」的名字，全仓还有几处？
+
+**口径收窄（本轮的第一次自我纠正）**：
+- 机括口径若取「注释里所有反引号名」，实测是 **2050 个名 / 85 个幽灵** —— 里面大半是概念词与参数名
+  （`grep(）` / `bayes` / `poisson` / `argA` / `argB`）。噪声比信号高一个量级，这面会被当成噪声源。
+- 收窄到**调用形态**（注释里写成 `` `name(` ``）：**538 个名 / 14 个幽灵** —— 逐条人工可读。
+- 且**裸名不收**是写进判据的（F2 可复算），不是说法。
+
+**现场四条读数（14 个幽灵）**：`claim` 7 / `history` 4 / `testSide` 1 / `placeholder` 2。
+七条真缺口（读的人会以为它已存在）：
+
+| 名字 | 位置 | 注释承诺了什么 |
+|---|---|---|
+| `fsec(` | `ui/panel-fold.js:15` | 面板折叠段的渲染口 `fsec(page, sec, headerHtml, bodyHtml)`；本文件导出的是 `foldSec` 一族 |
+| `onCommit(` | `core/commit.js:710` | `chain(opt)` 的 `opt.onCommit` 会在链提交后调用、并据此把邀约漏账记进 faults；代码面**一次没读它** |
+| `effectPending(` | `core/commit.js:474` | 「副作用队列由 `effectPending()` 读」；导出表里没有这个读口 —— 有写无读 |
+| `undoTurns(` | `engines/source-reconcile.js:5` | `timeline.js` 有「`proposeTurn` 纯函数事务 / `undoTurns(fromIndex)`」；timeline 没有 undo 面 |
+| `sizeAll(` | `engines/storage-forecast.js:63` | 「`totalBytes` 是 `sizeAll()` 那支的名字」；store 没有 `sizeAll` |
+| `exclusive(` | `engines/defer-token.js:17` | 传输操作「再经 `exclusive()` 串进一条尾链」；全仓没有这个函数 |
+| `devSettingsHtml(` | `engines/tool-diag.js:4286` | 设置页两个互斥分支 `playerSettingsHtml()` / `devSettingsHtml()`；后者不存在 |
+
+另四类各代表一种「不是缺口」：`history`（`impactOf` / `loadGateStat` / `addRule` / `loadPreset` —— 注释原文就是墓碑）、
+`testSide`（`makeHost` —— 名字在 tests 面，八台引擎都在引用它）、`placeholder`（`secXxx` / `xxxOn` —— 占位形态）。
+**四类不是分类癖**：它们正是「同一个读数位上的四种不同事实」—— 不分开就只能报一个 14，而 14 不能作为行动依据。
+
+**本轮三次自我纠正（全部是上一轮我自己留下的）**：
+1. **两把锁挂在了错误的档位上。** R278 的 `calendar-custom-bridge-v2603.js` 与 R279 的 `time-axis-bridge-v2604.js`
+   都是**纯脚本体**（顶层 IIFE 自跑即退，没有 `module.exports`），而 `runLock` 的语义是 `require(spec).runAll(assert)`
+   ⇒ 全量回归里必抛 `require(...)[m] is not a function`，**各记一条红，而单跑全绿**。
+   实测坐实：`node -e "require('./tests/calendar-custom-bridge-v2603.js')"` 跑完即退、`typeof m.runAll === 'undefined'`。
+   修法按本仓对纯脚本体的既有档位改用 `runScript`（spawn，退出码即结论），与 `attire-state` / `living-world` 同规。
+   顺手做了一次全仓审计：**281 个 `runLock` 站点、只有我这两处有问题**，其余 279 处都有 `module.exports`。
+2. **两条判据把自己写进了被查的文本**（同一个坑犯了两次）：
+   A3 查「本文件不自带剥离器」写的是 `indexOf('function stripComments')` —— 那个串就在该行自己里；
+   D2 查「不写盘」写的是 `indexOf('writeFileSync')` —— 同理。两处都改成正则形态（`/function\s+stripComments\s*\(/`）。
+   q1 锁里早记过这个坑（「不能是裸的 `loadGateStat(` —— 会被本段自己那句注释命中」），我重蹈了一次。
+3. **A4 判据把「引入版本」当成了「当前版本」。** 原写 `B.version === manifest.version`，而本仓 97 个引擎
+   都把 `VERSION` 写成**自己的引入版本**（2.330.0 / 2.380.0 / 2.524.0 …），不跟着仓库升。
+   后果实测：R279 把仓库升到 2.604.0 之后，已完成的面 CAL 的 A4 **静默转红**。
+   现口径三条：形态合法 / **不得高于** manifest（不许谎报未来版本）/ 与本源码头部注释同源。
+   修完两把锁 **CAL 39/39、TLX 30/30 同时转绿**。
+
+**边界（四条，全部是否定式）**：① 不做句义判断，归类靠人，判据只核「归类不矛盾」（每类旁证都复算）；
+② 不做跨仓拼写比较（`fsec` 像不像 `foldSec` 不算证）；③ **不改注释** —— 改注释是产品判断；
+④ 零写库：无 `--update`、无子进程、不产生账本。
+
+**为什么这一面只能锁在 Node 侧（一条关键先例）**：`engines/driver-ledger.js` 在 v2.282.0 **撤回**了一整套
+fs 静态扫描面 —— 理由写在源码里：浏览器 / Tauri 没有 `require` 也没有 `__dirname`，三处宿主全不可达。
+所以它不是引擎、不是面板段，而是一把专锁。这不是偷懒，是把「读数该住在哪个宿主」当判据。
+
+**读数（v2.605.0 现场实测）**：version-consistency **22** ·
+module-registry **597 / 608 ns / 491 边 / 798 调用期** · dead-export **2093 / 6 / 841** ·
+readings-v2106 **61**（refs 13308 / ns 593 / members 6283）·
+segment-extract **128**（测试面 704 / 硬线 2186）· z1-04 **46/46**（惰性 27 / 契约面 597 / 首帧 596）·
+settle **55** · plan-readings **16**（701 / 561 / 491）· module-cycle **65** ·
+ns-consumer 72 · orphan **26 段** · loose-readings 全绿 · test-surface-gate 全通过 ✓ ·
+**GNS-1 专锁 24/24** · CAL-1 **39/39** · TLX-1 **30/30** · gate-timeout rc=0。
+
+**未做（如实登记）**：① 不修那七处注释 / 七处实现 —— 七条里每一条都是「要么补实现、要么改注释」，
+两边都是产品判断（尤其 `opt.onCommit`：补上它意味着 commit 的提交后钩子从今天开始生效，那是行为变更）；
+② 不给本面加 `--update`（表靠人改，定期过期即红）；③ 不新增「引擎 VERSION ≤ manifest」的全局锚点
+（本轮已靠两把锁自证守住，再开一面留到需要时）。

@@ -72,9 +72,22 @@
     assert.deepStrictEqual(B.WHY.slice(), ['ok', 'module-missing', 'no-settings', 'drift']);
     assert.deepStrictEqual(B.CONTRACT.slice(), ['setMonths', 'getMonths', 'label', 'labelBack']);
   });
-  ok('A4 version 与仓内版本面同源', function () {
+  ok('A4 版本口径与引擎面一致：VERSION 是**引入版本**（≤ manifest），且与源码头部同源', function () {
+    // ⚠ v2.605.0 自纠：本条原写 `B.version === manifest.version`——把「引入版本」当成了「当前版本」。
+    //   它与引擎面的既有口径**相反**：本仓 97 个引擎都把 `VERSION` 写成自己的引入版本
+    //   （2.330.0 / 2.380.0 / 2.524.0 …），不跟着仓库升。后果实测：R279 把仓库升到 2.604.0 之后，已完成的 CAL 面
+    //   的 A4 静默转红（它单跑才能看见）—— 判据自己制造了一个「每升一版就多一条红」的面。
+    //   现口径三条：形态合法 / 不高于 manifest（不许谎报未来版本）/ 与本源码头部注释同源。
     const mf = JSON.parse(fs.readFileSync(path.join(BASE, 'manifest.json'), 'utf8'));
-    assert.strictEqual(B.version, mf.version, 'version 与 manifest 不一致');
+    const le = function (a, b) {
+      const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+      for (let k = 0; k < 3; k += 1) { if (pa[k] !== pb[k]) return pa[k] < pb[k]; }
+      return true;
+    };
+    assert.ok(/^\d+\.\d+\.\d+$/.test(B.version), 'VERSION 形态不合法：' + B.version);
+    assert.ok(le(B.version, mf.version), 'VERSION 高于 manifest（谎报未来版本）：' + B.version + ' > ' + mf.version);
+    const head = fs.readFileSync(path.join(BASE, 'engines/calendar-custom-bridge.js'), 'utf8').split('\n')[1] || '';
+    assert.ok(head.indexOf(B.version) >= 0, '与源码头部注释不同源（头部：' + head.trim().slice(0, 70) + '）');
   });
 
   console.log('\nB 契约面（注释承诺 vs 导出表）\n');
