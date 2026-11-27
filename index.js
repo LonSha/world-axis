@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.603.0';
+  const VERSION = '2.604.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1697,6 +1697,10 @@
     //   setMonths / clear（写盘）、不调 label / labelNow（会改 stat.labels）；
     //   写口是否受开关约束用 Function.prototype.toString 静态判，不真调。
     'engines/calendar-custom-bridge.js',
+    // v2.604.0（TLX-1）：时间轴对账面。被读方 store / calendar / calendarPlan / undercurrent-calendar 均在首帧档。
+    //   本模块进惰性档：只被工具页面板与专锁读。两个硬边界：零调（calendarPlan.label 会把标签计数 +1、
+    //   undercurrent.build 会把 builds +1，体检不能改现场）、零写（不 setClock / 不 transact）。
+    'engines/time-axis-bridge.js',
     // v2.600.0（BND-1）：配置绑定的遮蔽表。被读方 binding 在首帧档（它被 read 消费），
     //   本模块只被工具页面板读，故进惰性档。零写：不 bind / 不 unbind。
     'engines/binding-bridge.js',

@@ -100,7 +100,7 @@ const WIRED_WAVE = [
   // 第五次改判（v2.603.0 CAL-1）：calendarPlan。同一条口径。它的读数面要回答的是「为什么全程只显示第 N 日」：
   //   注释 3 承诺的 labelBack 全仓零实现（导出表里也没有）、边界 1 写着「总开关默认关闭」而 DEF.enabled 是 true、
   //   clear 写口绕过开关。桥零跑（不调 setMonths / clear / label / labelNow）。
-  { ns: 'calendarPlan', file: 'engines/calendar-custom.js', ver: 'v2.603.0', readers: ['engines/calendar-custom-bridge.js'] }
+  { ns: 'calendarPlan', file: 'engines/calendar-custom.js', ver: 'v2.603.0', readers: ['engines/calendar-custom-bridge.js', 'engines/time-axis-bridge.js'] }
 ];
 const ALL_TARGETS = TARGETS.concat(SECOND_WAVE).concat(WIRED_WAVE);
 // 第二批的关键方法（逐台现场实读导出面，不是照抄注释）。

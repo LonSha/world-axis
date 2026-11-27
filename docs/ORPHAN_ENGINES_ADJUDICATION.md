@@ -420,6 +420,15 @@ grep -rln "WA\.calendarPlan\b" --include=*.js engines core render ui actors dire
 ```
 
 本期自查：接线、账本销行（42 → 41）、锁的改判、文档本节与专锁五件**同批**完成，未复发旧病。
+### 补记（v2.604.0）：calendarPlan 多了一个读点
+
+`engines/time-axis-bridge.js`（R279 / TLX-1）要复算历法折算，只能拿月表 —— 于是它读
+`WA.calendarPlan.getMonths()`。这不是「补个最小读点销账」（本台早在 v2.603.0 已出列，
+账本销行也已完成），而是新面**顺带**把一个上一轮还冻在死导出面里的导出读活了：
+`calendarPlan.getMonths` 因此从 dead 名单离场（2088 → 2093 的净增 5 = +6 新桥导出 −1 本条）。
+读点登记同批改为两个：`engines/calendar-custom-bridge.js` 与 `engines/time-axis-bridge.js`，
+复算命令现在应打印**两行**；少一行就是读点丢了，多一行就是有第三个读者没登记。
+
 
 ## 六、与 `ns-consumer-ledger` 的关系
 

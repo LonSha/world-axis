@@ -1,14 +1,14 @@
 {
- "version": "2.603.0",
+ "version": "2.604.0",
  "loadOrderCount": 596,
- "lazyCount": 26,
- "loadedCount": 596,
+ "lazyCount": 27,
+ "loadedCount": 597,
  "uiCount": 26,
- "nsCount": 607,
+ "nsCount": 608,
  "totals": {
-  "loadEdges": 490,
+  "loadEdges": 491,
   "hardEdges": 0,
-  "callRefs": 796,
+  "callRefs": 798,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -382,6 +382,7 @@
     "engines/tenancy-rent.js",
     "engines/terrain-hazard.js",
     "engines/thread-sprout.js",
+    "engines/time-axis-bridge.js",
     "engines/time-ledger.js",
     "engines/token-budget.js",
     "engines/tool-diag-tables.js",
@@ -976,6 +977,7 @@
     "engines/tenancy-rent.js",
     "engines/terrain-hazard.js",
     "engines/thread-sprout.js",
+    "engines/time-axis-bridge.js",
     "engines/time-ledger.js",
     "engines/token-budget.js",
     "engines/tool-diag-tables.js",
@@ -11465,6 +11467,25 @@
   "engines/calendar-custom-bridge.js": {
    "ns": [
     "calendarPlanBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/time-axis-bridge.js": {
+   "ns": [
+    "timeAxisBridge"
    ],
    "requires": [
     "registerModule"

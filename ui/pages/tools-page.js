@@ -87,6 +87,7 @@
   // v2.602.0（PSC-1）：同款。净化保护面也是惰性档（被读方 purifyScope 在调用期档）。
   let __pscEnsureFail = 0;
     let __calEnsureFail = 0;
+    let __tlxEnsureFail = 0;
   const rfaLine = function () {
       const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
       if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
@@ -777,6 +778,46 @@
           + '“写口是否受开关约束”是读函数源码文本得出的，因为真调一次 clear 就会把月表清空。'
           + '“没设过月表”与“设过又清空”与“开关关着”在这台引擎的自有读数上完全同形 —— '
           + '本面把它们拆成七态。'
+          + '</div>';
+      })()}
+      `)}
+      ${foldSec('tools', 'timeaxis', '时间轴对账</div><div class="wa-dim">（TLX-1：同一个「今天」有几种说法 —— 暗流日历的「还剩几轮」可能整差一天）', () => `
+      ${(function () {
+        // 被读方全在首帧档，但本桥进的是惰性档：首帧未装载是常态，走 ensure + 失败记忆。
+        const rel = 'engines/time-axis-bridge.js';
+        const tlx = WA.timeAxisBridge;
+        if (!tlx || typeof tlx.audit !== 'function') {
+          if (__tlxEnsureFail) return '<div class="wa-dim">时间轴面装载失败（' + rel + '）—— 这不是“今天没分歧”，是这台引擎装不上</div>';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              if (p && typeof p.catch === 'function') p.catch(function () { __tlxEnsureFail = 1; });
+              return '<div class="wa-dim">时间轴面在惰性档，装载中（成功后下次渲染自愈）</div>';
+            }
+          } catch (e) { /* 落到下面统一记失败 */ }
+          __tlxEnsureFail = 1;
+          return '<div class="wa-dim">时间轴面装载失败（' + rel + '）</div>';
+        }
+        let a0 = null;
+        try { a0 = tlx.audit(); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const rd = a0.readings || {};
+        const rows = [
+          '<div class="wa-dim">· 世界钟：第 ' + esc(String(rd.clockDay == null ? '—' : rd.clockDay)) + ' 日'
+            + '（标签里的日号 ' + (rd.label && rd.label.parsed ? esc(String(rd.label.num)) : '解不出')
+            + '，差 ' + esc(String(rd.labelSkew == null ? '—' : rd.labelSkew)) + '）</div>',
+          '<div class="wa-dim">· 自定义历法：' + (rd.plan && rd.plan.ok
+            ? '月 ' + esc(String(rd.plan.monthIndex + 1)) + ' 第 ' + esc(String(rd.plan.dayOfMonth)) + ' 日 / 第 ' + esc(String(rd.plan.year)) + ' 年'
+            : '折不出（' + esc(String((rd.plan && rd.plan.why) || '无月表')) + '）') + '</div>',
+          '<div class="wa-dim">· 暗流日历：内部基准第 ' + esc(String(rd.ucBaseDay == null ? '—' : rd.ucBaseDay)) + ' 日，面子说第 '
+            + esc(String(rd.ucShown == null ? '—' : rd.ucShown)) + ' 日（差 ' + esc(String(rd.ucSkew == null ? '—' : rd.ucSkew)) + '）</div>'
+        ].join('');
+        return '<div class="wa-dim" id="wa-tlx-line">' + esc(tlx.lineOf(a0)) + '</div>' + rows
+          + '<div class="wa-dim">' + esc((tlx.diagnose().fixes || []).join(' ； ')) + '</div>'
+          + '<div class="wa-dim">本面只量：<b>不调 calendarPlan.label / labelNow</b>（它们会把标签计数 +1）、'
+          + '<b>不调 undercurrentCalendar.build</b>（它会把 builds +1）、不 setClock、不写盘 —— '
+          + '体检把计数改掉之后，读出来的就不是现场了，所以两处折算都是本面自己算的。'
+          + '标签只报能解析出的日号，<b>不回显原串</b>（那是你写进去的剧情）。'
+          + '四源的基约定写在桥里，由专锁 F 组去核源码原文 —— 哪台改了基而桥没改，锁红而不是桥静默跟随。'
           + '</div>';
       })()}
       `)}

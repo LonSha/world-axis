@@ -8589,3 +8589,76 @@ readme-slim 72 · tpl-comment 9/9 · evidence-index **698 条 stale 0** · relea
 不是历法功能已完成 —— `labelBack` 依然不存在」；`orphan` 锁把它从 `SECOND_WAVE` 移入 `WIRED_WAVE`（9 台）；
 文档新增五点九节（四条理由 + 四条边界 + 复算 bash + 本期自查）。
 至此本锁名下只剩 **3 台**（TARGETS 3，第二批归零）。
+
+## R279（v2.604.0 · TLX-1：时间轴对账面 —— 同一时刻有两个「今天」）
+
+**为何选它**：R278 之后 `orphan` 锁名下只剩 TARGETS 3 台，而 R278 的勘察里冒出一条
+没人回答的问题：本仓有四台器官各自回答「今天是哪天」，**没有任何一处把它们对读过**。
+这不是接一个引擎，是给四条已有的读数加一面镜子。
+
+**勘察坐实的四条口径（逐条读源码，不是推断）**：
+
+1. `engines/calendar.js` 的 `advanceDay`：`const day = (clock.dayIndex || 0) + 1;` 然后
+   写 `label = '第' + day + '日…'`、`dayIndex = day` ⇒ **标签数字 === dayIndex**（1 基表现、0 基存储）。
+2. `engines/calendar-custom.js` 的 `label`：`n = Number(dayIndex)` 直接除月表 ⇒ **0 基**，
+   第 0 日 = 第 1 年第 1 月第 1 日。
+3. `engines/undercurrent-calendar.js` 的 `getBaseStoryDay`：`const d = Math.floor(s.clock.dayIndex) + 1;`
+   ⇒ 1 基；但同一返回体里 `label: s.clock.label || ('第' + d + '日')` 取的是**世界钟的标签**。
+4. 现场合成：`clock.dayIndex = 1` 时 `clock.label` 是「第 1 日」，而暗流日历内部算的 `baseDay` 是 **2**。
+   读者按面板上的「第 1 日」去数「还剩 2 轮」，会落到**第 3 日**而不是第 2 日。
+
+一句话：**不是算术错，是两套 0/1 基约定在同一句读数里相遇而没人声明**。
+四台各自都对，拼起来就错 —— 这正是本仓治过多次的「同形不可分辨」的另一种形态：
+同一时刻有两个「今天」，而两个都长得像标准答案。
+
+**做了什么（15 导出 / 244 行）**：`engines/time-axis-bridge.js` ——
+`origin()` 逐源报基约定与依据（哪一行定的）、`readings()` 逐源报「今天是哪天」
+（`clockDay` / `labelNum` / `labelSkew` / `planLabel` / `ucBaseDay` / `ucSkew`）、
+`skew()` 只回差值摘要、`faults()` 五码（no-store / no-clock / bad-type / label-unparsed / no-months）、
+`audit()` / `lineOf()` / `summaryText()` / `diagnose()` / `stat()` / `__reset()`。
+八值 verdict（`module-missing > no-store > drift > clock-unset > derived-absent > skewed > aligned > ok`）；
+现场 verdict = `drift`、state = `derived-absent`。
+
+**六条边界（写进源注释，专锁逐条钉）**：
+
+1. **零调发动机的计算函数。** `calendarPlan.label()` 会把 `stat.labels` 加一、
+   `undercurrentCalendar.build()` 会把 `stat.builds` 加一 —— 体检把计数改了之后，
+   读出来的就不是现场了。所以本面**自己复算**两台的折算，只读 `getMonths()` 与 `store`。
+   专锁 D1 把三个函数换成炸弹，断言调用计数全 0。
+2. **零写。** 不 `setClock` / 不 `setSettings` / 不 `transact`；D2 断言 `store` 逐字未变。
+3. **只报数字不报正文。** `clock.label` 是用户可编辑自由文本（可能含剧情），
+   `labelNumOf()` 只回 `{present, parsed, num}`，**不回显原串**。E1 用 `SECRET-PLOT-NAME` 验。
+4. **基约定写死由专锁核源码。** `ORIGINS` 四条各带依据源码行，F 组逐条对源码原文。
+5. **`clock-unset` 与 `derived-absent` 分开。** 「世界钟从没设过」与「钟在但月表没登记」处置完全不同。
+6. **读数唯一出口。** verdict / why / faults 都从 `audit()` 出，`skew()` 与 `readings()` 同源。
+
+**踩过的坑（如实记）**：专锁 B4 首跑红，我算错了 —— 当天基是 `dayIndex + 1` 而不是常量 2，
+手写标签「第 9 日」时 `ucSkew = (6+1) − 9 = −3`，我写成了 `2 − 9`。
+改判据不改桥：桥在 B2 上已被另一条判据证实（第 1 日时 `ucSkew = 1`），一处对一处错，
+错的是我手算的那处。
+
+**顺带读到的一个真事（写进账本）**：新桥要复算历法折算只能拿月表，于是它读了
+`WA.calendarPlan.getMonths()` —— 而 `calendarPlan.getMonths` 上一轮还冻在死导出面里。
+本轮它**从 dead 面离场**（dead 2088 → 2093 的净增 5 = 新桥 +6 − 本条 −1）。
+这是「读数面成产品」的一次现场发生，正好是本仓零读账本当初要分辨的那件事。
+同批 `orphan` 锁把 `calendarPlan` 的读点登记改为两个（桥 + 时间轴面），文档补一条补记。
+
+**读数（v2.604.0 现场实测）**：version-consistency **22** ·
+module-registry **597 文件 / 608 ns / 491 边 / 硬边 0 / 798 调用期** ·
+dead-export **dead 2093 / uiDead 6 / dataOnly 841**（证据 2099 条）·
+readings-v2106 **61**（refs 13308 / ns 593 / members 6283 / 仅测试 586）·
+segment-extract **128**（测试面 703 / 重组面 19318 / 硬线 2196）·
+z1-04 **46/46**（惰性 27 / 契约面 597 / 首帧 596）· settle **55**（491 / 798 / 608 / 597）·
+plan-readings **16**（700 / 561 / 491）· module-cycle **65**（B1 624/624/620、
+B2 491+4138=4629、B5 667/608/630、零读 41 不动）· ns-consumer **72**（BASE_DEAD_NS 41）·
+orphan **26 段** · loose-readings 全绿 · TLX-1 专锁 **30/0** · q8 80/0 · q9 67/0 ·
+cap-tier 35/0 · capability-ui 61/0 · ui-a11y **1785/1785** · overview-fold 106 · ev1 88/0 ·
+ev6 180/0 · rel-contract 23 · p3-x1 54 · readme-slim 72 · tpl-comment 9/9 ·
+v11-pages-cats 12/0 · inject-sources 20 · evidence-index **699 条 stale 0** · release-manifest 可发。
+
+**未做（如实登记）**：① **不改任何一台的基约定** —— 四台改成哪一边都是产品决策：
+世界钟改 0 基会让所有既有存档的「第 N 日」跳一天；暗流日历改 0 基会让「还剩 N 轮」全部对不上。
+桥只报「两边必有一边改基」，不替人决定（G3 钉住这条：`diagnose` 给的修法里必须同时提到两边）。
+② 不补「标签反解」（`labelBack`）—— 那是 R278 就登记着的同一笔欠账。
+③ 不动 `getBaseStoryDay` 的返回体 —— 但今天它 `day` 与 `label` 相差 1 这件事
+已经被读数固定下来，任何一方改动都会在专锁 B 组红。④ 整趟全量回归仍按分面批次验。

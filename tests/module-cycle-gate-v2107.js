@@ -317,7 +317,14 @@ function runAll(A) {
   // v2.585.0（R261）：engines/appearance-lexicon.js 进文件面（data-only 也是产品文件，装载在案）
   //   ⇒ 605/605/602 → 606/606/602（三数同步 +1）。有引用数不变：没有任何产品文件 require 它
   //   —— 这正是「词表不参与判定」的可读出后果，不是漏接线。
-  A(a.files === 623 && a.aliasFiles === 623 && a.refFiles === 619,
+  // v2.604.0（R279 TLX-1）跟位：新增 engines/time-axis-bridge.js 一个文件、一个 ns（timeAxisBridge）、
+  //   尾部一条 registerModule 装载期边，调用期读 store / clock / calendarPlan / calendar 四 ns
+  //   （共 +3 个 (file,ns) 对；调用期 4135 → 4138）。
+  //   ⇒ B1 623/623/619 → 624/624/620；B2 490 + 4135 = 4625 → 491 + 4138 = 4629；B5 666/607/629 → 667/608/630。
+  //   B7 零读 ns 41 不动 —— timeAxisBridge 有产品读点（工具页时间轴对账段），它不进零读清单；
+  //   桥读的三台（calendar / calendarPlan / undercurrentCalendar）本来就在产品面上。不动也是结论。
+  //   B3 LOAD_ORDER 596 与 B6 漂移（667 - 608 = 59）两处照旧不动：新桥进的是惰性档，不是首帧。
+A(a.files === 624 && a.aliasFiles === 624 && a.refFiles === 620,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -593,7 +600,7 @@ function runAll(A) {
 //   PS：polish-bridge 进的是**惰性档**（LAZY_ORDER，与 binding/contrast/byte 同口径），不是首帧，
 //   故 LOAD_ORDER 不动 —— 我第一版把它放进首帧，是照着「供者相邻」写的，现场口径不是那样。
 //   B6 漂移（664 - 605 = 59）与 B10 登记面（41/48，本桥不注册 settings）两处不动 —— 不动也是结论。
-A(a.edgesLoad === 490 && a.edgesCall === 4135 && a.edgesAll === 4625 && a.identityOk,
+A(a.edgesLoad === 491 && a.edgesCall === 4138 && a.edgesAll === 4629 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -796,7 +803,7 @@ A(a.edgesLoad === 490 && a.edgesCall === 4135 && a.edgesAll === 4625 && a.identi
 // v2.585.0（R261）：appearanceLexicon 命名空间入库（静态提供方 +1）且无产品读点（读面不动）
 //   ⇒ 静态提供方 648 → 649、账本 591 → 592、读面仍 598。差额 649−592=57 与回填前**同量**
 //   （三面同步记账，B6 漂移口径不动）。
-A(a.nsProvided === 666 && a.nsLedger === 607 && a.nsRead === 629,
+A(a.nsProvided === 667 && a.nsLedger === 608 && a.nsRead === 630,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽

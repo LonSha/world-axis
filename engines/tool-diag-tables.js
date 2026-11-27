@@ -412,6 +412,7 @@
     // v2.602.0（PSC-1）：净化保护配对表。登记在此 = 该文件缺席时 secModules 会如实报 missing。
     'engines/purify-scope-bridge.js': 'purifyScopeBridge',
     'engines/calendar-custom-bridge.js': 'calendarPlanBridge',
+    'engines/time-axis-bridge.js': 'timeAxisBridge',
     // v2.598.0（SLT-1）：字节预算体检面。登记在此 = 该文件缺席时 secModules 会如实报 missing。
     'engines/byte-budget-bridge.js': 'byteBudgetBridge',
     // v2.599.0（CNT-1）：配色可读性体检面。
