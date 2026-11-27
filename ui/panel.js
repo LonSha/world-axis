@@ -4985,6 +4985,9 @@ ${emptyDrill}
     //   页模块只出 HTML，行为统一由宿主面板绑 —— 与「此刻」页同一口径。
     //   幂等：页模块的 bind 自己跳过已绑过的节点（DOM 每次重绘都是新节点，天然不叠）。
     try {
+      if (currentPage === 'overview' && WA.panelNowPage && typeof WA.panelNowPage.bindFerry === 'function') {
+        WA.panelNowPage.bindFerry(panelEl);
+      }
       if (currentPage === 'people' && WA.panelPeoplePage && typeof WA.panelPeoplePage.bind === 'function') {
         WA.panelPeoplePage.bind(panelEl, function () {
           toggle(false);

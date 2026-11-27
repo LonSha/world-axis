@@ -413,5 +413,27 @@ ok('同一请求重载后仍是一条，新请求不会碰撞旧 id；落盘状�
   assert.strictEqual(h.api.settle({ id: other.id }).persisted, false);
   assert.strictEqual(h.api.settle({ id: other.id }).reason, 'already-settled');
 });
+ok('东市邀约：打开面板不代答，切聊天不误写，重绘从约定回读', function () {
+  const h = load(CODE, {}, 4);
+  let chat = 'wa_default';
+  h.host.store.chatId = function () { return chat; };
+  vm.runInNewContext(rd('ui/pages/now-page.js'), { window: { WorldAxis: h.host } });
+  const page = h.host.panelNowPage;
+  assert.ok(!page.render().includes('wa-ferry-promise'));
+  chat = 'story-one';
+  assert.ok(page.render().includes('wa-ferry-promise'));
+  assert.strictEqual(h.api.stat().made, 0);
+  function controls() {
+    const handlers = [], status = {}, btn = { dataset: { chat: chat }, addEventListener: function (_, f) { handlers.push(f); } };
+    const root = { querySelector: function (id) { return id === '#wa-ferry-promise' ? btn : status; } };
+    page.bindFerry(root); page.bindFerry(root); assert.strictEqual(handlers.length, 1);
+    return { click: handlers[0], status: status };
+  }
+  const stale = controls(); chat = 'story-two'; stale.click();
+  assert.strictEqual(h.api.stat().made, 0); assert.ok(stale.status.textContent.includes('切换'));
+  const fresh = controls(); fresh.click(); fresh.click();
+  assert.strictEqual(h.api.stat().made, 1); assert.ok(fresh.status.textContent.includes('尚未确认落盘'));
+  assert.ok(page.render().includes('第 5 至 7 轮')); assert.ok(!page.render().includes('wa-ferry-promise'));
+});
 console.log('\nappointment-quota-v2562: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) { fails.forEach(function (f) { console.log('  FAIL ' + f); }); process.exit(1); }

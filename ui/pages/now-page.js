@@ -219,6 +219,41 @@
       + '</ul></div>';
   }
 
+  const ferryWho = '渡口的阿舟';
+  const ferryKey = 'first-scene:ferry-market:v1';
+  function currentChat() { return safe(function () { return WA.store.chatId(); }, ''); }
+  function ferryRow() {
+    const read = WA.appointment.view({ who: ferryWho });
+    if (!read.ok && read.reason !== 'actor-missing') throw Error('unreadable');
+    return read.ok ? read.appointments.find(function (x) { return x && x.requestKey === ferryKey; }) : null;
+  }
+  function ferryCard() {
+    const chat = currentChat();
+    if (!chat || chat === 'wa_default' || !WA.appointment || !WA.appointment.getSettings().enabled) return '';
+    const row = ferryRow();
+    if (row) return '<section><h3>东市之约</h3><p>' + esc(ferryWho + '在' + row.place + '等你，第 ' + row.from + ' 至 ' + row.to + ' 轮。约定状态：' + row.result) + '</p></section>';
+    return '<details><summary>可选故事 · 赴约还是救人</summary><p>阿舟要带你去东市认人。渡口那边还有个伤员等着帮忙。你要先答应这场约吗？</p>'
+      + '<button type="button" class="wa-btn" id="wa-ferry-promise" data-chat="' + esc(chat) + '">答应阿舟，在东市见</button>'
+      + '<p role="status" id="wa-ferry-status"></p></details>';
+  }
+  function bindFerry(root) {
+    const btn = root.querySelector('#wa-ferry-promise'), status = root.querySelector('#wa-ferry-status');
+    if (!btn || !status || btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
+        if (currentChat() !== btn.dataset.chat) { status.textContent = '对话已切换，请重新打开此刻页。'; return; }
+        const ack = WA.appointment.make({ who: ferryWho, withWhom: '你', place: '东市', expect: '带你认人', requestKey: ferryKey });
+        if (ack.deferred) { status.textContent = '约定仍待确认。'; return; }
+        const row = ack.ok && ferryRow();
+        if (!row || row.id !== ack.id) { status.textContent = '未能确认约定，请稍后重试。'; btn.disabled = false; return; }
+        status.textContent = '东市见，第 ' + row.from + ' 至 ' + row.to + ' 轮。' + (ack.persisted === true ? '约定已保存。' : '当前对话可见，尚未确认落盘。');
+      } catch (e) { status.textContent = '约定暂时无法确认。'; btn.disabled = false; }
+    });
+  }
+
   function render() {
     const s = store();
     const started = !!(s && s.clock && s.clock.label);
@@ -231,6 +266,8 @@
       const vd = safe(verdictBlock, '');
       if (vd) parts.push(vd);
     }
+    const invite = safe(ferryCard, '');
+    if (invite) parts.push(invite);
     const scene = sceneCard();
     if (scene) parts.push(scene);
     if (started) {
@@ -255,7 +292,7 @@
     });
   }
 
-  WA.panelNowPage = { render: render, bind: bind, ver: '2.518.0' };
+  WA.panelNowPage = { render: render, bind: bind, bindFerry: bindFerry, ver: '2.518.0' };
   if (typeof WA.registerModule === 'function') {
     WA.registerModule('ui/pages/now-page.js', { kind: 'ui', ver: '2.518.0' });
   }
