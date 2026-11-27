@@ -9023,8 +9023,53 @@ buildBlock 的 +1 是**既往漏跟位**，用 `git worktree add /tmp/wa_head HE
 **未做（如实登记）**：R7 / R8 两条仍原样在 `docs/PROJECT_ASSESSMENT.md`；本轮新增 **R9**：四条门禁
 在 HEAD 上就红（`inject-vis-v2580` FAIL 1/10 / `o8-consumer-gate-v2187` 35/3 /
 `ns-adjudication-v2568` **直接崩** / `stitch-ledger-truthfulness-v2552` 17/2），用 `/tmp/wa_head`
-逐条对照**逐字相同** ⇒ 零新增，未修；R287（模型身份面的第二条独立凭据）仍属产品决策，未动。
+逐条对照**逐字相同** ⇒ 零新增，未修；模型身份面的第二条独立凭据（场外探针）仍属产品决策、尚未立项 —— 它不占 R 号（R 是轮次序号，不是待办编号）。
 
 **主题一朵（系列第九处）**：① 命名 → ② 基约定 → ③ 完成度声明 → ④ 归属 → ⑤ 默认值 → ⑥ 指路 →
 ⑦ 写权 → ⑧ 挂载面 → ⑨ **接线面**。第九处不是任何模块的 bug，是**模块之间缺了三根线**
 （写口收票 / 正文取块 / 维护面读账）—— 三条都不在时，功能「看起来完全正常」。
+
+## R287（v2.612.0 · DB-1：两条登记债的偿还 —— 「从未跑过」的锁 + 落后 30 个键的账本）
+
+**R7：那把锁的断言从未跑过**
+
+· 现场：`tests/v11-push-api-registry.js` 只有 `module.exports`、**无顶层执行**，而 `tests/run.js` 用
+  `runScript`（spawn、rc 即结论）挂载 ⇒ 子进程什么都不跑就 rc=0。于是「现场 42 vs 表 40」这件事
+  只在有人手跑时现形，在总账上与绿同形。
+· 改 `runLock` 后当场 A1 红：多出 `arcGuideBridge.advance` / `panelFacesPage.refresh`。逐台裁决
+  （不补数、也不把它们硬塞进 `drive`）：
+  - `arcGuideBridge.advance` → **entry**。它零参可调，但零参语义是 `cur + 1`，而该模块头注纪律 2
+    明写「不猜楼层，读不到就回空块」——轮次替它每轮 +1 等于把「猜出来的在场」写回存档，比缺席更坏。
+    楼层真源是宿主聊天（`chat.length - 1`）。
+  - `panelFacesPage.refresh` → **ui**。它其实是**页内自调**（`ui/pages/faces-page.js` 的 bind 处理器里
+    5 处 `refresh()`），本锁口径只认 `WA.ns.method(` / `ns.method(`，自调不产生调用点 —— 这正是
+    「真零调用」两类形态里「仅自调」那一类的判据盲区，故不裁 dead。
+· 登记表 40 → 42；A10a 跟位；`v11-push-api-coverage` 8/8（C5 同源读数也是 42）。
+
+**R8：账本落后 30 个键**
+
+· `tests/field-liveness-ledger.json` 的 `schemaTopKeys` 停在 209，现场 `Object.keys(store.get())` 是 239；
+  门禁只判「骨架一级键未减少」，所以这 30 个键的缺席**永远不会红** —— 与 R7 同型：
+  **判据站在一个比现场更小的面上，然后说没事**。
+· 重扫对齐到 239（30 个全是 EXV29 批新建状态键：addressForms / aging / arcSettle / costChoice /
+  diceLog / diceSkills / etiquette / etiquetteHits / exitRites / factQueue / finale / floorOrder /
+  habitTells / identityLedger / inputDebounce / interruptCost / livelihood / looseEnds /
+  narrativePresetSnapshot / pastLife / posthumous / productionQueue / quietRound / reputationAfter /
+  roundMark / sceneIntent / switchAudit / ticketRing / toneTrail / worldBounds），逐个核过都有真写入方
+  （各引擎以 `STORE_KEY` 常量写入，多数在 `core/evict.js` 的有界性表登记）。
+· 又一次踩到同一坑并绕开：`--update` 内部是 `JSON.stringify(...)` 无缩进，会把 250 行账本压成单行
+  ⇒ 改为按现场键集重建该数组、其余字节逐字不动（diff 只有 31 行）。
+
+**跟位**：`index.js` / `manifest` / `__wantPin293` 升 2.612.0；10 把 s3 白名单与正则（其中 4 把是
+双引号数组形态，第一遍批量替换漏掉，靠 `version-consistency` 19 红→4 红→0 收敛）；6 本账本 version；
+`segment-extract` 的 run.js 减重 2158 → 2155（`runLock` 三行注释）；证据 704 条 stale 0；
+`docs/gates.md` 重生成；`version-consistency` **22/22**。
+
+**未做（如实登记）**：R9 那四条在 HEAD 上就红的门禁仍未修（`inject-vis-v2580` / `o8-consumer-gate-v2187` /
+`ns-adjudication-v2568` **崩溃** / `stitch-ledger-truthfulness-v2552`）；`field-liveness-ledger.json` 的
+`version` 仍是 2.40.0（那是账本口径版本，不是产品版本，本批不动）；登记表 42 条里仍有 19 条 entry
+**没有任何调用面** —— 本轮只保证「零调用这件事被显式登记」，不假装它们接上了。
+
+**主题一朵（第十处）**：前九处是「注释 / 文档 / 账本在说一件已不成立的事」，这一处换个方向 ——
+**判据在说一件从未发生过的事**（锁没跑过），以及**在一个更小的面上说没事**（账本 209 而现场 239）。
+两条治法相同：把判定面换成现场真源，并且**先证明它真的跑起来了**。

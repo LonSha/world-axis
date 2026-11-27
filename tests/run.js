@@ -22344,7 +22344,11 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
   //   现场重测口径（真零调用：产品面不存在 `WA.ns.method(` / `ns.method(`）：23 条。
   section('v2.299.0 (V11 OPV11-4): 推进类 API 死面裁决（drive / entry / ui / dead）');
   {
-        await runScript('./v11-push-api-registry.js');
+        // v2.611.0（R286 二号事）：本锁只有 `module.exports`、无顶层执行，原用 runScript（spawn、
+        //   rc 即结论）挂载 ⇒ 子进程什么都不跑就 rc=0。改 runLock 后当场报 A1 红（现场 42 vs 表 40：
+        //   arcGuideBridge.advance / panelFacesPage.refresh 两条零调用未登记），已逐条裁决补齐。
+        await runLock('./v11-push-api-registry.js');
+        await runLock('./v11-push-api-registry.js', 'runNegative');
   }
   // ── v2.301.0（V11 EXV11-8）：页/分类双表闭合锁 ────────────────────────────
   //   PAGES / CATS / PAGE_CAT / RENDERERS 四张表手写各一份，任何一处单边增长
@@ -23682,7 +23686,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.611.0';
+  const __wantPin293 = '2.612.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

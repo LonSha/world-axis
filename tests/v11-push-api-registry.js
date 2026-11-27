@@ -236,7 +236,10 @@ function runAll(a) {
     // v2.566.0：41 → 40。`followupGate.due` 已有真产品调用点（engines/spotlight.js:202），
     //   按本表纪律「有调用点 ⇒ 裁决过期」从 ENTRIES 移除，总数随之 -1（只许减，
     //   减少必须同步下调本常量，不许悄悄少报）。
-    a(s.total === 40, 'v11push: [A10a] 登记总数 == 40（实 ' + s.total + '；v2.566.0 移出 followupGate.due）');
+    // v2.611.0 跟位：40 → 42（R7 偿还：arcGuideBridge.advance 裁 entry / panelFacesPage.refresh 裁 ui）。
+    //   这两个数在 HEAD 上就是 42 vs 40 —— 锁用 runScript 挂载（spawn、rc 即结论），断言从未跑过，
+    //   所以「现场 42」这件事只在有人手跑时现形。本批同时把挂载改成 runLock。
+    a(s.total === 42, 'v11push: [A10a] 登记总数 == 42（实 ' + s.total + '；v2.566.0 移出 followupGate.due；v2.611.0 补登两条）');
     a(sum === s.total, 'v11push: [A10b] 各裁决之和 == 总数（' + sum + ' vs ' + s.total + '）');
   }
 }

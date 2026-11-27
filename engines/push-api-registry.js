@@ -66,10 +66,22 @@
       reason: '桥接刷新需具体桥接对象入参，由剧情事件提供' },
     { api: 'clock.advance', cls: 'entry', driver: null,
       reason: '时钟推进是世界时间写入口，需时间跳跃入参，由推演主路径提供' },
+    // v2.611.0（R286 二号事 / R7 偿还）补登：`arcGuideBridge.advance` 一直是推进动词前缀的
+    //   真零调用点（现场 42 vs 表 40）。为何不裁 drive：它确实零参可调，但零参时的语义是
+    //   `cur + 1`——而本模块头注纪律 2 明写「不猜楼层，读不到就回空块」。轮次每轮替它 +1
+    //   等于把「猜出来的在场」写回存档，比缺席更坏。故裁 entry：楼层只能由业务面给。
+    { api: 'arcGuideBridge.advance', cls: 'entry', driver: null,
+      reason: '手动楼层推进口：楼层真源是宿主聊天（chat.length-1），轮次替它自动 +1 就等于猜楼层——本模块七条纪律第 2 条明写不猜楼层，故只接受业务面/面板/测试给的具体楼层' },
     { api: 'cyberUI.progress', cls: 'ui', driver: null,
       reason: '进度条 HTML 生成器：属于 UI 组件工具箱，由页面渲染时调用，不是引擎推进' },
     { api: 'choiceBoard.refresh', cls: 'ui', driver: null,
       reason: '选项板重绘口：由页面在字体/布局变化后调用，不是引擎推进，故不进轮次' },
+    // v2.611.0（R286 二号事 / R7 偿还）补登：`panelFacesPage.refresh` 同批现场多出一条。
+    //   它其实是**页内自调**（ui/pages/faces-page.js 的 bind 处理器里 5 处 `refresh()`），
+    //   本锁口径只认 `WA.ns.method(` / `ns.method(` 形态，因此自调不产生调用点 —— 这正是
+    //   「真零调用」两类形态里「仅自调」那一类的判据盲区，故裁 ui 而不是 dead。
+    { api: 'panelFacesPage.refresh', cls: 'ui', driver: null,
+      reason: '人物卡页重绘口：由 panel.js 的 bind 处理器在换页/翻面/重载后自调（页内 5 处 refresh()），属 UI 渲染辅助，不是引擎推进' },
     // ── v2.524.0 归口：V11 覆盖率锁（tests/v11-push-api-coverage.js）的 C2 在收口轮次里
     //    复算出 21 条「真零调用且未裁决」——全是 v2.55～v2.517 之间落地的老引擎推进口，
     //    当时只做了「存在 + 自调」，没人接进任何调用面。逐台核过证据后按同一把尺子归口：
