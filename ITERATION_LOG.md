@@ -9170,3 +9170,34 @@ panel.js 重组面 19353、文件面 16964），恢复 128/128；`version-consis
 **主题一朵（第十二处）**：R286 是「装好了没人用」，这里是「连读数都在写、就差用户点一下」——
 治法仍然是接线，不是重造引擎：把 `buildProbe/judgeProbe` 这两个孤儿出口接到一个真按钮上，
 补一个「显式、单次、不自动、不折叠」的调用方，让整条链第一次真的跑起来。
+
+
+## R290 · v2.615.0 · 18 项双计划台账与跟位税工具（只做真交付，不做占位引擎）
+
+> 本轮不写死 hash（amend 会让 hash 漂移）；按 V30 计划与现场读数留档。
+
+**用户要求**：继续推进，18 项全做，做完后再跑全量回归。
+
+**先立真源**：新增 `plans/V30_DUAL_PLAN_18.md` 与 `tests/v30-dual-plan-v2615.js`（43/43）。
+18 项逐条带状态词：`done` / `already-done` / `partial` / `adjudicated` / `planned` / `evidence-gap`。
+本轮明确**不用**「列了就算做了」：凡需要新写口、自动链、真宿主证据的项，按现场标回 `planned` 或 `evidence-gap`。
+
+**真交付（#10 跟位税工具化）**：`tools/new-engine.js` 增加 `--mode=version-bump|data-only --check|--dry-run`。
+两种模式只输出必须同步的判据面清单（核心钉版、6 本 ledger、11 把 s3 白名单、dead-export `_note`、segment-extract 行数），**不写盘、不改判据**。
+原有七路引擎模式 --check 仍 7/7，其专锁 `opv29-z5-v2529.js` 48/48。
+
+**诚实回退**：曾按计划文字创建 8 个 stat/NOTE 桩引擎，随后识别为「记了没做」——
+它们既没有入口面也没有闭环，只会把 dead/module 的账本读成虚胖。已全部删除，
+计划状态同步回真实值；未把占位冒充交付。
+
+**版本与门禁跟位**：index/manifest/run.js pin 升 2.615.0；6 本 JSON ledger version；
+13 把 s3 版本判据上界追加 615（其中 s3-b4-n11 是 version-consistency 现场点名的漏项）；
+证据索引按 sha 重建（706 条 stale 0）。
+
+**定向验面**：version-consistency 22/22 · segment-extract 128/128（测试文件面 709→710、run.js 减重阈值 2153→2151） ·
+v30 台账锁 43/43 · 探针锁 8/8 · 脚手架专锁 48/48 ·
+module-registry / dead-export / engines-ns / test-surface 四门全绿 · 证据索引 706 条 stale 0。
+
+**未做（如实登记）**：2/3/4/5/7/8/12/13/16 仍为 planned 或 partial；9 为 evidence-gap。
+这些项缺的是入口设计、owner 写口或真宿主环境，不能用脚本桩冒充完成。
+全量回归按用户要求在计划收口后执行。

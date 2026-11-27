@@ -41,10 +41,42 @@ function arg(name, def) {
   return process.argv.slice(2).indexOf('--' + name) >= 0 ? true : def;
 }
 
+
+// ── v2.615.0（18 项计划 #10）：版本/数据资产跟位清单 ─────────────────────
+//   这不是「替人自动升版」——那会把判据放宽成追随者。它只列出**必须同步的判据面**
+//   与现场命令；人工确认后逐处落盘。口径与 ITERATION_LOG 里反复交的「跟位税」一致。
+function versionSites(kind, ver) {
+  const out = [];
+  const core = [
+    { id: 'pin:index.js/VERSION', file: 'index.js', anchor: "  const VERSION = '", must: 'const VERSION' },
+    { id: 'pin:manifest.json/version', file: 'manifest.json', anchor: '  "version": "', must: '"version"' },
+    { id: 'pin:tests/run.js/__wantPin293', file: 'tests/run.js', anchor: "  const __wantPin293 = '", must: '__wantPin293' },
+    { id: 'ledger:version-surface', file: 'tests/consumer-ledger.json', anchor: '"version"', must: '"version"' },
+    { id: 'tool:version-consistency', file: 'tools/version-consistency.js', anchor: 'module.exports', must: 'version' }
+  ];
+  core.forEach(function (s) { out.push(s); });
+  if (kind === 'data-only') {
+    out.push({ id: 'read:module-registry', file: 'tests/module-registry-ledger.json', anchor: '"totals"', must: '"totals"' });
+    out.push({ id: 'read:dead-export', file: 'tests/dead-export-ledger.json', anchor: '"version"', must: '"version"' });
+    out.push({ id: 'read:ns-consumer', file: 'tests/ns-consumer-ledger.json', anchor: '"version"', must: '"version"' });
+    out.push({ id: 'read:evidence', file: 'tests/evidence-ledger.json', anchor: '"rows"', must: '"rows"' });
+  }
+  return out.map(function (s) {
+    return Object.assign({}, s, { insert: '', note: kind + '@' + ver + ': 跟位清单（不自动改判据）' });
+  });
+}
+
 // ── 七个插入点：每个都只有「锚点 + 插入文本」两件事，没有第二套逻辑 ──────
 //   锚点选的是**结构行**（`const X = {`），不是注释 —— 注释会被人改写口吻，结构行不会。
-function sites(name, ns, ver) {
+function sites(name, ns, ver, mode) {
   const file = 'engines/' + name + '.js';
+  const kind = (mode === 'version-bump' || mode === 'data-only') ? mode : 'engine';
+  if (kind !== 'engine') {
+    // v2.615.0（18 项计划 #10）：跟位税工具化。
+    //   这两种模式**不写引擎骨架**，只把「本版哪些判据面必须同步」做成可复算清单。
+    //   仍然共用本文件的锚点检查纪律：锚点找不到就整体不写、不猜。
+    return versionSites(kind, ver);
+  }
   return [
     {
       id: 'wire:index.js/LOAD_ORDER', file: 'index.js',
@@ -177,6 +209,21 @@ function main() {
   const dry = !!arg('dry-run', false);
   const checkOnly = !!arg('check', false);
   const ver = arg('ver', '2.524.0');
+  const mode = String(arg('mode', 'engine')); // v2.615.0：engine | data-only | version-bump
+
+  if (mode !== 'engine' && mode !== 'data-only' && mode !== 'version-bump') {
+    console.error('bad-mode: ' + mode + '（要求 engine|data-only|version-bump）');
+    return 3;
+  }
+  if (mode !== 'engine' && (checkOnly || dry)) {
+    const vp = sites('__follow__', '__follow__', String(ver), mode);
+    console.log('FOLLOW ' + mode + '@' + ver + '（只读清单：以下判据面必须人工逐处同步）');
+    for (let i = 0; i < vp.length; i++) console.log('  · ' + vp[i].id + ' → ' + vp[i].file);
+    console.log('  · 11 把 s3 白名单/正则（上界追加，不整段替换）');
+    console.log('  · 6 本账本 version / dead-export _note 沿革 / segment-extract 行数判据');
+    console.log('NEW-ENGINE: FOLLOW-PLAN（不写盘；清单即交付）');
+    return 0;
+  }
 
   if (!name || name === true || !ns || ns === true) {
     console.error('用法: node tools/new-engine.js --name=<kebab> --ns=<camel> [--root=.] [--dry-run|--check]');
@@ -185,7 +232,7 @@ function main() {
   if (!NM_RE.test(String(name))) { console.error('bad-name: ' + name + '（要求 ^[a-z][a-z0-9-]{1,30}$）'); return 3; }
   if (!NS_RE.test(String(ns))) { console.error('bad-ns: ' + ns + '（要求 ^[a-z][a-zA-Z0-9]{1,30}$）'); return 3; }
 
-  const plan = sites(String(name), String(ns), String(ver));
+  const plan = sites(String(name), String(ns), String(ver), mode);
   const problems = [];
 
   // ① 目标文件在不在（一个都不许缺）

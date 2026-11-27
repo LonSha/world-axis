@@ -23486,6 +23486,8 @@ await runScript('./story-window-evidence-v2518.js');
     await runScript('./luke-stitch-v2326.js');
     // v2.614.0（R289）：人工身份探针接线面专锁（与 luke 三引擎同族，runScript 纯脚本体）
     await runScript('./channel-probe-run-v2614.js');
+    // v2.615.0（R290）：18 项双计划台账锁（纯脚本体；钉状态词与 #10 工具模式）
+    await runScript('./v30-dual-plan-v2615.js');
     await runScript('./member-surface-gate.js');
     await runScript('./motive-preview-regression.js');
     await runScript('./persona-schedule-evidence-regression.js');
@@ -23688,7 +23690,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.614.0';
+  const __wantPin293 = '2.615.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');
