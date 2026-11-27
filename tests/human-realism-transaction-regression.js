@@ -24,6 +24,10 @@ let r=H.settleGrudge(g.id,{resolution:'已归还欠薪',evidence:'当面交割�
 a(r.ok);a.strictEqual(r.grudge.settled,false);a.strictEqual(r.grudge.repairAccepted,true);
 a.strictEqual(H.getActor('甲').emotions.joy,joy);
 const copied=H.listGrudges();copied[0].settled=true;a.strictEqual(H.listGrudges()[0].settled,false);
+r=H.settleGrudge(g.id,{resolution:'暂时停火',evidence:'甲同意停止争执，仍保留戒备',response:'truce'});
+a(r.ok);a.strictEqual(r.grudge.truceAgreed,true);a.strictEqual(r.grudge.coldGrudge,true);
+a.strictEqual(r.grudge.heartForgiven,false);a.strictEqual(r.grudge.settled,false);
+a.strictEqual(H.getActor('甲').emotions.joy,joy);
 r=H.settleGrudge(g.id,{resolution:'愿意放下此事',evidence:'甲明确表达原谅，但未恢复信任',response:'forgive'});
 a(r.ok);a.strictEqual(r.grudge.settled,true);a.strictEqual(H.getActor('甲').emotions.joy,joy);
 console.log('human realism transaction / refusal / outer rollback / repair-not-forgiveness: PASS');
