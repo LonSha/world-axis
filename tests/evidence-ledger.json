@@ -267,7 +267,7 @@
     },
     {
       "file": "tests/appointment-quota-v2562.js",
-      "sha": "3ed3be40fd1e",
+      "sha": "9bd4422da917",
       "version": "2.562.0",
       "versionSource": "head",
       "fileAnchor": "2562",
@@ -3324,7 +3324,7 @@
     },
     {
       "file": "tests/human-realism-transaction-regression.js",
-      "sha": "d262127b37fe",
+      "sha": "8daad5bac495",
       "version": null,
       "versionSource": null,
       "fileAnchor": null,
@@ -7256,7 +7256,7 @@
     },
     {
       "file": "tests/reject-v2780.js",
-      "sha": "2e3bc9da4474",
+      "sha": "5a3258fe97d0",
       "version": "2.78.0",
       "versionSource": "title",
       "fileAnchor": "2780",
@@ -12000,7 +12000,7 @@
     },
     {
       "file": "tests/ui-gate.js",
-      "sha": "66e347f348bd",
+      "sha": "b157febc1d90",
       "version": null,
       "versionSource": null,
       "fileAnchor": null,

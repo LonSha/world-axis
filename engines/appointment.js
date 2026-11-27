@@ -58,22 +58,33 @@
     const row = { id: 'ap_' + r + '_' + (stat.made + 1), who: who, withWhom: withWhom, place: place,
       from: from, to: to > from ? to : from, expect: clean(s.expect, 80),
       result: '未到', createdAt: now(), createdRound: r };
-    let ok = false;
+    const requestKey = clean(s.requestKey, 120);
+    let entry = null, repeated = false, tx;
     try {
       if (WA.store && WA.store.transact) {
-        WA.store.transact(function (d) {
+        tx = WA.store.transact(function (d) {
           d.actors = d.actors || {};
           const a = findActor(d, who) || (d.actors[who] = { id: who, conditions: [] });
           a.appointments = list(a);
+          entry = requestKey && a.appointments.find(function (x) { return x && x.requestKey === requestKey; });
+          if (entry) { repeated = true; return true; }
+          // A reload resets stat.made; IDs used by settle() must still be unique across actors.
+          const used = new Set();
+          Object.keys(d.actors).forEach(function (k) { list(d.actors[k]).forEach(function (x) { if (x) used.add(x.id); }); });
+          let n = stat.made + 1;
+          while (used.has(row.id)) row.id = 'ap_' + r + '_' + (++n);
+          if (requestKey) row.requestKey = requestKey;
           a.appointments.push(row);
           if (a.appointments.length > cfg.maxPerActor) a.appointments.shift();
+          entry = row;
           return true;
         }, 'appointment:make');
-        ok = true;
       }
-    } catch (e) { ok = false; }
-    stat.made++;
-    return { ok: true, reason: ok ? 'made' : 'made-no-store', id: row.id, window: [row.from, row.to] };
+    } catch (e) { tx = null; }
+    if (!tx || tx.ok !== true || !entry) return { ok: false, reason: 'write-failed' };
+    if (!repeated) stat.made++;
+    return { ok: true, reason: 'made', id: entry.id, window: [entry.from, entry.to], repeated: repeated,
+      persisted: tx.persisted, deferred: !!tx.deferred };
   }
   /** 判结果：到场 / 迟到（宽限内）/ 失约（超过窗口）。 */
   function settle(spec) {
@@ -82,10 +93,10 @@
     const id = String(s.id || '').trim();
     const atRound = Number.isFinite(s.atRound) ? Number(s.atRound) : round();
     const shown = s.showUp !== false;
-    let out = null;
+    let out = null, tx;
     try {
       if (WA.store && WA.store.transact) {
-        WA.store.transact(function (d) {
+        tx = WA.store.transact(function (d) {
           const m = d.actors && typeof d.actors === 'object' ? d.actors : {};
           Object.keys(m).forEach(function (k) {
             list(m[k]).forEach(function (x) {
@@ -104,8 +115,11 @@
           return true;
         }, 'appointment:settle');
       }
-    } catch (e) { out = { ok: false, reason: 'write-failed' }; }
+    } catch (e) { tx = null; }
+    if (!tx || tx.ok !== true) return { ok: false, reason: 'write-failed' };
     if (!out) return { ok: false, reason: 'entry-missing' };
+    out.persisted = tx.persisted;
+    out.deferred = !!tx.deferred;
     if (out.result === '到场') { stat.kept++; return out; }
     if (out.result === '迟到') { stat.late++; markTrace(id, '迟到'); return out; }
     if (out.result === '失约') { stat.missed++; markTrace(id, '失约'); return out; }

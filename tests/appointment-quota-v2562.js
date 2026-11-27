@@ -96,7 +96,7 @@ function load(code, actors, roundNow) {
   vm.runInNewContext(code, { window: win, Date: Date, Number: Number, String: String, Array: Array,
     Object: Object, isFinite: isFinite, Math: Math, JSON: JSON, RegExp: RegExp, parseInt: parseInt },
     { filename: REL });
-  return { api: win.WorldAxis.appointment, store: store };
+  return { api: win.WorldAxis.appointment, store: store, host: WA };
 }
 function ap(id, place, from, to, result) {
   return { id: id, who: '甲', withWhom: '乙', place: place, from: from, to: to || (from + 2),
@@ -384,5 +384,34 @@ ok('N4 block 不拷贝（stat() 直接交回同一对象）⇒ C3 红', function
   assert.strictEqual(R.api.stat().block.picked, 3, '真源码上同一判据不红');
 });
 
+ok('事务拒绝时，建约与结算不返回成功、不计数、不留痕', function () {
+  const h = load(CODE, {}, 4);
+  const spec = { who: '甲', with: '乙', place: '集市', requestKey: 'market' };
+  const made = h.api.make(spec);
+  assert.ok(made.ok);
+  let traces = 0;
+  h.host.tracePost = { post: function () { traces++; } };
+  h.host.store.transact = function (fn) { fn(JSON.parse(JSON.stringify(h.store))); return { ok: false }; };
+  assert.strictEqual(h.api.make(Object.assign({}, spec, { requestKey: 'other' })).ok, false);
+  assert.strictEqual(h.api.settle({ id: made.id, atRound: 99, showUp: false }).ok, false);
+  assert.strictEqual(h.api.view({ who: '甲' }).appointments[0].result, '未到');
+  assert.strictEqual(h.api.stat().made, 1);
+  assert.strictEqual(h.api.stat().missed, 0);
+  assert.strictEqual(traces, 0);
+});
+ok('同一请求重载后仍是一条，新请求不会碰撞旧 id；落盘状态不伪造', function () {
+  const spec = { who: '甲', with: '乙', place: '集市', requestKey: 'market' };
+  const first = load(CODE, {}, 4);
+  const id = first.api.make(spec).id;
+  const h = load(CODE, JSON.parse(JSON.stringify(first.store.actors)), 4);
+  h.host.store.transact = function (fn) { fn(h.store); return { ok: true, persisted: false }; };
+  const replay = h.api.make(spec);
+  assert.strictEqual(replay.id, id); assert.strictEqual(replay.repeated, true);
+  assert.strictEqual(replay.persisted, false); assert.strictEqual(h.api.view({ who: '甲' }).appointments.length, 1);
+  const other = h.api.make(Object.assign({}, spec, { who: '丙' }));
+  assert.notStrictEqual(other.id, id);
+  assert.strictEqual(h.api.settle({ id: other.id }).persisted, false);
+  assert.strictEqual(h.api.settle({ id: other.id }).reason, 'already-settled');
+});
 console.log('\nappointment-quota-v2562: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) { fails.forEach(function (f) { console.log('  FAIL ' + f); }); process.exit(1); }

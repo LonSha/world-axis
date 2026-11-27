@@ -9347,6 +9347,15 @@ function runWitness(WA) {
         const cq3 = CS.schedule({ choiceId: 'ch_paid', effect: '花了大钱', reversible: 'paid' });
         want('need-cost', 'V28 EXV28-20：可付费撤回却没给代价凭证 ⇒ need-cost（不白撤）');
         trip('need-cost', function () { return CS.revoke({ id: cq3.id }).reason; });
+        want('made', '邀约：建约回执对应一条能按人物读回的约定');
+        trip('made', function () {
+          const who = 'wit_ap_made';
+          const ack = AP.make({ who: who, withWhom: '向导', place: '东市' });
+          const view = AP.view({ who: who });
+          return ack.ok && view.ok && view.appointments.some(function (x) {
+            return x.id === ack.id && x.place === '东市' && x.result === '未到';
+          }) ? ack.reason : null;
+        });
         // ——时间的层次（EXV28-27/28）：离线跳跃要说明，缺真源就说缺 ——
         want('missing-rounds', 'V28 EXV28-27：离线跳跃没说跨了多久 ⇒ missing-rounds');
         trip('missing-rounds', function () { return TL.jump({}).reason; });
