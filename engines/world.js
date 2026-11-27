@@ -752,15 +752,15 @@
     const who = clean(person, 60), f = clean(from, 40), t = clean(to, 40);
     if (!who || !f || !t) return { ok: false, reason: 'missing-fields' };
     if (!placeByName(f) || !placeByName(t)) return { ok: false, reason: 'unknown-place' };
-    const r = reach(f, t);
+    const r = transit('person', f, t);
     if (!r.ok) return r;
-    if (!r.reachable) { S.blocked++; return { ok: false, reason: 'unreachable', from: f, to: t }; }
+    const minutes = r.factored;
     const at2 = isFinite(Number(at)) ? Number(at) : clockNow('world');
-    const arrive = at2 + r.minutes * 60000;
+    const arrive = at2 + minutes * 60000;
     const c = canBeAt(who, t, arrive);
     if (!c.ok) { S.blocked++; return { ok: false, reason: c.reason, detail: c }; }
     S.moves++;
-    return { ok: true, person: who, from: f, to: t, minutes: r.minutes, departAt: at2, arriveAt: arrive, path: r.path };
+    return { ok: true, person: who, from: f, to: t, minutes: minutes, departAt: at2, arriveAt: arrive, path: r.path };
   }
 
   /**

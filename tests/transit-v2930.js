@@ -112,6 +112,18 @@ function tOf(WA, ch, f, t) { return WA.world.transit(ch, f, t); }
 // ══════════════ 判据 ══════════════
 function runAll(a) {
   const wSrc = src(WORLD), dSrc = src(DIAG), pSrc = src(PANEL), tSrc = src(WTAB);
+  {
+    const WA = fresh().WA;
+    seed(WA); on(WA); wx(WA, PL.B, 'rain');
+    const preview = WA.travelDesk.plan({ from: PL.A, to: PL.B });
+    const trip = WA.world.depart('赴约人', PL.A, PL.B, Date.now());
+    a(preview.ok && preview.factored === 45 && trip.ok && trip.left === preview.factored,
+      '雨中赴约：基础 30 分钟的路，行程按预览的 45 分钟登记');
+    wx(WA, PL.B, 'storm');
+    const blocked = WA.world.depart('救人者', PL.A, PL.B, Date.now());
+    a(!blocked.ok && blocked.reason === 'weather-blocked' && !WA.world.where('救人者').inTransit,
+      '暴雨封锁：实际出发也被拒绝，不留下在途行程');
+  }
   // ── A 面（静态）──
   a(hits(tSrc, A_CH) === 1, 'v2930: [A1] 三层通道封闭集合在真源码（person / goods / message）');
   a(wSrc.indexOf('CHANNELS: CHANNELS, transit: transit,') > 0,
