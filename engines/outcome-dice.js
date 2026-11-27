@@ -34,6 +34,22 @@
  *      只回 `consequence`，由 causal / act 决定怎么落地（越权改世界是别的模块的病）。
  *   ⑥ 账本有界：`diceLog` 只留最近 32 票（`__BOUNDED_CAPS` 同批登记），挤出最旧。
  *   ⑦ 纯函数 `bandOf(need, roll)` 可整表核：`ladder(target)` 给出 20 行，供专锁对读。
+ *
+ * ── 接线面（v2.611.0 R286 DWR-1 补的，此前四处断线）─────────────────
+ *   立项时（v2.524.0）只做到「装好了」，四个面一个都没接上，量出来的现场是：
+ *     ① **写口不收票**：`act.judge` 在产品侧零调用，而所有真实入口（agency / liaison /
+ *        story-window / opportunity / rehearsal）都只调 `act.add` + `act.admit`，没有一个
+ *        构造 `opts.check` —— 不是别人不接电话，是电话根本没拨。
+ *     ② **掷了不进正文**：本模块的 `buildBlock()` 没有调用点（不在 `render/inject.js`
+ *        的 SOURCES 里）⇒ 模型照旧把「撬开了锁」写下去，账本里却躺着一个 fumble。
+ *     ③ **有账本没读口**：`outcomeDice` / `diceLog` 在 `engines/tool-diag.js` 里 grep 零命中
+ *        ⇒「装好了从不拦路」与「根本没装」在维护者面上长得一模一样。
+ *     ④ **玩家声明面不掷**：`story-window` 的四个选择（find / follow / ask / verify）
+ *        正是 `SKILL_DEF` 里侦查 / 潜行 / 交谈 / 心理学那张表对应的四件事，却从不掷。
+ *   四条现在各有一个真消费方：`act.add`（写口收票，只有 `diceAdjusted === true` 才拦）、
+ *   `render/inject.js` 的 `outcomeDice` 源（判定票进正文）、`tool-diag` 的 `secOutcomeDice`
+ *   （两栏读数：writeTickets / writeRefused）、`story-window.choose`（票号 `sw:<窗口>:<选择>`）。
+ *   **默认关没有改**：它是刻意的玩家侧能力开关（八台一族），不是缺陷。
  */
 (function () {
   'use strict';

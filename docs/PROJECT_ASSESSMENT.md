@@ -45,6 +45,7 @@
   所以「跑回归不会改工作树」是可核验的（`sourceChanged: false`）。
 - 上一趟整趟：**通过 26,083 / 失败 0**（此前 12 红已按根因清零：新增 data-only 资产引发的
   四处读数副本跟位）。
+- 现场（v2.611.0）：上面「26,083 / 失败 0」是 **v2.586.0 的读数**，不是当前状态。全量整趟未重跑；四把专项锁单独跑时在 HEAD 上就红，逐条见 R9（其中 `ns-adjudication-v2568` 是崩溃，不是断言失败）。
 - 拒收码面 1,935 个内联码，每码有归属（见证 / 死表 52 / 基线 940），新增未分类码即红。
 
 **代价**：整趟约 2.5 小时，单节最长 792s（`v2.82.0`，占 44.5%）。分片研究已做过：
@@ -73,6 +74,7 @@
 | R6 | 词表仍无产品消费 | 零读 ns 55 含 `appearanceLexicon` | 词表「有交付物但没接线」，下一步应让 render 真读 |
 | R7 | **五把 V11 锁挂载失配：判据从未跑过** | 五把 `v11-*.js` 只有 `module.exports` 无顶层执行，却用 `runScript`（spawn，rc 即结论）挂载 ⇒ 子进程什么都不跑就 rc=0。实测：pending-state 33 / inject-dualface 20 / l3-registry 22 全绿（已改 runLock）；field-writers 报 W8a/W8b 两红（已随 R285 修好）；push-api-registry 报 A1 红（现场 42 vs 表 40：`arcGuideBridge.advance`、`panelFacesPage.refresh` 两条零调用未登记） | 「绿」有两种：断言通过，和**断言没跑**。后者在总账上与前者同形 |
 | R8 | 账本读数落后现场 | `tests/field-liveness-ledger.json` 的 `schemaTopKeys` 停在 209，而 `Object.keys(store.get())` 现场 239（差 30，全是 EXV29 批新建的状态键） | 任何以该账本为扫描面的判据都会漏 30 个键；R285 的锁已改用现场真源 |
+| R9 | **四把门禁在 HEAD 上就红（v2.611.0 实测，本轮零新增）** | ① `tests/inject-vis-v2580.js` FAIL 1 / 10（[C] 缺 `arcGuideBridge`：该源无独立取数口，在跳过名单里）；② `tests/o8-consumer-gate-v2187.js` 35 / 3（`polishBridge.version` / `purifyScopeBridge.version` 未登记 ⇒ B1/B2 实 2、C1 双面核对不过）；③ `tests/ns-adjudication-v2568.js` **直接崩**（`runAll` 第 226 行读 `undefined.cls`，栈直抵 `run_main_module`，**一项都没跑**）；④ `tests/stitch-ledger-truthfulness-v2552.js` 17 / 2（C1 账本缺 `arcGuide` 条 / C3 deadNs 应含 `arcGuide`） | 用 `git worktree add /tmp/wa_head HEAD`（97dcf5d）逐条对照：四条读数与本轮**逐字相同** ⇒ 确认均非本轮引入。但四条都属「判据在报、没人修」的形态；③ 最危险 —— **崩掉的锁在总账上与绿同形** |
 
 ## 6. 下一步（按性价比排序）
 

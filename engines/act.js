@@ -217,7 +217,13 @@
     //   ② digestSkipped：指纹面缺席因而未能留痕（如实降级，不假造一个可能撞的键）；
     //   ③ digestCollision：哈希撞键且 opId 原文不符（碰撞**不**当命中，如实计）。
     //   与 core/commit.js 的 archivedReuse/digestSkipped/digestCollision 逐字同口径。
-    archived: 0, digestSkipped: 0, digestCollision: 0 };
+    archived: 0, digestSkipped: 0, digestCollision: 0,
+    // v2.611.0（R286 DWR-1）：判定票面两栏 ——
+    //   diceTickets：带票登记的笔数（骰子真掷过、且掷出了档位）；
+    //   diceRefused：其中被票判没成的笔数（fail→delay / fumble→refuse，只有这两档会拦）。
+    //   两栏分开是因为「掷了、放行」与「掷了、没成」在读数上必须能分 —— 合成一个
+    //   `dice` 总数会让「骰子装好了但从不拦路」与「骰子正常在拦」长得一模一样。
+    diceTickets: 0, diceRefused: 0 };
   // v2.216.0（优化 Q7）：**幂等下限表**（本模块持有的那一半）。
   //   与 core/evict.js 的 IDEMPOTENT 同域：挤出侧负责「旋钮拧不到下限以下」，
   //   本模块负责「长局越过下限退场时留凭据」。两处缺一，去重真源仍会被静默掏空。
@@ -443,6 +449,37 @@
           on: hot ? hot.status : (cold ? 'receipt' : 'archived'), archived: !!arch };
       }
     }
+    // ── v2.611.0（R286 DWR-1）：**票从这里递进来** ──────────────────────────
+    //   到本批之前骰子是「装好了、没人用」：`judge` 在产品侧零调用，而所有真实入口
+    //   （agency / liaison / story-window / opportunity / rehearsal）都只调 `add` + `admit`，
+    //   没有一个构造 `opts.check`。**票从来没被递出去**（比「没人调 judge」更硬）。
+    //   接线口径三条，都是否定式：
+    //     ① 只有 `judge` 回 `diceAdjusted === true` 时才拦。原本就落 refuse / delay 的种类
+    //        （wait / rest，见 verdictOfRow）行为逐字不变 —— 骰子**不许**把别处的判定改严。
+    //     ② 拒收发生在 `mutate` **之前**：世界状态零变化。掷出去的那一票留在 `diceLog` 里，
+    //        因为「掷过一次」是不可撤销的事实，而「他做成了没有」才是世界事实。两者不许混。
+    //     ③ 关着时 `judge` 回 `check:{reason:'module-disabled'}` 且 `diceAdjusted:false`
+    //        ⇒ 不拦、不记、行上不留 `dice` —— 老路径逐字不变（默认关，见 outcome-dice 头注）。
+    const chk = (it.check && typeof it.check === 'object') ? it.check : null;
+    let dice = null;
+    if (chk) {
+      const jr = judge(kind, { check: chk });
+      const band = (jr && jr.ok && jr.check && jr.check.band) ? jr.check.band : null;
+      if (band) {
+        S.diceTickets++;
+        if (jr.diceAdjusted === true && (jr.verdict === 'refuse' || jr.verdict === 'delay')) {
+          S.diceRefused++;
+          S.lastReason = 'dice-' + jr.verdict;
+          return { ok: false, reason: 'dice-' + jr.verdict, person: who, kind: kind,
+            band: band, baseVerdict: jr.baseVerdict, check: jr.check,
+            note: '这一笔被判定票判没了（' + (jr.check.label || band) + '）：同一张票重掷回同一结果，'
+              + '换票等于换行动 —— 「说了不一定成」只在票上有概率，不在按钮上有概率' };
+        }
+        dice = { band: band, label: jr.check.label || band, roll: jr.check.roll, die: jr.check.die,
+          need: jr.check.need, ticket: jr.check.ticket || '', replay: jr.check.replay === true,
+          verdict: jr.verdict, adjusted: jr.diceAdjusted === true };
+      }
+    }
     let out = null;
     mutate(storeOf(), function (draft) {
       draft.acts = (draft.acts && typeof draft.acts === 'object' && !Array.isArray(draft.acts))
@@ -465,6 +502,9 @@
         //   msgId 是传话那一笔对应的世界消息 id（按 id 复查状态，不重发 —— 防同一条话发多份）。
         contractId: str(it.contractId, 60), msgId: '',
         result: '', reason: '', evidence: '', blockedBy: '', from_: str(it.from_, 60),
+        // v2.611.0（R286 DWR-1）：这一笔是掷出来的就留票（可复查到具体骰点），
+        //   没掷就是 null —— **不许塞一个空对象冒充「投过了」**。
+        dice: dice,
         at: now
       };
       draft.acts.rows.push(row);

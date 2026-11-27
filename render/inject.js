@@ -262,7 +262,12 @@
     //   详情仍留在按需条目里 —— 模型永远知道有什么，又不为详情付常驻 token。
     //   默认 **false**：这是**常驻**文本（每轮都在），与 worldAutobiography 同一条理由 ——
     //   没开过这个设置面的人不该凭空多出一段长期约束，也看不到它是哪来的。
-    'mixedIndex'];
+    // v2.611.0（R286 DWR-1）：判定票。与源表/def/VIS_NAMES/SRC_NAME/注入分支**五处同批**登记。
+    //   为什么它必须进正文而不是只留在账本里：骰子掷出来的档位**不告诉模型就等于没掷** ——
+    //   模型会照旧把「撬开了锁」写下去，而账本里明明躺着一个 fumble。
+    //   与 narrowConsumers 同一条理由取默认 **true**：`buildBlock()` 在开关关着（引擎默认关）
+    //   或最近没有票时返回 ''，空块不入正文，故不给老用户凭空多出一段约束。
+    'mixedIndex', 'outcomeDice'];
   const __REG = { key: LS_KEY, def: { sceneIntent: true, clock: true, background: true, people: true, currents: true, echoes: false, memory: true, opinion: false, pulse: true, ledger: true, digest: true,
         // 默认 **false**：与 rules.craft「未开启时不额外约束」一致。默认 true 会让所有
         //   老用户凭空多出一段约束——而他们从没开过这个设置面，也看不到是哪来的。
@@ -390,7 +395,10 @@ style: false,
         //   空局恒 ''，不给老用户凭空多出约束。
         // v2.567.0（引擎深度）：常驻混合索引默认 **false**（同 worldAutobiography 的理由）——
         //   常驻文本每轮都在，默认开会让老用户凭空多出一段长期约束，且看不到来源。
-        narrowConsumers: true, mixedIndex: false }, module: 'render' };
+        narrowConsumers: true, mixedIndex: false,
+        // v2.611.0（R286 DWR-1）：判定票。同 narrowConsumers 的理由取默认 true ——
+        //   `outcomeDice.buildBlock()` 在开关关着时恒返回 ''，默认开不产生任何 token。
+        outcomeDice: true }, module: 'render' };
   // v2.3.0: 读路径统一走 settingsBus（写路径早已迁移）——可见性配置损坏此前静默回落默认
   /**
    * v2.4.0: 可见性读入口（含子键缺口自愈 + 声明完整性检查）。
@@ -737,7 +745,12 @@ style: false,
     //   「注入项没有对应开关」这两种同形不可分辨的缺口。
     //   取名口径同 diplomacy：答「这一段是什么」——「常驻索引」明示它**只有名字与一句简报**，
     //   与「伏笔台账」「记忆」这类带内容的源划清边界。
-    mixedIndex: '常驻索引'
+    mixedIndex: '常驻索引',
+    // v2.611.0（R286 DWR-1）：判定票的显示名。与注入分支的 source 字面量逐字同名，
+    //   否则用户唯一能看见它的地方（注入日志 / 面板开关）裸露英文键名。
+    //   取名口径同 diplomacy：答「这一段是什么」—— 「判定票」明示它是一次掷骰的结果，
+    //   不是「难度」「检定规则」这类**会被人当成世界参数**的名字。
+    outcomeDice: '判定票'
   };
   // ── v2.91.0 O4：开关两面对账 ──────────────────────────────────────────
   /**
@@ -2073,6 +2086,13 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.narrowConsumers && WA.narrowConsumers) {
         const nb = engineCall('narrowConsumers', function () { return WA.narrowConsumers.buildBlock(); });
         if (nb) items.push({ source: '在用机制', content: nb });
+      }
+      // v2.611.0（R286 DWR-1）：判定票接产品链。到此之前 `outcomeDice.buildBlock()` **没有任何调用点**
+      //   —— 骰子掷了、账本记了、正文里一个字都没有，于是同一轮模型照旧把「撬开了锁」写下去。
+      //   空局/开关关着/最近无票时 buildBlock 自己返回 ''，**不输出空块**（不白吃常驻 token）。
+      if (vis.outcomeDice && WA.outcomeDice) {
+        const db = engineCall('outcomeDice', function () { return WA.outcomeDice.buildBlock(); });
+        if (db) items.push({ source: '判定票', content: db });
       }
       // v0.7: 近端事件一次性消费
       // v2.86.0 A5：本块既是读也是**写**（一次性消费要清 nearEvent），故整体守卫。

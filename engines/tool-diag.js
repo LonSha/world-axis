@@ -1954,6 +1954,46 @@
       };
     });
   }
+  /**
+   * v2.611.0（R286 DWR-1）：判定票读数。
+   *   为什么要单列一节，而不并进 action / storyWindow：那一节答「他这一轮动没动」，
+   *   本节答「这一笔是被掷出来的还是被说出来的」—— 两问的失效模式不同：
+   *   action 节坏了是「排队没人推」，本节坏了是「骰子掷了没人看」。
+   *   到本批之前这一节不存在：`outcomeDice` / `diceLog` 在 tool-diag 里 **grep 零命中**，
+   *   于是「骰子装好了但从不拦路」与「骰子根本没装」在维护者面上长得一模一样。
+   *   **只读** stat / view / skills —— 不 buildBlock、不 resolve（诊断面不得掷骰）。
+   */
+  function secOutcomeDice() {
+    return safe(function () {
+      if (!WA.outcomeDice || typeof WA.outcomeDice.view !== 'function') {
+        return { loaded: false, error: 'engines/outcome-dice.js 未加载（判定票读数缺席）' };
+      }
+      var v = WA.outcomeDice.view();
+      var st = (typeof WA.outcomeDice.stat === 'function') ? WA.outcomeDice.stat() : {};
+      var sk = (typeof WA.outcomeDice.skills === 'function') ? WA.outcomeDice.skills() : {};
+      var as = (WA.act && typeof WA.act.stat === 'function') ? WA.act.stat() : {};
+      var recent = (v.recent || []).slice(-3).map(function (x) {
+        return { ticket: (x && x.ticket) || '', band: (x && x.band) || '', label: (x && x.label) || '',
+          roll: (x && x.roll) || 0, die: (x && x.die) || 0, who: (x && x.who) || '', what: (x && x.what) || '' };
+      });
+      return {
+        loaded: true, enabled: v.enabled, die: v.die, total: v.total, cap: v.cap,
+        recent: recent, skillsCount: sk.count || 0, skillsCap: sk.cap || 0,
+        // 引擎自己的读数（本节只读，不汇总成第二真源）
+        rolled: st.rolled || 0, off: st.off || 0, replay: st.replay || 0, badInput: st.badInput || 0,
+        lastBand: st.lastBand || '',
+        // 接线面读数：写口收到几张票、拦住了几笔。两栏分开 —— 合成一个总数会让
+        //   「掷了、全放行」与「掷了、正常在拦」看起来一样。
+        writeTickets: as.diceTickets || 0, writeRefused: as.diceRefused || 0,
+        closedLoop: !!(v.enabled && (as.diceTickets || 0) > 0),
+        note: !v.enabled
+          ? '总开关关闭（默认关，玩家侧能力开关）—— 不掷骰、不记账、不拦路，世界回到「说了就成」'
+          : ((as.diceTickets || 0) === 0
+            ? '开关开着但写口还没收到过票 —— 「掷了」与「没掷」在这时同形，看 writeTickets'
+            : null)
+      };
+    });
+  }
   function secStoryChoice() {
     var sc = WA.storyChoice;
     if (!sc) return { error: 'storyChoice 模块未装载', closedLoop: false };
@@ -5019,6 +5059,9 @@ actions: WA.life.ACTIONS || [], commitments: WA.life.COMMITMENTS || []
       uiTheme: secUiTheme(),
       diplomacy: secDiplomacy(),
       agency: secAgency(),
+      // v2.611.0（R286 DWR-1）：判定票读数。与 action / storyWindow 分列不合并 ——
+      //   它们答「做了什么」，本节答「这一笔是不是掷出来的」。
+      outcomeDice: secOutcomeDice(),
       freight: secFreight(),
       storyChoice: secStoryChoice(),
       // v2.518.0：故事回应窗口的诊断节。与 storyChoice 分列不合并 ——

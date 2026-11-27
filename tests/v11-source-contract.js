@@ -159,7 +159,6 @@ const NON_SOURCE_BUILDBLOCK = {
   worldBounds: { verify: 'reasoning', reason: '世界边界：engines/inject-collector.js 320–321 行 WA.worldBounds.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
   etiquette: { verify: 'reasoning', reason: '礼节：engines/inject-collector.js 328–329 行 WA.etiquette.buildBlock() 真调用，块折叠入正文；无 def/VIS_NAMES/vis.X 分支，不进 SOURCES' },
   identityLedger: { verify: 'dead', reason: '四元组同一性账本（EXV29-01）：buildBlock 产品侧零调用点（死面账本归因 self-only），正文侧无消费者；同一性读数走 view() 与面板' },
-  outcomeDice: { verify: 'dead', reason: '检定骰面（S1「说了不一定成」）：buildBlock 产品侧零调用点（死面账本归因 self-only），动作结论走 act.VERDICTS 四档，正文不消费该块' },
   overhearSplit: { verify: 'dead', reason: '听者分层（EXV29-09）：buildBlock 产品侧零调用点（死面账本归因 self-only），远近由 spatial-acoustics、方言由 lingua-broker 分头供给' }
 };
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,7 +184,12 @@ const SOURCE_WITHOUT_BUILDBLOCK = {
   playerKnowledge: { verify: 'applyInline', reason: '对主角了解：applyInjections 内联读 WA.playerKnowledge.view() 成行（1521 行），无独立块' },
   affectionDual: { verify: 'applyInline', reason: '内外双轴：applyInjections 内联读 WA.affectionDual.view() 成行（1522 行），无独立块' },
   lifeProfile: { verify: 'applyInline', reason: '生活小档：applyInjections 内联读 WA.lifeProfile.view() 成行（1523 行），无独立块' },
-  suspenseLedger: { verify: 'applyInline', reason: '悬念簿：applyInjections 内联读 WA.suspenseLedger.view() 成行（1524 行），无独立块' }
+  suspenseLedger: { verify: 'applyInline', reason: '悬念簿：applyInjections 内联读 WA.suspenseLedger.view() 成行（1524 行），无独立块' },
+  // v2.611.0 补登记（既存欠账）：外貌词库源在 v2.588.0（R6）进了源表，却一直没进本白名单 ——
+  //   T5 于是每轮都报「未裁决: appearanceLexicon」，而 T7 的内联差集是 16、白名单 B 只有 15，
+  //   两个数咬不上。它确实是 inline 一族，但取数口不是 ns 上的 builder，而是 render/inject.js
+  //   自己的 lexiconHintBlock()（该函数直读 WA.appearanceLexicon 的词表）——故记 applyInline。
+  appearanceLexicon: { verify: 'applyInline', reason: '外貌词库：applyInjections 内联读本文件的 lexiconHintBlock()（直读 WA.appearanceLexicon 词表），无独立 buildBlock' }
 };
 // ─────────────────────────────────────────────────────────────────────────────
 // 源码切片工具
@@ -453,7 +457,12 @@ function runAll(a) {
   //   engines/inject-collector.js 有真调用点（reasoning），3 台死面账本归因 self-only（dead）。
   //   判据（长度相等）未动 —— 表跟位，不是放宽。
   // v2.584.0 跟位：attireState（穿着状态）注入分支入场 ⇒ 167 → 168。
-  a(j.sources.length === 168, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.569.0 跟位：166 → 167 = v2.567.0 的 mixedIndex 常驻索引注入源；v2.542.8 基线 166；v2.524.0 为 151）');
+  // v2.611.0 跟位（168 → 171，三段分开记）：
+  //   +0 本轮实际只加了一个源（outcomeDice 进 SOURCES）；
+  //   +2 是**既往漏跟位**：HEAD(97dcf5d) 实测已 170（v2.588.0 appearanceLexicon / v2.591.0 arcGuideBridge
+  //      / v2.610.0 narrowConsumers 这几批进表时，本判据的基线一直没跟）。这两条属既存欠账，本轮顺手补上；
+  //   +1 本轮（outcomeDice）。判据仍是「相等」，没有放宽。
+  a(j.sources.length === 171, 'v11src: [T1] SOURCES 解析到 ' + j.sources.length + ' 项（v2.569.0 跟位：166 → 167 = v2.567.0 的 mixedIndex 常驻索引注入源；v2.542.8 基线 166；v2.524.0 为 151）');
   //   v2.407.0 跟位：runtimeKeys 144 → 150（memoryRelay/stageSession 为 v2.402.0 V10 新增，
   //   summarizerAdapter/director/branchContinuity/factContinuity 为 v2.407.0 三缝新增）；
   //   SOURCES 仍 144 —— 六台都没有 def/VIS_NAMES/vis.X 注入契约，走白名单 A 归属。
@@ -461,7 +470,9 @@ function runAll(a) {
   //   localGrid / spatialBridge 两台已在白名单 A 按 dead 逐台裁决（证据见下方补登记）；
   //   其余进的是 SOURCES 或已在册项 —— 表跟位，判据（长度相等）未动。
   // v2.584.0 跟位：运行时 buildBlock 命名空间 190 → 191（attireState 有 buildBlock 且已接线）。
-  a(j.runtimeKeys.length === 191, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.569.0 跟位：189 → 190 = mixedIndex；v2.542.8 基线 189；v2.524.0 为 155）');
+  // v2.611.0：191 → 192 **纯既存补位** —— HEAD(97dcf5d) 实测就是 192，与本轮改动无关。
+  //   本项扫的是运行时全量 ns 的 buildBlock，不是 SOURCES 子集，所以进不进源表不影响它。
+  a(j.runtimeKeys.length === 192, 'v11src: [T1] 运行时 buildBlock 命名空间 ' + j.runtimeKeys.length + ' 台（v2.569.0 跟位：189 → 190 = mixedIndex；v2.542.8 基线 189；v2.524.0 为 155）');
   a(j.missingDef.length === 0, 'v11src: [T2] 源表每项在 def 有默认值（缺: ' + (j.missingDef.join(',') || '无') + '）');
   a(j.missingName.length === 0, 'v11src: [T3] 源表每项有面板显示名（缺: ' + (j.missingName.join(',') || '无') + '）');
   a(j.missingVis.length === 0, 'v11src: [T4] 源表每项有 vis 读取点（缺: ' + (j.missingVis.join(',') || '无') + '）');

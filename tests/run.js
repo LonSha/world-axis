@@ -22519,6 +22519,7 @@ section('v2.146.0（F2+W3）：后果涟漪网 + 多结局分支预演 —— �
     // v2.524.0（S1 单列可开关项）：`engines/outcome-dice.js` 专锁 —— 说了不一定成（d20 五档）。
     //   纯脚本体；三条真源码锚负控制（高能力不吃挂的判据 / CAP=32 的上界 / 默认关），两向自证。
     await runScript('./outcome-dice-v2525.js');
+    await runScript('./dice-wiring-v2611.js');
     await runScript('./identity-batch1-v2524.js');
     await runScript('./floor-batch2-v2524.js');
     await runScript('./finale-batch3-v2524.js');
@@ -23681,7 +23682,7 @@ await runScript('./story-window-evidence-v2518.js');
   //   升版时只改 __wantPin293 一处（v2.295.0 注释口径）。
   //   v2.416.0（OPV24-1）：2.410.0 → 2.416.0。此前 2.411~2.415 五版漏跟（全量未跑盲区），
   //   本版起由 tools/version-consistency.js ⑤ 机器盯住，漏跟当场红。
-  const __wantPin293 = '2.610.0';
+  const __wantPin293 = '2.611.0';
     assert(__verPin293 === __wantPin293,
       '入口 VERSION === ' + __wantPin293 + '（实 ' + __verPin293 + '）—— 严格相等，不是前缀；'
       + '否则 U9 事实报告的「runPins」这项在空集上恒真');

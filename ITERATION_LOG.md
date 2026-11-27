@@ -8944,3 +8944,87 @@ R282 定的「借名必须写主体」，本面把它升成判据（**B3：逐�
 ⑤ 默认值（R283）→ ⑥ **指路（本轮）**。六处不同，治法同一条：**先把事实量出来，再找那笔能定案的证据**
 ——本轮的证据不是 git，是「那个文件到底在不在」；而最值钱的一句反而是否定式：
 **12 条上游引用都不是缺口 —— 一个判据能把这 12 条隔在外面，比能多报 12 条更有用。**
+
+## R285（v2.610.0 · WRA-1：写权面覆盖面 —— 扫描面被自己锁死，挂载面从未跑过）
+
+**两层真缺口（实测，不是阅读推断）**
+
+① **扫描面被判据自己锁死**：`tests/v11-field-writers.js` 的 W2 真是双向对账，但它的扫描面就是
+`FIELDS` 数组本身（5 个字段）——「表里没有的字段」永远不会被扫。现场量：顶层键 **239** /
+多写者 **27** / 吃掉型 **9**。与 R283（默认值只扫它认识的那 354 台）、R284（指路只扫带目录前缀的
+引用）同族：**判据的扫描面被它自己锁死**。
+
+② **挂载面（比 ① 更硬）**：五把 `v11-*.js` 只有 `module.exports`、无顶层执行，却用 `runScript`
+（spawn、rc 即结论）挂载 ⇒ 子进程什么都不跑就 rc=0。**不是「总是绿」，是从未跑过**。
+改成 `runLock` 后 `v11-field-writers` 当场报 W8a/W8b 两红。
+
+**交付**：`engines/field-writers.js` 补声明 6 个字段共 11 个写者，新增 `COVERAGE` 冻结读数
+239/27/9/11/16/48 并从 `view()` 透出；新锁 `tests/write-authority-v2610.js`（18 项：扫描面＝全部
+顶层键 / 吃掉型 ⊆ 表内 / 未声明写者总数 48 一动即红 / 纯只读）；三把同型锁一并改 `runLock`
+（实测 pending-state 33 / inject-dualface 20 / l3-registry 22 全绿）。
+
+**「吃掉型」的可复算判据**：整块赋值站点 + 右值不引用本字段当前值 + 不是建行守卫
+（`if (!d.X)` / `if (d.X === undefined)`）。已知误报**故意留着**：`if (!ec) ec = d.economy = {...}`
+这种先赋局部别名的写法，判据看不出它其实也是守卫。mode 列**不由锁推导** —— 扫描器只能看
+「写没写整块」，看不出语义。
+
+**未做（如实登记）**：R7 `v11-push-api-registry` 跑真后 A1 红（现场 42 vs 表 40：`arcGuideBridge.advance`
+/ `panelFacesPage.refresh`）；R8 `field-liveness-ledger` 的 `schemaTopKeys` 还停在 209（现场 239）。
+本轮**只改了挂载方式与声明表，一个默认值都没动**。
+
+**本节的账迟了一轮**：v2.610.0 提交时没写这一节，`tests/iteration-log-v2595.js` 的 B2 从那天起就红
+（缺 285 落点）—— 正是这把锁立起来要防的那种形态，而它自己也靠下一轮的人记得补。
+
+## R286（v2.611.0 · DWR-1：判定票接线面 —— 功能都在，三个面一个都没接）
+
+**病根（三处断线，按证据硬度排序）**
+
+① **票从来没被递出去**：`act.judge` 过去只被 `action-desk-routes.js:629` 的 `'act.judge'` 路由转发
+（产品入口），而所有真调 `act.add` + `act.admit` 的入口（`agency.js:280/286`、`liaison.js:303`、
+`story-window.js:379/394/447`、`opportunity.js:451`、`rehearsal.js:228/230`、`ui/panel.js:9243/9256`）
+都不构造 `opts.check` ⇒ 「票从来没被递出去」比「没人调 judge」更硬。
+
+② **掷了不进正文**：`outcomeDice.buildBlock()` 零调用点（不在 `render/inject.js` 的 `SOURCES` 里）。
+
+③ **有账本没读口**：`outcomeDice` / `diceLog` 在 `engines/tool-diag.js` 里 grep 零命中。
+
+**交付（四处接线 + 一把锁）**
+
+· `engines/act.js` 的 `add`：`mutate` 之前收票（`judge(kind, { check })`），只在 `jr.diceAdjusted === true`
+  且 verdict 为 `refuse` / `delay` 时拒收；拒收发生在落盘前 ⇒ **世界零变化**；行上留 `dice` 字段
+  （没掷就是 `null`，不塞空对象冒充）；`stat` 加 `diceTickets` / `diceRefused` 两栏
+  （「掷了放行」与「掷了没成」在读数上必须能分）。
+· `engines/story-window.js` 的 `choose`：前置 `rollChoice()`，`CHOICE_SKILL` 四入口
+  （find 侦查 / follow 潜行 / ask 交谈 / verify 心理学），票号 `sw:<窗口id>:<选择>`；
+  `defer` / `wait` 不掷；掷坏（抛错 / 坏入参）返回 `null` —— **掷骰坏了不得拦住玩家**；
+  `stop` 时只记一次未成立尝试，不写 `choice`、不动 `status`、`retryable:false`。
+· `render/inject.js` 五处同批登记（SOURCES / def / SRC_NAME / 注入分支 / `ui/panel.js` 的 VIS_NAMES
+  「判定票」）；def 默认开，但 `buildBlock` 关着恒返回空串 ⇒ 不产生 token。
+· `engines/tool-diag.js` 新增 `secOutcomeDice()`（只读 `view` / `stat` / `skills` / `act.stat`，
+  不 buildBlock 不 resolve，报 `writeTickets` / `writeRefused` / `closedLoop` 三态）。
+· 新锁 `tests/dice-wiring-v2611.js`（**80 项**：A 静态 20 / B 写口行为 28 / C 读数 12 /
+  D 玩家声明面 16 / N 负控 4）。首跑 68/11，逐项修到 80/0。
+
+**一个必须写下的纠正**：`outcome-dice` 默认关**不是缺陷**。`DEF = { enabled: false, die: 100 }` 是
+v2.524.0（`cd57a23`）立项时的刻意决策，属八台「玩家侧能力开关」一族，与 v2.412.0 全开策略
+（`35d2c93`）并存不矛盾（全开策略开的是世界机制）。八台里七台注释自洽写「默认关」，
+唯 `engines/character-drive.js` 口径缺失 —— 本轮补注释，**没改任何默认值**。
+
+**跟位与门禁**：`v11-source-contract` 由 9 红收成 30 项全绿（删 `NON_SOURCE_BUILDBLOCK.outcomeDice`
+—— 它已进 SOURCES、白名单过期；补 `SOURCE_WITHOUT_BUILDLOCK.appearanceLexicon`（applyInline，
+取数口是 inject 自己的 `lexiconHintBlock()`）；T1 基线 168→171 / 191→192，其中 SOURCES 的 +2 与
+buildBlock 的 +1 是**既往漏跟位**，用 `git worktree add /tmp/wa_head HEAD` 实测 170/192 反推，
+已写进注释把「本轮 +1」与「补旧账 +2」分开记）。
+`dead-export-gate` 手工逐条收敛（**`--update` 会按 indent=2 重写 33k 行账本 ⇒ 16776 insertions / 16800 deletions**，
+已 `git checkout` 回退改字符串替换，这条坑写进账本 `_note`）。
+`version-consistency` **22/22**；`segment-extract-v2400` 128/128（含补 v2.610.0 漏跟的 `BASE_SECTION_CC`
+473→474 —— 在 HEAD 上就是红的）。
+
+**未做（如实登记）**：R7 / R8 两条仍原样在 `docs/PROJECT_ASSESSMENT.md`；本轮新增 **R9**：四条门禁
+在 HEAD 上就红（`inject-vis-v2580` FAIL 1/10 / `o8-consumer-gate-v2187` 35/3 /
+`ns-adjudication-v2568` **直接崩** / `stitch-ledger-truthfulness-v2552` 17/2），用 `/tmp/wa_head`
+逐条对照**逐字相同** ⇒ 零新增，未修；R287（模型身份面的第二条独立凭据）仍属产品决策，未动。
+
+**主题一朵（系列第九处）**：① 命名 → ② 基约定 → ③ 完成度声明 → ④ 归属 → ⑤ 默认值 → ⑥ 指路 →
+⑦ 写权 → ⑧ 挂载面 → ⑨ **接线面**。第九处不是任何模块的 bug，是**模块之间缺了三根线**
+（写口收票 / 正文取块 / 维护面读账）—— 三条都不在时，功能「看起来完全正常」。

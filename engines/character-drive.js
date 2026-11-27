@@ -27,6 +27,11 @@
   const WA = root.WorldAxis = root.WorldAxis || {};
   const VERSION = '2.542.5';
   const LS_KEY = 'worldaxis_character_drive_settings_v1';
+  // v2.611.0（R286 DWR-1）：**默认关**。本台与 arc-guide-bridge / arc-phase / inject-tier /
+  //   local-grid / outcome-dice / scene-intent / spatial-bridge 同属「玩家侧能力开关」八台一族：
+  //   默认关是 v2.412.0「全开策略」之外**刻意留的一族** —— 全开策略开的是世界机制，
+  //   这八台开的是「替玩家额外做判断」的能力，装好了但等玩家自己按。
+  //   八台里此前只有本台注释既没说开也没说关（口径缺失、读起来像漏改），本行补上。
   const DEF = { enabled: false, maxText: 40, lineTouchPace: 'press' };
   const __REG = { key: LS_KEY, def: DEF, module: 'characterDrive' };
   if (WA.settingsBus) WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);

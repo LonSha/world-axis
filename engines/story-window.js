@@ -13,6 +13,12 @@
   // 记恨类型的中文名（EX-7 投影用；不认识的类型照原样输出，不吞掉）。
   const GRUDGE_CN = { humiliation: '羞辱', breach_trust: '背信', contempt: '轻慢',
     profit_theft: '剥削', physical_harm: '伤害' };
+  // v2.611.0（R286 DWR-1）：玩家声明面**递票**。选择→技能是一张固定的表（可读、可改、可核），
+  //   不散在各分支里 —— 散着写会变成「哪一支漏了不掷」而没人看得出。
+  //   defer / wait **不掷**：它们不是「要不要成」的事（等待本来就不产出事实），
+  //   硬给它们上骰子等于把「他等着」判成「他办砸了」。
+  const CHOICE_SKILL = { find: '侦查', follow: '潜行', ask: '交谈', verify: '心理学' };
+  const CHOICE_TEXT = { find: '寻找线索', follow: '跟上去', ask: '开口问', verify: '核实' };
   // 投影自证位：任一个 owner 投影块抛错时记一笔，**不静默丢给下一块**。
   const projStat = { faults: 0, lastFault: '' };
   const REG = { key: KEY, def: DEF, module: 'storyWindow', bounds: { maxWindows: [1, 48], maxTraces: [1, 24] } };
@@ -354,6 +360,35 @@
     }, 'story-window:respond');
     return out || { ok: false, reason: 'store-unavailable' };
   }
+  /**
+   * v2.611.0（R286 DWR-1）：**把票递出去**。
+   *   到本批之前 `outcome-dice` 装好了却没人递票：`act.judge` 在产品侧零调用，
+   *   所有递票的参数（skill / ticket / who / what）从来没被构造过。
+   *   三条边界（否定式）：
+   *     ① 开关关着 ⇒ 返回 null，`choose` 逐字不变（默认关是刻意的玩家侧开关，不是缺陷）。
+   *     ② 掷骰抛错 / 坏入参（`not-in-table` 等）⇒ 也返回 null。**掷骰坏了不得拦住玩家**，
+   *        这一笔真假由诊断面（`tool-diag` 的 outcomeDice 节）记账，不由玩家买单。
+   *     ③ 票号 = `sw:<窗口id>:<选择>`。同一窗口同一选择只能掷一次 —— 重按回首次结果，
+   *        不许「读到失败再重按到成功」。换选择 = 换行动 = 换票。
+   */
+  function rollChoice(windowId, choice, ctx) {
+    const od = WA.outcomeDice;
+    if (!od || typeof od.check !== 'function') return null;
+    let on = false;
+    try { on = !!(od.settings && od.settings().enabled); } catch (e) { on = false; }
+    if (!on) return null;
+    const skill = CHOICE_SKILL[choice];
+    if (!skill) return null;
+    let r = null;
+    try {
+      r = od.check({ skill: skill,
+        ticket: 'sw:' + clean(windowId, 100) + ':' + choice,
+        who: clean((ctx && (ctx.player || ctx.person)) || 'player', 60),
+        what: CHOICE_TEXT[choice] || choice });
+    } catch (e) { return null; }
+    if (!r || r.ok !== true || !r.band) return null;
+    return { stop: (r.band === 'fail' || r.band === 'fumble'), band: r.band, skill: skill, die: r };
+  }
   function choose(id, choice, context) {
     // EX-9 扩展后的合法入口：正文三入口 + 人物页/线索页的正常入口。
     const allowed = ['find', 'verify', 'defer', 'ask', 'follow', 'wait'];
@@ -364,6 +399,20 @@
     if (cur.choice && cur.choice.id) return { ok: false, reason: 'already-chosen', choice: cur.choice };
     if (cur.status === 'settled' || cur.status === 'failed') return { ok: false, reason: 'window-closed' };
     const ctx = context || {};
+    // v2.611.0（R286 DWR-1）：**先掷，再委托**。掷骰放在各分支之前，是因为它要拦的是
+    //   「这一手成不成」，而不是某个 owner 肯不肯收；放在分支里会让「移动型 find」与
+    //   「原地型 find」得到两种命运（同一个选择两种概率 = 两套世界）。
+    const roll = rollChoice(cur.id, c, ctx);
+    if (roll && roll.stop) {
+      // 没成：只记一次未成立的尝试（不写 choice、不动 status，窗口不锁死）。
+      //   retryable 给 false **不是**说窗口关着，而是说「同一张票重按回同一结果」。
+      respond(cur.id, { choice: c, owner: 'outcomeDice', phase: 'dice-blocked',
+        reason: 'dice-' + roll.band });
+      return { ok: false, reason: 'dice-' + roll.band, choice: c, band: roll.band, skill: roll.skill,
+        check: roll.die, retryable: false,
+        note: '这一手没过检定（' + (roll.die.label || roll.band) + '）：窗口没锁，换一个选择就是换一张票；'
+          + '同一票重按回同一结果（一次一票，读到失败再重按到成功这条道是堵死的）' };
+    }
     // 选择只负责把玩家意图委托给既有 owner；委托缺失时明确返回 awaiting，
     // 不把“按钮已按下”伪装成位置、消息或证据已经落成。
     let owner = 'storyWindow', effect = null, reason = '', phase = c === 'defer' ? 'deferred' : 'awaiting-owner';
@@ -466,6 +515,12 @@
       if (!r) { out = { ok: false, reason: 'window-missing' }; return false; }
       if (r.choice && r.choice.id) { out = { ok: false, reason: 'already-chosen', choice: r.choice }; return false; }
       r.choice = { id: c, at: now('story-window.choice'), context: clean(ctx.note, 180) };
+      // v2.611.0（R286 DWR-1）：掷出来的才留票；关着时 roll 为 null，这一行逐字不执行。
+      if (roll && roll.die) {
+        r.choice.dice = { band: roll.band, label: roll.die.label || roll.band, skill: roll.skill,
+          roll: roll.die.roll, die: roll.die.die, ticket: roll.die.ticket || '',
+          replay: roll.die.replay === true };
+      }
       // 只有 owner 明确返回 applied 才进入 intervening；presented / planned / in-transit / registered 均仍是 awaiting。
       r.status = c === 'defer' ? 'deferred' : (phase === 'accepted' ? 'intervening' : 'awaiting');
       r.updatedAt = now('story-window.choice');
