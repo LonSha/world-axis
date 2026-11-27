@@ -9073,3 +9073,55 @@ buildBlock 的 +1 是**既往漏跟位**，用 `git worktree add /tmp/wa_head HE
 **主题一朵（第十处）**：前九处是「注释 / 文档 / 账本在说一件已不成立的事」，这一处换个方向 ——
 **判据在说一件从未发生过的事**（锁没跑过），以及**在一个更小的面上说没事**（账本 209 而现场 239）。
 两条治法相同：把判定面换成现场真源，并且**先证明它真的跑起来了**。
+
+## R288（v2.613.0 · R9：四条「在 HEAD 上就红」的门禁 —— 它们报的都是「已经变了的事」）
+
+四条都先量了两向：修复前的读数与 HEAD 逐字相同，修复后逐条转绿；没有一条是靠放宽判据。
+
+**① `tests/inject-vis-v2580.js`（FAIL 1 / 10 → pass 10）**
+
+C 面的做法是把每个源的取数口换成一个「只回哨兵」的假实现，再看产物里有没有哨兵。绝大多数分支形如
+`const b = engineCall(k, () => WA[k].buildBlock()); if (b) ...`，假实现回字符串就够；但 `arcGuideBridge`
+的分支写的是 `(r && r.ok && r.text) ? r.text : ''` —— 它期望**状态对象**。字符串没有 `.ok` ⇒ 分支恒空 ⇒
+判据报的其实是「假实现的形态不对」，不是「开关失效」。补 `SENT_SHAPE` 形态表（不跳过、不放宽）。
+
+**② `tests/o8-consumer-gate-v2187.js`（35 / 3 → 38 / 0）**
+
+两条未登记的无消费者导出：`polishBridge.version` / `purifyScopeBridge.version`。按 `shapeOf` 现算的
+`version-const` 档补进 `tests/consumer-ledger.json`（purpose 与现场复算同形，reviewAfter 按「登记时小版本 + 6」
+= 2.618.0）。**没有跑 `--register`** —— 它会 `JSON.stringify(..., 2)` 重写整表（本仓账本的 indent 是 1），
+同 dead-export / field-liveness 那两个坑。
+
+**③ `tests/ns-adjudication-v2568.js`（直接崩 → pass 150）**
+
+崩在 `Lbad.entries.arcGuide.cls`：`arcGuide` 在 v2.591.0（R266）被 `engines/arc-guide-bridge.js` 读活，
+按纪律④从零读账本**销行**，而本锁的 CASES 里还留着它、D2 负控还拿它做破坏样本。第二批判片另有三条
+同型幽灵（`contrast` / `factAge` / `slotFormat`，分别在 v2.597–2.603 由各自的桥销行）。
+治法不是把条目塞回账本，而是把判据改成**毕业后的形态**：
+· `CASES` 只留 `ctxBoundary` / `macroGuard`；新增 `GRADUATED` 三条，逐条钉「账本里没有它」+
+  「它的毕业读点真在桥上」（`WA.contrast` / `WA.factAge` / `WA.slotFormat` 字符串在对应 bridge 里）。
+· `C1a/C1b` 改成：产品面**有** `WA.arcGuide` 读者（bridge 真读）+ 账本里**没有** arcGuide 条。
+· D2 负控取样从 arcGuide 换成 ctxBoundary（仍在册 readonly-api）。
+· `F4` 13 → 10，另加 F5/F6 两条毕业判据。
+
+**④ `tests/stitch-ledger-truthfulness-v2552.js`（17 / 2 → 19 / 0）**
+
+C1 在等「arcGuide / ctxBoundary 两条都在册」、C3 断言 `deadNs` **应含** arcGuide —— 两句话都在等一条
+已出表的条目。本批把它拆成两半：ctxBoundary 仍 readonly-api（本仓注入不写 chat 正文，无可剥对象）；
+arcGuide 改为「不该在账本里 + bridge 真读它」。同批改 D2：原判据钉的是 `engines/arc-phase.js` 里
+「全仓没有产品级调用方」这句话，而它在 v2.591.0 之后就不成立了 —— **本批把 arc-phase.js 的注释按现场改写成
+真话**（它仍不接，但理由换成「相位判据与弧窗口不同源」），D2 改成钉「提供者在 bridge 里」+「arc-phase 仍明写不接」。
+
+**跟位**：`index.js` / `manifest` / `__wantPin293` 升 2.613.0；11 把 s3 白名单与正则（本轮改用
+「上界追加」而不是整段替换，一次过）；6 本账本 version；`segment-extract` 128/128 不动（run.js 行数未变）；
+`dead-export-gate` 的 `_note` 追加本批沿革（否则 `note-vs-entry` 会因版本词滞后报 ?）；
+`version-consistency` **22/22**。
+
+**未做（如实登记）**：`arcGuideBridge.plan` 仍然是**手动入口**（面板/测试给弧定义），产品侧没有「弧从哪来」的
+自动供给 —— 这是剧情语义决策，不属本轮；登记表 42 条里仍有 19 条 entry 没有任何调用面（那是**设计内**状态：
+它们要业务对象入参，轮次造不出来；要接就得先造出入口面，不是补一个 `drive` 就完）；
+模型身份面的第二条独立凭据（场外探针）仍待产品决策。
+
+**主题一朵（第十一处）**：这一批四条红，**没有一条是「判据太严」** —— 三条在等一件已经变了的事（arcGuide 出表、
+arc-phase 那句话过期、导出多了两个），一条在报它自己的假实现形态不对。所以治法全是「把判据挪到现场」，
+而不是「把现场挪回判据」。

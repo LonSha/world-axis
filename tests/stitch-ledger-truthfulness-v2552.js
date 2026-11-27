@@ -237,16 +237,22 @@ ok('B5 计数口径自证：同一函数在自身文件里能数到（口径不�
 // ── C 判据边界（本批最要紧的一条）─────────────────────────────
 const LEDGER = JSON.parse(rd('tests/ns-consumer-ledger.json'));
 
-ok('C1 账本已登记 arcGuide / ctxBoundary（两条都是 pending-wire）', function () {
-  ['arcGuide', 'ctxBoundary'].forEach(function (k) {
-    assert.ok(LEDGER.entries[k], '账本缺 ' + k + ' 条');
-    // v2.569.0 跟位：v2.568.0 已把这两条按纪律⑤改判 readonly-api（结构上接不上）。
-    //   判据形态不动（必须在账本里 + 必须是「没接线也不是 wired」的那两类），
-    //   只是合法类别从 pending-wire 扩到 {pending-wire, readonly-api}。
-    assert.ok(['pending-wire', 'readonly-api'].indexOf(LEDGER.entries[k].cls) >= 0, k + ' 的定性应是 pending-wire 或 readonly-api（实 ' + LEDGER.entries[k].cls + '）');
-    const ev = String(LEDGER.entries[k].evidence || '');
-    assert.ok(ev.length > 80, k + ' 的 evidence 太短（要写清「谁会在什么时候读它」）');
-  });
+ok('C1 账本口径（v2.613.0 跟位）：ctxBoundary 在册 readonly-api；arcGuide 已毕业，账本里不该有它', function () {
+  // v2.613.0（R288）跟位：本条立起时钉的是「arcGuide / ctxBoundary 两条都在册」。
+  //   现场已经分成两半：ctxBoundary 仍零读（本仓注入不写 chat 正文，无可剥对象 ⇒ readonly-api）；
+  //   arcGuide 在 v2.591.0（R266）被 arc-guide-bridge 读活，按纪律④**销行出表**。
+  //   这正是本锁 D2 当初写下的「改判触发器」：真出现产品级调用方，arcGuide 就不再是零读。
+  //   所以不是把条目塞回账本，而是把判据改成毕业后的真形态。
+  assert.ok(LEDGER.entries['ctxBoundary'], '账本缺 ctxBoundary 条');
+  assert.strictEqual(LEDGER.entries['ctxBoundary'].cls, 'readonly-api',
+    'ctxBoundary 的定性应是 readonly-api（实 ' + LEDGER.entries['ctxBoundary'].cls + '）');
+  assert.ok(String(LEDGER.entries['ctxBoundary'].evidence || '').length > 80,
+    'ctxBoundary 的 evidence 太短（要写清「谁会在什么时候读它」）');
+  assert.ok(!LEDGER.entries['arcGuide'],
+    'arcGuide 回到零读账本了 —— 它在 v2.591.0 已有产品读者（arc-guide-bridge），回来就是过期登记');
+  const bridge = rd('engines/arc-guide-bridge.js');
+  assert.ok(bridge.indexOf('WA.arcGuide') >= 0,
+    'arc-guide-bridge.js 里读不到 WA.arcGuide —— 那 arcGuide 出表就没依据了（本条判据需重判）');
 });
 
 ok('C2 判据边界的正面证据：writeRehearsal 仍零调用、saveAudit 已毕业，两台都不在账本里', function () {
@@ -282,7 +288,11 @@ ok('C3 deadNs 与账本双向一致（arcGuide / ctxBoundary 在，另两台不�
     ].join('')], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   const line = out.trim().split('\n').filter(function (l) { return l.trim().charAt(0) === '['; }).pop();
   const names = JSON.parse(line);
-  assert.ok(names.indexOf('arcGuide') >= 0, 'deadNs 应含 arcGuide（它已无产品读点）');
+  // v2.613.0：arcGuide 已毕业（v2.591.0 的 arc-guide-bridge 读活了它）⇒ deadNs 不该再含它。
+  //   原来这条断言写的是「应含」，方向反了也不报警 —— 因为它是 `ok(...)` 里的一个 assert，
+  //   现场一变就只是红一条，而不是崩；现在改成两向都钉：ctxBoundary 必须在，arcGuide 必须不在。
+  assert.ok(names.indexOf('arcGuide') < 0,
+    'deadNs 仍含 arcGuide —— 但它已有产品读者（arc-guide-bridge），说明门禁的口径又落后了');
   assert.ok(names.indexOf('ctxBoundary') >= 0, 'deadNs 应含 ctxBoundary');
   assert.ok(names.indexOf('writeRehearsal') < 0, 'deadNs 不该含 writeRehearsal（stat 仍在引用面）');
   assert.ok(names.indexOf('saveAudit') < 0, 'deadNs 不该含 saveAudit');
@@ -297,13 +307,17 @@ ok('D1 ctxBoundary.DEFAULTS 里只有 maxMarkLen、没有任何规则', function
   assert.ok(src.indexOf('DEFAULTS') >= 0, 'DEFAULTS 不在');
 });
 
-ok('D2 arcGuide 的 arcs 没有产品级提供者（arc-phase 注释是这句话的出处）', function () {
+ok('D2 arcGuide 的 arcs 现在**有**产品级提供者（v2.591.0 起），arc-phase 仍明写不接它自己那条路', function () {
+  // 本条立起时钉的是「arc-phase.js 里写着『全仓没有产品级调用方』」—— 那句话在 v2.591.0 之后
+  //   就成了不成立的话。本批把 arc-phase.js 的注释按现场改过（它仍不接，但理由换成了
+  //   『相位判据与弧窗口不同源』），于是这里同步改成钉**新的事实**：
+  //   ① 提供者在 arc-guide-bridge 里（存弧 + 调 plan）；② arc-phase 仍有「继续不接」的口径。
+  const bridge = rd('engines/arc-guide-bridge.js');
+  assert.ok(bridge.indexOf('WA.arcGuide') >= 0 && bridge.indexOf('arcGuideBridge') >= 0,
+    'arc-guide-bridge.js 不再是 arcGuide 的产品级提供者/读者 —— 本条判据需重判');
   const src = rd('engines/arc-phase.js');
-  const hit = src.split('\n').some(function (l) {
-    return l.indexOf('arcs') >= 0 && l.indexOf('没有产品级调用方') >= 0;
-  });
-  assert.ok(hit, 'arc-phase.js 里「arcs 由调用方提供，全仓没有产品级调用方」这句话不在了 —— '
-    + '若真出现了产品级调用方，arcGuide 就不再是 pending-wire，本条判据需更新');
+  assert.ok(src.indexOf('本文件仍然不读它') >= 0,
+    'arc-phase.js 的「继续不接」口径不见了 —— 若它真接了弧窗口，这里是第二份判据，需重判');
 });
 
 ok('D3 运行时复算：传空数组时两台读数确实是 0（所以「0 条」不是现场）', function () {

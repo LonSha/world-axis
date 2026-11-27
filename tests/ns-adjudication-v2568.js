@@ -41,7 +41,13 @@ const BASE = path.join(__dirname, '..');
 
 const LEDGER = 'tests/ns-consumer-ledger.json';
 const CASES = [
-  { ns: 'arcGuide', prov: 'engines/arc-guide.js' },
+  // v2.613.0（R288）：arcGuide 已从本表**出表** —— 它不再是零读 ns。
+  //   v2.591.0（R266 / NAR-1）的引导弧落地把它接活了：`engines/arc-guide-bridge.js` 里
+  //   `const G = WA.arcGuide;` 之后真调 plan / keysOf / windowOf，产品面第一次有读者，
+  //   按纪律④从 ns-consumer-ledger 销行。本锁当时的判据（C1a「产品面无 arcGuide.plan 调用点」）
+  //   因此变成恒假 —— 而它又拿账本条目做 A/D 段取样，于是整把锁在 `entries.arcGuide` 上崩掉
+  //   （v2.611.0 前就崩，读数上「崩掉」与「绿」一样不用人看）。治法不是把它塞回账本，
+  //   而是把 C1 改成守住**毕业后的形态**（见 C1a/C1b）。
   { ns: 'ctxBoundary', prov: 'engines/ctx-boundary.js' },
   { ns: 'macroGuard', prov: 'engines/macro-guard.js' }
 ];
@@ -50,17 +56,22 @@ const CASES = [
 const CASES2 = [
   { ns: 'cardFile', prov: 'engines/card-file.js' },
   { ns: 'chatGuard', prov: 'engines/chat-guard.js' },
-  { ns: 'contrast', prov: 'engines/contrast.js', allowProd: ['render/inject.js'] },
-  { ns: 'factAge', prov: 'engines/fact-age.js' },
   { ns: 'floorCensus', prov: 'engines/floor-census.js' },
   { ns: 'floorFavorites', prov: 'engines/floor-favorites.js' },
   { ns: 'floorHide', prov: 'engines/floor-hide.js' },
   { ns: 'floorScrub', prov: 'engines/floor-scrub.js' },
   { ns: 'saveMigrate', prov: 'engines/save-migrate.js' },
   { ns: 'setupPlan', prov: 'engines/setup-plan.js' },
-  { ns: 'slotFormat', prov: 'engines/slot-format.js' },
   { ns: 'storeMerge', prov: 'engines/store-merge.js' },
   { ns: 'streamGate', prov: 'engines/stream-gate.js' }
+];
+// v2.613.0（R288）：三条已毕业 —— 桥落地后按纪律④从零读账本出表，本表不再把它们当零读项。
+//   同 C1a/C1b 的道理：销行是账本的正确状态，锁不能拿一条已不存在的登记当取样点（那会崩或假红）。
+//   但毕业也要有判据：读点真的在桥上、账本里真的没有它们。
+const GRADUATED = [
+  { ns: 'contrast', reader: 'engines/contrast-bridge.js', why: 'v2.599.0 / R274 CNT-1：按 CSS 变量对算 WCAG' },
+  { ns: 'factAge', reader: 'engines/fact-age-bridge.js', why: 'v2.596.0 / R269 FAG-1：事龄读数面成产品' },
+  { ns: 'slotFormat', reader: 'engines/byte-budget-bridge.js', why: 'v2.598.0 / R273 SLT-1：字节预算真的用它的常量' }
 ];
 const CASES_ALL = CASES.concat(CASES2);
 
@@ -132,11 +143,12 @@ function runAll(assertFn) {
   // C1 arcGuide：无产品级 plan 调用点；且 arc-phase.js 明文写着拒接。
   //   口径：注释里写着「不接 arcGuide.plan()」**不算调用点**，故先剥注释再判（这是本锁第一版
   //   踩过的坑：不剥注释时 arc-phase.js 的拒接理由本身把判据打红）。
-  a(!/arcGuide\.plan\s*\(/.test(prod.filter(function (r) { return r !== 'engines/arc-guide.js'; })
-    .map(function (r) { return stripComments(rd(r)); }).join('\n')),
-    'C1a 剥注释后产品面无 arcGuide.plan( 调用点（无上游 ⇒ 不可接）');
-  a(/不接\s*`?arcGuide\.plan\(\)`?/.test(rd('engines/arc-phase.js')),
-    'C1b engines/arc-phase.js 明文写下拒接理由（改判触发器必须同步改它）');
+  const prodNoSelf = prod.filter(function (r) { return r !== 'engines/arc-guide.js'; })
+    .map(function (r) { return stripComments(rd(r)); }).join('\n');
+  a(/\bWA\.arcGuide\b/.test(prodNoSelf),
+    'C1a arcGuide 已有真产品面读者（arc-guide-bridge 读 WA.arcGuide）—— 本锁立起时的「无上游」前提已解除');
+  a(!E.arcGuide,
+    'C1b 账本里**没有** arcGuide 条（按纪律④已出表；它再以零读身份回去就是本锁要报的病）');
   // C2 ctxBoundary：注入面不往正文写带起止标记的块；DEFAULTS 无规则。
   const inj = rd('render/inject.js');
   a(inj.indexOf('<!-- wa') < 0 && inj.indexOf('【幕后】') < 0,
@@ -216,14 +228,16 @@ function runAll(assertFn) {
 
   // ── D 负控（账本文本的内存副本破坏） ──
   const good = rd(LEDGER);
-  const bad1 = good.replace(/("arcGuide"\s*:\s*\{[^{}]{0,80}?"cls"\s*:\s*)"readonly-api"/, '$1"pending-wire"');
+  //   v2.613.0：取样键从 arcGuide 换成 ctxBoundary —— 前者已出表（见 C1b），负控不能拿一条
+  //   账本里不存在的条目做破坏；ctxBoundary 仍在册、cls=readonly-api，形态不变。
+  const bad1 = good.replace(/("ctxBoundary"\s*:\s*\{[^{}]{0,80}?"cls"\s*:\s*)"readonly-api"/, '$1"pending-wire"');
   //   v2.569.0 修正：这里原先钉的是**带缩进的字面串**（`"arcGuide": {\n   "cls": …` 三个空格），
   //   本批账本经手改判后格式统一成了两空格缩进，于是「破坏」当场落空 ⇒ D1 红。
   //   这正是判据自己写在下面的那条纪律（「不依赖文本缩进形态，避免缩进一变负控就假绿」）
   //   被违反 —— 现在改成缩进无关的正则：只要求 arcGuide 块内**第一个** cls 字段。
   a(bad1 !== good, 'D1 负控自证：副本破坏确实改到了文本（否则 D2 恒真）');
   const Lbad = JSON.parse(bad1);
-  a(Lbad.entries.arcGuide.cls === 'pending-wire', 'D2 负控：cls 回改成 pending-wire ⇒ A2 判据必须现形');
+  a(Lbad.entries.ctxBoundary.cls === 'pending-wire', 'D2 负控：cls 回改成 pending-wire ⇒ A2 判据必须现形');
   //   负控 D2：cls 回改成 pending-wire ⇒ A2（cls === 'readonly-api'）必须现形。
   //   负控 D3：evidence 截短 ⇒ A3（>=200 字）必须现形。
   //   两处都走**对象副本**：D1 已单独证明文本副本能被改到，这里只需证明「判据表达式在坏数据
@@ -258,7 +272,12 @@ function runAll(assertFn) {
   a(CASES2.every(function (c) { return (E[c.ns] || {}).cls === 'readonly-api'; }),
     'F2 13 条 cls 全为 readonly-api');
   a(CASES2.every(function (c) { return exists(c.prov); }), 'F3 13 条 provider 文件都存在');
-  a(CASES2.length === 13, 'F4 第二批恰 13 条（少一条就是漏账）');
+  a(CASES2.length === 10, 'F4 第二批 10 条在册（13 − 3 已毕业：contrast / factAge / slotFormat）');
+  GRADUATED.forEach(function (g) {
+    a(!E[g.ns], 'F5 ' + g.ns + ' 已从零读账本出表（毕业：' + g.why + '）');
+    a(fs.readFileSync(path.join(BASE, g.reader), 'utf8').indexOf('WA.' + g.ns) >= 0,
+      'F6 ' + g.ns + ' 的毕业读点真在 ' + g.reader + ' 里（销行是真接线，不是销账）');
+  });
 
   return { pass: pass, fail: fail, fails: fails };
 }

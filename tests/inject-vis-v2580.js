@@ -49,6 +49,14 @@ const ITEM_METHOD = { memory: 'buildMemoryBlock', opinion: 'buildOpinionBlock', 
 //   逐源开始前给 mock 上下文塞一帧玩家输入，让 retrieval 走完整分支。
 //   这样判据强度不降反升：若有人把 `vis.retrieval` 守卫删掉，C 面 stillOff 仍会现形。
 const NEEDS_USER_FRAME = { retrieval: true };
+// v2.613.0（R288）：**取数口的返回形态**也得跟分支一致。
+//   C 面的做法是把源的取数口换成一个「只回哨兵」的假实现，再看产物里有没有哨兵。
+//   绝大多数分支形如 `const b = engineCall(k, () => WA[k].buildBlock()); if (b) ...`，
+//   假实现返回字符串就够；但 `arcGuideBridge` 的分支写的是 `(r && r.ok && r.text) ? r.text : ''`
+//   —— 它期望一个**状态对象**。字符串没有 .ok ⇒ 分支恒回空串 ⇒ 判据报的其实是
+//   「假实现的形态不对」，不是「开关失效」。这是判据自身的缺陷，按「不放宽、不跳过」的
+//   老规矩补形态表：给该源一个同形的假对象，让哨兵真能走到产物里。
+const SENT_SHAPE = { arcGuideBridge: 'ok-text' };
 function ensureUserFrame(WA) {
   try {
     const ctx = WA.mainWin.SillyTavern.getContext();
@@ -112,7 +120,8 @@ function probeAll(WA) {
     const frameOk = NEEDS_USER_FRAME[k] ? ensureUserFrame(WA) : true;
     if (!frameOk) { out.push({ source: k, kind: 'no-frame', skipped: true }); return; }
     const keep = m.mod[m.method];
-    m.mod[m.method] = function () { return tag; };
+    const fake = SENT_SHAPE[k] === 'ok-text' ? { ok: true, text: tag } : tag;
+    m.mod[m.method] = function () { return fake; };
     try {
       WA.render.setVisibility(k, true); const on = injectText(WA);
       WA.render.setVisibility(k, false); const off = injectText(WA);
