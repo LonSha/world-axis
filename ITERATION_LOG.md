@@ -9125,3 +9125,48 @@ arcGuide 改为「不该在账本里 + bridge 真读它」。同批改 D2：原�
 **主题一朵（第十一处）**：这一批四条红，**没有一条是「判据太严」** —— 三条在等一件已经变了的事（arcGuide 出表、
 arc-phase 那句话过期、导出多了两个），一条在报它自己的假实现形态不对。所以治法全是「把判据挪到现场」，
 而不是「把现场挪回判据」。
+
+## R289 · v2.614.0 · 人工身份探针接线面（A 案落地：引擎/账本/读数面全齐，就差用户点一下）
+
+> 提交：本轮 R289 / v2.614.0（27 files changed）
+
+**用户决定**：上一轮给的探针三选项里选 **A 人工触发**（「那就人工吧」）——零自动开支、一次一请求、点一下才算。
+
+**先量现场，再动手 —— 发现探针不是新东西**：
+`engines/channel-probe.js`（v2.326.0）早已存在，缝合自 Anti-Route 8.31 三件套，且已把 A 案大部分语义写好：
+`buildProbe()` 只产 body、`judgeProbe()` 非对称判定、`record()`/`channelStat()` 有界账本（Wilson 区间、base 归并、无 key）、
+设置面 `__REG` 已注册、面板 :3110 的「运行体检」已读三份读数、store 家族表已登记。
+但 `buildProbe` / `judgeProbe` 在产品面**零调用点**（grep 只命中自身与撞名）——这是本系列的**第十二处**：
+「引擎、账本、读数面、设置面全齐，就差用户点一下」，与第九处「接线面」同族但更极端（连诊断文案都已经在写了）。
+
+**与设计稿 `docs/MODEL_IDENTITY_PROBE.md` 的裁决**：通道探针判「能不能准确抄回冷门 token」（能力指纹，抗换小模型），
+设计稿 P1 判「固定问题的答案数值+形态偏置」（身份指纹，抗换同族模型）——两者不是同一件事、也不互相替代。
+用户 A 案选的是「把现成通道探针接一个按钮」这条最小闭环，不是从零写 P1 数值指纹；本轮据实落地前者，
+P1 仍作设计储备（设计稿三条实现纪律本轮逐条对齐）。
+
+**做的事**：
+· `engines/channel-probe.js` v2.326.0 → **v2.327.0**：新增 `runOnce(opts)`——**唯一**真发一次的入口，
+  默认传输取 `core/api-router.call`（仓里唯一发请求的口），无定时器/无自动/无重试/无 hook；
+  `timeoutMs` 交给 apiRouter（3–60s，默认 20s），`temperature:0 / maxTokens:256`。
+  **三态纪律**：全对 → `inconclusive`（抄对不证明身份）、抄错 → `weak`（可证伪），失败/空回/`output-limit`/no-base/disabled/busy → `unknown`
+  **绝不折叠、不记账、不进分母**（折叠一次就退化成「从未跑过却永远绿」的那把锁）；`output-limit` 单列 unknown 防假阳性。
+  不并发（连点不叠请求）；`diagnose()` 暴露 `last`/`running`/`readFail`/`runs`，把「账本读失败」与「本渠道还没结论」在读数上分开。
+  头注「不发请求」按纪律改成「不偷偷发请求」——否则注释开始说一件已不成立的事。
+· `ui/panel.js`：连接页每个通道卡片加「身份探针」按钮（class 形态，与既有保存/拉清单按钮同族，不进 id 守卫表）+
+  `wa-ch-probe-hint` 上次结论读数，接到 `CP.runOnce({channel})`。折叠段文案从「只读」改成「读数只读 · 探针在卡片上手动点」，
+  结论卡 line3 补「点了才发一次（不发=零支出）」。
+· 新锁 `tests/channel-probe-run-v2614.js`（8/8）：钉版本与 runOnce 出口、默认传输走 apiRouter、零裸 fetch/定时器、
+  不进正文/不改主判据、三态 unknown 不进分母、诊断读失败可分、账本归并无 key。挂进 `tests/run.js`（与 luke 三引擎同族 runScript）。
+
+**跟位**：`index.js` / `manifest` / `__wantPin293` / 11 把 s3 白名单与正则（上界追加 614）/ 6 本账本 version 全升 2.614.0；
+`luke-stitch-v2326.js` 的 PROBE.VERSION 跟位 2.327.0；`dead-export-ledger` 四条 own +1（runOnce 在同文件内各多调一次
+buildProbe/judgeProbe/record/ledgerRow）与 `_note` 沿革追加；`segment-extract` 四处行数判据跟位（run.js 23848 / 测试文件 709 /
+panel.js 重组面 19353、文件面 16964），恢复 128/128；`version-consistency` **22/22**；证据 705 条 stale 0。
+
+**HEAD 上就红、本批不背的历史遗留（worktree 实测确认）**：`reject-code-gate` 的 `dice-` 未分类、
+`ui-gate` 的 ask 页 7 与 faces 无结论卡、`ui-binding-coverage` 的 faces-page 未覆盖——三条在 HEAD 上同红，
+本批去行号后报告逐字一致（只因 panel.js 增行导致行号平移），**不是本轮引入**。
+
+**主题一朵（第十二处）**：R286 是「装好了没人用」，这里是「连读数都在写、就差用户点一下」——
+治法仍然是接线，不是重造引擎：把 `buildProbe/judgeProbe` 这两个孤儿出口接到一个真按钮上，
+补一个「显式、单次、不自动、不折叠」的调用方，让整条链第一次真的跑起来。

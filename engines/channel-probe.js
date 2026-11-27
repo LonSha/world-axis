@@ -1,5 +1,5 @@
 /**
- * WorldAxis engines/channel-probe.js (v2.326.0) — 坏 token 身份探针 / 渠道可验性账本
+ * WorldAxis engines/channel-probe.js (v2.327.0) — 坏 token 身份探针 / 渠道可验性账本
  * 缝合自「卢克之光 V0.5 / Anti-Route 8.31」的 8_probe.js + 5_route.js + 13_stats.js。
  *
  * ── 它治什么（缺口，先说不重复）─────────────────────────────────
@@ -16,7 +16,12 @@
  *
  * ── 四条边界（全是否定式）──────────────────────────────────────
  *   ① 非对称结论：抄错 ⇒ 大概率不是目标高阶模型；抄对 ⇒ **不能证明身份**，只说「不像便宜替身」。
- *   ② 不发请求：buildProbe() 只返回 body；没有 fetch、没有 XMLHttpRequest、没有定时器。
+ *   ② 不偷偷发请求：buildProbe() 只返回 body；**唯一**会真发请求的是 runOnce(opts)，且它
+ *      必须由调用方**显式调用一次**（无定时器、无自动触发、无 hook、不 monkey-patch），
+ *      请求经 core/api-router 的既有唯一出口发出。本文件没有 fetch、没有 XMLHttpRequest。
+ *      （v2.327.0 收口：原句是「不发请求」。那句在 v2.326.0 是真的 —— 因为当时压根没有
+ *        调用方，buildProbe/judgeProbe 在产品面**零调用点**。本版把线接上了，于是
+ *        「不发请求」必须改成「不偷偷发请求」，否则注释开始说一件已不成立的事。）
  *   ③ 不写 chat：探针是独立小请求，结果不进世界、不进正文、不进 store。
  *   ④ 不外带 key：导出文本与账本里默认不含 apiKey，渠名按 base 归并（换 key 不分家）。
  */
@@ -61,7 +66,7 @@
     return b ? hashStr(b).slice(0, 10) : 'local';
   }
 
-  const _st = { built: 0, judged: 0, weak: 0, inconclusive: 0, faults: 0, lastReason: '', lastAt: 0, used: [] };
+  const _st = { built: 0, judged: 0, weak: 0, inconclusive: 0, faults: 0, readFail: 0, lastReason: '', lastAt: 0, last: null, used: [] };
   function note(k) { _st[k] = (_st[k] || 0) + 1; _st.lastAt = clockWall(); }
 
   /** 轮换：优先没跑过的；不够时从已跑过的里补齐，绝不整批重置（否则连续两批会一模一样） */
@@ -133,6 +138,101 @@
     }
   }
 
+  /* ── 跑一次（**唯一**真发请求的入口；必须由调用方显式触发）──────────────────
+   *  R289（v2.327.0）的病：buildProbe/judgeProbe 在产品面**零调用点** —— 引擎、设置面、
+   *  账本、读数面全齐，就差用户点一下（与 R286 判定的「接线面」同族，且更极端：连诊断
+   *  文案都已经在写了）。这一段补的是那根线。
+   *
+   *  它不自己攥着网络：传输层由 opts.call 注入，默认取 WA.apiRouter.call（仓里唯一发请求的口）。
+   *  没有定时器（超时走 apiRouter 自带的 timeoutMs）、没有自动触发、没有重试、没有队列。
+   *
+   *  三态纪律（docs/MODEL_IDENTITY_PROBE.md §4）：拿不到结论一律 unknown，**绝不折叠**成
+   *  inconclusive/weak。折叠一次，这个探针就退化成「从未跑过却永远绿」的那把锁。
+   *  · request-failed:*  请求失败 / 超时 / 未配置 / 密钥仓未就绪。**output-limit 也归此类**：
+   *    截断会缺行，判下去会把一个好渠道误判成 weak —— 这是本函数唯一必须防的假阳性。
+   *  · empty-reply / no-items / probe-disabled / busy：没内容可判。
+   *  unknown 不记账（record 只收 weak/inconclusive）⇒ 不进分母、不污染区间。
+   *
+   *  探针也是一次真请求，所以它照常进 requestViewer / modelReceipt / tokenBudget ——
+   *  不隐藏、不豁免（藏起来的请求才是坏的）；但它不进世界、不进正文、不改身份面主判据。
+   *
+   *  @param {{channel?:string, base?:string, call?:Function, timeoutMs?:number}} opts
+   *  @returns {Promise<Object>} {ok, status:'weak'|'inconclusive'|'unknown', reason?, ...}
+   */
+  let _running = false;
+  async function __runOnce(opts) {
+    const o = opts || {};
+    const channel = clean(o.channel || 'inference', 40);
+    const t0 = clockWall();
+    function unk(reason) {
+      const r = String(reason == null ? '' : reason);
+      if (/^request-failed|threw|no-transport|no-router/.test(r)) note('faults');
+      _st.lastReason = r;
+      _st.lastAt = clockWall();
+      _st.last = { status: 'unknown', reason: r, base: '', channel: channel,
+        hit: 0, total: 0, at: _st.lastAt, ms: clockWall() - t0 };
+      return { ok: false, status: 'unknown', reason: r, channel: channel, base: '',
+        ms: clockWall() - t0, recorded: false,
+        conclusion: '未拿到结论（' + r + '）—— 不记账、不进分母；这不是「模型没问题」。' };
+    }
+    const built = buildProbe();
+    if (!built.ok) return unk(built.reason || 'probe-build-failed');
+    let base = clean(o.base, 200);
+    if (!base) {
+      try {
+        const cfg = (WA.apiRouter && typeof WA.apiRouter.getChannel === 'function')
+          ? WA.apiRouter.getChannel(channel) : null;
+        base = String((cfg && cfg.baseUrl) || '');
+      } catch (e) { return unk('no-router'); }
+    }
+    if (!base) return unk('no-base-url');
+    const call = (typeof o.call === 'function') ? o.call
+      : ((WA.apiRouter && typeof WA.apiRouter.call === 'function')
+        ? function (ch, msgs, oo) { return WA.apiRouter.call(ch, msgs, oo); }
+        : null);
+    if (!call) return unk('no-transport');
+    let text = '';
+    try {
+      text = await call(channel, built.messages, {
+        temperature: 0, maxTokens: 256,
+        timeoutMs: Math.max(3000, Math.min(60000, Math.floor(Number(o.timeoutMs) || 20000)))
+      });
+    } catch (e) {
+      const kind = (e && e.kind) ? String(e.kind) : 'error';
+      return unk('request-failed:' + kind);
+    }
+    const j = judgeProbe({ items: built.items, text: text });
+    if (!j.ok) return unk(j.reason || 'judge-failed');
+    const rec = record(base, j.verdict);
+    const out = {
+      ok: true, status: j.verdict, channel: channel, base: clean(base, 200),
+      hit: j.hit, total: j.total, rate: j.rate, misses: j.misses, ms: clockWall() - t0,
+      conclusion: j.conclusion, note: j.note,
+      row: (rec && rec.row) || ledgerRow(base), recorded: !!(rec && rec.ok)
+    };
+    _st.last = { status: out.status, reason: '', base: out.base, channel: channel,
+      hit: out.hit, total: out.total, at: clockWall(), ms: out.ms };
+    _st.lastReason = '';
+    return out;
+  }
+  /** 外壳只管两件事：不并发（连点不会叠出两个真请求）与兜底异常。 */
+  async function runOnce(opts) {
+    if (_running) {
+      return { ok: false, status: 'unknown', reason: 'busy', recorded: false,
+        conclusion: '上一轮探针还没回来 —— 不并发、不排队，等它回来再点。' };
+    }
+    _running = true;
+    try { return await __runOnce(opts); }
+    catch (e) { note('faults'); return unk2(e); }
+    finally { _running = false; }
+  }
+  function unk2(e) {
+    const r = 'probe-run-threw:' + String((e && e.message) || e).slice(0, 80);
+    _st.lastReason = r; _st.lastAt = clockWall();
+    return { ok: false, status: 'unknown', reason: r, recorded: false,
+      conclusion: '未拿到结论（内部异常）—— 不记账、不进分母。' };
+  }
+
   /* ── 渠道账本（只记有结论的轮次，不吃 key）── */
   /** 读侧归因（v2.381.0 收口）：G16 口径要求每一处裸读点附近都投递一次读失败归因。
    *  本条治的病与 engines/* 同族：`catch (e) { return {} }` 会把「localStorage 被拒」
@@ -148,7 +248,7 @@
       const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem(LEDGER_KEY) : null;
       const o = raw ? JSON.parse(raw) : {};
       return (o && typeof o === 'object') ? o : {};
-    } catch (e) { noteRead(LEDGER_KEY, e); return {}; }
+    } catch (e) { note('readFail'); noteRead(LEDGER_KEY, e); return {}; }
   }
   function writeLed(o) {
     try { if (typeof localStorage !== 'undefined') localStorage.setItem(LEDGER_KEY, JSON.stringify(o)); } catch (e) { /* 配额满不算失败 */ }
@@ -245,23 +345,31 @@
     }).join('');
   }
   function diagnose() {
+    const st = _st;
     return { ok: true, enabled: getSettings().enabled, status: getSettings().enabled ? 'ready' : 'disabled',
-      items: ITEMS.length, lastReason: _st.lastReason,
-      note: '只产探针 body 与判定；不发请求、不写 chat、不落世界、账本不含 key' };
+      items: ITEMS.length, lastReason: st.lastReason, running: _running,
+      // v2.327.0：账本读回失败与「本渠道还没有任何结论」在读数上**不再同形**。
+      //   此前 catch 把「localStorage 被拒」（配额满 / 隐私模式 / 宿主禁止）答成空账本，
+      //   补救完全不同（查存储可读性 vs 正常开局态），读数面必须分得开。
+      ledger: st.readFail ? 'unreadable' : 'ok', readFail: st.readFail,
+      last: st.last ? Object.assign({}, st.last) : null,
+      runs: { built: st.built, judged: st.judged, weak: st.weak, inconclusive: st.inconclusive, faults: st.faults },
+      note: '产探针 body、判定与一次显式运行（runOnce）；不偷偷发请求、不写 chat、不落世界、账本不含 key' };
   }
 
   WA.channelProbe = {
-    VERSION: '2.326.0', ITEMS: ITEMS.slice(),
+    VERSION: '2.327.0', ITEMS: ITEMS.slice(),
     getSettings: getSettings, setSettings: setSettings,
-    buildProbe: buildProbe, judgeProbe: judgeProbe,
+    buildProbe: buildProbe, judgeProbe: judgeProbe, runOnce: runOnce,
     record: record, ledgerRow: ledgerRow, channelStat: channelStat,
     wilson: wilson, exportText: exportText, spark: spark,
     channelKey: channelKey, diagnose: diagnose,
     stat: function () { return Object.assign({}, _st, { used: _st.used.slice() }); },
     reset: function () {
       Object.keys(_st).forEach(function (k) { _st[k] = Array.isArray(_st[k]) ? [] : (typeof _st[k] === 'number' ? 0 : (typeof _st[k] === 'boolean' ? false : '')); });
+      _st.last = null;
       return { ok: true };
     }
   };
-  if (WA.registerModule) WA.registerModule('engines/channel-probe.js', { kind: 'engine', ver: '2.326.0' });
+  if (WA.registerModule) WA.registerModule('engines/channel-probe.js', { kind: 'engine', ver: '2.327.0' });
 })();

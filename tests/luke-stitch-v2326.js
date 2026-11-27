@@ -31,7 +31,7 @@ t('A1: 三引擎装载且版本/出口齐备', function () {
   assert.ok(LENS && GUARD && PROBE, '三个命名空间都在 WA 上');
   assert.strictEqual(LENS.VERSION, '2.326.0');
   assert.strictEqual(GUARD.VERSION, '2.326.0');
-  assert.strictEqual(PROBE.VERSION, '2.326.0');
+  assert.strictEqual(PROBE.VERSION, '2.327.0');
   ['getSettings', 'setSettings', 'lensBody', 'lensStrip', 'lensApply', 'buildBlock', 'diagnose', 'reset']
     .forEach(function (k) { assert.strictEqual(typeof LENS[k], 'function', 'LENS.' + k); });
   ['judge', 'noteRetry', 'unlock', 'diagnose'].forEach(function (k) { assert.strictEqual(typeof GUARD[k], 'function', 'GUARD.' + k); });

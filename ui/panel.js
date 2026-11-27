@@ -3116,12 +3116,13 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           rows.push('渠道探针：' + esc(d.status) + ' / 有结论 n=' + s.n
             + '（可疑 ' + s.weak + '、旁证 ' + s.inconclusive + '）'
             + (s.interval.enough ? '' : '，样本不足不给区间') + ' ' + esc(cp.spark([s.weak, s.inconclusive, s.n]))
-            + '；名字对得上一律不算证据，抄对也不能证明身份。');
+            + '；名字对得上一律不算证据，抄对也不能证明身份。'
+            + (d.last ? (' · 上次 ' + esc(d.last.status) + (d.last.reason ? ('（' + esc(d.last.reason) + '）') : '')) : ' · 还没点过探针'));
         }
       } catch (e) { rows.push('缝合读数暂不可用（不影响 API 使用）'); }
       return rows.length
         ? '<details class="wa-details" style="margin:8px 0;border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:4px 8px;">'
-          + '<summary style="cursor:pointer;opacity:0.75;font-size:12px;">运行体检（只读 · 点开看三份读数）</summary>'
+          + '<summary style="cursor:pointer;opacity:0.75;font-size:12px;">运行体检（读数只读 · 探针在通道卡片上手动点）</summary>'
           + '<div class="wa-dim">'
           + rows.map(function (r) { return '· ' + r; }).join('<br/>') + '</div></details>'
         : '';
@@ -3143,7 +3144,7 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
       const q = WA.apiRouter.queueLength();
       const line3 = '出问题去哪看：同时最多 ' + WA.apiRouter.getConcurrency() + ' 个请求'
         + (q ? ('，当前排队 ' + q + ' 个') : '，当前没有排队')
-        + '；下面的「运行体检」折叠里有叙述镜片 / 回包守卫 / 渠道探针三份只读读数';
+        + '；折叠里有叙述镜片 / 回包守卫 / 渠道探针三份读数；身份探针在每个通道卡片的「身份探针」按钮上，点了才发一次（不发=零支出）';
       return '<div class="wa-verdict"><b>此刻</b><ul>'
         + [line1, line2, line3].map(function (x) { return '<li>' + x + '</li>'; }).join('')
         + '</ul></div>';
@@ -3170,7 +3171,16 @@ return `<div data-omniscient><div class="wa-row"><label class="wa-row"><input id
           <div class="wa-row">
             <button class="wa-btn wa-mini wa-ch-fetch">拉取清单</button>
             <button class="wa-btn wa-mini wa-ch-save">保存</button>
+            <button class="wa-btn wa-mini wa-ch-probe" title="发一次 8 项拄写探针（1 个短请求），只判「像不像高阶模型」；不进世界、不进正文">身份探针</button>
           </div>
+          <div class="wa-dim wa-ch-probe-hint">${(() => {
+            const cp = WA.channelProbe;
+            const last = (cp && cp.diagnose && cp.diagnose().last) || null;
+            if (!last || last.channel !== c.name) return '';
+            const tag = last.status === 'weak' ? '可疑' : last.status === 'inconclusive' ? '旁证' : '未得结论';
+            return '上次探针：' + tag + (last.total ? ('（' + last.hit + '/' + last.total + '）') : '')
+              + (last.reason ? (' · ' + esc(last.reason)) : '');
+          })()}</div>
         </div>`).join('')}
       <div class="wa-sec">并发上限：<b id="wa-conc-v">${WA.apiRouter.getConcurrency()}</b>（队列 ${WA.apiRouter.queueLength()}）</div>
       <input type="range" min="1" max="10" value="${WA.apiRouter.getConcurrency()}" id="wa-conc" class="wa-range" title="同时进行的 AI 请求上限（调高会更快，但可能触发供应商限流）"/>
@@ -13713,6 +13723,27 @@ on('#wa-desk-show', showDesk);
           }
         } catch (e) { /* 引擎层故障不拖垮面板 */ }
         fetchBtn.disabled = false;
+      };
+      // v2.614.0（R289 · A 案人工触发）：身份探针按钮 —— **唯一**由玩家显式发起真请求的口。
+      //   走引擎 runOnce（它自己不 hook fetch，只经 apiRouter.call 发出）；本按钮不并发、不排队、
+      //   不重试；unknown 不记账；探针不进世界、不进正文、不改身份面主判据。
+      const probeBtn = box.querySelector('.wa-ch-probe');
+      if (probeBtn) probeBtn.onclick = async () => {
+        const hintEl = box.querySelector('.wa-ch-probe-hint');
+        const CP = WA.channelProbe;
+        if (!CP || typeof CP.runOnce !== 'function') { hintEl && (hintEl.textContent = '探针引擎未加载'); return; }
+        probeBtn.disabled = true;
+        if (hintEl) hintEl.textContent = '探针发送中（1 个短请求）…';
+        try {
+          const r = await CP.runOnce({ channel: box.dataset.chan });
+          if (hintEl) {
+            const tag = r.status === 'weak' ? '大概率不是目标高阶模型' : r.status === 'inconclusive' ? '不像便宜替身（不能证明身份）' : '未得结论（不记账）';
+            hintEl.textContent = '探针：' + tag + (r.total ? (' · ' + r.hit + '/' + r.total) : '')
+              + (r.reason ? (' · ' + r.reason) : '') + (r.ms ? (' · ' + r.ms + 'ms') : '');
+          }
+          renderBody();
+        } catch (e) { if (hintEl) hintEl.textContent = '探针失败：' + ((e && e.message) || '?'); }
+        probeBtn.disabled = false;
       };
       // v2.517.0：候选下拉 change → 只回填输入框（保存仍走既有 .wa-ch-save 路径，setChannel 白名单不被污染）。
       const cands = box.querySelector('.wa-ch-cands');
