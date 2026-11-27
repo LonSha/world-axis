@@ -9,7 +9,7 @@
   'use strict';
 
   const MODULE = 'worldAxis';
-  const VERSION = '2.602.0';
+  const VERSION = '2.603.0';
   const LOG = '[世界枢轴]';
 
   // 防止重复加载
@@ -1692,6 +1692,11 @@
     //   （与上面几台同一条口径）。三个边界：零跑（不调 protect/restore/applyWith ——
     //   它们会改 stat 的六个计数）、零写、只报残留个数不回显正文。
     'engines/purify-scope-bridge.js',
+    // v2.603.0（CAL-1）：自定义历法面。被读方 calendarPlan 在首帧档（引擎自注册在首帧），
+    //   本模块只被工具页面板与专锁读，故进惰性档。三条实锤都靠静态读：不调
+    //   setMonths / clear（写盘）、不调 label / labelNow（会改 stat.labels）；
+    //   写口是否受开关约束用 Function.prototype.toString 静态判，不真调。
+    'engines/calendar-custom-bridge.js',
     // v2.600.0（BND-1）：配置绑定的遮蔽表。被读方 binding 在首帧档（它被 read 消费），
     //   本模块只被工具页面板读，故进惰性档。零写：不 bind / 不 unbind。
     'engines/binding-bridge.js',

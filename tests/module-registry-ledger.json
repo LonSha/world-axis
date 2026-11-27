@@ -1,14 +1,14 @@
 {
- "version": "2.602.0",
+ "version": "2.603.0",
  "loadOrderCount": 596,
- "lazyCount": 25,
- "loadedCount": 595,
+ "lazyCount": 26,
+ "loadedCount": 596,
  "uiCount": 26,
- "nsCount": 606,
+ "nsCount": 607,
  "totals": {
-  "loadEdges": 489,
+  "loadEdges": 490,
   "hardEdges": 0,
-  "callRefs": 794,
+  "callRefs": 796,
   "ghostRefs": 0
  },
  "loadErrors": {},
@@ -81,6 +81,7 @@
     "engines/broker-house.js",
     "engines/bureaucracy-ascension.js",
     "engines/byte-budget-bridge.js",
+    "engines/calendar-custom-bridge.js",
     "engines/calendar-custom.js",
     "engines/calendar.js",
     "engines/call-timeline.js",
@@ -693,6 +694,7 @@
     "engines/broker-house.js",
     "engines/bureaucracy-ascension.js",
     "engines/byte-budget-bridge.js",
+    "engines/calendar-custom-bridge.js",
     "engines/calendar-custom.js",
     "engines/call-timeline.js",
     "engines/campaign.js",
@@ -11444,6 +11446,25 @@
   "engines/purify-scope-bridge.js": {
    "ns": [
     "purifyScopeBridge"
+   ],
+   "requires": [
+    "registerModule"
+   ],
+   "requiresFiles": [
+    "core/store.js"
+   ],
+   "providerOrderOk": true,
+   "callRefs": [
+    "clock",
+    "modules"
+   ],
+   "ghostRefs": [],
+   "stateKeys": [],
+   "consumedBy": []
+  },
+  "engines/calendar-custom-bridge.js": {
+   "ns": [
+    "calendarPlanBridge"
    ],
    "requires": [
     "registerModule"

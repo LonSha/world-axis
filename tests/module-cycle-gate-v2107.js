@@ -317,7 +317,7 @@ function runAll(A) {
   // v2.585.0（R261）：engines/appearance-lexicon.js 进文件面（data-only 也是产品文件，装载在案）
   //   ⇒ 605/605/602 → 606/606/602（三数同步 +1）。有引用数不变：没有任何产品文件 require 它
   //   —— 这正是「词表不参与判定」的可读出后果，不是漏接线。
-  A(a.files === 622 && a.aliasFiles === 622 && a.refFiles === 618,
+  A(a.files === 623 && a.aliasFiles === 623 && a.refFiles === 619,
     'B1 文件面 ' + a.files + ' / 解析出别名 ' + a.aliasFiles + ' / 有引用 ' + a.refFiles
     + '（覆盖率三数一起报，不许只报边数）');
   // v2.124.0（R4 · 补 v2.123.0 欠账）：1054 / 1091 → 1057 / 1094。
@@ -582,6 +582,9 @@ function runAll(A) {
 // v2.602.0（PSC-1）跟位：新增 engines/purify-scope-bridge.js 一个文件、五个调用期 ns 对
 //   （purifyScope / settingsBus / __settingsRegs / clock / Date）⇒ B1 621/621/617 → 622/622/618；
 //   B2 489 + 4131 = 4620；B5 664/605/623 → 665/606/627；B7 零读 ns 43 → 42（本轮销 purifyScope）。
+//   v2.603.0（R278 CAL-1）跟位：calendar-custom-bridge 新增一个文件、一个 ns（calendarPlanBridge）、尾部一条 registerModule 装载期边、读 store / settingsBus / __settingsRegs / clock 四 ns 的调用期边（共 +4）
+//   ⇒ B1 622/622/618 → 623/623/619；B2 489 + 4131 = 4620 → 490 + 4135 = 4625；B5 665/606/627 → 666/607/629；
+//   B7 零读 ns 42 → 41（本轮销 calendarPlan）。B3 LOAD_ORDER 596 与 B6 漂移两处不动 —— 它进的是惰性档。
 //   B3 LOAD_ORDER 596 与 B6 漂移（665 - 606 = 59）两处不动 —— 不动也是结论（它进的是惰性档）。
 // v2.601.0（PLS-1）跟位：新增 engines/polish-bridge.js 一个文件、六个调用期 ns 对
 //   （apiRouter / settingsBus / __settingsRegs / polish / clock / Date）⇒
@@ -590,7 +593,7 @@ function runAll(A) {
 //   PS：polish-bridge 进的是**惰性档**（LAZY_ORDER，与 binding/contrast/byte 同口径），不是首帧，
 //   故 LOAD_ORDER 不动 —— 我第一版把它放进首帧，是照着「供者相邻」写的，现场口径不是那样。
 //   B6 漂移（664 - 605 = 59）与 B10 登记面（41/48，本桥不注册 settings）两处不动 —— 不动也是结论。
-A(a.edgesLoad === 489 && a.edgesCall === 4131 && a.edgesAll === 4620 && a.identityOk,
+A(a.edgesLoad === 490 && a.edgesCall === 4135 && a.edgesAll === 4625 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'
@@ -793,7 +796,7 @@ A(a.edgesLoad === 489 && a.edgesCall === 4131 && a.edgesAll === 4620 && a.identi
 // v2.585.0（R261）：appearanceLexicon 命名空间入库（静态提供方 +1）且无产品读点（读面不动）
 //   ⇒ 静态提供方 648 → 649、账本 591 → 592、读面仍 598。差额 649−592=57 与回填前**同量**
 //   （三面同步记账，B6 漂移口径不动）。
-A(a.nsProvided === 665 && a.nsLedger === 606 && a.nsRead === 627,
+A(a.nsProvided === 666 && a.nsLedger === 607 && a.nsRead === 629,
     'B5 命名空间面：静态提供方 ' + a.nsProvided + ' / 账本 ' + a.nsLedger + ' / 读面 ' + a.nsRead);
   // v2.529.0（缝合批 19 件）：静态提供方 +19、账本（module-registry --update 后）+19；
   //   读面不变 569 —— 19 件目前没有产品读点，这是**如实读数**，不是判据放宽
@@ -849,7 +852,7 @@ A(a.nsProvided === 665 && a.nsLedger === 606 && a.nsRead === 627,
 // v2.585.0（R261）：零读 ns 54 → 55 —— appearanceLexicon 入库后产品面零读。这不是漏接线，
 //   而是本版要钉住的事实：词表 data-only、引擎不消费（appearance.js 源码不出现 appearanceLexicon，
 //   由 tests/appearance-items-v2585.js 的 C5 静态锁住）。
-A(a.deadNs.length === 42, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
+A(a.deadNs.length === 41, 'B7 零读 ns ' + a.deadNs.length + ' 个（只报不红：消费者可能是 tests/宿主）');
   A(a.crossFileWrite.length === 0 && a.staleRegistration.length === 0
     && a.unreflected.length === 0 && a.ownerMismatch.length === 0,
     'B8 四条硬判据全绿（跨文件写 ' + a.crossFileWrite.length + ' / 过期登记 '

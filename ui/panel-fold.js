@@ -104,6 +104,9 @@
     { page: 'tools', id: 'polishroute', label: '润色通道归位（PLS-1）' },
     // v2.602.0（PSC-1）：净化保护面是第 25 个折叠段。同批登记（口径已定死，不留“下一轮再补”）。
     { page: 'tools', id: 'purifyscope', label: '净化保护配对（PSC-1）' },
+    // v2.603.0（CAL-1）：自定义历法面是第 26 个折叠段。同批登记（口径已定死，不留“下一轮再补”）。
+    //   与 PSC-1 相邻：一个管“保护与还原能不能对上”，一个管“日期到底该叫什么”。
+    { page: 'tools', id: 'calendarplan', label: '自定义历法（CAL-1）' },
   ];
   const __REG = {
     key: LS_KEY,

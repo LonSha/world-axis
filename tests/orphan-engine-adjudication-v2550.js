@@ -1,6 +1,6 @@
 'use strict';
 /**
- * tests/orphan-engine-adjudication-v2550.js — 五台「零故事面读点」引擎的裁决锁（v2.550.0）
+ * tests/orphan-engine-adjudication-v2550.js — 「零故事面读点」引擎的裁决锁（v2.550.0 时五台，后逐台出列；现余台数以 TARGETS 为准）
  *
  * 治的病（比「没接线」更根本的一件）：
  *   v2.548.0 收口时把第三梯队压到 7 台，量了一遍「有没有产品读点」，读数把五台晾在台上：
@@ -45,7 +45,7 @@ function ok(name, fn) {
   catch (e) { console.log('  ✗ ' + name + ' :: ' + e.message); throw e; }
 }
 
-// ── 五台裁决对象：命名空间 ⇄ 文件 ⇄ 中文名 ──
+// ── 裁决对象（v2.550.0 五台，后逐台出列；现余台数以 TARGETS 为准）：命名空间 ⇄ 文件 ⇄ 中文名 ──
 //   `enabled` 在 A3 钉住：默认开着却无人读，正是这份裁决最要紧的那句话（见文档「开关≠读点」）。
 const TARGETS = [
   { ns: 'preflight', file: 'engines/rehearse.js', zh: '写前预演与检查存档' },
@@ -63,10 +63,13 @@ const TARGETS = [
 //   ③ 故事面零读。可达面读数照样逐台记（大多为 0，如实报）。
 //   其中 `unifiedPending` 落在 core/ 而不是 engines/ —— 它是聚合器不是引擎，
 //   但「零读」的后果完全一样（产品面拿不到聚合器，待办中心就读不到合并视图）。
+// v2.603.0（CAL-1）：最后一台 calendarPlan 也出列，本批此刻为空。
+//   空数组会让 F 段的 forEach 零次执行 = 永真假绿，所以 F 段改成条件执行：
+//   有台时照旧逐台钉；为空时只输出一条「本批已全部出列」的断言（断言本身也要能红：它钉住「出列的那些真的在 WIRED_WAVE 里」），
+//   而不是输出五条看上去很健康的假绿。
 const SECOND_WAVE = [
-  // v2.600.0（BND-1）改判出列：binding 已被 engines/binding-bridge.js 真读（见 WIRED_WAVE）。
-  { ns: 'calendarPlan', file: 'engines/calendar-custom.js', zh: '自定义历法规划' },
-  // v2.602.0（PSC-1）改判出列：purifyScope 已被 engines/purify-scope-bridge.js 真读（见 WIRED_WAVE）。
+  // 全部已出列：observationProjection / unifiedPending / fieldWriters（v2.590~2.594）、
+  //   binding（v2.600.0）、purifyScope（v2.602.0）、calendarPlan（v2.603.0 CAL-1）。
 ];
 // ═════════ G 已接线出列：两台（v2.592.0 RFA-1 / v2.594.0 OPJ-1）═════════
 //   出列不是「忘了这座」，是裁决真的被推翻了 —— 但推翻必须留痕：
@@ -93,21 +96,21 @@ const WIRED_WAVE = [
   //   而是读数面本身成了产品。引擎自己写着「保护出得去回不来是比没保护更坏的结局」，
   //   但「从来没跑过 / 跑了但每次无块可保 / 保了没还原 / 实锤回不来」这四种形态，
   //   在它的自有读数上完全同形。桥零跑（不调 protect / restore / applyWith）。
-  { ns: 'purifyScope', file: 'engines/purify-scope.js', ver: 'v2.602.0', readers: ['engines/purify-scope-bridge.js'] }
+  { ns: 'purifyScope', file: 'engines/purify-scope.js', ver: 'v2.602.0', readers: ['engines/purify-scope-bridge.js'] },
+  // 第五次改判（v2.603.0 CAL-1）：calendarPlan。同一条口径。它的读数面要回答的是「为什么全程只显示第 N 日」：
+  //   注释 3 承诺的 labelBack 全仓零实现（导出表里也没有）、边界 1 写着「总开关默认关闭」而 DEF.enabled 是 true、
+  //   clear 写口绕过开关。桥零跑（不调 setMonths / clear / label / labelNow）。
+  { ns: 'calendarPlan', file: 'engines/calendar-custom.js', ver: 'v2.603.0', readers: ['engines/calendar-custom-bridge.js'] }
 ];
 const ALL_TARGETS = TARGETS.concat(SECOND_WAVE).concat(WIRED_WAVE);
 // 第二批的关键方法（逐台现场实读导出面，不是照抄注释）。
 const KEYS2 = {
-  binding: ['getSettings', 'bind', 'read', 'unbind', 'list'],
-  calendarPlan: ['getSettings', 'setMonths', 'getMonths', 'label', 'labelNow', 'clear'],
-  // purifyScope 于 v2.602.0 出列（见 WIRED_WAVE）—— KEYS2 只服务 SECOND_WAVE，故同批移除。
+  // 空：本批已全部出列（v2.603.0）。本表只服务 SECOND_WAVE，随之清空 —— 留着旧条目就是留下无人读的判据。
 };
 // 第二批可达面实测（v2.588.0 现场，node tools 复算命令见文档 D3）。
 //   `assign` = 行首顶格后的 `WA.<ns> = {` 处数：必须恰 1 —— 注释里写 `= {...}` 不算。
 const FACES2 = {
-  binding: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
-  calendarPlan: { switchN: 1, toolTable: 0, deskRoute: 0, registry: 1, assign: 1 },
-  // purifyScope 同上（FACES2 只服务 SECOND_WAVE）。
+  // 空：同 KEYS2 —— FACES2 只服务 SECOND_WAVE。
 };
 // 每台至少要有这些方法才算「定义面完整」（不是空对象挂在 WA 上）。
 const KEYS = {
@@ -172,14 +175,14 @@ function countIn(rel, needle) {
   return n;
 }
 
-// ═════════ A 定义面：五台都在 WA 上，关键方法在场 ═════════
-ok('A0 前置：五台命名空间都在 WA 上（不是缺载/改名）', function () {
+// ═════════ A 定义面：各台都在 WA 上，关键方法在场（台数以 TARGETS 为准） ═════════
+ok('A0 前置：本锁名下各台命名空间都在 WA 上（不是缺载/改名）', function () {
   TARGETS.forEach(function (t) {
     assert.ok(W[t.ns], 'WA.' + t.ns + ' 缺席（' + t.file + '）');
     assert.strictEqual(typeof W[t.ns], 'object', 'WA.' + t.ns + ' 不是对象');
   });
 });
-ok('A1 五台的关键方法都在（定义面不是空壳）', function () {
+ok('A1 各台的关键方法都在（定义面不是空壳）', function () {
   TARGETS.forEach(function (t) {
     KEYS[t.ns].forEach(function (k) {
       assert.strictEqual(typeof W[t.ns][k], 'function', 'WA.' + t.ns + '.' + k + ' 缺席');
@@ -193,7 +196,7 @@ ok('A2 名字与文件一一对应：源码里恰有一处 `WA.<ns> = {`', funct
     assert.strictEqual(n, 1, t.file + ' 里 `WA.' + t.ns + ' = {` 应恰 1 处，实 ' + n);
   });
 });
-ok('A3 默认就是开的：五台 getSettings().enabled 均为 true（开却无人读）', function () {
+ok('A3 默认就是开的：各台 getSettings().enabled 均为 true（开却无人读）', function () {
   TARGETS.forEach(function (t) {
     const st = W[t.ns].getSettings();
     assert.strictEqual(st.enabled, true, 'WA.' + t.ns + '.getSettings().enabled 应为 true（实 '
@@ -202,7 +205,7 @@ ok('A3 默认就是开的：五台 getSettings().enabled 均为 true（开却无
 });
 
 // ═════════ B 可达面：四类非故事面入口的精确读数 ═════════
-ok('B0 面板开关面：preflight / polish / archiveHide 各一行，ensemble / autoHide 无', function () {
+ok('B0 面板开关面：逐台与 FACES 登记同值（preflight / archiveHide 各一行，autoHide 无）', function () {
   TARGETS.forEach(function (t) {
     const n = countIn('ui/settings.js', 'data-sw-ns="' + t.ns + '"');
     assert.strictEqual(n, FACES[t.ns].switchN, t.ns + ' 开关行数应为 ' + FACES[t.ns].switchN + '，实 ' + n);
@@ -222,13 +225,13 @@ ok('B2 行动台路由面：只有 autoHide 有（7 条路由 × 每行 2 处引
       + FACES[t.ns].deskRoute + '，实 ' + n);
   });
 });
-ok('B3 注册表面：五台各一行「文件 → 命名空间」（注册表不等于读点）', function () {
+ok('B3 注册表面：各台各一行「文件 → 命名空间」（注册表不等于读点）', function () {
   TARGETS.forEach(function (t) {
     const n = countIn('engines/tool-diag-tables.js', "'" + t.file + "': '" + t.ns + "'");
     assert.strictEqual(n, FACES[t.ns].registry, t.ns + ' 注册行应为 ' + FACES[t.ns].registry + '，实 ' + n);
   });
 });
-ok('B4 可达≠故事面：五台入口全是手动面/面板面（为零读做前置）', function () {
+ok('B4 可达≠故事面：各台入口全是手动面/面板面（为零读做前置）', function () {
   TARGETS.forEach(function (t) {
     const f = FACES[t.ns];
     const storyFace = 0;   // 四类入口没有一类在故事面上
@@ -254,7 +257,7 @@ TARGETS.forEach(function (t) {
 });
 
 // ═════════ D 文档面：裁决在位 ═════════
-ok('D0 裁决文档在位，且含五台名字', function () {
+ok('D0 裁决文档在位，且含各台名字', function () {
   assert.ok(fs.existsSync(path.join(BASE, DOC_REL)), DOC_REL + ' 不存在');
   const doc = fs.readFileSync(path.join(BASE, DOC_REL), 'utf8');
   TARGETS.forEach(function (t) {
@@ -296,6 +299,8 @@ ok('E2 台账口径：autoHide 已被窄消费者台账登记（本裁决不新�
 });
 
 
+if (SECOND_WAVE.length) {
+  // 第二批仍有零读台：逐台钉（与 v2.588.0 口径一致）
 // ═════════ F 第二批：零读引擎（v2.588.0 / R264 时为七台，后逐台出列；现余台数以 SECOND_WAVE 为准）═════════
 ok('F0 第二批命名空间都在 WA 上且是对象', function () {
   SECOND_WAVE.forEach(function (t) {
@@ -342,6 +347,22 @@ SECOND_WAVE.forEach(function (t) {
       + ' —— 若是有意接线，请先改 docs/ORPHAN_ENGINES_ADJUDICATION.md 的裁决与改判触发器，再改本锁');
   });
 });
+} else {
+  // 第二批已是 0 台：旧判据全部停用。这**不是**只要跳过就行 —— 空数组会让上面五条
+  // 判据的 forEach 零次执行、看上去全绿。所以这里改钉另一件事：说好出列的那些台
+  // **真的**在 WIRED_WAVE 里，而且两张只服务第二批的表确实空了。
+  ok('F 第二批已全部出列（0 台）—— 旧判据停用，改钉「出列是真的」', function () {
+    assert.strictEqual(SECOND_WAVE.length, 0, '本分支只在第二批为空时执行');
+    assert.deepStrictEqual(Object.keys(KEYS2), [], 'KEYS2 应清空（否则就是留下无人读的旧判据）');
+    assert.deepStrictEqual(Object.keys(FACES2), [], 'FACES2 应清空');
+    const wired = WIRED_WAVE.map(function (t) { return t.ns; });
+    ['observationProjection', 'unifiedPending', 'fieldWriters', 'binding', 'purifyScope', 'calendarPlan']
+      .forEach(function (n) {
+        assert.ok(wired.indexOf(n) >= 0, n + ' 说好出列，却不在 WIRED_WAVE 里（旧名单没清干净）');
+      });
+    assert.strictEqual(wired.length, 9, 'WIRED_WAVE 应为 9 台，实 ' + wired.length);
+  });
+}
 // ═════════ G 已接线出列：改判是真的（v2.592.0 起逐台出列，台数以 WIRED_WAVE 为准）═════════
 ok('G0 已接线的各台不在第二批名单里（出列不是漏写）', function () {
   const names = SECOND_WAVE.map(function (t) { return t.ns; });

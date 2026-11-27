@@ -373,9 +373,57 @@ grep -rln "WA\.purifyScope\b" --include=*.js engines core render ui actors direc
 
 本期自查：接线、账本销行（43 → 42）、锁的改判、文档本节与专锁五件**同批**完成，未复发旧病。
 
+## 五点九、改判记录（v2.603.0）：calendarPlan 出列
+
+第五次同款改判（前四次：v2.592.0 四台、v2.597.0 ensemble、v2.600.0 binding、v2.601.0 polish、v2.602.0 purifyScope）。
+这一次治的是**时间轴**，而它的缺口形态是「注释把未完成写成已完成」。
+
+| 命名空间 | 文件 | 出列版本 | 故事面读点 | 为什么这算是真读点 |
+|---|---|---|---|---|
+| `calendarPlan` | `engines/calendar-custom.js` | **v2.603.0**（CAL-1） | `engines/calendar-custom-bridge.js` | 历法对齐表：读 `getMonths` / `getSettings` / `stat`，**一次 `setMonths` / `clear` / `label` / `labelNow` 都不调**——它回答「注释承诺的三件事，实现做了几件」 |
+
+这台为什么必须出列：
+
+1. **注释承诺了一个不存在的函数。** 文件头的“本模块只做三件事”里，第三件是
+   `labelBack(dayIndex, atDay)`——「**历史楼**口径：用「当时」的历法算」。而导出表里没有它，
+   全仓范围内 `labelBack` 只出现一次 —— 就是那句注释本身。
+   读注释的人会以为「历史楼口径已就绪」，而它从未存在。
+2. **默认值与文档相反。** 边界 1 原文写着「总开关默认关闭」，而 `DEF = { enabled: true }`。
+   这不是「默认开着更好」的主张问题：两者必有一个在说谎，而读者无法从任何读数上分辨哪个。
+3. **写口绕过开关。** `setMonths` 看 `enabled`，`label` 看 `enabled`，而 `clear()` **不看**。
+   关掉开关之后，`label` 返回 `null`、`setMonths` 拒收，但月表照样能被清空。
+   否定式边界 1 只承诺了读口行为，没说写口一起关。
+4. **四种「什么都没发生」在它的自有读数上同形。** 没设过月表（`sets === 0`）、
+   设过又清空（`sets > 0` 但月表 0 项）、开关关着、只产出过「日期待确认」（`labels === 0` 且 `unknowns > 0`）。
+   这四种的处置完全不同，但旧读数上只能看到「一份空月表」。
+
+边界（与前四节同源）：
+
+1. **读数面成产品 ≠ 功能面成产品。** 今天桥的 verdict 是 `drift`（因为上面那三条结构缺口真的在场），
+   运行态是 `never-set` —— 这恰恰证明引擎本体一行未改、一次没设过月表。
+2. **读点必须恰等于落地面。** 命中集只有 `engines/calendar-custom-bridge.js`（`G1` 逐步比对）。
+3. **桥零跑。** `setMonths` / `clear` 会写盘，`label` / `labelNow` 会改 `stat` 的标签与待确认计数。
+   专锁 I1 用五个探针（setMonths / clear / setSettings / label / labelNow）钉住调用计数全 0。
+4. **只报结构不报月名。** 月名是用户自定义的设定名（可能含剧情），
+   `table()` 只回个数与总天数。专锁 D4 用 `SECRET-MOON-NAME` 做样本，断言读数里搜不到它。
+
+另一层：**源口径不许漂。** 桥里写死了两个常量（`CONTRACT` 与 `DOC_ENABLED_DEFAULT`），
+它们的事实依据是 `engines/calendar-custom.js` 的注释原文。专锁 J1/J2/J3 去读源文件逐条核：
+注释改了而桥没改、或实现赶上了注释，两种情形都会红。
+
+复算（应只打印一行）：
+
+```bash
+grep -rln "WA\.calendarPlan\b" --include=*.js engines core render ui actors direction index.js \
+  | grep -vE 'tool-diag|narrow-consumers|action-desk-routes'
+# → engines/calendar-custom-bridge.js
+```
+
+本期自查：接线、账本销行（42 → 41）、锁的改判、文档本节与专锁五件**同批**完成，未复发旧病。
+
 ## 六、与 `ns-consumer-ledger` 的关系
 
-仍在本锁名下的这几台（TARGETS 3 + 第二批 1）都在零读账本的 `entries` 里，分类不变；已出列的八台里 `polish` / `purifyScope` / `binding` 已同批销行（销的是「零读」，不是「功能已完成」），`ensemble` 未在账本内，另四台的读点形态见上两节。本文不注销任何条目——
+仍在本锁名下的这几台（TARGETS 3 + 第二批 0，第二批已全部出列）都在零读账本的 `entries` 里，分类不变；已出列的九台里 `polish` / `purifyScope` / `binding` / `calendarPlan` 已同批销行（销的是「零读」，不是「功能已完成」），`ensemble` 未在账本内，另四台的读点形态见上几节。本文不注销任何条目——
 **注销需要读点，而本文的结论正是「现在没有合法读点」**。
 两者的分工是：账本说「它零读」，本文说「为什么零读是对的、什么条件下不再对」。
 

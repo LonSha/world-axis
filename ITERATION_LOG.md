@@ -8512,3 +8512,80 @@ F 段小节注释保留「v2.588.0 / R264 时为七台」并注明「后逐台�
 同批改文档第六节一处当前计数：「已出列的七台」→「八台」、「另三台」→「另四台」
 （销行 3 台 + ensemble 不在账本内 + 剩 4 台读点形态见前两节，八台正好合账）。
 改完复跑：orphan 仍 **31 段全绿**，收尾语自动报「另 8 台已出列接线」 —— 台数交给数组，人只写口径。
+
+## R278（v2.603.0 · CAL-1：自定义历法面 —— 注释承诺了三件事，实现做了几件）
+
+**为何选它**：R277 之后 `orphan` 锁名下只剩 4 台（TARGETS 3 + 第二批 1），而第二批最后那台
+`calendarPlan` 的形态与前三台不同 —— 它不是一个「读不到状态」的引擎，而是一个
+**注释把未完成写成已完成**的引擎。这正是本仓反复治的那类病的原始形态。
+
+**勘察发现的四条硬缺口（全部实测，不是推断）**：
+
+1. **`labelBack` 不存在。** `engines/calendar-custom.js` 头部的「本模块只做三件事」里，
+   第三件是 `labelBack(dayIndex, atDay)` ——「历史楼口径：用「当时」的历法算」。
+   而 `WA.calendarPlan = {...}` 的导出表里没有它。全仓 `grep -rn 'labelBack'` **只有一处命中**：
+   就是那句注释本身。读注释的人会以为历史楼口径已就绪。这不是「待写」，是**谎报完成度**。
+2. **默认值与文档相反。** 边界 1 原文「总开关默认关闭」，`DEF = { enabled: true }`。
+   这不是「默认开着更好」的主张问题：两者必有一个在说谎，而读者无法从任何读数上分辨。
+3. **`clear()` 绕过开关。** `setMonths` 看 `enabled`、`label` 看 `enabled`，`clear()` **不看**。
+   关掉开关后 `label` 返回 `null`、`setMonths` 拒收，但月表照样能被清空。
+4. **四种「什么都没发生」在自有读数上同形。** 没设过月表（`sets === 0`）、设过又清空
+   （`sets > 0` 但月表 0 项）、开关关着、只产出过「待确认」。四种处置完全不同，
+   旧读数上都只是「一份空月表」。
+
+**做了什么（15 导出 / 240 行）**：`engines/calendar-custom-bridge.js` ——
+`contract()` 现读导出表对三条承诺、`switches()` 比对实现默认值与文档口径、
+`table()` 只报月数与年天数（月名一个都不出）、`bypass()` 静态判「写口是否受开关约束」、
+`faults()` 五码、`audit()` / `lineOf()` / `summaryText()` / `diagnose()` / `stat()` / `__reset()`。
+八值 verdict（`module-missing > no-settings > drift > disabled > never-set > table-empty > unknown-only > ok`）；
+**`drift` 压过运行态是刻意的**：读数的第一句该是「这份注释承诺了它没做的事」，
+运行态不丢 —— `audit().state` 始终带着，`lineOf()` 在 drift 时也附一句。
+现场 verdict = `drift`、state = `never-set`。
+
+**为什么 `bypass()` 读源码文本而不是真调**：真调一次 `clear` 就会把月表清空，
+那台引擎的现场就被体检改掉了。用 `Function.prototype.toString` 静态判，是唯一能同时
+满足「零跑」与「能回答」的路。配套两条防伪：先**剥注释**再判（否则一句「本函数不看 enabled」
+的注释就能骗过去），且不锚定调用形态（引擎本地叫 `settings()`，调用方可能写 `getSettings()` ——
+只看函数体里到底有没有 `enabled`）。
+
+**踩过的坑（如实记）**：
+- 专锁 E2 首跑红：我给 `clear` 补上开关判定后仍报「无保护」。原因是桥的正则写窄了，只认
+  `settings().enabled`，不认 `getSettings().enabled`。**改桥不改锁** —— 这是判据的权利。
+  顺手把「剥注释」也加了进去（原实现会被一句注释骗过）。
+- 专锁 A2 首跑红：我写 `B.VERDICT.push('zzz')` 然后断言长度为 8。导出的是副本，但每次访问
+  返回的是**同一个**副本，push 就是把这个导出改大了 —— 判据本身写错了。改成验证读数
+  不受污染（`audit().verdict` 仍是 drift、`contract().promised` 仍 4 个），末尾复原。
+- `engines/calendar-custom-bridge.js` 初版用 `WA[NAME]` 取引擎。静态扫描只认字面成员访问，
+  于是 `calendarPlan` 在 ns-consumer 门禁里仍被算成「零读 ns」——**桥明明读了它，读数却说没读**。
+  改成字面 `WA.calendarPlan` 后 dead 面 2089 → 2088、未定性清零。这条写进源注释了。
+
+**同批清掉的两处「绿得毫无提示」**：
+- `orphan` 锁的 A/B 段：A0/A1/A3、B3/B4、D0 的判据名还写着「五台」，B0 还点名
+  `polish / ensemble`（两者早已出列）。全部改成「各台」/「逐台」；B0 改成
+  「逐台与 FACES 登记同值（preflight / archiveHide 各一行，autoHide 无）」。
+- **`SECOND_WAVE` 变空带来的隐患**：空数组会让 F 段五条判据的 `forEach` 零次执行 = 永真假绿。
+  所以 F 段改成条件执行：有台时照旧逐台钉；为空时只输出**一条**断言，且它自己能红 ——
+  钉「说好出列的六台真的在 `WIRED_WAVE` 里」「`KEYS2` / `FACES2` 确实清空」「WIRED_WAVE 恰 9 台」。
+  收尾语从「31 段」变成「26 段」，差的就是这五条旧判据退出。
+
+**读数（v2.603.0 现场实测）**：version-consistency **22** ·
+module-registry **596 文件 / 607 ns / 490 边 / 硬边 0 / 796 调用期** ·
+dead-export **dead 2088 / uiDead 6 / dataOnly 836**（证据 2094 条）·
+readings-v2106 **61**（refs 13298 / ns 592 / members 6269 / 仅测试 586）·
+segment-extract **128**（section 473 / 测试面 702 / 重组面 19277 / 硬线 2200）·
+z1-04 **46/46**（惰性 26 / 契约面 596 / 首帧 596）· settle **55**（490 / 796 / 607 / 596）·
+plan-readings **16**（699 / 560 / 490）· module-cycle **65**（B1 623/623/619、B2 490+4135=4625、
+B5 666/607/629、零读 41）· ns-consumer **72**（BASE_DEAD_NS 41）· orphan **26 段** ·
+CAL-1 专锁 **39/0** · q8 80/0 · q9 67/0 · cap-tier 35/0 · capability-ui 61/0 ·
+ui-a11y **1784/1784** · overview-fold 106 · ev1 88/0 · ev6 180/0 · rel-contract 23 · p3-x1 54 ·
+readme-slim 72 · tpl-comment 9/9 · evidence-index **698 条 stale 0** · release-manifest 可发。
+
+**未做（如实登记）**：① **不补 `labelBack`** —— 补它要决定「历史楼该用哪一版月表算」，
+那是产品决策（月表是单值、没有版本历史），不是体检面能替的决定；桥只把「差这一件」摆到台面上。
+② 不把 `DEF.enabled` 改成 `false`，也不改注释原文 —— 两边都是一行改动，但改哪边是人的判断；
+桥只报「两者相反」。③ 不动 `clear()` 的开关覆盖 —— 同上。④ 整趟全量回归仍按分面批次验。
+
+**销行与改判**：`tests/ns-consumer-ledger.json` 销 `calendarPlan`（42 → 41）并写明「销的是零读，
+不是历法功能已完成 —— `labelBack` 依然不存在」；`orphan` 锁把它从 `SECOND_WAVE` 移入 `WIRED_WAVE`（9 台）；
+文档新增五点九节（四条理由 + 四条边界 + 复算 bash + 本期自查）。
+至此本锁名下只剩 **3 台**（TARGETS 3，第二批归零）。

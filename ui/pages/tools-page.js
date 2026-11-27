@@ -86,6 +86,7 @@
   let __plsEnsureFail = 0;
   // v2.602.0（PSC-1）：同款。净化保护面也是惰性档（被读方 purifyScope 在调用期档）。
   let __pscEnsureFail = 0;
+    let __calEnsureFail = 0;
   const rfaLine = function () {
       const B = (WA.refineBridge && typeof WA.refineBridge.summaryText === 'function') ? WA.refineBridge : null;
       if (!B) return '档案精编：引擎未装载（engines/refine-bridge.js）';
@@ -727,6 +728,55 @@
           + '残留占位符只报<b>个数</b>，不回显正文（那是楼层正文，可能含剧透）。'
           + '“从来没跑过”与“跑了但每次无块可保”与“保了没还原”在这台引擎的自有读数上完全同形 —— '
           + '本面把它们拆成五态，是为了让这三种“什么都没发生”不再长得一样。'
+          + '</div>';
+      })()}
+      `)}
+      ${foldSec('tools', 'calendarplan', '自定义历法</div><div class="wa-dim">（CAL-1：为什么全程只显示「第 403 日」—— 注释承诺的三件事，实现做了几件）', () => `
+      ${(function () {
+        // 被读方（calendar-custom）在首帧档，但本桥进的是惰性档：首帧未装载是常态，走 ensure + 失败记忆。
+        const rel = 'engines/calendar-custom-bridge.js';
+        const cal = WA.calendarPlanBridge;
+        if (!cal || typeof cal.audit !== 'function') {
+          if (__calEnsureFail) return '<div class="wa-dim">历法面装载失败（' + rel + '）—— 这不是“没设月表”，是这台引擎装不上</div>';
+          try {
+            if (WA.lazyLoad && typeof WA.lazyLoad.ensure === 'function') {
+              const p = WA.lazyLoad.ensure(rel);
+              if (p && typeof p.catch === 'function') p.catch(function () { __calEnsureFail = 1; });
+              return '<div class="wa-dim">历法面在惰性档，装载中（成功后下次渲染自愈）</div>';
+            }
+          } catch (e) { /* 落到下面统一记失败 */ }
+          __calEnsureFail = 1;
+          return '<div class="wa-dim">历法面装载失败（' + rel + '）</div>';
+        }
+        let a0 = null;
+        try { a0 = cal.audit(); } catch (e) { return '<div class="wa-dim">读数抛错：' + esc(e && e.message) + '</div>'; }
+        const ct = a0.contract || {};
+        const sw = a0.switches || {};
+        const tb = a0.table || {};
+        const bp = a0.bypass || {};
+        const rows = [
+          '<div class="wa-dim">· 注释承诺：' + esc((ct.promised || []).join(' / '))
+            + '（缺 ' + esc(String((ct.missing || []).length)) + ' 件'
+            + ((ct.missing || []).length ? '：' + esc((ct.missing || []).join(' / ')) : '') + '）</div>',
+          '<div class="wa-dim">· 开关：实现默认 ' + esc(String(sw.defEnabled))
+            + ' / 文档口径 ' + esc(String(sw.docEnabledDefault))
+            + (sw.contradict ? '（<b>相反</b>）' : '（一致）')
+            + '，此刻 ' + esc(String(sw.curEnabled)) + '</div>',
+          '<div class="wa-dim">· 月表：' + esc(String(tb.count == null ? 0 : tb.count)) + ' 项 / 一年 '
+            + esc(String(tb.yearDays == null ? 0 : tb.yearDays)) + ' 日'
+            + ((tb.badItems || 0) > 0 ? '，坏项 ' + esc(String(tb.badItems)) : '')
+            + '（月名一个都不出——那是你的设定，可能含剧情）</div>',
+          '<div class="wa-dim">· 写口：' + ((bp.unguarded || []).length
+            ? '<b>绕过开关</b>：' + esc((bp.unguarded || []).join(' / '))
+            : '都受开关约束')
+            + '（静态判源码文本，不真调）</div>'
+        ].join('');
+        return '<div class="wa-dim" id="wa-cal-line">' + esc(cal.lineOf(a0)) + '</div>' + rows
+          + '<div class="wa-dim">' + esc((cal.diagnose().fixes || []).join(' ； ')) + '</div>'
+          + '<div class="wa-dim">本面只量：<b>不调 setMonths / clear</b>（它们会写盘）、<b>不调 label / labelNow</b>（它们会改 stat 的标签/待确认计数，体检把计数改掉之后读出来的就不是现场）、不写盘。'
+          + '“写口是否受开关约束”是读函数源码文本得出的，因为真调一次 clear 就会把月表清空。'
+          + '“没设过月表”与“设过又清空”与“开关关着”在这台引擎的自有读数上完全同形 —— '
+          + '本面把它们拆成七态。'
           + '</div>';
       })()}
       `)}

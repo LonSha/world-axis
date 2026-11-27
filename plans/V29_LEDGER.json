@@ -1,628 +1,628 @@
 {
-  "tool": "plan-ledger",
-  "schema": 1,
-  "version": "2.601.0",
-  "sourceDigest": "83ed656dd2e8ad9f4c52a31c31dee2a29cc0ce644bcc7040b2835653a8c3313e",
-  "sourceCommits": 37,
-  "total": 36,
-  "delivered": {
-    "OPV29-01": {
-      "group": "Z1",
-      "commit": "8874b46",
-      "subject": "chore(worldaxis): 台账回填 —— 已交付 23/36，计划读数 tests/*.js 602 → 603（+ OPV29-01 锁级分片：按节 4.1% / N=4 1.03x；单节 792.2s→263.6s 省 66.7%）",
-      "readings": [],
-      "recompute": false,
-      "note": ""
-    },
-    "OPV29-02": {
-      "group": "Z1",
-      "commit": "5c1a186",
-      "subject": "feat(worldaxis): OPV29-02 增量回归 —— 改了什么只跑哪些锁，不知道就退回全量（20 项）",
-      "readings": [],
-      "recompute": false,
-      "note": ""
-    },
-    "OPV29-03": {
-      "group": "Z1",
-      "commit": "f7b2835",
-      "subject": "feat(worldaxis): OPV29-03 隔离器瘦身 —— 35.5M→32.0M，三条铁律不许瘦错（22 项）",
-      "readings": [
-        "node tests/opv29-z1-03-v2529.js ⇒ pass (22)",
-        "node tools/mirror-slim.js ⇒ 复制面 1512 个文件 · 35.5M → 32.0M（省 3.5M / 9.7%）· 排除 6 · 拒绝 2 · 目标 20M 未达成",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 602→603",
-        "node tests/test-surface-gate.js ⇒ 全部通过（无孤儿）",
-        "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
-        "产品面优先改成永不拒绝 ⇒ FAIL 1/22（只红 B1）",
-        "引用检查改成恒当未引用 ⇒ FAIL 3/22（A4+A5+B2）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-04": {
-      "group": "Z1",
-      "commit": "64a73aa",
-      "subject": "feat(engines): OPV29-04 惰性装载 —— 首帧装载期边 462→441，契约面一条不少",
-      "readings": [],
-      "recompute": false,
-      "note": ""
-    },
-    "OPV29-05": {
-      "group": "Z1",
-      "commit": "8d6a19e",
-      "subject": "feat(worldaxis): OPV29-05 首屏预算 —— 「只渲染可见页」第一次有了冷开读数与机械判据（21 项，冷开 42 / 静态 1794 = 2%）",
-      "readings": [
-        "node tools/first-screen-budget.js --check ⇒ PASS（rc=0）：冷开 42 ≤ 预算 1600 且 ≤ 静态半数 897",
-        "node tests/opv29-z1-05-v2529.js ⇒ pass (21)",
-        "真破坏负控制：拿掉 C3 ⇒ FAIL 1/21 · 冷开假装 1794 ⇒ FAIL 5/21"
-      ],
-      "recompute": true,
-      "note": "专锁 21 项全绿 · 面数 610→611 · 裸锚 27 = 基线 · segment-extract pass（128）· test-surface-gate 全通过 · orphan pass · plan-readings pass（16）· readings-v2106 pass（61）· release-manifest rc=0"
-    },
-    "OPV29-06": {
-      "group": "Z1",
-      "commit": "d755c54",
-      "subject": "chore(worldaxis): 台账回填 —— 已交付 22/36，计划读数 tests/*.js 601 → 602（+ OPV29-06 门禁实测：七快 19.5s / 慢门 86.0s / 合计下界 105.5s）",
-      "readings": [],
-      "recompute": false,
-      "note": ""
-    },
-    "OPV29-07": {
-      "group": "Z2",
-      "commit": "3138c4c",
-      "subject": "perf(tool-diag): OPV29-07 tool-diag 拆段（8425 → 6004 行 · 表 2467 行）",
-      "readings": [
-        "wc -l engines/tool-diag.js ⇒ 6004",
-        "wc -l engines/tool-diag-tables.js ⇒ 2467",
-        "wc -l tests/run.js ⇒ 22994",
-        "node tests/opv29-z1-07-v2529.js ⇒ pass (23)",
-        "node tests/module-registry-gate.js ⇒ 文件 546 / 装载期边 438 / 调用期 701 / 结构问题 0",
-        "node tests/module-cycle-gate.js ⇒ rc=0 · 别名 568 / 有引用 566 / problems 0",
-        "node tests/export-contract.js ⇒ rc=0（tests/export_contract.txt 无 diff）",
-        "node tests/inventory.js ⇒ rc=0",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
-        "node tools/plan-readings.js ⇒ pass（16 条）",
-        "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（基线 27）",
-        "node tests/settle-v2830.js ⇒ pass (55)",
-        "node tests/s3-tx7-v2170.js ⇒ 44 / 0",
-        "node tests/s3-tx8-v2171.js ⇒ 49 / 0",
-        "node tests/s3-tx9-v2172.js ⇒ 46 / 0",
-        "node tests/s3-b3-e7-v2188.js ⇒ 347 / 失败 0",
-        "node tests/s3-b3-n8-v2224.js ⇒ 344 / 失败 0"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-08": {
-      "group": "Z2",
-      "commit": "fac79ec",
-      "subject": "perf(action-desk): OPV29-08 路由表出闸（4123 → 1643 行 · 表 2530 行，14 动作与拒收码不变）",
-      "readings": [
-        "node tests/opv29-z1-08-v2529.js ⇒ pass（23 项；A2 表体量 2530 = 2530 / A11 关键路由 8 条逐字点名全在 / C5 拒收码三面差额 0，真吐 1 种码、未声明 0 种）",
-        "node tests/exp10-action-desk-v2232.js ⇒ 36 / 失败 0",
-        "node tests/opv29-z3-18-v2529.js ⇒ pass（27 项）",
-        "node tests/exv22-v2400.js ⇒ pass（138 / 0）",
-        "node tests/ns-consumer-ledger-v2400.js ⇒ pass（70 项）",
-        "node tests/v8-driver-l3-2294.js ⇒ 35 pass / 0 fail",
-        "node tests/v7-driver-ledger-2275.js ⇒ 103 passed, 0 failed",
-        "node tests/module-cycle-gate-v2107.js ⇒ pass（65 项；文件面 569/569/567 · 装载期 440 + 调用期 3961 = 4401 · LOAD_ORDER 568 · ns 612/558/569）",
-        "node tests/module-registry-gate.js ⇒ pass —— 文件 547 / 命名空间 558 / 装载期边 440 / 硬边 0 / 调用期 703 / 结构问题 0",
-        "node tests/settle-v2830.js ⇒ pass (55)",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项；run.js 22966 行 < 23000、测试文件面 618）",
-        "node tools/plan-readings.js ⇒ pass（16 条可复算读数与现场全等）",
-        "node tests/test-surface-gate.js ⇒ 全部通过",
-        "拿掉引擎守卫（`|| function(){return {};}` + 删 throw）⇒ FAIL 2 / 23（A7 / B1 红）",
-        "'recycle.enforce' 改名为 'recycle.enforceX' ⇒ FAIL 1 / 23（A11 红）",
-        "还原 ⇒ pass（23）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-09": {
-      "group": "Z2",
-      "commit": "c5eb2de",
-      "subject": "perf(reject-recovery): OPV29-09 冻结表与判定分离（1388 → 244 行）",
-      "readings": [
-        "wc -l engines/reject-recovery.js ⇒ 244",
-        "wc -l engines/reject-recovery-tables.js ⇒ 1204",
-        "node tools/reject-recovery.js ⇒ rc=0（承诺与现场逐条一致）",
-        "node tests/reject-recovery-lock-v2192.js ⇒ pass (215)",
-        "node tests/module-cycle-gate-v2107.js ⇒ pass（65 项）",
-        "node tests/module-registry-gate.js ⇒ pass（文件 542 / ns 553）",
-        "node tests/settle-v2830.js ⇒ pass (55)",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
-        "node tools/plan-readings.js ⇒ pass（16 条读数与现场全等）",
-        "node tools/release-manifest.js ⇒ rc=0",
-        "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（冻结基线 27）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-10": {
-      "group": "Z2",
-      "commit": "83f3c5c",
-      "subject": "perf(inject-budget): OPV29-10 科目表与算法分离（1425 → 863 行）",
-      "readings": [
-        "wc -l engines/inject-budget.js ⇒ 863",
-        "wc -l engines/inject-budget-tables.js ⇒ 600",
-        "grep -c \"': { rank:\" engines/inject-budget-tables.js ⇒ 163（PRIORITY 键数，搬前后一致）",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
-        "node tests/test-surface-gate.js ⇒ 全部通过 ✓",
-        "node tests/orphan-lock-v2750.js ⇒ pass",
-        "node tools/plan-readings.js ⇒ pass（16 条读数与现场全等）",
-        "node tools/release-manifest.js ⇒ rc=0",
-        "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（冻结基线 27）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-11": {
-      "group": "Z2",
-      "commit": "bc216de",
-      "subject": "perf(engines): OPV29-11 backstage / world-lab / world.js 三件拆段（1140 / 1281 / 1333 行）",
-      "readings": [
-        "wc -l engines/backstage.js ⇒ 1140",
-        "wc -l engines/backstage-protocols.js ⇒ 167",
-        "wc -l engines/world-lab.js ⇒ 1281",
-        "wc -l engines/world-lab-tables.js ⇒ 66",
-        "wc -l engines/world.js ⇒ 1333",
-        "wc -l engines/world-tables.js ⇒ 61",
-        "wc -l tests/run.js ⇒ 22994",
-        "node tests/opv29-z1-11-v2529.js ⇒ pass (36)",
-        "node tests/module-registry-gate.js ⇒ 文件 545 / 装载期边 436 / 调用期 699 / 结构问题 0",
-        "node tests/module-cycle-gate.js ⇒ 别名 567 / 有引用 565 / nsFaceDrift 0 / problems 0",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
-        "node tools/plan-readings.js ⇒ pass（16 条）",
-        "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（基线 27）",
-        "node tests/s3-b3-e9-v2188.js ⇒ 334 / 失败 0",
-        "node tests/transit-v2930.js ⇒ pass（74 项）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-12": {
-      "group": "Z2",
-      "commit": "04bd086",
-      "subject": "chore(worldaxis): 台账回填 —— OPV29-12 已交付（专锁 17 项 / 面数 606→607 / 裸锚 27 = 基线）",
-      "readings": [],
-      "recompute": false,
-      "note": ""
-    },
-    "OPV29-13": {
-      "group": "Z3",
-      "commit": "435d7fa",
-      "subject": "feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项",
-      "readings": [
-        "node tests/opv29-z6-13-v2529.js ⇒ pass (35)",
-        "node tools/phrase-coverage.js ⇒ 在用 1853 = 扫描面 1905 − 死表 52（基线 937）· 有玩家话 837 · 裸码 1016 · 覆盖 45.2%",
-        "node tools/phrase-coverage.js --check ⇒ rc=0（达标线 45.2 = 首测实测值）",
-        "node tests/opv29-z6-34-v2529.js ⇒ pass (24)",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 600→602",
-        "node tests/test-surface-gate.js ⇒ 全部通过（无孤儿）",
-        "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
-        "破坏 engines/controllability.js 让 importCheck 真往存档里填默认值 ⇒ FAIL 2/22",
-        "把 tools/phrase-coverage.js 的 bad 恒置空 ⇒ FAIL 4/35（C2b+C2c+C3b+C3c）",
-        "把达标判断改成恒真（const ok = true）⇒ FAIL 4/35（C1c+C2c+C3c+C4c）",
-        "的 rc≠0 混成同一个码，把「读不到」伪装成「不达标」。改为返回 null ⇒ engine-unreadable。"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-14": {
-      "group": "Z3",
-      "commit": "896ee74",
-      "subject": "feat(worldaxis): OPV29-14 死码归并 —— 52 条死表逐条定性、锚点漂移判据上线当天抓到并修掉 1 条（17 项）",
-      "readings": [
-        "node tools/dead-table-triage.js --check ⇒ PASS（rc=0）：死表 52 / keep 52 · del 0 · wire 0 / 漂移 0",
-        "node tests/opv29-z1-14-v2529.js ⇒ pass (17)",
-        "真破坏负控制：台账少一条 ⇒ FAIL 3/17 · bad-draft 锚点退回漂移前 ⇒ FAIL 4/17"
-      ],
-      "recompute": true,
-      "note": "专锁 17 项全绿 · 面数 609→610 · 裸锚 27 = 基线 · segment-extract pass（128）· test-surface-gate 全通过 · orphan pass · plan-readings pass（16）· readings-v2106 pass（61）· release-manifest rc=0"
-    },
-    "OPV29-15": {
-      "group": "Z3",
-      "commit": "bd051c6",
-      "subject": "chore(worldaxis): 台账回填 —— OPV29-15 现场已交付（漏登，不是未做）",
-      "readings": [
-        "node tests/opv29-z3-v2524.js ⇒ PASS 27/27（Y 段即故障自诊：下一步只给一条命令、禁止清单点名危险动作、活锁不得当可回收）",
-        "node tools/fault-selfhelp.js ⇒ 锁 active @ /tmp/worldaxis-regression-c5e46bb9b9c91eac0912.lock / git HEAD 857b9e5 ⇒ 现场可跑",
-        "node tools/fault-selfhelp.js --symptom=git-object-corrupt ⇒ 下一步 git fsck --connectivity-only --no-dangling，禁止 find .git -delete"
-      ],
-      "recompute": true,
-      "note": "专锁 27/27 绿；两种真事故的下一步命令各自唯一，危险动作逐条点名禁止（find -delete / git gc --prune=now / find .git -delete）。"
-    },
-    "OPV29-16": {
-      "group": "Z3",
-      "commit": "bc7cf4b",
-      "subject": "chore(worldaxis): 台账回填 tests/*.js 595->596（OPV29-16 新增专锁后现场值）",
-      "readings": [],
-      "recompute": false,
-      "note": ""
-    },
-    "OPV29-17": {
-      "group": "Z3",
-      "commit": "fc9c38f",
-      "subject": "chore(worldaxis): 台账回填 —— OPV29-17 已交付（专锁 17 项 / 面数 607→608 / 负控制 FAIL 1/17 与 FAIL 5/17 真读数）",
-      "readings": [],
-      "recompute": false,
-      "note": ""
-    },
-    "OPV29-18": {
-      "group": "Z3",
-      "commit": "52bb590",
-      "subject": "feat(worldaxis): OPV29-28 计划台账自动汇总 + OPV29-18 台账与现场一致 —— 68 项",
-      "readings": [
-        "node tests/opv29-z5-28-v2529.js ⇒ pass (41)",
-        "node tools/plan-ledger.js --check ⇒ pass（已交付 8/36 · 未交付 28）",
-        "node tests/opv29-z3-18-v2529.js ⇒ pass (27)",
-        "node tools/plan-readings.js ⇒ pass（16 条可复算读数与现场全等）",
-        "28 四向 ⇒ FAIL 6/41（区间不剥，A5/A6/B1/B10）· FAIL 3/41（正文也算，B3+A7/A8）·",
-        "18 三向 ⇒ FAIL 1/27（去 recipeHits，只红 B5）· FAIL 2/27（永不判过期，B2/B2b）·"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-19": {
-      "group": "Z4",
-      "commit": "695725d",
-      "subject": "feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项",
-      "readings": [
-        "node tests/opv29-z4-v2529.js ⇒ pass (25)",
-        "node tests/opv29-z4-anchor-v2529.js ⇒ pass (20)",
-        "node tools/flake-audit.js ⇒ 268 处直采 / harness 53 / suspect 215",
-        "node tools/anchor-audit.js ⇒ 5488 字面锚 / 裸短锚 1858 / opv29 专锁 27（基线 27）",
-        "node tools/anchor-audit.js（负控制覆盖）⇒ 缺「负控制」字样 0 / 既无读数也未声明 0 / 已声明欠账 1",
-        "21 三向 ⇒ FAIL 3/25（找不到锚原样返回，A2/A8/A10）· FAIL 1/25（不复核写盘，A11）·",
-        "19 三向 ⇒ FAIL 5/20（A3+A6）· FAIL 4/20（只红 B10）· FAIL 5/20（A5+A10）",
-        "3. `flake-audit` 曾有一条 log 规则（console.log ⇒ harness），于是「写一个打印时间戳"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-20": {
-      "group": "Z4",
-      "commit": "695725d",
-      "subject": "feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项",
-      "readings": [
-        "node tests/opv29-z4-v2529.js ⇒ pass (25)",
-        "node tests/opv29-z4-anchor-v2529.js ⇒ pass (20)",
-        "node tools/flake-audit.js ⇒ 268 处直采 / harness 53 / suspect 215",
-        "node tools/anchor-audit.js ⇒ 5488 字面锚 / 裸短锚 1858 / opv29 专锁 27（基线 27）",
-        "node tools/anchor-audit.js（负控制覆盖）⇒ 缺「负控制」字样 0 / 既无读数也未声明 0 / 已声明欠账 1",
-        "21 三向 ⇒ FAIL 3/25（找不到锚原样返回，A2/A8/A10）· FAIL 1/25（不复核写盘，A11）·",
-        "19 三向 ⇒ FAIL 5/20（A3+A6）· FAIL 4/20（只红 B10）· FAIL 5/20（A5+A10）",
-        "3. `flake-audit` 曾有一条 log 规则（console.log ⇒ harness），于是「写一个打印时间戳"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-21": {
-      "group": "Z4",
-      "commit": "695725d",
-      "subject": "feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项",
-      "readings": [
-        "node tests/opv29-z4-v2529.js ⇒ pass (25)",
-        "node tests/opv29-z4-anchor-v2529.js ⇒ pass (20)",
-        "node tools/flake-audit.js ⇒ 268 处直采 / harness 53 / suspect 215",
-        "node tools/anchor-audit.js ⇒ 5488 字面锚 / 裸短锚 1858 / opv29 专锁 27（基线 27）",
-        "node tools/anchor-audit.js（负控制覆盖）⇒ 缺「负控制」字样 0 / 既无读数也未声明 0 / 已声明欠账 1",
-        "21 三向 ⇒ FAIL 3/25（找不到锚原样返回，A2/A8/A10）· FAIL 1/25（不复核写盘，A11）·",
-        "19 三向 ⇒ FAIL 5/20（A3+A6）· FAIL 4/20（只红 B10）· FAIL 5/20（A5+A10）",
-        "3. `flake-audit` 曾有一条 log 规则（console.log ⇒ harness），于是「写一个打印时间戳"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-22": {
-      "group": "Z4",
-      "commit": "b54d947",
-      "subject": "chore(worldaxis): 台账回填 —— OPV29-22 已交付（专锁 13 项 / 面数 608->609 / 负控制 FAIL 3/13、FAIL 2/13、FAIL 3/13 真读数）",
-      "readings": [
-        "node tools/mock-boundary.js --check => PASS（rc=0）：清缓存 51 / 注入 2（在册）/ 产品源顶替 0",
-        "node tests/opv29-z4-22-v2529.js => pass (13)",
-        "真破坏负控制：台账真删 => FAIL 3/13 · 未登记注入 => FAIL 2/13 · 产品源顶替 => FAIL 3/13"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-23": {
-      "group": "Z4",
-      "commit": "695725d",
-      "subject": "feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项",
-      "readings": [
-        "node tests/opv29-z4-v2529.js ⇒ pass (25)",
-        "node tests/opv29-z4-anchor-v2529.js ⇒ pass (20)",
-        "node tools/flake-audit.js ⇒ 268 处直采 / harness 53 / suspect 215",
-        "node tools/anchor-audit.js ⇒ 5488 字面锚 / 裸短锚 1858 / opv29 专锁 27（基线 27）",
-        "node tools/anchor-audit.js（负控制覆盖）⇒ 缺「负控制」字样 0 / 既无读数也未声明 0 / 已声明欠账 1",
-        "21 三向 ⇒ FAIL 3/25（找不到锚原样返回，A2/A8/A10）· FAIL 1/25（不复核写盘，A11）·",
-        "19 三向 ⇒ FAIL 5/20（A3+A6）· FAIL 4/20（只红 B10）· FAIL 5/20（A5+A10）",
-        "3. `flake-audit` 曾有一条 log 规则（console.log ⇒ harness），于是「写一个打印时间戳"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-24": {
-      "group": "Z4",
-      "commit": "c0dd117",
-      "subject": "chore(worldaxis): 台账回填 tests/*.js 596->597（OPV29-24 新增专锁后现场值）",
-      "readings": [],
-      "recompute": false,
-      "note": ""
-    },
-    "OPV29-25": {
-      "group": "Z5",
-      "commit": "e1daaa5",
-      "subject": "feat(worldaxis): OPV29-25 新引擎脚手架 —— 七处接线一次检查一次写入，少一处就不写盘",
-      "readings": [
-        "node tools/new-engine.js --check --name=x --ns=x  ⇒ OK（7 处锚点齐、唯一命中）",
-        "node tests/opv29-z5-v2529.js                     ⇒ pass（48 项）",
-        "node tests/segment-extract-v2400.js              ⇒ pass（128 项）",
-        "node tools/smoke.js                              ⇒ 通过 14 / 失败 0"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-26": {
-      "group": "Z5",
-      "commit": "ea9542b",
-      "subject": "feat(worldaxis): OPV29-26 登记一致性校验 + OPV29-33 密钥扫描扩面 —— 68 项",
-      "readings": [
-        "node tests/opv29-z5-26-v2529.js ⇒ pass (40)",
-        "node tools/registry-audit.js ⇒ 三向差集 0 / 0 / 0（补登记后）",
-        "node tests/opv29-z6-33-v2529.js ⇒ pass (28)",
-        "26 三向 ⇒ FAIL 3/40 · FAIL 4/40 · FAIL 1/40（对应边 1 / 边 2 / 边 3 各自失效）",
-        "33 两向 ⇒ FAIL 6/28 · FAIL 13/28（占位不豁免 / 漏扫面当零泄漏）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-27": {
-      "group": "Z5",
-      "commit": "3480ad5",
-      "subject": "feat(worldaxis): OPV29-27 版本面跟位 + OPV29-35 发布清单化 —— 23 项，面数 596→598",
-      "readings": [
-        "node tests/opv29-z5-27-v2529.js ⇒ pass (23)",
-        "node tools/release-manifest.js ⇒ 唯一版本 2.524.0 / 载体 9 项 / 不同值 1 种",
-        "node tools/release-manifest.js --check ⇒ rc=0（BUILD_ID 2fd1cb069d4495d5829bdee09d752c1fa94649d3 40 位）",
-        "node tools/release-manifest.js（发布必检）⇒ 4 项全 ✓ / missingRelease 0",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 596→598",
-        "pattern-miss 时填一个假版本（读不到当通过）⇒ FAIL 2/23（B12+B13）",
-        "用众数冒充唯一版本（分叉被吃掉）⇒ FAIL 1/23（只红 B9）",
-        "只核真源不核跟位（副本落后也放行）⇒ FAIL 2/23（B7+B10）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-28": {
-      "group": "Z5",
-      "commit": "52bb590",
-      "subject": "feat(worldaxis): OPV29-28 计划台账自动汇总 + OPV29-18 台账与现场一致 —— 68 项",
-      "readings": [
-        "node tests/opv29-z5-28-v2529.js ⇒ pass (41)",
-        "node tools/plan-ledger.js --check ⇒ pass（已交付 8/36 · 未交付 28）",
-        "node tests/opv29-z3-18-v2529.js ⇒ pass (27)",
-        "node tools/plan-readings.js ⇒ pass（16 条可复算读数与现场全等）",
-        "28 四向 ⇒ FAIL 6/41（区间不剥，A5/A6/B1/B10）· FAIL 3/41（正文也算，B3+A7/A8）·",
-        "18 三向 ⇒ FAIL 1/27（去 recipeHits，只红 B5）· FAIL 2/27（永不判过期，B2/B2b）·"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-29": {
-      "group": "Z5",
-      "commit": "0e3f0f4",
-      "subject": "feat(worldaxis): OPV29-29 依赖零新增守门 —— 扫 1308 个 JS，外部包 0，白名单走既有登记表",
-      "readings": [
-        "node tools/dep-audit.js                 ⇒ 依赖合规: 0 个外部包",
-        "node tools/dep-audit.js --self-test     ⇒ pass（四类分类 + 注释剥离 + 动态可见）",
-        "node tests/opv29-z5-dep-v2529.js        ⇒ pass（22 项）",
-        "node tests/segment-extract-v2400.js     ⇒ pass（128 项）",
-        "node tools/smoke.js                     ⇒ 通过 14 / 失败 0"
-      ],
-      "recompute": true,
-      "note": "JS 文件 1308 · 内置 1938 / 本地 1250 / 已声明可选 11 / 外部 0 / 动态 489 / 拼接噪声 5。"
-    },
-    "OPV29-30": {
-      "group": "Z5",
-      "commit": "5a176aa",
-      "subject": "feat(engines): OPV29-30 破坏性变更迁移 —— 存档结构变更给迁移与回滚",
-      "readings": [
-        "node tests/opv29-z5-30-v2529.js ⇒ pass 33 / 33",
-        "node tests/stitch-nekotools-v2529.js ⇒ pass 53 / 53",
-        "node tests/stitch-redbird-v2529.js ⇒ pass 89 / 89",
-        "node tests/module-registry-gate.js ⇒ pass：文件 567 / 命名空间 578 / 装载期边 460 / 硬边 0 / 调用期 743 / 结构问题 0",
-        "node tests/module-cycle-gate-v2107.js ⇒ pass（65 项）",
-        "node tests/settle-v2830.js ⇒ pass (55)",
-        "node tests/ns-consumer-ledger-v2400.js ⇒ pass（72 项）",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项）· BASE_TEST_FILES 620 → 621",
-        "node tests/test-surface-gate.js ⇒ 全部通过（孤儿 2，均豁免）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-31": {
-      "group": "Z6",
-      "commit": "b62742f",
-      "subject": "feat(worldaxis): OPV29-31/32 收口 —— 存储自愈补上「文件在但空」这一盲区，锁自愈补齐五态与幂等",
-      "readings": [
-        "node tests/opv29-z6-v2529.js                     ⇒ pass（51 项）",
-        "node tools/fault-selfhelp.js --json              ⇒ 可解析，带 lock/git",
-        "node tools/fault-selfhelp.js --symptom=git-object-corrupt ⇒ 退出 0"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-32": {
-      "group": "Z6",
-      "commit": "b62742f",
-      "subject": "feat(worldaxis): OPV29-31/32 收口 —— 存储自愈补上「文件在但空」这一盲区，锁自愈补齐五态与幂等",
-      "readings": [
-        "node tests/opv29-z6-v2529.js                     ⇒ pass（51 项）",
-        "node tools/fault-selfhelp.js --json              ⇒ 可解析，带 lock/git",
-        "node tools/fault-selfhelp.js --symptom=git-object-corrupt ⇒ 退出 0"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-33": {
-      "group": "Z6",
-      "commit": "ea9542b",
-      "subject": "feat(worldaxis): OPV29-26 登记一致性校验 + OPV29-33 密钥扫描扩面 —— 68 项",
-      "readings": [
-        "node tests/opv29-z5-26-v2529.js ⇒ pass (40)",
-        "node tools/registry-audit.js ⇒ 三向差集 0 / 0 / 0（补登记后）",
-        "node tests/opv29-z6-33-v2529.js ⇒ pass (28)",
-        "26 三向 ⇒ FAIL 3/40 · FAIL 4/40 · FAIL 1/40（对应边 1 / 边 2 / 边 3 各自失效）",
-        "33 两向 ⇒ FAIL 6/28 · FAIL 13/28（占位不豁免 / 漏扫面当零泄漏）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-34": {
-      "group": "Z6",
-      "commit": "435d7fa",
-      "subject": "feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项",
-      "readings": [
-        "node tests/opv29-z6-13-v2529.js ⇒ pass (35)",
-        "node tools/phrase-coverage.js ⇒ 在用 1853 = 扫描面 1905 − 死表 52（基线 937）· 有玩家话 837 · 裸码 1016 · 覆盖 45.2%",
-        "node tools/phrase-coverage.js --check ⇒ rc=0（达标线 45.2 = 首测实测值）",
-        "node tests/opv29-z6-34-v2529.js ⇒ pass (24)",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 600→602",
-        "node tests/test-surface-gate.js ⇒ 全部通过（无孤儿）",
-        "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
-        "破坏 engines/controllability.js 让 importCheck 真往存档里填默认值 ⇒ FAIL 2/22",
-        "把 tools/phrase-coverage.js 的 bad 恒置空 ⇒ FAIL 4/35（C2b+C2c+C3b+C3c）",
-        "把达标判断改成恒真（const ok = true）⇒ FAIL 4/35（C1c+C2c+C3c+C4c）",
-        "的 rc≠0 混成同一个码，把「读不到」伪装成「不达标」。改为返回 null ⇒ engine-unreadable。"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-35": {
-      "group": "Z6",
-      "commit": "3480ad5",
-      "subject": "feat(worldaxis): OPV29-27 版本面跟位 + OPV29-35 发布清单化 —— 23 项，面数 596→598",
-      "readings": [
-        "node tests/opv29-z5-27-v2529.js ⇒ pass (23)",
-        "node tools/release-manifest.js ⇒ 唯一版本 2.524.0 / 载体 9 项 / 不同值 1 种",
-        "node tools/release-manifest.js --check ⇒ rc=0（BUILD_ID 2fd1cb069d4495d5829bdee09d752c1fa94649d3 40 位）",
-        "node tools/release-manifest.js（发布必检）⇒ 4 项全 ✓ / missingRelease 0",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 596→598",
-        "pattern-miss 时填一个假版本（读不到当通过）⇒ FAIL 2/23（B12+B13）",
-        "用众数冒充唯一版本（分叉被吃掉）⇒ FAIL 1/23（只红 B9）",
-        "只核真源不核跟位（副本落后也放行）⇒ FAIL 2/23（B7+B10）"
-      ],
-      "recompute": true,
-      "note": ""
-    },
-    "OPV29-36": {
-      "group": "Z6",
-      "commit": "435d7fa",
-      "subject": "feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项",
-      "readings": [
-        "node tests/opv29-z6-13-v2529.js ⇒ pass (35)",
-        "node tools/phrase-coverage.js ⇒ 在用 1853 = 扫描面 1905 − 死表 52（基线 937）· 有玩家话 837 · 裸码 1016 · 覆盖 45.2%",
-        "node tools/phrase-coverage.js --check ⇒ rc=0（达标线 45.2 = 首测实测值）",
-        "node tests/opv29-z6-34-v2529.js ⇒ pass (24)",
-        "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 600→602",
-        "node tests/test-surface-gate.js ⇒ 全部通过（无孤儿）",
-        "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
-        "破坏 engines/controllability.js 让 importCheck 真往存档里填默认值 ⇒ FAIL 2/22",
-        "把 tools/phrase-coverage.js 的 bad 恒置空 ⇒ FAIL 4/35（C2b+C2c+C3b+C3c）",
-        "把达标判断改成恒真（const ok = true）⇒ FAIL 4/35（C1c+C2c+C3c+C4c）",
-        "的 rc≠0 混成同一个码，把「读不到」伪装成「不达标」。改为返回 null ⇒ engine-unreadable。"
-      ],
-      "recompute": true,
-      "note": ""
-    }
+ "tool": "plan-ledger",
+ "schema": 1,
+ "version": "2.603.0",
+ "sourceDigest": "83ed656dd2e8ad9f4c52a31c31dee2a29cc0ce644bcc7040b2835653a8c3313e",
+ "sourceCommits": 37,
+ "total": 36,
+ "delivered": {
+  "OPV29-01": {
+   "group": "Z1",
+   "commit": "8874b46",
+   "subject": "chore(worldaxis): 台账回填 —— 已交付 23/36，计划读数 tests/*.js 602 → 603（+ OPV29-01 锁级分片：按节 4.1% / N=4 1.03x；单节 792.2s→263.6s 省 66.7%）",
+   "readings": [],
+   "recompute": false,
+   "note": ""
   },
-  "pending": [],
-  "violations": {
-    "rangeForm": [
-      {
-        "commit": "07fd549",
-        "form": "OPV29-01～36"
-      }
-    ],
-    "noRecompute": [
-      "OPV29-01",
-      "OPV29-02",
-      "OPV29-04",
-      "OPV29-06",
-      "OPV29-12",
-      "OPV29-16",
-      "OPV29-17",
-      "OPV29-24"
-    ],
-    "unparsedForm": [
-      {
-        "commit": "1d43ac4",
-        "subject": "v2.584.0 R258：全量 19 红逐条跟位（出厂启用面 / OPV29 计数 / 计划读数 / 话术面）"
-      },
-      {
-        "commit": "81d90e4",
-        "subject": "v2.542.11（探针跟位）：desk-coverage 的 ROUTES 锚点随 OPV29 拆段搬迁"
-      }
-    ],
-    "dupClaims": [
-      {
-        "item": "OPV29-22",
-        "commits": [
-          "b54d947",
-          "b9acf44"
-        ]
-      },
-      {
-        "item": "OPV29-17",
-        "commits": [
-          "fc9c38f",
-          "faf5f82"
-        ]
-      },
-      {
-        "item": "OPV29-12",
-        "commits": [
-          "04bd086",
-          "829986f"
-        ]
-      },
-      {
-        "item": "OPV29-01",
-        "commits": [
-          "8874b46",
-          "a51e564"
-        ]
-      },
-      {
-        "item": "OPV29-06",
-        "commits": [
-          "d755c54",
-          "ff62c3b"
-        ]
-      },
-      {
-        "item": "OPV29-24",
-        "commits": [
-          "c0dd117",
-          "0f7700e"
-        ]
-      },
-      {
-        "item": "OPV29-16",
-        "commits": [
-          "bc7cf4b",
-          "30af0ae"
-        ]
-      }
-    ]
+  "OPV29-02": {
+   "group": "Z1",
+   "commit": "5c1a186",
+   "subject": "feat(worldaxis): OPV29-02 增量回归 —— 改了什么只跑哪些锁，不知道就退回全量（20 项）",
+   "readings": [],
+   "recompute": false,
+   "note": ""
   },
-  "counts": {
-    "delivered": 36,
-    "pending": 0,
-    "rangeForm": 1,
-    "noRecompute": 8,
-    "unparsedForm": 2,
-    "dupClaims": 7
+  "OPV29-03": {
+   "group": "Z1",
+   "commit": "f7b2835",
+   "subject": "feat(worldaxis): OPV29-03 隔离器瘦身 —— 35.5M→32.0M，三条铁律不许瘦错（22 项）",
+   "readings": [
+    "node tests/opv29-z1-03-v2529.js ⇒ pass (22)",
+    "node tools/mirror-slim.js ⇒ 复制面 1512 个文件 · 35.5M → 32.0M（省 3.5M / 9.7%）· 排除 6 · 拒绝 2 · 目标 20M 未达成",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 602→603",
+    "node tests/test-surface-gate.js ⇒ 全部通过（无孤儿）",
+    "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
+    "产品面优先改成永不拒绝 ⇒ FAIL 1/22（只红 B1）",
+    "引用检查改成恒当未引用 ⇒ FAIL 3/22（A4+A5+B2）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-04": {
+   "group": "Z1",
+   "commit": "64a73aa",
+   "subject": "feat(engines): OPV29-04 惰性装载 —— 首帧装载期边 462→441，契约面一条不少",
+   "readings": [],
+   "recompute": false,
+   "note": ""
+  },
+  "OPV29-05": {
+   "group": "Z1",
+   "commit": "8d6a19e",
+   "subject": "feat(worldaxis): OPV29-05 首屏预算 —— 「只渲染可见页」第一次有了冷开读数与机械判据（21 项，冷开 42 / 静态 1794 = 2%）",
+   "readings": [
+    "node tools/first-screen-budget.js --check ⇒ PASS（rc=0）：冷开 42 ≤ 预算 1600 且 ≤ 静态半数 897",
+    "node tests/opv29-z1-05-v2529.js ⇒ pass (21)",
+    "真破坏负控制：拿掉 C3 ⇒ FAIL 1/21 · 冷开假装 1794 ⇒ FAIL 5/21"
+   ],
+   "recompute": true,
+   "note": "专锁 21 项全绿 · 面数 610→611 · 裸锚 27 = 基线 · segment-extract pass（128）· test-surface-gate 全通过 · orphan pass · plan-readings pass（16）· readings-v2106 pass（61）· release-manifest rc=0"
+  },
+  "OPV29-06": {
+   "group": "Z1",
+   "commit": "d755c54",
+   "subject": "chore(worldaxis): 台账回填 —— 已交付 22/36，计划读数 tests/*.js 601 → 602（+ OPV29-06 门禁实测：七快 19.5s / 慢门 86.0s / 合计下界 105.5s）",
+   "readings": [],
+   "recompute": false,
+   "note": ""
+  },
+  "OPV29-07": {
+   "group": "Z2",
+   "commit": "3138c4c",
+   "subject": "perf(tool-diag): OPV29-07 tool-diag 拆段（8425 → 6004 行 · 表 2467 行）",
+   "readings": [
+    "wc -l engines/tool-diag.js ⇒ 6004",
+    "wc -l engines/tool-diag-tables.js ⇒ 2467",
+    "wc -l tests/run.js ⇒ 22994",
+    "node tests/opv29-z1-07-v2529.js ⇒ pass (23)",
+    "node tests/module-registry-gate.js ⇒ 文件 546 / 装载期边 438 / 调用期 701 / 结构问题 0",
+    "node tests/module-cycle-gate.js ⇒ rc=0 · 别名 568 / 有引用 566 / problems 0",
+    "node tests/export-contract.js ⇒ rc=0（tests/export_contract.txt 无 diff）",
+    "node tests/inventory.js ⇒ rc=0",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
+    "node tools/plan-readings.js ⇒ pass（16 条）",
+    "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（基线 27）",
+    "node tests/settle-v2830.js ⇒ pass (55)",
+    "node tests/s3-tx7-v2170.js ⇒ 44 / 0",
+    "node tests/s3-tx8-v2171.js ⇒ 49 / 0",
+    "node tests/s3-tx9-v2172.js ⇒ 46 / 0",
+    "node tests/s3-b3-e7-v2188.js ⇒ 347 / 失败 0",
+    "node tests/s3-b3-n8-v2224.js ⇒ 344 / 失败 0"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-08": {
+   "group": "Z2",
+   "commit": "fac79ec",
+   "subject": "perf(action-desk): OPV29-08 路由表出闸（4123 → 1643 行 · 表 2530 行，14 动作与拒收码不变）",
+   "readings": [
+    "node tests/opv29-z1-08-v2529.js ⇒ pass（23 项；A2 表体量 2530 = 2530 / A11 关键路由 8 条逐字点名全在 / C5 拒收码三面差额 0，真吐 1 种码、未声明 0 种）",
+    "node tests/exp10-action-desk-v2232.js ⇒ 36 / 失败 0",
+    "node tests/opv29-z3-18-v2529.js ⇒ pass（27 项）",
+    "node tests/exv22-v2400.js ⇒ pass（138 / 0）",
+    "node tests/ns-consumer-ledger-v2400.js ⇒ pass（70 项）",
+    "node tests/v8-driver-l3-2294.js ⇒ 35 pass / 0 fail",
+    "node tests/v7-driver-ledger-2275.js ⇒ 103 passed, 0 failed",
+    "node tests/module-cycle-gate-v2107.js ⇒ pass（65 项；文件面 569/569/567 · 装载期 440 + 调用期 3961 = 4401 · LOAD_ORDER 568 · ns 612/558/569）",
+    "node tests/module-registry-gate.js ⇒ pass —— 文件 547 / 命名空间 558 / 装载期边 440 / 硬边 0 / 调用期 703 / 结构问题 0",
+    "node tests/settle-v2830.js ⇒ pass (55)",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项；run.js 22966 行 < 23000、测试文件面 618）",
+    "node tools/plan-readings.js ⇒ pass（16 条可复算读数与现场全等）",
+    "node tests/test-surface-gate.js ⇒ 全部通过",
+    "拿掉引擎守卫（`|| function(){return {};}` + 删 throw）⇒ FAIL 2 / 23（A7 / B1 红）",
+    "'recycle.enforce' 改名为 'recycle.enforceX' ⇒ FAIL 1 / 23（A11 红）",
+    "还原 ⇒ pass（23）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-09": {
+   "group": "Z2",
+   "commit": "c5eb2de",
+   "subject": "perf(reject-recovery): OPV29-09 冻结表与判定分离（1388 → 244 行）",
+   "readings": [
+    "wc -l engines/reject-recovery.js ⇒ 244",
+    "wc -l engines/reject-recovery-tables.js ⇒ 1204",
+    "node tools/reject-recovery.js ⇒ rc=0（承诺与现场逐条一致）",
+    "node tests/reject-recovery-lock-v2192.js ⇒ pass (215)",
+    "node tests/module-cycle-gate-v2107.js ⇒ pass（65 项）",
+    "node tests/module-registry-gate.js ⇒ pass（文件 542 / ns 553）",
+    "node tests/settle-v2830.js ⇒ pass (55)",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
+    "node tools/plan-readings.js ⇒ pass（16 条读数与现场全等）",
+    "node tools/release-manifest.js ⇒ rc=0",
+    "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（冻结基线 27）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-10": {
+   "group": "Z2",
+   "commit": "83f3c5c",
+   "subject": "perf(inject-budget): OPV29-10 科目表与算法分离（1425 → 863 行）",
+   "readings": [
+    "wc -l engines/inject-budget.js ⇒ 863",
+    "wc -l engines/inject-budget-tables.js ⇒ 600",
+    "grep -c \"': { rank:\" engines/inject-budget-tables.js ⇒ 163（PRIORITY 键数，搬前后一致）",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
+    "node tests/test-surface-gate.js ⇒ 全部通过 ✓",
+    "node tests/orphan-lock-v2750.js ⇒ pass",
+    "node tools/plan-readings.js ⇒ pass（16 条读数与现场全等）",
+    "node tools/release-manifest.js ⇒ rc=0",
+    "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（冻结基线 27）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-11": {
+   "group": "Z2",
+   "commit": "bc216de",
+   "subject": "perf(engines): OPV29-11 backstage / world-lab / world.js 三件拆段（1140 / 1281 / 1333 行）",
+   "readings": [
+    "wc -l engines/backstage.js ⇒ 1140",
+    "wc -l engines/backstage-protocols.js ⇒ 167",
+    "wc -l engines/world-lab.js ⇒ 1281",
+    "wc -l engines/world-lab-tables.js ⇒ 66",
+    "wc -l engines/world.js ⇒ 1333",
+    "wc -l engines/world-tables.js ⇒ 61",
+    "wc -l tests/run.js ⇒ 22994",
+    "node tests/opv29-z1-11-v2529.js ⇒ pass (36)",
+    "node tests/module-registry-gate.js ⇒ 文件 545 / 装载期边 436 / 调用期 699 / 结构问题 0",
+    "node tests/module-cycle-gate.js ⇒ 别名 567 / 有引用 565 / nsFaceDrift 0 / problems 0",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项）",
+    "node tools/plan-readings.js ⇒ pass（16 条）",
+    "node tools/anchor-audit.js ⇒ 本批 opv29 专锁裸锚 27（基线 27）",
+    "node tests/s3-b3-e9-v2188.js ⇒ 334 / 失败 0",
+    "node tests/transit-v2930.js ⇒ pass（74 项）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-12": {
+   "group": "Z2",
+   "commit": "04bd086",
+   "subject": "chore(worldaxis): 台账回填 —— OPV29-12 已交付（专锁 17 项 / 面数 606→607 / 裸锚 27 = 基线）",
+   "readings": [],
+   "recompute": false,
+   "note": ""
+  },
+  "OPV29-13": {
+   "group": "Z3",
+   "commit": "435d7fa",
+   "subject": "feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项",
+   "readings": [
+    "node tests/opv29-z6-13-v2529.js ⇒ pass (35)",
+    "node tools/phrase-coverage.js ⇒ 在用 1853 = 扫描面 1905 − 死表 52（基线 937）· 有玩家话 837 · 裸码 1016 · 覆盖 45.2%",
+    "node tools/phrase-coverage.js --check ⇒ rc=0（达标线 45.2 = 首测实测值）",
+    "node tests/opv29-z6-34-v2529.js ⇒ pass (24)",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 600→602",
+    "node tests/test-surface-gate.js ⇒ 全部通过（无孤儿）",
+    "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
+    "破坏 engines/controllability.js 让 importCheck 真往存档里填默认值 ⇒ FAIL 2/22",
+    "把 tools/phrase-coverage.js 的 bad 恒置空 ⇒ FAIL 4/35（C2b+C2c+C3b+C3c）",
+    "把达标判断改成恒真（const ok = true）⇒ FAIL 4/35（C1c+C2c+C3c+C4c）",
+    "的 rc≠0 混成同一个码，把「读不到」伪装成「不达标」。改为返回 null ⇒ engine-unreadable。"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-14": {
+   "group": "Z3",
+   "commit": "896ee74",
+   "subject": "feat(worldaxis): OPV29-14 死码归并 —— 52 条死表逐条定性、锚点漂移判据上线当天抓到并修掉 1 条（17 项）",
+   "readings": [
+    "node tools/dead-table-triage.js --check ⇒ PASS（rc=0）：死表 52 / keep 52 · del 0 · wire 0 / 漂移 0",
+    "node tests/opv29-z1-14-v2529.js ⇒ pass (17)",
+    "真破坏负控制：台账少一条 ⇒ FAIL 3/17 · bad-draft 锚点退回漂移前 ⇒ FAIL 4/17"
+   ],
+   "recompute": true,
+   "note": "专锁 17 项全绿 · 面数 609→610 · 裸锚 27 = 基线 · segment-extract pass（128）· test-surface-gate 全通过 · orphan pass · plan-readings pass（16）· readings-v2106 pass（61）· release-manifest rc=0"
+  },
+  "OPV29-15": {
+   "group": "Z3",
+   "commit": "bd051c6",
+   "subject": "chore(worldaxis): 台账回填 —— OPV29-15 现场已交付（漏登，不是未做）",
+   "readings": [
+    "node tests/opv29-z3-v2524.js ⇒ PASS 27/27（Y 段即故障自诊：下一步只给一条命令、禁止清单点名危险动作、活锁不得当可回收）",
+    "node tools/fault-selfhelp.js ⇒ 锁 active @ /tmp/worldaxis-regression-c5e46bb9b9c91eac0912.lock / git HEAD 857b9e5 ⇒ 现场可跑",
+    "node tools/fault-selfhelp.js --symptom=git-object-corrupt ⇒ 下一步 git fsck --connectivity-only --no-dangling，禁止 find .git -delete"
+   ],
+   "recompute": true,
+   "note": "专锁 27/27 绿；两种真事故的下一步命令各自唯一，危险动作逐条点名禁止（find -delete / git gc --prune=now / find .git -delete）。"
+  },
+  "OPV29-16": {
+   "group": "Z3",
+   "commit": "bc7cf4b",
+   "subject": "chore(worldaxis): 台账回填 tests/*.js 595->596（OPV29-16 新增专锁后现场值）",
+   "readings": [],
+   "recompute": false,
+   "note": ""
+  },
+  "OPV29-17": {
+   "group": "Z3",
+   "commit": "fc9c38f",
+   "subject": "chore(worldaxis): 台账回填 —— OPV29-17 已交付（专锁 17 项 / 面数 607→608 / 负控制 FAIL 1/17 与 FAIL 5/17 真读数）",
+   "readings": [],
+   "recompute": false,
+   "note": ""
+  },
+  "OPV29-18": {
+   "group": "Z3",
+   "commit": "52bb590",
+   "subject": "feat(worldaxis): OPV29-28 计划台账自动汇总 + OPV29-18 台账与现场一致 —— 68 项",
+   "readings": [
+    "node tests/opv29-z5-28-v2529.js ⇒ pass (41)",
+    "node tools/plan-ledger.js --check ⇒ pass（已交付 8/36 · 未交付 28）",
+    "node tests/opv29-z3-18-v2529.js ⇒ pass (27)",
+    "node tools/plan-readings.js ⇒ pass（16 条可复算读数与现场全等）",
+    "28 四向 ⇒ FAIL 6/41（区间不剥，A5/A6/B1/B10）· FAIL 3/41（正文也算，B3+A7/A8）·",
+    "18 三向 ⇒ FAIL 1/27（去 recipeHits，只红 B5）· FAIL 2/27（永不判过期，B2/B2b）·"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-19": {
+   "group": "Z4",
+   "commit": "695725d",
+   "subject": "feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项",
+   "readings": [
+    "node tests/opv29-z4-v2529.js ⇒ pass (25)",
+    "node tests/opv29-z4-anchor-v2529.js ⇒ pass (20)",
+    "node tools/flake-audit.js ⇒ 268 处直采 / harness 53 / suspect 215",
+    "node tools/anchor-audit.js ⇒ 5488 字面锚 / 裸短锚 1858 / opv29 专锁 27（基线 27）",
+    "node tools/anchor-audit.js（负控制覆盖）⇒ 缺「负控制」字样 0 / 既无读数也未声明 0 / 已声明欠账 1",
+    "21 三向 ⇒ FAIL 3/25（找不到锚原样返回，A2/A8/A10）· FAIL 1/25（不复核写盘，A11）·",
+    "19 三向 ⇒ FAIL 5/20（A3+A6）· FAIL 4/20（只红 B10）· FAIL 5/20（A5+A10）",
+    "3. `flake-audit` 曾有一条 log 规则（console.log ⇒ harness），于是「写一个打印时间戳"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-20": {
+   "group": "Z4",
+   "commit": "695725d",
+   "subject": "feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项",
+   "readings": [
+    "node tests/opv29-z4-v2529.js ⇒ pass (25)",
+    "node tests/opv29-z4-anchor-v2529.js ⇒ pass (20)",
+    "node tools/flake-audit.js ⇒ 268 处直采 / harness 53 / suspect 215",
+    "node tools/anchor-audit.js ⇒ 5488 字面锚 / 裸短锚 1858 / opv29 专锁 27（基线 27）",
+    "node tools/anchor-audit.js（负控制覆盖）⇒ 缺「负控制」字样 0 / 既无读数也未声明 0 / 已声明欠账 1",
+    "21 三向 ⇒ FAIL 3/25（找不到锚原样返回，A2/A8/A10）· FAIL 1/25（不复核写盘，A11）·",
+    "19 三向 ⇒ FAIL 5/20（A3+A6）· FAIL 4/20（只红 B10）· FAIL 5/20（A5+A10）",
+    "3. `flake-audit` 曾有一条 log 规则（console.log ⇒ harness），于是「写一个打印时间戳"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-21": {
+   "group": "Z4",
+   "commit": "695725d",
+   "subject": "feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项",
+   "readings": [
+    "node tests/opv29-z4-v2529.js ⇒ pass (25)",
+    "node tests/opv29-z4-anchor-v2529.js ⇒ pass (20)",
+    "node tools/flake-audit.js ⇒ 268 处直采 / harness 53 / suspect 215",
+    "node tools/anchor-audit.js ⇒ 5488 字面锚 / 裸短锚 1858 / opv29 专锁 27（基线 27）",
+    "node tools/anchor-audit.js（负控制覆盖）⇒ 缺「负控制」字样 0 / 既无读数也未声明 0 / 已声明欠账 1",
+    "21 三向 ⇒ FAIL 3/25（找不到锚原样返回，A2/A8/A10）· FAIL 1/25（不复核写盘，A11）·",
+    "19 三向 ⇒ FAIL 5/20（A3+A6）· FAIL 4/20（只红 B10）· FAIL 5/20（A5+A10）",
+    "3. `flake-audit` 曾有一条 log 规则（console.log ⇒ harness），于是「写一个打印时间戳"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-22": {
+   "group": "Z4",
+   "commit": "b54d947",
+   "subject": "chore(worldaxis): 台账回填 —— OPV29-22 已交付（专锁 13 项 / 面数 608->609 / 负控制 FAIL 3/13、FAIL 2/13、FAIL 3/13 真读数）",
+   "readings": [
+    "node tools/mock-boundary.js --check => PASS（rc=0）：清缓存 51 / 注入 2（在册）/ 产品源顶替 0",
+    "node tests/opv29-z4-22-v2529.js => pass (13)",
+    "真破坏负控制：台账真删 => FAIL 3/13 · 未登记注入 => FAIL 2/13 · 产品源顶替 => FAIL 3/13"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-23": {
+   "group": "Z4",
+   "commit": "695725d",
+   "subject": "feat(worldaxis): OPV29-21/23 空转检测与抖测试治理 + OPV29-19/20 锚定收窄与负控制覆盖 —— 45 项",
+   "readings": [
+    "node tests/opv29-z4-v2529.js ⇒ pass (25)",
+    "node tests/opv29-z4-anchor-v2529.js ⇒ pass (20)",
+    "node tools/flake-audit.js ⇒ 268 处直采 / harness 53 / suspect 215",
+    "node tools/anchor-audit.js ⇒ 5488 字面锚 / 裸短锚 1858 / opv29 专锁 27（基线 27）",
+    "node tools/anchor-audit.js（负控制覆盖）⇒ 缺「负控制」字样 0 / 既无读数也未声明 0 / 已声明欠账 1",
+    "21 三向 ⇒ FAIL 3/25（找不到锚原样返回，A2/A8/A10）· FAIL 1/25（不复核写盘，A11）·",
+    "19 三向 ⇒ FAIL 5/20（A3+A6）· FAIL 4/20（只红 B10）· FAIL 5/20（A5+A10）",
+    "3. `flake-audit` 曾有一条 log 规则（console.log ⇒ harness），于是「写一个打印时间戳"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-24": {
+   "group": "Z4",
+   "commit": "c0dd117",
+   "subject": "chore(worldaxis): 台账回填 tests/*.js 596->597（OPV29-24 新增专锁后现场值）",
+   "readings": [],
+   "recompute": false,
+   "note": ""
+  },
+  "OPV29-25": {
+   "group": "Z5",
+   "commit": "e1daaa5",
+   "subject": "feat(worldaxis): OPV29-25 新引擎脚手架 —— 七处接线一次检查一次写入，少一处就不写盘",
+   "readings": [
+    "node tools/new-engine.js --check --name=x --ns=x  ⇒ OK（7 处锚点齐、唯一命中）",
+    "node tests/opv29-z5-v2529.js                     ⇒ pass（48 项）",
+    "node tests/segment-extract-v2400.js              ⇒ pass（128 项）",
+    "node tools/smoke.js                              ⇒ 通过 14 / 失败 0"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-26": {
+   "group": "Z5",
+   "commit": "ea9542b",
+   "subject": "feat(worldaxis): OPV29-26 登记一致性校验 + OPV29-33 密钥扫描扩面 —— 68 项",
+   "readings": [
+    "node tests/opv29-z5-26-v2529.js ⇒ pass (40)",
+    "node tools/registry-audit.js ⇒ 三向差集 0 / 0 / 0（补登记后）",
+    "node tests/opv29-z6-33-v2529.js ⇒ pass (28)",
+    "26 三向 ⇒ FAIL 3/40 · FAIL 4/40 · FAIL 1/40（对应边 1 / 边 2 / 边 3 各自失效）",
+    "33 两向 ⇒ FAIL 6/28 · FAIL 13/28（占位不豁免 / 漏扫面当零泄漏）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-27": {
+   "group": "Z5",
+   "commit": "3480ad5",
+   "subject": "feat(worldaxis): OPV29-27 版本面跟位 + OPV29-35 发布清单化 —— 23 项，面数 596→598",
+   "readings": [
+    "node tests/opv29-z5-27-v2529.js ⇒ pass (23)",
+    "node tools/release-manifest.js ⇒ 唯一版本 2.524.0 / 载体 9 项 / 不同值 1 种",
+    "node tools/release-manifest.js --check ⇒ rc=0（BUILD_ID 2fd1cb069d4495d5829bdee09d752c1fa94649d3 40 位）",
+    "node tools/release-manifest.js（发布必检）⇒ 4 项全 ✓ / missingRelease 0",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 596→598",
+    "pattern-miss 时填一个假版本（读不到当通过）⇒ FAIL 2/23（B12+B13）",
+    "用众数冒充唯一版本（分叉被吃掉）⇒ FAIL 1/23（只红 B9）",
+    "只核真源不核跟位（副本落后也放行）⇒ FAIL 2/23（B7+B10）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-28": {
+   "group": "Z5",
+   "commit": "52bb590",
+   "subject": "feat(worldaxis): OPV29-28 计划台账自动汇总 + OPV29-18 台账与现场一致 —— 68 项",
+   "readings": [
+    "node tests/opv29-z5-28-v2529.js ⇒ pass (41)",
+    "node tools/plan-ledger.js --check ⇒ pass（已交付 8/36 · 未交付 28）",
+    "node tests/opv29-z3-18-v2529.js ⇒ pass (27)",
+    "node tools/plan-readings.js ⇒ pass（16 条可复算读数与现场全等）",
+    "28 四向 ⇒ FAIL 6/41（区间不剥，A5/A6/B1/B10）· FAIL 3/41（正文也算，B3+A7/A8）·",
+    "18 三向 ⇒ FAIL 1/27（去 recipeHits，只红 B5）· FAIL 2/27（永不判过期，B2/B2b）·"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-29": {
+   "group": "Z5",
+   "commit": "0e3f0f4",
+   "subject": "feat(worldaxis): OPV29-29 依赖零新增守门 —— 扫 1308 个 JS，外部包 0，白名单走既有登记表",
+   "readings": [
+    "node tools/dep-audit.js                 ⇒ 依赖合规: 0 个外部包",
+    "node tools/dep-audit.js --self-test     ⇒ pass（四类分类 + 注释剥离 + 动态可见）",
+    "node tests/opv29-z5-dep-v2529.js        ⇒ pass（22 项）",
+    "node tests/segment-extract-v2400.js     ⇒ pass（128 项）",
+    "node tools/smoke.js                     ⇒ 通过 14 / 失败 0"
+   ],
+   "recompute": true,
+   "note": "JS 文件 1308 · 内置 1938 / 本地 1250 / 已声明可选 11 / 外部 0 / 动态 489 / 拼接噪声 5。"
+  },
+  "OPV29-30": {
+   "group": "Z5",
+   "commit": "5a176aa",
+   "subject": "feat(engines): OPV29-30 破坏性变更迁移 —— 存档结构变更给迁移与回滚",
+   "readings": [
+    "node tests/opv29-z5-30-v2529.js ⇒ pass 33 / 33",
+    "node tests/stitch-nekotools-v2529.js ⇒ pass 53 / 53",
+    "node tests/stitch-redbird-v2529.js ⇒ pass 89 / 89",
+    "node tests/module-registry-gate.js ⇒ pass：文件 567 / 命名空间 578 / 装载期边 460 / 硬边 0 / 调用期 743 / 结构问题 0",
+    "node tests/module-cycle-gate-v2107.js ⇒ pass（65 项）",
+    "node tests/settle-v2830.js ⇒ pass (55)",
+    "node tests/ns-consumer-ledger-v2400.js ⇒ pass（72 项）",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项）· BASE_TEST_FILES 620 → 621",
+    "node tests/test-surface-gate.js ⇒ 全部通过（孤儿 2，均豁免）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-31": {
+   "group": "Z6",
+   "commit": "b62742f",
+   "subject": "feat(worldaxis): OPV29-31/32 收口 —— 存储自愈补上「文件在但空」这一盲区，锁自愈补齐五态与幂等",
+   "readings": [
+    "node tests/opv29-z6-v2529.js                     ⇒ pass（51 项）",
+    "node tools/fault-selfhelp.js --json              ⇒ 可解析，带 lock/git",
+    "node tools/fault-selfhelp.js --symptom=git-object-corrupt ⇒ 退出 0"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-32": {
+   "group": "Z6",
+   "commit": "b62742f",
+   "subject": "feat(worldaxis): OPV29-31/32 收口 —— 存储自愈补上「文件在但空」这一盲区，锁自愈补齐五态与幂等",
+   "readings": [
+    "node tests/opv29-z6-v2529.js                     ⇒ pass（51 项）",
+    "node tools/fault-selfhelp.js --json              ⇒ 可解析，带 lock/git",
+    "node tools/fault-selfhelp.js --symptom=git-object-corrupt ⇒ 退出 0"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-33": {
+   "group": "Z6",
+   "commit": "ea9542b",
+   "subject": "feat(worldaxis): OPV29-26 登记一致性校验 + OPV29-33 密钥扫描扩面 —— 68 项",
+   "readings": [
+    "node tests/opv29-z5-26-v2529.js ⇒ pass (40)",
+    "node tools/registry-audit.js ⇒ 三向差集 0 / 0 / 0（补登记后）",
+    "node tests/opv29-z6-33-v2529.js ⇒ pass (28)",
+    "26 三向 ⇒ FAIL 3/40 · FAIL 4/40 · FAIL 1/40（对应边 1 / 边 2 / 边 3 各自失效）",
+    "33 两向 ⇒ FAIL 6/28 · FAIL 13/28（占位不豁免 / 漏扫面当零泄漏）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-34": {
+   "group": "Z6",
+   "commit": "435d7fa",
+   "subject": "feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项",
+   "readings": [
+    "node tests/opv29-z6-13-v2529.js ⇒ pass (35)",
+    "node tools/phrase-coverage.js ⇒ 在用 1853 = 扫描面 1905 − 死表 52（基线 937）· 有玩家话 837 · 裸码 1016 · 覆盖 45.2%",
+    "node tools/phrase-coverage.js --check ⇒ rc=0（达标线 45.2 = 首测实测值）",
+    "node tests/opv29-z6-34-v2529.js ⇒ pass (24)",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 600→602",
+    "node tests/test-surface-gate.js ⇒ 全部通过（无孤儿）",
+    "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
+    "破坏 engines/controllability.js 让 importCheck 真往存档里填默认值 ⇒ FAIL 2/22",
+    "把 tools/phrase-coverage.js 的 bad 恒置空 ⇒ FAIL 4/35（C2b+C2c+C3b+C3c）",
+    "把达标判断改成恒真（const ok = true）⇒ FAIL 4/35（C1c+C2c+C3c+C4c）",
+    "的 rc≠0 混成同一个码，把「读不到」伪装成「不达标」。改为返回 null ⇒ engine-unreadable。"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-35": {
+   "group": "Z6",
+   "commit": "3480ad5",
+   "subject": "feat(worldaxis): OPV29-27 版本面跟位 + OPV29-35 发布清单化 —— 23 项，面数 596→598",
+   "readings": [
+    "node tests/opv29-z5-27-v2529.js ⇒ pass (23)",
+    "node tools/release-manifest.js ⇒ 唯一版本 2.524.0 / 载体 9 项 / 不同值 1 种",
+    "node tools/release-manifest.js --check ⇒ rc=0（BUILD_ID 2fd1cb069d4495d5829bdee09d752c1fa94649d3 40 位）",
+    "node tools/release-manifest.js（发布必检）⇒ 4 项全 ✓ / missingRelease 0",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 596→598",
+    "pattern-miss 时填一个假版本（读不到当通过）⇒ FAIL 2/23（B12+B13）",
+    "用众数冒充唯一版本（分叉被吃掉）⇒ FAIL 1/23（只红 B9）",
+    "只核真源不核跟位（副本落后也放行）⇒ FAIL 2/23（B7+B10）"
+   ],
+   "recompute": true,
+   "note": ""
+  },
+  "OPV29-36": {
+   "group": "Z6",
+   "commit": "435d7fa",
+   "subject": "feat(worldaxis): OPV29-13 拒收码话术覆盖率 + OPV29-34/36 导入最小权限与回滚演练 —— 59 项",
+   "readings": [
+    "node tests/opv29-z6-13-v2529.js ⇒ pass (35)",
+    "node tools/phrase-coverage.js ⇒ 在用 1853 = 扫描面 1905 − 死表 52（基线 937）· 有玩家话 837 · 裸码 1016 · 覆盖 45.2%",
+    "node tools/phrase-coverage.js --check ⇒ rc=0（达标线 45.2 = 首测实测值）",
+    "node tests/opv29-z6-34-v2529.js ⇒ pass (24)",
+    "node tests/segment-extract-v2400.js ⇒ pass（128 项），BASE_TEST_FILES 600→602",
+    "node tests/test-surface-gate.js ⇒ 全部通过（无孤儿）",
+    "node tools/anchor-audit.js ⇒ opv29 专锁裸锚 27（冻结基线 27）· 缺读数 0 · 缺负控制 0",
+    "破坏 engines/controllability.js 让 importCheck 真往存档里填默认值 ⇒ FAIL 2/22",
+    "把 tools/phrase-coverage.js 的 bad 恒置空 ⇒ FAIL 4/35（C2b+C2c+C3b+C3c）",
+    "把达标判断改成恒真（const ok = true）⇒ FAIL 4/35（C1c+C2c+C3c+C4c）",
+    "的 rc≠0 混成同一个码，把「读不到」伪装成「不达标」。改为返回 null ⇒ engine-unreadable。"
+   ],
+   "recompute": true,
+   "note": ""
   }
+ },
+ "pending": [],
+ "violations": {
+  "rangeForm": [
+   {
+    "commit": "07fd549",
+    "form": "OPV29-01～36"
+   }
+  ],
+  "noRecompute": [
+   "OPV29-01",
+   "OPV29-02",
+   "OPV29-04",
+   "OPV29-06",
+   "OPV29-12",
+   "OPV29-16",
+   "OPV29-17",
+   "OPV29-24"
+  ],
+  "unparsedForm": [
+   {
+    "commit": "1d43ac4",
+    "subject": "v2.584.0 R258：全量 19 红逐条跟位（出厂启用面 / OPV29 计数 / 计划读数 / 话术面）"
+   },
+   {
+    "commit": "81d90e4",
+    "subject": "v2.542.11（探针跟位）：desk-coverage 的 ROUTES 锚点随 OPV29 拆段搬迁"
+   }
+  ],
+  "dupClaims": [
+   {
+    "item": "OPV29-22",
+    "commits": [
+     "b54d947",
+     "b9acf44"
+    ]
+   },
+   {
+    "item": "OPV29-17",
+    "commits": [
+     "fc9c38f",
+     "faf5f82"
+    ]
+   },
+   {
+    "item": "OPV29-12",
+    "commits": [
+     "04bd086",
+     "829986f"
+    ]
+   },
+   {
+    "item": "OPV29-01",
+    "commits": [
+     "8874b46",
+     "a51e564"
+    ]
+   },
+   {
+    "item": "OPV29-06",
+    "commits": [
+     "d755c54",
+     "ff62c3b"
+    ]
+   },
+   {
+    "item": "OPV29-24",
+    "commits": [
+     "c0dd117",
+     "0f7700e"
+    ]
+   },
+   {
+    "item": "OPV29-16",
+    "commits": [
+     "bc7cf4b",
+     "30af0ae"
+    ]
+   }
+  ]
+ },
+ "counts": {
+  "delivered": 36,
+  "pending": 0,
+  "rangeForm": 1,
+  "noRecompute": 8,
+  "unparsedForm": 2,
+  "dupClaims": 7
+ }
 }
