@@ -435,5 +435,35 @@ ok('东市邀约：打开面板不代答，切聊天不误写，重绘从约定�
   assert.strictEqual(h.api.stat().made, 1); assert.ok(fresh.status.textContent.includes('尚未确认落盘'));
   assert.ok(page.render().includes('第 5 至 7 轮')); assert.ok(!page.render().includes('wa-ferry-promise'));
 });
+ok('此刻页实点：守约、救助后赶到、留在渡口失约和中止', function () {
+  require('./mock');
+  const env = require('./ui-gate-sync').fresh();
+  const W = env.WA, root = env.dom.createElement('div');
+  let round = 4;
+  W.evolution.roundOf = function () { return round; };
+  const page = W.panelNowPage;
+  function draw() { root.innerHTML = page.render(); page.bindFerry(root); }
+  function button(key) { return Array.from(root.querySelectorAll('[data-ferry]')).find(function (e) { return e.dataset.ferry === key; }); }
+  function click(key) { const b = button(key); assert.ok(b, key + ': ' + root.textContent); b.click(); }
+  function row() { return W.appointment.view({ who: '渡口的阿舟' }).appointments[0]; }
+  function start() {
+    round = 4;
+    W.store.transact(function (d) { d.world = {}; d.region = { places: [] }; d.actors = {}; delete d.careChain; }, 'test:ferry');
+    draw(); root.querySelector('#wa-ferry-promise').click();
+    assert.ok(button('market') && button('ferry')); assert.strictEqual(row().result, '未到');
+  }
+  start(); click('market'); assert.strictEqual(W.world.where('你').left, 30);
+  click('arrive'); assert.ok(!button('meet')); assert.strictEqual(row().result, '未到');
+  W.world.advance(30); draw(); click('meet'); assert.strictEqual(row().result, '未到');
+  round = 5; click('meet'); assert.strictEqual(row().result, '到场');
+  start(); click('ferry'); assert.strictEqual(W.world.where('你').left, 10); assert.ok(!button('aid'));
+  W.world.advance(10); draw(); click('aid'); draw(); assert.ok(!button('aid'));
+  assert.strictEqual(W.store.get().careChain.commitments.length, 1); assert.strictEqual(row().result, '未到');
+  click('market'); assert.strictEqual(W.world.where('你').left, 40); W.world.advance(40);
+  round = 7; draw(); click('meet'); assert.strictEqual(row().result, '迟到');
+  start(); click('ferry'); W.world.advance(10); round = 7; draw(); assert.ok(!button('miss'));
+  round = 8; draw(); click('aid'); click('miss'); assert.strictEqual(row().result, '失约');
+  start(); click('market'); W.world.stop('你'); draw(); assert.ok(!button('meet') && !button('ferry')); assert.strictEqual(row().result, '未到');
+});
 console.log('\nappointment-quota-v2562: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) { fails.forEach(function (f) { console.log('  FAIL ' + f); }); process.exit(1); }

@@ -227,17 +227,116 @@
     if (!read.ok && read.reason !== 'actor-missing') throw Error('unreadable');
     return read.ok ? read.appointments.find(function (x) { return x && x.requestKey === ferryKey; }) : null;
   }
+  const crossroads = '渡口岔路';
+  function ferryPosition(row) {
+    const pos = WA.world.where(row.withWhom);
+    if (!pos.ok) throw Error('position');
+    if (!pos.place && pos.reason === 'no-journey') {
+      const active = ((store().region || {}).places || []).find(function (p) { return p && (p.active || p.current); });
+      return Object.assign({}, pos, { origin: (active && (active.name || active.label)) || crossroads });
+    }
+    return pos;
+  }
+  function careId(row) { return 'ferry-care:' + row.id; }
+  function hasCare(row) {
+    return ((store().careChain || {}).commitments || []).some(function (c) {
+      return c && c.id === careId(row) && c.caregiver === row.withWhom && c.placeId === '渡口' && c.ward === '渡口伤员';
+    });
+  }
+  // Only the optional story's starter map may be filled in. Never revise an existing road's duration or capacity.
+  function prepareStarter(from) {
+    const map = store().world || {};
+    if (from !== crossroads || (map.places || []).length || (map.roads || []).length) return;
+    for (const name of [crossroads, '渡口', '东市']) {
+      if (!WA.world.addPlace({ name: name }).ok) throw Error('place');
+    }
+    if (!WA.world.addRoad(from, '渡口', 10).ok || !WA.world.addRoad(from, '东市', 30).ok) throw Error('road');
+  }
+  function journeyControls(row, chat) {
+    if (!WA.world || !WA.travelDesk) return '';
+    function button(key, label) { return '<button type="button" class="wa-btn" data-ferry="' + key + '" data-row="' + esc(row.id) + '" data-chat="' + esc(chat) + '">' + esc(label) + '</button>'; }
+    const pos = ferryPosition(row), from = pos.place || pos.origin, care = hasCare(row);
+    let html = care ? '<p>你已在渡口接手照护伤员。</p>' : '';
+    if (row.result !== '未到') return html;
+    if (pos.inTransit) return html + '<p>' + esc(pos.from + ' → ' + pos.to + '，还剩 ' + pos.left + ' 分钟。') + '</p>' + button('arrive', '查看是否抵达');
+    if (!from) return html + '<p>行程已中止，当前位置未确认。</p>';
+    html += '<p>' + esc(pos.place ? '当前位置：' + from : '本次出发地：' + from) + '</p>';
+    if (pos.arrived && from === row.place) html += button('meet', '向阿舟报到');
+    else if (from !== row.place) html += button('market', '去东市赴约');
+    if (pos.arrived && from === '渡口') {
+      if (!care) html += button('aid', '接手照护渡口伤员');
+      if (WA.evolution.roundOf() > row.to) html += button('miss', '确认错过东市之约');
+    } else if (from !== '渡口' && !care) html += button('ferry', '去渡口帮伤员');
+    return html;
+  }
+  function ferryAction(row, action) {
+    const pos = ferryPosition(row), who = row.withWhom, from = pos.place || pos.origin;
+    if (action === 'arrive' && pos.inTransit) {
+      const r = WA.world.arrive(who);
+      if (!r.ok) return r.reason === 'still-in-transit' ? '还在路上。' : '抵达尚未确认。';
+      return ferryPosition(row).arrived ? '已经抵达。' : '抵达尚未确认。';
+    }
+    if (pos.inTransit) return '还在路上。';
+    if (action === 'market' || action === 'ferry') {
+      const to = action === 'market' ? row.place : '渡口';
+      if (!from || from === to || !WA.world.getSettings().enabled || !WA.travelDesk.getSettings().enabled) return '现在不能从这里出发。';
+      if (pos.reason === 'no-journey') prepareStarter(from, to);
+      const plan = WA.travelDesk.plan({ from: from, to: to });
+      if (!plan.ok) return '未能出发：' + (plan.reason || plan.fault);
+      const ack = WA.travelDesk.commit('depart', { person: who, from: from, to: to, stamp: plan.stamp });
+      const back = ferryPosition(row);
+      return ack.ok && back.inTransit && back.to === to ? '已经出发，尚未抵达。' : '未确认出发：' + (ack.reason || ack.fault || '未读到行程');
+    }
+    if (!pos.arrived) return '尚未确认抵达。';
+    if (action === 'aid' && from === '渡口') {
+      if (!hasCare(row)) WA.careChain.registerCareCommitment({ id: careId(row), caregiver: who, ward: '渡口伤员', placeId: '渡口' });
+      return hasCare(row) ? '你已接手照护，伤情仍需观察。' : '照护记录尚未确认。';
+    }
+    const round = WA.evolution.roundOf();
+    if (!Number.isFinite(round)) return '当前轮次未确认。';
+    const meet = action === 'meet' && from === row.place;
+    if (meet && round < row.from) return '你到早了，第 ' + row.from + ' 轮再向阿舟报到。';
+    if (!meet && !(action === 'miss' && from === '渡口' && round > row.to)) return '约定仍未结算。';
+    const ack = WA.appointment.settle({ id: row.id, showUp: meet, atRound: round });
+    const back = ferryRow();
+    return ack.ok && !ack.deferred && back && back.id === row.id && back.result === ack.result ? '约定结果：' + back.result : '结算尚未确认。';
+  }
   function ferryCard() {
     const chat = currentChat();
     if (!chat || chat === 'wa_default' || !WA.appointment || !WA.appointment.getSettings().enabled) return '';
     const row = ferryRow();
-    if (row) return '<section><h3>东市之约</h3><p>' + esc(ferryWho + '在' + row.place + '等你，第 ' + row.from + ' 至 ' + row.to + ' 轮。约定状态：' + row.result) + '</p></section>';
+    if (row) return '<section><h3>东市之约</h3><p>' + esc(ferryWho + '与你约在' + row.place + '，第 ' + row.from + ' 至 ' + row.to + ' 轮。约定状态：' + row.result) + '</p>' + safe(function () { return journeyControls(row, chat); }, '<p>行程暂时读不到。</p>') + '<p role="status" id="wa-ferry-status"></p></section>';
     return '<details><summary>可选故事 · 赴约还是救人</summary><p>阿舟要带你去东市认人。渡口那边还有个伤员等着帮忙。你要先答应这场约吗？</p>'
       + '<button type="button" class="wa-btn" id="wa-ferry-promise" data-chat="' + esc(chat) + '">答应阿舟，在东市见</button>'
       + '<p role="status" id="wa-ferry-status"></p></details>';
   }
   function bindFerry(root) {
     const btn = root.querySelector('#wa-ferry-promise'), status = root.querySelector('#wa-ferry-status');
+    function refresh(note) {
+      const box = root.querySelector('[data-ferry-scene]');
+      if (!box || !('innerHTML' in box)) return;
+      box.innerHTML = ferryCard();
+      const live = box.querySelector('#wa-ferry-status');
+      if (live) live.textContent = note;
+      bindFerry(root);
+    }
+    const actions = root.querySelectorAll ? root.querySelectorAll('[data-ferry]') : [];
+    Array.from(actions).forEach(function (el) {
+      if (el.dataset.bound || !status) return;
+      el.dataset.bound = '1';
+      el.addEventListener('click', function () {
+        if (el.disabled) return;
+        if (currentChat() !== el.dataset.chat) { status.textContent = '对话已切换，请重新打开此刻页。'; return; }
+        el.disabled = true;
+        try {
+          const row = ferryRow();
+          const note = WA.appointment.getSettings().enabled && row && row.id === el.dataset.row && row.result === '未到'
+            ? ferryAction(row, el.dataset.ferry) : '这项约定已改变。';
+          status.textContent = note;
+          refresh(note);
+        } catch (e) { status.textContent = '行程暂时无法确认。'; el.disabled = false; }
+      });
+    });
     if (!btn || !status || btn.dataset.bound) return;
     btn.dataset.bound = '1';
     btn.addEventListener('click', function () {
@@ -250,6 +349,7 @@
         const row = ack.ok && ferryRow();
         if (!row || row.id !== ack.id) { status.textContent = '未能确认约定，请稍后重试。'; btn.disabled = false; return; }
         status.textContent = '东市见，第 ' + row.from + ' 至 ' + row.to + ' 轮。' + (ack.persisted === true ? '约定已保存。' : '当前对话可见，尚未确认落盘。');
+        refresh(status.textContent);
       } catch (e) { status.textContent = '约定暂时无法确认。'; btn.disabled = false; }
     });
   }
@@ -267,7 +367,7 @@
       if (vd) parts.push(vd);
     }
     const invite = safe(ferryCard, '');
-    if (invite) parts.push(invite);
+    if (invite) parts.push('<div data-ferry-scene>' + invite + '</div>');
     const scene = sceneCard();
     if (scene) parts.push(scene);
     if (started) {
