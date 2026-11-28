@@ -35,7 +35,7 @@ function auditWire(src) {
     const t = ln.replace(/^\s+/, '');
     return t.indexOf('//') === 0 || t.indexOf('*') === 0 || t.indexOf('/*') === 0;
   };
-  const referenced = {}, rendered = {};
+  const referenced = Object.create(null), rendered = Object.create(null);
   L.forEach(function (ln, i) {
     if (isComment(ln)) return;
     let m;
@@ -50,7 +50,7 @@ function auditWire(src) {
     while ((m = reId.exec(ln))) { (rendered[m[1]] = rendered[m[1]] || []).push(i + 1); }
   });
   const refKeys = Object.keys(referenced), renKeys = Object.keys(rendered);
-  const renSet = {}, refSet = {};
+  const renSet = Object.create(null), refSet = Object.create(null);
   renKeys.forEach(function (k) { renSet[k] = 1; });
   refKeys.forEach(function (k) { refSet[k] = 1; });
   // v2.518.0 收口（UI-P1）：幽灵分两档，不合并。
@@ -112,6 +112,8 @@ async function main() {
   }
 
   console.log('\n\u25a0 UI 接线面门禁（引用面 → 渲染面）');
+  const collision = auditWire(`$('#constructor'); $('#toString'); ta('constructor'); ta('__proto__');`);
+  assert(collision.rendered.constructor.length === 1 && collision.rendered.__proto__.length === 1 && collision.ghosts.join() === 'toString', '原型同名字符串可以索引，未渲染的同名引用仍是幽灵');
   const files = uiFiles();
   // v2.42.0：不再写死「三个 ui 文件」。原断言 `files.length === 3` 只能证明「模块数量没变」，
   //   证明不了「发现面与另一道 ui 门禁（ui-gate-sync 的真实装载/点击面）一致」——

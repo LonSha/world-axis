@@ -163,7 +163,9 @@ function wrapperOf(src) {
   let m;
   while ((m = re.exec(text))) {
     const name = m[1];
-    const params = m[2].split(',').map(function (p) { return p.trim(); }).filter(Boolean);
+    // WRAP_CALL reads the first argument only. Destructuring is not a path identifier.
+    const first = /^\s*([A-Za-z_$][\w$]*)\s*(?:,|$)/.exec(m[2]);
+    if (!first) continue;
     // 取函数体（按花括号配平，字符串已被抹成空白面，故不需要再处理引号）
     let i = re.lastIndex - 1, depth = 0, end = -1;
     for (; i < text.length; i += 1) {
@@ -186,18 +188,15 @@ function wrapperOf(src) {
     //     ② 参数被用来**拼路径**：出现 basename(param) 或 join(…param…)，即参数不是被
     //        顺手 log 一下。
     const esc = function (p) { return p.replace(/[$]/g, '\\$&'); };
-    const requiresParam = params.some(function (p) {
-      return p && new RegExp('\\brequire\\s*\\(\\s*' + esc(p) + '\\b').test(body);
-    });
-    const spawnsParam = params.some(function (p) {
-      if (!p) return false;
+    const e = esc(first[1]), endId = '(?![\\w$])';
+    const requiresParam = new RegExp('\\brequire\\s*\\(\\s*' + e + endId).test(body);
+    const spawnsParam = (function () {
       // 同上：容许标识符前缀 —— runScript 体内是别名调用 cp_spawnSync(…)。
       // （不收 exec / execSync：shell 字符串形态不构成「跑某个 .js 文件」。）
       if (!/[\w$]*(spawnSync|spawn|execFileSync|execFile)\s*\(/.test(body)) return false;
-      const e = esc(p);
-      return new RegExp('basename\\s*\\(\\s*' + e + '\\b').test(body)
-        || new RegExp('join\\s*\\([^)]*\\b' + e + '\\b').test(body);
-    });
+      return new RegExp('basename\\s*\\(\\s*' + e + endId).test(body)
+        || new RegExp('join\\s*\\([^)]*(?<![\\w$])' + e + endId).test(body);
+    })();
     if (requiresParam || spawnsParam) names[name] = true;
   }
   return names;

@@ -100,7 +100,7 @@
     if (!text.trim()) { out.reason = 'empty'; return out; }
     // 明确零：连续对话 / 同一时刻。这条**先于**所有拒绝层，因为「没有时间变化」是否定句的
     //   反例形态（「没有时间变化」本身带「没有」），按层顺序会被误判成 not-fact。
-    if (/无时间变化|没有时间变化|时间未变|同一时刻|连续对话|紧接着|0\s*分钟/.test(text)) {
+    if (/无时间变化|没有时间变化|时间未变|同一时刻|连续对话|紧接着|(?:^|[^\d.])0\s*分钟/.test(text)) {
       out.ok = true; out.minutes = 0; out.unit = 'zero'; out.reason = 'explicit-zero';
       return out;
     }

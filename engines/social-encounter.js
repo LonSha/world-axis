@@ -32,8 +32,6 @@
     'overhear_fragment'
   ]);
 
-  // 记录最近的市井偶遇历史: Array<EncounterRecord>
-  const _encounterHistory = [];
   const MAX_HISTORY = 40;
 
   function _cleanStr(s, max) {
@@ -63,9 +61,11 @@
 
     const aidA = _cleanStr(actorA.actorId);
     const aidB = _cleanStr(actorB.actorId);
+    if (!aidA || !aidB) return { ok: false, reason: !aidA ? 'missing-actor-a' : 'missing-actor-b' };
     if (aidA === aidB) return { ok: false, reason: 'cannot-encounter-self' };
 
     envOpts = envOpts || {};
+    if (envOpts.visit && getRecentEncounters(MAX_HISTORY).some(r=>r.visit===envOpts.visit && r.placeId===pid)) return {ok:true,encountered:false,reason:'same-visit'};
     const density = _clamp(Number(envOpts.crowdDensity != null ? envOpts.crowdDensity : 50), 0, 100);
 
     const stA = _clamp(Number(actorA.stealth || 0), 0, 100);
@@ -81,8 +81,8 @@
 
     let interactionType = 'avoidance';
     let narrativeBrief = '';
-    const nameA = actorA.name || aidA;
-    const nameB = actorB.name || aidB;
+    const nameA = _cleanStr(actorA.name) || aidA;
+    const nameB = _cleanStr(actorB.name) || aidB;
 
     if (!aSpottedB && !bSpottedA) {
       // 双方在人潮中彼此错过
@@ -137,17 +137,35 @@
       timestamp: clockNow('social-encounter')
     };
 
-    _encounterHistory.unshift(record);
-    if (_encounterHistory.length > MAX_HISTORY) {
-      _encounterHistory.pop();
-    }
+    if (typeof WA.store?.transact !== 'function') return {ok:false, reason:'store-unavailable'};
+    const tx = WA.store.transact(d => {
+      if (!Array.isArray(d.socialEncounter?.rows)) d.socialEncounter = {rows: []};
+      d.socialEncounter.rows.push(Object.assign({}, record, {nameA, nameB, ...(envOpts.visit ? {visit:envOpts.visit} : {}), round: d.evolution?.round || 0}));
+      if (WA.evict) WA.evict.array(d.socialEncounter.rows, 'socialEncounter.rows');
+      else d.socialEncounter.rows.splice(0, Math.max(0, d.socialEncounter.rows.length - MAX_HISTORY));
+    });
+    if (!tx?.ok) return {ok:false, reason:'store-unavailable'};
 
     return Object.assign({ ok: true }, record);
   }
 
   function getRecentEncounters(limit) {
     const l = Math.min(MAX_HISTORY, Math.max(1, Number(limit || 10)));
-    return _encounterHistory.slice(0, l);
+    const rows = WA.store?.get?.()?.socialEncounter?.rows;
+    return Array.isArray(rows) ? rows.slice(-l).reverse().map(r => Object.assign({}, r)) : [];
+  }
+
+  function buildBlock(options) {
+    const now = WA.store?.get?.()?.evolution?.round || 0;
+    const row = getRecentEncounters(MAX_HISTORY).find(r =>
+      (r.actorA === 'player' || r.actorB === 'player') &&
+      (r.interactionType === 'gaze_lock' || r.interactionType === 'brush_past') &&
+      Number.isInteger(r.round) && r.round <= now && now - r.round <= 1);
+    if (!row) return '';
+    const who = row.actorA === 'player' ? row.actorB : row.actorA;
+    const name = WA.store.get().people?.[who]?.name || (row.actorA === 'player' ? row.nameB : row.nameA) || who;
+    const label = s => _cleanStr(s).replace(/[\r\n\t<>]/g, ' ');
+    return (options?.heading === false ? '' : '【亲历偶遇】') + '你曾在' + label(row.placeId) + '与' + label(name) + (row.interactionType === 'brush_past' ? '擦肩而过。' : '目光相遇。');
   }
 
   /**
@@ -217,7 +235,10 @@
   }
 
   function resetAll() {
-    _encounterHistory.length = 0;
+    if (getRecentEncounters(1).length) {
+      const tx = WA.store.transact(d => { d.socialEncounter.rows = []; });
+      if (!tx?.ok) return {ok:false, reason:'store-unavailable'};
+    }
     return { ok: true, reset: true };
   }
 
@@ -225,12 +246,13 @@
     version: VERSION,
     evaluateEncounter: evaluateEncounter,
     getRecentEncounters: getRecentEncounters,
+    buildBlock: buildBlock,
     checkBlindspot: checkBlindspot,
     resetAll: resetAll,
     diagnose: function () {
       return {
         ok: true,
-        recentEncounterCount: _encounterHistory.length,
+        recentEncounterCount: getRecentEncounters(MAX_HISTORY).length,
         version: VERSION
       };
     }

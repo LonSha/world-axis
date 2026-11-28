@@ -74,6 +74,7 @@ gearWear.registerGear('charlie_runner_main_gear', {
 
 it('1.1 驱动四层总线 dispatchTick 脉冲，全域物理->机能->行为->社会逐级级联', () => {
   const tickRes = cascadeBus.dispatchTick({
+    elapsedMinutes: 30,
     temperature: -5,
     humidity: 95,
     rainfall: 10,

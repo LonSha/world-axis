@@ -64,8 +64,8 @@ function runAll(a) {
   a(rd('engines/tool-diag-tables.js').indexOf("'engines/floor-settle.js': 'floorSettle'") > 0,
     'A3: tool-diag 声明表已登记（漏登记 ⇒ inventory 定义面与诊断面上该模块不存在）');
   a(rd('core/store.js').indexOf('floorSettle: { entries: [] }') > 0, 'A3b: 骨架已物化（不在骨架里 registryParity 会报，冷启动直写会炸）');
-  a(rd('core/interceptor.js').indexOf('WA.floorSettle.beginRound()') > 0, 'A4: 拦截器在轮开始抓基线');
-  a(rd('core/interceptor.js').indexOf('WA.floorSettle.endRound()') > 0, 'A4b: 拦截器在 after 链尾部落账');
+  a(rd('core/interceptor.js').indexOf("WA.floorSettle.beginRound('host-before')") > 0, 'A4: 宿主生成前只抓基线，候选归属按最终回复确定');
+  a(rd('core/interceptor.js').indexOf('WA.floorSettle.endRound(settleRec)') > 0, 'A4b: 拦截器在 after 链尾部落账');
   a(rd('core/interceptor.js').indexOf("WA.floorSettle.onFloorEvent('deleted'") > 0, 'A4c: 删楼事件已接（否则「删最后一楼自闭环」永不触发）');
   const badA = Object.keys(ANCHOR).filter(function (k) { return cnt(rd(ANCHOR[k].rel), ANCHOR[k].txt) !== 1; });
   a(badA.length === 0, 'A5: 破坏锚点在目标文件里各恰 1 次（不合：' + badA.join(',') + '）');
@@ -121,6 +121,16 @@ function runAll(a) {
     'B7: 被后续楼层改过的键**不退**并如实报冲突（reason=' + b7.reason + ' / conflicts=' + b7.conflicts + '）');
   a(W7.store.get().clock.dayIndex === 9, 'B7b: 冲突键原样保留（dayIndex=9，不被"回退"静默覆盖）');
 
+  {
+    const WR = envWith(null).WA, F = WR.floorSettle;
+    F.beginRound('host-before'); const replyFloor = pushMsg('十分钟后。');
+    WR.store.transact(d => { d.clock.dayIndex = 2; d.worldFacts.push({key:'x',value:'y'}); });
+    const rec = WR.settleGuard.begin().rec; WR.settleGuard.commit(rec);
+    a(F.endRound(rec).floor === replyFloor, '实际回复楼拥有结算账');
+    WR.store.transact(d => { d.clock.dayIndex = 3; });
+    a(F.rollback(replyFloor,{replySig:rec.sig}).reason === 'world-conflict' && WR.store.get().worldFacts.length === 1, '玩家改钟后拒绝整个候选回退，不部分撤销事实');
+    a(F.onFloorEvent('deleted',{index:replyFloor,scopeOnly:true}).mode === 'scope' && WR.store.get().clock.dayIndex === 3,'无法证明删的是末楼，不自动退');
+  }
   // B8/B9 关闭与未开局
   const e8 = envWith(null); const W8 = e8.WA;
   W8.floorSettle.setSettings({ enabled: false });

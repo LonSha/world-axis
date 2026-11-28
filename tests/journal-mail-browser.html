@@ -1,0 +1,75 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Journal mail DOM check</title>
+<button id="wa-orb">手札</button><textarea id="send_textarea"></textarea><pre id="result">NOT RUN</pre>
+<script>
+// Open in Chromium with a regular Chrome UA; the extension intentionally skips headless UAs.
+const q = sel => document.querySelector(sel);
+let chat = 'A', inputs = 0;
+const letter = {kind:'letter', id:'lt_0_1', from:'你', to:'阿舟', content:'东市（西门）<b>见</b>', arriveRound:1};
+const hidden = {kind:'letter', id:'secret', from:'甲', to:'你', content:'秘密', verdict:''};
+let s = {chronicle:[hidden]};
+let prefs = {seen:{chron:301,facts:8,fs:0,rum:5}}, events={};
+window.WorldAxis = {on:(k,fn)=>events[k]=fn, settingsBus:{read:()=>prefs,saveOrThrow:(_,p)=>{prefs=JSON.parse(JSON.stringify(p));return {ok:true};}},store:{get:()=>s, chatId:()=>chat}, evolution:{roundOf:()=>1}};
+q('textarea').oninput = () => inputs++;
+</script><script src="../engines/social-encounter.js"></script><script src="../ui/journal.js"></script><script>
+const passed = [];
+function check(cond, name) { if (!cond) throw Error(name); passed.push(name); }
+try {
+  const open = () => WorldAxis.journal.open(true), body = () => q('.wj-body').textContent;
+  const draft = () => q('[data-wj="draft-letter"]');
+  open(); check(body().includes('空白') && !body().includes('秘密'), '未送达的来信不公开');
+  s.chronicle = [letter, hidden, {...hidden, to:'乙', verdict:'arrived'}]; open();
+  check(!body().includes('空白') && body().includes('最近一封口信 · 给阿舟') && body().includes('<b>见</b>'), '口信旧档首页与文本转义');
+  q('.wj-body [data-tab=away]').click();
+  check(body().includes('尚无送达回执') && !body().includes('秘密') && !!draft(), '实点进入远方且不泄露私信');
+  const ta = q('textarea');
+  function run(row, expected) {
+    s.chronicle = [row]; open(); const before = JSON.stringify(s); ta.value = '原稿  '; const n = inputs; draft().click();
+    check(ta.value.startsWith('原稿  \n') && ta.value.includes(expected) && inputs === n+1 && document.activeElement === ta && q('#wa-journal').classList.contains('wj-hidden') && JSON.stringify(s) === before, expected);
+  }
+  run(letter, '东市（西门）<b>见</b>」，现在有消息了吗？');
+  run({...letter, verdict:'arrived'}, '已经送到'); run({...letter, verdict:'lost'}, '没能送到');
+  run({...letter, verdict:'intercepted'}, '被人截下'); run({...letter, verdict:'arrived', replyText:'我等你'}, '阿舟回了「我等你」');
+  run({...hidden, verdict:'arrived'}, '甲捎来的那句「秘密」');
+  s.chronicle = [letter]; open(); s.chronicle = [{...letter, verdict:'arrived', replyText:'新回执'}]; draft().click();
+  check(ta.value.includes('新回执'), '点击时重读实际回执');
+  open(); const before = ta.value, count = inputs; chat = 'B'; draft().click();
+  check(ta.value === before && inputs === count, '切聊同 ID 旧按钮不能写草稿');
+  chat = 'wa_default'; open(); check(!draft(), '默认档无草稿按钮');
+  chat='A'; s={chronicle:[{title:'校庆'}]}; events['chat:changed']();WorldAxis.journal.open(false);
+  check(Array.isArray(prefs.seen.chats),'数字游标迁移');
+  s.chronicle.push(...Array.from({length:12},()=>({...hidden,to:'乙'})));open();
+  check(body().includes('校庆') && !q('.wj-body .wj-new')&&!body().includes('秘密'),'私信不占公开列表或未读数');
+  s.chronicle[0]={title:'招新'};open();check(q('.wj-body .wj-new')?.parentElement.textContent.includes('招新'),'等长轮换点亮正确条目');
+  const a=s;chat='B';s={chronicle:[{title:'另一世界'}]};events['chat:changed']();open();check(!q('.wj-body .wj-new'),'新聊天不继承未读点');
+  chat='A';s=a;events['chat:changed']();open();check(q('.wj-body .wj-new')?.parentElement.textContent.includes('招新'),'切回仍有该聊天自己的未读');
+  const W=WorldAxis, E=W.socialEncounter, now=()=>{open();q('.wj-nav [data-tab=now]').click();return body();};
+  s={evolution:{round:7},world:{journeys:[{person:'你',from:'宿舍',to:'图书馆',status:'arrived',total:5}]}};
+  W.store.transact=fn=>{fn(s);return {ok:true};};
+  let pos={inTransit:true,from:'图书馆',to:'学校',left:9}; W.world={where:()=>pos};
+  check(now().includes('图书馆 → 学校 · 在途 · 还需 9 分钟')&&!body().includes('已到达'),'新行程优先于旧到达回执');
+  pos={...pos,inTransit:false,reason:'halted'};check(now().includes('行程中止，当前位置未知')&&!body().includes('已到达'),'中止不冒充到达');
+  pos={place:'学校'};s.world.journeys.push({person:'你',from:'图书馆',to:'学校',status:'arrived',total:15});check(now().includes('图书馆 → 学校 · 已到达 · 耗时 15 分钟'),'到达切换为耗时回执');
+  s={evolution:{round:7}};pos={};
+  const actor=id=>({actorId:id,name:id}),meet=(a,b)=>E.evaluateEncounter('东市',a,b,{crowdDensity:55});
+  meet(actor('甲'),actor('乙'));meet(actor('player'),{...actor('暗中人'),stealth:99});check(!now().includes('亲历偶遇')&&!body().includes('暗中人'),'第三方及单方察觉不公开');
+  const prior=JSON.stringify(s);meet(actor('player'),actor('阿舟'));const after=JSON.stringify(s);check(now().includes('你曾在东市与阿舟目光相遇。')&&!body().includes('空白')&&JSON.stringify(s)===after,'仅有相遇的手札只读展示');
+  s.evolution.round=9;check(!now().includes('亲历偶遇'),'相遇过期即隐去');s=JSON.parse(prior);check(!now().includes('亲历偶遇'),'恢复相遇前状态无残留');
+  s=JSON.parse(after);chat='C';s={};events['chat:changed']();check(!now().includes('阿舟'),'切聊不串相遇');
+  const ap = {who:'小春',withWhom:'你',place:'学校',from:3,to:6,result:'未到'};
+  const contract = {status:'active',title:'送稿',principal:'校刊',agent:'你',agentKind:'person',currentStage:0,stages:[{label:'交初稿'}]};
+  s={clock:{iso:'2026-04-28T09:00:00+09:00'},actors:{春:{appointments:[ap,{...ap,withWhom:'乙',place:'密室'}]}},commission:{contracts:[contract,{...contract,agentKind:'faction',title:'私约'}]}};
+  pos={arrived:true,place:'宿舍'};W.world.transit=()=>({ok:true,factored:15});
+  const start=Date.parse(s.clock.iso);let close=start+16*60000;
+  W.world.useWindowOf=()=>({ok:true,open:start,close});W.world.canBeAt=(_,__,at)=>({ok:at>=start&&at<close,reason:'closed'});
+  const snap=JSON.stringify(s);check(now().includes('小春 · 学校')&&body().includes('第 3 至 6 轮')&&body().includes('可在开放时段抵达'),'约定同时显示轮次和抵达时窗');
+  check(body().includes('交初稿')&&!body().includes('密室')&&!body().includes('私约')&&JSON.stringify(s)===snap,'仅玩家个人待办，无渲染写盘');
+  close=start+15*60000;check(now().includes('抵达时已经关闭'),'抵达恰逢关门不算赶上');
+  s.clock.iso='2026-04-28';check(now().includes('剧情时间未确定'),'只有日期不猜抵达时间');
+  ap.result='到场';contract.status='settled';check(!now().includes('我的约定')&&!body().includes('我的委托'),'结算后不再待办');
+  chat='D';s={};events['chat:changed']();check(!now().includes('交初稿')&&!body().includes('小春'),'另一聊天不继承待办');
+  s={lostFound:{rows:[{who:'你',what:'胸针',where:'学校',finder:'私吞者',status:'closed-pocketed',claimants:[{proof:'内侧刻字'}]},{who:'甲',what:'秘密物品',status:'found'}]}};
+  check(now().includes('胸针')&&body().includes('暂无招领消息')&&!body().includes('私吞者')&&!body().includes('内侧刻字')&&!body().includes('秘密物品'),'失物不公开第三方、私吞与凭据');
+  s.lostFound.rows[0].status='found';s.lostFound.rows[0].disposition='surrender';check(now().includes('已上交，可认领'),'上交后出现招领消息');
+  q('#result').textContent = 'PASS ' + passed.length + '\n' + passed.join('\n');
+} catch (e) { q('#result').textContent = 'FAIL after ' + passed.length + ': ' + e.message; }
+</script></html>

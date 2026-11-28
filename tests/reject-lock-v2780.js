@@ -231,7 +231,8 @@ function runAll(a) {
     //   就是本文件 runWitness 的「见证零缺失」（missing=0 = 每条都真从产品 API 跑出来了），
     //   letter-post / hearsay-ledger 尚无独立专锁 —— 这是欠账，不是已还账。
     //   本轮之前这 13 条既没登记、也没专锁：面外清单静默落后，正是这条判据该抓的东西。
-    'arrived', 'lost', 'intercepted', 'sent',
+    // sent is now an inline send receipt; only delivery verdicts remain outside this scan.
+    'arrived', 'lost', 'intercepted',
     'versioned', 'traced', 'chain-broken', 'sharded',
     'versioned-no-store', 'sharded-no-store', 'ticked', 'ticked-no-store', 'opened'];
   const outSorted = wOutFace.slice().sort();

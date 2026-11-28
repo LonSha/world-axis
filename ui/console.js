@@ -54,10 +54,10 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ── 页面目录：分组 + 一句话用途（玩家看不到，给作者/调试者的导航）──
-  const GROUPS = [
-    { id: 'core', label: '叙事' }, { id: 'world', label: '世界' },
-    { id: 'workshop', label: '工坊' }, { id: 'meta', label: '系统' }
-  ];
+  function sidebarGroups(p) {
+    return Array.from(p.querySelectorAll('.wa-cat-btn')).filter(b => b.dataset.cat !== 'all')
+      .map(b => ({ id: b.dataset.cat, label: b.textContent.trim() }));
+  }
   const DESC = {
     overview: '世界是否在转、哪里卡住——启用面、体检与开局引导',
     world: '世界钟、地点、道路、背景与远方地图',
@@ -162,7 +162,8 @@
     });
     // 分组标题与顺序：收藏 → 叙事 → 世界 → 工坊 → 系统。用 CSS order，不移动 DOM 节点（原 querySelectorAll 顺序不变）
     box.querySelectorAll('.wc-gh').forEach(x => x.remove());
-    const ord = { pins: 0, core: 1, world: 3, workshop: 5, meta: 7 };
+    const GROUPS = sidebarGroups(p), ord = Object.create(null);
+    GROUPS.forEach((g, i) => { ord[g.id] = 5 + i; });
     const mk = (txt, o) => { const h = doc.createElement('div'); h.className = 'wc-gh'; h.textContent = txt; h.style.order = o; box.appendChild(h); };
     if (pref.pins.length) mk('收藏', 0);
     GROUPS.forEach(g => mk(g.label, ord[g.id] * 10 - 1));
@@ -229,7 +230,7 @@
   function closePal() { if (pal) pal.hidden = true; }
   function pick(x) {
     if (!x) return; closePal();
-    if (x.kind === 'page') { if (x.id !== 'all' && WA.ui.showCat && pageList().find(p => p.id === x.id)) { try { WA.ui.showCat('all'); } catch (e) {} } go(x.id); }
+    if (x.kind === 'page') { go(x.id); }
     else jump(x.id);
   }
   function jump(id) {

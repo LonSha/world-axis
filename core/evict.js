@@ -361,6 +361,8 @@
     'fondness.corrections': { path: 'fondness.rows.*.corrections', cap: 8, why: '好感纠错依据环（每行各自有界；只增不删地约束模型不得再依据同一事件）' },
     // ── v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽（era-cycle.js / survival.js / warrant.js / beast-bond.js）──
     'eraCycle.rows': { path: 'eraCycle.rows', cap: 8, why: '资料片周期环形（四档状态机 + 倒计时，结算转长草强制换事件）' },
+    'lostFound.rows': { path: 'lostFound.rows', cap: 'per-call', why: '报失按当前 maxRows 挤出，设置上界 96' },
+    'socialEncounter.rows': { path: 'socialEncounter.rows', cap: 40, why: '当前聊天最近实际发生的偶遇' },
     'survival.rows': { path: 'survival.rows', cap: 12, why: '生存三轴环形（饱食/精力/负重分段，归零惩罚如实报出）' },
     // v2.141.0（F2）：生理与照护真实层（lifeline.js）。
     //   必须是**环形容器**而不是写入侧硬上界：登记过的病况「后来稳定了/长期带着」

@@ -90,8 +90,8 @@ function runAll(assertFn) {
   // ── C 面：四处登记静态对账 ──
   const inj = readOf('render/inject.js');
   const panel = readOf('ui/panel.js');
-  a(/const SOURCES = \[[\s\S]*?'mixedIndex'\]/.test(inj), 'C1 源表 SOURCES 末项含 mixedIndex');
-  a(/narrowConsumers: true, mixedIndex: false \}/.test(inj), 'C2 def 默认 **false**（常驻文本不给老用户凭空多约束）');
+  a(/const SOURCES = \[[\s\S]*?'mixedIndex'[\s\S]*?\]/.test(inj), 'C1 源表 SOURCES 含 mixedIndex（不要求在末项）');
+  a(/narrowConsumers: true, mixedIndex: false(?:,| \})/.test(inj), 'C2 def 默认 **false**（常驻文本不给老用户凭空多约束）');
   a(/mixedIndex: '常驻索引'/.test(inj), 'C3 SRC_NAME 显示名逐字登记');
   a(/if \(vis\.mixedIndex && WA\.mixedIndex\) \{/.test(inj), 'C4 注入分支受可见性开关守卫（不是只判模块在不在）');
   a(/WA\.mixedIndex\.buildBlock\(\)/.test(inj), 'C5 分支真调 buildBlock（真消费点，不是注释自述）');

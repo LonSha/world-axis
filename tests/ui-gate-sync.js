@@ -187,7 +187,21 @@ async function checkClickable(env, opts) {
       const body = panel.querySelector('.wa-body');
       if (!body) continue;
       const ctrls = body.querySelectorAll('button,input,select,textarea');
-      for (const c of ctrls) {
+      const local = ctrls.filter(c => !c.dataset.nav);
+      const nav = ctrls.filter(c => c.dataset.nav);
+      const seenNav = new Map();
+      for (const original of local.concat(nav)) {
+        let c = original;
+        if (original.dataset.nav) {
+          const target = original.dataset.nav;
+          const index = seenNav.get(target) || 0;
+          seenNav.set(target, index + 1);
+          try {
+            panel.querySelectorAll('.wa-tab').find(t => t.dataset.page === page).click();
+            c = panel.querySelector('.wa-body').querySelectorAll('[data-nav]').filter(el => el.dataset.nav === target)[index];
+            if (!c) throw new Error('导航控件不在来源页');
+          } catch (e) { out.thrown.push(page + ' | ' + target + ' -> ' + e.message); continue; }
+        }
         out.controls++;
         const tag = '<' + String(c.tagName || '').toLowerCase() + (c.id ? ' id=' + c.id : '') + '>';
         // 前提补齐：真浏览器里 `<input type=file>` 的 `.files` **恒**为 FileList（未选文件时

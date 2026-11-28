@@ -348,6 +348,9 @@
     //   export-contract 的 OWNER 不认 ⇒ 契约串里 mapEditor 的调用点被静默跳过。
     //   本表是 inventory 定义面与 tool-diag 诊断面的唯一来源，故「接了线但没登记」也算漏。
     'engines/map-editor.js': 'mapEditor',
+    'engines/map-generator.js': 'mapGenerator',
+    'engines/settings-desk.js': 'settingsDesk',
+    'engines/appearance-lexicon.js': 'appearanceLexicon',
     'engines/body-anatomy.js': 'bodyAnatomy',
     'engines/ladder.js': 'ladder',
     'engines/scene-slice.js': 'sceneSlice',
@@ -605,6 +608,8 @@
     //   「诊断清单覆盖全部磁盘模块」当场报缺这两个文件。
     'ui/pages/now-page.js': 'panelNowPage',
     'ui/pages/people-page.js': 'panelPeoplePage',
+    'ui/pages/faces-page.js': 'panelFacesPage',
+    'ui/pages/map-page.js': 'panelMapPage',
     // v2.542.0：玩家面手札 / 开发者面工作台外壳。登记为**必载**（都在 index.js 的 LOAD_ORDER
     //   里、且必须先于无头环境判定就能定义命名空间）—— 但它们的 ns 是**自执行入口型**：
     //   没有别的模块读 WA.journal / WA.console，缺席的表现是「◈ 还是老面板 / 面板还是老样子」，
@@ -941,12 +946,16 @@
       // v2.518.0 收口（UI-P1）：玩家面两个页模块同款（无头环境不装载 → optionalMissing）。
       'panelNowPage',
       'panelPeoplePage',
+      'panelFacesPage',
+      'panelMapPage',
       // v2.542.0：手札 / 工作台外壳（无头环境不装载 → optionalMissing）。
       'journal',
       'console',
     ];
 
   const UI_BINDINGS = [
+    { page: 'map', ids: ['wa-map-gen','wa-map-scan','wa-map-plan','wa-map-check','wa-map-clear','wa-map-set','wa-map-w','wa-map-h','wa-map-export','wa-map-json'], cond: ['wa-map-last','wa-map-out','wa-map-absent','wa-map-empty','wa-map-noviewport','wa-map-canvas','wa-map-page-absent'] },
+    { page: 'faces', ids: ['wa-faces-apply','wa-faces-kw','wa-faces-limit','wa-faces-only','wa-faces-reload'], cond: ['wa-faces-out','wa-faces-absent','wa-faces-head','wa-faces-dup','wa-faces-list','wa-faces-count','wa-faces-page-absent'] },
     { page: 'tools', ids: ['wa-events-auto', 'wa-par-every', 'wa-par-max', 'wa-par-enabled', 'wa-par-export', 'wa-par-view', 'wa-par-seed', 'wa-par-import', 'wa-par-input', 'wa-an-run', 'wa-an-out', 'wa-snap-dl', 'wa-snap-up', 'wa-snap-file', 'wa-snap-faces', 'wa-snap-subset', 'wa-snap-out', 'wa-imp-pick', 'wa-imp-file', 'wa-imp-text', 'wa-imp-run', 'wa-imp-out', 'wa-diag-run', 'wa-diag-dl', 'wa-diag-out',
       // v2.2.0: 诊断出口收口——三个新增控件同样纳入「渲染 ↔ 绑定」一致性校验
       'wa-stat-reset', 'wa-compat-view', 'wa-wf-reset',
@@ -1029,8 +1038,8 @@
       dynamic: ['wa-setting-search-count',
         'wa-epoch-holomap', 'wa-cataclysm-holomap', 'wa-finance-holomap', 'wa-theology-hub', 'wa-regiment-hub', 'wa-prison-hub', 'wa-bloodline-hub', 'wa-engineering-hub', 'wa-dungeon-hub', 'wa-eco-hub', 'wa-court-hub', 'wa-trauma-fold', 'wa-blackmarket-fold', 'wa-shadow-network-fold', 'wa-naval-fold'] },
     { page: 'world', ids: [], cond: ['wa-current-auto-on','wa-current-auto-turns'] },
-    { page: 'inject', ids: [], cond: ['wa-collector-enabled','wa-collector-tokens','wa-changes-enabled','wa-budget-source-board'] },
-    { page: 'tools', ids: [], cond: ['wa-par-round','wa-par-continue'] },
+    { page: 'inject', ids: [], cond: ['wa-collector-enabled','wa-collector-tokens','wa-changes-enabled','wa-budget-source-board','wa-inj-arc','wa-inj-arc-out','wa-inj-arc-absent'] },
+    { page: 'tools', ids: [], cond: ['wa-par-round','wa-par-continue','wa-rfa-scan','wa-rfa-out','wa-opj-line','wa-fag-line','wa-ens-line','wa-byte-line','wa-cnt-line','wa-bnd-line','wa-pls-line','wa-psc-line','wa-cal-line','wa-tlx-line','wa-rfa-line'] },
     { page: 'events', ids: [], cond: ['wa-sc-capacity','wa-cm-capacity','wa-inv-capacity','wa-af-capacity','wa-ops-capacity'] },
     { page: 'desk', ids: ['wa-wdesk-ns', 'wa-wdesk-load', 'wa-wdesk-stat',
       // v2.294.0（V8 EXV8-2）：写口台页。同 v2.197.0 的理由——新控件必须「渲染 + 绑定 + 守卫登记」
@@ -1096,8 +1105,8 @@
       //   与 style/causal 同一取舍：world/shadow/threads 是产品文件，缺席本身就是断裂。
       //   注：world 组的 `wa-world-ev-title` 既是日程标题输入、又是「查到会人」的取案入口
       //   （空值时回落到最近一次日程），故一个控件同时挂在两个出口上——绑定不重复登记。
-      'wa-world-enabled', 'wa-world-place', 'wa-world-addplace', 'wa-world-reach',
-      'wa-world-rd-a', 'wa-world-rd-b', 'wa-world-rd-min', 'wa-world-addroad',
+      'wa-world-enabled', 'wa-world-place', 'wa-world-parent', 'wa-world-layout', 'wa-world-zone', 'wa-world-addplace', 'wa-world-reach',
+      'wa-world-rd-a', 'wa-world-rd-b', 'wa-world-rd-min', 'wa-world-guide', 'wa-world-addroad',
       'wa-world-ev-title', 'wa-world-ev-place', 'wa-world-addevent', 'wa-world-tick', 'wa-world-who',
       'wa-world-mv-who', 'wa-world-mv-from', 'wa-world-mv-to', 'wa-world-move', 'wa-world-canbe',
       'wa-world-tr-ch', 'wa-world-transit',
@@ -1476,7 +1485,7 @@
     //     Y4 `wa-td-*` 是**账户级口径**（此刻整个世界等我处理的）——
     //     两页读数同源（`pendingCenter.items`），写口都为零，不是两个真源。
     { page: 'todo', ids: ['wa-td-all', 'wa-td-soon', 'wa-td-src', 'wa-td-drill', 'wa-td-flags', 'wa-td-diag', 'wa-td-act'],
-      dynamic: ['wa-td-out'] },
+      cond: ['wa-td-recon','wa-td-recon-absent'], dynamic: ['wa-td-out'] },
     { page: 'tools', ids: ['wa-ws-enabled', 'wa-ws-name', 'wa-ws-tags', 'wa-ws-extract',
       'wa-ws-save', 'wa-ws-list', 'wa-ws-id', 'wa-ws-variance', 'wa-ws-sow', 'wa-ws-get',
       'wa-ws-drop', 'wa-ws-stat', 'wa-ws-out',
@@ -1974,7 +1983,7 @@
     //   · wa-legacy-readings：只在「有『此刻』卡」时才被包进 <details> ⇒ overview / cond；
     //   · wa-now-back-chat / wa-people-legacy：玩家面专有（开发者面不渲染）⇒ overview / people 的 player 层。
     { page: 'events', ids: ['wa-sw-enabled', 'wa-sw-capacity', 'wa-sw-traces', 'wa-sw-view', 'wa-sw-evidence'] },
-    { page: 'overview', ids: [], cond: ['wa-legacy-readings'], player: ['wa-now-back-chat'] },
+    { page: 'overview', ids: [], cond: ['wa-legacy-readings'], player: ['wa-now-back-chat','wa-ferry-promise','wa-ferry-status'] },
     { page: 'people', ids: [], player: ['wa-people-legacy'] },
     // v2.542.6（L1-L4 收口补登）：手札壳（ui/journal.js）两枚静态容器此前从未进表 ——
     //   全量回归的 UI 绑定门禁如实报「未覆盖：wj-out」。

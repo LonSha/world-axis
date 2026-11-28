@@ -108,7 +108,7 @@ function runAll(a) {
   const chk = ME.check();
   a(chk.ok === true, 'G2: 校验能跑');
   a((chk.violations || []).length === 0, 'G3: 生成出来的图零冲突（实 ' + (chk.violations || []).length + ' 处）');
-  const rv = MG.revert(g3);
+  const rv = WA.mapGenerator.revert(g3);
   a(rv.ok === true && rv.removed === g3.appliedCount, 'G4: revert 逆序删回（' + rv.removed + ' / ' + g3.appliedCount + '）');
   const C0 = ME.counts();
   a(C0.terrains + C0.regions + C0.subs + C0.pois + C0.roads === 0, 'G5: revert 之后计数归零（整批可撤）');
@@ -137,7 +137,11 @@ function runAll(a) {
   box.WorldAxis = { mapEditor: ME, mapGenerator: MG, mapViewport: WA.mapViewport, worldbook: WA.worldbook };
   vm.createContext(box);
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'ui/pages/map-page.js'), 'utf8'), box, { filename: 'ui/pages/map-page.js' });
-  const page = box.WorldAxis.panelMapPage;
+  verifyPage(box.WorldAxis, a);
+  return { places: names.length, applied: g1.appliedCount, fingerprint: g1.fingerprint };
+}
+function verifyPage(WA, a) {
+  const page = WA.panelMapPage;
   a(!!page && typeof page.render === 'function' && typeof page.bind === 'function', 'I2: 页面模块暴露 render + bind');
   const html = page.render();
   ['wa-map-gen', 'wa-map-scan', 'wa-map-plan', 'wa-map-check', 'wa-map-clear', 'wa-map-set', 'wa-map-export'].forEach(function (id, i) {
@@ -147,9 +151,8 @@ function runAll(a) {
   a(html.indexOf('世界书缓存') >= 0, 'I5: 页面报素材读数（世界书缓存条数），不是「看起来有图就行」');
   const b = page.bind(null);
   a(b.ok === false && b.reason === 'no-root', 'I6: bind 在没有根节点时如实拒绝（不许静默假装绑好）');
-  const snap = page.snapshot();
+  const snap = WA.panelMapPage.snapshot();
   a(snap.hasEditor === true && snap.hasGenerator === true, 'I7: snapshot 报出两个依赖都在位');
-  return { places: names.length, applied: g1.appliedCount, fingerprint: g1.fingerprint };
 }
 
 module.exports = { runAll: runAll };

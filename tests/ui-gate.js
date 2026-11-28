@@ -226,8 +226,8 @@ async function main() {
     // 负向 A：调用点裸 prompt（真实反映「有人写了裸 prompt()」；不能回退 askText 内部——
     //   它自带 try/catch，ReferenceError 会被吞掉而无法现形）
     const bA = srcP.replace(
-      "const v = askText('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null)",
-      "const v = prompt('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null)");
+      "on('#wa-set-clock', () => { const v = askText(",
+      "on('#wa-set-clock', () => { const v = prompt(");
     assert(bA !== srcP, '（自证）负向注入点 A 命中（世界钟裸 prompt）');
     const envA = fresh({ srcOverride: { 'ui/panel.js': bA } });
     // v2.382.0（历史欠账消红）：G18 的两个负控制取证对象都在 **开发者模式**设置页里。

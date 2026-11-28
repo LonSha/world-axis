@@ -56,8 +56,8 @@ function runAll(assertFn) {
     const WA = load();
     WA.roundDrivers.setSettings({ enabled: true });
     const r = WA.roundDrivers.tickAll();
-    aa(r.ok === true && r.called === WA.roundDrivers.DRIVERS.length,
-      'B2 开启后登记驱动全调（实 called=' + r.called + ' driven=' + r.driven + '）');
+    aa(r.ok === true && r.called === WA.roundDrivers.DRIVERS.length - 1 && WA.roundDrivers.DRIVERS.filter(d => d.needsDays).map(d => d.engine).join() === 'eraCycle',
+      'B2 普通轮只跳过需要日历证据的纪元（实 called=' + r.called + ' driven=' + r.driven + '）');
   }
   {
     const WA = load();

@@ -706,6 +706,13 @@ module.exports = async function toolDiagV092(ctx) {
   // 幂等：重复调用不报错且仍清空
   const unj2 = WA.render.uninject();
   assert(unj2.ok === true && unj2.cleared.length === 3, 'uninject 幂等');
+  const beforeSwitchRev = WA.store.committedRev();
+  const beforeSwitchLedger = JSON.stringify(WA.render.injectionLedger({ all: true }));
+  global.__extPromptLog = [];
+  const switchCleanup = WA.render.uninject('chat-changed');
+  assert(switchCleanup.ok && global.__extPromptLog.length === 3 && global.__extPromptLog.every(r => r.text === ''), '切聊仍清除宿主的三个槽位');
+  assertDeepEq(WA.store.committedRev(), beforeSwitchRev, '切聊清槽不提交旧世界快照');
+  assertDeepEq(JSON.stringify(WA.render.injectionLedger({ all: true })), beforeSwitchLedger, '切聊清槽不写目的聊天台账');
   // P2-② 回归：transact 删除 key 后不复活（深合并陷阱不存在）
   WA.store.transact(d => { d.tempProbe = { a: 1, b: 2 }; });
   assert(WA.store.get().tempProbe.b === 2, '写入嵌套对象');
@@ -1831,7 +1838,7 @@ module.exports = async function toolDiagV092(ctx) {
   assert(WA.emit('t.bus.snap', null) === 1, '下轮才生效（b 已被移除）');
   // 死信号：有发出无监听
   WA.emit('t.bus.nowhere', null);
-  const deadRow = WA.busStats().events.find(r => r.event === 't.bus.nowhere');
+  const deadRow = WA.busStats(Infinity).events.find(r => r.event === 't.bus.nowhere');
   assert(deadRow && deadRow.dead === 1 && deadRow.listeners === 0, '无人监听计入 dead');
   // 泄漏告警：超过阈值只警一次
   const leakFns = [];

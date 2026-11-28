@@ -132,6 +132,29 @@
       }
     } catch (e) { /* 留痕失败不伪造 */ }
   }
+  // An explicit later conversation belongs to the settled appointment. Keep one receipt across reloads.
+  function together(a, b) {
+    if (!WA.world || !WA.world.where || !WA.world.getSettings().enabled) return false;
+    const x = WA.world.where(a), y = WA.world.where(b);
+    return !!(x.ok && y.ok && x.arrived && y.arrived && !x.inTransit && !y.inTransit && x.place && x.place === y.place);
+  }
+  function revisit(spec) {
+    const s = spec || {}, turn = round(), who = clean(s.who, 40), line = clean(s.line, 160);
+    if (!settings().enabled || !who || !line) return { ok: false };
+    const current = view({ who: who });
+    const row = current.ok && current.appointments.find(function (x) { return x && x.id === s.id; });
+    if (!row || !Number.isFinite(row.atRound) || turn <= row.atRound || row.result === '未到') return { ok: false };
+    if (row.reunion) return { ok: true, repeated: true };
+    const pos = WA.world.where(row.withWhom);
+    if (!together(row.withWhom, who)) return { ok: false };
+    const tx = WA.store.transact(function (d) {
+      const x = list(findActor(d, who)).find(function (v) { return v && v.id === row.id; });
+      if (!x || x.result !== row.result || x.atRound !== row.atRound) return false;
+      if (!x.reunion) x.reunion = { round: turn, place: pos.place, line: line, sealOffered: s.sealOffered === true };
+      return true;
+    }, 'appointment:revisit');
+    return { ok: !!(tx && tx.ok), deferred: !!(tx && tx.deferred), persisted: tx && tx.persisted };
+  }
   function view(spec) {
     const s = spec && typeof spec === 'object' ? spec : {};
     const who = clean(s.who || s.id, 40);
@@ -174,7 +197,7 @@
     };
     return cand.slice().sort(byWhen).slice(0, BLOCK_QUOTA);
   }
-  function buildBlock() {
+  function buildBlock(speaker) {
     const cfg = settings();
     if (!cfg.enabled) return '';
     let d = {};
@@ -200,17 +223,28 @@
       dueNow: cand.filter(function (c) { return (Number(c.row.from) || 0) <= r; }).length,
       mode: cand.length === 0 ? 'empty' : (cand.length <= BLOCK_QUOTA ? 'all-fit' : 'nearest-first')
     };
-    if (!picked.length) return '';
+    const recent = [];
+    Object.keys(m).forEach(function (k) {
+      list(m[k]).forEach(function (x) {
+        const v = x && x.reunion;
+        if (!speaker || (speaker !== x?.who && speaker !== x?.withWhom)) return;
+        if (!v || !v.line || !Number.isFinite(v.round) || v.round > r || r - v.round > 3) return;
+        recent.push({ round: v.round, id: x.id, text: x.who + '与' + x.withWhom + '在' + v.place + '重逢时（只限当事人知道）：' + v.line });
+      });
+    });
+    recent.sort(function (a, b) { return b.round - a.round || String(a.id).localeCompare(String(b.id)); });
+    const memory = recent.length ? '[最近的会面]\n' + recent[0].text : '';
+    if (!picked.length) return memory;
     const lines = picked.map(function (c) {
       const x = c.row;
       return '- ' + c.who + '与' + x.withWhom + '约在' + x.place
         + '（第 ' + x.from + '–' + x.to + ' 轮）' + (x.expect ? '：' + x.expect : '');
     });
-    return '[还没结的约]\n' + lines.join('\n');
+    return '[还没结的约]\n' + lines.join('\n') + (memory ? '\n' + memory : '');
   }
   WA.appointment = {
     getSettings: settings, setSettings: function (p) { return WA.settingsBus ? WA.settingsBus.saveOrThrow(__REG, WA.settingsBus.normalize(__REG, Object.assign({}, settings(), p || {}))) : { ok: false, reason: 'no-settings-bus' }; },
-    RESULTS: RESULT.slice(), make: make, settle: settle, view: view, buildBlock: buildBlock,
+    RESULTS: RESULT.slice(), make: make, settle: settle, together: together, revisit: revisit, view: view, buildBlock: buildBlock,
     // v2.562.0：`stat` 的浅拷贝必须单独再拷 `block`（对象）—— 否则外部改返回值会污染下一次读数。
     stat: function () { return Object.assign({}, stat,
       { block: stat.block ? Object.assign({}, stat.block) : null }); }

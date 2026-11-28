@@ -1,0 +1,8 @@
+[
+  "wa-pulse-res", "wa-now-back-chat", "wa-ferry-status", "wa-ferry-promise",
+  "wa-faces-out", "wa-faces-absent", "wa-faces-head", "wa-faces-dup", "wa-faces-kw", "wa-faces-only",
+  "wa-faces-limit", "wa-faces-apply", "wa-faces-reload", "wa-faces-list", "wa-faces-count",
+  "wa-map-gen", "wa-map-scan", "wa-map-plan", "wa-map-check", "wa-map-clear", "wa-map-export",
+  "wa-map-w", "wa-map-h", "wa-map-set", "wa-map-last", "wa-map-out", "wa-map-absent",
+  "wa-map-empty", "wa-map-noviewport", "wa-map-canvas", "wa-map-json"
+]

@@ -67,7 +67,7 @@ const A_HIDE = "    if (!__devMode) { const cb = panelEl.querySelector('.wa-cat-
 // ⑦ 关掉时弹回 overview
 const A_BACK = '      if (!__devMode && PLAYER_PAGES.indexOf(currentPage) < 0) {';
 // ⑧ 打开时分类切回 all（否则「开了还是只有 6 页」）
-const A_CATALL = "        currentCat = 'all';";
+const A_CATALL = "      if (__devMode) currentCat = PAGE_CAT[currentPage] || 'core';";
 // ⑨ WA.ui 导出口（读口）
 const A_EXPORT = '    devMode() { return __devMode === true; },';
 // ⑩ 页签文案（纯展示层，id 不动）
@@ -90,7 +90,7 @@ const A_SETBIND = '      if (devCb) devCb.onchange = function () {';
 const A_GUARD = "'wa-set-devmode',";
 // ── PAGES 冻结清单（业务页签；分类条不属于页签）──
 // boot / drive 是真实开局与运行工具页，保留在 DOM 并仅由开发者模式显示。
-const PAGES_FROZEN = ["overview","world","people","memory","enemies","parallel","inject","sediment","offline","net","health","beat","chapter","todo","port","find","graph","travel","supply","evidence","branchdiff","storyloop","retrieval","actiondesk","events","director","settings","connect","desk","boot","drive","assistant","tools","logs"];
+const PAGES_FROZEN = ["overview","world","people","memory","enemies","parallel","inject","sediment","offline","net","health","beat","chapter","todo","port","find","graph","map","travel","supply","evidence","branchdiff","storyloop","retrieval","actiondesk","events","director","settings","faces","connect","desk","boot","drive","assistant","tools","logs"];
 // ── 环境：真实 UI 渲染路径 ───────────────────────────────────────────
 let gate = null;
 function envWith(ov) {
@@ -189,7 +189,7 @@ function runB(a) {
     'B1b: 可见页即动线六页（实 ' + JSON.stringify(vis) + '）—— 填 API → 看世界 → 看人物 → 看事件 → 设设置');
   // B2 全量页签仍在 DOM（可见性层过滤，不是删节点）
   const all = allPages(env);
-  a(all.length === 34, 'B2: 34 个业务页签全部仍在 DOM（可见性过滤而非删除，实 ' + all.length + '）');
+  a(all.length === PAGES_FROZEN.length, 'B2: 36 个业务页签全部仍在 DOM（可见性过滤而非删除，实 ' + all.length + '）');
   // B3 分类条对玩家隐藏
   a(catbarVisible(env) === false, 'B3: 分类条对玩家隐藏（核心/世界/工坊/系统是另一套要学的黑话）');
   // B4 打开开发者模式：32 页可见、分类条显示
@@ -197,7 +197,15 @@ function runB(a) {
   const WA2 = env2.WA;
   WA2.ui.setDevMode(true);
   const vis2 = visiblePages(env2);
-  a(vis2.length === 34, 'B4: 开发者模式后 34 个业务页全部可见（实 ' + vis2.length + '）—— currentCat 旁路 + 切回 all，不是「开了还是 6 页」');
+  a(vis2.join(',') === 'overview,todo,actiondesk', 'B4: 开发者模式先显示当前行动');
+  const grouped = [];
+  for (const cat of ['core','world','story','history','meta','workshop']) {
+    a(WA2.ui.showCat(cat).ok, '任务组可达：' + cat);
+    grouped.push(...visiblePages(env2));
+  }
+  a(grouped.length === all.length && new Set(grouped).size === all.length, '六个非空任务组覆盖所有页且无重复');
+  WA2.ui.showCat('all');
+  a(visiblePages(env2).join() === all.join(), '全部页按注册顺序可达');
   a(catbarVisible(env2) === true, 'B4b: 开发者模式分类条显示（恢复完整导航）');
   a(WA2.ui.devMode() === true, 'B4c: devMode() 读口与界面一致');
   // B5 关掉：停在玩家页留在原页；停在机制页弹回 overview
@@ -255,7 +263,7 @@ function runC(a) {
   try { global.localStorage.setItem(KEY, JSON.stringify({ page: 'overview', devMode: true })); } catch (e) {}
   const env3 = envWith(null);
   a(env3.WA.ui.devMode() === true, 'C3: 落盘 devMode:true 重开面板后仍是开发者模式（关面板再开不丢）');
-  a(visiblePages(env3).length === 34, 'C3b: 持久化的开发者模式装载即 34 个业务页可见（不闪 6 页）');
+  a(visiblePages(env3).join(',') === 'overview,todo,actiondesk', 'C3b: 重载后显示概览所属任务组');
   // 收尾：清掉本节写的状态键（与 ui-components-v2109 同口径：storage 属 soft 面，本节自己收）
   try { global.localStorage.removeItem(KEY); } catch (e) {}
 }
@@ -322,7 +330,7 @@ function runNegative(a) {
       '        const __vis = true && __catOK;', 'N1');
     const env = envWith({ [PANEL]: P1 });
     const n = visiblePages(env).length;
-    a(n === 34, 'N1: 摘掉模式过滤后 34 个业务页全可见（实 ' + n + '）⇒ B1 的「恰好 6 页」不是恒真');
+    a(n === PAGES_FROZEN.length, 'N1: 摘掉模式过滤后 36 个业务页全可见（实 ' + n + '）⇒ B1 的「恰好 6 页」不是恒真');
   }
   // N2 摘掉分类旁路 ⇒ **玩家模式**判据现形（旁路摘掉后玩家只剩 core 类 2 页）
   //   注：不能在破坏副本上走 setDevMode(true)——syncTabs 开头「currentCat = pageCat」会顺着
@@ -339,20 +347,12 @@ function runNegative(a) {
     a(vis.length === 0,
       'N2: 摘掉分类旁路后玩家模式只亮 core 类（world/people/settings/connect 被藏死，非 core 玩家页实 ' + vis.length + ' 个）⇒ B1b 不是恒真');
   }
-  // N3 摘掉「打开时切回 all」⇒ 装载即开（C3b 路径）判据现形：currentCat 停 core 只亮该类 + 玩家页
-  //   注：N3 的破坏位在 __setDevMode 内的 currentCat='all'，装载期修复（if (__devMode) currentCat='all'）
-  //   是另一处。装载即开绕过 __setDevMode，所以摘掉 __setDevMode 里的切换后走装载路径必现缺陷——
-  //   但装载期修复在位时该路径恰好也覆盖它，故 N3 改为同时摘两处（这是同缺陷两修复位的组合破坏）。
+  // N3 强制恢复旧的全量首屏：C3b 必须能发现回归。
   {
-    const P3a = brk(P0, A_CATALL,
-      '        currentCat = currentCat; // 摘掉切换', 'N3');
-    const A_LOADALL = "  if (__devMode) currentCat = 'all';";
-    const P3 = brk(P3a, A_LOADALL,
-      '  if (__devMode) currentCat = currentCat; // 摘掉装载切回', 'N3b');
+    const P3 = brk(P0, "let currentPage = __pageOr('overview');\n  if (__devMode) currentCat = PAGE_CAT[currentPage] || 'core';", "let currentPage = __pageOr('overview');\n  if (__devMode) currentCat = 'all';", 'N3');
     try { global.localStorage.setItem(KEY, JSON.stringify({ page: 'overview', devMode: true })); } catch (e) {}
     const env = envWith({ [PANEL]: P3 });
-    const n = visiblePages(env).length;
-    a(n < 34, 'N3: 摘掉两处「切回 all」后装载即开只亮 core 类 + 玩家旁路页（实 ' + n + ' 页 < 34）⇒ B4/C3b 不是恒真');
+    a(visiblePages(env).length === PAGES_FROZEN.length, 'N3: 全量首屏不满足任务组首屏契约');
     try { global.localStorage.removeItem(KEY); } catch (e) {}
   }
   // N4 摘掉 buildPanel 藏分类条 ⇒ B3 判据现形（分类条对玩家可见）

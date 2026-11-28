@@ -166,6 +166,15 @@ function runNegative(a) {
   });
 
   // ════ D 非空转 ════
+  // The path literal in a wrapper call occupies slot zero; only that binding is evidence.
+  const probeFile = 'tests/wrapper-probe.js';
+  const hasEdge = src => gate.wrappedOf(src + "\nprobe('./wrapper-probe.js');", [probeFile]).includes(probeFile);
+  assert.ok(!hasEdge('function probe(scanResult, [rel, ref, expected]) {}'), 'D9 解构参数不使扫描中断');
+  assert.ok(!hasEdge('function probe([rel, ref]) { require(rel); }'), 'D9 从首参数拆出的值不是路径字面量');
+  assert.ok(!hasEdge('function probe(note, spec) { require(spec); }'), 'D9 执行第二参数不构成第一参数的边');
+  assert.ok(hasEdge('function probe(spec, [rel, ref]) { require(spec); }'), 'D9 第一参数真被执行，后续解构不遮蔽它');
+  assert.ok(hasEdge('function probe(spec$) { cp_spawnSync(node, [path.join(dir, spec$)]); }'), 'D9 子进程路径接受带 $ 的标识符');
+  assert.ok(!hasEdge('function probe(spec) { require(spec$); }'), 'D9 同名前缀不构成执行证据');
   //   D1 前置：“去注释副本”与原件不同（下一行不是恒真）
   const gateSrc = fs.readFileSync(path.join(BASE, GATE_REL), 'utf8');
   const runSrc = fs.readFileSync(path.join(BASE, 'tests/run.js'), 'utf8');

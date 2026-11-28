@@ -474,6 +474,26 @@ function judge(a) {
     }
   });
   // ── C 不变式段（结构断言，与 B 段互为交叉验证）──
+  // 同一条路线：试演可通、试演被封、显式应用。冻结为字符串，防止浅拷贝掩盖共享计数。
+  const route = mkW(null);
+  route.weather.setSettings({ enabled: true });
+  route.weather.setWeather('乙地', 'clear');
+  const observed = () => JSON.stringify([worldSig(route), route.act.stat(), route.world.stat()]);
+  const beforeOpen = observed();
+  const open = route.rehearsal.preview([RER], { now: 1000 });
+  a(open.ok && beforeOpen === observed(), 'v2118/b7: 通行预览成功，真实世界和行动/通行计数不动');
+  route.weather.setWeather('乙地', 'storm');
+  const beforeBlock = observed();
+  const blocked = route.rehearsal.run([RER], { now: 1000 });
+  const denial = blocked.trace && blocked.trace[0];
+  a(denial && !denial.ok && denial.reason === 'weather-blocked' && beforeBlock === observed(),
+    'v2118/b7: 风暴试演返回实际封路原因，不写真实状态或计数：' + JSON.stringify(denial));
+  route.weather.setWeather('乙地', 'clear');
+  const ready = route.rehearsal.preview([RER], { now: 1000 });
+  const trips = route.world.stat().transits.person;
+  const applied = ready.ok && route.rehearsal.apply(ready.previewId, { steps: [RER], now: 1000 });
+  a(applied && applied.applied === 1 && route.world.stat().transits.person === trips + 1 &&
+    route.store.get().world.journeys.length === 1, 'v2118/b7: 显式应用才登记一趟真实行程和一次通行');
   const W = mkW(null);
   const r0 = W.rehearsal.run([WAIT], { now: 1000 });
   a(r0.ok === true && r0.dryRun === true, 'v2118/b7: [C] 试演结果自标 dryRun（读数不冒充真跑）');

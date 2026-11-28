@@ -93,20 +93,44 @@
   function state() { try { return (WA.store && WA.store.get && WA.store.get()) || {}; } catch (e) { return {}; } }
   function devMode() { try { return !!(WA.ui && WA.ui.devMode && WA.ui.devMode()); } catch (e) { return false; } }
 
-  // 世界刻度：用各列表长度作「读到哪」的游标（只增不减的环形列表在截断后会偏小，故取 max 保守）
-  function marks(s) {
+  const playerMail = c => c && c.kind === 'letter' && (c.from === '你' || (c.to === '你' && c.verdict === 'arrived'));
+  function visible(s) {
+    const rows = arr(s.chronicle);
     return {
-      chron: arr(s.chronicle).length, facts: arr(s.worldFacts).length,
-      fs: arr(obj(s.memory).foreshadows).length, rum: arr(s.rumors).length + arr(obj(s.evolution).winds).length
+      chron: rows.filter(c => c && c.kind !== 'letter').slice(-12).reverse(),
+      mail: rows.filter(playerMail).slice(-12).reverse(),
+      facts: arr(s.worldFacts).filter(Boolean).slice(-5).reverse(),
+      rum: arr(s.rumors).concat(arr(obj(s.evolution).winds)).filter(w => txt(w, ['text','content','summary','title'])).slice(-6).reverse(),
+      fs: arr(obj(s.memory).foreshadows).filter(f => f && f.status !== 'dropped' && f.status !== 'recycled').slice().reverse()
     };
   }
-  function unread(s) {
-    const m = marks(s), p = pref.seen;
-    if (!p) return { chron: 0, facts: 0, fs: 0, rum: 0, any: 0 };
-    const u = { chron: Math.max(0, m.chron - p.chron), facts: Math.max(0, m.facts - p.facts), fs: Math.max(0, m.fs - p.fs), rum: Math.max(0, m.rum - p.rum) };
-    u.any = u.chron + u.facts + u.fs + u.rum; return u;
+  function token(k, x) {
+    const fields = k === 'mail' ? [x.id,x.from,x.to,x.content,x.verdict,x.verdict === 'arrived' && x.replyText] : k === 'chron' ? [x.id,x.kind,x.title,x.summary] : k === 'facts' ? [x.id,x.key,x.value] : k === 'fs' ? [x.id,x.status,x.content] : [x.id,txt(x,['text','content','summary','title'])];
+    // Keep text out of global reading preferences, including player correspondence.
+    const str = JSON.stringify(fields); let h = 2166136261;
+    for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+    return (h >>> 0).toString(36);
   }
-  let openUnread = { chron: 0, facts: 0, fs: 0, rum: 0, any: 0 };   // 本次打开时冻结，阅读中不跳动
+  const chatKey = () => WA.store?.chatId?.();
+  const cursors = () => arr(pref.seen?.chats);
+  function remember(s) {
+    const chat = chatKey(); if (!chat || chat === 'wa_default') return;
+    const rows = visible(s), keys = {};
+    for (const k of Object.keys(rows)) keys[k] = rows[k].map(x => token(k,x));
+    pref.seen = { chats: cursors().filter(c => c.chat !== chat).slice(-15).concat({chat,keys}) }; save();
+  }
+  function baseline() { if (!cursors().some(c => c.chat === chatKey())) remember(state()); }
+  function unread(s) {
+    const prev = cursors().find(c => c.chat === chatKey())?.keys, rows = visible(s);
+    const u = { any: 0, fresh: {} };
+    for (const k of Object.keys(rows)) {
+      const old = new Map(); for (const id of arr(prev?.[k])) old.set(id,(old.get(id)||0)+1);
+      const flags = rows[k].map(x => { const id=token(k,x), n=old.get(id)||0; if(n) old.set(id,n-1); return !!prev && !n; });
+      u.fresh[k] = flags; u[k] = flags.filter(Boolean).length; u.any += u[k];
+    }
+    return u;
+  }
+  let openUnread = unread({});
 
   // ── 视觉零件 ──
   const IC = {
@@ -123,31 +147,81 @@
   const NEW = '<i class="wj-new">新</i>';
   const sec = (title, inner, extra) => '<section class="wj-sec"><h3>' + esc(title) + (extra || '') + '</h3>' + inner + '</section>';
   const cite = t => t ? '<button class="wj-cite" data-cite="' + esc(t) + '" aria-label="带进对话" title="带进对话">' + icon('quill', 14) + '</button>' : '';
-  const isNew = (i, n) => i < n;   // 列表已倒序：前 n 条即新
+  const isNew = (k, i) => !!openUnread.fresh[k]?.[i];
 
   // ── 五页 ──
+  function recentMail(s) {
+    const rows = arr(s.chronicle);
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const c = rows[i];
+      if (!playerMail(c)) continue;
+      const who = c.from === '你' ? '给' + c.to : '来自' + c.from;
+      return '<button type="button" class="wj-digest" data-tab="away"><b>最近一封口信 · ' + esc(who) + '</b><span>'
+        + esc(String(c.content || '').slice(0, 48)) + '</span><em>翻看口信 →</em></button>';
+    }
+    return '';
+  }
+  function appointmentTravel(s, pos, destination) {
+    if (pos?.inTransit || !pos?.arrived || !pos.place) return '当前位置未确定，暂不能估算';
+    const iso = s.clock?.iso;
+    const at = typeof iso === 'string' && /T.*(?:Z|[+-]\d\d:\d\d)$/i.test(iso) ? Date.parse(iso) : NaN;
+    const route = pos.place === destination ? {ok:true,factored:0} : WA.world?.transit?.('person',pos.place,destination);
+    if (!route?.ok || !Number.isFinite(route.factored)) return '暂无可用路线';
+    const travel = route.factored ? '路上约 ' + route.factored + ' 分钟' : '已在约定地点';
+    const win = WA.world?.useWindowOf?.(destination,'meeting');
+    if (!win?.ok || !win.close) return travel + ' · 未登记开放时窗';
+    if (!Number.isFinite(at)) return travel + ' · 剧情时间未确定';
+    const arrival = at + route.factored * 60000;
+    const fit = WA.world?.canBeAt?.('你',destination,arrival,0,'meeting');
+    if (fit?.ok) return travel + ' · 可在开放时段抵达';
+    if (fit?.reason === 'closed') return travel + (arrival < win.open ? ' · 抵达时尚未开放' : ' · 抵达时已经关闭');
+    return travel + (fit?.reason === 'scheduled-elsewhere' ? ' · 抵达时另有日程' : ' · 暂不能确认');
+  }
+  function playerAgenda(s, pos) {
+    const chat = chatKey();
+    if (!chat || chat === 'wa_default') return '';
+    const row = (title, detail) => '<div class="wj-row"><div class="wj-row-main"><b>' + esc(title) + '</b><span>' + esc(detail) + '</span></div></div>';
+    const appointments = Object.values(obj(s.actors)).flatMap(a => arr(a?.appointments)).filter(x => x?.result === '未到' && x.place && (x.who === '你' || x.withWhom === '你')).sort((a,b) => a.from-b.from);
+    const contracts = arr(s.commission?.contracts).filter(c => c?.status === 'active' && ((c.agent === '你' && c.agentKind === 'person') || (c.principal === '你' && c.principalKind === 'person')));
+    const losses = arr(s.lostFound?.rows).filter(r => r?.who === '你');
+    const lossList = losses.length ? sec('我的失物', losses.map(r => row(r.what, (r.where ? r.where + ' · ' : '') + (r.status === 'claimed' ? '已领回' : r.status === 'found' && r.disposition === 'surrender' ? '已上交，可认领' : '暂无招领消息'))).join('')) : '';
+    return lossList + (appointments.length ? sec('我的约定',appointments.map(x => row((x.who === '你' ? x.withWhom : x.who) + ' · ' + x.place, '第 ' + x.from + ' 至 ' + x.to + ' 轮 · ' + appointmentTravel(s,pos,x.place))).join('')) : '')
+      + (contracts.length ? sec('我的委托',contracts.map(c => row(c.title, (c.agent === '你' && c.agentKind === 'person' ? '委托方：' + c.principal : '受托方：' + c.agent) + ' · ' + (arr(c.stages)[c.currentStage]?.label || '进行中'))).join('')) : '');
+  }
   function pageNow(s) {
     const clock = obj(s.clock), bg = txt(s.background, ['text']);
-    const facts = arr(s.worldFacts).slice(-5).reverse();
-    const currents = arr(s.currents).filter(c => c && c.visibility !== 'hidden').slice(0, 3);
+    const pos=WA.world?.where?.('你'), place=pos?.place||(pos?.inTransit ? pos.from : null), zone=place && WA.world?.zoneOf?.(place);
+    const local=zone && WA.calendar?.localTime?.(clock.iso,zone);
+    const facts = visible(s).facts;
+    const trip = arr(s.world?.journeys).filter(j => j?.person === '你').slice(-1)[0];
+    let travel = '';
+    if (pos?.inTransit) travel = pos.from + ' → ' + pos.to + ' · 在途' + (Number.isFinite(pos.left) ? ' · 还需 ' + pos.left + ' 分钟' : '');
+    else if (pos?.reason === 'halted') travel = pos.from + ' → ' + pos.to + ' · 行程中止，当前位置未知';
+    else if (trip?.status === 'arrived') travel = trip.from + ' → ' + trip.to + ' · 已到达' + (Number.isFinite(trip.total) ? ' · 耗时 ' + trip.total + ' 分钟' : '');
+    const receipt = travel ? sec('最近行程', '<p class="wj-prose">' + esc(travel) + '</p>') : '';
+    const meeting = WA.socialEncounter?.buildBlock?.({heading:false});
+    const currents = arr(s.currents).map(c => WA.atlas?.playerCurrent?.(c)).filter(Boolean).slice(0, 3);
     const nPeople = Object.keys(obj(s.people)).length;
-    if (!clock.label && !bg && !facts.length && !nPeople) return onboarding();
+    const mail = recentMail(s);
+    const agenda = playerAgenda(s,pos);
+    if (!receipt && !meeting && !openUnread.any && !mail && !clock.label && !bg && !facts.length && !currents.length && !nPeople && !agenda) return onboarding();
     const wx = arr(obj(s.weather).rows).slice(-1)[0];
     const u = openUnread;
-    const digest = u.any ? '<button class="wj-digest" data-tab="away"><b>你不在时</b><span>'
-      + [u.chron && ('发生了 ' + u.chron + ' 件事'), u.rum && (u.rum + ' 条新风声'), u.facts && (u.facts + ' 条事实落定'), u.fs && ('埋下 ' + u.fs + ' 处伏笔')].filter(Boolean).join('，')
+    const target = u.chron || u.mail || u.rum ? 'away' : u.fs ? 'threads' : 'now';
+    const digest = u.any ? '<button class="wj-digest" data-tab="' + target + '"><b>你不在时</b><span>'
+      + [u.mail && (u.mail + ' 条口信动态'), u.chron && ('发生了 ' + u.chron + ' 件事'), u.rum && (u.rum + ' 条新风声'), u.facts && (u.facts + ' 条事实落定'), u.fs && ('埋下 ' + u.fs + ' 处伏笔')].filter(Boolean).join('，')
       + '</span><em>去看看 →</em></button>' : '';
     const hero = '<div class="wj-hero"><div class="wj-kicker">世界时间' + (clock.dayIndex ? ' · 第 ' + esc(clock.dayIndex) + ' 日' : '') + '</div>'
-      + '<div class="wj-time">' + esc(clock.label || '尚未设定') + '</div>'
+      + '<div class="wj-time">' + esc(local ? local.replace('T',' ')+' '+zone : clock.label || '尚未设定') + '</div>'
       + (wx ? '<div class="wj-weather">' + esc((wx.place ? wx.place + ' · ' : '') + (wx.kind || '')) + '</div>' : '')
       + '<div class="wj-busy" hidden>世界正在推演…</div></div>';
     const brew = currents.length
-      ? currents.map(c => { const t = c.public_trace || c.summary || ''; return '<div class="wj-row"><div class="wj-row-main"><b>' + esc(c.title || '一股暗流') + '</b><span>' + esc(t) + '</span></div>' + cite((c.title || '') + '：' + t) + '</div>'; }).join('')
+      ? currents.map(c => '<div class="wj-row"><div class="wj-row-main"><b>' + esc(c.title) + '</b><span>' + esc(c.text) + '</span></div>' + cite(c.title + '：' + c.text) + '</div>').join('')
       : empty('暂时风平浪静。');
     const factHtml = facts.length
-      ? facts.map((f, i) => '<div class="wj-row"><div class="wj-row-main"><b>' + esc(f.key || '') + (isNew(i, u.facts) ? NEW : '') + '</b><span>' + esc(f.value || '') + '</span></div></div>').join('')
+      ? facts.map((f, i) => '<div class="wj-row"><div class="wj-row-main"><b>' + esc(f.key || '') + (isNew('facts', i) ? NEW : '') + '</b><span>' + esc(f.value || '') + '</span></div></div>').join('')
       : empty('还没有落定的世界事实——聊几轮之后，这里会逐渐写满。');
-    return hero + digest + (bg ? sec('世界背景', '<details class="wj-more"><summary><p class="wj-prose wj-clamp">' + esc(bg) + '</p><span>展开</span></summary><p class="wj-prose">' + esc(bg) + '</p></details>') : '')
+    return hero + receipt + agenda + (meeting ? sec('亲历偶遇', '<p class="wj-prose">' + esc(meeting) + '</p>') : '') + mail + digest + (bg ? sec('世界背景', '<details class="wj-more"><summary><p class="wj-prose wj-clamp">' + esc(bg) + '</p><span>展开</span></summary><p class="wj-prose">' + esc(bg) + '</p></details>') : '')
       + sec('正在酝酿', brew) + sec('已经落定', factHtml);
   }
   function onboarding() {
@@ -162,43 +236,68 @@
 
   function pageAway(s) {
     const u = openUnread;
-    const chron = arr(s.chronicle).slice(-12).reverse();
+    const {chron, mail: letters, rum: winds} = visible(s);
+    const round = WA.evolution?.roundOf?.(s);
+    const mail = letters.map((c, i) => {
+      let status = '在途';
+      if (c.verdict === 'arrived') status = '已送达';
+      else if (c.verdict === 'lost') status = '遗失';
+      else if (c.verdict === 'intercepted') status = '被截获';
+      else if (c.verdict) status = '结果待核实';
+      else if (Number.isFinite(c.arriveRound)) status = round >= c.arriveRound ? '已到可投递轮次，尚无送达回执' : '在途 · 最早第 ' + c.arriveRound + ' 轮可投递';
+      const chat = WA.store?.chatId?.();
+      const hand = chat && chat !== 'wa_default' && c.from === '你' && !c.verdict && round >= c.arriveRound && WA.letterPost?.getSettings?.()?.enabled && WA.appointment?.together?.('你', c.to)
+        ? '<button type="button" class="wj-btn wj-btn-sm" data-wj="give-letter" data-chat="' + esc(chat) + '" data-letter="' + esc(c.id) + '">当面交给' + esc(c.to) + '</button>' : '';
+      const draft = chat && chat !== 'wa_default' && c.id ? '<button type="button" class="wj-btn wj-btn-sm" data-wj="draft-letter" data-chat="' + esc(chat) + '" data-letter="' + esc(c.id) + '">' + icon('quill', 14) + ' 起草下一句</button>' : '';
+      return '<div class="wj-row"><div class="wj-row-main"><b>' + esc(c.from) + ' → ' + esc(c.to) + ' · ' + status + (isNew('mail', i) ? NEW : '') + '</b><span>' + esc(c.content) + '</span>'
+        + (c.verdict === 'arrived' && c.replyText ? '<span>回信：' + esc(c.replyText) + '</span>' : '') + hand + draft + '</div></div>';
+    }).join('');
     const ev = obj(s.evolution);
-    const winds = arr(s.rumors).concat(arr(ev.winds)).slice(-6).reverse();
     const factions = arr(ev.factions).slice(0, 8);
     const log = chron.length
-      ? '<ol class="wj-timeline">' + chron.map((c, i) => '<li class="' + (isNew(i, u.chron) ? 'is-new' : '') + '"><div class="wj-tl-head"><b>' + esc(c.title || c.kind || '记事') + (isNew(i, u.chron) ? NEW : '') + '</b>' + cite((c.title || '') + (c.summary ? '：' + c.summary : '')) + '</div>'
+      ? '<ol class="wj-timeline">' + chron.map((c, i) => '<li class="' + (isNew('chron', i) ? 'is-new' : '') + '"><div class="wj-tl-head"><b>' + esc(c.title || c.kind || '记事') + (isNew('chron', i) ? NEW : '') + '</b>' + cite((c.title || '') + (c.summary ? '：' + c.summary : '')) + '</div>'
         + (c.summary ? '<div class="wj-tl-body">' + esc(c.summary) + '</div>' : '') + '</li>').join('') + '</ol>'
       : empty('你不在的地方，还没有发生值得记下的事。');
     const wind = winds.length
-      ? winds.map((w, i) => { const t = txt(w, ['text', 'content', 'summary', 'title']); return '<div class="wj-quote' + (isNew(i, u.rum) ? ' is-new' : '') + '"><p>' + esc(t) + '</p>' + cite('听说' + t) + '</div>'; }).join('')
+      ? winds.map((w, i) => { const t = txt(w, ['text', 'content', 'summary', 'title']); return '<div class="wj-quote' + (isNew('rum', i) ? ' is-new' : '') + '"><p>' + esc(t) + '</p>' + cite('听说' + t) + '</div>'; }).join('')
       : empty('街头巷尾还没有传开什么。');
     const TONE = { '鼎盛': 'up', '稳固': 'up', '倾轧': 'mid', '困顿': 'down', '衰落': 'down', '瓦解': 'down' };
     const fac = factions.length ? '<div class="wj-chips">' + factions.map(f => '<span class="wj-chip wj-t-' + (TONE[f.status] || 'mid') + '">' + esc(f.name || '?') + (f.status ? '<i>' + esc(f.status) + '</i>' : '') + '</span>').join('') + '</div>' : '';
-    return sec('镜头之外', log) + sec('风声', wind) + (fac ? sec('各方势力', fac) : '');
+    const gazette = WA.panelMapPage?.localGazette?.();
+    return (mail ? sec('我的口信', mail) : '') + (gazette ? sec('地方图志', gazette) : '') + sec('镜头之外', log) + sec('风声', wind) + (fac ? sec('各方势力', fac) : '');
   }
 
   function bond(p) {
     const rel = arr(obj(p.profile).relations);
-    const r = rel.find(x => /user|player|玩家|主角|你/i.test(String(x.target || ''))) || rel[0];
+    const player = WA.compat?.context?.()?.name1;
+    const r = rel.find(x => x && (x.target === player && player || /^(?:user|player|玩家|主角|你|\{\{user\}\})$/i.test(String(x.target || '').trim())));
     if (!r) return '';
-    const bar = (label, v) => { const n = Math.max(0, Math.min(100, Number(v) || 0)); return '<div class="wj-meter"><span>' + label + '</span><i><b style="width:' + n + '%"></b></i></div>'; };
+    const bar = (label, v) => { if ((typeof v !== 'number' && !(typeof v === 'string' && v.trim())) || !Number.isFinite(Number(v))) return ''; const n = Math.max(0, Math.min(100, Number(v))); return '<div class="wj-meter"><span>' + label + '</span><i><b style="width:' + n + '%"></b></i></div>'; };
     return '<div class="wj-meters">' + bar('亲近', r.intimacy) + bar('信任', r.trust) + (Number(r.hostility) > 20 ? bar('敌意', r.hostility).replace('wj-meter"', 'wj-meter wj-meter-hot"') : '') + '</div>';
   }
   function pagePeople(s) {
-    const ppl = Object.values(obj(s.people)).filter(Boolean);
+    const people = obj(s.people);
+    const keys = new Map(Object.entries(people).map(([k, p]) => [p, k]));
+    const ppl = Object.values(people).filter(Boolean);
     if (!ppl.length) return sec('人物', empty('还没有登记的人物。角色在正文里出场后，会自动出现在这里。'));
     ppl.sort((a, b) => (b.lastSeenAt || b.updatedAt || 0) - (a.lastSeenAt || a.updatedAt || 0));
-    const top = ppl[0].lastSeenAt || 0;
-    const here = [], away = [], gone = [];
-    ppl.forEach((p, i) => { const ls = p.lastSeenAt || 0; (i < 3 && ls && ls === top ? here : (!p.location || /不明|未知/.test(p.location) ? gone : away)).push(p); });
+    const here = [], away = [], gone = [], positions = new Map();
+    const tracked = WA.world?.getSettings?.()?.enabled;
+    const me = tracked && WA.world.where('你');
+    ppl.forEach(p => {
+      const pos = tracked && WA.world.where(p.name || p.id);
+      positions.set(p, pos);
+      const colocated = me?.arrived && pos?.arrived && me.place && me.place === pos.place;
+      (colocated ? here : pos?.arrived || pos?.inTransit ? away : gone).push(p);
+    });
     const card = p => {
       const name = p.name || p.id || '无名';
       const known = Object.keys(obj(p.knowledge)).length;
-      const meta = [p.location && ('在 ' + p.location), p.action].filter(Boolean).join(' · ');
+      const pos = positions.get(p);
+      const meta = [pos?.inTransit ? '正前往' + pos.to : pos?.place ? '在 ' + pos.place : '位置未确认', p.action].filter(Boolean).join(' · ');
       return '<details class="wj-card"><summary><span class="wj-avatar">' + esc(String(name).slice(0, 1)) + '</span>'
         + '<span class="wj-card-main"><b>' + esc(name) + '</b><span class="wj-sub">' + esc(meta || '行踪未知') + '</span></span><span class="wj-chev"></span></summary>'
-        + '<div class="wj-card-body">' + bond(p)
+        + '<div class="wj-card-body">' + bond(p) + (p.name && WA.panelPeoplePage?.contactForm?.(keys.get(p), p.name) || '')
         + (p.intent ? '<div class="wj-kv"><span>打算</span><p>' + esc(txt(p.intent, ['text', 'summary'])) + '</p></div>' : '')
         + (p.innerVoice ? '<div class="wj-kv"><span>心声</span><p class="wj-italic">' + esc(txt(p.innerVoice, ['text'])) + '</p></div>' : '')
         + '<div class="wj-kv"><span>所知</span><p>' + (known ? '知道 ' + known + ' 件事——不会知道更多' : '对局势所知甚少') + '</p></div>'
@@ -206,13 +305,12 @@
     };
     const group = (t, list) => list.length ? sec(t, list.map(card).join(''), '<em>' + list.length + '</em>') : '';
     return '<input class="wj-search" type="search" placeholder="找人…" aria-label="搜索人物" data-wj="find"/>'
-      + '<div id="wj-people">' + group('就在身边', here) + group('在别处', away) + group('久未露面', gone) + '</div>';
+      + '<div id="wj-people">' + group('就在身边', here) + group('已有行踪', away) + group('位置未确认', gone) + '</div>';
   }
 
   function pageThreads(s) {
     const u = openUnread;
-    const all = arr(obj(s.memory).foreshadows);
-    const fs = all.map((f, i) => ({ f: f, i: i })).filter(x => x.f && x.f.status !== 'dropped' && x.f.status !== 'recycled').reverse();
+    const fs = visible(s).fs.map((f,i) => ({f,i}));
     const LBL = { waiting: '埋下', developing: '发展中', triggered: '已触发' };
     const direct = arr(s.directEvents).filter(e => e && e.status === 'active');
     const evs = arr(obj(s.evolution).events).slice(-6).reverse();
@@ -221,7 +319,7 @@
     const order = { triggered: 0, developing: 1, waiting: 2 };
     fs.sort((a, b) => (order[a.f.status] ?? 3) - (order[b.f.status] ?? 3));
     const fsHtml = fs.length
-      ? fs.map(x => '<div class="wj-row"><span class="wj-tag wj-tag-' + esc(x.f.status) + '">' + esc(LBL[x.f.status] || x.f.status) + '</span><div class="wj-row-main"><span>' + esc(x.f.content || '') + (x.i >= all.length - u.fs ? NEW : '') + '</span></div>' + cite('（伏笔）' + (x.f.content || '')) + '</div>').join('')
+      ? fs.map(x => '<div class="wj-row"><span class="wj-tag wj-tag-' + esc(x.f.status) + '">' + esc(LBL[x.f.status] || x.f.status) + '</span><div class="wj-row-main"><span>' + esc(x.f.content || '') + (isNew('fs', x.i) ? NEW : '') + '</span></div>' + cite('（伏笔）' + (x.f.content || '')) + '</div>').join('')
       : empty('没有悬而未决的伏笔。');
     const evHtml = direct.length + evs.length
       ? direct.map(e => '<div class="wj-row wj-row-hot"><div class="wj-row-main"><b>' + esc(e.title || e.name || '突发事件') + '</b><span>正在发生</span></div></div>').join('')
@@ -235,7 +333,7 @@
     return sec('推演', '<button class="wj-btn wj-btn-primary" data-wj="simulate">让世界走一步</button><p class="wj-hint">平时每轮回复后会自动推演，这里可以手动补一次。</p><div class="wj-out" id="wj-out" role="status"></div>')
       + sec('阅读', '<div class="wj-field"><span>底色</span>' + seg('tone', [['ink', '墨'], ['paper', '纸']]) + '</div><div class="wj-field"><span>字号</span>' + seg('size', [['s', '小'], ['m', '中'], ['l', '大']]) + '</div>')
       + sec('连接与机制', '<button class="wj-btn" data-wj="open-connect">配置 API 通道<span>›</span></button><button class="wj-btn" data-wj="open-settings">机制开关与强度<span>›</span></button>')
-      + sec('高级', '<label class="wj-switch"><input type="checkbox" data-wj="dev" ' + (devMode() ? 'checked' : '') + '/><span></span>开发者模式</label><p class="wj-hint">开启后仍从 ◈ 进手札，但会多出「打开完整面板」这一条路（给作者和调试用：世界的每一个零件都在那里）。</p>');
+      + sec('高级', '<label class="wj-switch"><input type="checkbox" data-wj="dev" ' + (devMode() ? 'checked' : '') + '/><span></span>开发者模式</label>' + (devMode() ? '<button type="button" class="wj-btn" data-wj="open-full">打开完整面板<span>›</span></button>' : ''));
   }
   const PAGES = { now: pageNow, away: pageAway, people: pagePeople, threads: pageThreads, settings: pageSettings };
 
@@ -291,11 +389,22 @@
     applyTone();
     const body = root.querySelector('.wj-body');
     let html = '';
-    try { html = PAGES[pref.tab](state()); } catch (e) { html = empty('这一页暂时打不开。可以在设置里打开开发者模式看看原因。'); }
+    try { const s = state(); openUnread = unread(s); html = PAGES[pref.tab](s); } catch (e) { html = empty('这一页暂时打不开。可以在设置里打开开发者模式看看原因。'); }
     body.innerHTML = '<div class="wj-page">' + html + '</div>';
+    if (pref.tab === 'now' && typeof WA.panelNowPage?.ferryCard === 'function') {
+      const scene = WA.panelNowPage.ferryCard();
+      if (scene) {
+        const slot = doc.createElement('div');
+        slot.dataset.ferryScene = '';
+        slot.innerHTML = scene;
+        body.querySelector('.wj-page').prepend(slot);
+        WA.panelNowPage.bindFerry(body, render);
+      }
+    }
+    if (pref.tab === 'people') WA.panelPeoplePage?.bindContacts?.(body);
     const b = body.querySelector('.wj-busy'); if (b) b.hidden = !busy;
     const u = openUnread;
-    const dots = { away: u.chron + u.rum, now: u.facts, threads: u.fs };
+    const dots = { away: u.chron + u.mail + u.rum, now: u.facts, threads: u.fs };
     root.querySelectorAll('.wj-nav button').forEach(x => {
       const on = x.dataset.tab === pref.tab;
       x.classList.toggle('on', on); x.setAttribute('aria-selected', on);
@@ -322,10 +431,10 @@
         root.style.setProperty('height', '100vh', 'important');
       } catch (ge) {}
       root.classList.remove('wj-hidden'); render();
-      setTimeout(() => { try { root.querySelector('.wj-sheet').focus(); } catch (e) {} }, 30);
+      setTimeout(() => { try { if (!root.classList.contains('wj-hidden')) root.querySelector('.wj-sheet').focus(); } catch (e) {} }, 30);
     } else {
       root.classList.add('wj-hidden');
-      pref.seen = marks(s); save(); badge();                 // 合上 = 读过
+      remember(s); badge();                 // 合上 = 读过
       try { lastFocus && lastFocus.focus && lastFocus.focus(); } catch (e) {}
     }
   }
@@ -341,11 +450,11 @@
     try { if (page && WA.ui && WA.ui.goPage) WA.ui.goPage(page); } catch (e) { if (WA.log) WA.log('warn', 'journal: 跳页失败 ' + page, e); }
   }
   // 带进对话：追加到酒馆输入框，不自动发送（玩家自己决定怎么接）
-  function citeToChat(t) {
+  function citeToChat(t, verbatim) {
     const ta = doc.getElementById('send_textarea');
     if (!ta) { toast('没找到对话输入框'); return; }
-    const line = '（' + String(t).replace(/[（）]/g, '') + '）';
-    ta.value = (ta.value ? ta.value.replace(/\s*$/, '') + '\n' : '') + line;
+    const line = verbatim ? String(t) : '（' + String(t).replace(/[（）]/g, '') + '）';
+    ta.value += (ta.value && !ta.value.endsWith('\n') ? '\n' : '') + line;
     try { ta.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
     toast('已放进输入框');
   }
@@ -357,19 +466,53 @@
     if (t.dataset.tab) { go(t.dataset.tab); return; }
     if (t.dataset.pref) { const [k, v] = t.dataset.pref.split(':'); pref[k] = v; save(); render(); return; }
     const a = t.dataset.wj;
+    if (a === 'draft-letter') {
+      const chat = WA.store?.chatId?.();
+      const row = chat && chat !== 'wa_default' && chat === t.dataset.chat && arr(state().chronicle).find(c => playerMail(c) && c.id === t.dataset.letter);
+      if (!row) { render(); toast('当前聊天里没有这封口信。'); return; }
+      const ta = doc.getElementById('send_textarea');
+      if (!ta) { toast('没找到对话输入框'); return; }
+      const subject = '给' + row.to + '的那句「' + (row.content || '') + '」';
+      const line = row.from !== '你' ? row.from + '捎来的那句「' + row.content + '」，我想回一句：'
+        : row.verdict === 'arrived' && row.replyText ? row.to + '回了「' + row.replyText + '」。我想说：'
+        : row.verdict === 'arrived' ? subject + '已经送到。我接下来想……'
+        : row.verdict === 'lost' ? subject + '没能送到。还有谁能帮我带话？'
+        : row.verdict === 'intercepted' ? subject + '被人截下了。我能从哪里打听它的下落？'
+        : subject + '，现在有消息了吗？';
+      citeToChat(line, true); open(false); ta.focus(); return;
+    }
+    if (a === 'give-letter') {
+      const chat = WA.store?.chatId?.();
+      if (!chat || chat === 'wa_default' || chat !== t.dataset.chat) return;
+      const row = arr(state().chronicle).find(c => c && c.kind === 'letter' && c.id === t.dataset.letter && c.from === '你');
+      if (!row || row.verdict || !WA.appointment?.together?.('你', row.to)) { render(); toast('现在不能当面交信。'); return; }
+      const ack = WA.letterPost?.deliver?.({ id: row.id, verdict: 'arrived' });
+      const found = arr(state().chronicle).some(c => c && c.kind === 'letter' && c.id === row.id && c.verdict === 'arrived');
+      render(); toast(ack?.ok && found ? '信已交到对方手里。' : '尚未确认送达。'); return;
+    }
     if (a === 'close') open(false);
     else if (a === 'open-connect') openFull('connect');
     else if (a === 'open-settings') openFull('settings');
+    else if (a === 'open-full' && devMode()) openFull('overview');
     else if (a === 'simulate') simulate(t);
   }
+  let manualRequest = null;
   function simulate(btn) {
-    if (busy) return;
-    const p = (function () { try { return WA.backstage && WA.backstage.forceSimulate ? WA.backstage.forceSimulate() : null; } catch (e) { return Promise.reject(e); } })();
-    if (!p) { say('世界还推不动：先在「配置 API 通道」里接上一个模型。'); return; }
+    const chat = WA.store.chatId();
+    if (manualRequest?.chat === chat) return;
+    const req = { chat };
+    manualRequest = req;
+    const show = text => { if (manualRequest === req && WA.store.chatId() === chat) say(text); };
     btn.disabled = true; btn.textContent = '世界正在走…'; say('');
-    Promise.resolve(p).then(r => say(r && r.ok === false ? ('没走成：' + (r.reason || '未知原因')) : '世界走了一步。去「远方」看看发生了什么。'),
-      err => say('没走成：' + ((err && err.message) || err)))
-      .finally(() => { btn.disabled = false; btn.textContent = '让世界走一步'; });
+    Promise.resolve().then(() => WA.backstage?.forceSimulate()).then(async r => {
+      if (r?.queued) {
+        show('已排队，尚未结算。');
+        if (!r.completion) return;
+        r = await r.completion;
+      }
+      show(r?.ok === true ? '本次推演已结算。' : ('未确认结算：' + (r?.reason || '没有回执')));
+    }).catch(err => show('没走成：' + (err?.message || err)))
+      .finally(() => { if (manualRequest === req) manualRequest = null; btn.disabled = false; btn.textContent = '让世界走一步'; });
   }
   function onChange(e) {
     if (e.target.dataset.wj !== 'dev') return;
@@ -452,8 +595,10 @@
     WA.on('backstage:started', () => setBusy(true));
     WA.on('backstage:settled', () => { setBusy(false); badge(); render(); });
     WA.on('backstage:failed', () => setBusy(false, true));
+    // Normal reply settlement can change mail eligibility without a backstage simulation.
+    WA.on('reply:world-updated', () => { badge(); render(); });
     ['clock:changed', 'registry:changed', 'chapters:changed'].forEach(ev => WA.on(ev, () => { badge(); render(); }));
-    WA.on('chat:changed', () => { pref.seen = null; save(); badge(); render(); });   // 换聊天 = 换世界，刻度重置
+    WA.on('chat:changed', () => { baseline(); openUnread = unread(state()); badge(); render(); });   // 换聊天 = 换世界，刻度重置
   }
   // ── v2.542.25：接管不再只靠一条 60×500ms（30s）的轮询 ──
   //   现场实测（真 Chromium + 真手机 UA 跑本仓 ST）：WA.ui.mount() 到 t≈15s 才建出 #wa-orb，
@@ -470,7 +615,7 @@
     if (!hookOrb()) return false;
     hooked = true;
     listen();
-    if (!pref.seen) { pref.seen = marks(state()); save(); }
+    baseline();
     badge();
     return true;
   }

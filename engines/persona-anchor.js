@@ -44,12 +44,101 @@
   }
   WA.__settingsRegs = (WA.__settingsRegs || []).concat([__REG]);
 
+  // ── v2.616.0（R291 / NPC 分层棱镜缝合）──────────────────────────────
+  // 机制移植自 layered-npc-persona Skill 的 npc-persona-prism：
+  //   Stage 0 表层身份 / Stage 1 深层人设 / Stage 2 私密档案三层渐进建档；
+  //   情分 × 情愫双轨正交归一化；确定性随机（同种子同签）；开放 Schema（未知字段原样保留）。
+  // 只取机制与接口，不搬外部词库；随机自包含（不走 WA.rand，避免污染随机通道计数）。
+  const BOND_TIERS = ['死敌', '敌视', '戒备疏远', '萍水客套', '熟稔认可', '亲近信赖', '生死莫逆'];
+  const ROMANCE_TIERS = ['无意风月', '初见微澜', '一见倾心', '逐利逢迎', '暗生情愫', '暧昧拉扯', '露水欢好', '热恋痴缠', '深爱不渝', '爱恨交缠'];
+  const INTIMATE_MODES = ['自动', '亲密', '普通'];
+  const PRISM_SURFACE = ['冷静自持', '外热内冷', '温和疏离', '锋利直接', '慢热寡言'];
+  const PRISM_DEEP = [
+    { conflict: '表面顺从，内里绝不交出主导权', trace: '住处只留一把椅子是旧的', soft: '被认真记住小事时会短暂失态' },
+    { conflict: '渴望被需要，又惧怕被看穿', trace: '手机相册里全是没发出去的照片', soft: '对方不问自取的温柔' },
+    { conflict: '以玩笑掩饰不容触碰的底线', trace: '抽屉深处压着一枚旧徽章', soft: '被人当众认真维护' }
+  ];
+  const PRISM_PRIVATE = [
+    { history: '情史留白多、只肯说结果', kink: '慢热、重仪式感', sense: '后颈与手腕最经不起触碰' },
+    { history: '有过一段不愿细说的旧关系', kink: '偏好掌控节奏', sense: '低声叫名字时防线会松' },
+    { history: '经验有限但观察入微', kink: '克制的试探', sense: '被从背后环住时呼吸会乱' }
+  ];
+  function hash32(s) { let h = 2166136261 >>> 0; const str = String(s); for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h >>> 0; }
+  function seededRng(seed) { let x = hash32(seed) >>> 0; return function () { x = (x + 0x6D2B79F5) >>> 0; let t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  function pickOf(rng, arr) { return (Array.isArray(arr) && arr.length) ? arr[Math.floor(rng() * arr.length) % arr.length] : null; }
+  function normEnum(v, allowed) { const s = String(v == null ? '' : v).trim(); return allowed.indexOf(s) >= 0 ? s : undefined; }
+  function normalizeBondTier(v) {
+    const fuzzy = [[/死敌|不共戴天/, '死敌'], [/敌视|厌恶|仇视/, '敌视'], [/戒备|疏远|冷淡|防备/, '戒备疏远'], [/生死|莫逆|过命|托付/, '生死莫逆'], [/亲近|信赖|贴心|心腹|挚友/, '亲近信赖'], [/熟稔|认可|友善|融洽/, '熟稔认可'], [/萍水|客套|初识|点头/, '萍水客套']];
+    const s = normEnum(v, BOND_TIERS); if (s) return s;
+    const raw = String(v == null ? '' : v).trim();
+    for (let i = 0; i < fuzzy.length; i++) if (fuzzy[i][0].test(raw)) return fuzzy[i][1];
+    return undefined;
+  }
+  function normalizeRomanceTier(v) {
+    const fuzzy = [[/无意|绝缘|纯友谊/, '无意风月'], [/爱恨|交缠|虐恋/, '爱恨交缠'], [/深爱|不渝|挚爱/, '深爱不渝'], [/热恋|痴缠|相恋/, '热恋痴缠'], [/露水|欢好|炮友/, '露水欢好'], [/暧昧|拉扯|试探/, '暧昧拉扯'], [/暗生|暗恋|心动/, '暗生情愫'], [/逐利|逢迎|攀附/, '逐利逢迎'], [/一见|倾心/, '一见倾心'], [/初见|微澜/, '初见微澜']];
+    const s = normEnum(v, ROMANCE_TIERS); if (s) return s;
+    const raw = String(v == null ? '' : v).trim();
+    for (let i = 0; i < fuzzy.length; i++) if (fuzzy[i][0].test(raw)) return fuzzy[i][1];
+    return undefined;
+  }
+  function normalizeIntimateMode(v) {
+    if (v === undefined) return undefined;
+    if (v === null || v === '') return '自动';
+    const s = normEnum(v, INTIMATE_MODES); if (s) return s;
+    const raw = String(v).trim();
+    if (/冻结|普通|normal|freeze/i.test(raw)) return '普通';
+    if (/提拔|亲密|核心|intimate/i.test(raw)) return '亲密';
+    if (/自动|auto/i.test(raw)) return '自动';
+    return undefined;
+  }
+  function normalizeTiers(t) {
+    const src = t || {}; const out = {}; let n = 0;
+    ['bondTier', 'romanceTier', 'intimateMode'].forEach(function (k) {
+      const fn = k === 'bondTier' ? normalizeBondTier : (k === 'romanceTier' ? normalizeRomanceTier : normalizeIntimateMode);
+      if (src[k] !== undefined) { const v = fn(src[k]); if (v) { out[k] = v; n++; } }
+    });
+    stat.tiersNormalized += n;
+    return out;
+  }
+  function rollPrism(person, seed) {
+    const who = clean(person, 40);
+    const rng = seededRng(who + '|' + String(seed == null ? '' : seed));
+    const surface = pickOf(rng, PRISM_SURFACE);
+    const deepSrc = pickOf(rng, PRISM_DEEP) || {};
+    const privSrc = pickOf(rng, PRISM_PRIVATE) || {};
+    stat.prismsRolled++;
+    return {
+      person: who,
+      stage0: { surface: surface || '' },
+      stage1: { coreConflict: deepSrc.conflict || '', trace: deepSrc.trace || '', softSpot: deepSrc.soft || '' },
+      stage2: { history: privSrc.history || '', taste: privSrc.kink || '', sense: privSrc.sense || '' },
+      seed: String(seed == null ? '' : seed)
+    };
+  }
+  function collectPending() {
+    const s = state().personaAnchor; const anchors = (s && s.anchors) || {}; const pending = [];
+    Object.keys(anchors).forEach(function (k) {
+      const a = anchors[k];
+      const mode = normalizeIntimateMode(a.intimateMode) || '自动';
+      if (mode === '普通') return;
+      const needStage1 = !(a.deep && a.deep.coreConflict);
+      const needStage2 = !(a.private && a.private.history);
+      if (!needStage1 && !needStage2) return;
+      pending.push({ person: a.person, needStage1: needStage1, needStage2: needStage2, mode: mode, rerollCount: a.rerollCount || 0 });
+    });
+    stat.pendingBuilt += pending.length;
+    return pending;
+  }
+
   const stat = {
     anchorsRegistered: 0,
     driftsBlocked: 0,
     driftsAllowed: 0,
     auditsPerformed: 0,
     auditsFlagged: 0,
+    prismsRolled: 0,
+    tiersNormalized: 0,
+    pendingBuilt: 0,
     lastReason: '',
     faults: {}
   };
@@ -96,12 +185,36 @@
         draft.personaAnchor.anchors = draft.personaAnchor.anchors || {};
         
         const existed = !!draft.personaAnchor.anchors[who];
+        const tiers = normalizeTiers({ bondTier: s.bondTier, romanceTier: s.romanceTier, intimateMode: s.intimateMode });
+        let surface = s.surface ? clean(s.surface, 120) : null;
+        let deep = (s.deep && typeof s.deep === 'object' && !Array.isArray(s.deep)) ? Object.assign({}, s.deep) : null;
+        let priv = (s.private && typeof s.private === 'object' && !Array.isArray(s.private)) ? Object.assign({}, s.private) : null;
+        // 确定性分层填充：autoPrism 且缺层时，用 who+prismSeed 自包含 rng 现摇，
+        // 同人同种子必同签（Skill 的主/副模型同签口径），但**不新增任何导出面**。
+        if (s.autoPrism && (!surface || !deep || !priv)) {
+          const rp = rollPrism(who, s.prismSeed);
+          if (!surface) surface = rp.stage0.surface;
+          if (!deep) deep = { coreConflict: rp.stage1.coreConflict, softSpot: rp.stage1.softSpot, trace: rp.stage1.trace };
+          if (!priv) priv = { history: rp.stage2.history, taste: rp.stage2.taste, sense: rp.stage2.sense };
+        }
+        const KNOWN = ['person','coreTraits','toneStyle','forbiddenBehaviors','resistance','surface','deep','private','bondTier','romanceTier','intimateMode','rerollCount','ext','autoPrism','prismSeed'];
+        const ext = (s.ext && typeof s.ext === 'object' && !Array.isArray(s.ext))
+          ? Object.assign({}, s.ext)
+          : (function () { const o = {}; Object.keys(s).forEach(function (k) { if (KNOWN.indexOf(k) < 0) o[k] = s[k]; }); return o; })();
         draft.personaAnchor.anchors[who] = {
           person: who,
           coreTraits: traits,
           toneStyle: tone,
           forbiddenBehaviors: forbidden,
           resistance: resistance,
+          surface: surface,
+          deep: deep,
+          private: priv,
+          bondTier: tiers.bondTier || null,
+          romanceTier: tiers.romanceTier || null,
+          intimateMode: tiers.intimateMode || '自动',
+          rerollCount: Number.isFinite(s.rerollCount) ? s.rerollCount : 0,
+          ext: ext,
           updatedAt: clockNow('personaAnchor:register')
         };
         out = { ok: true, person: who, existed: existed };
@@ -286,6 +399,10 @@
         row += '；绝对禁忌=[' + a.forbiddenBehaviors.join('、') + ']';
       }
       lines.push(row);
+      if (a.surface) lines.push('  · 表层身份（Stage 0）：' + a.surface);
+      if (a.deep && a.deep.coreConflict) lines.push('  · 深层人设（Stage 1）：内核矛盾=' + a.deep.coreConflict + (a.deep.softSpot ? '；软肋=' + a.deep.softSpot : ''));
+      if (a.private && a.private.history) lines.push('  · 私密档案（Stage 2）：情史=' + a.private.history + (a.private.taste ? '；口味=' + a.private.taste : ''));
+      if (a.bondTier || a.romanceTier) lines.push('  · 关系双轨：情分=' + (a.bondTier || '未定') + ' × 情愫=' + (a.romanceTier || '未定'));
     });
 
     lines.push('任何违反上述基线的话术或违和态度均属于劣质表现，严禁无故转变。');

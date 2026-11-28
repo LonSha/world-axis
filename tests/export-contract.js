@@ -52,7 +52,7 @@ const OPTIONAL = ['ui', 'uiSettings', 'assistant', 'renderPerf',
   //   写进契约串（它不知道这两个 ns 在无头环境是合法缺席），于是产物多 48 字符，
   //   而 tests/run.js 本块永远不会收这两项 ⇒ 「产物与 FROZEN2800 逐字一致」恒假。
   'panelNowPage',
-  'panelPeoplePage',
+  'panelPeoplePage', 'panelFacesPage', 'panelMapPage',
   // v2.542.0：ui/journal.js / ui/console.js —— 与 tests/run.js 的 UI_NS2800 成对（两处同批）。
   //   无头环境里 ui/*.js 不装载，故属可选缺席（与 panelNowPage 同款）。
   'journal',

@@ -99,11 +99,17 @@
   }
 
   /**
-   * 驱动四层级联大脉冲 (Single World Clock Pulse)
-   * @param {object} worldContext { hour, activeActors, currentZones, weather, disasters }
+   * A pulse advances round-based systems. elapsedMinutes applies to scene actors;
+   * elapsedDays applies to registered fortresses (whole days, at most 60 per call).
+   * Neither local duration establishes elapsed time for the other owner.
    */
-  function dispatchTick(worldContext) {
+  function dispatchTick(worldContext, workflowPulse) {
     worldContext = worldContext || {};
+    const { elapsedMinutes = 0, elapsedDays = 0 } = worldContext;
+    if (!Number.isFinite(elapsedMinutes) || elapsedMinutes < 0 ||
+        !Number.isSafeInteger(elapsedDays) || elapsedDays < 0 || elapsedDays > 60) {
+      return { ok: false, reason: 'invalid-elapsed-time' };
+    }
     _tickCounter++;
     const now = clockNow('cascade-bus');
     const hour = Number.isFinite(Number(worldContext.hour)) ? Number(worldContext.hour) : 9;
@@ -123,13 +129,13 @@
 
     // ── Layer 1: 物理底层演化 ──
     for (const pid of places) {
-      if (WA.engines && WA.engines.environmentalHazard) {
+      if (elapsedMinutes > 0 && places.length === 1 && WA.engines && WA.engines.environmentalHazard) {
         // 自动巡检环境负荷
         const hazs = WA.engines.environmentalHazard.getZoneHazards(pid);
         if (hazs.length > 0) {
           // 物理层向机能层触发侵蚀级联
           for (const aid of actors) {
-            WA.engines.environmentalHazard.evaluateExposure(aid, pid, 30, {});
+            WA.engines.environmentalHazard.evaluateExposure(aid, pid, elapsedMinutes, {});
           }
         }
       }
@@ -173,8 +179,8 @@
         WA.metabolismClock.accumulateFatigue(aid, 2, 'circadian_tick');
       }
       // V16 EXV16-2: 生物毒素半衰期生化代谢
-      if (WA.toxicMetabolism && typeof WA.toxicMetabolism.metabolize === 'function') {
-        WA.toxicMetabolism.metabolize(aid, 30);
+      if (elapsedMinutes > 0 && WA.toxicMetabolism && typeof WA.toxicMetabolism.metabolize === 'function') {
+        WA.toxicMetabolism.metabolize(aid, elapsedMinutes);
       }
       // V16 EXV16-7: 随身装备疲劳应力自然微衰变
       if (WA.gearWear && typeof WA.gearWear.applyStress === 'function') {
@@ -217,12 +223,12 @@
     //   推进一个时间片 --- 它夹在机能层与行为层之间，因为身体还能不能动先于他打算做什么。
     for (const pid of places) {
       // 战役围城消耗：断粮、哗变、城墙损耗的自然演进（已登记要塞才推进）
-      if (WA.siegeAttrition && typeof WA.siegeAttrition.getFortress === "function") {
+      if (elapsedDays > 0 && WA.siegeAttrition && typeof WA.siegeAttrition.getFortress === "function") {
         try {
           const fort = WA.siegeAttrition.getFortress(pid);
           // getFortress 返回裸对象或 null（无 ok 字段）—— 判 ok 会让本段永远空转。
           if (fort) {
-            const siegeRes = WA.siegeAttrition.advanceSiege({ fortressId: pid, daysElapsed: 1 });
+            const siegeRes = WA.siegeAttrition.advanceSiege({ fortressId: pid, daysElapsed: elapsedDays });
             if (siegeRes && siegeRes.ok) report.tactical.fortressesAdvanced++;
           }
         } catch (eSiege) {}
@@ -260,7 +266,9 @@
     if (actors.length >= 2 && WA.engines && WA.engines.socialEncounter) {
       for (let i = 0; i < actors.length - 1; i++) {
         for (let j = i + 1; j < actors.length; j++) {
-          WA.engines.socialEncounter.evaluateEncounter(places[0] || 'common_plaza', { actorId: actors[i] }, { actorId: actors[j] }, {});
+          const visits=worldContext.visits;
+          const visit=visits && JSON.stringify([actors[i],visits[actors[i]],actors[j],visits[actors[j]]].map(String));
+          WA.engines.socialEncounter.evaluateEncounter(places[0] || 'common_plaza', { actorId: actors[i] }, { actorId: actors[j] }, {visit});
         }
       }
     }
@@ -289,7 +297,8 @@
       } catch (eStealth) {}
     }
     // V19 OPV19-5: 通用退场角色跨题材自主生计与舞台聚光灯运转脉冲
-    if (WA.stagePresence && typeof WA.stagePresence.tickOffstageAutonomy === 'function') {
+    // The after chain has a separately switchable owner: stagePresence.advanceOffstage.
+    if (!workflowPulse && WA.stagePresence && typeof WA.stagePresence.tickOffstageAutonomy === 'function') {
       try {
         WA.stagePresence.tickOffstageAutonomy({ hoursPassed: 1, actors: actors });
       } catch (eStage) {}
@@ -365,11 +374,13 @@
         if (bfRes && bfRes.ok !== false) report.epochal.butterfliesAdvanced++;
       } catch (eButterfly) {}
     }
-    // 资料片周期轮转：世界注意力的节奏本身也随时间片走一拍
-    if (WA.eraCycle && typeof WA.eraCycle.tick === "function") {
+    // 具名周期按实际经过的天数推进。
+    const era = worldContext.eraAdvance;
+    if (era && typeof era.name === 'string' && era.name.trim() && Number.isSafeInteger(era.dayDelta) && era.dayDelta > 0 && WA.eraCycle && typeof WA.eraCycle.tick === "function") {
       try {
-        WA.eraCycle.tick();
-        report.epochal.eraCyclesTicked++;
+        const ack = WA.eraCycle.tick(era.name, era.dayDelta, era.nextEvent);
+        const back = ack?.ok && ack.reason !== 'disabled' && WA.eraCycle.read(era.name);
+        if (back?.ok && back.reason === 'applied' && back.stage === ack.stage && back.countdown === ack.countdown) report.epochal.eraCyclesTicked++;
       } catch (eEra) {}
     }
     dispatchEvent('epochal', 'epochal_tick', { places: places, actors: actors, tick: _tickCounter });
@@ -527,7 +538,7 @@
               errors.push({ layer: layer, error: detail.error || detail.result.refusal || detail.result.reason || 'listener-rejected' });
             }
           });
-        }
+}
         return {
           ok: !wave.aborted && errors.length === 0, originLayer: originLayer,
           waveId: wave.id, broadcastedAt: clockNow('cascade-wave'),
@@ -590,7 +601,34 @@
   WA.engines.cascadeBus = engine;
   WA.cascadeBus = engine;
 
-  // 挂载主工作流周期触发（每轮生成后自动推动四层总线）
+  function workflowScene(st) {
+    const world = WA.world;
+    const tracked = world?.getSettings?.()?.enabled;
+    const me = tracked && world.where('你');
+    const region = st.region?.currentPlace;
+    const place = me?.arrived ? me.place : (!me || me.reason === 'no-journey') && region;
+    const actors = [];
+    if (me?.arrived && place) {
+      actors.push('player');
+      const contacts = new Map(Object.entries(st.people || {}).map(([id, p]) => [p?.name, id]));
+      const names = new Set((st.world?.journeys || []).map(j => j?.person));
+      for (const name of names) {
+        if (!name || name === '你') continue;
+        const pos = world.where(name);
+        const id = contacts.get(name) || name;
+        if (pos.arrived && pos.place === place && !actors.includes(id)) actors.push(id);
+        if (actors.length === 5) break;
+      }
+    }
+    const visits=Object.create(null);
+    for (const j of st.world?.journeys||[]) if(j?.status==='arrived') {
+      const id=j.person==='你'?'player':Object.keys(st.people||{}).find(k=>st.people[k]?.name===j.person)||j.person;
+      visits[id]=j.visitNo||j.id+'@'+j.departAt;
+    }
+    const zone=place && world.zoneOf?.(place), local=WA.calendar?.localTime?.(st.clock?.iso,zone);
+    return {visits, hour:local ? Number(local.slice(11,13)) : undefined,currentZones: typeof place === 'string' && place.trim() ? [place] : [], activeActors: actors};
+  }
+  // 每轮生成后自动推动六层总线。
   if (WA.workflow && typeof WA.workflow.register === 'function') {
     try {
       WA.workflow.register({
@@ -598,15 +636,10 @@
         chain: 'after',
         order: 25,
         critical: false,
-        label: '四层级联调度总线·全域物理与机能演进脉冲',
+        label: '六层级联调度总线·世界演进',
         async run() {
           const st = (WA.store && WA.store.get) ? WA.store.get() : {};
-          const curPlace = (st.region && st.region.currentPlace) || 'common_plaza';
-          const activePeople = (st.people && Object.keys(st.people).slice(0, 5)) || ['player'];
-          dispatchTick({
-            currentZones: [curPlace],
-            activeActors: activePeople
-          });
+          dispatchTick(workflowScene(st), true);
         }
       });
     } catch (e) {}

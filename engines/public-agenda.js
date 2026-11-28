@@ -176,13 +176,15 @@
     if (WA.store && WA.store.transact) {
       txOk = WA.store.transact(function (draft) {
         draft.publicAgenda = draft.publicAgenda || { agendas: {}, proposals: [], deliberations: [] };
-        var activeIds = [];
+        var activeIds = draft.publicAgenda.proposals.filter(function (p) {
+          return p && p.placeId === pid && (p.status === 'scheduled' || p.status === 'debated');
+        }).map(function (p) { return p.id; });
 
-        placeProposals.forEach(function (prop, idx) {
+        placeProposals.forEach(function (prop) {
           var target = draft.publicAgenda.proposals.filter(function (p) { return p && p.id === prop.id; })[0];
           if (!target) return;
 
-          if (idx < maxSlots) {
+          if (activeIds.length < maxSlots) {
             target.status = 'scheduled';
             target.scheduledAt = now();
             target.updatedAt = now();
@@ -227,6 +229,8 @@
     var b = ensureBucket();
     var prop = b.proposals.filter(function (p) { return p && p.id === proposalId; })[0];
     if (!prop) return { ok: false, reason: 'proposal-not-found', id: proposalId };
+    if (outcome !== 'enacted' && outcome !== 'rejected') return { ok: false, reason: 'invalid-outcome' };
+    if (prop.status !== 'scheduled' && prop.status !== 'debated') return { ok: false, reason: 'not-on-agenda' };
 
     var deliberationRecord = {
       id: WA.rand.id('delib_', 7, 'id'),
@@ -253,6 +257,8 @@
         var target = draft.publicAgenda.proposals.filter(function (p) { return p && p.id === proposalId; })[0];
         if (target) {
           target.status = outcome;
+          const agenda = draft.publicAgenda.agendas?.[target.placeId];
+          if (Array.isArray(agenda?.activeTopicIds)) agenda.activeTopicIds = agenda.activeTopicIds.filter(id => id !== target.id);
           target.updatedAt = now();
         }
         draft.publicAgenda.deliberations.push(deliberationRecord);

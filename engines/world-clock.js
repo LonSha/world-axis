@@ -73,6 +73,7 @@
     const m = /(?:周|週|星期|礼拜|禮拜)\s*([一二三四五六日天])/.exec(t);
     if (m) return WD_INDEX[m[1]];
     const en = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const jp=/^([日月火水木金土])曜(?:日)?$/.exec(t); if(jp) return '日月火水木金土'.indexOf(jp[1]);
     const i = en.indexOf(t.toLowerCase());
     return i >= 0 ? i : null;
   }
@@ -102,11 +103,17 @@
     const wd = weekdayIndexOf(wdRaw);
     const wdText = wd == null ? null : WEEKDAYS[wd];
     const md = /(\d{1,2})\s*[-/.]\s*(\d{1,2})/.exec(date || '');
-    const month = md ? +md[1] : null; const day = md ? +md[2] : null;
+    const civil=/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/.exec(date||'');
+    const month = civil ? +civil[2] : md ? +md[1] : null; const day = civil ? +civil[3] : md ? +md[2] : null;
     const yearH = /(\d{1,4})\s*年/.exec(date || '');
-    const year = yearH ? +yearH[1] : null;
+    const year = civil ? +civil[1] : yearH ? +yearH[1] : null;
+    if (civil) {
+      const d=new Date(0); d.setUTCFullYear(year,month-1,day);
+      if (d.getUTCMonth()!==month-1 || d.getUTCDate()!==day || (wd!==null && d.getUTCDay()!==wd)) return {why:'invalid-date'};
+    }
     const timeOk = !!time && /^\d{1,2}\s*[:：]\s*\d{2}(?:\s*[:：]\s*\d{2})?$/.test(time.trim());
     if (time && !timeOk) return { why: 'dirty-time' };
+    if (timeOk && time.split(/[:：]/).some((v,i)=>Number(v)>(i===0?23:59))) return {why:'dirty-time'};
     const haveWeekday = !cfg.requireWeekday || wd != null;
     const haveTime = !cfg.requireTime || timeOk;
     const complete = !!date && haveWeekday && haveTime;

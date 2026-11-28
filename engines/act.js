@@ -240,7 +240,13 @@
     Object.keys(stat).forEach(function (k) {
       Object.defineProperty(f, k, {
         enumerable: true,
-        get: function () { return statOf()[k]; },
+        get: function () {
+          const bag = statOf();
+          if (bag[k] === undefined && bag !== stat) {
+            bag[k] = typeof stat[k] === 'object' ? Object.create(null) : (typeof stat[k] === 'number' ? 0 : '');
+          }
+          return bag[k];
+        },
         set: function (v) { statOf()[k] = v; }
       });
     });

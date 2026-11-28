@@ -39,12 +39,11 @@
     });
   }
   function n(v) { return (typeof v === 'number' && isFinite(v)) ? v : 0; }
-  function desk() { return WA.settingsDesk || null; }
 
   function setLast(kind, r) {
     const x = r || {};
     LAST.kind = kind;
-    LAST.at = Date.now();
+    LAST.at = WA.clock?.wallNow?.() ?? null;
     LAST.ok = !!x.ok;
     if (kind === 'flip') {
       LAST.text = x.ok
@@ -81,14 +80,14 @@
   }
 
   function render() {
-    const d = desk();
-    if (!d || typeof d.list !== 'function') {
+    const viewDesk = WA.settingsDesk;
+    if (!viewDesk || typeof viewDesk.list !== 'function') {
       return '<div class="wa-dim" id="wa-faces-absent">设置面台模块缺席（engines/settings-desk.js 未装载）—— 这不是「没有设置面」，是读数缺口</div>';
     }
-    const dg = (typeof d.diagnose === 'function') ? d.diagnose() : null;
-    const l = d.list({ only: VIEW.only, kw: VIEW.kw, limit: VIEW.limit });
+    const dg = (typeof viewDesk.diagnose === 'function') ? viewDesk.diagnose() : null;
+    const l = viewDesk.list({ only: VIEW.only, kw: VIEW.kw, limit: VIEW.limit });
     const t = l.totals || {};
-    const summary = typeof d.summaryText === 'function' ? d.summaryText(dg) : '';
+    const summary = typeof viewDesk.summaryText === 'function' ? viewDesk.summaryText(dg) : '';
     const verdict = '<div class="wa-verdict"><b>此刻</b><ul>'
       + '<li>这个机制开没开：' + esc(summary || '设置面台读数不可用 —— 这不是「没有设置面」') + '</li>'
       + '<li>能不能翻：行内标着「纯参数，不可翻」的没有开关；其余勾选走设置总线写回并读回复核</li>'
@@ -136,7 +135,7 @@
   function bind(root, onAfter) {
     if (!root || typeof root.querySelector !== 'function') return { ok: false, reason: 'no-root' };
     const q = function (s) { return root.querySelector(s); };
-    const d = desk();
+    const actionDesk = WA.settingsDesk;
 
     const bApply = q('#wa-faces-apply');
     if (bApply && typeof bApply.onclick !== 'function') {
@@ -153,8 +152,8 @@
     const bReload = q('#wa-faces-reload');
     if (bReload && typeof bReload.onclick !== 'function') {
       bReload.onclick = function () {
-        if (!d || typeof d.list !== 'function') { setLast('reload', { ok: false, reason: 'desk-absent' }); refresh(); return; }
-        setLast('reload', d.list({ only: VIEW.only, kw: VIEW.kw, limit: VIEW.limit }));
+        if (!actionDesk || typeof actionDesk.list !== 'function') { setLast('reload', { ok: false, reason: 'desk-absent' }); refresh(); return; }
+        setLast('reload', actionDesk.list({ only: VIEW.only, kw: VIEW.kw, limit: VIEW.limit }));
         refresh();
         if (typeof onAfter === 'function') onAfter(LAST);
       };
@@ -171,8 +170,8 @@
         const el = (ev && ev.target) || box;
         const key = el && el.getAttribute ? el.getAttribute('data-key') : null;
         const want = !!(el && el.checked);
-        if (!d || typeof d.flip !== 'function') { setLast('flip', { ok: false, reason: 'desk-absent', key: key }); refresh(); return; }
-        const r = d.flip(key, want);
+        if (!actionDesk || typeof actionDesk.flip !== 'function') { setLast('flip', { ok: false, reason: 'desk-absent', key: key }); refresh(); return; }
+        const r = actionDesk.flip(key, want);
         setLast('flip', r);
         // 失败必须把勾选框**还原**：写不进去却留着一个勾，就是界面在说谎。
         if (!r.ok && el) el.checked = !want;

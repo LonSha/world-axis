@@ -223,7 +223,7 @@
     //   plans/V28_MASTER_PLAN.md 对应条目的中文命题，不另起一套叫法。
     offstageQueue: '场外轮转', actStep: '判定步', tracePost: '痕迹投递',
     misbelief: '误信认知', threadSprout: '支线萌芽', dormantLadder: '暗线阶梯',
-    consequenceSchedule: '后果排期', appointment: '承诺债', timeLedger: '三层时间对账',
+    consequenceSchedule: '后果排期', appointment: '承诺债', socialEncounter: '亲历偶遇', timeLedger: '三层时间对账',
     hearsayLedger: '传闻账', farAccount: '异地同时', interlude: '视角插曲',
     letterPost: '信件与口信', worldBrief: '世界近况'
   };
@@ -416,24 +416,21 @@
   //     落盘的界面状态语义，收益不抵迁移风险——故本版**不改名**，改为用锁把撞名事实钉死，
   //     让它从「没人知道的隐患」变成「有据可查的已知项」。）
   const CATS = [
-    { id: 'core', icon: '◈', label: '核心' },
-    { id: 'world', icon: '🌐', label: '世界' },
-    { id: 'workshop', icon: '🧰', label: '工坊' },
-    { id: 'meta', icon: '⚙️', label: '元' },
+    { id: 'core', icon: '◈', label: '当前行动' },
+    { id: 'world', icon: '🌐', label: '世界与人物' },
+    { id: 'story', icon: '🎬', label: '剧情推进' },
+    { id: 'history', icon: '📚', label: '历史与证据' },
+    { id: 'meta', icon: '⚙️', label: '连接与配置' },
+    { id: 'workshop', icon: '🧰', label: '诊断与维护' },
     { id: 'all', icon: '≡', label: '全部' }
   ];
   const PAGE_CAT = {
-    overview: 'core', chapter: 'core', beat: 'core', todo: 'core', events: 'core', director: 'core', actiondesk: 'core',
-    world: 'world', people: 'world', memory: 'world', enemies: 'world', parallel: 'world', travel: 'world', sediment: 'world', offline: 'world',
-    // v2.588.0（R264）：地图页归「世界」类（地理是世界的一部分，与 world/people/travel 同类）。
-    map: 'world',
-    inject: 'workshop', supply: 'workshop', evidence: 'workshop', branchdiff: 'workshop', storyloop: 'workshop', retrieval: 'workshop', port: 'workshop', find: 'workshop', graph: 'workshop', net: 'workshop',
-    settings: 'meta', health: 'core', connect: 'meta', assistant: 'meta', tools: 'meta', logs: 'meta',
-    // v2.589.0（R264 / CFG-2）：设置面总账页归「元信息」类（与设置页同类：都不改剧情，只改视图/机制）。
-    faces: 'meta',
-    desk: 'meta',
-    // v2.301.0（V11 EXV11-1/-3）：新页归属（EXV11-8 双向断言：PAGES ⊂ PAGE_CAT 闭合）
-    boot: 'core', drive: 'meta'
+    overview: 'core', actiondesk: 'core', todo: 'core',
+    world: 'world', people: 'world', enemies: 'world', graph: 'world', map: 'world', travel: 'world', supply: 'world',
+    boot: 'story', events: 'story', director: 'story', beat: 'story', chapter: 'story', storyloop: 'story', drive: 'story',
+    memory: 'history', sediment: 'history', find: 'history', evidence: 'history', retrieval: 'history', parallel: 'history', branchdiff: 'history',
+    settings: 'meta', connect: 'meta', net: 'meta', offline: 'meta', inject: 'meta',
+    health: 'workshop', faces: 'workshop', logs: 'workshop', tools: 'workshop', port: 'workshop', desk: 'workshop', assistant: 'workshop'
   };
   let currentCat = 'core';
 
@@ -516,11 +513,8 @@
   //   删项即红灯）。过滤只发生在**可见性层**（复用 cat 切换的 style.display 机制）。
   const PLAYER_PAGES = ['overview', 'world', 'people', 'events', 'connect', 'settings'];
   let __devMode = __panelState().devMode === true;
-  // v2.255.0 SIMPLIFY-NAV（C3b 探针抓到的真缺陷）：持久化恢复的开发者模式必须装载即全量。
-  //   currentCat 初值 'core'，若不同步切 'all'，devMode:true 的装载只有 core 类 7 页可见
-  //   ——「开了开关、关了面板、再打开，少了 24 页」。
-  if (__devMode) currentCat = 'all';
   let currentPage = __pageOr('overview');
+  if (__devMode) currentCat = PAGE_CAT[currentPage] || 'core';
   let panelEl = null, orbEl = null;
   /** v2.109.0（#7）：上一次「基准面」按下时的性能快照。存在的意义就是**下次能比对**——
    *   没有它，`importSnapshot` 只能与现场自比（恒等），那是看起来有值、其实没有意义的读数。 */
@@ -1122,8 +1116,8 @@ const peopleIds = Object.keys(s.people);
       <div class="wa-sec">世界织体（地点、道路、共同日程）</div>
       <div class="wa-list">${settleRows}</div>
       <label class="wa-row"><input id="wa-world-enabled" type="checkbox" ${WA.world && WA.world.getSettings().enabled ? 'checked' : ''}/> 启用世界织体</label>
-      <div class="wa-row"><input id="wa-world-place" class="wa-input" placeholder="地点名"/><button class="wa-btn" id="wa-world-addplace" title="登记一个地点：没登记的地方不可达（不猜「大概很近」）">登记地点</button><button class="wa-btn" id="wa-world-reach">查可到</button></div>
-      <div class="wa-row"><input id="wa-world-rd-a" class="wa-input" placeholder="从"/><input id="wa-world-rd-b" class="wa-input" placeholder="到"/><input id="wa-world-rd-min" class="wa-input" placeholder="分钟"/><button class="wa-btn" id="wa-world-addroad" title="登记一条道路：没登记的路走不通">登记道路</button></div>
+      <div class="wa-row"><input id="wa-world-place" class="wa-input" placeholder="地点名"/><input id="wa-world-parent" class="wa-input" placeholder="所属地点"/><input id="wa-world-layout" class="wa-input" placeholder="固定位置（如北门内东侧）"/><input id="wa-world-zone" class="wa-input" placeholder="时区（如 Asia/Tokyo）"/><button class="wa-btn" id="wa-world-addplace" title="登记一个地点：没登记的地方不可达（不猜「大概很近」）">登记地点</button><button class="wa-btn" id="wa-world-reach">查可到</button></div>
+      <div class="wa-row"><input id="wa-world-rd-a" class="wa-input" placeholder="从"/><input id="wa-world-rd-b" class="wa-input" placeholder="到"/><input id="wa-world-rd-min" class="wa-input" placeholder="分钟"/><input id="wa-world-guide" class="wa-input" placeholder="从起点到终点的走法"/><button class="wa-btn" id="wa-world-addroad" title="登记一条道路：没登记的路走不通">登记道路</button></div>
       <div class="wa-row"><input id="wa-world-ev-title" class="wa-input" placeholder="共同日程名"/><input id="wa-world-ev-place" class="wa-input" placeholder="地点"/><button class="wa-btn" id="wa-world-addevent">登记日程</button><button class="wa-btn" id="wa-world-tick">推进日程</button><button class="wa-btn" id="wa-world-who" title="到场者只认日程证据——没依据的人不会出现在名单里">查到会人</button></div>
       <div class="wa-row"><input id="wa-world-mv-who" class="wa-input" placeholder="人物"/><input id="wa-world-mv-from" class="wa-input" placeholder="从"/><input id="wa-world-mv-to" class="wa-input" placeholder="到"/><button class="wa-btn" id="wa-world-move" title="先问路通不通，再问此人这一刻在不在别处">移动</button><button class="wa-btn" id="wa-world-canbe">能否在场</button></div>
       <div class="wa-row"><input id="wa-world-tr-ch" class="wa-input" placeholder="person / goods / message"/><button class="wa-btn" id="wa-world-transit" title="按通道判通行：人可到 / 物可到 / 消息可到分开作答；恶劣天气封锁路线（人/物不可，消息可）">判通行</button></div>
@@ -4902,7 +4896,9 @@ ${emptyDrill}
     //  病：六页的标题都是名词（世界/人物/事件），玩家得先猜这页能回答什么。
     //  只对玩家模式加：开发者模式要的是密度，不是解释。
     const __pageHtml = RENDERERS[currentPage]();
-    stageOut(body, (__devMode ? '' : __askLine(currentPage)) + __pageHtml);
+    const peer = __devMode && ({ map: ['查看行程', 'travel'], travel: ['查看地图', 'map'],
+      settings: ['查看设置面', 'faces'], faces: ['返回设置', 'settings'] })[currentPage];
+    stageOut(body, (__devMode ? '' : __askLine(currentPage)) + (peer ? navBtn(peer[0], peer[1]) : '') + __pageHtml);
     bindBody();
     applySettingSearch();
     try {
@@ -5854,7 +5850,7 @@ on('#wa-desk-show', showDesk);
         };
       } catch (e) { if (out) out.textContent = '镜像视图失败：' + (e && e.message); }
     });
-    on('#wa-set-clock', () => { const v = askText('设定世界时间（如「三日目·黄昏」）：', WA.store.read('clock.label', '')); if (v != null) { WA.calendar.setClock(v); renderBody(); } });
+    on('#wa-set-clock', () => { const v = askText('设定剧情时间（如 2026-04-28T23:55:00+09:00，或自由标签）：', WA.store.read('clock.label', '')); if (v != null) { WA.calendar.setClock(v); renderBody(); } });
     on('#wa-next-day', () => {
       if (!WA.calendar || typeof WA.calendar.advanceDay !== 'function') { WA.log('warn', '世界钟模块未加载'); return; }
       const day = WA.calendar.advanceDay({ source: 'user' });
@@ -9137,13 +9133,13 @@ on('#wa-desk-show', showDesk);
       }; }
     on('#wa-world-addplace', () => {
       if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
-      const r = WA.world.addPlace({ name: wv('#wa-world-place') });
+      const r = WA.world.addPlace({ name: wv('#wa-world-place'), parent:wv('#wa-world-parent'), layout:wv('#wa-world-layout'), zone:wv('#wa-world-zone') });
       worldOut(Object.assign({}, r, { id: r.ok ? (r.name + (r.existed ? ':已有' : ':新登记')) : r.reason }));
       renderBody();
     });
     on('#wa-world-addroad', () => {
       if (!WA.world) return worldOut({ ok: false, reason: 'module-missing' });
-      const r = WA.world.addRoad(wv('#wa-world-rd-a'), wv('#wa-world-rd-b'), Number(wv('#wa-world-rd-min')));
+      const r = WA.world.addRoad(wv('#wa-world-rd-a'), wv('#wa-world-rd-b'), Number(wv('#wa-world-rd-min')), undefined, {directions:wv('#wa-world-guide')});
       worldOut(Object.assign({}, r, { id: r.ok ? (r.minutes + '分钟') : r.reason }));
       renderBody();
     });
@@ -16587,13 +16583,8 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
         WA.ui.goPage('overview');
         return { ok: true, devMode: false, page: 'overview' };
       }
-      // 打开开发者模式时把分类切回「全部」：此前 currentCat 停在离开时的分类上
-      //（玩家模式从 core 类页出发），syncTabs 的分类过滤会把非 core 类的 26 页藏掉，
-      // 表现为「开了开发者模式还是只有 6 页」——开关看着生效、实际没全量。
-      if (__devMode) {
-        currentCat = 'all';
-        panelEl.querySelectorAll('.wa-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === 'all'));
-      }
+      // 启用后显示当前页所属任务组；「全部」仍可手动选择。
+      if (__devMode) currentCat = PAGE_CAT[currentPage] || 'core';
       syncTabs();
     }
     return { ok: true, devMode: __devMode };
@@ -16625,11 +16616,7 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
       <div class="wa-nav-bar" role="navigation" aria-label="面板导航"><span id="wa-nav-out" class="wa-dim"></span>
         <button class="wa-btn wa-mini" id="wa-nav-back" title="回到上一页，并按离开时的样子还原输入与滚动位（ui/panel-nav.js 的回程栈，有界 8 层）">← 返回</button></div>
       <div class="wa-cat-bar wa-cat-nav" role="tablist" aria-label="面板分类">
-        <button class="wa-cat-btn wa-cat-pill active" data-cat="core" role="tab" aria-selected="true">◈ 核心</button>
-        <button class="wa-cat-btn wa-cat-pill" data-cat="world" role="tab" aria-selected="false">🌐 世界</button>
-        <button class="wa-cat-btn wa-cat-pill" data-cat="workshop" role="tab" aria-selected="false">🧰 工坊</button>
-        <button class="wa-cat-btn wa-cat-pill" data-cat="meta" role="tab" aria-selected="false">⚙️ 元</button>
-        <button class="wa-cat-btn wa-cat-pill" data-cat="all" role="tab" aria-selected="false">≡ 全部</button>
+        ${CATS.map(c => `<button class="wa-cat-btn wa-cat-pill${c.id === currentCat ? ' active' : ''}" data-cat="${c.id}" role="tab" aria-selected="${c.id === currentCat}">${c.icon} ${c.label}</button>`).join('')}
       </div>
       <div class="wa-row wa-page-q-row" style="display:none;"><input id="wa-page-q" class="wa-input" type="search" placeholder="搜页签：输入即跳到第一个匹配（如 记忆 / 伏笔 / 账）" aria-label="搜索页签"/><span id="wa-page-q-hint" class="wa-dim" aria-live="polite"></span></div>
       <div class="wa-tabs">${PAGES.map(p => `<button class="wa-tab" data-page="${p.id}" data-cat="${PAGE_CAT[p.id] || 'core'}">${p.icon} ${p.label}</button>`).join('')}</div>
@@ -16706,12 +16693,12 @@ return '<div class="wa-item">' + esc(k) + '：' + (d.checks[k] ? '在场' : '<sp
       sb.style.display = (currentPage === "settings" || (inp && inp.value.trim().length > 0)) ? "" : "none";
     }
     const pageCat = PAGE_CAT[currentPage] || 'core';
-    if (currentCat !== 'all' && currentCat !== pageCat) {
-      currentCat = pageCat;
-      if (panelEl) {
-        panelEl.querySelectorAll('.wa-cat-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === currentCat));
-      }
-    }
+    if (currentCat !== 'all') currentCat = pageCat;
+    if (panelEl) panelEl.querySelectorAll('.wa-cat-btn').forEach(b => {
+      const active = b.dataset.cat === currentCat;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-selected', String(active));
+    });
     if (panelEl) {
       panelEl.querySelectorAll('.wa-tab').forEach(t => {
         t.classList.toggle('active', t.dataset.page === currentPage);

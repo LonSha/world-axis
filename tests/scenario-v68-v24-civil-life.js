@@ -198,6 +198,13 @@ eq(pk.ok, true, '私吞也留痕（两途都记账）');
 eq(WA.lostFound.claim(rl2.id, { by: '孙五', distinguisher: '袋口补丁' }).ok, false, '私吞件无可认领（unknown-item）');
 eq(WA.lostFound.stat().pocketed, 1, '私吞计数真记 1');
 WA.lostFound.reset();
+const priorLostSettings = WA.lostFound.getSettings();
+try {
+  WA.lostFound.setSettings({maxRows:8});
+  const ids = Array.from({length:9}, (_, i) => WA.lostFound.reportLoss({who:'你',what:'物件'+i}).id);
+  const rows = WA.lostFound.view().rows;
+  ok(ids.every(Boolean) && rows.length === 8 && rows.every((row, i) => row.id === ids[i+1]), '上限 8 时保留最新八件，不误删新报失');
+} finally { WA.lostFound.setSettings(priorLostSettings); WA.lostFound.reset(); }
 // ─────────────────────────────────────────────────────────────────────
 // 68-7 朝圣香火
 // ─────────────────────────────────────────────────────────────────────

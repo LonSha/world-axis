@@ -60,7 +60,7 @@ function runAll(a) {
   a(engSrc.indexOf('saveOrThrow') >= 0 && engSrc.indexOf('normalize') >= 0,
     'A6: 引擎真的用 normalize + saveOrThrow 写回（不是自己拼值）');
   a(panelSrc.indexOf("{ id: 'faces', icon:") >= 0, 'A7: PAGES 有设置面页项（页 id 纯小写）');
-  a(/const PAGE_CAT = \{[\s\S]*?\bfaces: 'meta'/.test(panelSrc), "A7b: PAGE_CAT 登记 faces: 'meta'");
+  a(/const PAGE_CAT = \{[^}]*\bfaces: 'workshop'/.test(panelSrc), "A7b: 设置面登记在诊断与维护分类");
   a(panelSrc.indexOf('faces: renderFacesDesk,') >= 0, 'A7c: RENDERERS 成对挂载 renderFacesDesk');
   a(panelSrc.indexOf("WA.panelFacesPage && typeof WA.panelFacesPage.bind === 'function'") >= 0,
     'A7d: bindBody 真的去绑设置面页（页模块只出 HTML，行为归面板）');
@@ -128,19 +128,19 @@ function runAll(a) {
 
   const r2 = D.flip(pureParam[0].key, false);
   a(r2.ok === false && r2.reason === 'no-enabled', 'C3: 纯参数面 ⇒ no-enabled（实 ' + r2.reason + '）');
-  const pp = D.face(pureParam[0].key);
+  const pp = WA.settingsDesk.face(pureParam[0].key);
   a(pp.hasSwitch === false, 'C3b: 拒收之后该面仍然没有开关（没有凭空补一个 enabled 字段进去）');
 
   // 选一个「默认关」的面真翻，跑完还原。
   const target = switchable.filter(function (r) { return r.def.enabled === false; })[0] || switchable[0];
-  const tBefore = D.face(target.key);
+  const tBefore = WA.settingsDesk.face(target.key);
   const tWant = !tBefore.on;
-  const statA = D.stat();
+  const statA = WA.settingsDesk.stat();
   const r3 = withReg(WA, target, function () { return D.flip(target.key, tWant); });
   a(r3.ok === true && r3.changed === true,
     'C4: 真翻一个面成功（' + target.key + ' ' + tBefore.on + '→' + tWant + '，实 changed=' + r3.changed + '）');
   a(r3.before === tBefore.on && r3.after === tWant, 'C4b: 返回体记 before/after（' + r3.before + '→' + r3.after + '）');
-  const statB = D.stat();
+  const statB = WA.settingsDesk.stat();
   a(statB.flips === statA.flips + 1, 'C4c: stat.flips 恰 +1（实 ' + statA.flips + '→' + statB.flips + '）');
   a(statB.flipsOk === statA.flipsOk + 1, 'C4d: stat.flipsOk 恰 +1');
   a(!!statB.lastFlip && statB.lastFlip.key === target.key, 'C4e: lastFlip 记的是这一次（' + (statB.lastFlip && statB.lastFlip.key) + '）');
@@ -155,19 +155,19 @@ function runAll(a) {
   // restore 回出厂值。
   const r5 = withReg(WA, target, function () {
     D.flip(target.key, tWant);
-    return D.restore(target.key);
+    return WA.settingsDesk.restore(target.key);
   });
   a(r5.ok === true && r5.after === (tBefore.defOn === null ? undefined : tBefore.defOn),
     'C6: restore 回到出厂值（目标 ' + tBefore.defOn + '，实 ' + r5.after + '）');
-  const r6 = D.restore('worldaxis_definitely_not_a_face_v1');
+  const r6 = WA.settingsDesk.restore('worldaxis_definitely_not_a_face_v1');
   a(r6.ok === false && r6.reason === 'invalid-key', 'C6b: restore 不存在的键也如实拒收');
   // 还原确认：跑完这一组，磁盘必须逐字回到开跑前。
-  const tAfter = D.face(target.key);
+  const tAfter = WA.settingsDesk.face(target.key);
   a(tAfter.on === tBefore.on && tAfter.source === tBefore.source,
     'C7: 整组跑完目标面逐字复原（' + tBefore.on + '/' + tBefore.source + ' → ' + tAfter.on + '/' + tAfter.source + '）');
 
   // ── D 可核性 ─────────────────────────────────────────────────
-  const st = D.stat();
+  const st = WA.settingsDesk.stat();
   a(st.flips > 0 && st.flipsRefused > 0, 'D1: stat 两类计数都非零（flips ' + st.flips + ' / refused ' + st.flipsRefused + '）');
   a(st.flips >= st.flipsOk && st.flipsOk > 0,
     'D1b: 成功数不超过总尝试数且非零（flips ' + st.flips + ' ≥ flipsOk ' + st.flipsOk + '）');

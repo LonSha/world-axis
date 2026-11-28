@@ -6,18 +6,116 @@
   const clockNow = function (site) { try { return WA.clock.now(site); } catch (e) { return Date.now(); } };
   const clockWall = function () { try { return WA.clock.wallNow(); } catch (e) { return Date.now(); } };
 
+  // Leave floating story time floating. Never let Date.parse choose the device zone.
+  function instant(iso) {
+    const m = /^(\d{4}-\d\d-\d\d)T(\d\d:\d\d)(:\d\d(?:\.\d{1,3})?)?(Z|[+-]\d\d:\d\d)?$/.exec(iso || '');
+    if (!m) return null;
+    const wall = Date.parse(m[1]+'T'+m[2]+(m[3]||':00')+'Z');
+    const ms = Date.parse(iso + (m[4] ? '' : 'Z'));
+    if (!Number.isFinite(ms) || !Number.isFinite(wall) || new Date(wall).toISOString().slice(0,16)!==iso.slice(0,16)) return null;
+    return {ms, offset:wall-ms, suffix:m[4]||''};
+  }
+  function shifted(iso, minutes) {
+    if (minutes%1440===0 && /^\d{4}-\d{2}-\d{2}$/.test(iso||'')) {
+      const civil=instant(iso+'T00:00Z'); if (civil) return new Date(civil.ms+minutes*60000).toISOString().slice(0,10);
+    }
+    const t = instant(iso); if (!t) return '';
+    return new Date(t.ms+t.offset+minutes*60000).toISOString().replace(/\.000Z$|Z$/,'')+t.suffix;
+  }
+  function localTime(iso, zone) {
+    const t=instant(iso); if (!t) return null;
+    if (!zone) return iso.slice(0,16);
+    if (!t.suffix) return null;
+    try {
+      const fmt=new Intl.DateTimeFormat('en-GB',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+      const p=Object.fromEntries(fmt.formatToParts(t.ms).map(v=>[v.type,v.value]));
+      return p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute;
+    } catch (_) { return null; }
+  }
+  // All text-derived clock writes use the same factual sentences, including day/part labels.
+  function narratedFacts(text) {
+    const body = String(text ?? '').replace(/<!--[\s\S]*?(?:-->|$)|「[^」]*(?:」|$)|『[^』]*(?:』|$)|“[^”]*(?:”|$)|‘[^’]*(?:’|$)|"[^"]*(?:"|$)/g, ' ');
+    return body.replace(/[^。！？!?；;\n]*[?？]/g, '').split(/[。！!；;\n]/).map(s => s.trim()).filter(s => s &&
+      !/如果|假如|假设|只要|要是|预计|预定|约定|计划|打算|准备|可能|应该|将会|将于|还要|还需|本来|原定|昨天|昨日|上次|回忆|想起|曾经|刚才|方才|平时|通常|往往|每天|提前|延后|推迟|尚未|没有|还没|是否|据说|听说|提醒|等到|问[：:]|[「『“”」』"]/.test(s));
+  }
+  function completesHere(s, event, world) {
+    if (/(?:不|没|未|险些|差点|盼|要|想|等到|之后|之前|听|问|说)/.test(s)) return false;
+    if (['结束了','结束','按时结束','正式结束','顺利结束'].some(end => s === event.title + end)) return true;
+    if (!s.endsWith(event.title)) return false;
+    const prefix = s.slice(0, -event.title.length);
+    // A simple named subject can be checked against its journey. Do not treat a whole clause as a name.
+    const m = /^([^，,：:在]{1,30}?)(?:在([^，,：:]+))?(上完了|完成了|做完了)$/.exec(prefix);
+    if (!m || (m[2] && m[2] !== event.place)) return false;
+    const position = world.where(m[1] === '我' ? '你' : m[1]);
+    return position.reason === 'no-journey' || position.place === event.place;
+  }
+  function repeatsWalk(sentence, minutes, st) {
+    if (st.clock?.source !== 'travel') return false;
+    const trip = (st.world?.journeys || []).slice().reverse().find(j => j.person === '你');
+    if (trip?.status !== 'arrived' || trip.total !== minutes) return false;
+    return ['', '我', '你'].some(who => ['到','走到','步行到'].some(v => ['花了','用了'].some(cost =>
+      sentence.startsWith(who + '从' + trip.from + v + trip.to + cost))));
+  }
+  function elapsedAction(facts, st) {
+    const E = WA.elapsedEvidence;
+    if (!E || !E.settings().enabled) return 0;
+    const clock = instant(st.clock?.iso), world = WA.world;
+    if (clock?.suffix && world?.getSettings().enabled) {
+      const pos = world.where('你');
+      const here = pos.arrived ? pos.place : pos.reason === 'no-journey' && st.region?.currentPlace;
+      const due = here ? world.eventsBetween(clock.ms, clock.ms + 1).filter(e => e.place === here && e.status !== 'done' && e.start <= clock.ms && facts.some(s => completesHere(s, e, world))) : [];
+      if (due.length === 1) {
+        const remaining = (due[0].end - clock.ms) / 60000;
+        if (Number.isInteger(remaining) && remaining > 0 && remaining <= E.settings().maxMinutes) return {minutes:remaining, eventId:due[0].id};
+      }
+    }
+    const spans = [];
+    for (const fact of facts) {
+      // Only an explicit self-correction replaces a disputed duration; unrelated spans stay ambiguous.
+      const corrected = /^.+[，,]不对[，,]实际(只?(?:用了|花了).+)$/.exec(fact);
+      const s = corrected ? corrected[1] : fact;
+      if (/不到|差点|差一点|还剩|往往|通常|每天|以往|之前|曾|说|问|告诉|写着|意味着|[?？]/.test(s)) continue;
+      const p = E.parse(s);
+      if (!p.ok || !p.minutes || p.minutes > E.settings().maxMinutes || repeatsWalk(s, p.minutes, st)) continue;
+      const a = s.indexOf(p.anchor), before = s.slice(0,a), after = s.slice(a+p.anchor.length);
+      if ((!before && /^(?:之?后)(?:[，,、]|$)/.test(after)) ||
+          (/(?:持续了|过去了|经过了|练了|学了|等了|工作了|训练了|休息了|睡了|花了|用了)$/.test(before) && !/^(?:前|内|之|以|的|后才会)/.test(after))) spans.push(p.minutes);
+    }
+    // Several durations can overlap or describe the same action. Do not silently sum them.
+    return spans.length === 1 ? {minutes:spans[0]} : null;
+  }
+  function suggestPart(facts) {
+    if (facts.some(s => /次日|第二天|翌日|天亮|隔日/.test(s))) return 'day';
+    if (facts.some(s => /黄昏|傍晚|入夜|夜幕/.test(s))) return 'evening';
+    if (facts.some(s => /黎明|清晨|破晓/.test(s))) return 'dawn';
+    return null;
+  }
+  function writeClock(label, opts, finishedEvent) {
+    opts = opts || {};
+    WA.store.transact(d => {
+      d.clock.label = label;
+      delete d.clock.relative;
+      d.clock.source = opts.source || 'user';
+      d.clock.iso = opts.iso || (instant(label) || (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(label) && instant(label+'T00:00Z')) ? label : '') || d.clock.iso || '';
+      if (finishedEvent) {
+        const row = d.world?.events?.find(e => e.id === finishedEvent);
+        if (row && row.end === instant(opts.iso)?.ms) row.status = 'done';
+      }
+      if (opts.dayIndex != null) d.clock.dayIndex = opts.dayIndex;
+    });
+    WA.emit('clock:changed', label);
+  }
   WA.calendar = {
-    /** 设定世界时间（自由标签或ISO） */
-    setClock(label, opts) {
-      opts = opts || {};
-      WA.store.transact(d => {
-        d.clock.label = label;
-        d.clock.source = opts.source || 'user';
-        d.clock.iso = opts.iso || d.clock.iso || '';
-        if (opts.dayIndex != null) d.clock.dayIndex = opts.dayIndex;
-      });
-      WA.emit('clock:changed', label);
+    localTime,
+    applyTravel(clock, minutes) {
+      if (!clock || !(minutes>0) || !instant(clock.iso)) return;
+      const next=shifted(clock.iso,minutes); if (!next) return;
+      const days=(Date.parse(next.slice(0,10))-Date.parse(clock.iso.slice(0,10)))/86400000;
+      clock.iso=next; clock.dayIndex=(clock.dayIndex||0)+days;
+      clock.label=next.slice(0,16).replace('T',' '); clock.source='travel';
     },
+    /** 设定世界时间（自由标签或ISO） */
+    setClock(label, opts) { writeClock(label, opts); },
     /**
      * 推进一天（整日推进入口）。
      *
@@ -37,19 +135,13 @@
       const prev = String(clock.label || '');
       const part = (o.keepPart && prev.indexOf('·') >= 0) ? prev.split('·')[1] : '';
       const day = (clock.dayIndex || 0) + 1;
-      this.setClock('第' + day + '日' + (part ? '·' + part : ''), { source: o.source || 'engine', dayIndex: day });
+      this.setClock('第' + day + '日' + (part ? '·' + part : ''), { source: o.source || 'engine', dayIndex: day, iso:shifted(clock.iso,1440) });
       // v2.11.0: 计量放在**单一实现**里（autoAdvance 的 day 分支不再自己 ++，否则同一件事计两次）
       try { __calStat.dayAdvances++; } catch (e) { /* 计量失败不影响推进 */ }
       return day;
     },
     /** 解析正文中的时间词并建议推进（骨架：只做常见模式） */
-    suggestAdvance(text) {
-      const t = String(text == null ? '' : text);
-      if (/次日|第二天|翌日|天亮|隔日/.test(t)) return 'day';
-      if (/黄昏|傍晚|入夜|夜幕/.test(t)) return 'evening';
-      if (/黎明|清晨|破晓/.test(t)) return 'dawn';
-      return null;
-    },
+    suggestAdvance(text) { return suggestPart(narratedFacts(text)); },
     /** v2.1.0: 时段标签（suggestAdvance 的返回值 → 世界钟可读标签） */
     partLabel(part) {
       return ({ dawn: '清晨', evening: '入夜' })[part] || '黄昏';
@@ -58,7 +150,7 @@
     advancePart(part) {
       const s = WA.store.get();
       const day = (s.clock.dayIndex || 0) + (part === 'dawn' ? 1 : 0);
-      this.setClock('第' + day + '日·' + this.partLabel(part), { source: 'text', dayIndex: day });
+      this.setClock('第' + day + '日·' + this.partLabel(part), { source: 'text', dayIndex: day, iso:part==='dawn' ? shifted(s.clock.iso,1440) : s.clock.iso });
       return day;
     },
     /**
@@ -74,13 +166,34 @@
       __calStat.runs++;
       __calStat.lastAt = clockWall();
       if (o.force !== true && loadSettings().auto === false) { __calStat.skipped++; return { ok: false, reason: 'disabled' }; }
-      const kind = this.suggestAdvance(t);
+      const st = WA.store.get();
+      const facts = narratedFacts(t);
+      const action = st.clock && (!st.clock.iso || instant(st.clock.iso)) && elapsedAction(facts, st);
+      const minutes = action?.minutes || 0;
+      const kind = minutes ? 'elapsed' : suggestPart(facts);
       if (!kind) { __calStat.noSignal++; return { ok: false, reason: 'no-time-word' }; }
-      const sig = kind + ':' + __hash(t);
+      // Equivalent elapsed evidence on the same floor is one settlement, even with different prose.
+      const evidence = o.floor != null && minutes ? 'm' + minutes + ':' + (action.eventId || '') : __hash(t);
+      const sig = (WA.store.chatId?.() || '') + ':' + (o.floor ?? '') + ':' + evidence;
       if (sig === __calStat.lastSig) { __calStat.deduped++; return { ok: false, reason: 'dedup', kind: kind }; }
       __calStat.lastSig = sig;
       let label;
-      if (kind === 'day') {
+      if (kind === 'elapsed' && !st.clock.iso) {
+        // No civil start time: keep a relative span, never invent midnight or a date.
+        WA.store.transact(d => {
+          const r = d.clock.relative || {base:d.clock.label || '场景起点', minutes:0};
+          r.minutes += minutes;
+          const h = Math.floor(r.minutes / 60), m = r.minutes % 60;
+          label = r.base + '之后 ' + (h ? h + '小时' : '') + (m ? m + '分钟' : '');
+          d.clock.relative = r; d.clock.label = label; d.clock.source = 'text';
+        });
+        WA.emit('clock:changed', label);
+      } else if (kind === 'elapsed') {
+        const next = shifted(st.clock.iso, minutes);
+        const days = (Date.parse(next.slice(0,10)) - Date.parse(st.clock.iso.slice(0,10))) / 86400000;
+        label = next.slice(0,16).replace('T',' ');
+        writeClock(label, {iso:next, dayIndex:(st.clock.dayIndex || 0) + days, source:'text'}, action.eventId);
+      } else if (kind === 'day') {
         // 跳日：保留原时段信息（『第1日·黄昏』→『第2日·黄昏』）——**收敛到 advanceDay 单一实现**
         this.advanceDay({ keepPart: true, source: 'text' });
         label = WA.store.read('clock.label', '');
@@ -112,6 +225,7 @@
   // v2.1.0: 自动推进观测对象
   const __calStat = { runs: 0, advanced: 0, deduped: 0, noSignal: 0, skipped: 0, lastKind: null, lastLabel: '', lastAt: 0, lastSig: '',
     dayAdvances: 0 };
+  WA.on?.('floor:clock-restored', () => { __calStat.lastSig = ''; });
   function __hash(str) {
     let h = 0x811c9dc5;
     for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
@@ -143,7 +257,7 @@
         const chat = (ctx && ctx.chat) || [];
         const last = chat.length ? chat[chat.length - 1] : null;
         const text = (last && !last.is_user && last.mes) || '';
-        if (text) WA.calendar.autoAdvance(text);
+        if (text && !last.is_system) WA.calendar.autoAdvance(text, {floor:chat.length});
       }
     });
   }

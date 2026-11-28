@@ -165,7 +165,7 @@
    * 轮开始：抓基线。若本楼已有「同楼同指纹仍 live」的记账（= 重掷），**先退回它**再抓基线 ——
    * 顺序不能反：先抓再退，新基线就含旧结算，退回等于没退。
    */
-  function beginRound() {
+  function beginRound(type) {
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
     const floor = floorNow();
@@ -174,11 +174,15 @@
     const cid = chatId();
     let reconciled = null;
     const same = entries().filter(function (e) { return e && e.floor === floor && e.state === 'live'; });
-    if (same.length) {
+    if (same.length && type !== 'host-before') {
       const rec = same[same.length - 1];
       if (rec.sig === sig) {
-        const r = rollback(floor, { why: 'reroll' });
-        reconciled = { state: 'rolled-back', ok: !!r.ok, restored: r.restored || 0, conflicts: r.conflicts || 0 };
+        // A normal generation after reload can have the exact settled signature.
+        // Untyped callers retain the original floor-reconciliation API.
+        if (type == null || type === 'regenerate' || type === 'swipe') {
+          const r = rollback(floor, { why: 'reroll' });
+          reconciled = { state: 'rolled-back', ok: !!r.ok, restored: r.restored || 0, conflicts: r.conflicts || 0 };
+        }
       } else {
         // 楼层被编辑过：指纹不同 ⇒ 不擅自回退（口径 ④）
         try {
@@ -194,17 +198,22 @@
         reconciled = { state: 'stale', ok: false };
       }
     }
-    __pending = { floor: floor, sig: sig, chatId: cid, at: clockWall('floorSettle.begin'), snap: snapshot() };
+    __pending = { floor: floor, sig: sig, chatId: cid, at: clockWall('floorSettle.begin'), snap: snapshot(), previousSettle: clone(state().meta?.lastSettle || null) };
     stat.rounds++;
     return { ok: true, reason: 'ok', floor: floor, sig: sig, chatId: cid, reconciled: reconciled };
   }
 
   /** 轮结束：把本轮真实改动的世界键写进存档账（跟着存档走 ⇒ 重载后仍退得回去）。 */
-  function endRound() {
+  function endRound(reply) {
     const cfg = settings();
     if (!cfg.enabled) return refuse('disabled');
     if (!__pending) return refuse('no-begin');
     const p = __pending;
+    if (reply) {
+      const floor = floorNow();
+      if (p.chatId !== chatId() || reply.chatId !== p.chatId || reply.floor !== floor || floor < p.floor || floor > p.floor + 1) { __pending = null; return refuse('changed-context'); }
+      p.floor = floor; p.sig = sigNow();
+    }
     const after = snapshot();
     const d = diffOf(p.snap, after);
     const keyNames = Object.keys(d.keys);
@@ -214,6 +223,7 @@
     }
     const entry = {
       floor: p.floor, sig: p.sig, chatId: p.chatId, at: clockNow('floorSettle.end'),
+      ...(reply ? {replySig: reply.sig, previousSettle: p.previousSettle} : {}),
       keys: d.keys, skipped: d.skipped.slice(0, 12), changed: keyNames.length, state: 'live'
     };
     const r = WA.store.transact(function (draft) {
@@ -248,6 +258,7 @@
     const rec = live[live.length - 1];
     if (rec.chatId && rec.chatId !== cid) return refuse('other-chat');   // 口径 ③
     const cur = state();
+    if (o.replySig && (o.replySig !== rec.replySig || rec.skipped?.length)) return refuse('unverified-reply');
     const plan = { restored: 0, conflicts: [], gone: [] };
     Object.keys(rec.keys || {}).forEach(function (k) {
       const r = rec.keys[k];
@@ -258,6 +269,8 @@
       // 这一楼开始前**没有** ⇒ 删掉整键（写 null 会把「从来没有过」冒充成「有个空值」）。
       if (r.had) plan.restored++; else plan.gone.push(k);
     });
+    // The next prompt refreshes these two projections. Preserve their current values.
+    if (o.replySig && plan.conflicts.some(k => k !== 'stagePresence' && k !== 'lastInjection')) return refuse('world-conflict');
     if (!plan.restored && !plan.gone.length) {
       stat.conflicts += plan.conflicts.length;
       return { ok: false, reason: 'all-conflict', floor: n, restored: 0, conflicts: plan.conflicts.length, keys: plan.conflicts };
@@ -269,6 +282,10 @@
         if (r.had) draft[k] = clone(r.before);
         else delete draft[k];
       });
+      if (rec.replySig && draft.meta?.lastSettle?.sig === rec.replySig && draft.meta.lastSettle.chatId === cid) {
+        if (rec.previousSettle) draft.meta.lastSettle = clone(rec.previousSettle);
+        else delete draft.meta.lastSettle;
+      }
       const b = bucket(draft);
       for (let i = 0; i < b.entries.length; i++) {
         if (b.entries[i] && b.entries[i].floor === n && b.entries[i].state === 'live') {
@@ -279,6 +296,7 @@
       return true;
     }, 'floorSettle:rollback');
     if (!w || w.ok === false) return { ok: false, reason: 'write-failed', floor: n, restored: 0, conflicts: 0 };
+    if (Object.hasOwn(rec.keys || {}, 'clock') && !plan.conflicts.includes('clock')) WA.emit?.('floor:clock-restored');
     stat.rolledBack++;
     stat.restoredKeys += plan.restored + plan.gone.length;
     stat.conflicts += plan.conflicts.length;
@@ -331,7 +349,7 @@
     const tail = floorNow();
     const isLast = (tail == null) || (floor >= tail);
     if (kind === 'deleted' || kind === 'edited') {
-      if (isLast) {
+      if (isLast && !p.scopeOnly) {
         const r = rollback(floor, { why: kind });
         return { ok: r.ok !== false, reason: r.reason, floor: floor, mode: 'self-close',
           restored: r.restored || 0, conflicts: r.conflicts || 0 };

@@ -77,6 +77,7 @@
       const article = {
         articleId: aid,
         periodical: periodical,
+        publicPlace: typeof s.publicPlace === 'string' ? clean(s.publicPlace.trim(), 40) : '',
         headline: headline,
         targetClass: targetClass,
         ideologyTopic: ideologyTopic,

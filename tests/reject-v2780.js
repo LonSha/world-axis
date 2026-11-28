@@ -409,6 +409,31 @@ function runWitness(WA) {
   const seen = {};
   const expect = {};
   function want(code, desc) { expect[code] = desc; }
+  // 单独的存档夹具，避免把路标、提案或到访留给其余见证。
+  {
+    const store = WA.store, oldGet = store.get, oldTx = store.transact;
+    const cfg = Wd.getSettings(), data = {};
+    const check = (code, desc, fn) => { want(code, desc); trip(code, fn); };
+    try {
+      store.get = () => data;
+      store.transact = fn => ({ok:fn(data) !== false});
+      Wd.setSettings({enabled:true});
+      check('bad-people', '空旅客名单', () => Wd.advance(1,{channel:'person',people:[]}).reason);
+      check('invalid-zone', '非法时区', () => Wd.addPlace({name:'学校',zone:'Invalid/Zone'}).reason);
+      Wd.addPlace({name:'学校',layout:'北门'}); Wd.addPlace({name:'宿舍'});
+      check('geography-locked', '既有布局冲突', () => Wd.addPlace({name:'学校',layout:'西门'}).reason);
+      Wd.addRoad('宿舍','学校',10,null,{directions:'向北'});
+      check('directions-locked', '同向路标冲突', () => Wd.addRoad('宿舍','学校',10,null,{directions:'向西'}).reason);
+      check('invalid-elapsed-time', '经过时间不可为负', () => WA.cascadeBus.dispatchTick({elapsedMinutes:-1}).reason);
+      WA.publicAgenda.submitProposal({id:'unscheduled',placeId:'学校',groupName:'校刊',title:'征稿',sourceEvidence:'提案簿'});
+      check('not-on-agenda', '未排期不可议决', () => WA.publicAgenda.enactAgendaTopic({proposalId:'unscheduled'}).reason);
+      check('same-visit', '同次到访不产生重复相遇', () => {
+        const visit = () => WA.socialEncounter.evaluateEncounter('学校',{actorId:'你'},{actorId:'春'},{visit:'witness'});
+        const first = visit(), next = visit();
+        return first.encountered && next.ok && next.encountered === false && WA.socialEncounter.getRecentEncounters(5).length === 1 && next.reason;
+      });
+    } finally { store.get = oldGet; store.transact = oldTx; Wd.setSettings(cfg); }
+  }
   // 期刊配置拒收：仅替换聊天读口，始终恢复，不写世界存档。
   if (WA.periodicals && WA.store) {
     const keepChatId = WA.store.chatId;
@@ -8859,6 +8884,29 @@ function runWitness(WA) {
   //      它属**判不出面**（那一行对象不带 ok），但「判不出」不等于「不用验」：
   //      本段证明它真的挂在那份清单上，而不是源码里一个没人产出过的字面量。
   {
+    // A fresh engine owns the queue; only the inference result and host are fakes.
+    const vm = require('vm');
+    const box = vm.createContext({ AbortController }, { microtaskMode: 'afterEvaluate' });
+    const host = { backstageProtocols: WA.backstageProtocols, workflow: { register() {} },
+      clock: { now() { return 1; } }, emit() {}, log() {}, store: { chatId: () => 'queue-test' },
+      mainWin: { SillyTavern: { getContext: () => ({ chat: [{ mes: 'test' }] }) } } };
+    box.window = { WorldAxis: host };
+    const engine = require('path').join(__dirname, '..', 'engines', 'backstage.js');
+    vm.runInContext(require('fs').readFileSync(engine, 'utf8'), box, { filename: engine });
+    const bk = host.backstage;
+    let calls = 0;
+    bk._runInference = () => { calls++; return null; };
+    const running = bk.forceSimulate();
+    const old = bk.forceSimulate(), latest = bk.forceSimulate();
+    want('superseded', '只有被后续请求替换的手动排队项收到该回执');
+    if (old.queued && latest.queued && old.completion !== latest.completion && readBack(old.completion).got?.ok === false) {
+      tripAsync('superseded', () => old.completion);
+    }
+    vm.runInContext('void 0', box);
+    const finished = [running, latest.completion].map(p => readBack(p));
+    if (calls !== 2 || bk.isRunning() || bk.pending() || finished.some(o => !o.done || o.got?.reason !== 'no-result')) {
+      throw new Error('排队见证失败：运行项和最新排队项应各执行一次并收到自己的结算结果');
+    }
     const BK = WA.backstage, CR = WA.chatRecycle;
     const keepB = BK ? BK.getSettings() : null;
     const keepC = CR ? CR.getSettings() : null;

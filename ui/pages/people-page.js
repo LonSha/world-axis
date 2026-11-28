@@ -19,8 +19,11 @@
     try { return fn(); } catch (e) { return fallback; }
   }
   function store() { return safe(function () { return WA.store.get(); }, null); }
+  function reading(value) {
+    return typeof value === 'number' || (typeof value === 'string' && value.trim()) ? Number(value) : NaN;
+  }
   function bandOf(value) {
-    const n = Number(value);
+    const n = reading(value);
     if (!isFinite(n)) return '';
     const bands = safe(function () {
       return WA.registry && typeof WA.registry.relationBands === 'function'
@@ -46,7 +49,7 @@
     })[band] || band;
   }
   function trustText(value) {
-    const n = Number(value);
+    const n = reading(value);
     if (!isFinite(n)) return '';
     if (n <= 20) return '仍在观察你';
     if (n <= 40) return '对你有所保留';
@@ -55,7 +58,7 @@
     return '把你当作可以托付的人';
   }
   function bondText(value) {
-    const n = Number(value);
+    const n = reading(value);
     if (!isFinite(n)) return '';
     if (n <= 20) return '你们的联系还很浅';
     if (n <= 45) return '你们之间已有一些牵连';
@@ -128,6 +131,61 @@
     if (out && out.ok === false && out.retryable !== true) noteAttempt(wid, { choice: name, reason: out.reason || 'unknown', owner: 'peoplePage' });
     return out;
   }
+  function contactPlaces() {
+    return ((store()?.world || {}).places || []).map(function (p) { return p && p.name; }).filter(Boolean);
+  }
+  function contactForm(key, name) {
+    const chat = safe(function () { return WA.store.chatId(); }, '');
+    if (!chat || chat === 'wa_default' || name === '你') return '';
+    const places = contactPlaces();
+    const rows = safe(function () { return WA.appointment.view({ who: name }).appointments || []; }, []);
+    const pending = rows.filter(function (r) { return r && r.withWhom === '你' && r.result === '未到'; });
+    return '<details data-contact="' + esc(key) + '" data-chat="' + esc(chat) + '"><summary>联系' + esc(name) + '</summary>'
+      + pending.map(function (r) { return '<p>' + esc(r.place) + '，第 ' + esc(r.from) + ' 至 ' + esc(r.to) + ' 轮</p>'; }).join('')
+      + (places.length ? '<label>地点 <select>' + places.map(function (p) { return '<option>' + esc(p) + '</option>'; }).join('') + '</select></label><button type="button" class="wa-btn" data-contact-action="meet">记下当面说好的约</button>' : '')
+      + '<label>口信 <input maxlength="140"></label><button type="button" class="wa-btn" data-contact-action="letter">托人带话</button><p role="status"></p></details>';
+  }
+  function bindContacts(root) {
+    Array.from(root.querySelectorAll('[data-contact]')).forEach(function (box) {
+      const key = box.dataset.contact, chat = box.dataset.chat;
+      Array.from(box.querySelectorAll('[data-contact-action]')).forEach(function (b) {
+        if (b.dataset.bound) return;
+        b.dataset.bound = '1';
+        b.addEventListener('click', function () {
+          const status = box.querySelector('[role="status"]');
+          if (b.disabled || chat !== WA.store.chatId() || chat === 'wa_default') return;
+          const p = (store().people || {})[key];
+          if (!p || !p.name || ['__proto__','constructor','prototype'].includes(p.name)) return;
+          const who = p.name;
+          try {
+            if (b.dataset.contactAction === 'letter') {
+              const input = box.querySelector('input'), text = input.value.trim();
+              if (!text) { status.textContent = '口信还是空的。'; return; }
+              const ack = WA.letterPost.send({ from: '你', to: who, content: text });
+              const found = (store().chronicle || []).some(function (x) { return x && x.kind === 'letter' && x.id === ack.id && x.content === text && x.to === who; });
+              status.textContent = ack.ok && found ? '口信在路上，尚未送到。可在手札「远方」查看。' : '尚未确认寄出。';
+              if (found) input.value = '';
+            } else {
+              const place = box.querySelector('select').value;
+              if (!contactPlaces().includes(place) || !WA.appointment.together('你', who)) { status.textContent = '尚未当面碰见，不能替对方答应。'; return; }
+              const req = 'contact:' + WA.evolution.roundOf() + ':' + place;
+              const ack = WA.appointment.make({ who: who, withWhom: '你', place: place, requestKey: req });
+              status.textContent = ack.ok && !ack.deferred ? '约在' + place + '，第 ' + ack.window.join(' 至 ') + ' 轮。' : '约定尚未确认。';
+              if (ack.ok && !ack.deferred) {
+                b.disabled = true;
+                const origin = WA.world.where(who).place;
+                if (!ack.repeated && origin !== place && WA.travelDesk?.getSettings().enabled) {
+                  const plan = WA.travelDesk.plan({ from: origin, to: place });
+                  if (plan.ok) WA.travelDesk.commit('depart', { person: who, from: origin, to: place, stamp: plan.stamp });
+                  status.textContent += WA.world.where(who).inTransit ? '对方已经动身。' : '尚未确认动身。';
+                }
+              }
+            }
+          } catch (e) { status.textContent = '暂时无法确认。'; }
+        });
+      });
+    });
+  }
   function personCard(person, key, index, recKey) {
     const p = person || {};
     const name = p.name || key || ('人物 ' + (index + 1));
@@ -144,12 +202,13 @@
       + '<button class="wa-btn wa-mini" data-wa-sw-act="follow" data-wa-sw-person="' + esc(name) + '">跟随</button>'
       + '<button class="wa-btn wa-mini" data-wa-sw-act="wait" data-wa-sw-person="' + esc(name) + '">等待</button>'
       + '</div>';
+    const contact = contactForm(key, name);
     return '<article class="wa-people-card"' + recAttr + '>'
       + '<div class="wa-people-card-head"><h3>' + esc(name) + '</h3>'
       + (tags.length ? '<span class="wa-people-tag-count">' + tags.length + ' 个印象</span>' : '') + '</div>'
       + (line ? '<p class="wa-people-relation">' + esc(line) + '</p>' : '<p class="wa-people-relation is-quiet">还没有足够的相处记录。</p>')
       + tagHtml
-      + actHtml
+      + actHtml + contact
       + '</article>';
   }
   function renderClues() {
@@ -203,7 +262,7 @@
       + (withTag ? ('，其中 ' + withTag + ' 人已经留下了印象') : '，都还没有留下印象'));
     // ② 离你最近的那个：affinity 是数才参与比较，NaN/缺字段一律不掺进来（不拿 0 冒充读数）
     const rated = rows.filter(function (p) {
-      return !!p.name && isFinite(Number(p.affinity));
+      return !!p.name && Number.isFinite(reading(p.affinity));
     }).map(function (p) { return { name: String(p.name), aff: Number(p.affinity) }; });
     rated.sort(function (a, b) { return b.aff - a.aff; });
     const main = rated[0] || null;
@@ -299,6 +358,7 @@
   }
   function bind(root, onAccepted) {
     if (!root || typeof root.querySelectorAll !== 'function') return;
+    bindContacts(root);
     const btns = root.querySelectorAll('[data-wa-sw-act]');
     for (let i = 0; i < btns.length; i++) {
       const btn = btns[i];
@@ -318,7 +378,7 @@
       });
     }
   }
-  WA.panelPeoplePage = { render: render, bind: bind, ver: '2.518.0' };
+  WA.panelPeoplePage = { render: render, bind: bind, contactForm: contactForm, bindContacts: bindContacts, ver: '2.518.0' };
   if (typeof WA.registerModule === 'function') {
     WA.registerModule('ui/pages/people-page.js', { kind: 'ui', ver: '2.518.0' });
   }

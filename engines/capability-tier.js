@@ -329,9 +329,9 @@
     "节拍报告需输入依据"
   ],
   "eraCycle": [
-    "connected",
-    "roundDrivers:eraCycle.tick",
-    "零参时代轮转"
+    "manual",
+    "writeDesk:eraCycle.tick",
+    "推进指定周期需要实际经过的天数"
   ]
 };
   function probeFull() {

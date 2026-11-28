@@ -77,6 +77,15 @@
   // ── 串行推演链 ──
   let currentTask = null;
   let pendingAnchor = null;
+  function queueNext(anchor, reason, manual) {
+    if (pendingAnchor?.finish) pendingAnchor.finish({ ok: false, reason: 'superseded' });
+    const next = { anchor, reason, chat: WA.store.chatId() };
+    pendingAnchor = next;
+    __simMark('skipped', 'queued', anchor.idx);
+    const reply = { ok: true, queued: true };
+    if (manual) reply.completion = new Promise(resolve => { next.finish = resolve; });
+    return reply;
+  }
   let taskSeq = 0;
 
   function latestAnchor() {
@@ -328,7 +337,7 @@
       }
       const anchor = latestAnchor();
       if (!anchor) return __simSkip('no-chat', anchor && anchor.idx);
-      if (currentTask) { __simMark('skipped', 'queued', anchor && anchor.idx); pendingAnchor = { anchor, reason }; return { ok: true, queued: true }; }
+      if (currentTask) return queueNext(anchor, reason, false);
       return this._start(anchor, reason);
     },
 
@@ -336,7 +345,7 @@
     forceSimulate() {
       const anchor = latestAnchor();
       if (!anchor) return __simSkip('no-chat', anchor && anchor.idx);
-      if (currentTask) { __simMark('skipped', 'queued', anchor && anchor.idx); pendingAnchor = { anchor, reason: 'manual' }; return { ok: true, queued: true }; }
+      if (currentTask) return queueNext(anchor, 'manual', true);
       return this._start(anchor, 'manual');
     },
 
@@ -515,7 +524,12 @@
         }
         // v2.403.0：result 为空 ⇒ 推演没产出（通道未配置已在 _runInference 记 channel-unset；
         //   此处兜底 no-result，防止「静默冒充成功」再次骗过玩家面）。
-        if (__simHealth.state === 'running') __simMark('skipped', 'no-result', anchor && anchor.idx);
+        if (!result) {
+          const why = __simHealth.reason === 'channel-unset' ? 'channel-unset' : 'no-result';
+          if (why === 'no-result') __simMark('skipped', why, anchor.idx);
+          WA.emit('backstage:failed', { id, anchor, reason: why });
+          return { ok: false, reason: why };
+        }
         WA.emit('backstage:settled', { id, anchor });
         __simMark('ok', 'settled', anchor && anchor.idx);
         // v2.407.0（三缝①）：结算成功 ⇒ 本轮吃过的楼层算「已读」，把书签推进到该锚。
@@ -532,7 +546,16 @@
         return { ok: false, error: e };
       } finally {
         currentTask = null;
-        if (pendingAnchor) { const p = pendingAnchor; pendingAnchor = null; this._start(p.anchor, p.reason || 'catch-up'); }
+                if (pendingAnchor) {
+          const p = pendingAnchor;
+          pendingAnchor = null;
+          if (p.chat !== WA.store.chatId()) {
+            p.finish?.({ ok: false, reason: 'chat-changed' });
+          } else {
+            const run = this._start(p.anchor, p.reason || 'catch-up');
+            if (p.finish) run.then(p.finish, error => p.finish({ ok: false, error }));
+          }
+        }
       }
     },
 
@@ -600,7 +623,7 @@
         //   后果：模型按契约必然不给 ⇒ 两轴**由构造即死**（恒 undefined），而引擎侧一切正常，
         //   静态锁全绿。这是「声明面承认、契约面缺席」的同型病（对照 v2.37.0 实体清单只进不出）。
         ' "relation_update": [{"name":"持有者","target":"对象","intimacy":0-100,"trust":0-100,"hostility":0-100,"vigilance":0-100,"attachment":0-100,"boundary_status":"...","relationship_aftereffect":"..."}]（只写本轮确实发生变化的关系；数值为**变化后**的新值，本引擎按单次±20硬边界截断，请勿为保证生效而反复加码。attachment 是独立于亲密度的「依恋」，boundary_status/relationship_aftereffect 描述关系边界状态与后遗症，均非必填）,',
-        ' "currents": [{"title":"...","summary":"...","visibility":"hidden|trace|known|direct","publicity":"private|trace|public","public_trace":"...","stage":"...","causes":[],"participants":[]}],',
+        ' "currents": [{"title":"...","summary":"...","visibility":"hidden|trace|known|direct","publicity":"private|trace|public","public_trace":"...","publicPlace":"公开迹象实际出现的已登记地点；未明确则留空，不填幕后地点","stage":"...","causes":[],"participants":[]}],',
         ' "knowledge_updates": [{"person":"...","about":"...","status":"fact|suspected","route":"witnessed|told|investigated|message|public_channel|inferred"}],',
         ' "echoes": [{"refCurrent":"事件标题","result":"...","exposure":"subtle|obvious"}],',
         ' "chronicle": [{"kind":"event|fact|pulse","title":"...","summary":"...","refs":[]}]（refs：可选的楼层引用数组，元素形如 m77；不给则引擎按本次结算楼层自动锚定）',
@@ -852,7 +875,10 @@
           old.stage = c.stage || old.stage;
           old.visibility = c.visibility || old.visibility;
           old.publicity = c.publicity || old.publicity || 'private';
-          old.public_trace = c.public_trace || old.public_trace;
+          const priorTrace = old.public_trace;
+          old.public_trace = c.public_trace || priorTrace;
+          if (typeof c.publicPlace === 'string') old.publicPlace = c.publicPlace.trim().slice(0, 40);
+          else if (c.public_trace && c.public_trace !== priorTrace) old.publicPlace = '';
           old.updatedAt = now;
         } else if (created < LIMITS.currents_new) {
           created++;
@@ -862,6 +888,7 @@
             visibility: c.visibility || 'hidden',
             publicity: c.publicity || 'private',
             public_trace: c.public_trace || '',
+            publicPlace: typeof c.publicPlace === 'string' ? c.publicPlace.trim().slice(0, 40) : '',
             causes: c.causes || [], participants: c.participants || [],
             stage: c.stage || '发展', createdAt: now, updatedAt: now,
             branchId: anchorBranchId(anchor)

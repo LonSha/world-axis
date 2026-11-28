@@ -45,6 +45,7 @@
     'dormantLadder',
     'consequenceSchedule',
     'appointment',
+    'socialEncounter',
     'timeLedger',
     'hearsayLedger',
     'farAccount',
@@ -283,6 +284,7 @@ style: false,
         // v2.591.0（R266 / NAR-1）：引导弧。取 true —— 它自己的总开关默认关（__REG.def.enabled=false），
         //   两开关同时开才会有内容；只开这里等于零 token。
         arcGuideBridge: true,
+        socialEncounter: true,
         worldBrief: true, offstageQueue: true, actStep: true, tracePost: true, misbelief: true, threadSprout: true, dormantLadder: true, consequenceSchedule: true, appointment: true, timeLedger: true, hearsayLedger: true, farAccount: true, interlude: true, letterPost: true,
         // v2.96.0：传播与辟谣。取默认 true（同四条理由——其模块总开关默认为关）。
         // v2.99.0：原著幕目。同一条理由——其模块总开关默认为关，故注入面取默认 true。
@@ -440,6 +442,8 @@ style: false,
     } catch (e) {}
   }
   function recordUninject(trigger, result) {
+    // During CHAT_CHANGED the host names the destination, but slots belong to the source.
+    if (trigger === 'chat-changed') return;
     try {
       __uninjectLedger.push({ at: clockNow('render.inject'), chat: ledgerChatId(), trigger: trigger || 'unknown', ok: !!result.ok, reason: result.reason || null, cleared: result.cleared || [] });
       if (__uninjectLedger.length > 20) __uninjectLedger.splice(0, __uninjectLedger.length - 20);
@@ -702,6 +706,7 @@ style: false,
     dormantLadder: '暗线阶梯',
     consequenceSchedule: '该来的事',
     appointment: '说好的事',
+    socialEncounter: '亲历偶遇',
     timeLedger: '时间与期限',
     hearsayLedger: '听来的',
     farAccount: '别处也在走',
@@ -1182,6 +1187,10 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
     });
     return out;
   }
+  function appointmentSpeaker() {
+    const ctx = WA.compat?.context?.();
+    return ctx && ctx.groupId == null && ctx.characterId != null ? ctx.name2 : null;
+  }
   function engineFailureCount() {
     return Object.keys(engineFailures).reduce(function (a, k) { return a + engineFailures[k].count; }, 0);
   }
@@ -1394,7 +1403,8 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       //   整个世界状态块打成空（而这一段是注入的根：它没了，模型看到的时间/背景/人物/
       //   暗流/回声一起消失，现场只是一条英文 TypeError）。口径：坏的那段不进文本并留痕，
       //   其余段照常产出——「少一块」远好过「全没有」。
-      try { if (vis.clock && s.clock && s.clock.label) parts.push('【世界时间】' + s.clock.label); }
+      try { if (vis.clock && s.clock && s.clock.label) parts.push('【世界时间】' + s.clock.label
+        + '。按本轮实际经历推进：完整上课、训练、实验等按课表或合理时长叙述，不把数小时写成几分钟。跨过整段时用“两小时后，……”等明确过渡；只写开头、片段或并行行动，不预支或重复计算整段。'); }
       catch (e) { noteEngineFailure('clock', e); }
       try { if (vis.pulse && s.worldPulse) parts.push('【世界脉搏】压力' + s.worldPulse.pressure + '/3（' + s.worldPulse.trend + '）' + (s.worldPulse.note || '')); }
       catch (e) { noteEngineFailure('pulse', e); }
@@ -2045,7 +2055,14 @@ humanRealism: 'worldaxis_human_realism_settings_v1',
       if (vis.threadSprout && WA.threadSprout) { const b = engineCall('threadSprout', function () { return WA.threadSprout.buildBlock(); }); if (b) items.push({ source: '长出来的线', content: b }); }
       if (vis.dormantLadder && WA.dormantLadder) { const b = engineCall('dormantLadder', function () { return WA.dormantLadder.buildBlock(); }); if (b) items.push({ source: '暗线阶梯', content: b }); }
       if (vis.consequenceSchedule && WA.consequenceSchedule) { const b = engineCall('consequenceSchedule', function () { return WA.consequenceSchedule.buildBlock(); }); if (b) items.push({ source: '该来的事', content: b }); }
-      if (vis.appointment && WA.appointment) { const b = engineCall('appointment', function () { return WA.appointment.buildBlock(); }); if (b) items.push({ source: '说好的事', content: b }); }
+      if (vis.appointment && WA.appointment) {
+        const b = engineCall('appointment', function () { return WA.appointment.buildBlock(appointmentSpeaker()); });
+        if (b) items.push({ source: '说好的事', content: b });
+      }
+      if (vis.socialEncounter && WA.socialEncounter) {
+        const b = engineCall('socialEncounter', function () { return WA.socialEncounter.buildBlock(); });
+        if (b) items.push({ source: '亲历偶遇', content: b });
+      }
       if (vis.timeLedger && WA.timeLedger) { const b = engineCall('timeLedger', function () { return WA.timeLedger.buildBlock(); }); if (b) items.push({ source: '时间与期限', content: b }); }
       if (vis.hearsayLedger && WA.hearsayLedger) { const b = engineCall('hearsayLedger', function () { return WA.hearsayLedger.buildBlock(); }); if (b) items.push({ source: '听来的', content: b }); }
       if (vis.farAccount && WA.farAccount) { const b = engineCall('farAccount', function () { return WA.farAccount.buildBlock(); }); if (b) items.push({ source: '别处也在走', content: b }); }
@@ -2452,7 +2469,8 @@ wasChars: (function () { const it = items[f.id]; return it && typeof it.content 
         // v0.1.29: 撤销状态回写快照——槽位已清空但证据保留（幂等重放依赖 keys），
         // 诊断读到这里不应再把上一轮注入当作「仍在生效」的活证据
         try {
-          if (WA.store && cleared.length) WA.store.transact(function (d) {
+          // The old cache is still needed for slot keys; never persist it under the new chat ID.
+          if (trigger !== 'chat-changed' && WA.store && cleared.length) WA.store.transact(function (d) {
             if (d.lastInjection) { d.lastInjection.injected = false; d.lastInjection.clearedAt = clockNow('render.inject'); d.lastInjection.clearedBy = trigger || 'manual'; }
           });
         } catch (e) {}

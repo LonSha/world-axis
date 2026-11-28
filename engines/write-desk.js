@@ -69,7 +69,7 @@
     reasoning: ['directive'],
     storyTone: ['set', 'clear'],
     temperament: ['setTemperament'],
-    eraCycle: ['init'],
+    eraCycle: ['init', 'tick'],
     backstageTone: ['era', 'socialHint', 'noteAdd']
   };
 

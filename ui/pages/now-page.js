@@ -228,6 +228,7 @@
     return read.ok ? read.appointments.find(function (x) { return x && x.requestKey === ferryKey; }) : null;
   }
   const crossroads = '渡口岔路';
+  const ferryRelief = '值渡的兰姨';
   function ferryPosition(row) {
     const pos = WA.world.where(row.withWhom);
     if (!pos.ok) throw Error('position');
@@ -252,25 +253,186 @@
     }
     if (!WA.world.addRoad(from, '渡口', 10).ok || !WA.world.addRoad(from, '东市', 30).ok) throw Error('road');
   }
+  function careEntry(row) {
+    return ((store().careChain || {}).commitments || []).find(function (c) { return c && c.id === careId(row) && c.ward === '渡口伤员' && c.placeId === '渡口'; });
+  }
+  function sealItem(row) {
+    return ((store().gear || {}).items || []).find(function (x) { return x && x.requestKey === 'ferry-seal:' + row.id; });
+  }
+  function takeSeal(row) {
+    if (!row.reunion?.sealOffered || !WA.appointment.together(row.withWhom, ferryWho) || !WA.gear?.getSettings().enabled) return '现在不能交接。';
+    let item = sealItem(row);
+    if (!item) {
+      const name = '掌柜的私印';
+      const tx = WA.store.transact(function (d) {
+        for (const who of [ferryWho, row.withWhom]) {
+          if (!Object.values(d.people || {}).some(function (p) { return p && p.name === who; })) WA.registry.ensurePerson(d, 'p_' + who, who, 'ferry-story');
+        }
+        return WA.entities.upsert(d, 'object', { name: name }) !== 'skipped';
+      }, 'ferry:register-seal');
+      if (!tx.ok || tx.deferred) return '交接尚未确认。';
+      WA.gear.make(name, { holder: ferryWho, requestKey: 'ferry-seal:' + row.id });
+      item = sealItem(row);
+    }
+    if (!item || item.holder !== ferryWho) return '不能重复领取。';
+    const ack = WA.gear.lend(item.id, row.withWhom, { from: ferryWho });
+    return ack.ok && sealItem(row)?.holder === row.withWhom ? '你接过了掌柜的私印。' : '交接尚未确认。';
+  }
+  function departFor(who, from, to) {
+    const plan = WA.travelDesk.plan({ from: from, to: to });
+    return plan.ok ? WA.travelDesk.commit('depart', { person: who, from: from, to: to, stamp: plan.stamp }) : plan;
+  }
+  function npcDeparture(row) {
+    const npc = WA.world.where(ferryWho);
+    if (!npc.ok || npc.inTransit || npc.place === row.place) return;
+    // This optional opening establishes the fork as his origin only on its own starter map.
+    const fresh = !(store().world || {}).places?.length && !(store().world || {}).roads?.length;
+    if (!npc.place && !(npc.reason === 'no-journey' && fresh && ferryPosition(row).origin === crossroads)) return;
+    const origin = npc.place || crossroads;
+    prepareStarter(origin);
+    departFor(ferryWho, origin, row.place);
+  }
   function journeyControls(row, chat) {
     if (!WA.world || !WA.travelDesk) return '';
     function button(key, label) { return '<button type="button" class="wa-btn" data-ferry="' + key + '" data-row="' + esc(row.id) + '" data-chat="' + esc(chat) + '">' + esc(label) + '</button>'; }
     const pos = ferryPosition(row), from = pos.place || pos.origin, care = hasCare(row);
-    let html = care ? '<p>你已在渡口接手照护伤员。</p>' : '';
-    if (row.result !== '未到') return html;
-    if (pos.inTransit) return html + '<p>' + esc(pos.from + ' → ' + pos.to + '，还剩 ' + pos.left + ' 分钟。') + '</p>' + button('arrive', '查看是否抵达');
+    const entry = careEntry(row);
+    let html = entry ? '<p>你曾在渡口接手照护。</p>' : '';
+    if (!Object.values(store().people || {}).some(p => p?.name === ferryWho)) html += button('remember', '把阿舟记入人物手札');
+    if (entry) {
+      const chain = store().careChain;
+      const queued = chain.publicQueue?.some(q => q.commitmentId === entry.id);
+      const ref = chain.referrals?.find(r => r.commitmentId === entry.id && entry.referralHistory?.includes(r.id) && r.toCaregiver === entry.caregiver);
+      const gap = chain.breaches?.filter(b => b.commitmentId === entry.id).length || 0;
+      html += '<p>' + esc((queued ? '伤员已登记候诊。' : '') + (ref ? ref.toCaregiver + '已接班。' : entry.status === 'queued' ? '伤员正在候诊，尚无人接班。' : entry.status === 'delayed' ? '照护有了空档。' : '目前没有接班记录。') + (gap ? '缺席记录：' + gap + ' 次。' : '')) + '</p>';
+      if (care && pos.arrived && from === '渡口') {
+        if (entry.status === 'active') html += button('queue', '为伤员登记候诊');
+        const relief = WA.world.where(ferryRelief);
+        if (relief.arrived && relief.place === from) html += entry.reliefVolunteer === ferryRelief ? button('handoff', '和兰姨当面交班') : button('call', '问兰姨能否替班');
+        else if (relief.inTransit && relief.to === from) html += button('walk', '在渡口等兰姨（行程十分钟）');
+        else if (relief.reason === 'no-journey') html += button('call', '向岔路的兰姨喊一声，请她替班');
+      }
+    }
+    if (pos.inTransit) return html + '<p>' + esc(pos.from + ' → ' + pos.to + '，还剩 ' + pos.left + ' 分钟。') + '</p>' + button('walk', '沿路前行十分钟') + button('arrive', '查看是否抵达');
+    if (!row.reunion && pos.arrived && (from === row.place || from === '渡口')) html += '<p>现在是第 ' + esc(WA.evolution.roundOf()) + ' 轮。</p>' + button('wait', from === '渡口' && care ? '守着伤员（世界演化一轮）' : '在这里等候（世界演化一轮）');
+    if (row.result !== '未到') {
+      if (row.reunion) {
+        html += '<p>' + esc('第 ' + row.reunion.round + ' 轮 · ' + row.reunion.place + '。' + row.reunion.line) + '</p>';
+        const item = sealItem(row);
+        if (item?.holder === row.withWhom) return html + (item.uses ? '<p>你曾出示过这枚私印。</p>' : from === row.place && pos.arrived ? button('show', '在东市出示私印') : '');
+        return html + (row.reunion.sealOffered && WA.appointment.together(row.withWhom, ferryWho) && (!item || item.holder === ferryWho) ? button('seal', '接过私印') : '');
+      }
+      if (WA.evolution.roundOf() <= row.atRound) return html + '<p>阿舟还有话留到下次见面。</p>';
+      return html + (WA.appointment.together(row.withWhom, ferryWho) ? button('reunion', '再见阿舟') : (from && from !== row.place && !pos.inTransit ? button('market', '去东市找阿舟') : '<p>还没有碰见阿舟。</p>'));
+    }
     if (!from) return html + '<p>行程已中止，当前位置未确认。</p>';
     html += '<p>' + esc(pos.place ? '当前位置：' + from : '本次出发地：' + from) + '</p>';
-    if (pos.arrived && from === row.place) html += button('meet', '向阿舟报到');
+    if (pos.arrived && from === row.place) html += WA.appointment.together(row.withWhom, ferryWho) ? button('meet', '向阿舟报到') : '<p>你到了东市，还没碰见阿舟。</p>';
     else if (from !== row.place) html += button('market', '去东市赴约');
     if (pos.arrived && from === '渡口') {
-      if (!care) html += button('aid', '接手照护渡口伤员');
+      if (!entry) html += button('aid', '接手照护渡口伤员');
       if (WA.evolution.roundOf() > row.to) html += button('miss', '确认错过东市之约');
-    } else if (from !== '渡口' && !care) html += button('ferry', '去渡口帮伤员');
+    } else if (from !== '渡口' && !entry) html += button('ferry', '去渡口帮伤员');
     return html;
   }
   function ferryAction(row, action) {
+    if (action === 'remember') {
+      const tx = WA.store.transact(d => {
+        if (Object.values(d.people || {}).some(p => p?.name === ferryWho)) return true;
+        return WA.registry.ensurePerson(d, 'p_' + ferryWho, ferryWho, 'ferry-story').row?.name === ferryWho;
+      }, 'ferry:remember');
+      return tx?.ok && !tx.deferred && Object.values(store().people || {}).some(p => p?.name === ferryWho)
+        ? '阿舟已记在人物手札里。' : '尚未确认记入。';
+    }
     const pos = ferryPosition(row), who = row.withWhom, from = pos.place || pos.origin;
+    const atFerry = pos.arrived && from === '渡口';
+    if (action === 'call' || action === 'handoff') {
+      if (!atFerry || !hasCare(row)) return '现在不能交班。';
+      const relief = WA.world.where(ferryRelief);
+      if (action === 'call') {
+        const present = relief.arrived && relief.place === from;
+        if (!present) {
+          if (relief.reason !== 'no-journey') return '请先确认兰姨的行程。';
+          const ack = departFor(ferryRelief, crossroads, from);
+          const back = WA.world.where(ferryRelief);
+          if (!ack.ok || !back.inTransit || back.to !== from) return '尚未确认有人来替班。';
+        }
+        const tx = WA.store.transact(d => {
+          const c = d.careChain?.commitments?.find(x => x.id === careId(row) && x.caregiver === who);
+          if (!c) return false;
+          c.reliefVolunteer = ferryRelief;
+          return true;
+        }, 'ferry:volunteer');
+        if (!tx?.ok || tx.deferred || careEntry(row)?.reliefVolunteer !== ferryRelief) return '替班意愿尚未确认。';
+        return present ? '兰姨看过伤员，点头说：「我来替你。」' : '兰姨从岔路应了一声：「我来替你。」她还在路上。';
+      }
+      if (!relief.arrived || relief.place !== from) return '兰姨还没到渡口。';
+      if (careEntry(row)?.reliefVolunteer !== ferryRelief) return '兰姨尚未答应接班。';
+      const ack = WA.careChain.referCare({ commitmentId: careId(row), toCaregiver: ferryRelief, resourceUsed: '值守', resourceCost: 0, reason: 'ferry-face-to-face' });
+      const back = careEntry(row);
+      return ack.ok && back?.caregiver === ferryRelief && back.referralHistory?.includes(ack.referral?.id) ? '兰姨在伤员身边坐下，接过了你的班。' : '尚未确认交班。';
+    }
+    if (action === 'walk') {
+      const waiting = !pos.inTransit && atFerry && hasCare(row) && WA.world.where(ferryRelief).to === from && WA.world.where(ferryRelief).inTransit;
+      if (!pos.inTransit && !waiting) return '没有可推进的行程。';
+      const traveller = waiting ? ferryRelief : who;
+      const before = WA.world.where(traveller);
+      const people = [who, ferryWho, ferryRelief];
+      const prior = people.map(name => WA.world.where(name));
+      const ack = WA.world.advance(Math.min(10, before.left), { channel: 'person', people });
+      const back = WA.world.where(traveller);
+      if (!ack.ok) return '行程尚未确认。';
+      // Use committed travel, not the button label (the last leg may be shorter).
+      const walked = (a, b) => !a.inTransit ? 0 : b.arrived && b.place === a.to ? a.left :
+        b.inTransit && b.from === a.from && b.to === a.to ? a.left - b.left : 0;
+      const elapsed = walked(before, back);
+      if (elapsed > 0) {
+        const contacts = new Map(Object.entries(store().people || {}).map(([id, p]) => [p?.name, id]));
+        people.forEach((name, i) => {
+          const next = WA.world.where(name);
+          const staying = name === who && waiting && prior[i].arrived && next.arrived && prior[i].place === next.place;
+          const minutes = staying ? elapsed : walked(prior[i], next);
+          if (!(minutes > 0)) return;
+          const actor = name === who ? 'player' : contacts.get(name) || name;
+          WA.toxicMetabolism?.metabolize(actor, minutes);
+          if (staying) WA.engines?.environmentalHazard?.evaluateExposure(actor, next.place, minutes, {});
+        });
+      }
+      return back.arrived && back.place === before.to ? traveller + '已抵达' + back.place + '。' : back.inTransit && back.left < before.left ? '还剩 ' + back.left + ' 分钟。' : '行程尚未确认。';
+    }
+    if (action === 'wait') {
+      if (row.reunion || !pos.arrived || (!atFerry && from !== row.place)) return '现在不能守候。';
+      const before = WA.evolution.roundOf();
+      WA.evolution.tick();
+      return WA.evolution.roundOf() === before + 1 ? '你又等了一轮。现在是第 ' + (before + 1) + ' 轮。' : '轮次尚未确认。';
+    }
+    if (action === 'seal') return takeSeal(row);
+    if (action === 'show') {
+      const item = sealItem(row);
+      if (!pos.arrived || from !== row.place || !item || item.holder !== who || item.uses) return '不能出示私印。';
+      const ack = WA.gear.use(item.id, { by: who });
+      return ack.ok && sealItem(row)?.uses === 1 ? '你在东市出示了私印。' : '出示尚未确认。';
+    }
+    if (action === 'queue') {
+      const c = careEntry(row);
+      if (!pos.arrived || from !== '渡口' || c?.caregiver !== who || c.status !== 'active') return '现在不能登记候诊。';
+      WA.careChain.queueForPublicCare({ commitmentId: c.id });
+      return careEntry(row)?.status === 'queued' ? '已登记候诊，尚未交接。' : '候诊尚未确认。';
+    }
+    if (action === 'reunion') {
+      const bond = safe(function () { return WA.fondness.read(ferryWho); }, null);
+      const lines = { '到场': '阿舟替你挪出一条长凳：「上回你准时到，我跟掌柜提过你了。坐，我来引见。」', '迟到': '阿舟收起怀表：「上回总算等到你。这回我先告诉你铺子在哪，别再错过开门。」', '失约': '阿舟没带你往铺子走：「上回我等到收摊。今天先把那天的事说清楚吧。」' };
+      if (!lines[row.result]) return '约定仍未结算。';
+      let line = lines[row.result];
+      if (careEntry(row)) line += '你提起渡口的伤员，他停下来听你讲。';
+      if (bond && bond.ok && Number.isFinite(bond.trust)) {
+        if (bond.trust >= 70) line += '他把掌柜的私印递给你：「这件先托给你。」';
+        else if (bond.trust <= 30) line += '他把私印收回袖里：「这件暂时由我拿着。」';
+      }
+      const ack = WA.appointment.revisit({ id: row.id, who: ferryWho, line: line, sealOffered: !!(bond && bond.ok && Number.isFinite(bond.trust) && bond.trust >= 70) });
+      const back = ferryRow();
+      return ack.ok && !ack.deferred && back && back.id === row.id && back.reunion ? '重逢已记入这场约定。' : '现在还见不到阿舟。';
+    }
     if (action === 'arrive' && pos.inTransit) {
       const r = WA.world.arrive(who);
       if (!r.ok) return r.reason === 'still-in-transit' ? '还在路上。' : '抵达尚未确认。';
@@ -285,15 +447,22 @@
       if (!plan.ok) return '未能出发：' + (plan.reason || plan.fault);
       const ack = WA.travelDesk.commit('depart', { person: who, from: from, to: to, stamp: plan.stamp });
       const back = ferryPosition(row);
-      return ack.ok && back.inTransit && back.to === to ? '已经出发，尚未抵达。' : '未确认出发：' + (ack.reason || ack.fault || '未读到行程');
+      const moving = ack.ok && back.inTransit && back.to === to;
+      const c = careEntry(row);
+      if (moving && from === '渡口' && c?.caregiver === who && ['active','queued'].includes(c.status)) {
+        WA.careChain.reportCareAbsence(c.id, 'left-ferry');
+        return careEntry(row)?.status === 'delayed' ? '已经出发，渡口暂时无人接你的班。' : '已经出发，照护交接尚未确认。';
+      }
+      return moving ? '已经出发，尚未抵达。' : '未确认出发：' + (ack.reason || ack.fault || '未读到行程');
     }
     if (!pos.arrived) return '尚未确认抵达。';
     if (action === 'aid' && from === '渡口') {
-      if (!hasCare(row)) WA.careChain.registerCareCommitment({ id: careId(row), caregiver: who, ward: '渡口伤员', placeId: '渡口' });
+      if (!careEntry(row)) WA.careChain.registerCareCommitment({ id: careId(row), caregiver: who, ward: '渡口伤员', placeId: '渡口' });
       return hasCare(row) ? '你已接手照护，伤情仍需观察。' : '照护记录尚未确认。';
     }
     const round = WA.evolution.roundOf();
     if (!Number.isFinite(round)) return '当前轮次未确认。';
+    if (action === 'meet' && !WA.appointment.together(who, ferryWho)) return '还没有碰见阿舟。';
     const meet = action === 'meet' && from === row.place;
     if (meet && round < row.from) return '你到早了，第 ' + row.from + ' 轮再向阿舟报到。';
     if (!meet && !(action === 'miss' && from === '渡口' && round > row.to)) return '约定仍未结算。';
@@ -310,7 +479,7 @@
       + '<button type="button" class="wa-btn" id="wa-ferry-promise" data-chat="' + esc(chat) + '">答应阿舟，在东市见</button>'
       + '<p role="status" id="wa-ferry-status"></p></details>';
   }
-  function bindFerry(root) {
+  function bindFerry(root, onPromise) {
     const btn = root.querySelector('#wa-ferry-promise'), status = root.querySelector('#wa-ferry-status');
     function refresh(note) {
       const box = root.querySelector('[data-ferry-scene]');
@@ -318,7 +487,7 @@
       box.innerHTML = ferryCard();
       const live = box.querySelector('#wa-ferry-status');
       if (live) live.textContent = note;
-      bindFerry(root);
+      bindFerry(root, onPromise);
     }
     const actions = root.querySelectorAll ? root.querySelectorAll('[data-ferry]') : [];
     Array.from(actions).forEach(function (el) {
@@ -330,7 +499,7 @@
         el.disabled = true;
         try {
           const row = ferryRow();
-          const note = WA.appointment.getSettings().enabled && row && row.id === el.dataset.row && row.result === '未到'
+          const note = WA.appointment.getSettings().enabled && row && row.id === el.dataset.row && (row.result === '未到' || ['remember', 'reunion', 'market', 'seal', 'show', 'queue', 'walk', 'arrive', 'wait', 'call', 'handoff'].includes(el.dataset.ferry))
             ? ferryAction(row, el.dataset.ferry) : '这项约定已改变。';
           status.textContent = note;
           refresh(note);
@@ -348,8 +517,15 @@
         if (ack.deferred) { status.textContent = '约定仍待确认。'; return; }
         const row = ack.ok && ferryRow();
         if (!row || row.id !== ack.id) { status.textContent = '未能确认约定，请稍后重试。'; btn.disabled = false; return; }
+        if (!ack.repeated && WA.world && WA.travelDesk) safe(function () { npcDeparture(row); }, null);
         status.textContent = '东市见，第 ' + row.from + ' 至 ' + row.to + ' 轮。' + (ack.persisted === true ? '约定已保存。' : '当前对话可见，尚未确认落盘。');
-        refresh(status.textContent);
+        if (onPromise) {
+          const note = status.textContent;
+          onPromise(note);
+          const live = root.querySelector('#wa-ferry-status');
+          if (live) live.textContent = note;
+        }
+        else refresh(status.textContent);
       } catch (e) { status.textContent = '约定暂时无法确认。'; btn.disabled = false; }
     });
   }
@@ -392,7 +568,7 @@
     });
   }
 
-  WA.panelNowPage = { render: render, bind: bind, bindFerry: bindFerry, ver: '2.518.0' };
+  WA.panelNowPage = { render: render, bind: bind, ferryCard: ferryCard, bindFerry: bindFerry, ver: '2.518.0' };
   if (typeof WA.registerModule === 'function') {
     WA.registerModule('ui/pages/now-page.js', { kind: 'ui', ver: '2.518.0' });
   }

@@ -6,7 +6,7 @@
  "uiCount": 26,
  "nsCount": 608,
  "totals": {
-  "loadEdges": 491,
+  "loadEdges": 492,
   "hardEdges": 0,
   "callRefs": 798,
   "ghostRefs": 0
@@ -1244,7 +1244,9 @@
    "callRefs": [],
    "ghostRefs": [],
    "stateKeys": [],
-   "consumedBy": []
+   "consumedBy": [
+    "engines/calendar.js"
+   ]
   },
   "engines/backstage-protocols.js": {
    "ns": [
@@ -2103,9 +2105,11 @@
     "calendar"
    ],
    "requires": [
+    "on",
     "workflow"
    ],
    "requiresFiles": [
+    "core/interceptor.js",
     "core/workflow.js"
    ],
    "providerOrderOk": true,

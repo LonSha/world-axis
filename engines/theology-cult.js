@@ -94,6 +94,8 @@
     const record = {
       sectId: sid,
       name: cleanStr(payload.name || sid, 60),
+      publicPlace: typeof payload.publicPlace === 'string' ? cleanStr(payload.publicPlace, 40) : '',
+      publicTeaching: typeof payload.publicTeaching === 'string' ? cleanStr(payload.publicTeaching, 100) : '',
       creed: cleanStr(payload.creed || 'Universal Truth', 100),
       orthodoxy: clamp(payload.orthodoxy !== undefined ? payload.orthodoxy : 70, 0, 100),
       fervor: clamp(payload.fervor !== undefined ? payload.fervor : 30, 0, 100),

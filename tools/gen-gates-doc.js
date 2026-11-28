@@ -45,7 +45,7 @@ const GATES = [
   // 八道之后的第九道：七族硬读数自洽。实测耗时 117s —— 故**不进快档**（MAX_MS 12000），
   //   只在本生成器里真跑一次抽读数。GATES_ALLOW_SLOW=0 可跳过它（只打印时用）。
   { rel: 'tests/readings-v2106.js', name: 'readings-v2106', slow: true,
-    re: /现场 refs\s*(\d+)\s*\/\s*命名空间\s*(\d+)\s*\/\s*成员\s*(\d+)/ },
+    re: /(?:现场 refs|概要：读数族\s*\d+\s*态\s*·\s*现场 refs)\s*(\d+)\s*\/\s*命名空间\s*(\d+)\s*\/\s*成员\s*(\d+)/ },
 ];
 
 /** 真跑一个门禁，返回 {name, rc, ms, readings, raw}。不抛。 */

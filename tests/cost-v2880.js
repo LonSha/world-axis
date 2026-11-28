@@ -117,6 +117,8 @@ function runAll(a) {
     a(miss.length === 0, 'v2880: [A1] PRIORITY 的 ' + priKeys.length + ' 个源全部被科目表盖住（缺: ' + (miss.join('/') || '无') + '）');
     a(accKeys.length === priKeys.length, 'v2880: [A2] 科目表条目数等于源面数（实 ' + accKeys.length + ' vs ' + priKeys.length + '）——多登记或漏登都会现形');
     const empty = accKeys.filter(function (k) { return !k; });
+    a(new Set(priKeys).size === priKeys.length && new Set(accKeys).size === accKeys.length,
+      'v2880: [A2] 优先级表与科目表各自无重复源名');
     a(empty.length === 0, 'v2880: [A2] 每条都带真名（空名: ' + empty.length + '）');
     a(s.indexOf(ANCHOR_MAIN) >= 0, 'v2880: [A3] 账本主键取自调用方交来的成本表（旧形从注入项清单出发，本版修的真缺陷）');
     a(s.indexOf('unmeasuredCount: unmeasured.length') >= 0, 'v2880: [A3] 非计量项单独成账（unmeasuredCount）');

@@ -153,10 +153,13 @@
       const b = ensure(draft);
       if (b.items.length >= cfg.maxItems) { out = { ok: false, reason: 'items-full', cap: cfg.maxItems }; return false; }
       const now = clockNow('gear');
+      const requestKey = clean(o.requestKey, 100);
+      if (requestKey && b.items.some(function (x) { return x && x.requestKey === requestKey; })) return false;
       const id = 'gr_' + now + '_' + b.items.length;
       const row = { id: id, name: nm, holder: holder, carry: carry, place: clean(o.place, 40),
         uses: 0, durability: dur, maxDurability: cfg.maxDurability, repairs: 0, slot: '',
         at: now, updatedAt: now };
+      if (requestKey) row.requestKey = requestKey;
       b.items.push(row);
       WA.evict.array(b.items, 'gear.items', cfg.maxItems);
       out = { ok: true, id: id, name: nm, holder: holder, carry: carry,

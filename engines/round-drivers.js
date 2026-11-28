@@ -59,7 +59,7 @@
    *   · quota.tick()        配额老化与过期 —— 零参
    *   · spotlight.idle()    久缺名单结算 —— 零参（读默认阈值）
    *   · rhythmLoop.step()   节奏环相位推进 —— 零参（不 rewind）
-   *   · eraCycle.tick()     时代轮转推进 —— 零参
+   *   · eraCycle.tick(name, dayDelta, nextEvent) needs calendar evidence; a bare round cannot advance it.
    */
   // V11 OPV11-3 口径：本名单不再自己写死 —— **从 l3Registry 派生**，避免两处各写一份。
   //   现场实测（v11p3e）确认基线七台之外另有三台是零参可驱动的纯状态机，
@@ -75,7 +75,7 @@
     { engine: 'quota', method: 'tick', from: 'baseline' },
     { engine: 'spotlight', method: 'idle', from: 'baseline' },
     { engine: 'rhythmLoop', method: 'step', from: 'baseline' },
-    { engine: 'eraCycle', method: 'tick', from: 'baseline' }
+    { engine: 'eraCycle', method: 'tick', from: 'baseline', needsDays: true }
   ];
   const DRIVERS = (function () {
     const out = BASE_DRIVERS.slice();
@@ -108,6 +108,7 @@
     stat.runs++;
     let called = 0, driven = 0, disabled = 0, threw = 0;
     DRIVERS.forEach(function (d) {
+      if (d.needsDays) return; // Explicit day deltas go through the write desk or a dated cascade.
       const eng = WA[d.engine];
       if (!eng || typeof eng[d.method] !== 'function') { note('engine-missing:' + d.engine); return; }
       let res = null;
@@ -126,7 +127,7 @@
     const cfg = settings();
     return {
       enabled: !!cfg.enabled,
-      drivers: DRIVERS.map(function (d) { return d.engine + '.' + d.method + '()'; }),
+      drivers: DRIVERS.map(function (d) { return d.engine + '.' + d.method + (d.needsDays ? '(name, dayDelta, nextEvent)' : '()'); }),
       stat: JSON.parse(JSON.stringify(stat))
     };
   }

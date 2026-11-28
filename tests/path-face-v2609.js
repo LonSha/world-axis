@@ -92,10 +92,23 @@
 
   /** 本轮校正的四处（每处都要仍然「指得出去」）。 */
   const FIXED = [
-    ['core/clock.js', 49, 'core/replay.js', 'history'],
-    ['engines/reject-recovery-tables.js', 890, 'engines/player-archive.js', 'present'],
-    ['engines/inspector-state.js', 5, 'engines/inject-inspector.js', 'present'],
-    ['index.js', 2261, 'engines/inspector.js', 'history'],  ];
+    ['core/clock.js', 'core/replay.js', 'history'],
+    ['engines/reject-recovery-tables.js', 'engines/player-archive.js', 'present'],
+    ['engines/inspector-state.js', 'engines/inject-inspector.js', 'present'],
+    ['index.js', 'engines/inspector.js', 'history'],
+  ];
+
+  function checkFixed(scanResult, [rel, ref, expected]) {
+    const hits = [];
+    for (const kind of ['present', 'history', 'stale', 'upstream', 'placeholder']) {
+      for (const r of scanResult[kind]) {
+        if (r.ref === ref && r.site.startsWith(rel + ':')) hits.push({ kind, site: r.site });
+      }
+    }
+    const label = rel + ' → ' + ref;
+    assert.strictEqual(hits.length, 1, label + ' 命中 ' + hits.length + '：' + hits.map(r => r.site).join(', '));
+    assert.strictEqual(hits[0].kind, expected, hits[0].site + ' 分类为 ' + hits[0].kind + '，期望 ' + expected);
+  }
 
   /** 已知上游引用（12 条，每条必须带主体词；只减不增）。 */
   const UPSTREAM = [
@@ -138,18 +151,7 @@
       '现场缺失：[' + staleSites.join(',') + ']');
   });
   ok('B2 四处校正逐个复算：要么指向真文件，要么带「已删除/从未存在」标记', function () {
-    FIXED.forEach(function (row) {
-      const rel = row[0], ln = row[1], ref = row[2], kind = row[3];
-      assert.strictEqual(staleSites.indexOf(rel + ':' + ln), -1, rel + ':' + ln + ' 仍在缺失名单');
-      const line = lineOf(rel, ln);
-      assert.ok(line.indexOf(ref) >= 0, rel + ':' + ln + ' 行内找不到 ' + ref);
-      if (kind === 'present') {
-        assert.ok(fs.existsSync(path.join(BASE, ref)), ref + ' 不存在（改了名字但名字也不对）');
-      } else {
-        const win = [lineOf(rel, ln - 2), lineOf(rel, ln - 1), line, lineOf(rel, ln + 1), lineOf(rel, ln + 2)].join('\n');
-        assert.ok(HIST_RE.test(win), rel + ':' + ln + ' 是历史引用但没标（已删除/从未存在）');
-      }
-    });
+    FIXED.forEach(row => checkFixed(LIVE, row));
   });
   ok('B3 12 条上游引用：仍在原位、仍带主体词（不许把上游路径当本仓缺口）', function () {
     UPSTREAM.forEach(function (row) {
@@ -190,6 +192,21 @@
   });
   ok('C7 反控：裸文件名（无目录前缀）⇒ 不报', function () {
     assert.strictEqual(one('// 见 no-such-thing.js 的头部。\n').stale.length, 0);
+  });
+
+  ok('C8 校正只认指定文件：移动行号仍通过，换文件或缺失必报', function () {
+    const row = [PROBE, 'engines/act.js', 'present'];
+    const moved = one('\n\n// engines/act.js');
+    checkFixed(moved, row);
+    assert.throws(() => checkFixed(moved, ['index.js', row[1], row[2]]), /命中 0/);
+    assert.throws(() => checkFixed(one('// empty'), row), /命中 0/);
+  });
+  ok('C9 同文件重复或历史标记丢失必报', function () {
+    const row = [PROBE, 'engines/old-ghost.js', 'history'];
+    const text = '// 已删除 engines/old-ghost.js';
+    checkFixed(one(text), row);
+    assert.throws(() => checkFixed(one(text + '\n' + text), row), /命中 2/);
+    assert.throws(() => checkFixed(one('// engines/old-ghost.js'), row), /分类为 stale/);
   });
 
   // ══ D 零写 ══

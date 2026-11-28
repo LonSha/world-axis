@@ -120,7 +120,44 @@
     ok('N2 unanchored fallback pass');
   }
 
+  function runLayeredPrismV2616() {
+    // v2.616.0：只经公开 API 验分层棱镜缝合（不新增导出面）。
+    // 同人同种子重复建档 => 三层逐字同签（Skill 的主/副模型同签口径）。
+    PA.registerAnchor('棱镜甲', { coreTraits: ['克制'], autoPrism: true, prismSeed: 'seed-42' });
+    const a1 = PA.getAnchor('棱镜甲');
+    a(a1.surface && a1.deep && a1.deep.coreConflict && a1.private && a1.private.history, 'three stages filled');
+    PA.registerAnchor('棱镜甲', { coreTraits: ['克制'], autoPrism: true, prismSeed: 'seed-42' });
+    const a2 = PA.getAnchor('棱镜甲');
+    a(a1.surface === a2.surface && a1.deep.coreConflict === a2.deep.coreConflict && a1.private.history === a2.private.history, 'same person + same seed => identical prism');
+    ok('v2.616.0 deterministic prism via public API pass');
+
+    // 多种子必须出现差异（证明确定性随机真在抽，而非恒定值）。
+    const surfaces = {};
+    for (let i = 0; i < 12; i++) {
+      const who = '棱镜种子' + i;
+      PA.registerAnchor(who, { coreTraits: ['克制'], autoPrism: true, prismSeed: 'seed-' + i });
+      surfaces[PA.getAnchor(who).surface] = 1;
+    }
+    a(Object.keys(surfaces).length >= 2, 'different seeds => prism variety');
+    ok('v2.616.0 seeded variety pass');
+
+    // 双轨归一化 + 开放 Schema（未知字段原样进 ext）。
+    const regC = PA.registerAnchor('棱镜丙', { coreTraits: ['克制'], autoPrism: true, prismSeed: 'seed-43', bondTier: '过命交情', romanceTier: '暗恋', intimateMode: '冻结', customFutureField: { keep: '开放 Schema 原样保留' } });
+    a(regC.ok, 'normalized-tier anchor registered');
+    const c = PA.getAnchor('棱镜丙');
+    a(c.bondTier === '生死莫逆' && c.romanceTier === '暗生情愫' && c.intimateMode === '普通', 'tiers normalized & stored');
+    a(c.ext && c.ext.customFutureField && c.ext.customFutureField.keep === '开放 Schema 原样保留', 'open schema preserved in ext');
+    ok('v2.616.0 tiers normalization + open schema pass');
+
+    const block = PA.buildBlock();
+    a(block.indexOf('表层身份（Stage 0）') >= 0, 'buildBlock exposes stage0');
+    a(block.indexOf('深层人设（Stage 1）：内核矛盾=') >= 0, 'buildBlock exposes stage1');
+    a(block.indexOf('关系双轨：情分=生死莫逆 × 情愫=暗生情愫') >= 0, 'buildBlock exposes dual-tier readpoint');
+    ok('v2.616.0 injection readpoints pass');
+  }
+
   runPositive();
   runNegative();
+  runLayeredPrismV2616();
   console.log(`Summary: ${passed} passed, 0 failed`);
 })();

@@ -42,7 +42,12 @@ const ITEM_METHOD = { memory: 'buildMemoryBlock', opinion: 'buildOpinionBlock', 
 //   哨兵不能像 buildBlock 那样直接换字符串：分支里 `v.count`/`v.rows` 解引用会拼出空串。
 //   此处用**包壳哨兵**：替换后的 view 返回 { count:1, rows:[{…SENT…}] } 形态，
 //   分支照常拼装 ⇒ 哨兵文本随 rows.text 进产物，判的就是「开关 ⇒ 分支真的走没走」。
-const ITEM_WRAP = ['playerKnowledge', 'affectionDual', 'lifeProfile', 'suspenseLedger'];
+const ITEM_WRAP = ['playerKnowledge', 'affectionDual', 'lifeProfile', 'suspenseLedger', 'appearanceLexicon', 'arcGuideBridge'];
+// v2.615.0 补漏：appearanceLexicon 的产品分支不调引擎方法，而是 render/inject.js 内的
+//   lexiconHintBlock() 直接读 WA.appearanceLexicon.LEXICON 拼块；arcGuideBridge 的产品出口是
+//   buildBlock() 返回 {ok,text}，当前 armAll 直接替换成裸 tag 字符串会让 r.text 失效。
+//   两者都改用包壳哨兵，和上面 view 包壳同一纪律（换真读口、保留分支形状）。
+
 /** 稳定种子的配对抽样：同一份源码任何时候都抽样到同一批配对（结果可复现） */
 function pairsOf(list, max) {
   const out = [];
@@ -87,6 +92,30 @@ function armAll(WA) {
     // 装不上哨兵不许静默跳过：一旦跳过，tags 里已有 k ⇒ [前题]/[B]/[C] 会以
     // 「缺/误伤/漏」的形式误报到那个源头上，看起来像引擎缺陷，其实是判据表漏登记。
     // 这里把「装不上」单独收集起来，runAll 里作为独立判据判红并点名（可自证、可定位）。
+    if (k === 'appearanceLexicon') {
+      // data-only 词库：注入分支读 LEXICON 后由 lexiconHintBlock 拼装；哨兵塞进 L1 的第一个词。
+      if (!mod || !mod.LEXICON || typeof mod.LEXICON !== 'object') { unarmed.push(k + '→LEXICON(包装)'); return; }
+      const keepL = mod.LEXICON;
+      const wrapped = {};
+      Object.keys(keepL).forEach(function (layer) { wrapped[layer] = Object.assign({}, keepL[layer]); });
+      const firstLayerKey = Object.keys(wrapped)[0];
+      const firstLayer = firstLayerKey ? wrapped[firstLayerKey] : null;
+      if (firstLayer) {
+        const firstKey = Object.keys(firstLayer)[0];
+        if (firstKey) firstLayer[firstKey] = [tag].concat(Array.isArray(firstLayer[firstKey]) ? firstLayer[firstKey] : []);
+      }
+      mod.LEXICON = wrapped;
+      restores.push(function () { mod.LEXICON = keepL; });
+      return;
+    }
+    if (k === 'arcGuideBridge') {
+      // 对象返回形态：产品分支读 r.ok && r.text，不能替换成裸字符串。
+      if (!mod || typeof mod.buildBlock !== 'function') { unarmed.push(k + '→buildBlock(对象包装)'); return; }
+      const keepB = mod.buildBlock;
+      mod.buildBlock = function () { return { ok: true, text: tag }; };
+      restores.push(function () { mod.buildBlock = keepB; });
+      return;
+    }
     if (ITEM_WRAP.indexOf(k) >= 0) {
       // 包壳形态：view 返回对象，分支内联拼装。哨兵藏在 rows[0].text 里。
       if (!mod || typeof mod.view !== 'function') { unarmed.push(k + '→view(包装)'); return; }

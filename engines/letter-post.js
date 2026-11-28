@@ -58,19 +58,21 @@
     const r = round();
     const row = { id: 'lt_' + r + '_' + (stat.sent + 1), kind: 'letter', from: from, to: to,
       content: content, sentRound: r, arriveRound: r + delay, at: now(), verdict: '', repliedAt: 0 };
-    let wrote = false;
+    let tx;
     try {
       if (WA.store && WA.store.transact) {
-        WA.store.transact(function (d) {
+        tx = WA.store.transact(function (d) {
           d.chronicle = Array.isArray(d.chronicle) ? d.chronicle : [];
+          let n = stat.sent + 1;
+          while (d.chronicle.some(function (x) { return x && x.id === row.id; })) row.id = 'lt_' + r + '_' + (++n);
           d.chronicle.push(row);
           return true;
         }, 'letter:send');
-        wrote = true;
       }
-    } catch (e) { wrote = false; }
+    } catch (e) { tx = null; }
+    if (!tx || !tx.ok) return { ok: false, reason: 'write-failed' };
     stat.sent++;
-    return { ok: true, reason: wrote ? 'sent' : 'sent-no-store', id: row.id, arriveRound: row.arriveRound,
+    return { ok: true, reason: 'sent', id: row.id, arriveRound: row.arriveRound, deferred: !!tx.deferred, persisted: tx.persisted,
       note: '信在路上：' + delay + ' 轮后才可能到手' };
   }
 

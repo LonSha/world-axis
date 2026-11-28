@@ -23,6 +23,9 @@
 (function () {
   'use strict';
   const WA = window.WorldAxis = window.WorldAxis || {};
+  function displayReading(value) {
+    return String(value || '暂无读数').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
   const METHODS = {
   // ══ 段体开始（原 ui/panel.js 16971-17129 行，逐字搬迁，一个字符未改）══
     // v2.340.0 (V17 EXV17-9): 全息宏观因果与心智戏剧沙盘大盘渲染
@@ -68,15 +71,15 @@
           <div class="wa-holomap-header"><h4>WorldAxis 纪元全息态势仪表大盘</h4></div>
           <details class="wa-details" id="wa-epoch-holomap" open>
             <summary class="wa-summary">历史演进与纪元形态</summary>
-            <div class="wa-fold-body">${data.epoch || '文明演进平稳，当前处于承平纪元'}</div>
+            <div class="wa-fold-body">${displayReading(data.epoch)}</div>
           </details>
           <details class="wa-details" id="wa-cataclysm-holomap" open>
             <summary class="wa-summary">极端地貌灾变与迁徙流民</summary>
-            <div class="wa-fold-body">${data.hazard || '地壳板块稳固，暂无大尺度灾变'}</div>
+            <div class="wa-fold-body">${displayReading(data.hazard)}</div>
           </details>
           <details class="wa-details" id="wa-finance-holomap" open>
             <summary class="wa-summary">地下金融信用与挤兑预警</summary>
-            <div class="wa-fold-body">${data.finance || '流动性充裕，未侦测到钱庄暴雷'}</div>
+            <div class="wa-fold-body">${displayReading(data.finance)}</div>
           </details>
         `;
         container.appendChild(wrap);
@@ -108,35 +111,35 @@
           <div class="wa-hub-header"><h4>WorldAxis V21 文明盛衰与生态全景控制大盘</h4></div>
           <details class="wa-details" id="wa-theology-hub">
             <summary class="wa-summary">神权信仰天平与教派狂热</summary>
-            <div class="wa-fold-body">${data.theology || '四海向化，神权信仰平和自守'}</div>
+            <div class="wa-fold-body">${displayReading(data.theology)}</div>
           </details>
           <details class="wa-details" id="wa-regiment-hub">
             <summary class="wa-summary">战役军团排阵与阵线士气</summary>
-            <div class="wa-fold-body">${data.regiment || '营垒坚实，军容肃整'}</div>
+            <div class="wa-fold-body">${displayReading(data.regiment)}</div>
           </details>
           <details class="wa-details" id="wa-prison-hub">
             <summary class="wa-summary">刑狱地道与水牢禁闭档案</summary>
-            <div class="wa-fold-body">${data.prison || '囹圄安稳，门禁森严'}</div>
+            <div class="wa-fold-body">${displayReading(data.prison)}</div>
           </details>
           <details class="wa-details" id="wa-bloodline-hub">
             <summary class="wa-summary">宗族血脉信托与先祖诅咒</summary>
-            <div class="wa-fold-body">${data.bloodline || '昭穆序定，谱系传续无虞'}</div>
+            <div class="wa-fold-body">${displayReading(data.bloodline)}</div>
           </details>
           <details class="wa-details" id="wa-engineering-hub">
             <summary class="wa-summary">文明工程图纸与器械工坊</summary>
-            <div class="wa-fold-body">${data.engineering || '百工严谨，工坊按部就班'}</div>
+            <div class="wa-fold-body">${displayReading(data.engineering)}</div>
           </details>
           <details class="wa-details" id="wa-dungeon-hub">
             <summary class="wa-summary">地牢秘境迷宫与机关陷阱拓扑</summary>
-            <div class="wa-fold-body">${data.dungeon || '地宫虚静，陷阱静默待发'}</div>
+            <div class="wa-fold-body">${displayReading(data.dungeon)}</div>
           </details>
           <details class="wa-details" id="wa-eco-hub">
             <summary class="wa-summary">深层生态食物链与异化灾警</summary>
-            <div class="wa-fold-body">${data.eco || '林野自适，物种营养级稳态平衡'}</div>
+            <div class="wa-fold-body">${displayReading(data.eco)}</div>
           </details>
           <details class="wa-details" id="wa-court-hub">
             <summary class="wa-summary">深宫内斗派系与禁军兵权</summary>
-            <div class="wa-fold-body">${data.court || '君臣相得，宫廷法度清明'}</div>
+            <div class="wa-fold-body">${displayReading(data.court)}</div>
           </details>
         `;
         container.appendChild(wrap);
@@ -163,19 +166,19 @@
         wrap.innerHTML = `
           <details class="wa-details" id="wa-trauma-fold">
             <summary class="wa-summary">身体创伤与病理诊查</summary>
-            <div class="wa-fold-body">${data.toxicology || '经络血气平稳，未探得致命毒质'}</div>
+            <div class="wa-fold-body">${displayReading(data.toxicology)}</div>
           </details>
           <details class="wa-details" id="wa-blackmarket-fold">
             <summary class="wa-summary">隐秘市集与商誉信用</summary>
-            <div class="wa-fold-body">${data.blackmarket || '当前无逾期借贷，市井流水如常'}</div>
+            <div class="wa-fold-body">${displayReading(data.blackmarket)}</div>
           </details>
           <details class="wa-details" id="wa-shadow-network-fold">
             <summary class="wa-summary">暗中潜伏与眼线网络</summary>
-            <div class="wa-fold-body">${data.stealth || '未处于严密盯梢视锥盲区'}</div>
+            <div class="wa-fold-body">${displayReading(data.stealth)}</div>
           </details>
           <details class="wa-details" id="wa-naval-fold">
             <summary class="wa-summary">远洋水文与操舵航程</summary>
-            <div class="wa-fold-body">${data.maritime || '泊锚于安全港湾'}</div>
+            <div class="wa-fold-body">${displayReading(data.maritime)}</div>
           </details>
         `;
         container.appendChild(wrap);

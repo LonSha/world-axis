@@ -449,21 +449,65 @@ ok('此刻页实点：守约、救助后赶到、留在渡口失约和中止', f
   function start() {
     round = 4;
     W.store.transact(function (d) { d.world = {}; d.region = { places: [] }; d.actors = {}; delete d.careChain; }, 'test:ferry');
-    draw(); root.querySelector('#wa-ferry-promise').click();
+    root.innerHTML = page.render(); page.bindFerry(root, draw);
+    const previous = root.querySelector('#wa-ferry-status');
+    root.querySelector('#wa-ferry-promise').click();
+    const live = root.querySelector('#wa-ferry-status');
+    assert.notStrictEqual(live, previous); assert.ok(live.textContent.includes('东市见'));
     assert.ok(button('market') && button('ferry')); assert.strictEqual(row().result, '未到');
   }
   start(); click('market'); assert.strictEqual(W.world.where('你').left, 30);
   click('arrive'); assert.ok(!button('meet')); assert.strictEqual(row().result, '未到');
   W.world.advance(30); draw(); click('meet'); assert.strictEqual(row().result, '未到');
   round = 5; click('meet'); assert.strictEqual(row().result, '到场');
+  function revisit(trust, expected) {
+    assert.ok(!button('reunion'));
+    if (trust != null) assert.ok(W.fondness.apply('渡口的阿舟', { delta: 0.1, trust: trust }).ok);
+    round++; draw(); assert.ok(!row().reunion); click('reunion');
+    assert.ok(row().reunion.line.includes(expected));
+    assert.strictEqual(row().reunion.place, W.world.where('你').place);
+    assert.strictEqual(row().reunion.round, round); const original = row().reunion.line;
+    assert.ok(W.appointment.revisit({ who: '渡口的阿舟', id: row().id, line: '改写' }).repeated);
+    draw(); assert.ok(!button('reunion')); assert.strictEqual(row().reunion.line, original);
+    return original;
+  }
+  assert.ok(revisit(90, '上回你准时到').includes('先托给你'));
+  assert.ok(W.appointment.buildBlock('渡口的阿舟').includes('上回你准时到'));
+  assert.ok(!W.appointment.buildBlock('旁人').includes('[最近的会面]'));
+  assert.ok(!W.appointment.buildBlock().includes('[最近的会面]'));
+  assert.ok(!W.appointment.buildBlock('渡口的阿舟').includes('伤员'));
+  click('seal'); assert.strictEqual(W.store.get().gear.items.filter(x => x.requestKey === 'ferry-seal:' + row().id && x.holder === '你').length, 1);
+  draw(); assert.ok(!button('seal')); click('show'); draw(); assert.ok(!button('show'));
   start(); click('ferry'); assert.strictEqual(W.world.where('你').left, 10); assert.ok(!button('aid'));
   W.world.advance(10); draw(); click('aid'); draw(); assert.ok(!button('aid'));
   assert.strictEqual(W.store.get().careChain.commitments.length, 1); assert.strictEqual(row().result, '未到');
+  click('queue'); assert.strictEqual(W.store.get().careChain.publicQueue.length, 1); draw(); assert.ok(!button('queue')); assert.ok(root.textContent.includes('尚无人接班'));
   click('market'); assert.strictEqual(W.world.where('你').left, 40); W.world.advance(40);
   round = 7; draw(); click('meet'); assert.strictEqual(row().result, '迟到');
+  assert.strictEqual(W.store.get().careChain.breaches.length, 1);
+  const low = revisit(10, '铺子在哪'); assert.ok(low.includes('你提起渡口的伤员')); assert.ok(low.includes('暂时由我拿着')); assert.ok(!button('seal'));
   start(); click('ferry'); W.world.advance(10); round = 7; draw(); assert.ok(!button('miss'));
   round = 8; draw(); click('aid'); click('miss'); assert.strictEqual(row().result, '失约');
   start(); click('market'); W.world.stop('你'); draw(); assert.ok(!button('meet') && !button('ferry')); assert.strictEqual(row().result, '未到');
+  start(); click('ferry');
+  const plan = W.travelDesk.plan({ from: '渡口岔路', to: '东市' });
+  assert.ok(W.travelDesk.commit('depart', { person: '无关旅客', from: '渡口岔路', to: '东市', stamp: plan.stamp }).ok);
+  const hazard = W.engines.environmentalHazard, metabolism = W.toxicMetabolism;
+  assert.ok(hazard.registerZoneHazard('渡口', 'cold', 2).ok);
+  for (const actor of ['player', '无关旅客']) assert.ok(metabolism.applyToxin(actor, 'hallucinogen', 80).ok);
+  const levels = () => ['player', '无关旅客'].map(id => metabolism.getActorToxinStatus(id).toxins[0].concentration);
+  click('walk'); assert.strictEqual(W.world.where('无关旅客').left, 30);
+  assert.deepStrictEqual(levels(), [63.5, 80]);
+  assert.strictEqual(hazard.getActorExposureStatus('player').activeHazards.length, 0);
+  click('aid'); click('queue'); click('call'); assert.ok(!button('handoff'));
+  assert.strictEqual(W.store.get().careChain.commitments[0].reliefVolunteer, '值渡的兰姨');
+  click('walk'); click('handoff'); assert.ok(!button('handoff') && !button('aid'));
+  assert.deepStrictEqual(levels(), [50.4, 80]);
+  assert.strictEqual(hazard.getActorExposureStatus('player').activeHazards[0].accumulatedErosion, 3.2);
+  const chain = W.store.get().careChain;
+  assert.strictEqual(chain.referrals.length, 1); assert.strictEqual(chain.referrals[0].resourceCost, 0);
+  assert.deepStrictEqual(Array.from(chain.commitments[0].referralHistory), [chain.referrals[0].id]);
+  click('market'); assert.ok(root.textContent.includes('已接班')); assert.strictEqual(W.store.get().careChain.breaches.length, 0);
 });
 console.log('\nappointment-quota-v2562: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) { fails.forEach(function (f) { console.log('  FAIL ' + f); }); process.exit(1); }

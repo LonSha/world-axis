@@ -99,7 +99,14 @@
     const f = {};
     Object.keys(stat).forEach(function (k) {
       Object.defineProperty(f, k, { enumerable: true,
-        get: function () { return statOf()[k]; },
+        get: function () {
+          const bag = statOf();
+          if (bag[k] === undefined && bag !== stat) {
+            // Sparse execution contexts start at zero; never share a live channel table.
+            bag[k] = typeof stat[k] === 'object' ? Object.create(null) : (typeof stat[k] === 'number' ? 0 : '');
+          }
+          return bag[k];
+        },
         set: function (v) { statOf()[k] = v; } });
     });
     return f;
@@ -128,6 +135,10 @@
     //   全部分支都判在写事务**之前**（只读）——拒收分支不进事务，
     //   「拒收却推进 rev / 半条记录落盘」就没有立足点（v2.79.0 立的规矩）。
     const parent = clean(item && item.parent, 40);
+    const layout = clean(item.layout, 100), zone = clean(item.zone, 64);
+    if (zone) try { new Intl.DateTimeFormat('en',{timeZone:zone}); } catch (_) { return {ok:false, reason:'invalid-zone'}; }
+    const existing=placeByName(name);
+    if ((layout && existing?.layout && layout !== existing.layout) || (zone && existing?.zone && zone !== existing.zone)) return {ok:false,reason:'geography-locked'};
     if (parent) {
       if (parent === name) return { ok: false, reason: 'self-parent', name: name };
       if (!placeByName(parent)) return { ok: false, reason: 'unknown-parent', parent: parent };
@@ -159,6 +170,8 @@
           if (loop) { out = { ok: false, reason: 'parent-cycle', name: name, parent: parent }; return false; }
           hit.parent = parent;
         }
+        if (layout) hit.layout=layout;
+        if (zone) hit.zone=zone;
         out = { ok: true, id: hit.id, name: name, existed: true, parent: clean(hit.parent, 40) }; return;
       }
       const row = { id: 'pl_' + name, name: name, kind: kind || 'public', parent: parent,
@@ -167,6 +180,8 @@
         // v2.117.0：按用途细分的窗口（空数组 = 该地点不按用途细分，仍按上面的开闭判）。
         uses: [],
         at: clockNow('world') };
+      if (layout) row.layout=layout;
+      if (zone) row.zone=zone;
       draft.world.places.push(row);
       // 剪枝走挤出侧单一出口（站点 world.places 已登记）——不自行 slice。
       WA.evict.array(draft.world.places, 'world.places');
@@ -219,6 +234,10 @@
       }
     }
     const x = clean(a, 40), y = clean(b, 40), mins = Number(minutes);
+    const directions=clean(opts.directions,120);
+    const oldRoad=roads().find(r=>r && ((r.a===x && r.b===y)||(r.a===y && r.b===x)));
+    const key=!oldRoad || oldRoad.a===x ? 'forwardGuide' : 'reverseGuide';
+    if (directions && oldRoad?.[key] && oldRoad[key]!==directions) return {ok:false,reason:'directions-locked'};
     if (!x || !y) return { ok: false, reason: 'missing-fields' };
     if (x === y) return { ok: false, reason: 'self-road' };
     if (!isFinite(mins) || mins <= 0) return { ok: false, reason: 'bad-minutes' };
@@ -239,6 +258,7 @@
         //   缺省参数不是「把容量改成不限」，那会让一次「改个耗时」顺带抹掉通行量。
         const explicitCap = !(cap === undefined || cap === null || cap === '');
         hit.minutes = Math.round(mins);
+        if (directions) hit[key]=directions;
         if (explicitCap) hit.cap = lim; else if (!isFinite(hit.cap)) hit.cap = 0;
         // v2.117.0（B2 后半）：`capBy` 也只改**显式给出的那一层**。
         //   上一版只校验没落盘 ⇒ 分通道容量整整一层空转（roadCapOf 永远读 0 = 不限）。
@@ -249,6 +269,7 @@
       }
       const row = { id: 'rd_' + x + '_' + y, a: x, b: y, minutes: Math.round(mins), cap: lim, at: clockNow('world') };
       applyCapBy(row, capBy);
+      if (directions) row.forwardGuide=directions;
       draft.world.roads.push(row);
       WA.evict.array(draft.world.roads, 'world.roads');
       out = { ok: true, id: row.id, existed: false, minutes: row.minutes, capBy: capObjOf(row) };
@@ -859,6 +880,7 @@
         person: who, from: m.from, to: m.to, path: m.path.slice(),
         total: m.minutes, left: m.minutes, departAt: m.departAt, arriveAt: m.arriveAt,
         status: 'in-transit', at: clockNow('world') };
+      row.visitNo=draft.world.visitSequence=(Number(draft.world.visitSequence)||0)+1;
       draft.world.journeys.push(row);
       // v2.162.0（TP7）：写入侧容量闸——在途行程自身已满时**如实拒收**，
       //   不把未完成的行程交给挤出器当可回收历史丢（与 farfield.pending 的背压闸同形）。
@@ -909,6 +931,9 @@
     const windowed = (at !== null);
     const arrived = [], still = [], deferred = [];
     const doPerson = (!want || want === 'person');
+    // A local scene may advance named travellers without moving unrelated people or cargo.
+    const people = opts.people === undefined ? null : opts.people;
+    if (people !== null && (want !== 'person' || !Array.isArray(people) || !people.length || !people.every(p => typeof p === 'string' && p.trim()))) return { ok: false, reason: 'bad-people' };
     const doGoods = (!want || want === 'goods');
     const doMsg = (!want || want === 'message');
     mutate(storeOf(), function (draft) {
@@ -917,6 +942,8 @@
         const list = Array.isArray(w.journeys) ? w.journeys : [];
         list.forEach(function (j) {
           if (!j || j.status !== 'in-transit') return;
+          if (people && !people.includes(j.person)) return;
+          if (j.person==='你' && !windowed) WA.calendar?.applyTravel?.(draft.clock, Math.min(step,Number(j.left)||0));
           const floor = isFinite(j.left) ? Math.max(0, Number(j.left) - step) : 0;
           if (!windowed) {
             // v2.65.0 台账语义（逐字不变，既有门禁锚点钉在这两行上）。
@@ -935,6 +962,7 @@
           if (leftNext === 0 && clockOk) {
             j.left = 0; j.status = 'arrived'; j.at = now;
             if (eta !== null && eta <= now) j.arrivedAt = eta;
+            if (j.person === '你') WA.calendar?.applyTravel?.(draft.clock, walked);
             arrived.push(j.person + '→' + j.to);
             return;
           }
@@ -945,6 +973,7 @@
           //   处理：显式 `deferred` 且**一格不动**——把 left 抹成 0 就是销毁证据，
           //   下一次推进再也看不出「这里曾经两账不一致」。
           if (leftNext === 0) { deferred.push(j.person + '→' + j.to); return; }
+          if (j.person === '你') WA.calendar?.applyTravel?.(draft.clock, walked);
           j.left = leftNext; still.push(j.person);
         });
       }
@@ -1317,13 +1346,35 @@
     return '（本面名额：' + parts.join('；')
       + '。未列出不等于没有——还在登记表上；名额只截断不筛选，不改任何既有事实）';
   }
+  function zoneOf(name) {
+    const seen=new Set(); let p=placeByName(name);
+    while (p && !seen.has(p.name)) { if (p.zone) return p.zone; seen.add(p.name); p=placeByName(p.parent); }
+    return '';
+  }
+  function fixedScene() {
+    const me=where('你'), region=state().region?.currentPlace;
+    const focus=me.arrived?[me.place]:me.inTransit?[me.from,me.to]:me.reason==='no-journey'&&placeByName(region)?[region]:[];
+    if (!focus.length) return '';
+    const family=new Set(focus.concat(focus.map(n=>placeByName(n)?.parent).filter(Boolean)));
+    const nearby=places().filter(p=>family.has(p.name)||family.has(p.parent));
+    const zone=zoneOf(focus[0]), local=WA.calendar?.localTime?.(state().clock?.iso,zone);
+    const lines=[];
+    if (zone && local) lines.push('当地时间：'+focus[0]+' '+local.replace('T',' ')+' '+zone);
+    for (const p of nearby) if (p.layout) lines.push('固定布局：'+p.name+(p.parent?'∈'+p.parent:'')+'：'+p.layout);
+    for (const r of roads()) if (family.has(r.a)||family.has(r.b)||nearby.some(p=>p.name===r.a||p.name===r.b)) {
+      if (r.forwardGuide) lines.push('固定走法：'+r.a+'→'+r.b+'：'+r.forwardGuide);
+      if (r.reverseGuide) lines.push('固定走法：'+r.b+'→'+r.a+'：'+r.reverseGuide);
+    }
+    return lines.slice(0,16).join('\n');
+  }
   function buildBlock() {
     headRound();
     const cfg = settings(); if (!cfg.enabled || !WA.store) return '';
     const ps = pickHead(places(), headQuota(cfg, 'maxPlaces', 24, DEF.maxPlaces), '地点');
     const es = pickHead(events().filter(function (e) { return e && e.status !== 'done'; }), headQuota(cfg, 'maxEvents', 12, DEF.maxEvents), '共同日程');
     if (!ps.length && !es.length) return '';
-    const lines = [];
+    const fixed=fixedScene();
+    const lines = fixed ? [fixed] : [];
     if (ps.length) {
       lines.push('地点：' + ps.map(function (p) {
         const pa = clean(p.parent, 40);
@@ -1350,6 +1401,7 @@
   }
 
   WA.world = {
+    zoneOf, fixedScene,
     PLACE_KINDS: PLACE_KINDS, EVENT_KINDS: EVENT_KINDS,
     // v2.93.0（X4）：通行三层 + 判定入口。transit 的消费方：诊断 secWorld + 面板世界页按钮。
     CHANNELS: CHANNELS, transit: transit,

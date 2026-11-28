@@ -191,7 +191,7 @@
     const limit = (num(o.limit) && num(o.limit) > 0) ? Math.max(1, Math.floor(num(o.limit))) : LIMIT_DEF;
     const a = sideA();
     const b = sideB();
-    _stat.reads++; _stat.lastAt = Date.now();
+    _stat.reads++; _stat.lastAt = WA.clock?.wallNow?.() ?? null;
 
     // ① 不可读就不对读（纪律一）。顺序即优先级：A 的模块 > A 的开关 > A 的读 > B 的模块 > B 的读。
     let notComparable = null;

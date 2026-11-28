@@ -36,7 +36,7 @@
   function n(v) { return (typeof v === 'number' && isFinite(v)) ? v : 0; }
   function setLast(kind, r) {
     LAST.kind = kind;
-    LAST.at = Date.now();
+    LAST.at = WA.clock?.wallNow?.() ?? null;
     LAST.ok = !!(r && r.ok);
     LAST.text = summarize(kind, r);
     return LAST;
@@ -84,15 +84,27 @@
     return '';
   }
 
+  function localGazette() {
+    const g = WA.atlas?.localGazette?.();
+    if (!g?.ok) return '<p class="wa-dim">'+(g?.reason === 'disabled' ? '地方图志未启用。' : '地方记录暂时读不到。')+'</p>';
+    if (!g.places.length) return '<p class="wa-dim">还没有登记公开地点。</p>';
+    return '<div data-local-gazette>' + g.places.map(p => '<details' + (p.name === g.here ? ' open' : '') + '><summary>'
+      + esc(p.name) + (p.name === g.here ? ' · 你在此处' : '') + '</summary>'
+      + (p.layout ? '<p>固定位置：' + esc(p.layout) + '</p>' : '')
+      + (p.roads.length ? '<p>相邻道路：' + p.roads.map(r => esc(r.to) + '（' + esc(r.minutes) + ' 分钟）' + (r.guide ? '：' + esc(r.guide) : '')).join('、') + '</p>' : '')
+      + (p.items.length ? '<ul>' + p.items.map(i => '<li><b>' + esc(i.kind) + ' · ' + esc(i.title) + '</b>'
+        + (i.text ? '：' + esc(i.text) : '') + '</li>').join('') + '</ul>' : '<p>暂无当地公开记录。</p>') + '</details>').join('') + '</div>';
+  }
+
   function render() {
-    const ed = WA.mapEditor;
-    const gen = WA.mapGenerator;
-    const doc = (ed && typeof ed.doc === 'function') ? ed.doc() : null;
-    const counts = (ed && typeof ed.counts === 'function') ? ed.counts() : null;
+    const viewEditor = WA.mapEditor;
+    const viewGenerator = WA.mapGenerator;
+    const doc = (viewEditor && typeof viewEditor.doc === 'function') ? viewEditor.doc() : null;
+    const counts = (viewEditor && typeof viewEditor.counts === 'function') ? viewEditor.counts() : null;
     const total = counts ? (n(counts.terrains) + n(counts.regions) + n(counts.subs) + n(counts.pois) + n(counts.roads)) : 0;
-    const fp = (doc && ed && typeof ed.fingerprint === 'function') ? ed.fingerprint() : null;
-    const gs = (gen && typeof gen.getSettings === 'function') ? gen.getSettings() : null;
-    const dg = (gen && typeof gen.diagnose === 'function') ? gen.diagnose() : null;
+    const fp = (doc && viewEditor && typeof viewEditor.fingerprint === 'function') ? viewEditor.fingerprint() : null;
+    const gs = (viewGenerator && typeof viewGenerator.getSettings === 'function') ? viewGenerator.getSettings() : null;
+    const dg = (viewGenerator && typeof viewGenerator.diagnose === 'function') ? viewGenerator.diagnose() : null;
 
     let wbAll = 0, wbSel = 0;
     try {
@@ -134,7 +146,7 @@
     const out = '<div class="wa-out" id="wa-map-out">' + last + '</div>';
 
     let canvas;
-    if (!ed) {
+    if (!viewEditor) {
       canvas = '<div class="wa-dim" id="wa-map-absent">地图编辑模块缺席（engines/map-editor.js 未装载）—— 这不是「没有地图」，是读数缺口</div>';
     } else if (!doc || !total) {
       canvas = '<div class="wa-dim" id="wa-map-empty">底图还是空的（世界坐标 ' + (doc ? (n(doc.width) + '×' + n(doc.height)) : '未建文档') + '）。'
@@ -164,7 +176,7 @@
         + ' 次 · 词表 ' + n(dg.suffixes) + ' 项') : '')
       + '</div>';
 
-    return head + bar + setBar + out + stat
+    return '<section><h3>地方图志</h3>' + localGazette() + '</section>' + head + bar + setBar + out + stat
       + '<div id="wa-map-canvas" class="wa-map-canvas" style="height:420px;overflow:auto;border:1px solid rgba(255,255,255,0.08);border-radius:6px;margin-top:8px">' + canvas + '</div>'
       + '<div class="wa-dim">读法：面（水/区/街区）在下、路（线）在中、点（POI）在上；每个面/点都带 data-name，可在控制台按名字查。</div>'
       + '<textarea id="wa-map-json" class="wa-input" title="生成结果原文（只读）—— 逐条 addPoly/addRect/addRoad/addPoi，点「导出」后可复制" style="display:none;width:100%;height:120px;margin-top:6px" readonly></textarea>';
@@ -188,7 +200,8 @@
   function bind(root, onAfter) {
     if (!root || typeof root.querySelector !== 'function') return { ok: false, reason: 'no-root' };
     const q = function (s) { return root.querySelector(s); };
-    const gen = WA.mapGenerator, ed = WA.mapEditor;
+    const gen = WA.mapGenerator;
+    const ed = WA.mapEditor;
 
     const bGen = q('#wa-map-gen');
     if (bGen && typeof bGen.onclick !== 'function') {
@@ -289,6 +302,7 @@
   }
 
   WA.panelMapPage = {
+    localGazette,
     render: render,
     bind: bind,
     /** 只读快照（给锁与诊断用；不含 DOM）。 */

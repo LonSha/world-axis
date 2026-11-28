@@ -600,7 +600,7 @@ A(a.files === 624 && a.aliasFiles === 624 && a.refFiles === 620,
 //   PS：polish-bridge 进的是**惰性档**（LAZY_ORDER，与 binding/contrast/byte 同口径），不是首帧，
 //   故 LOAD_ORDER 不动 —— 我第一版把它放进首帧，是照着「供者相邻」写的，现场口径不是那样。
 //   B6 漂移（664 - 605 = 59）与 B10 登记面（41/48，本桥不注册 settings）两处不动 —— 不动也是结论。
-A(a.edgesLoad === 491 && a.edgesCall === 4138 && a.edgesAll === 4629 && a.identityOk,
+A(a.edgesLoad === 492 && a.edgesCall === 4192 && a.edgesAll === 4684 && a.identityOk,
   //   恒等式 476 + 4012 = 4488 当场核对。
     'B2 边恒等式：装载期 ' + a.edgesLoad + ' + 调用期 ' + a.edgesCall + ' = ' + a.edgesAll
     + '（v2.117.0（计划二 B1–B6）：新增 engines/act.js / engines/opportunity.js /'

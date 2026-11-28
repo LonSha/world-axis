@@ -96,7 +96,7 @@ function runNegative(a) {
   {
     let sawRed = false;
     checkAll(function (v, msg) { if (!v && msg.indexOf('[P1]') >= 0) sawRed = true; },
-      SRC.replace('boot: \'core\'', ''));
+      SRC.replace('boot: \'story\'', ''));
     a(sawRed, 'v11pc: [N1] 删 PAGE_CAT 键 ⇒ P1 现形');
   }
   // N2: 塞一个孤儿键 ⇒ P2 红
@@ -110,7 +110,7 @@ function runNegative(a) {
   {
     let sawRed = false;
     checkAll(function (v, msg) { if (!v && msg.indexOf('[P3]') >= 0) sawRed = true; },
-      SRC.replace('boot: \'core\'', 'boot: \'nosuchcat\''));
+      SRC.replace('boot: \'story\'', 'boot: \'nosuchcat\''));
     a(sawRed, 'v11pc: [N3] 越界分类 ⇒ P3 现形');
   }
   // N4: 原版上同款判据仍成立

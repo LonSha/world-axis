@@ -317,7 +317,56 @@
   //   刻意**不导出** `resetStat`：它没有产品侧消费方（本会话读数在诊断页已是累计量，
   //   不需要一个「清零」按钮），挂上去只会让「谁能调」与「谁真在调」分叉 ——
   //   这正是 v2.139.0 死导出门禁在 faction-graph 上点名过的那类口。
+  function playerCurrent(c) {
+    if (!c || ['已结束','closed','已结案','终局','recycled','dropped'].includes(c.stage)) return null;
+    if (c.visibility === 'trace') return c.public_trace ? {title:'可见迹象', text:c.public_trace} : null;
+    if (!['public','known','direct'].includes(c.visibility) || !c.title) return null;
+    return {title:c.title, text:c.public_trace || c.summary || ''};
+  }
+
+  // Join public observations to registered route nodes; never infer location from prose.
+  function localGazette() {
+    const cfg = settings();
+    if (!cfg.enabled || !WA.world?.getSettings?.().enabled) return {ok:false, reason:'disabled'};
+    const s = snap();
+    if (!s) return {ok:false, reason:'store-unavailable'};
+    const rows = v => Array.isArray(v) ? v : [];
+    const places = new Map();
+    const known = new Map();
+    for (const p of rows(s.world?.places)) {
+      if (!p?.name || !['market','public','sacred'].includes(p.kind)) continue;
+      known.set(p.id, p.name);
+      if (!places.has(p.name)) places.set(p.name, {name:p.name, layout:p.layout || '', roads:[], items:[]});
+    }
+    for (const r of rows(s.world?.roads)) {
+      if (!places.has(r?.a) || !places.has(r.b) || !(r.minutes > 0)) continue;
+      places.get(r.a).roads.push({to:r.b, minutes:r.minutes, guide:r.forwardGuide || ''});
+      places.get(r.b).roads.push({to:r.a, minutes:r.minutes, guide:r.reverseGuide || ''});
+    }
+    function add(place, kind, title, text) {
+      if (places.has(place) && title) places.get(place).items.push({kind, title, text});
+    }
+    for (const c of rows(s.currents)) {
+      const v = playerCurrent(c);
+      if (v) add(c.publicPlace, '暗流', v.title, v.text);
+    }
+    const statuses = {proposed:'已提案', scheduled:'已排期', delayed:'候议', debated:'审议中', enacted:'已通过', rejected:'未通过'};
+    for (const p of rows(s.publicAgenda?.proposals)) {
+      if (p?.isSecret !== false) continue;
+      add(places.has(p.placeId) ? p.placeId : known.get(p.placeId), '议事', p.title, p.groupName + ' · ' + (statuses[p.status] || '状态未明'));
+    }
+    for (const a of rows(s.socialIdeology?.articles)) {
+      if (a) add(a.publicPlace, '刊论', a.headline, a.periodical);
+    }
+    if (WA.theologyCult?.settings?.().enabled) for (const t of Object.values(s.theologySects?.sects || {})) {
+      if (t?.publicTeaching) add(t.publicPlace, '信仰', t.name, t.publicTeaching);
+    }
+    const me = WA.world.where('你');
+    return {ok:true, here:me?.arrived ? me.place : null, places:Array.from(places.values())};
+  }
+
   WA.atlas = {
+    localGazette, playerCurrent,
     getSettings: settings,
     setSettings: function (patch) { return saveSettings(patch); },
     places: places, routes: routes, relations: relations, view: view,

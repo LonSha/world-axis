@@ -154,7 +154,7 @@
     const matched = rows.length;
     const shownRows = rows.slice(0, limit);
     __stat.lists += 1;
-    __stat.lastList = { at: Date.now(), only: only, kw: kw, matched: matched, shown: shownRows.length };
+    __stat.lastList = { at: WA.clock?.wallNow?.() ?? null, only: only, kw: kw, matched: matched, shown: shownRows.length };
     return {
       ok: true, rows: shownRows, totals: totals,
       shown: shownRows.length, matched: matched, total: totals.faces,
@@ -201,7 +201,7 @@
     if (before.on === on) {
       // ⑥ 幂等：不白写盘。changed:false 是**结论**，不是失败。
       __stat.flipsOk += 1;
-      __stat.lastFlip = { at: Date.now(), key: k, before: before.on, after: on, changed: false };
+      __stat.lastFlip = { at: WA.clock?.wallNow?.() ?? null, key: k, before: before.on, after: on, changed: false };
       return { ok: true, key: k, before: before.on, after: on, changed: false };
     }
     let next = null, w = null;
@@ -227,7 +227,7 @@
         hint: '写回后读到的值/来源与目标不符（磁盘可能是旧值）：' + after.source };
     }
     __stat.flipsOk += 1;
-    __stat.lastFlip = { at: Date.now(), key: k, before: before.on, after: after.on, changed: true };
+    __stat.lastFlip = { at: WA.clock?.wallNow?.() ?? null, key: k, before: before.on, after: after.on, changed: true };
     return { ok: true, key: k, before: before.on, after: after.on, changed: true };
   }
 

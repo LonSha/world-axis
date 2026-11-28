@@ -473,6 +473,8 @@
       parallelEvents: { rows: [] },
       // v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽。登记了容量却不在骨架里，冷启动直写会炸事务。
       eraCycle: { rows: [] },
+      lostFound: { rows: [], seq: 0 },
+      socialEncounter: { rows: [] },
       survival: { rows: [] },
       // v2.141.0（F2）：生理与照护真实层（lifeline.js）。
       //   登记了容量却不在骨架里，registryParity 会报「未在骨架物化」，冷启动直写会炸事务
@@ -2105,6 +2107,8 @@
     'fondness.rows.*.corrections': { cap: 8, kind: 'array', wildcard: true, site: 'fondness.js WA.evict.array(hit.corrections)（每行各自有界）' },
     // v2.68.0 资料片周期 / 生存三轴 / 通缉 / 驯兽。cap 与 evict.SITES 同源；不登记会被 sizeAudit 报 unbounded。
     'eraCycle.rows': { cap: 8, site: 'era-cycle.js WA.evict.array(eraCycle.rows)' },
+    'lostFound.rows': { cap: 96, site: 'lost-and-found.js reportLoss enforces settings.maxRows' },
+    'socialEncounter.rows': { cap: 40, site: 'social-encounter.js WA.evict.array(socialEncounter.rows)' },
     'survival.rows': { cap: 12, site: 'survival.js WA.evict.array(survival.rows)' },
     // v2.141.0（F2）：生理与照护真实层（lifeline.js 唯一写入 `draft.lifeline`）。
     //   形如 { rows: [ { who, cond, kind, course, limits[], care[], history[] } ] }。

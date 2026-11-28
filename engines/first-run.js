@@ -168,7 +168,7 @@
   const STEPS = [
     { id: 'api', order: 1, title: '配一个 API', why: '没有它，插件不会说话',
       probe: probeApi, exit: { do: 'openConnect', hint: '在「API」页填第一个通道（default）的 Base URL / API Key / 模型，点保存' } },
-    { id: 'tier', order: 2, title: '选一个档位', why: '100 项机制出厂只跑 5 项',
+    { id: 'tier', order: 2, title: '选一个档位', why: '出厂使用轻量档；当前启用数以本局设置为准',
       probe: probeTier, exit: { do: 'applyTier', arg: 'standard', hint: '在设置页顶部切「标准」档，一次多开一批机制' } },
     { id: 'talk', order: 3, title: '说第一句话', why: '世界要等你开口才动',
       probe: probeTalk, exit: { do: 'openOverview', hint: '回到对话，随便说一句（推演随即开始）' } }

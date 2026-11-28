@@ -243,7 +243,7 @@
     var toCaregiver = clean(s.toCaregiver, 60);
     var toFacilityId = clean(s.toFacilityId, 60);
     var resourceUsed = clean(s.resourceUsed || 'medical_supplies', 40);
-    var resourceCost = Math.max(0, Math.floor(Number(s.resourceCost) || 1));
+    var resourceCost = s.resourceCost === 0 ? 0 : Math.max(0, Math.floor(Number(s.resourceCost) || 1));
     var referralReason = clean(s.reason || 'absence-mitigation', 60);
 
     if (!cid) return { ok: false, reason: 'missing-commitment-id' };

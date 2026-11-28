@@ -22,6 +22,18 @@
   // v2.1.0: 净化原文快照（WeakMap：不写进 chat 存档，随消息对象回收）
   const __purifiedRaw = new WeakMap();
 
+  let observedChat;
+  function observeMessages() {
+    const chat = getCtx()?.chat;
+    observedChat = Array.isArray(chat) ? {id: WA.store?.chatId?.(), rows: chat.slice()} : null;
+  }
+  function deletion(index) {
+    const chat = getCtx()?.chat, prev = observedChat; observeMessages();
+    if (!Array.isArray(chat) || !prev || prev.id !== WA.store?.chatId?.()) return {index: 0, scopeOnly: true};
+    let at = 0; while (at < chat.length && prev.rows[at] === chat[at]) at++;
+    // ST reports remaining length for both middle and tail deletion.
+    return {index: at, scopeOnly: prev.rows.length !== chat.length + 1 || at !== chat.length || index !== chat.length};
+  }
   function getCtx() {
     try { return mainWin.SillyTavern && mainWin.SillyTavern.getContext ? mainWin.SillyTavern.getContext() : null; }
     catch (e) { return null; }
@@ -56,7 +68,7 @@
     const len = ctx && ctx.chat ? ctx.chat.length : 0;
     const last = len && ctx.chat[len - 1];
     // 去重签名：聊天长度 + 最后一条的松散指纹 + swipe_id 视为同一轮（不含时间戳，否则永不命中）
-    return len + ':' + looseFp(last && last.mes) + ':' + (last && last.swipe_id != null ? last.swipe_id : 0);
+    return (WA.store?.chatId?.() || '') + ':' + len + ':' + looseFp(last && last.mes) + ':' + (last && last.swipe_id != null ? last.swipe_id : 0);
   }
 
   // 主拦截：SillyTavern 在组装prompt前 await 此函数
@@ -83,6 +95,7 @@
         }
       }
     } catch (eAl) { WA.log('warn', '对齐读数失败（不影响生成）', eAl); }
+    observeMessages();
     const sig = roundSig();
     if (sig === lastRoundSig) { WA.log('info', '拦截器去重：本轮before链已执行'); return; }
     lastRoundSig = sig;
@@ -103,7 +116,7 @@
       // v2.231.0（优化 OPT-5）：**轮边界记账**——生成前抓世界键基线，after 链跑完逐键比出
       //   「这一楼真正改了哪些键、改前是什么」。位置是硬约束：必须早于 before 链（链里就会推进
       //   世界），且**晚于** settleGuard 的跳过判定（被跳过的轮不该留下一笔空账）。
-      try { if (WA.floorSettle) WA.floorSettle.beginRound(); } catch (e) { WA.log('warn', '楼层结算记账起点失败', e); }
+      try { if (WA.floorSettle) WA.floorSettle.beginRound('host-before'); } catch (e) { WA.log('warn', '楼层结算记账起点失败', e); }
       await WA.workflow.run('before', ctx);
     } catch (e) {
       WA.log('error', 'before链关键失败，本轮沿用上一份已确认世界状态', e);
@@ -218,12 +231,21 @@
         const afterEvt = et.GENERATION_ENDED || et.MESSAGE_RECEIVED;
         if (afterEvt && !afterHooked) {
           afterHooked = true;
-          ctx.eventSource.on(afterEvt, async (...args) => {
+          const settleReply = async (...args) => {
+            observeMessages();
             // v0.7.0: 楼层结算守卫——世界推进（round++/骰子/风声/推演）每楼层至多一次。
             // 重掷（swipe）/重复通知不再虚增世界时间（探针实证 round 1→2→3 虚增）。
             let settleRec = null, guardWhy = null;
             if (WA.settleGuard) {
-              const g = WA.settleGuard.begin();
+              let g = WA.settleGuard.begin();
+              if (g.reason === 'reroll') {
+                const m = getCtx()?.chat?.[g.rec.floor], prev = WA.store?.get()?.meta?.lastSettle;
+                if (m && !m.is_user && !m.is_system && m.mes && prev?.swipe !== g.rec.swipe && m.swipes?.[m.swipe_id] === m.mes) {
+                  const back = WA.floorSettle?.rollback(g.rec.floor, {why:'swipe',replySig:prev.sig});
+                  if (back?.ok) { lastRoundSig = ''; WA.floorSettle.beginRound('host-before'); g = WA.settleGuard.begin(); }
+                  else WA.log('warn','候选切换未重结算：'+(back?.reason || '无结算账'));
+                }
+              }
               if (!g.settle) {
                 guardWhy = g.reason;
                 WA.settleGuard.markSkip(guardWhy);
@@ -317,7 +339,7 @@
                 // v2.231.0（优化 OPT-5）：after 链跑完 ⇒ 把「这一楼改了哪些世界键」落成存档账。
                 //   必须在 workflow.run('after') **之后**：链里才是真正的结算发生地；
                 //   也必须在 settleGuard.commit 之后（被跳过的轮不进这里，故不会记空账）。
-                try { if (WA.floorSettle) WA.floorSettle.endRound(); } catch (e) { WA.log('warn', '楼层结算记账失败', e); }
+                try { if (WA.floorSettle) WA.floorSettle.endRound(settleRec); } catch (e) { WA.log('warn', '楼层结算记账失败', e); }
                 // v2.518.0：正文成功推进后只开启一次可追踪故事回应窗口。
                 // 只在 after 链完成且楼层结算提交后调用；重复通知由 storyWindow 自身幂等守卫拒绝。
                 try {
@@ -343,9 +365,15 @@
                 } catch (eSW) { WA.log('warn', '故事回应窗口开启失败', eSW); }
               };
               if (WA.store && WA.store.batch) await WA.store.batch(runAfter); else await runAfter();
+              WA.emit?.('reply:world-updated');
             }
             catch (e) { WA.log('error', 'after链执行异常', e); }
             finally { if (purifiedText != null && tailMsg) tailMsg.mes = purifiedText; }   // v2.1.0: 恢复净化文本
+          };
+          ctx.eventSource.on(afterEvt, settleReply);
+          if (et.MESSAGE_SWIPED) ctx.eventSource.on(et.MESSAGE_SWIPED, async index => {
+            const c = getCtx(), m = c?.chat?.[index], prev = WA.store?.get()?.meta?.lastSettle;
+            if (index === c?.chat?.length-1 && m?.mes && !m.is_user && !m.is_system && m.swipes?.[m.swipe_id] === m.mes && prev?.chatId === WA.store.chatId() && prev.floor === index && prev.swipe !== m.swipe_id) await settleReply();
           });
         }
         // v2.1.0: 输出侧净化——purifier.apply 此前全库零调用（功能整体失效）
@@ -462,6 +490,7 @@
             //   否则它会在新聊天里冲当本聊天的选项（与关系图谱重建同一条“单一持久来源”）。
             try { if (WA.choiceBoard && typeof WA.choiceBoard.unmount === 'function') WA.choiceBoard.unmount(); }
             catch (e) { WA.log('warn', '切聊天清理待选按钮失败', e); }
+            observeMessages(); lastRoundSig = '';
             WA.emit && WA.emit('chat:changed');
           });
         }
@@ -494,11 +523,12 @@
           const delEvt = et.MESSAGE_DELETED, edEvt = et.MESSAGE_EDITED;
           let hooked = 0;
           if (delEvt) {
-            ctx.eventSource.on(delEvt, function () {
-              try { WA.floorChanges.onFloorEvent('deleted', { args: Array.prototype.slice.call(arguments) }); }
+            ctx.eventSource.on(delEvt, function (index) {
+              const removed = deletion(index);
+              try { WA.floorChanges.onFloorEvent('deleted', { args: [removed.index] }); }
               catch (e) { WA.log('warn', '楼层删除记账失败', e); }
               // v2.231.0（优化 OPT-5）：删**最后一楼** ⇒ 自闭环退回该楼结算；删中间楼 ⇒ 只出范围。
-              try { if (WA.floorSettle) WA.floorSettle.onFloorEvent('deleted', { args: Array.prototype.slice.call(arguments) }); }
+              try { lastRoundSig = ''; if (WA.floorSettle) WA.floorSettle.onFloorEvent('deleted', removed); }
               catch (e) { WA.log('warn', '楼层结算退回失败', e); }
             });
             hooked++;

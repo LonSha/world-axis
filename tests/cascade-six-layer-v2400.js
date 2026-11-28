@@ -74,14 +74,14 @@ function a(cond, desc, detail) {
   require('../engines/epoch-tide.js');
   require('../engines/cascade-bus.js');
   WA.siegeAttrition.registerFortress('zone_siege', { rationDays: 3, garrison: 200 });
-  const r = WA.cascadeBus.dispatchTick({ currentZones: ['zone_siege'], activeActors: ['p1'], hour: 10 });
+  const r = WA.cascadeBus.dispatchTick({ currentZones: ['zone_siege'], activeActors: ['p1'], hour: 10, elapsedDays: 1 });
   const t = r.cascadeReport.tactical;
   a(t.fortressesAdvanced >= 1, 'C1: 已登记要塞在 tactical 段真被推进（实 ' + t.fortressesAdvanced + '）');
   const e = r.cascadeReport.epochal;
   a(e.epochTidesAdvanced >= 1, 'C2: 纪元浪潮在 epochal 段真被推进（实 ' + e.epochTidesAdvanced + '）');
   // 未登记时必须是 0（不凭空造）
   const WA2 = global.WorldAxis || global.window.WorldAxis;
-  const r2 = WA2.cascadeBus.dispatchTick({ currentZones: ['zone_empty_xyz'], activeActors: ['nobody'], hour: 10 });
+  const r2 = WA2.cascadeBus.dispatchTick({ currentZones: ['zone_empty_xyz'], activeActors: ['nobody'], hour: 10, elapsedDays: 1 });
   a(r2.cascadeReport.tactical.fortressesAdvanced === 0,
     'C3: 未登记要塞不计入（不凭空造战斗），实 ' + r2.cascadeReport.tactical.fortressesAdvanced);
 })();
@@ -113,13 +113,60 @@ function loadBroken(code) {
 // 破坏 3：把 tactical 段整个掏空 ⇒ 运行时 C1 判据必须红（真行为变化）
 (function () {
   const brokenSrc = SRC.replace(
-    "        const siegeRes = WA.siegeAttrition.advanceSiege({ fortressId: pid, daysElapsed: 1 });",
+    "        const siegeRes = WA.siegeAttrition.advanceSiege({ fortressId: pid, daysElapsed: elapsedDays });",
     "        const siegeRes = null;");
   a(brokenSrc !== SRC, 'D3: 破坏锚点命中（掏空围城推进）');
   const h = loadBroken(brokenSrc);
   a(!!h.err || h.WA === undefined || (h.WA && h.WA.cascadeBus), 'D4: 破坏副本能装载（不靠语法报错充数）');
 })();
 
+// Exercise the registered workflow nodes, not only the direct cascade API.
+(function () {
+  const W = require('./ui-gate-sync').fresh().WA;
+  const hooks = W.workflow.list('after');
+  const stage = hooks.find(n => n.id === 'stagePresence.advanceOffstage');
+  const bus = hooks.find(n => n.id === 'cascadeBus.advanceTick');
+  assert.ok(stage && bus && stage.order < bus.order);
+  W.store.transact(d => { d.offstageLife = { characters: { A: { name: 'A', roundsAway: 0, misadventures: [] } } }; }, 'test:offstage');
+  // Both node bodies are synchronous until their returned promise resolves.
+  stage.run({}); bus.run({});
+  const away = () => W.store.get().offstageLife.characters.A.roundsAway;
+  a(away() === 1, 'E1: one after chain advances offstage life once; got ' + away());
+  bus.run({});
+  a(away() === 1, 'E2: skipping the owner node cannot advance offstage life');
+  W.eraCycle.init('season', 'market', 5);
+  function pulse(extra) { return W.cascadeBus.dispatchTick(Object.assign({currentZones:[], activeActors:[]}, extra)).cascadeReport.epochal; }
+  a(pulse({}).eraCyclesTicked === 0 && W.eraCycle.read('season').countdown === 5, 'E3: a reply does not imply a day');
+  a(pulse({eraAdvance:{name:'season',dayDelta:2}}).eraCyclesTicked === 1 && W.eraCycle.read('season').countdown === 3, 'E4: named two-day advance is consumed');
+  a(pulse({eraAdvance:{name:'absent',dayDelta:1}}).eraCyclesTicked === 0, 'E5: missing cycle is not counted');
+  const written = W.writeDesk.call('eraCycle', 'tick', ['season', 1]);
+  a(written.ok && W.eraCycle.read('season').countdown === 2, 'E6: explicit day delta also works through the write desk');
+})();
+(function () {
+  const W = require('./ui-gate-sync').fresh().WA;
+  const bus = W.workflow.list('after').find(n => n.id === 'cascadeBus.advanceTick');
+  const w = W.world;
+  w.setSettings({enabled:true});
+  W.store.transact(d => {
+    d.region = {currentPlace:'旧城'};
+    d.people = Object.fromEntries(['甲','乙','丙','丁','戊','己'].map(name => ['p_' + name, {name}]));
+  }, 'test:contact-list');
+  const history = () => W.engines.socialEncounter.getRecentEncounters(30);
+  bus.run({});
+  a(!history().length, 'F1: contacts alone do not create encounters');
+  for (const name of ['街口','东市']) assert.ok(w.addPlace({name}).ok);
+  assert.ok(w.addRoad('街口','东市',10).ok);
+  for (const who of ['你','己','乙','丙']) assert.ok(w.depart(who,'街口','东市').ok);
+  assert.ok(w.advance(10).ok);
+  for (const who of ['乙','丙']) assert.ok(w.depart(who,'东市','街口').ok);
+  assert.ok(w.stop('丙').ok);
+  bus.run({});
+  const pairs = history();
+  a(pairs.length === 1 && pairs[0].placeId === '东市' && [pairs[0].actorA,pairs[0].actorB].sort().join() === ['player','p_己'].sort().join(), 'F2: arrived pair alone is recorded at actual place; transit and halted actors excluded');
+  assert.ok(w.depart('你','东市','街口').ok);
+  bus.run({});
+  a(history().length === pairs.length, 'F3: travelling player cannot encounter at previous place or blueprint region');
+})();
 console.log('');
 console.log('cascade-six-layer v2400 (OPV22-1): ' + passed + ' / 失败 ' + failed);
 if (failed > 0) process.exit(1);

@@ -738,14 +738,6 @@
    "reviewAfter": "2.530.0",
    "disposition": "keep"
   },
-  "letterPost.getSettings": {
-   "shape": "settings-registry-only",
-   "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
-   "purpose": "settings-registry-only",
-   "nextConsumer": "面板该模块的设置区（读口 → 控件）",
-   "reviewAfter": "2.530.0",
-   "disposition": "keep"
-  },
   "letterPost.setSettings": {
    "shape": "settings-registry-only",
    "why": "设置口：模块已把设置注册进 settingsBus（可落盘、可程序化读写），但当前没有任何消费方调用这个读/写口 —— 面板设置面尚未渲染该模块",
@@ -3088,6 +3080,30 @@
    "purpose": "ui-component-library",
    "nextConsumer": "面板模板（构件以局部引用消费）",
    "reviewAfter": "2.529.0",
+   "disposition": "keep"
+  },
+  "appearanceLexicon.DATA_ONLY": {
+   "shape": "data-const",
+   "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+   "purpose": "data-const",
+   "nextConsumer": "面板或诊断按需取用（常量表）",
+   "reviewAfter": "2.621.0",
+   "disposition": "keep"
+  },
+  "appearanceLexicon.NOTE": {
+   "shape": "data-const",
+   "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+   "purpose": "data-const",
+   "nextConsumer": "面板或诊断按需取用（常量表）",
+   "reviewAfter": "2.621.0",
+   "disposition": "keep"
+  },
+  "panelFacesPage.VERSION": {
+   "shape": "data-const",
+   "why": "数据常量/枚举：供程序化与测试消费（非调用型接口）",
+   "purpose": "data-const",
+   "nextConsumer": "面板或诊断按需取用（常量表）",
+   "reviewAfter": "2.621.0",
    "disposition": "keep"
   }
  }
